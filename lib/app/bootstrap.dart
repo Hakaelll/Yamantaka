@@ -53,11 +53,11 @@ Future<void> bootstrap(List<String> arguments) async {
     logger: logger,
     preloadedSettings: settings,
   );
-  final initialPath = initialPdfPath(arguments);
+  final initialPaths = initialPdfPaths(arguments);
   logger.info(
     'Bootstrap completed in ${startupStopwatch.elapsedMilliseconds} ms.',
   );
-  runApp(YamantakaApp(services: services, initialPath: initialPath));
+  runApp(YamantakaApp(services: services, initialPaths: initialPaths));
 }
 
 String? initialPdfPath(List<String> arguments) {
@@ -66,4 +66,15 @@ String? initialPdfPath(List<String> arguments) {
     if (unquoted.toLowerCase().endsWith('.pdf')) return unquoted;
   }
   return null;
+}
+
+List<String> initialPdfPaths(List<String> arguments) {
+  final paths = <String>[];
+  for (final argument in arguments) {
+    final unquoted = argument.replaceAll('"', '');
+    if (unquoted.toLowerCase().endsWith('.pdf') && !paths.contains(unquoted)) {
+      paths.add(unquoted);
+    }
+  }
+  return paths;
 }

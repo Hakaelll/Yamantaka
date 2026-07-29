@@ -11,11 +11,14 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/core/platform/window_service.dart';
+import 'package:yamantaka/features/annotations/application/annotation_controller.dart';
+import 'package:yamantaka/features/annotations/domain/annotation.dart';
 import 'package:yamantaka/features/bookmarks/application/bookmark_controller.dart';
 import 'package:yamantaka/features/library/application/document_service.dart';
 import 'package:yamantaka/features/reader/application/reader_controller.dart';
 import 'package:yamantaka/features/reader/domain/reader_models.dart';
 import 'package:yamantaka/features/reader/presentation/reader_screen.dart';
+import 'package:yamantaka/features/navigation/application/navigation_history_controller.dart';
 import 'package:yamantaka/features/search/application/search_controller.dart'
     as app_search;
 import 'package:yamantaka/pdf_engine/adapters/pdfrx_document_engine.dart';
@@ -25,6 +28,7 @@ import 'package:yamantaka/pdf_engine/presentation/pdf_viewer_adapter.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/paths/app_paths.dart';
 import 'package:yamantaka/storage/repositories/bookmark_repository.dart';
+import 'package:yamantaka/storage/repositories/annotation_repository.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
 import 'package:yamantaka/storage/repositories/preferences_repository.dart';
 import 'package:yamantaka/storage/repositories/reading_session_repository.dart';
@@ -59,6 +63,8 @@ void main() {
     final documents = DocumentRepository(database);
     final viewController = PdfViewController();
     final bookmarks = BookmarkController(BookmarkRepository(database));
+    final annotations = AnnotationController(AnnotationRepository(database));
+    final navigationHistory = NavigationHistoryController();
     final search = app_search.SearchController(engine, viewController, logger);
     final covers = Directory('${directory.path}${Platform.pathSeparator}covers')
       ..createSync();
@@ -81,7 +87,9 @@ void main() {
       ),
       windowService: FakeWindowService(),
       logger: logger,
+      annotations: annotations,
       bookmarks: bookmarks,
+      navigationHistory: navigationHistory,
       search: search,
       viewController: viewController,
       shouldGenerateCovers: () => false,
@@ -93,6 +101,8 @@ void main() {
       await _bounded(reader.closeDocument(), 'reader teardown');
       reader.dispose();
       bookmarks.dispose();
+      annotations.dispose();
+      navigationHistory.dispose();
       search.dispose();
       await _bounded(engine.dispose(), 'engine teardown');
       database.close();
@@ -228,6 +238,20 @@ void main() {
     await tester.tap(find.byTooltip('Cerrar panel'));
     await tester.pump();
     await _captureReaderState(tester, suffix: '-facing');
+    annotations.create(
+      pageIndex: reader.currentPageIndex,
+      type: AnnotationType.pageComment,
+      color: AnnotationColor.blue,
+      note: 'Nota local de integración',
+      tags: const ['estudio'],
+    );
+    await tester.tap(find.byTooltip('Anotaciones'));
+    await tester.pump();
+    expect(find.text('Nota local de integración'), findsOneWidget);
+    expect(find.byKey(const Key('annotation-add-page-note')), findsOneWidget);
+    await _captureReaderState(tester, suffix: '-annotations');
+    await tester.tap(find.byTooltip('Cerrar panel'));
+    await tester.pump();
     await tester.tap(find.byTooltip('Paleta de comandos (Ctrl+K)'));
     await tester.pump();
     expect(find.byKey(const Key('command-palette-search')), findsOneWidget);

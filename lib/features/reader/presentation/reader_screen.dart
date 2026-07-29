@@ -44,6 +44,7 @@ final class ReaderScreen extends StatefulWidget {
     this.onPanelChanged,
     this.onChromeVisibilityChanged,
     this.onDocumentInfo,
+    this.onExportAnnotations,
   });
 
   final ReaderController controller;
@@ -69,6 +70,7 @@ final class ReaderScreen extends StatefulWidget {
   final ValueChanged<ReaderPanelSection?>? onPanelChanged;
   final ValueChanged<bool>? onChromeVisibilityChanged;
   final VoidCallback? onDocumentInfo;
+  final Future<void> Function()? onExportAnnotations;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -301,6 +303,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                     onShowOutline: () => _showPanel(ReaderPanelSection.outline),
                     onShowBookmarks: () =>
                         _showPanel(ReaderPanelSection.bookmarks),
+                    onShowAnnotations: () =>
+                        _showPanel(ReaderPanelSection.annotations),
                     onAdjustMargins: () => _showMarginChooser(context),
                     onDocumentInfo:
                         widget.onDocumentInfo ??
@@ -371,6 +375,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                   width: panelWidth,
                   onClose: _closePanel,
                   onWidthChanged: _resizePanel,
+                  onExportAnnotations: widget.onExportAnnotations,
                 ),
               ),
             ),
@@ -389,6 +394,33 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                       ),
                 minHeight: 2,
                 backgroundColor: Colors.transparent,
+              ),
+            ),
+          if (controller.annotations?.pageHasAnnotations(
+                controller.currentPageIndex,
+              ) ??
+              false)
+            Positioned(
+              left: AppSpacing.space12,
+              top: controlsShown
+                  ? AppSizes.topBarHeight + AppSpacing.space8
+                  : AppSpacing.space12,
+              child: Semantics(
+                label:
+                    'La página ${controller.currentPageIndex + 1} tiene anotaciones',
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.appColors.surfacePrimary.withValues(
+                      alpha: 0.92,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: context.appColors.borderStrong),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(AppSpacing.space8),
+                    child: Icon(Icons.rate_review_outlined, size: 16),
+                  ),
+                ),
               ),
             ),
         ],
@@ -531,6 +563,12 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     AppCommandId.showThumbnails: () =>
         _showPanel(ReaderPanelSection.thumbnails),
     AppCommandId.showOutline: () => _showPanel(ReaderPanelSection.outline),
+    AppCommandId.showAnnotations: () =>
+        _showPanel(ReaderPanelSection.annotations),
+    AppCommandId.navigationBack: () =>
+        unawaited(widget.controller.historyBack()),
+    AppCommandId.navigationForward: () =>
+        unawaited(widget.controller.historyForward()),
     AppCommandId.fitWidth: () => unawaited(widget.controller.fitWidth()),
     AppCommandId.fitPage: () => unawaited(widget.controller.fitPage()),
     AppCommandId.changeReaderTheme: () => _showThemeChooser(context),
@@ -618,39 +656,102 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     final textController = TextEditingController(
       text: '${widget.controller.currentPageIndex + 1}',
     );
+    var previewPage = widget.controller.currentPageIndex + 1;
     final page = await showDialog<int>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ir a página'),
-        content: SizedBox(
-          width: 320,
-          child: TextField(
-            key: const Key('go-to-page-field'),
-            controller: textController,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Número de página',
-              helperText: 'Entre 1 y ${widget.controller.pageCount}',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Ir a página'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  key: const Key('go-to-page-field'),
+                  controller: textController,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Número de página',
+                    helperText: 'Entre 1 y ${widget.controller.pageCount}',
+                  ),
+                  onChanged: (value) {
+                    final parsed = int.tryParse(value);
+                    if (parsed != null) {
+                      setDialogState(
+                        () => previewPage = parsed.clamp(
+                          1,
+                          widget.controller.pageCount,
+                        ),
+                      );
+                    }
+                  },
+                  onSubmitted: (value) =>
+                      Navigator.pop(context, int.tryParse(value)),
+                ),
+                if (widget.controller.pageCount >= 20) ...[
+                  const SizedBox(height: AppSpacing.space12),
+                  Semantics(
+                    label: 'Recorrido rápido de páginas',
+                    value:
+                        'Página $previewPage de ${widget.controller.pageCount}',
+                    child: Slider(
+                      key: const Key('reader-page-scrubber'),
+                      min: 1,
+                      max: widget.controller.pageCount.toDouble(),
+                      divisions: math.min(widget.controller.pageCount - 1, 500),
+                      value: previewPage.toDouble(),
+                      label: '$previewPage',
+                      onChanged: (value) {
+                        setDialogState(() {
+                          previewPage = value.round();
+                          textController.text = '$previewPage';
+                        });
+                      },
+                    ),
+                  ),
+                  Text(
+                    _outlineLabelForPage(previewPage - 1) ??
+                        'Página $previewPage',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ],
+              ],
             ),
-            onSubmitted: (value) => Navigator.pop(context, int.tryParse(value)),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(context, int.tryParse(textController.text)),
+              child: const Text('Ir'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(context, int.tryParse(textController.text)),
-            child: const Text('Ir'),
-          ),
-        ],
       ),
     );
     textController.dispose();
     if (page != null) await widget.controller.goToPage(page);
+  }
+
+  String? _outlineLabelForPage(int pageIndex) {
+    String? label;
+    void visit(List<PdfOutlineItem> items) {
+      for (final item in items) {
+        final itemPage = item.pageIndex;
+        if (itemPage != null && itemPage <= pageIndex) label = item.title;
+        visit(item.children);
+      }
+    }
+
+    visit(widget.controller.outline);
+    return label;
   }
 
   Future<void> _showThemeChooser(BuildContext context) async {

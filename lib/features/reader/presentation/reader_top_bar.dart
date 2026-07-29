@@ -22,6 +22,7 @@ final class ReaderTopBar extends StatelessWidget
     required this.onShowThumbnails,
     required this.onShowOutline,
     required this.onShowBookmarks,
+    required this.onShowAnnotations,
     required this.onAdjustMargins,
     required this.onDocumentInfo,
     required this.onToggleChrome,
@@ -41,6 +42,7 @@ final class ReaderTopBar extends StatelessWidget
   final VoidCallback onShowThumbnails;
   final VoidCallback onShowOutline;
   final VoidCallback onShowBookmarks;
+  final VoidCallback onShowAnnotations;
   final VoidCallback onAdjustMargins;
   final VoidCallback onDocumentInfo;
   final VoidCallback onToggleChrome;
@@ -86,6 +88,22 @@ final class ReaderTopBar extends StatelessWidget
                 ),
               ),
             ),
+            if (!compact && controller.navigationHistory != null) ...[
+              IconButton(
+                tooltip: 'Volver a la ubicación anterior (Alt+←)',
+                onPressed: controller.navigationHistory!.canGoBack
+                    ? controller.historyBack
+                    : null,
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 17),
+              ),
+              IconButton(
+                tooltip: 'Avanzar en el historial (Alt+→)',
+                onPressed: controller.navigationHistory!.canGoForward
+                    ? controller.historyForward
+                    : null,
+                icon: const Icon(Icons.arrow_forward_ios_rounded, size: 17),
+              ),
+            ],
             if (!compact && showModeControls) ...[
               const SizedBox(width: AppSpacing.space12),
               SegmentedButton<ReaderMode>(
@@ -145,6 +163,12 @@ final class ReaderTopBar extends StatelessWidget
                 selected: activePanel == ReaderPanelSection.bookmarks,
                 onPressed: onShowBookmarks,
               ),
+              _PanelIconButton(
+                tooltip: 'Anotaciones',
+                icon: Icons.rate_review_outlined,
+                selected: activePanel == ReaderPanelSection.annotations,
+                onPressed: onShowAnnotations,
+              ),
             ],
             if (!compact)
               IconButton(
@@ -188,6 +212,11 @@ final class ReaderTopBar extends StatelessWidget
                   value: _ReaderMenuAction.bookmarks,
                   checked: activePanel == ReaderPanelSection.bookmarks,
                   child: const Text('Marcadores'),
+                ),
+                CheckedPopupMenuItem(
+                  value: _ReaderMenuAction.annotations,
+                  checked: activePanel == ReaderPanelSection.annotations,
+                  child: const Text('Anotaciones'),
                 ),
                 const PopupMenuDivider(),
                 const PopupMenuItem(
@@ -243,6 +272,8 @@ final class ReaderTopBar extends StatelessWidget
         onShowOutline();
       case _ReaderMenuAction.bookmarks:
         onShowBookmarks();
+      case _ReaderMenuAction.annotations:
+        onShowAnnotations();
       case _ReaderMenuAction.rotate:
         controller.rotateClockwise();
       case _ReaderMenuAction.margins:
@@ -266,6 +297,7 @@ enum _ReaderMenuAction {
   thumbnails,
   outline,
   bookmarks,
+  annotations,
   rotate,
   margins,
   fullscreen,

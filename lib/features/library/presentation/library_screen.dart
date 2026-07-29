@@ -8,6 +8,8 @@ import '../../../app/app_config.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_density.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../organization/application/organization_controller.dart';
+import '../../organization/domain/organization_models.dart';
 import '../application/library_controller.dart';
 import '../domain/library_document.dart';
 
@@ -105,6 +107,13 @@ final class LibraryScreen extends StatefulWidget {
     this.onReadingFilterChanged,
     this.onDocumentInfo,
     this.onRelocateDocument,
+    this.organization,
+    this.onGlobalSearch,
+    this.onOpenPaths,
+    this.onWorkspaces,
+    this.onImportFolder,
+    this.onRecoverFolder,
+    this.safeMode = false,
   });
 
   final LibraryController controller;
@@ -116,6 +125,13 @@ final class LibraryScreen extends StatefulWidget {
   final ValueChanged<LibraryReadingState>? onReadingFilterChanged;
   final Future<void> Function(LibraryDocument document)? onDocumentInfo;
   final Future<void> Function(LibraryDocument document)? onRelocateDocument;
+  final OrganizationController? organization;
+  final VoidCallback? onGlobalSearch;
+  final Future<void> Function(List<String> paths)? onOpenPaths;
+  final VoidCallback? onWorkspaces;
+  final VoidCallback? onImportFolder;
+  final VoidCallback? onRecoverFolder;
+  final bool safeMode;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -158,6 +174,12 @@ final class _LibraryScreenState extends State<LibraryScreen> {
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyF, control: true):
             _focusFilter,
+        if (widget.onGlobalSearch != null)
+          const SingleActivator(
+            LogicalKeyboardKey.keyF,
+            control: true,
+            shift: true,
+          ): widget.onGlobalSearch!,
       },
       child: Focus(
         autofocus: true,
@@ -166,15 +188,64 @@ final class _LibraryScreenState extends State<LibraryScreen> {
           onDragExited: (_) => setState(() => _dragging = false),
           onDragDone: (details) {
             setState(() => _dragging = false);
-            final pdf = details.files
+            final pdfs = details.files
                 .where((file) => file.path.toLowerCase().endsWith('.pdf'))
-                .firstOrNull;
-            if (pdf != null) widget.onOpenPath(pdf.path);
+                .map((file) => file.path)
+                .toSet()
+                .toList(growable: false);
+            if (pdfs.isEmpty) return;
+            if (widget.onOpenPaths != null) {
+              widget.onOpenPaths!(pdfs);
+            } else {
+              widget.onOpenPath(pdfs.first);
+            }
           },
           child: Scaffold(
             appBar: AppBar(
               title: const Text(AppConfig.productName),
               actions: [
+                if (widget.safeMode)
+                  const Tooltip(
+                    message:
+                        'Modo seguro: la sesión y el índice no se restauraron',
+                    child: Padding(
+                      padding: EdgeInsets.all(AppSpacing.space12),
+                      child: Icon(Icons.health_and_safety_outlined),
+                    ),
+                  ),
+                if (widget.organization != null)
+                  IconButton(
+                    tooltip: 'Colecciones',
+                    onPressed: _showCollections,
+                    icon: const Icon(Icons.folder_copy_outlined),
+                  ),
+                if (widget.onWorkspaces != null)
+                  IconButton(
+                    tooltip: 'Espacios de trabajo',
+                    onPressed: widget.onWorkspaces,
+                    icon: const Icon(Icons.space_dashboard_outlined),
+                  ),
+                if (widget.onImportFolder != null)
+                  IconButton(
+                    tooltip: 'Importar carpeta',
+                    onPressed: widget.onImportFolder,
+                    icon: const Icon(Icons.create_new_folder_outlined),
+                  ),
+                if (widget.onRecoverFolder != null &&
+                    widget.controller.documents.any(
+                      (document) => document.isMissing,
+                    ))
+                  IconButton(
+                    tooltip: 'Recuperar documentos movidos',
+                    onPressed: widget.onRecoverFolder,
+                    icon: const Icon(Icons.find_replace_rounded),
+                  ),
+                if (widget.onGlobalSearch != null)
+                  IconButton(
+                    tooltip: 'Buscar en la biblioteca (Ctrl+Mayús+F)',
+                    onPressed: widget.onGlobalSearch,
+                    icon: const Icon(Icons.manage_search_rounded),
+                  ),
                 if (compact)
                   IconButton(
                     key: const Key('library-open-button'),
@@ -201,7 +272,10 @@ final class _LibraryScreenState extends State<LibraryScreen> {
             body: Stack(
               children: [
                 ListenableBuilder(
-                  listenable: widget.controller,
+                  listenable: Listenable.merge([
+                    widget.controller,
+                    if (widget.organization != null) widget.organization!,
+                  ]),
                   builder: (context, _) => _LibraryBody(
                     controller: widget.controller,
                     onOpenPath: widget.onOpenPath,
@@ -222,6 +296,7 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                     },
                     onDocumentInfo: widget.onDocumentInfo,
                     onRelocateDocument: widget.onRelocateDocument,
+                    documentPredicate: widget.organization?.includes,
                   ),
                 ),
                 if (_dragging)
@@ -245,6 +320,99 @@ final class _LibraryScreenState extends State<LibraryScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showCollections() async {
+    final organization = widget.organization;
+    if (organization == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.library_books_outlined),
+              title: const Text('Toda la biblioteca'),
+              selected:
+                  organization.selectedCollectionId == null &&
+                  organization.selectedSmartCollection == null,
+              onTap: () {
+                organization.clearSelection();
+                Navigator.pop(context);
+              },
+            ),
+            for (final smart in SmartCollection.values)
+              ListTile(
+                leading: const Icon(Icons.auto_awesome_outlined),
+                title: Text(smart.label),
+                selected: organization.selectedSmartCollection == smart,
+                onTap: () {
+                  organization.selectSmartCollection(smart);
+                  Navigator.pop(context);
+                },
+              ),
+            if (organization.collections.isNotEmpty) const Divider(),
+            for (final collection in organization.collections)
+              ListTile(
+                leading: Icon(
+                  collection.isPinned
+                      ? Icons.folder_special_outlined
+                      : Icons.folder_outlined,
+                ),
+                title: Text(collection.name),
+                trailing: Text('${collection.documentCount}'),
+                selected: organization.selectedCollectionId == collection.id,
+                onTap: () {
+                  organization.selectCollection(collection.id);
+                  Navigator.pop(context);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.create_new_folder_outlined),
+              title: const Text('Nueva colección'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _createCollection(organization);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createCollection(OrganizationController organization) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nueva colección'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 60,
+          decoration: const InputDecoration(labelText: 'Nombre'),
+          onSubmitted: (value) => Navigator.pop(context, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Crear'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name != null && name.trim().isNotEmpty) {
+      final created = organization.createCollection(name);
+      organization.selectCollection(created.id);
+    }
   }
 
   void _focusFilter() {
@@ -280,6 +448,7 @@ final class _LibraryBody extends StatelessWidget {
     required this.onReadingStateChanged,
     required this.onDocumentInfo,
     required this.onRelocateDocument,
+    this.documentPredicate,
   });
 
   final LibraryController controller;
@@ -297,6 +466,7 @@ final class _LibraryBody extends StatelessWidget {
   final ValueChanged<LibraryReadingState> onReadingStateChanged;
   final Future<void> Function(LibraryDocument document)? onDocumentInfo;
   final Future<void> Function(LibraryDocument document)? onRelocateDocument;
+  final bool Function(String documentId)? documentPredicate;
 
   @override
   Widget build(BuildContext context) {
@@ -322,7 +492,9 @@ final class _LibraryBody extends StatelessWidget {
       return EmptyLibraryState(onOpen: onPickDocument);
     }
     final filterResult = evaluateLibraryDocuments(
-      controller.documents,
+      controller.documents.where(
+        (document) => documentPredicate?.call(document.id) ?? true,
+      ),
       query: query,
       sortOrder: sortOrder,
       readingState: readingState,

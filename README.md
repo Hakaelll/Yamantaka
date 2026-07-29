@@ -12,13 +12,13 @@ Base funcional Flutter 0.1.0 para Windows, Android e iOS, validada entre el 28
 y el 29 de julio de 2026:
 
 - `flutter analyze`: aprobado, sin incidencias.
-- `flutter test`: 66 pruebas aprobadas.
+- `flutter test`: 86 pruebas aprobadas.
 - PDFium: apertura, bitmap nativo, extracción y búsqueda verificadas con un PDF
   legal generado durante la prueba.
 - SQLite: esquema, migración inicial y repositorios verificados en memoria.
 - Integración Windows: aprobada sobre el lector completo con `ui.Image`,
   lectura de píxeles, pintura nativa, chrome real, búsqueda, paleta, zoom,
-  avance/retroceso, marcador, cierre y restauración.
+  avance/retroceso, marcador, anotación de página, cierre y restauración.
 - `flutter build windows --release`: aprobado; el ejecutable se abrió con un
   PDF real mediante argumento, mostró una ventana receptiva y no abrió
   conexiones TCP durante el smoke.
@@ -49,6 +49,18 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
   localizar, continuar, reiniciar o retirar sin borrar el PDF.
 - Historial local acotado y opcional; copia de seguridad JSON versionada con
   vista previa, validación, prebackup e importación transaccional, nunca PDF.
+- Anotaciones locales por página con nota, tipos/colores acotados, etiquetas,
+  filtros, undo, estado de revisión y exportación Markdown/JSON; nunca escribe
+  el PDF.
+- Pestañas acotadas con suspensión, reapertura, pin/reorder y espacios de
+  trabajo locales transaccionales.
+- Búsqueda global FTS5 opt-in sobre metadatos, páginas y anotaciones, cancelable
+  y borrable, sin OCR ni consultas persistidas.
+- Colecciones manuales, etiquetas y vistas inteligentes; importación de carpeta
+  con preview y recuperación conservadora por huella.
+- Historial de navegación atrás/adelante, scrubber para documentos largos, seis
+  perfiles base, diagnóstico redaccionado y safe mode tras tres cierres no
+  limpios.
 - Ajustes de apariencia, lectura, barra, atajos, biblioteca, historial, copias y
   privacidad; perfil inicial para tinta electrónica y previsualización ligera.
 - Sistema visual editorial de segunda generación con tokens semánticos,
@@ -61,11 +73,11 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
 
 ## Capturas
 
-![Biblioteca por estado de lectura en Windows](docs/screenshots/windows-library-reading-states.png)
+![Biblioteca filtrada por colección en Windows](docs/screenshots/windows-library-third-generation-collection-filtered.png)
 
-![Lector contextual con PDFium real en Windows](docs/screenshots/windows-reader-contextual.png)
+![Anotaciones locales en el lector Windows](docs/screenshots/windows-reader-third-generation-annotations.png)
 
-![Ajustes de escritorio en tema oscuro](docs/screenshots/windows-settings-dark.png)
+![Biblioteca compacta en tema oscuro](docs/screenshots/windows-library-third-generation-compact-dark.png)
 
 Son capturas reproducibles de la aplicación Release y de la integración
 Windows con PDFium; no son mockups. Búsqueda, paleta, variante compacta y tema
@@ -156,6 +168,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - El visor usa páginas completas virtualizadas; el contrato admite regiones,
   pero todavía no hay teselas.
 - No hay OCR: un escaneo sin texto muestra el estado correspondiente.
+- La selección geométrica nativa para highlight/subrayado/tachado está
+  bloqueada por el adaptador actual; hoy se crean notas ligadas a página.
+- Split/comparación tienen dominio y política serializables, pero no se anuncian
+  como disponibles: falta ownership y perfil de dos visores reales.
+- La UI avanzada de merge/reorder de etiquetas, perfiles personalizados, modo
+  estudio de tres zonas y keep-awake de presentación sigue pendiente.
 - Android/iOS están inicializados, pero sus toolchains y UX nativa no se han
   validado.
 - Existe un perfil reproducible de 40 documentos, 100 páginas y carga vectorial
@@ -167,12 +185,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   cuando una versión upstream corregida supere la misma captura nativa.
 - El build de desarrollo no está firmado ni empaquetado para distribución.
 
-No se incluyen edición, firma, anotación compleja, nube, cuentas, telemetría,
+No se incluyen edición/firma del PDF, anotación geométrica sin selección nativa,
+nube, cuentas, telemetría,
 IA, EPUB ni formatos distintos de PDF.
 
 ## Próximo paso
 
-Ejecutar YAM-041 para cerrar tabulación, Narrador y DPI nativo 100/150/200 %;
-después medir YAM-042 (teselas en páginas extremas) y preparar YAM-043 (notas
-locales ligeras). El orden y los criterios completos permanecen en
+Resolver YAM-050 (selección/geométrica nativa), prototipar y medir YAM-062
+(split con dos visores reales) y cerrar YAM-041 (Narrador y DPI nativo
+100/150/200 %). El orden y los criterios completos permanecen en
 [NEXT_TODOS.md](NEXT_TODOS.md).

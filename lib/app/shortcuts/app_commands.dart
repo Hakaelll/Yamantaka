@@ -24,6 +24,9 @@ enum AppCommandId {
   documentMode,
   showThumbnails,
   showOutline,
+  showAnnotations,
+  navigationBack,
+  navigationForward,
   fitWidth,
   fitPage,
   changeReaderTheme,
@@ -326,6 +329,20 @@ abstract final class AppCommandRegistry {
       label: 'Mostrar miniaturas',
     ),
     AppCommandDefinition(id: AppCommandId.showOutline, label: 'Mostrar índice'),
+    AppCommandDefinition(
+      id: AppCommandId.showAnnotations,
+      label: 'Mostrar anotaciones',
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.navigationBack,
+      label: 'Volver a la ubicación anterior',
+      shortcutLabel: 'Alt+←',
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.navigationForward,
+      label: 'Avanzar en el historial',
+      shortcutLabel: 'Alt+→',
+    ),
     AppCommandDefinition(id: AppCommandId.fitWidth, label: 'Ajustar al ancho'),
     AppCommandDefinition(
       id: AppCommandId.fitPage,
@@ -472,6 +489,12 @@ abstract final class AppCommandRegistry {
       ),
       const SingleActivator(LogicalKeyboardKey.end): action(
         AppCommandId.lastPage,
+      ),
+      const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): action(
+        AppCommandId.navigationBack,
+      ),
+      const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): action(
+        AppCommandId.navigationForward,
       ),
     };
     final tokens = resolvedTokens(overrides);

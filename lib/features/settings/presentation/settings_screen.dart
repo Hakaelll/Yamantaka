@@ -11,6 +11,7 @@ import '../../../app/theme/app_tokens.dart';
 import '../../../storage/repositories/app_settings_repository.dart';
 import '../../../storage/backup/local_backup_service.dart';
 import '../../reader/domain/reader_models.dart';
+import '../../diagnostics/presentation/diagnostics_dialog.dart';
 
 final class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -172,6 +173,27 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         id: _SettingsSectionId.reading,
         description: 'Comportamiento inicial y navegación.',
         children: [
+          _DropdownSetting(
+            label: 'Perfil de lectura',
+            description:
+                'Aplica un conjunto coherente sin mezclar densidad de interfaz '
+                'y zoom del contenido.',
+            value: widget.services.readingProfiles.defaultProfileId,
+            values: const {
+              'builtin-reading': 'Lectura',
+              'builtin-study': 'Estudio',
+              'builtin-presentation': 'Presentación',
+              'builtin-night': 'Noche',
+              'builtin-eink': 'Tinta electrónica',
+              'builtin-comparison': 'Comparación',
+            },
+            onChanged: (value) {
+              widget.services.readingProfiles
+                ..setDefault(value)
+                ..apply(value);
+              setState(() {});
+            },
+          ),
           _DropdownSetting(
             label: 'Vista predeterminada',
             value: settings.defaultViewMode,
@@ -346,15 +368,18 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _ActionSetting(
             label: 'Eliminar historial',
-            description: 'Quita recientes, progreso y marcadores.',
+            description:
+                'Reinicia progreso, preferencias por documento, marcadores y '
+                'sesiones. Conserva biblioteca, anotaciones y colecciones.',
             actionLabel: 'Eliminar',
             destructive: true,
             onPressed: () => _confirmAndRun(
               context,
               title: '¿Eliminar historial?',
               body:
-                  'Se eliminarán recientes, progreso, preferencias por '
-                  'documento y marcadores.',
+                  'Se reiniciarán progreso, preferencias por documento, '
+                  'marcadores y sesiones. Se conservarán documentos, '
+                  'anotaciones, etiquetas y colecciones.',
               action: widget.services.deleteHistory,
             ),
           ),
@@ -422,6 +447,31 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       _SettingsSectionData(
+        id: _SettingsSectionId.advanced,
+        description: 'Diagnóstico, integridad y recuperación local.',
+        children: [
+          _ActionSetting(
+            label: 'Centro de diagnóstico',
+            description:
+                'Versiones, esquema, tamaños, recursos e integridad sin rutas, '
+                'títulos, consultas ni contenido.',
+            actionLabel: 'Abrir',
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (context) =>
+                  DiagnosticsDialog(services: widget.services),
+            ),
+          ),
+          _ActionSetting(
+            label: 'Ayuda contextual',
+            description:
+                'Resumen local de búsqueda, anotaciones, espacios y atajos.',
+            actionLabel: 'Ver ayuda',
+            onPressed: () => _showContextualHelp(context),
+          ),
+        ],
+      ),
+      _SettingsSectionData(
         id: _SettingsSectionId.privacy,
         description: 'Datos locales y sesiones de lectura.',
         children: [
@@ -449,6 +499,35 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       ),
     ];
   }
+
+  Future<void> _showContextualHelp(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Ayuda de Yamantaka'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: const SingleChildScrollView(
+          child: Text(
+            'Anotaciones: abre el panel de notas en el lector; se guardan '
+            'fuera del PDF y pueden exportarse en Markdown o JSON.\n\n'
+            'Búsqueda global: Ctrl+Mayús+F desde la biblioteca. La indexación '
+            'es opcional, cancelable y permanece en este dispositivo.\n\n'
+            'Espacios de trabajo: guarda pestañas, posiciones y el panel para '
+            'restaurar una sesión. Los PDF nunca se copian.\n\n'
+            'Teclado: Ctrl+K abre comandos, Ctrl+F busca en la superficie '
+            'actual, F11 entra o sale de pantalla completa y Escape cierra la '
+            'superficie temporal activa.',
+          ),
+        ),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Entendido'),
+        ),
+      ],
+    ),
+  );
 
   Future<void> _assignShortcut(
     BuildContext context,
@@ -633,11 +712,15 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       }
-    } on Object catch (error) {
+    } on Object {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('No se pudo importar: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo importar. Los datos actuales se conservaron.',
+            ),
+          ),
+        );
       }
     }
   }
@@ -654,6 +737,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         content: Text(
           'Versión ${preview.version} · ${preview.documentCount} documentos · '
           '${preview.bookmarkCount} marcadores · '
+          '${preview.annotationCount} anotaciones · '
           '${preview.sessionCount} sesiones.\n\n'
           'Se sustituirán los datos locales actuales. Antes se guardará una '
           'copia de seguridad automática. Los PDF no se modifican.',
@@ -731,6 +815,7 @@ enum _SettingsSectionId {
   library('Biblioteca', Icons.library_books_outlined),
   history('Historial', Icons.history_rounded),
   backup('Copias locales', Icons.inventory_2_outlined),
+  advanced('Avanzado', Icons.health_and_safety_outlined),
   privacy('Privacidad', Icons.shield_outlined);
 
   const _SettingsSectionId(this.label, this.icon);

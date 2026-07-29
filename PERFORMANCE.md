@@ -151,3 +151,44 @@ validación manual y multi-equipo/DPI, no cubierta por una única máquina.
 El primer hito renderiza páginas completas virtualizadas. El contrato acepta
 regiones para poder añadir teselas si las mediciones de documentos extremos lo
 justifican; todavía no se implementan ni se anuncian como disponibles.
+
+## Perfil de tercera iteración — 2026-07-29
+
+Se repitió el escenario Profile de cinco pasadas después de integrar
+anotaciones, pestañas, organización, búsqueda y diagnóstico:
+
+| Secuencia | Mediana | p95 |
+| --- | ---: | ---: |
+| Interacción de biblioteca | 127,831 ms | 137,071 ms |
+| Interacción de lector | 80,934 ms | 88,532 ms |
+| Build de frame en biblioteca | 3,214 ms | 6,643 ms |
+| Build de frame en lector | 2,651 ms | 4,646 ms |
+| Apertura vectorial pesada | 14,690 ms | 15,511 ms |
+| Render pesado deduplicado/cacheado | 5,528 ms | 6,912 ms |
+
+Hubo cero frames de build/raster fuera de presupuesto. El motor terminó con
+0 documentos abiertos, 0 renders pendientes y 0 bytes/páginas cacheados; las
+15 solicitudes produjeron 5 misses, 5 deduplicaciones y 5 hits. RSS pasó de
+136,6 MiB de base a 280,8 MiB de pico y liberó 41,2 MiB al volver, con mínimo
+de 239,6 MiB. El runtime de Windows puede retener memoria; esto no prueba
+ausencia de fugas sostenidas.
+
+Un benchmark SQLite/Dart independiente ejecutó tres procesos, cada uno con 500
+documentos, 100 anotaciones, 10 colecciones, 5 tabs y 7 pasadas:
+
+| Métrica | Medianas observadas | p95 máximo |
+| --- | --- | ---: |
+| FTS global | 0,600 / 0,818 / 0,798 ms | 6,009 ms |
+| Consulta de colección | 0,507 / 0,432 / 0,425 ms | 1,250 ms |
+| Restauración de workspace | 0,778 / 0,870 / 0,892 ms | 1,969 ms |
+
+Las tres bases midieron 659.456 bytes, terminaron con integridad `ok` y RSS
+final inferior al baseline observado. Los informes viven bajo `build/performance`
+y declaran `contains_paths_or_titles: false`. Son evidencia local reproducible,
+no un umbral universal; falta otro hardware/GPU y corpus real grande.
+
+El gate Release final produjo 19 archivos y 41.504.911 bytes (39,58 MiB), sin
+cambios en dependencias. Un smoke oculto creó la ventana en 588 ms, midió
+117,0 MiB de working set y 118,5 MiB privados, mantuvo cero conexiones TCP y
+cerró limpiamente mediante `CloseMainWindow`. Es una observación única, no una
+distribución.

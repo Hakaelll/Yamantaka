@@ -602,3 +602,22 @@ Antes de cerrar una tarea visual:
 - [ ] No aparecen tarjetas, sombras, radios ni acentos sin función.
 - [ ] Las capturas corresponden a código ejecutado.
 - [ ] Análisis, pruebas e integración no presentan regresiones.
+
+## 28. Superficies de tercera generación
+
+- Las pestañas son una franja compacta de contexto: nombre, progreso, pin,
+  ausencia y cierre; no compiten con la barra principal ni usan tarjetas.
+- Anotaciones reutiliza el panel lateral único. La acción primaria es “Anotar
+  página”; búsqueda y filtros permanecen encima de una lista virtualizada.
+- Colecciones se eligen en una hoja ligera y la biblioteca conserva la misma
+  jerarquía de “continuar” y “recientes”; filtrar no crea otra pantalla.
+- Diagnóstico y workspaces son diálogos de gestión, no dashboards permanentes.
+- Safe mode se expresa con un indicador sobrio y texto accionable, nunca con
+  bloqueo o borrado automático.
+- Split no se muestra hasta que existan dos lectores reales y medidos; el
+  breakpoint técnico por sí solo no constituye una función visual.
+
+Las capturas `windows-reader-third-generation-*` y
+`windows-library-third-generation-*` demuestran estados ejecutados a
+1200×800 y 640×760: anotaciones, colecciones, filtro, modo compacto y oscuro.
+La matriz Narrador y DPI nativo 100/150/200 % continúa en revisión.

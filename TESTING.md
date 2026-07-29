@@ -4,9 +4,10 @@
 
 - `dart format`: código Dart formateado.
 - `flutter analyze`: aprobado sin incidencias.
-- `flutter test --reporter compact`: 66 pruebas aprobadas.
-- `flutter test integration_test -d windows`: aprobado sobre el lector
-  completo y PDFium real.
+- `flutter test --reporter compact`: 86 pruebas aprobadas.
+- Integración Windows: lector, biblioteca y perfil aprobados individualmente
+  sobre PDFium real; el agregado encontró la incidencia de arranque del runner
+  documentada más abajo.
 - `flutter build windows --release`: aprobado; genera
   `build\windows\x64\runner\Release\yamantaka.exe`.
 - Smoke Release: ventana visible y receptiva, tema claro restaurado y cierre
@@ -163,3 +164,37 @@ resolución, tema y documento fixture. El recorrido se repite tras cada hallazgo
 
 Cada ejecución restante debe registrar fecha, build, equipo, escala y PDF. Un
 caso pendiente nunca se presenta como aprobado.
+
+## Tercera iteración — evidencia 2026-07-29
+
+La suite añade cobertura de:
+
+- esquema v2/FTS5, migración v1→v2, copia previa, backup v1/v2 e integridad;
+- anotaciones CRUD, filtros, rectángulos normalizados, rotación, huella,
+  revisión/undo y exportación Markdown/JSON;
+- colecciones, vistas inteligentes y relaciones sin borrar documentos;
+- pestañas activa/warm/suspendida, máximo, close/reopen y workspaces/split
+  serializado;
+- historial atrás/adelante y frontera exacta de split;
+- búsqueda unificada por metadato, página y anotación, además de clear FTS;
+- safe mode tras tres arranques y diagnóstico sin datos privados;
+- argumentos múltiples deduplicados.
+
+La integración Windows aislada aprueba lector, rendimiento y biblioteca. El
+comando agregado `flutter test integration_test -d windows` aprobó biblioteca,
+pero el runner no pudo iniciar después las apps de perfil y lector, antes de
+cualquier aserción. Lector volvió a aprobar aislado y el perfil aprobó aislado y
+con `flutter drive --profile`. Por ello no se oculta la incidencia ni se
+clasifica como regresión funcional.
+
+| Evidencia nueva | Tamaño/tema | Resultado |
+| --- | --- | --- |
+| `windows-reader-third-generation-annotations.png` | 1200×800, claro/marfil | Panel, filtro, nota y salto aprobados |
+| `windows-library-third-generation-collections.png` | 1200×800, claro | Selector de colección y smart views aprobados |
+| `windows-library-third-generation-collection-filtered.png` | 1200×800, claro | Dos documentos correctos, sin overflow |
+| `windows-library-third-generation-compact.png` | 640×760, claro | Jerarquía y controles accesibles |
+| `windows-library-third-generation-compact-dark.png` | 640×760, oscuro | Contraste y densidad aprobados visualmente |
+
+Pendientes manuales explícitos: selección geométrica del PDF, split con dos
+visores, comparación, Narrador, DPI nativo 100/150/200 %, paths Unicode/largos,
+permisos/reparse points de carpetas y otro equipo/GPU.

@@ -54,3 +54,33 @@ se bloquean.
 
 No existe sincronización. Cualquier propuesta futura requerirá una nueva
 decisión explícita; no forma parte de las copias locales actuales.
+
+## Anotaciones, organización e índice
+
+Anotaciones, etiquetas, colecciones, workspaces y perfiles se guardan solo en
+SQLite local. Pueden revelar hábitos, proyectos y fragmentos del documento:
+limpiar “historial” no los elimina; “borrar todos los datos” sí. El backup JSON
+v2 y las exportaciones manuales de anotaciones contienen datos sensibles y
+deben protegerse como el PDF, aunque nunca contienen sus bytes.
+
+El índice FTS es opcional y reconstruible. Solo se activa desde la búsqueda
+global de la sesión, procesa un archivo por vez, no hace OCR y puede
+pausarse/cancelarse/borrarse. No se incluye en backup. Las consultas no se
+persisten, registran ni envían; los snippets solo aparecen en pantalla.
+
+Importar una carpeta es siempre una acción explícita con preview y límite; no
+instala watcher ni escanea en segundo plano. Recuperar documentos solo
+autoasocia una huella exacta. Candidatos ambiguos o de baja confianza no mutan
+datos.
+
+## Diagnóstico y modo seguro
+
+El informe diagnóstico usa campos permitidos: versión, sistema, arquitectura,
+esquema, integridad, tamaños/conteos, caché y contadores del motor. Enmascara la
+ruta de datos y excluye nombres, títulos, rutas de documentos, consultas y
+texto de anotaciones. Copiar/exportar y abrir la carpeta requieren acción
+explícita.
+
+Safe mode registra únicamente un contador de arranques no limpios. Al tercer
+caso evita restauración y preferencias personalizadas; no transmite ni borra
+datos. La aplicación no crea conexiones TCP en los flujos medidos.

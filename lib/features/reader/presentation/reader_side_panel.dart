@@ -7,10 +7,12 @@ import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../pdf_engine/models/pdf_models.dart';
 import '../../../pdf_engine/pdf_document_engine.dart';
+import '../../annotations/domain/annotation.dart';
 import '../../bookmarks/domain/bookmark.dart';
+import '../../navigation/application/navigation_history_controller.dart';
 import '../application/reader_controller.dart';
 
-enum ReaderPanelSection { thumbnails, outline, bookmarks, search }
+enum ReaderPanelSection { thumbnails, outline, bookmarks, annotations, search }
 
 final class ReaderSidePanel extends StatefulWidget {
   const ReaderSidePanel({
@@ -21,6 +23,7 @@ final class ReaderSidePanel extends StatefulWidget {
     required this.width,
     required this.onClose,
     required this.onWidthChanged,
+    this.onExportAnnotations,
   });
 
   final ReaderPanelSection section;
@@ -29,6 +32,7 @@ final class ReaderSidePanel extends StatefulWidget {
   final double width;
   final VoidCallback onClose;
   final ValueChanged<double> onWidthChanged;
+  final Future<void> Function()? onExportAnnotations;
 
   @override
   State<ReaderSidePanel> createState() => _ReaderSidePanelState();
@@ -124,6 +128,7 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
     ReaderPanelSection.thumbnails => 'Miniaturas',
     ReaderPanelSection.outline => 'Índice',
     ReaderPanelSection.bookmarks => 'Marcadores',
+    ReaderPanelSection.annotations => 'Anotaciones',
     ReaderPanelSection.search => 'Buscar',
   };
 
@@ -135,6 +140,10 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
     ReaderPanelSection.outline => _OutlinePanel(controller: widget.controller),
     ReaderPanelSection.bookmarks => _BookmarksPanel(
       controller: widget.controller,
+    ),
+    ReaderPanelSection.annotations => _AnnotationsPanel(
+      controller: widget.controller,
+      onExport: widget.onExportAnnotations,
     ),
     ReaderPanelSection.search => _SearchPanel(
       controller: widget.controller,
@@ -254,7 +263,11 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
                 ? context.appColors.selectionBackground
                 : Colors.transparent,
             child: InkWell(
-              onTap: () => widget.controller.viewController.goToPage(index),
+              onTap: () => widget.controller.navigateTo(
+                index,
+                reason: NavigationReason.thumbnail,
+                label: 'Miniatura de página ${index + 1}',
+              ),
               child: Container(
                 margin: const EdgeInsets.only(bottom: AppSpacing.space12),
                 padding: const EdgeInsets.all(AppSpacing.space6),
@@ -312,6 +325,18 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
                       '${index + 1}',
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
+                    if (widget.controller.annotations?.pageHasAnnotations(
+                          index,
+                        ) ??
+                        false)
+                      const Padding(
+                        padding: EdgeInsets.only(top: AppSpacing.space4),
+                        child: Icon(
+                          Icons.rate_review_outlined,
+                          size: 15,
+                          semanticLabel: 'Página con anotaciones',
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -400,7 +425,11 @@ final class _OutlinePanel extends StatelessWidget {
                 ),
           onTap: entry.item.pageIndex == null
               ? null
-              : () => controller.viewController.goToPage(entry.item.pageIndex!),
+              : () => controller.navigateTo(
+                  entry.item.pageIndex!,
+                  reason: NavigationReason.outline,
+                  label: 'Sección del índice',
+                ),
         );
       },
     );
@@ -452,8 +481,11 @@ final class _BookmarksPanel extends StatelessWidget {
                       ),
                       itemBuilder: (context, index) => _BookmarkTile(
                         bookmark: bookmarks[index],
-                        onOpen: () => controller.viewController.goToPage(
+                        onOpen: () => controller.navigateTo(
                           bookmarks[index].pageIndex,
+                          reason: NavigationReason.bookmark,
+                          label:
+                              'Marcador en página ${bookmarks[index].pageIndex + 1}',
                         ),
                         onDelete: () =>
                             controller.bookmarks.remove(bookmarks[index]),
@@ -534,6 +566,413 @@ final class _BookmarkTile extends StatelessWidget {
       ),
     );
   }
+}
+
+final class _AnnotationsPanel extends StatefulWidget {
+  const _AnnotationsPanel({required this.controller, this.onExport});
+
+  final ReaderController controller;
+  final Future<void> Function()? onExport;
+
+  @override
+  State<_AnnotationsPanel> createState() => _AnnotationsPanelState();
+}
+
+final class _AnnotationsPanelState extends State<_AnnotationsPanel> {
+  final TextEditingController _queryController = TextEditingController();
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final annotations = widget.controller.annotations;
+    if (annotations == null) {
+      return const _PanelEmptyState(
+        icon: Icons.rate_review_outlined,
+        title: 'Anotaciones no disponibles',
+        message: 'El almacén local de anotaciones no está conectado.',
+      );
+    }
+    return ListenableBuilder(
+      listenable: annotations,
+      builder: (context, _) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.space12),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        key: const Key('annotation-add-page-note'),
+                        onPressed: () => _editAnnotation(),
+                        icon: const Icon(Icons.add_comment_outlined, size: 18),
+                        label: Text(
+                          'Anotar página ${widget.controller.currentPageIndex + 1}',
+                        ),
+                      ),
+                    ),
+                    if (widget.onExport != null) ...[
+                      const SizedBox(width: AppSpacing.space8),
+                      IconButton.outlined(
+                        tooltip: 'Exportar anotaciones',
+                        onPressed: widget.onExport,
+                        icon: const Icon(Icons.ios_share_outlined),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.space8),
+                TextField(
+                  controller: _queryController,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.search_rounded, size: 18),
+                    labelText: 'Buscar en notas',
+                  ),
+                  onChanged: (value) => annotations.setFilters(search: value),
+                ),
+                const SizedBox(height: AppSpacing.space8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<AnnotationType?>(
+                        initialValue: annotations.typeFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          labelText: 'Tipo',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('Todos'),
+                          ),
+                          ...AnnotationType.values.map(
+                            (type) => DropdownMenuItem(
+                              value: type,
+                              child: Text(
+                                type.label,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) => annotations.setFilters(
+                          type: value,
+                          clearType: value == null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.space8),
+                    Expanded(
+                      child: DropdownButtonFormField<AnnotationColor?>(
+                        initialValue: annotations.colorFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          labelText: 'Color',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('Todos'),
+                          ),
+                          ...AnnotationColor.values.map(
+                            (color) => DropdownMenuItem(
+                              value: color,
+                              child: Text(
+                                color.label,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) => annotations.setFilters(
+                          color: value,
+                          clearColor: value == null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (annotations.reviewRequiredCount > 0)
+            MaterialBanner(
+              content: Text(
+                '${annotations.reviewRequiredCount} anotaciones necesitan '
+                'revisión porque cambió el documento.',
+              ),
+              leading: const Icon(Icons.warning_amber_rounded),
+              actions: const [SizedBox.shrink()],
+            ),
+          const Divider(height: 1),
+          Expanded(
+            child: annotations.annotations.isEmpty
+                ? const _PanelEmptyState(
+                    icon: Icons.rate_review_outlined,
+                    title: 'Sin anotaciones',
+                    message:
+                        'Añade una nota de página o una marca local para '
+                        'volver a esta idea.',
+                  )
+                : ListView.builder(
+                    key: const PageStorageKey('reader-annotations'),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.space8,
+                    ),
+                    itemCount: annotations.annotations.length,
+                    itemBuilder: (context, index) {
+                      final annotation = annotations.annotations[index];
+                      return Semantics(
+                        button: true,
+                        label:
+                            '${annotation.type.label}, página '
+                            '${annotation.pageIndex + 1}, '
+                            '${annotation.color.label}',
+                        child: ListTile(
+                          leading: _AnnotationColorMarker(
+                            color: Color(annotation.color.argb),
+                            type: annotation.type,
+                          ),
+                          title: Text(
+                            annotation.note ??
+                                annotation.selectedText ??
+                                annotation.type.label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            [
+                              'Página ${annotation.pageIndex + 1}',
+                              if (annotation.tags.isNotEmpty)
+                                annotation.tags.take(2).join(', '),
+                              if (annotation.status ==
+                                  AnnotationAttachmentStatus.reviewRequired)
+                                'Revisar posición',
+                            ].join(' · '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () => widget.controller.navigateTo(
+                            annotation.pageIndex,
+                            reason: NavigationReason.annotation,
+                            label:
+                                'Anotación en página ${annotation.pageIndex + 1}',
+                          ),
+                          trailing: PopupMenuButton<_AnnotationAction>(
+                            tooltip: 'Acciones de anotación',
+                            onSelected: (action) =>
+                                _runAction(action, annotation),
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: _AnnotationAction.edit,
+                                child: Text('Editar'),
+                              ),
+                              PopupMenuItem(
+                                value: _AnnotationAction.copy,
+                                child: Text('Copiar contenido'),
+                              ),
+                              PopupMenuItem(
+                                value: _AnnotationAction.delete,
+                                child: Text('Eliminar'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runAction(
+    _AnnotationAction action,
+    PdfAnnotation annotation,
+  ) async {
+    final controller = widget.controller.annotations!;
+    switch (action) {
+      case _AnnotationAction.edit:
+        await _editAnnotation(annotation);
+      case _AnnotationAction.copy:
+        await Clipboard.setData(
+          ClipboardData(text: annotation.note ?? annotation.selectedText ?? ''),
+        );
+      case _AnnotationAction.delete:
+        controller.delete(annotation);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Anotación eliminada'),
+            action: SnackBarAction(
+              label: 'Deshacer',
+              onPressed: () => controller.undoDelete(),
+            ),
+          ),
+        );
+    }
+  }
+
+  Future<void> _editAnnotation([PdfAnnotation? annotation]) async {
+    final noteController = TextEditingController(text: annotation?.note ?? '');
+    final tagsController = TextEditingController(
+      text: annotation?.tags.join(', ') ?? '',
+    );
+    var type = annotation?.type ?? AnnotationType.pageComment;
+    var color = annotation?.color ?? AnnotationColor.yellow;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(
+            annotation == null ? 'Nueva anotación' : 'Editar anotación',
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<AnnotationType>(
+                    initialValue: type,
+                    decoration: const InputDecoration(labelText: 'Tipo'),
+                    items: AnnotationType.values
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => type = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.space12),
+                  DropdownButtonFormField<AnnotationColor>(
+                    initialValue: color,
+                    decoration: const InputDecoration(labelText: 'Color'),
+                    items: AnnotationColor.values
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => color = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.space12),
+                  TextField(
+                    controller: noteController,
+                    autofocus: true,
+                    maxLength: AppConfig.maxAnnotationNoteLength,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Comentario',
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.space8),
+                  TextField(
+                    controller: tagsController,
+                    maxLength: 160,
+                    decoration: const InputDecoration(
+                      labelText: 'Etiquetas opcionales',
+                      hintText: 'estudio, revisar',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == true) {
+      final tags = tagsController.text
+          .split(',')
+          .map((tag) => tag.trim())
+          .where((tag) => tag.isNotEmpty)
+          .toList(growable: false);
+      if (annotation == null) {
+        widget.controller.annotations!.create(
+          pageIndex: widget.controller.currentPageIndex,
+          type: type,
+          color: color,
+          note: noteController.text,
+          pageRotation: widget.controller.preferences?.pageRotation ?? 0,
+          tags: tags,
+        );
+      } else {
+        widget.controller.annotations!.update(
+          annotation.copyWith(
+            type: type,
+            color: color,
+            note: noteController.text,
+            tags: tags,
+          ),
+        );
+      }
+    }
+    noteController.dispose();
+    tagsController.dispose();
+  }
+}
+
+enum _AnnotationAction { edit, copy, delete }
+
+final class _AnnotationColorMarker extends StatelessWidget {
+  const _AnnotationColorMarker({required this.color, required this.type});
+
+  final Color color;
+  final AnnotationType type;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: type.label,
+    child: Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: context.appColors.borderStrong),
+      ),
+      child: Icon(
+        type == AnnotationType.pageComment
+            ? Icons.chat_bubble_outline_rounded
+            : Icons.format_color_fill_rounded,
+        size: 16,
+      ),
+    ),
+  );
 }
 
 final class _SearchPanel extends StatelessWidget {

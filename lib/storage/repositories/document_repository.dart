@@ -19,6 +19,13 @@ final class DocumentRepository {
     return rows.map(_fromRow).toList(growable: false);
   }
 
+  List<LibraryDocument> all() {
+    final rows = _database.database.select(
+      'SELECT * FROM documents ORDER BY last_opened_at DESC',
+    );
+    return rows.map(_fromRow).toList(growable: false);
+  }
+
   LibraryDocument? byId(String id) {
     final rows = _database.database.select(
       'SELECT * FROM documents WHERE id = ? LIMIT 1',

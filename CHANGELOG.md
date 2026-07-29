@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0-dev — 2026-07-29 (tercera iteración local)
+
+- Esquema SQLite v2 recuperable para anotaciones, etiquetas, colecciones,
+  workspaces, perfiles e índice FTS5; backup JSON v2 compatible con v1.
+- Notas/anotaciones locales por página, panel filtrable, navegación, undo y
+  exportación Markdown/JSON sin modificar el PDF.
+- Pestañas acotadas y suspendibles, apertura múltiple y workspaces locales.
+- Búsqueda global e indexación opt-in cancelable, sin OCR ni red.
+- Colecciones/vistas inteligentes, importación de carpeta con preview y
+  recuperación conservadora por huella.
+- Historial de navegación, perfiles base, diagnóstico redaccionado y safe mode.
+- 86 pruebas, integración Windows aislada, 14 capturas nuevas, perfil de cinco
+  pasadas y tres procesos sintéticos avanzados.
+- Selección geométrica y split/comparación real permanecen bloqueados y no se
+  anuncian como funciones terminadas.
+
 ## 0.1.0-dev — 2026-07-29 (interfaz contextual y funciones locales)
 
 - Biblioteca por estado de lectura con recuentos, combinación texto/orden en una

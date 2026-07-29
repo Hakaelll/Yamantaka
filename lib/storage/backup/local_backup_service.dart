@@ -17,6 +17,7 @@ final class BackupPreview {
     required this.documentCount,
     required this.bookmarkCount,
     required this.sessionCount,
+    required this.annotationCount,
   });
 
   final int version;
@@ -24,6 +25,7 @@ final class BackupPreview {
   final int documentCount;
   final int bookmarkCount;
   final int sessionCount;
+  final int annotationCount;
 }
 
 final class LocalBackupService {
@@ -36,7 +38,7 @@ final class LocalBackupService {
        _settings = settings;
 
   static const format = 'yamantaka-local-backup';
-  static const version = 1;
+  static const version = 2;
 
   final AppDatabase _database;
   final AppPaths _paths;
@@ -59,6 +61,7 @@ final class LocalBackupService {
       documentCount: (tables['documents']! as List).length,
       bookmarkCount: (tables['bookmarks']! as List).length,
       sessionCount: (tables['reading_sessions']! as List).length,
+      annotationCount: (tables['annotations']! as List).length,
     );
   }
 
@@ -75,6 +78,17 @@ final class LocalBackupService {
     database.execute('BEGIN IMMEDIATE');
     try {
       database
+        ..execute('DELETE FROM workspace_tabs')
+        ..execute('DELETE FROM workspaces')
+        ..execute('DELETE FROM collection_documents')
+        ..execute('DELETE FROM collections')
+        ..execute('DELETE FROM document_tags')
+        ..execute('DELETE FROM annotation_tags')
+        ..execute('DELETE FROM tags')
+        ..execute('DELETE FROM annotations')
+        ..execute('DELETE FROM reading_profiles')
+        ..execute('DELETE FROM library_search')
+        ..execute('DELETE FROM search_index_state')
         ..execute('DELETE FROM reading_sessions')
         ..execute('DELETE FROM bookmarks')
         ..execute('DELETE FROM document_preferences')
@@ -99,6 +113,47 @@ final class LocalBackupService {
         'reading_sessions',
         _sessionColumns,
         tables['reading_sessions']! as List,
+      );
+      _restoreTable(
+        'annotations',
+        _annotationColumns,
+        tables['annotations']! as List,
+      );
+      _restoreTable('tags', _tagColumns, tables['tags']! as List);
+      _restoreTable(
+        'annotation_tags',
+        _annotationTagColumns,
+        tables['annotation_tags']! as List,
+      );
+      _restoreTable(
+        'document_tags',
+        _documentTagColumns,
+        tables['document_tags']! as List,
+      );
+      _restoreTable(
+        'collections',
+        _collectionColumns,
+        tables['collections']! as List,
+      );
+      _restoreTable(
+        'collection_documents',
+        _collectionDocumentColumns,
+        tables['collection_documents']! as List,
+      );
+      _restoreTable(
+        'reading_profiles',
+        _readingProfileColumns,
+        tables['reading_profiles']! as List,
+      );
+      _restoreTable(
+        'workspaces',
+        _workspaceColumns,
+        tables['workspaces']! as List,
+      );
+      _restoreTable(
+        'workspace_tabs',
+        _workspaceTabColumns,
+        tables['workspace_tabs']! as List,
       );
       _restoreTable(
         'app_metadata',
@@ -129,6 +184,15 @@ final class LocalBackupService {
       'document_preferences': _tableRows('document_preferences'),
       'bookmarks': _tableRows('bookmarks'),
       'reading_sessions': _tableRows('reading_sessions'),
+      'annotations': _tableRows('annotations'),
+      'tags': _tableRows('tags'),
+      'annotation_tags': _tableRows('annotation_tags'),
+      'document_tags': _tableRows('document_tags'),
+      'collections': _tableRows('collections'),
+      'collection_documents': _tableRows('collection_documents'),
+      'reading_profiles': _tableRows('reading_profiles'),
+      'workspaces': _tableRows('workspaces'),
+      'workspace_tabs': _tableRows('workspace_tabs'),
       'app_metadata': _tableRows('app_metadata'),
     },
   };
@@ -149,7 +213,7 @@ final class LocalBackupService {
     final decoded = jsonDecode(await file.readAsString());
     if (decoded is! Map<String, dynamic> ||
         decoded['format'] != format ||
-        decoded['version'] != version ||
+        (decoded['version'] != 1 && decoded['version'] != version) ||
         decoded['containsPdfFiles'] != false ||
         DateTime.tryParse(decoded['exportedAt']?.toString() ?? '') == null) {
       throw const FormatException(
@@ -160,10 +224,34 @@ final class LocalBackupService {
     if (tables is! Map<String, dynamic>) {
       throw const FormatException('La copia no contiene tablas válidas.');
     }
+    if (decoded['version'] == 1) {
+      for (final name in const [
+        'annotations',
+        'tags',
+        'annotation_tags',
+        'document_tags',
+        'collections',
+        'collection_documents',
+        'reading_profiles',
+        'workspaces',
+        'workspace_tabs',
+      ]) {
+        tables.putIfAbsent(name, () => <Object?>[]);
+      }
+    }
     _validateTable(tables, 'documents', _documentColumns);
     _validateTable(tables, 'document_preferences', _preferenceColumns);
     _validateTable(tables, 'bookmarks', _bookmarkColumns);
     _validateTable(tables, 'reading_sessions', _sessionColumns);
+    _validateTable(tables, 'annotations', _annotationColumns);
+    _validateTable(tables, 'tags', _tagColumns);
+    _validateTable(tables, 'annotation_tags', _annotationTagColumns);
+    _validateTable(tables, 'document_tags', _documentTagColumns);
+    _validateTable(tables, 'collections', _collectionColumns);
+    _validateTable(tables, 'collection_documents', _collectionDocumentColumns);
+    _validateTable(tables, 'reading_profiles', _readingProfileColumns);
+    _validateTable(tables, 'workspaces', _workspaceColumns);
+    _validateTable(tables, 'workspace_tabs', _workspaceTabColumns);
     _validateTable(tables, 'app_metadata', _metadataColumns);
     if (decoded['settings'] is! Map<String, dynamic>) {
       throw const FormatException('La copia no contiene ajustes válidos.');
@@ -372,3 +460,85 @@ const _sessionColumns = <String>[
 ];
 
 const _metadataColumns = <String>['key', 'value', 'updated_at'];
+
+const _annotationColumns = <String>[
+  'id',
+  'document_id',
+  'page_index',
+  'type',
+  'color',
+  'note',
+  'selected_text',
+  'context_before',
+  'context_after',
+  'rects_json',
+  'page_rotation',
+  'document_fingerprint',
+  'status',
+  'created_at',
+  'updated_at',
+];
+
+const _tagColumns = <String>[
+  'id',
+  'name',
+  'normalized_name',
+  'color',
+  'created_at',
+  'updated_at',
+];
+
+const _annotationTagColumns = <String>['annotation_id', 'tag_id'];
+const _documentTagColumns = <String>['document_id', 'tag_id'];
+
+const _collectionColumns = <String>[
+  'id',
+  'name',
+  'normalized_name',
+  'icon',
+  'sort_order',
+  'is_pinned',
+  'created_at',
+  'updated_at',
+];
+
+const _collectionDocumentColumns = <String>[
+  'collection_id',
+  'document_id',
+  'added_at',
+];
+
+const _readingProfileColumns = <String>[
+  'id',
+  'name',
+  'is_builtin',
+  'settings_json',
+  'created_at',
+  'updated_at',
+];
+
+const _workspaceColumns = <String>[
+  'id',
+  'name',
+  'is_default',
+  'active_tab_id',
+  'panel_section',
+  'panel_width',
+  'split_json',
+  'collection_id',
+  'created_at',
+  'updated_at',
+];
+
+const _workspaceTabColumns = <String>[
+  'id',
+  'workspace_id',
+  'document_id',
+  'sort_order',
+  'is_pinned',
+  'page_index',
+  'zoom_level',
+  'page_layout',
+  'reading_mode',
+  'scroll_offset',
+];

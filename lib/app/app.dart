@@ -9,9 +9,16 @@ import 'package:window_manager/window_manager.dart';
 import '../core/errors/app_failure.dart';
 import '../features/library/domain/library_document.dart';
 import '../features/library/presentation/library_screen.dart';
+import '../features/library/presentation/folder_import_dialog.dart';
+import '../features/navigation/application/navigation_history_controller.dart';
 import '../features/reader/application/reader_controller.dart';
 import '../features/reader/presentation/reader_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/search/domain/global_search_models.dart';
+import '../features/search/presentation/global_search_dialog.dart';
+import '../features/workspaces/domain/workspace_models.dart';
+import '../features/workspaces/presentation/document_tab_bar.dart';
+import '../features/workspaces/presentation/workspace_dialog.dart';
 import '../storage/repositories/app_settings_repository.dart';
 import 'app_config.dart';
 import 'app_services.dart';
@@ -20,10 +27,16 @@ import 'theme/app_theme.dart';
 import 'theme/app_tokens.dart';
 
 final class YamantakaApp extends StatefulWidget {
-  const YamantakaApp({super.key, required this.services, this.initialPath});
+  const YamantakaApp({
+    super.key,
+    required this.services,
+    this.initialPath,
+    this.initialPaths = const [],
+  });
 
   final AppServices services;
   final String? initialPath;
+  final List<String> initialPaths;
 
   @override
   State<YamantakaApp> createState() => _YamantakaAppState();
@@ -43,10 +56,16 @@ final class _YamantakaAppState extends State<YamantakaApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.services.reader.addListener(_syncActiveTab);
     if (_isDesktop) windowManager.addListener(this);
-    if (widget.initialPath case final path?) {
+    final startupPaths = widget.initialPaths.isNotEmpty
+        ? widget.initialPaths
+        : widget.initialPath == null
+        ? const <String>[]
+        : [widget.initialPath!];
+    if (startupPaths.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(_openPath(path));
+        unawaited(_openPaths(startupPaths));
       });
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -66,6 +85,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
   void dispose() {
     _windowSaveTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    widget.services.reader.removeListener(_syncActiveTab);
     if (_isDesktop) windowManager.removeListener(this);
     unawaited(_saveWindowBounds().whenComplete(widget.services.dispose));
     super.dispose();
@@ -88,7 +108,9 @@ final class _YamantakaAppState extends State<YamantakaApp>
     return ListenableBuilder(
       listenable: widget.services.settings,
       builder: (context, _) {
-        final settings = widget.services.settings.settings;
+        final settings = widget.services.safeMode
+            ? const AppSettings()
+            : widget.services.settings.settings;
         return MaterialApp(
           navigatorKey: _navigatorKey,
           title: AppConfig.productName,
@@ -134,56 +156,15 @@ final class _YamantakaAppState extends State<YamantakaApp>
       ),
       onDocumentInfo: _showDocumentInfo,
       onRelocateDocument: _relocateDocument,
+      organization: widget.services.organization,
+      onGlobalSearch: _showGlobalSearch,
+      onOpenPaths: _openPaths,
+      onWorkspaces: _showWorkspaces,
+      onImportFolder: _importFolder,
+      onRecoverFolder: _recoverMissingFromFolder,
+      safeMode: widget.services.safeMode,
     ),
-    _AppPage.reader => ReaderScreen(
-      controller: widget.services.reader,
-      engine: widget.services.engine,
-      viewerAdapter: widget.services.viewerAdapter,
-      onBack: _closeReader,
-      onOpenDocument: _pickAndOpen,
-      onOpenSettings: () => setState(() => _page = _AppPage.settings),
-      reduceMotion:
-          widget.services.settings.settings.reduceMotion ||
-          widget.services.settings.settings.disableAnimations,
-      showProgress: widget.services.settings.settings.showProgress,
-      readingDirection: widget.services.settings.settings.readingDirection,
-      visualProfile: widget.services.settings.settings.visualProfile,
-      initialPanelWidth: widget.services.settings.settings.readerPanelWidth,
-      initialPanelSection: widget.services.settings.settings.readerPanelSection,
-      initialPanelOpen: widget.services.settings.settings.readerPanelOpen,
-      initialChromeVisible:
-          widget.services.settings.settings.readerChromeVisible,
-      showModeControls:
-          widget.services.settings.settings.showReaderModeControls,
-      showPanelControls:
-          widget.services.settings.settings.showReaderPanelControls,
-      shortcutOverrides: widget.services.settings.settings.shortcutOverrides,
-      recentDocuments: widget.services.library.documents
-          .take(8)
-          .toList(growable: false),
-      onOpenPath: _openPath,
-      onPanelWidthChanged: (width) => unawaited(
-        widget.services.settings.update(
-          widget.services.settings.settings.copyWith(readerPanelWidth: width),
-        ),
-      ),
-      onPanelChanged: (section) => unawaited(
-        widget.services.settings.update(
-          widget.services.settings.settings.copyWith(
-            readerPanelOpen: section != null,
-            readerPanelSection: section?.name ?? '',
-          ),
-        ),
-      ),
-      onChromeVisibilityChanged: (visible) => unawaited(
-        widget.services.settings.update(
-          widget.services.settings.settings.copyWith(
-            readerChromeVisible: visible,
-          ),
-        ),
-      ),
-      onDocumentInfo: _showCurrentDocumentInfo,
-    ),
+    _AppPage.reader => _buildReaderPage(),
     _AppPage.settings => SettingsScreen(
       services: widget.services,
       onBack: () => setState(
@@ -194,9 +175,268 @@ final class _YamantakaAppState extends State<YamantakaApp>
     ),
   };
 
+  Widget _buildReaderPage() => Column(
+    children: [
+      DocumentTabBar(
+        controller: widget.services.tabs,
+        onActivate: (tab) => unawaited(_activateTab(tab)),
+        onClose: (tab) => unawaited(_closeTab(tab)),
+        onOpenDocument: () => unawaited(_pickAndOpen()),
+      ),
+      Expanded(
+        child: ReaderScreen(
+          controller: widget.services.reader,
+          engine: widget.services.engine,
+          viewerAdapter: widget.services.viewerAdapter,
+          onBack: _closeReader,
+          onOpenDocument: _pickAndOpen,
+          onOpenSettings: () => setState(() => _page = _AppPage.settings),
+          reduceMotion:
+              widget.services.settings.settings.reduceMotion ||
+              widget.services.settings.settings.disableAnimations,
+          showProgress: widget.services.settings.settings.showProgress,
+          readingDirection: widget.services.settings.settings.readingDirection,
+          visualProfile: widget.services.settings.settings.visualProfile,
+          initialPanelWidth: widget.services.settings.settings.readerPanelWidth,
+          initialPanelSection:
+              widget.services.settings.settings.readerPanelSection,
+          initialPanelOpen: widget.services.settings.settings.readerPanelOpen,
+          initialChromeVisible:
+              widget.services.settings.settings.readerChromeVisible,
+          showModeControls:
+              widget.services.settings.settings.showReaderModeControls,
+          showPanelControls:
+              widget.services.settings.settings.showReaderPanelControls,
+          shortcutOverrides:
+              widget.services.settings.settings.shortcutOverrides,
+          recentDocuments: widget.services.library.documents
+              .take(8)
+              .toList(growable: false),
+          onOpenPath: _openPath,
+          onPanelWidthChanged: (width) => unawaited(
+            widget.services.settings.update(
+              widget.services.settings.settings.copyWith(
+                readerPanelWidth: width,
+              ),
+            ),
+          ),
+          onPanelChanged: (section) => unawaited(
+            widget.services.settings.update(
+              widget.services.settings.settings.copyWith(
+                readerPanelOpen: section != null,
+                readerPanelSection: section?.name ?? '',
+              ),
+            ),
+          ),
+          onChromeVisibilityChanged: (visible) => unawaited(
+            widget.services.settings.update(
+              widget.services.settings.settings.copyWith(
+                readerChromeVisible: visible,
+              ),
+            ),
+          ),
+          onDocumentInfo: _showCurrentDocumentInfo,
+          onExportAnnotations: _exportAnnotations,
+        ),
+      ),
+    ],
+  );
+
   Future<void> _pickAndOpen() async {
     final selected = await _pickPdf();
     if (selected != null) await _openPath(selected.path);
+  }
+
+  Future<void> _openPaths(List<String> paths) async {
+    for (final path in paths.take(AppConfig.maxOpenTabs)) {
+      await _openPath(path);
+    }
+    if (paths.length > AppConfig.maxOpenTabs) {
+      _showNotice(
+        'Se abrieron ${AppConfig.maxOpenTabs} archivos; el resto se omitió '
+        'para respetar el límite de recursos.',
+      );
+    }
+  }
+
+  Future<void> _showGlobalSearch() async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => GlobalSearchDialog(
+        controller: widget.services.globalSearch,
+        indexController: widget.services.libraryIndex,
+        onOpen: (result) => unawaited(_openGlobalSearchResult(result)),
+      ),
+    );
+  }
+
+  Future<void> _showWorkspaces() async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    final settings = widget.services.settings.settings;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => WorkspaceDialog(
+        controller: widget.services.workspaces,
+        panelSection: settings.readerPanelSection,
+        panelWidth: settings.readerPanelWidth,
+        onRestore: (workspace) => unawaited(_restoreWorkspace(workspace)),
+      ),
+    );
+  }
+
+  Future<void> _importFolder() async {
+    final directory = await getDirectoryPath(
+      confirmButtonText: 'Analizar carpeta',
+    );
+    if (directory == null) return;
+    if (!mounted) return;
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    if (!context.mounted) return;
+    unawaited(
+      widget.services.folderImport.scan(directory, includeSubdirectories: true),
+    );
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => FolderImportDialog(
+        controller: widget.services.folderImport,
+        onImport: () async {
+          final summary = await widget.services.folderImport.importNew();
+          await widget.services.library.load();
+          if (context.mounted) Navigator.pop(context);
+          _showNotice(
+            'Importados ${summary.imported}; '
+            '${summary.duplicates} duplicados; '
+            '${summary.inaccessible + summary.invalid} con error.',
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _recoverMissingFromFolder() async {
+    final directory = await getDirectoryPath(
+      confirmButtonText: 'Buscar documentos',
+    );
+    if (directory == null) return;
+    _showNotice('Buscando coincidencias locales…');
+    final matches = await widget.services.documentRecovery.findMatches(
+      directory,
+    );
+    final summary = await widget.services.documentRecovery.recoverExact(
+      matches,
+    );
+    await widget.services.library.load();
+    _showNotice(
+      'Recuperados ${summary.recovered}; '
+      '${summary.ambiguous} ambiguos; '
+      '${summary.modified} modificados; '
+      '${summary.notFound} no encontrados.',
+    );
+  }
+
+  Future<void> _restoreWorkspace(WorkspaceSnapshot workspace) async {
+    widget.services.workspaces.restore(workspace.id);
+    final available = workspace.tabs
+        .where((tab) => !tab.isMissing && File(tab.path).existsSync())
+        .toList(growable: false);
+    final missingCount = workspace.tabs.length - available.length;
+    final active = available
+        .where((tab) => tab.id == workspace.activeTabId)
+        .firstOrNull;
+    final target = active ?? available.firstOrNull;
+    if (target != null) await _activateTab(target);
+    if (missingCount > 0) {
+      _showNotice(
+        'Espacio restaurado; $missingCount documentos no están disponibles.',
+      );
+    }
+  }
+
+  Future<void> _openGlobalSearchResult(GlobalSearchResult result) async {
+    final document = widget.services.documents.byId(result.documentId);
+    if (document == null || document.isMissing) {
+      _showNotice('El documento del resultado no está disponible.');
+      return;
+    }
+    await _openPath(document.path);
+    final pageIndex = result.pageIndex;
+    if (pageIndex != null &&
+        widget.services.reader.status == ReaderStatus.ready) {
+      await widget.services.reader.navigateTo(
+        pageIndex,
+        reason: NavigationReason.searchResult,
+        label: 'Resultado de búsqueda global',
+      );
+    }
+  }
+
+  Future<void> _exportAnnotations() async {
+    final context = _navigatorKey.currentContext;
+    final document = widget.services.reader.document;
+    if (context == null || document == null) return;
+    final format = await showDialog<_AnnotationExportFormat>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Exportar anotaciones'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.pop(context, _AnnotationExportFormat.markdown),
+            child: const ListTile(
+              leading: Icon(Icons.description_outlined),
+              title: Text('Markdown'),
+              subtitle: Text('Documento legible y ordenado por página'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.pop(context, _AnnotationExportFormat.json),
+            child: const ListTile(
+              leading: Icon(Icons.data_object_rounded),
+              title: Text('JSON versionado'),
+              subtitle: Text('Datos estructurados para futura importación'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (format == null) return;
+    final extension = format == _AnnotationExportFormat.markdown
+        ? 'md'
+        : 'json';
+    final location = await getSaveLocation(
+      suggestedName: 'yamantaka-anotaciones.$extension',
+      acceptedTypeGroups: [
+        XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
+      ],
+    );
+    if (location == null) return;
+    final annotations = widget.services.annotations.annotations;
+    final content = format == _AnnotationExportFormat.markdown
+        ? widget.services.annotationExporter.toMarkdown(
+            title: document.title ?? document.fileName,
+            author: document.author,
+            progress: document.readingProgress,
+            annotations: annotations,
+          )
+        : widget.services.annotationExporter.toVersionedJson(
+            documentId: document.id,
+            title: document.title ?? document.fileName,
+            author: document.author,
+            progress: document.readingProgress,
+            annotations: annotations,
+          );
+    try {
+      await File(location.path).writeAsString(content, flush: true);
+      _showNotice('Anotaciones exportadas.');
+    } on Object {
+      _showNotice('No se pudo exportar. Comprueba permisos y espacio libre.');
+    }
   }
 
   Future<XFile?> _pickPdf() async {
@@ -229,6 +469,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
     }
     if (!mounted) return;
     if (opened) {
+      final document = widget.services.reader.document;
+      if (document != null) widget.services.tabs.open(document);
       setState(() => _page = _AppPage.reader);
       unawaited(
         widget.services.settings.update(
@@ -243,6 +485,43 @@ final class _YamantakaAppState extends State<YamantakaApp>
     ScaffoldMessenger.of(
       _navigatorKey.currentContext ?? context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _activateTab(DocumentTab tab) async {
+    if (tab.isMissing) {
+      _showNotice('El documento de esta pestaña no está disponible.');
+      return;
+    }
+    widget.services.tabs.activate(tab.id);
+    await _openPath(tab.path);
+  }
+
+  Future<void> _closeTab(DocumentTab tab) async {
+    final wasActive = widget.services.tabs.activeTabId == tab.id;
+    widget.services.tabs.close(tab.id);
+    if (!wasActive) return;
+    final next = widget.services.tabs.activeTab;
+    if (next == null) {
+      await _closeReader();
+    } else {
+      await _activateTab(next);
+    }
+  }
+
+  void _syncActiveTab() {
+    final reader = widget.services.reader;
+    final preferences = reader.preferences;
+    if (reader.status != ReaderStatus.ready || preferences == null) return;
+    widget.services.tabs.updateActiveNavigation(
+      pageIndex: reader.currentPageIndex,
+      zoomLevel: preferences.zoomLevel,
+      pageLayout: preferences.pageLayout.name,
+      readingMode: preferences.viewMode.name,
+      scrollOffset: preferences.scrollOffset,
+      readingProgress: reader.pageCount == 0
+          ? 0
+          : (reader.currentPageIndex + 1) / reader.pageCount,
+    );
   }
 
   Future<String?> _askForPassword({required bool wrongPassword}) async {
@@ -301,6 +580,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
   Future<void> _restoreLastSession() async {
     if (_restorationAttempted) return;
     _restorationAttempted = true;
+    if (widget.services.safeMode) return;
     final settings = widget.services.settings.settings;
     final path = settings.lastDocumentPath;
     final pathExists = path.isNotEmpty && File(path).existsSync();
@@ -602,6 +882,8 @@ enum _DocumentInfoAction {
   relocate,
   open,
 }
+
+enum _AnnotationExportFormat { markdown, json }
 
 final class _DocumentMetadataLine extends StatelessWidget {
   const _DocumentMetadataLine({required this.label, required this.value});

@@ -15,9 +15,11 @@ import '../../../pdf_engine/presentation/pdf_viewer_adapter.dart';
 import '../../../storage/repositories/document_repository.dart';
 import '../../../storage/repositories/preferences_repository.dart';
 import '../../../storage/repositories/reading_session_repository.dart';
+import '../../annotations/application/annotation_controller.dart';
 import '../../bookmarks/application/bookmark_controller.dart';
 import '../../library/application/document_service.dart';
 import '../../library/domain/library_document.dart';
+import '../../navigation/application/navigation_history_controller.dart';
 import '../../search/application/search_controller.dart';
 import '../domain/reader_models.dart';
 import '../domain/reading_session.dart';
@@ -36,7 +38,9 @@ final class ReaderController extends ChangeNotifier {
     required ThumbnailService thumbnails,
     required WindowService windowService,
     required AppLogger logger,
+    this.annotations,
     required this.bookmarks,
+    this.navigationHistory,
     required this.search,
     required this.viewController,
     required bool Function() shouldGenerateCovers,
@@ -73,7 +77,9 @@ final class ReaderController extends ChangeNotifier {
   final int Function() _readingHistoryLimit;
   final bool Function() _shouldRestorePosition;
   final DocumentPreferences Function(String documentId) _defaultPreferences;
+  final AnnotationController? annotations;
   final BookmarkController bookmarks;
+  final NavigationHistoryController? navigationHistory;
   final SearchController search;
   final PdfViewController viewController;
 
@@ -124,8 +130,18 @@ final class ReaderController extends ChangeNotifier {
       currentPageIndex = _shouldRestorePosition()
           ? libraryDocument.lastPageIndex.clamp(0, pageCount - 1)
           : 0;
+      annotations?.load(libraryDocument.id, libraryDocument.fingerprint);
       bookmarks.load(libraryDocument.id);
       search.attach(openedDocument!.documentId, pageCount);
+      navigationHistory?.reset(
+        NavigationLocation(
+          pageIndex: currentPageIndex,
+          offset: preferences?.scrollOffset ?? 0,
+          zoom: preferences?.zoomLevel ?? 1,
+          reason: NavigationReason.history,
+          label: 'Posición inicial',
+        ),
+      );
       outline = const [];
       status = ReaderStatus.ready;
       pendingPath = null;
@@ -210,7 +226,9 @@ final class ReaderController extends ChangeNotifier {
     _savePositionNow();
     _finishSession();
     search.reset();
+    annotations?.clear();
     bookmarks.clear();
+    navigationHistory?.clear();
     final opened = openedDocument;
     document = null;
     openedDocument = null;
@@ -244,8 +262,40 @@ final class ReaderController extends ChangeNotifier {
   Future<void> lastPage() =>
       viewController.goToPage((pageCount - 1).clamp(0, pageCount));
 
-  Future<void> goToPage(int oneBasedPage) =>
-      viewController.goToPage(oneBasedPage.clamp(1, pageCount) - 1);
+  Future<void> goToPage(int oneBasedPage) => navigateTo(
+    oneBasedPage.clamp(1, pageCount) - 1,
+    reason: NavigationReason.distantPage,
+    label: 'Página $oneBasedPage',
+  );
+
+  Future<void> navigateTo(
+    int pageIndex, {
+    required NavigationReason reason,
+    required String label,
+  }) async {
+    if (pageCount == 0) return;
+    final target = pageIndex.clamp(0, pageCount - 1);
+    navigationHistory?.record(
+      NavigationLocation(
+        pageIndex: target,
+        offset: viewController.scrollOffset,
+        zoom: viewController.zoom,
+        reason: reason,
+        label: label,
+      ),
+    );
+    await viewController.goToPage(target);
+  }
+
+  Future<void> historyBack() async {
+    final location = navigationHistory?.back();
+    if (location != null) await viewController.goToPage(location.pageIndex);
+  }
+
+  Future<void> historyForward() async {
+    final location = navigationHistory?.forward();
+    if (location != null) await viewController.goToPage(location.pageIndex);
+  }
 
   Future<void> resetProgress() async {
     final currentDocument = document;

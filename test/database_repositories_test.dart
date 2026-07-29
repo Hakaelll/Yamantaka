@@ -20,7 +20,7 @@ void main() {
 
   tearDown(() => database.close());
 
-  test('migration creates the complete version-one schema', () {
+  test('migration creates the complete current schema', () {
     final version = database.database
         .select('PRAGMA user_version')
         .first
@@ -32,7 +32,7 @@ void main() {
         .map((row) => row['name'])
         .toSet();
 
-    expect(version, 1);
+    expect(version, 2);
     expect(
       tables,
       containsAll({
@@ -41,6 +41,10 @@ void main() {
         'bookmarks',
         'reading_sessions',
         'app_metadata',
+        'annotations',
+        'collections',
+        'workspaces',
+        'library_search',
       }),
     );
   });

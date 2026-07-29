@@ -1,0 +1,268 @@
+import 'package:flutter/material.dart';
+
+import '../../../app/theme/app_components.dart';
+import '../../../app/theme/app_tokens.dart';
+import '../application/global_search_controller.dart';
+import '../application/library_index_controller.dart';
+import '../domain/global_search_models.dart';
+
+final class GlobalSearchDialog extends StatefulWidget {
+  const GlobalSearchDialog({
+    super.key,
+    required this.controller,
+    required this.indexController,
+    required this.onOpen,
+  });
+
+  final GlobalLibrarySearchController controller;
+  final LibraryIndexController indexController;
+  final ValueChanged<GlobalSearchResult> onOpen;
+
+  @override
+  State<GlobalSearchDialog> createState() => _GlobalSearchDialogState();
+}
+
+final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
+  late final TextEditingController _queryController = TextEditingController(
+    text: widget.controller.query,
+  );
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(AppSpacing.space16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 680),
+        child: ListenableBuilder(
+          listenable: Listenable.merge([
+            widget.controller,
+            widget.indexController,
+          ]),
+          builder: (context, _) {
+            final progress = widget.indexController.progress;
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.space16,
+                    AppSpacing.space16,
+                    AppSpacing.space8,
+                    AppSpacing.space12,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Buscar en la biblioteca',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Cerrar',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.space16,
+                  ),
+                  child: TextField(
+                    key: const Key('global-search-field'),
+                    controller: _queryController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.manage_search_rounded),
+                      labelText: 'Documentos, contenido, notas y etiquetas',
+                      suffixIcon: _queryController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Limpiar',
+                              onPressed: () {
+                                _queryController.clear();
+                                widget.controller.clear();
+                              },
+                              icon: const Icon(Icons.clear_rounded),
+                            ),
+                    ),
+                    onChanged: (value) {
+                      setState(() {});
+                      widget.controller.search(value);
+                    },
+                    onSubmitted: widget.controller.search,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.space8),
+                _IndexStatusBar(
+                  controller: widget.indexController,
+                  progress: progress,
+                ),
+                const Divider(height: 1),
+                Expanded(child: _results()),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _results() {
+    final controller = widget.controller;
+    if (controller.isSearching && controller.results.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (controller.query.isEmpty) {
+      return const AppStatusView(
+        icon: Icons.search_rounded,
+        title: 'Búsqueda local unificada',
+        message:
+            'Busca por metadatos, contenido extraíble, anotaciones, '
+            'colecciones y etiquetas. El índice permanece en este dispositivo.',
+      );
+    }
+    if (controller.results.isEmpty) {
+      return const AppStatusView(
+        icon: Icons.search_off_rounded,
+        title: 'Sin resultados',
+        message:
+            'El documento puede no contener texto extraíble o aún no estar '
+            'indexado. Yamantaka no realiza OCR.',
+      );
+    }
+    return ListView.builder(
+      key: const PageStorageKey('global-search-results'),
+      itemCount: controller.results.length + (controller.hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == controller.results.length) {
+          return Padding(
+            padding: const EdgeInsets.all(AppSpacing.space16),
+            child: OutlinedButton(
+              onPressed: () =>
+                  controller.search(controller.query, loadMore: true),
+              child: const Text('Cargar más'),
+            ),
+          );
+        }
+        final result = controller.results[index];
+        return ListTile(
+          leading: Icon(_icon(result.kind)),
+          title: Text(
+            result.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            [
+              result.kind.label,
+              if (result.pageIndex != null) 'Página ${result.pageIndex! + 1}',
+              if (result.snippet.isNotEmpty) result.snippet,
+            ].join(' · '),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onTap: () {
+            Navigator.pop(context);
+            widget.onOpen(result);
+          },
+        );
+      },
+    );
+  }
+
+  static IconData _icon(GlobalSearchKind kind) => switch (kind) {
+    GlobalSearchKind.metadata => Icons.picture_as_pdf_outlined,
+    GlobalSearchKind.pageText => Icons.subject_rounded,
+    GlobalSearchKind.annotation => Icons.rate_review_outlined,
+    GlobalSearchKind.collection => Icons.folder_outlined,
+    GlobalSearchKind.tag => Icons.label_outline_rounded,
+  };
+}
+
+final class _IndexStatusBar extends StatelessWidget {
+  const _IndexStatusBar({required this.controller, required this.progress});
+
+  final LibraryIndexController controller;
+  final LibraryIndexProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
+      child: Row(
+        children: [
+          Switch(value: controller.enabled, onChanged: controller.setEnabled),
+          const SizedBox(width: AppSpacing.space4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  controller.enabled
+                      ? progress.isRunning
+                            ? 'Indexando ${progress.completedDocuments} de '
+                                  '${progress.totalDocuments}'
+                            : 'Índice local activado'
+                      : 'Índice local desactivado',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                if (progress.isRunning)
+                  LinearProgressIndicator(value: progress.fraction),
+              ],
+            ),
+          ),
+          if (progress.isRunning)
+            IconButton(
+              tooltip: progress.isPaused ? 'Reanudar' : 'Pausar',
+              onPressed: progress.isPaused
+                  ? controller.resume
+                  : controller.pause,
+              icon: Icon(
+                progress.isPaused
+                    ? Icons.play_arrow_rounded
+                    : Icons.pause_rounded,
+              ),
+            )
+          else if (controller.enabled)
+            IconButton(
+              tooltip: 'Actualizar índice',
+              onPressed: controller.indexIncremental,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          PopupMenuButton<_IndexAction>(
+            tooltip: 'Mantenimiento del índice',
+            onSelected: (action) {
+              switch (action) {
+                case _IndexAction.rebuild:
+                  controller.rebuild();
+                case _IndexAction.clear:
+                  controller.clearIndex();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _IndexAction.rebuild,
+                child: Text('Reconstruir índice'),
+              ),
+              PopupMenuItem(
+                value: _IndexAction.clear,
+                child: Text('Borrar índice'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _IndexAction { rebuild, clear }

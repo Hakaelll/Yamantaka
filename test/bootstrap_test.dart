@@ -9,4 +9,17 @@ void main() {
     );
     expect(initialPdfPath(['--verbose', 'notes.txt']), isNull);
   });
+
+  test('collects multiple unique PDF command-line arguments', () {
+    expect(
+      initialPdfPaths([
+        'yamantaka.exe',
+        r'C:\one.pdf',
+        r'C:\two.PDF',
+        r'C:\one.pdf',
+        '--safe',
+      ]),
+      [r'C:\one.pdf', r'C:\two.PDF'],
+    );
+  });
 }

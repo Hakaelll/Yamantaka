@@ -10,8 +10,10 @@ import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/application/library_controller.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
 import 'package:yamantaka/features/library/presentation/library_screen.dart';
+import 'package:yamantaka/features/organization/application/organization_controller.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
+import 'package:yamantaka/storage/repositories/organization_repository.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -59,9 +61,17 @@ void main() {
       );
     }
     final controller = LibraryController(documents, logger);
+    final organization = OrganizationController(
+      OrganizationRepository(database),
+    );
+    final collection = organization.createCollection('Investigación');
+    organization
+      ..addDocument(collection.id, 'sample-1')
+      ..addDocument(collection.id, 'sample-3');
     await controller.load();
     addTearDown(() async {
       controller.dispose();
+      organization.dispose();
       database.close();
       await directory.delete(recursive: true);
     });
@@ -83,6 +93,7 @@ void main() {
           onOpenSettings: () {},
           showRecents: true,
           onDocumentInfo: (_) async {},
+          organization: organization,
         ),
       ),
     );
@@ -90,6 +101,25 @@ void main() {
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
     await _capture(tester, capturePath);
+
+    await tester.tap(find.byTooltip('Colecciones'));
+    await tester.pumpAndSettle();
+    await _capture(tester, _suffix(capturePath, '-collections'));
+    await tester.scrollUntilVisible(
+      find.text('Investigación'),
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(find.text('Investigación'));
+    await tester.pumpAndSettle();
+    await _capture(tester, _suffix(capturePath, '-collection-filtered'));
+    organization.clearSelection();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('En curso 2'));
     await tester.pumpAndSettle();

@@ -291,3 +291,78 @@ El detalle exacto está en `third_party/pdfrx/PATCHES.md`.
   siempre incluyen modo, DPI, tamaño y número de pasadas.
 - Riesgos: un único equipo y proceso no representa otras GPU ni una prueba de
   fugas sostenida; YAM-041/048 conservan esa ampliación.
+
+## ADR-018 — Esquema v2 y copia pre-migración
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: anotaciones, organización y workspaces amplían datos privados y no
+  pueden depender de una migración destructiva.
+- Decisión: migración SQLite v2 transaccional, `VACUUM INTO` previo, FKs,
+  `integrity_check` posterior y backup JSON v2 compatible con v1.
+- Motivo: una copia recuperable y allowlists explícitas limitan el radio de
+  fallo sin añadir dependencias.
+- Consecuencias: FTS/estado de indexación son reconstruibles y se excluyen del
+  backup; notas, tags, colecciones y workspaces sí se incluyen.
+- Riesgos: la copia requiere espacio libre; falta simular disco lleno/corrupción.
+
+## ADR-019 — Anotaciones normalizadas sin escribir el PDF
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: las anotaciones deben sobrevivir a zoom/DPI/rotación sin alterar el
+  documento original ni inventar geometría que el visor no expone.
+- Decisión: almacenar tipo, color acotado, texto, página, rotación y rectángulo
+  0–1 ligados a huella; marcar para revisión si cambia la identidad.
+- Motivo: es portable, validable y respeta el límite local-first.
+- Consecuencias: nota de página funciona ya; highlight/underline/strike desde
+  selección quedan bloqueados hasta disponer de cajas nativas.
+- Riesgos: no existe anclaje semántico si el contenido cambia.
+
+## ADR-020 — Pestañas como estado suspendible
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: mantener un visor PDF por pestaña rompería el presupuesto de memoria.
+- Decisión: máximo 12 tabs, activa + una warm y resto suspendidas; persistir
+  contexto serializable y abrir/cerrar el único handle activo al cambiar.
+- Motivo: ofrece cambio rápido y workspaces sin convertir tabs en procesos.
+- Consecuencias: restaurar una suspendida puede reabrir el PDF; ausentes quedan
+  visibles y no causan bucle.
+- Riesgos: falta perfil sostenido con 12 documentos pesados.
+
+## ADR-021 — FTS local opt-in y reconstruible
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: buscar en biblioteca completa requiere índice, pero texto y
+  anotaciones son datos sensibles.
+- Decisión: FTS5 local activado explícitamente por sesión, indexación secuencial
+  cancelable, sin OCR, consulta efímera y borrado/rebuild visibles.
+- Motivo: SQLite ya está incluido; no añade servicio, cuenta ni dependencia.
+- Consecuencias: el índice no entra en backups y su opt-in no persiste.
+- Riesgos: corpus grandes requieren perfil real adicional.
+
+## ADR-022 — Safe mode tras tres cierres no limpios
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: restaurar repetidamente un documento/estado problemático puede
+  encadenar crashes.
+- Decisión: contador mínimo en metadata; al tercer arranque no limpio usar
+  preferencias base y omitir restauración, sin borrar datos.
+- Motivo: corta el bucle de forma local, reversible y explicable.
+- Consecuencias: un cierre forzado intencional cuenta como no limpio.
+- Riesgos: falta diferenciar causas y ofrecer reintento explícito.
+
+## ADR-023 — Split definido pero no anunciado
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: comparación exige dos ownership de visor, foco y presupuesto; una
+  mera división de layout sería engañosa.
+- Decisión: versionar solo dominio/política de split y frontera 1100 px; mantener
+  YAM-062/063 bloqueadas hasta dos lectores reales, cierre y perfil nativo.
+- Motivo: preserva honestidad del producto y evita visores invisibles/fugas.
+- Consecuencias: workspaces pueden conservar un estado futuro compatible.
+- Riesgos: el contrato puede ajustarse tras el prototipo.
