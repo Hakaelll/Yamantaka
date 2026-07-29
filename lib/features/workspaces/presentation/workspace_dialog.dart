@@ -59,7 +59,7 @@ final class WorkspaceDialog extends StatelessWidget {
                         icon: Icons.space_dashboard_outlined,
                         title: 'Sin espacios guardados',
                         message:
-                            'Guarda las pestañas, posiciones y panel actuales '
+                            'Guarda los documentos, posiciones y panel actuales '
                             'para recuperar esta sesión de lectura.',
                       )
                     : ListView.separated(
@@ -84,7 +84,8 @@ final class WorkspaceDialog extends StatelessWidget {
                             ),
                             title: Text(workspace.name),
                             subtitle: Text(
-                              '${workspace.tabs.length} pestañas'
+                              '${workspace.tabs.length} '
+                              '${workspace.tabs.length == 1 ? 'documento' : 'documentos'}'
                               '${missing == 0 ? '' : ' · $missing ausentes'}',
                             ),
                             onTap: () {

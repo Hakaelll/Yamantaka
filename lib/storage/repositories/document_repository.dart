@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:sqlite3/common.dart' show Row;
 
 import '../../features/library/domain/library_document.dart';
+import '../../features/library/domain/document_cover.dart';
 import '../../features/reader/domain/reader_models.dart';
 import '../database/app_database.dart';
 
@@ -13,7 +14,7 @@ final class DocumentRepository {
 
   List<LibraryDocument> recent({int limit = 40}) {
     final rows = _database.database.select(
-      'SELECT * FROM documents ORDER BY last_opened_at DESC LIMIT ?',
+      '$_documentSelect ORDER BY d.last_opened_at DESC LIMIT ?',
       [limit],
     );
     return rows.map(_fromRow).toList(growable: false);
@@ -21,14 +22,14 @@ final class DocumentRepository {
 
   List<LibraryDocument> all() {
     final rows = _database.database.select(
-      'SELECT * FROM documents ORDER BY last_opened_at DESC',
+      '$_documentSelect ORDER BY d.last_opened_at DESC',
     );
     return rows.map(_fromRow).toList(growable: false);
   }
 
   LibraryDocument? byId(String id) {
     final rows = _database.database.select(
-      'SELECT * FROM documents WHERE id = ? LIMIT 1',
+      '$_documentSelect WHERE d.id = ? LIMIT 1',
       [id],
     );
     return rows.isEmpty ? null : _fromRow(rows.first);
@@ -36,7 +37,7 @@ final class DocumentRepository {
 
   LibraryDocument? byNormalizedPath(String normalizedPath) {
     final rows = _database.database.select(
-      'SELECT * FROM documents WHERE normalized_path = ? LIMIT 1',
+      '$_documentSelect WHERE d.normalized_path = ? LIMIT 1',
       [normalizedPath],
     );
     return rows.isEmpty ? null : _fromRow(rows.first);
@@ -44,8 +45,8 @@ final class DocumentRepository {
 
   LibraryDocument? byFingerprint(String fingerprint) {
     final rows = _database.database.select(
-      'SELECT * FROM documents WHERE fingerprint = ? '
-      'ORDER BY last_opened_at DESC LIMIT 1',
+      '$_documentSelect WHERE d.fingerprint = ? '
+      'ORDER BY d.last_opened_at DESC LIMIT 1',
       [fingerprint],
     );
     return rows.isEmpty ? null : _fromRow(rows.first);
@@ -58,8 +59,8 @@ final class DocumentRepository {
         id, path, normalized_path, file_name, title, author, page_count,
         file_size, file_modified_at, added_at, last_opened_at, last_page_index,
         reading_progress, preferred_view_mode, preferred_theme, is_missing,
-        fingerprint, thumbnail_path
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        fingerprint, thumbnail_path, is_favorite
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         path = excluded.path,
         normalized_path = excluded.normalized_path,
@@ -76,7 +77,8 @@ final class DocumentRepository {
         preferred_theme = excluded.preferred_theme,
         is_missing = excluded.is_missing,
         fingerprint = excluded.fingerprint,
-        thumbnail_path = excluded.thumbnail_path
+        thumbnail_path = excluded.thumbnail_path,
+        is_favorite = excluded.is_favorite
       ''',
       [
         document.id,
@@ -97,6 +99,7 @@ final class DocumentRepository {
         document.isMissing ? 1 : 0,
         document.fingerprint,
         document.thumbnailPath,
+        document.isFavorite ? 1 : 0,
       ],
     );
   }
@@ -136,7 +139,73 @@ final class DocumentRepository {
     );
   }
 
+  void saveCover(DocumentCoverMetadata metadata) {
+    _database.database.execute(
+      '''
+      INSERT INTO document_covers (
+        document_id, source_page_index, small_thumbnail_path,
+        large_thumbnail_path, generated_at, source_modified_at, confidence,
+        selection_mode, algorithm_version, crop_mode, page_aspect_ratio
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(document_id) DO UPDATE SET
+        source_page_index = excluded.source_page_index,
+        small_thumbnail_path = excluded.small_thumbnail_path,
+        large_thumbnail_path = excluded.large_thumbnail_path,
+        generated_at = excluded.generated_at,
+        source_modified_at = excluded.source_modified_at,
+        confidence = excluded.confidence,
+        selection_mode = excluded.selection_mode,
+        algorithm_version = excluded.algorithm_version,
+        crop_mode = excluded.crop_mode,
+        page_aspect_ratio = excluded.page_aspect_ratio
+      ''',
+      [
+        metadata.documentId,
+        metadata.sourcePageIndex,
+        metadata.smallThumbnailPath,
+        metadata.largeThumbnailPath,
+        _date(metadata.generatedAt),
+        _date(metadata.sourceModifiedAt),
+        metadata.confidence,
+        metadata.selectionMode.name,
+        metadata.algorithmVersion,
+        metadata.cropMode.name,
+        metadata.pageAspectRatio,
+      ],
+    );
+    updateThumbnail(metadata.documentId, metadata.smallThumbnailPath);
+  }
+
+  void invalidateCover(String documentId) {
+    _database.database.execute(
+      'DELETE FROM document_covers WHERE document_id = ?',
+      [documentId],
+    );
+    _database.database.execute(
+      'UPDATE documents SET thumbnail_path = NULL WHERE id = ?',
+      [documentId],
+    );
+  }
+
+  void toggleFavorite(String documentId) {
+    _database.database.execute(
+      '''
+      UPDATE documents
+      SET is_favorite = CASE is_favorite WHEN 1 THEN 0 ELSE 1 END
+      WHERE id = ?
+      ''',
+      [documentId],
+    );
+  }
+
   void clearThumbnailPath(String thumbnailPath) {
+    _database.database.execute(
+      '''
+      DELETE FROM document_covers
+      WHERE small_thumbnail_path = ? OR large_thumbnail_path = ?
+      ''',
+      [thumbnailPath, thumbnailPath],
+    );
     _database.database.execute(
       'UPDATE documents SET thumbnail_path = NULL WHERE thumbnail_path = ?',
       [thumbnailPath],
@@ -144,6 +213,7 @@ final class DocumentRepository {
   }
 
   void clearThumbnailPaths() {
+    _database.database.execute('DELETE FROM document_covers');
     _database.database.execute('UPDATE documents SET thumbnail_path = NULL');
   }
 
@@ -201,6 +271,32 @@ final class DocumentRepository {
     } on FileSystemException {
       // Missing and inaccessible files are represented by is_missing instead.
     }
+    final coverDocumentId = row['cover_document_id'] as String?;
+    final cover = coverDocumentId == null
+        ? null
+        : DocumentCoverMetadata(
+            documentId: coverDocumentId,
+            sourcePageIndex: row['cover_source_page_index'] as int,
+            smallThumbnailPath: row['cover_small_path'] as String,
+            largeThumbnailPath: row['cover_large_path'] as String,
+            generatedAt: DateTime.parse(row['cover_generated_at'] as String),
+            sourceModifiedAt: DateTime.parse(
+              row['cover_source_modified_at'] as String,
+            ),
+            confidence: row['cover_confidence'] as double,
+            selectionMode: _enumByName(
+              CoverSelectionMode.values,
+              row['cover_selection_mode'] as String,
+              CoverSelectionMode.automatic,
+            ),
+            algorithmVersion: row['cover_algorithm_version'] as int,
+            cropMode: _enumByName(
+              CoverCropMode.values,
+              row['cover_crop_mode'] as String,
+              CoverCropMode.contain,
+            ),
+            pageAspectRatio: row['cover_page_aspect_ratio'] as double,
+          );
     return LibraryDocument(
       id: row['id'] as String,
       path: path,
@@ -228,9 +324,29 @@ final class DocumentRepository {
       isMissing: (row['is_missing'] as int) == 1,
       hasFileChanged: hasFileChanged,
       fingerprint: row['fingerprint'] as String,
-      thumbnailPath: row['thumbnail_path'] as String?,
+      thumbnailPath:
+          cover?.smallThumbnailPath ?? row['thumbnail_path'] as String?,
+      coverMetadata: cover,
+      isFavorite: (row['is_favorite'] as int) == 1,
     );
   }
+
+  static const String _documentSelect = '''
+    SELECT d.*,
+      c.document_id AS cover_document_id,
+      c.source_page_index AS cover_source_page_index,
+      c.small_thumbnail_path AS cover_small_path,
+      c.large_thumbnail_path AS cover_large_path,
+      c.generated_at AS cover_generated_at,
+      c.source_modified_at AS cover_source_modified_at,
+      c.confidence AS cover_confidence,
+      c.selection_mode AS cover_selection_mode,
+      c.algorithm_version AS cover_algorithm_version,
+      c.crop_mode AS cover_crop_mode
+      , c.page_aspect_ratio AS cover_page_aspect_ratio
+    FROM documents d
+    LEFT JOIN document_covers c ON c.document_id = d.id
+  ''';
 
   static String _date(DateTime value) => value.toUtc().toIso8601String();
 

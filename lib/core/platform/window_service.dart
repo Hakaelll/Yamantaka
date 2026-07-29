@@ -9,7 +9,7 @@ abstract interface class WindowService {
 }
 
 final class DesktopWindowService implements WindowService {
-  const DesktopWindowService();
+  bool _restoreMaximizedOnExit = false;
 
   bool get _supported =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -20,7 +20,22 @@ final class DesktopWindowService implements WindowService {
 
   @override
   Future<void> setFullScreen(bool value) async {
-    if (_supported) await windowManager.setFullScreen(value);
+    if (!_supported || await windowManager.isFullScreen() == value) return;
+    if (Platform.isWindows && value) {
+      // window_manager 0.5.2 keeps the native title bar when fullscreen is
+      // requested from a maximized window. Enter from a restored state so the
+      // plugin snapshots/removes the complete frame, then restore maximized
+      // state after leaving fullscreen.
+      _restoreMaximizedOnExit = await windowManager.isMaximized();
+      if (_restoreMaximizedOnExit) await windowManager.unmaximize();
+      await windowManager.setFullScreen(true);
+      return;
+    }
+    await windowManager.setFullScreen(value);
+    if (Platform.isWindows && !value && _restoreMaximizedOnExit) {
+      _restoreMaximizedOnExit = false;
+      await windowManager.maximize();
+    }
   }
 
   @override

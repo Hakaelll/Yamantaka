@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 import '../core/errors/app_failure.dart';
 import '../features/library/domain/library_document.dart';
 import '../features/library/presentation/library_screen.dart';
+import '../features/library/presentation/document_cover_picker.dart';
 import '../features/library/presentation/folder_import_dialog.dart';
 import '../features/navigation/application/navigation_history_controller.dart';
 import '../features/reader/application/reader_controller.dart';
@@ -17,7 +18,6 @@ import '../features/settings/presentation/settings_screen.dart';
 import '../features/search/domain/global_search_models.dart';
 import '../features/search/presentation/global_search_dialog.dart';
 import '../features/workspaces/domain/workspace_models.dart';
-import '../features/workspaces/presentation/document_tab_bar.dart';
 import '../features/workspaces/presentation/workspace_dialog.dart';
 import '../storage/repositories/app_settings_repository.dart';
 import 'app_config.dart';
@@ -25,6 +25,13 @@ import 'app_services.dart';
 import 'shortcuts/app_commands.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_tokens.dart';
+
+@visibleForTesting
+ThemeMode resolveAppThemeMode(AppSettings settings, {required bool safeMode}) {
+  // Safe mode protects restoration and indexing; changing palette is a
+  // presentation-only operation and remains available.
+  return settings.darkMode ? ThemeMode.dark : ThemeMode.light;
+}
 
 final class YamantakaApp extends StatefulWidget {
   const YamantakaApp({
@@ -108,16 +115,19 @@ final class _YamantakaAppState extends State<YamantakaApp>
     return ListenableBuilder(
       listenable: widget.services.settings,
       builder: (context, _) {
-        final settings = widget.services.safeMode
-            ? const AppSettings()
-            : widget.services.settings.settings;
+        // Safe mode suppresses risky restoration/indexing paths, but it must
+        // never discard presentation preferences such as the selected theme.
+        final settings = widget.services.settings.settings;
         return MaterialApp(
           navigatorKey: _navigatorKey,
           title: AppConfig.productName,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(density: settings.interfaceDensity),
           darkTheme: AppTheme.dark(density: settings.interfaceDensity),
-          themeMode: settings.darkMode ? ThemeMode.dark : ThemeMode.light,
+          themeMode: resolveAppThemeMode(
+            settings,
+            safeMode: widget.services.safeMode,
+          ),
           themeAnimationDuration:
               settings.reduceMotion || settings.disableAnimations
               ? AppMotion.instant
@@ -127,7 +137,41 @@ final class _YamantakaAppState extends State<YamantakaApp>
               openDocument: () => unawaited(_pickAndOpen()),
               overrides: settings.shortcutOverrides,
             ),
-            child: Focus(autofocus: true, child: Builder(builder: _buildPage)),
+            child: Focus(
+              autofocus: true,
+              child: Builder(
+                builder: (context) {
+                  final reduceMotion =
+                      settings.reduceMotion ||
+                      settings.disableAnimations ||
+                      MediaQuery.disableAnimationsOf(context);
+                  return AnimatedSwitcher(
+                    duration: reduceMotion
+                        ? AppMotion.instant
+                        : AppMotion.panel,
+                    reverseDuration: reduceMotion
+                        ? AppMotion.instant
+                        : AppMotion.fast,
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      final scale = Tween<double>(
+                        begin: 0.985,
+                        end: 1,
+                      ).animate(animation);
+                      return FadeTransition(
+                        opacity: animation,
+                        child: ScaleTransition(scale: scale, child: child),
+                      );
+                    },
+                    child: KeyedSubtree(
+                      key: ValueKey(_page),
+                      child: _buildPage(context),
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
         );
       },
@@ -156,6 +200,11 @@ final class _YamantakaAppState extends State<YamantakaApp>
       ),
       onDocumentInfo: _showDocumentInfo,
       onRelocateDocument: _relocateDocument,
+      onToggleFavorite: _toggleFavorite,
+      onChangeCover: _changeDocumentCover,
+      onRevealDocument: (document) =>
+          widget.services.revealDocument(document.path),
+      onRemoveDocument: _removeDocument,
       organization: widget.services.organization,
       onGlobalSearch: _showGlobalSearch,
       onOpenPaths: _openPaths,
@@ -175,71 +224,53 @@ final class _YamantakaAppState extends State<YamantakaApp>
     ),
   };
 
-  Widget _buildReaderPage() => Column(
-    children: [
-      DocumentTabBar(
-        controller: widget.services.tabs,
-        onActivate: (tab) => unawaited(_activateTab(tab)),
-        onClose: (tab) => unawaited(_closeTab(tab)),
-        onOpenDocument: () => unawaited(_pickAndOpen()),
+  Widget _buildReaderPage() => ReaderScreen(
+    controller: widget.services.reader,
+    engine: widget.services.engine,
+    viewerAdapter: widget.services.viewerAdapter,
+    onBack: _closeReader,
+    onOpenDocument: _pickAndOpen,
+    onOpenSettings: () => setState(() => _page = _AppPage.settings),
+    reduceMotion:
+        widget.services.settings.settings.reduceMotion ||
+        widget.services.settings.settings.disableAnimations,
+    showProgress: widget.services.settings.settings.showProgress,
+    readingDirection: widget.services.settings.settings.readingDirection,
+    visualProfile: widget.services.settings.settings.visualProfile,
+    initialPanelWidth: widget.services.settings.settings.readerPanelWidth,
+    initialPanelSection: widget.services.settings.settings.readerPanelSection,
+    initialPanelOpen: widget.services.settings.settings.readerPanelOpen,
+    initialChromeVisible: widget.services.settings.settings.readerChromeVisible,
+    showModeControls: widget.services.settings.settings.showReaderModeControls,
+    showPanelControls:
+        widget.services.settings.settings.showReaderPanelControls,
+    shortcutOverrides: widget.services.settings.settings.shortcutOverrides,
+    recentDocuments: widget.services.library.documents
+        .take(8)
+        .toList(growable: false),
+    onOpenPath: _openPath,
+    onPanelWidthChanged: (width) => unawaited(
+      widget.services.settings.update(
+        widget.services.settings.settings.copyWith(readerPanelWidth: width),
       ),
-      Expanded(
-        child: ReaderScreen(
-          controller: widget.services.reader,
-          engine: widget.services.engine,
-          viewerAdapter: widget.services.viewerAdapter,
-          onBack: _closeReader,
-          onOpenDocument: _pickAndOpen,
-          onOpenSettings: () => setState(() => _page = _AppPage.settings),
-          reduceMotion:
-              widget.services.settings.settings.reduceMotion ||
-              widget.services.settings.settings.disableAnimations,
-          showProgress: widget.services.settings.settings.showProgress,
-          readingDirection: widget.services.settings.settings.readingDirection,
-          visualProfile: widget.services.settings.settings.visualProfile,
-          initialPanelWidth: widget.services.settings.settings.readerPanelWidth,
-          initialPanelSection:
-              widget.services.settings.settings.readerPanelSection,
-          initialPanelOpen: widget.services.settings.settings.readerPanelOpen,
-          initialChromeVisible:
-              widget.services.settings.settings.readerChromeVisible,
-          showModeControls:
-              widget.services.settings.settings.showReaderModeControls,
-          showPanelControls:
-              widget.services.settings.settings.showReaderPanelControls,
-          shortcutOverrides:
-              widget.services.settings.settings.shortcutOverrides,
-          recentDocuments: widget.services.library.documents
-              .take(8)
-              .toList(growable: false),
-          onOpenPath: _openPath,
-          onPanelWidthChanged: (width) => unawaited(
-            widget.services.settings.update(
-              widget.services.settings.settings.copyWith(
-                readerPanelWidth: width,
-              ),
-            ),
-          ),
-          onPanelChanged: (section) => unawaited(
-            widget.services.settings.update(
-              widget.services.settings.settings.copyWith(
-                readerPanelOpen: section != null,
-                readerPanelSection: section?.name ?? '',
-              ),
-            ),
-          ),
-          onChromeVisibilityChanged: (visible) => unawaited(
-            widget.services.settings.update(
-              widget.services.settings.settings.copyWith(
-                readerChromeVisible: visible,
-              ),
-            ),
-          ),
-          onDocumentInfo: _showCurrentDocumentInfo,
-          onExportAnnotations: _exportAnnotations,
+    ),
+    onPanelChanged: (section) => unawaited(
+      widget.services.settings.update(
+        widget.services.settings.settings.copyWith(
+          readerPanelOpen: section != null,
+          readerPanelSection: section?.name ?? '',
         ),
       ),
-    ],
+    ),
+    onChromeVisibilityChanged: (visible) => unawaited(
+      widget.services.settings.update(
+        widget.services.settings.settings.copyWith(
+          readerChromeVisible: visible,
+        ),
+      ),
+    ),
+    onDocumentInfo: _showCurrentDocumentInfo,
+    onExportAnnotations: _exportAnnotations,
   );
 
   Future<void> _pickAndOpen() async {
@@ -489,23 +520,11 @@ final class _YamantakaAppState extends State<YamantakaApp>
 
   Future<void> _activateTab(DocumentTab tab) async {
     if (tab.isMissing) {
-      _showNotice('El documento de esta pestaña no está disponible.');
+      _showNotice('Este documento guardado ya no está disponible.');
       return;
     }
     widget.services.tabs.activate(tab.id);
     await _openPath(tab.path);
-  }
-
-  Future<void> _closeTab(DocumentTab tab) async {
-    final wasActive = widget.services.tabs.activeTabId == tab.id;
-    widget.services.tabs.close(tab.id);
-    if (!wasActive) return;
-    final next = widget.services.tabs.activeTab;
-    if (next == null) {
-      await _closeReader();
-    } else {
-      await _activateTab(next);
-    }
   }
 
   void _syncActiveTab() {
@@ -756,29 +775,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
         await widget.services.library.load();
         _showNotice('Progreso reiniciado.');
       case _DocumentInfoAction.remove:
-        final confirmed = await _confirmDocumentAction(
-          title: 'Retirar de la biblioteca',
-          message:
-              'Se eliminarán el progreso, marcadores y sesiones locales. '
-              'El archivo PDF no se borrará.',
-          confirmLabel: 'Retirar',
-        );
-        if (!confirmed) return;
-        if (isCurrentDocument) await widget.services.reader.closeDocument();
-        widget.services.documents.remove(document.id);
-        if (isCurrentDocument) {
-          await widget.services.settings.update(
-            widget.services.settings.settings.copyWith(
-              lastDocumentPath: '',
-              readerPanelOpen: false,
-            ),
-          );
-        }
-        await widget.services.library.load();
-        if (mounted && isCurrentDocument) {
-          setState(() => _page = _AppPage.library);
-        }
-        _showNotice('Documento retirado. El PDF no se ha borrado.');
+        await _removeDocument(document);
       case _DocumentInfoAction.relocate:
         await _relocateDocument(document);
       case _DocumentInfoAction.open:
@@ -809,6 +806,65 @@ final class _YamantakaAppState extends State<YamantakaApp>
       return;
     }
     await _openPath(selected.path);
+  }
+
+  Future<void> _toggleFavorite(LibraryDocument document) async {
+    await widget.services.library.toggleFavorite(document.id);
+    _showNotice(
+      document.isFavorite ? 'Quitado de favoritos.' : 'Añadido a favoritos.',
+    );
+  }
+
+  Future<void> _changeDocumentCover(LibraryDocument document) async {
+    final context = _navigatorKey.currentContext;
+    if (context == null || document.isMissing) return;
+    final changed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => DocumentCoverPickerDialog(
+        document: document,
+        loadPreviews: () => widget.services.thumbnails.previewPages(document),
+        onUsePage: (pageIndex) =>
+            widget.services.thumbnails.setManualCover(document, pageIndex),
+        onRestoreAutomatic: () =>
+            widget.services.thumbnails.restoreAutomaticCover(document),
+      ),
+    );
+    if (changed == true) {
+      await widget.services.library.load();
+      _showNotice('Portada actualizada.');
+    }
+  }
+
+  Future<void> _removeDocument(LibraryDocument document) async {
+    final isCurrentDocument =
+        widget.services.reader.document?.id == document.id &&
+        widget.services.reader.status == ReaderStatus.ready;
+    final confirmed = await _confirmDocumentAction(
+      title: 'Retirar de la biblioteca',
+      message:
+          'Se eliminarán el progreso, marcadores y sesiones locales. '
+          'El archivo PDF no se borrará.',
+      confirmLabel: 'Retirar',
+    );
+    if (!confirmed) return;
+    if (isCurrentDocument) await widget.services.reader.closeDocument();
+    await widget.services.thumbnails.removeForDocument(document);
+    widget.services.documents.remove(document.id);
+    widget.services.organization.reload();
+    if (isCurrentDocument) {
+      await widget.services.settings.update(
+        widget.services.settings.settings.copyWith(
+          lastDocumentPath: '',
+          readerPanelOpen: false,
+        ),
+      );
+    }
+    await widget.services.library.load();
+    if (mounted && isCurrentDocument) {
+      setState(() => _page = _AppPage.library);
+    }
+    _showNotice('Documento retirado. El PDF no se ha borrado.');
   }
 
   Future<bool> _confirmDocumentAction({

@@ -17,6 +17,7 @@ final class ReaderTopBar extends StatelessWidget
     required this.showModeControls,
     required this.showPanelControls,
     required this.onBack,
+    required this.onOpenDocument,
     required this.onSearch,
     required this.onCommandPalette,
     required this.onShowThumbnails,
@@ -25,6 +26,7 @@ final class ReaderTopBar extends StatelessWidget
     required this.onShowAnnotations,
     required this.onAdjustMargins,
     required this.onDocumentInfo,
+    required this.onToggleFullScreen,
     required this.onToggleChrome,
     required this.onOpenSettings,
     this.shortcutOverrides = '{}',
@@ -37,6 +39,7 @@ final class ReaderTopBar extends StatelessWidget
   final bool showModeControls;
   final bool showPanelControls;
   final VoidCallback onBack;
+  final VoidCallback onOpenDocument;
   final VoidCallback onSearch;
   final VoidCallback onCommandPalette;
   final VoidCallback onShowThumbnails;
@@ -45,6 +48,7 @@ final class ReaderTopBar extends StatelessWidget
   final VoidCallback onShowAnnotations;
   final VoidCallback onAdjustMargins;
   final VoidCallback onDocumentInfo;
+  final VoidCallback onToggleFullScreen;
   final VoidCallback onToggleChrome;
   final VoidCallback onOpenSettings;
   final String shortcutOverrides;
@@ -180,74 +184,148 @@ final class ReaderTopBar extends StatelessWidget
             PopupMenuButton<_ReaderMenuAction>(
               tooltip: 'Más opciones',
               onSelected: _runAction,
+              constraints: const BoxConstraints(minWidth: 252, maxWidth: 292),
               itemBuilder: (context) => [
-                if (compact) ...[
-                  CheckedPopupMenuItem(
+                PopupMenuItem(
+                  value: _ReaderMenuAction.openDocument,
+                  height: 40,
+                  child: _ReaderMenuItem(
+                    icon: Icons.file_open_outlined,
+                    label: 'Abrir otro PDF…',
+                    shortcut: AppCommandRegistry.shortcutLabel(
+                      AppCommandId.openDocument,
+                      shortcutOverrides,
+                    ),
+                  ),
+                ),
+                const PopupMenuDivider(height: 9),
+                if (compact || !showModeControls) ...[
+                  PopupMenuItem(
                     value: _ReaderMenuAction.documentMode,
-                    checked: preferences.viewMode == ReaderMode.document,
-                    child: const Text('Modo documento'),
+                    height: 40,
+                    child: _ReaderMenuItem(
+                      icon: Icons.description_outlined,
+                      label: 'Modo documento',
+                      selected: preferences.viewMode == ReaderMode.document,
+                    ),
                   ),
-                  CheckedPopupMenuItem(
+                  PopupMenuItem(
                     value: _ReaderMenuAction.bookMode,
-                    checked: preferences.viewMode == ReaderMode.book,
-                    child: const Text('Modo libro'),
+                    height: 40,
+                    child: _ReaderMenuItem(
+                      icon: Icons.menu_book_outlined,
+                      label: 'Modo libro',
+                      selected: preferences.viewMode == ReaderMode.book,
+                    ),
                   ),
-                  const PopupMenuDivider(),
+                  const PopupMenuDivider(height: 9),
+                ],
+                if (compact) ...[
                   const PopupMenuItem(
                     value: _ReaderMenuAction.commandPalette,
-                    child: Text('Paleta de comandos'),
+                    height: 40,
+                    child: _ReaderMenuItem(
+                      icon: Icons.keyboard_command_key_rounded,
+                      label: 'Paleta de comandos',
+                    ),
                   ),
+                  const PopupMenuDivider(height: 9),
                 ],
-                CheckedPopupMenuItem(
-                  value: _ReaderMenuAction.thumbnails,
-                  checked: activePanel == ReaderPanelSection.thumbnails,
-                  child: const Text('Miniaturas'),
-                ),
-                CheckedPopupMenuItem(
-                  value: _ReaderMenuAction.outline,
-                  checked: activePanel == ReaderPanelSection.outline,
-                  child: Text('Índice'),
-                ),
-                CheckedPopupMenuItem(
-                  value: _ReaderMenuAction.bookmarks,
-                  checked: activePanel == ReaderPanelSection.bookmarks,
-                  child: const Text('Marcadores'),
-                ),
-                CheckedPopupMenuItem(
-                  value: _ReaderMenuAction.annotations,
-                  checked: activePanel == ReaderPanelSection.annotations,
-                  child: const Text('Anotaciones'),
-                ),
-                const PopupMenuDivider(),
+                if (!expanded || !showPanelControls) ...[
+                  PopupMenuItem(
+                    value: _ReaderMenuAction.thumbnails,
+                    height: 40,
+                    child: _ReaderMenuItem(
+                      icon: Icons.grid_view_outlined,
+                      label: 'Miniaturas',
+                      selected: activePanel == ReaderPanelSection.thumbnails,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ReaderMenuAction.outline,
+                    height: 40,
+                    child: _ReaderMenuItem(
+                      icon: Icons.format_list_bulleted_rounded,
+                      label: 'Índice',
+                      selected: activePanel == ReaderPanelSection.outline,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ReaderMenuAction.bookmarks,
+                    height: 40,
+                    child: _ReaderMenuItem(
+                      icon: Icons.bookmarks_outlined,
+                      label: 'Marcadores',
+                      selected: activePanel == ReaderPanelSection.bookmarks,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ReaderMenuAction.annotations,
+                    height: 40,
+                    child: _ReaderMenuItem(
+                      icon: Icons.rate_review_outlined,
+                      label: 'Anotaciones',
+                      selected: activePanel == ReaderPanelSection.annotations,
+                    ),
+                  ),
+                  const PopupMenuDivider(height: 9),
+                ],
                 const PopupMenuItem(
                   value: _ReaderMenuAction.rotate,
-                  child: Text('Girar página'),
+                  height: 40,
+                  child: _ReaderMenuItem(
+                    icon: Icons.rotate_right_rounded,
+                    label: 'Girar página',
+                  ),
                 ),
                 const PopupMenuItem(
                   value: _ReaderMenuAction.margins,
-                  child: Text('Márgenes de lectura'),
+                  height: 40,
+                  child: _ReaderMenuItem(
+                    icon: Icons.width_normal_rounded,
+                    label: 'Márgenes de lectura',
+                  ),
                 ),
                 PopupMenuItem(
                   value: _ReaderMenuAction.fullscreen,
-                  child: Text(
-                    'Pantalla completa '
-                    '(${AppCommandRegistry.shortcutLabel(AppCommandId.fullScreen, shortcutOverrides)})',
+                  height: 40,
+                  child: _ReaderMenuItem(
+                    icon: Icons.fullscreen_rounded,
+                    label: 'Pantalla completa',
+                    shortcut: AppCommandRegistry.shortcutLabel(
+                      AppCommandId.fullScreen,
+                      shortcutOverrides,
+                    ),
                   ),
                 ),
                 PopupMenuItem(
                   value: _ReaderMenuAction.toggleChrome,
-                  child: Text(
-                    'Ocultar interfaz '
-                    '(${AppCommandRegistry.shortcutLabel(AppCommandId.toggleChrome, shortcutOverrides)})',
+                  height: 40,
+                  child: _ReaderMenuItem(
+                    icon: Icons.visibility_off_outlined,
+                    label: 'Ocultar interfaz',
+                    shortcut: AppCommandRegistry.shortcutLabel(
+                      AppCommandId.toggleChrome,
+                      shortcutOverrides,
+                    ),
+                  ),
+                ),
+                const PopupMenuDivider(height: 9),
+                const PopupMenuItem(
+                  value: _ReaderMenuAction.documentInfo,
+                  height: 40,
+                  child: _ReaderMenuItem(
+                    icon: Icons.info_outline_rounded,
+                    label: 'Información del documento',
                   ),
                 ),
                 const PopupMenuItem(
-                  value: _ReaderMenuAction.documentInfo,
-                  child: Text('Información del documento'),
-                ),
-                const PopupMenuItem(
                   value: _ReaderMenuAction.settings,
-                  child: Text('Ajustes'),
+                  height: 40,
+                  child: _ReaderMenuItem(
+                    icon: Icons.settings_outlined,
+                    label: 'Ajustes',
+                  ),
                 ),
               ],
             ),
@@ -260,6 +338,8 @@ final class ReaderTopBar extends StatelessWidget
 
   void _runAction(_ReaderMenuAction action) {
     switch (action) {
+      case _ReaderMenuAction.openDocument:
+        onOpenDocument();
       case _ReaderMenuAction.documentMode:
         controller.setReaderMode(ReaderMode.document);
       case _ReaderMenuAction.bookMode:
@@ -279,7 +359,7 @@ final class ReaderTopBar extends StatelessWidget
       case _ReaderMenuAction.margins:
         onAdjustMargins();
       case _ReaderMenuAction.fullscreen:
-        controller.toggleFullScreen();
+        onToggleFullScreen();
       case _ReaderMenuAction.toggleChrome:
         onToggleChrome();
       case _ReaderMenuAction.documentInfo:
@@ -291,6 +371,7 @@ final class ReaderTopBar extends StatelessWidget
 }
 
 enum _ReaderMenuAction {
+  openDocument,
   documentMode,
   bookMode,
   commandPalette,
@@ -333,6 +414,50 @@ final class _PanelIconButton extends StatelessWidget {
               )
             : null,
         icon: Icon(icon),
+      ),
+    );
+  }
+}
+
+final class _ReaderMenuItem extends StatelessWidget {
+  const _ReaderMenuItem({
+    required this.icon,
+    required this.label,
+    this.shortcut,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? shortcut;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Semantics(
+      selected: selected,
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: selected ? colors.accentPrimary : colors.textSecondary,
+          ),
+          const SizedBox(width: AppSpacing.space12),
+          Expanded(
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+          if (shortcut case final value?)
+            Text(
+              value,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: colors.textMuted),
+            )
+          else if (selected)
+            Icon(Icons.check_rounded, size: 16, color: colors.accentPrimary),
+        ],
       ),
     );
   }

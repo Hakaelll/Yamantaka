@@ -330,6 +330,10 @@ El detalle exacto está en `third_party/pdfrx/PATCHES.md`.
 - Consecuencias: restaurar una suspendida puede reabrir el PDF; ausentes quedan
   visibles y no causan bucle.
 - Riesgos: falta perfil sostenido con 12 documentos pesados.
+- Enmienda 2026-07-29: el modelo suspendible permanece como detalle interno para
+  espacios de trabajo, pero se elimina la franja visual de pestañas. El cambio
+  de documento queda en biblioteca, recientes, espacios, `Ctrl+O` y la paleta;
+  así el lector conserva altura, centro y jerarquía.
 
 ## ADR-021 — FTS local opt-in y reconstruible
 
@@ -366,3 +370,22 @@ El detalle exacto está en `third_party/pdfrx/PATCHES.md`.
 - Motivo: preserva honestidad del producto y evita visores invisibles/fugas.
 - Consecuencias: workspaces pueden conservar un estado futuro compatible.
 - Riesgos: el contrato puede ajustarse tras el prototipo.
+
+## ADR-024 — Portadas locales y biblioteca espacial determinista
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: una lista convencional no expresa la colección personal y elegir
+  siempre la página uno produce portadas pobres, pero no se permite IA externa,
+  OCR pesado ni una escena 3D.
+- Decisión: esquema SQLite v3 con `document_covers`; heurística local sobre seis
+  páginas; miniaturas pequeña/grande; selección manual dominante; cola
+  secuencial; layout por celdas con jitter derivado de ID y slivers virtuales.
+- Motivo: reutiliza PDFium, SQLite, tokens y acciones existentes sin red, nueva
+  dependencia ni cambios en el lector.
+- Consecuencias: la biblioteca conserva selección/scroll/filtros en memoria,
+  muestra información solo para selección/hover/foco y agrupa controles
+  secundarios en overlays o menús.
+- Riesgos: la heurística visual no comprende semántica y necesita corrección
+  manual en documentos atípicos; falta perfil nativo sostenido con cientos de
+  portadas reales y Narrador/DPI completo.

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yamantaka/app/app.dart';
 import 'package:yamantaka/app/theme/app_density.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
 import 'package:yamantaka/app/theme/app_tokens.dart';
+import 'package:yamantaka/storage/repositories/app_settings_repository.dart';
 
 void main() {
   group('responsive window classes', () {
@@ -71,9 +73,43 @@ void main() {
     final dark = AppTheme.dark().extension<AppColorTokens>()!;
 
     expect(light.appBackground, const Color(0xFFF1F0EC));
-    expect(light.accentPrimary, const Color(0xFF655D4C));
-    expect(dark.appBackground, const Color(0xFF171816));
-    expect(dark.textPrimary, const Color(0xFFECECE7));
+    expect(light.accentPrimary, const Color(0xFF393B37));
+    expect(dark.appBackground, const Color(0xFF111210));
+    expect(dark.textPrimary, const Color(0xFFE8E8E3));
+  });
+
+  test(
+    'dark mode remains active even while safe mode is protecting startup',
+    () {
+      expect(
+        resolveAppThemeMode(const AppSettings(darkMode: true), safeMode: true),
+        ThemeMode.dark,
+      );
+      expect(
+        resolveAppThemeMode(
+          const AppSettings(darkMode: false),
+          safeMode: false,
+        ),
+        ThemeMode.light,
+      );
+    },
+  );
+
+  test('the semantic style reaches every global application surface', () {
+    final theme = AppTheme.light();
+    final colors = theme.extension<AppColorTokens>()!;
+
+    expect(theme.scaffoldBackgroundColor, colors.appBackground);
+    expect(theme.appBarTheme.backgroundColor, colors.surfacePrimary);
+    expect(theme.dialogTheme.backgroundColor, colors.surfaceElevated);
+    expect(theme.popupMenuTheme.color, colors.surfaceElevated);
+    expect(theme.bottomSheetTheme.backgroundColor, colors.surfaceElevated);
+    expect(
+      theme.menuTheme.style?.backgroundColor?.resolve({}),
+      colors.surfaceElevated,
+    );
+    expect(theme.navigationRailTheme.backgroundColor, colors.surfaceSecondary);
+    expect(theme.scrollbarTheme.thumbColor?.resolve({}), colors.borderStrong);
   });
 
   test(

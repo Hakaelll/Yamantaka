@@ -346,39 +346,43 @@ ocultarse/revelarse en cualquier modo mediante el mismo comando persistido.
 Jerarquía:
 
 ```text
-Encabezado: Yamantaka | Abrir PDF | Ajustes
-Continuar leyendo
-Recientes | Filtrar | Estado | Ordenar
-Acciones secundarias
+Barra discreta: Biblioteca | Más | Abrir PDF | Ajustes
+Comando local: contador | Buscar | Filtrar/ordenar
+Espacio de artefactos virtualizado
+Información tipográfica de selección/hover/foco
 ```
 
-“Continuar leyendo” es dominante cuando existe un documento válido. Combina
-portada, título, autor disponible, página, porcentaje, última lectura y una
-acción inequívoca. Se presenta como un bloque editorial delimitado, no como un
-banner ni una tarjeta elevada.
+La portada es el objeto. No existe una tarjeta con título permanente: la página
+respeta su proporción, usa radio mínimo, sombra difusa y un jitter estable de
+posición/giro. Selección eleva 8 px y escala 5,5 %; hover eleva 3 px. Los no
+seleccionados reducen saturación/opacidad sin desaparecer. Progreso es una
+línea de 2 px; terminado usa un anillo y favorito un marcador monocromático.
 
-Los recientes forman una lista sin tarjetas individuales. En expandido se
-alinean metadatos en columnas; en compacto se apilan bajo el título. El hover
-puede revelar acciones, pero abrir/localizar siempre funciona con teclado.
+Uno a seis documentos forman una constelación centrada con espacio negativo.
+Desde siete se usa una cuadrícula invisible con variaciones controladas y
+scroll vertical. `SliverGrid.builder` recicla objetos en bibliotecas grandes.
+La semilla usa el ID estable: cargar portada, filtrar o reiniciar no mueve la
+composición.
 
-El filtro opera localmente sobre título, autor y archivo, se enfoca con
-`Ctrl+F` y no persiste su texto. Ordena por última apertura, título o progreso.
-El estado (`Todos`, `En curso`, `Sin empezar`, `Terminados`) se combina en la
-misma evaluación y sí puede persistirse. El selector segmentado tiene recuentos
-y desplazamiento horizontal contenido en compacto, sin elevar el app bar. El
-contador se actualiza como región semántica y cero coincidencias ofrece
-“Limpiar filtro”.
+Un clic selecciona, doble clic/Enter abre y el menú contextual reúne abrir,
+favorito, portada, información, revelar y retirar. Flechas navegan por la
+geometría; Inicio/Fin saltan a extremos, Suprimir confirma retirada y Escape
+cierra overlay o selección. El foco tiene contorno propio y no depende de
+sombra/color.
 
-Cada portada solicita una decodificación ajustada a su caja física y DPR, usa
-calidad baja para miniatura y vive en un límite de repintado propio. La lista
-continúa virtualizada mediante slivers.
+`Ctrl+F` abre un campo flotante con foco y contador; Escape lo cierra y restaura
+la colección. Estado, favorito y orden viven en un popover compacto con
+recuentos y reset. Colecciones, workspaces, importación, recuperación y búsqueda
+global están bajo “Más”; no se eliminan para simplificar la barra.
+
+Cada portada solicita una decodificación ajustada a caja física/DPR, usa la
+miniatura pequeña a distancia y la grande al seleccionar. El placeholder es una
+placa neutra con inicial o estado de error. Título, autor, progreso y fecha solo
+aparecen para selección, hover o foco en un bloque tipográfico ligero.
 
 El estado vacío contiene mensaje corto, explicación local-first y una sola
-acción principal. Las filas expresan “Sin empezar”, “En curso” o “Terminado”.
-Un archivo ausente reduce contraste y muestra texto/icono/“Localizar”; un
-archivo cambiado usa aviso propio y un error de imagen usa icono roto. El color
-nunca es el único indicador. La acción de información es independiente de
-abrir y conserva un objetivo accesible.
+acción principal. Un archivo ausente reduce contraste y anuncia “Localizar”; un
+error de portada mantiene geometría. El color nunca es el único indicador.
 
 ## 14. Lector
 
@@ -605,8 +609,13 @@ Antes de cerrar una tarea visual:
 
 ## 28. Superficies de tercera generación
 
-- Las pestañas son una franja compacta de contexto: nombre, progreso, pin,
-  ausencia y cierre; no compiten con la barra principal ni usan tarjetas.
+- El lector no presenta una segunda franja de pestañas. Abrir otro PDF vive en
+  el menú compacto y en `Ctrl+O`; biblioteca, recientes y espacios recuperan
+  documentos sin restar altura ni desplazar el centro del PDF.
+- Al cambiar el ancho de ventana o acoplar el panel, el visor conserva el zoom
+  elegido y vuelve a centrar el documento dentro del área útil.
+- Menús, paneles, ajustes, diálogos, scrollbars, chips y controles comparten
+  superficies, bordes, radios y estados semánticos del tema global.
 - Anotaciones reutiliza el panel lateral único. La acción primaria es “Anotar
   página”; búsqueda y filtros permanecen encima de una lista virtualizada.
 - Colecciones se eligen en una hoja ligera y la biblioteca conserva la misma

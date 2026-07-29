@@ -49,7 +49,7 @@ cancelación y recursos abiertos para pruebas/Profile; no persiste ni transmite.
 
 ## Persistencia
 
-SQLite v2 guarda documentos, preferencias, marcadores, sesiones, anotaciones,
+SQLite v3 guarda documentos, preferencias, marcadores, sesiones, anotaciones,
 etiquetas, colecciones, workspaces, perfiles e índice FTS reconstruible. Las
 migraciones son incrementales, crean una copia pre-migración y se ejecutan en
 transacción; `PRAGMA integrity_check` cierra el gate. Los PDF permanecen en su
@@ -57,13 +57,38 @@ ubicación original.
 
 Preferencias globales pequeñas, idioma y geometría de ventana usan el almacén
 nativo asíncrono. Caché y miniaturas viven en el directorio de caché de la
-aplicación. El límite de portadas elimina primero las más antiguas y limpia su
-referencia en SQLite.
+aplicación. `document_covers` conserva página fuente, miniaturas pequeña/grande,
+fecha, modificación del origen, confianza, modo manual/automático, versión de
+algoritmo, recorte y proporción. El límite elimina primero las más antiguas y
+limpia su referencia en SQLite.
 
 La posición se guarda al cambiar de página, al cerrar y con debounce; nunca por
-cada píxel. El filtro textual de biblioteca es estado efímero de widget; el
-estado de lectura seleccionado, atajos, panel, sección, ancho, chrome y política
-de recuperación viven como preferencias globales validadas.
+cada píxel. `LibraryController` retiene selección, scroll, consulta y filtros al
+entrar en el lector sin escribir la consulta en disco. El estado de lectura
+seleccionado, atajos, panel, sección, ancho, chrome y política de recuperación
+viven como preferencias globales validadas.
+
+## Portadas y biblioteca de artefactos
+
+`ThumbnailService` es el único caso de uso que renderiza y persiste portadas.
+Puntúa como máximo seis páginas a escala baja combinando prioridad de posición,
+densidad de bordes, contraste, espacio uniforme, longitud/líneas del texto y
+marcadores de índice. Si la mejora no supera el umbral vuelve a la página uno.
+Después renderiza una miniatura pequeña y otra de selección, actualiza SQLite y
+notifica a la biblioteca. La cola de importación es secuencial, cancelable por
+documento y nunca bloquea su registro inicial.
+
+Una elección manual conserva página y modo. Si cambia el archivo, la imagen se
+considera inválida y se vuelve a renderizar desde esa página; el algoritmo no
+la sustituye. El selector abre el PDF localmente, muestra hasta seis previews,
+acepta cualquier número de página válido y cierra siempre el handle.
+
+`LibraryArtifactLayout` es puro y probado. Un hash FNV estable del ID produce
+desplazamientos de ±8/±12 px, giro de ±1,25° y una variación mínima de escala.
+La geometría mantiene celdas invisibles sin solapamiento. De siete documentos
+en adelante la UI usa `SliverGrid.builder`; selección, scroll, búsqueda y orden
+no alteran el jitter. `ArtifactDocument` solo pinta/expone semántica y emite
+acciones; persistencia, PDFium y SQL quedan fuera del widget.
 
 ## Copias, historial y recuperación
 
@@ -94,8 +119,9 @@ repositorio por documento; panel/chrome pertenecen al shell.
   paginada e indexación secuencial cancelable.
 - `BookmarkController`: marcadores del documento.
 - `AnnotationController`: CRUD, filtros, estado de revisión y undo.
-- `DocumentTabsController`/`WorkspaceController`: pestañas acotadas y snapshots
-  transaccionales sin mantener todos los PDF abiertos.
+- `DocumentTabsController`/`WorkspaceController`: contextos documentales
+  acotados y snapshots transaccionales sin mantener todos los PDF abiertos ni
+  mostrar una barra de pestañas.
 - `OrganizationController`: colecciones, etiquetas y vistas inteligentes.
 - `SettingsController`: preferencias globales y perfil visual.
 - `AppCommandRegistry`: definiciones, opciones seguras, conflictos, bindings y
@@ -133,10 +159,11 @@ de contenido deja de coincidir, el registro se conserva como `needsReview`; no
 se recoloca por heurística. El panel opera sobre una lista acotada por documento
 y nunca modifica bytes PDF.
 
-La barra de pestañas representa contexto, no handles. Solo la pestaña activa y
-como máximo una vecina pueden estar calientes; las demás conservan estado
-serializable y quedan suspendidas. Un workspace guarda orden, pin, documento
-activo y navegación en una transacción. El contrato `SplitViewState` ya define
+Los contextos documentales no tienen una barra visible. Solo el documento
+activo y como máximo un contexto vecino pueden estar calientes; los demás
+conservan estado serializable y quedan suspendidos. Un workspace guarda orden,
+pin, documento activo y navegación en una transacción. El contrato
+`SplitViewState` ya define
 orientación/ratio y la frontera exacta de 1100 px, pero todavía no instancia un
 segundo visor: split y comparación siguen bloqueados hasta medir ownership,
 cierre y memoria de dos motores reales.

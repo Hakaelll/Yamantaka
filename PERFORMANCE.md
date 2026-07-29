@@ -155,7 +155,8 @@ justifican; todavía no se implementan ni se anuncian como disponibles.
 ## Perfil de tercera iteración — 2026-07-29
 
 Se repitió el escenario Profile de cinco pasadas después de integrar
-anotaciones, pestañas, organización, búsqueda y diagnóstico:
+anotaciones, contextos documentales suspendibles, organización, búsqueda y
+diagnóstico:
 
 | Secuencia | Mediana | p95 |
 | --- | ---: | ---: |
@@ -192,3 +193,17 @@ cambios en dependencias. Un smoke oculto creó la ventana en 588 ms, midió
 117,0 MiB de working set y 118,5 MiB privados, mantuvo cero conexiones TCP y
 cerró limpiamente mediante `CloseMainWindow`. Es una observación única, no una
 distribución.
+
+## Biblioteca de artefactos — 2026-07-29
+
+- El registro de importación termina antes del análisis de portada; una cola
+  secuencial limita PDFium a un trabajo adicional y permite cancelar al retirar.
+- Solo se analizan seis páginas a escala 0,16; el resultado final guarda escalas
+  0,24 y 0,56. No se carga el PDF completo ni se hace OCR.
+- La UI usa `SliverGrid.builder` desde siete objetos, `cacheWidth` por DPR y
+  calidad baja salvo selección. Jitter/layout son cálculo puro O(n) sin IO.
+- Búsqueda, estado, favorito y orden se resuelven en una pasada sobre los
+  metadatos ya residentes. Hover queda encapsulado en cada artefacto.
+- La prueba estructural simula 100 documentos, valida separación y navegación;
+  falta un perfil Windows sostenido con cientos de PDF/portadas reales antes de
+  fijar un umbral universal.

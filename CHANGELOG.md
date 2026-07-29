@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.1.0-dev — 2026-07-29 (biblioteca de artefactos)
+
+- Extiende el rediseño monocromático al lector, paneles, menús, diálogos,
+  ajustes y controles globales; elimina la franja visible de pestañas.
+- Corrige el centrado del PDF al redimensionar o acoplar paneles y centra de
+  forma simétrica las constelaciones pequeñas de la biblioteca.
+- Regenera portadas en caché v3 a mayor resolución y adapta las miniaturas
+  laterales al ancho/DPI con filtrado de alta calidad y retención acotada.
+- Compacta el menú del lector, añade iconos y evita duplicar accesos al panel
+  cuando ya están visibles en la barra superior.
+- Mantiene centrada la página al alcanzar el zoom mínimo, limita ese extremo al
+  ajuste de página y valida el centro mediante lectura de píxeles.
+- Convierte pantalla completa en una vista inmersiva sin barras, panel,
+  progreso ni indicadores; `Escape` restaura la interfaz.
+- Corrige el modo oscuro aun durante un arranque seguro, convierte `←`/`→` en
+  la navegación principal y hace que el modo libro avance por pliegos:
+  portada, 2–3, 4–5 y sucesivos.
+- Biblioteca espacial monocromática con portadas flotantes, jitter estable,
+  virtualización, selección, foco, hover, teclado y menú contextual.
+- Búsqueda temporal y filtros/orden compactos; favorito persistente y
+  restauración de selección, scroll y contexto de vista.
+- Detección local sobre seis páginas, caché pequeña/grande, esquema SQLite v3 y
+  selector manual de portada que el algoritmo no sobrescribe.
+- Tokens claro/oscuro refinados e iconos de aplicación generados directamente
+  desde la imagen original entregada, sin reinterpretarla ni introducirla como
+  decoración dentro de la interfaz.
+- Transición corta de opacidad/escala entre biblioteca y lector, respetando
+  tanto la preferencia de animación como la reducción de movimiento del sistema.
+- Nuevas pruebas de scoring, persistencia, layout, navegación, filtros,
+  accesibilidad y migración; sin dependencias de runtime nuevas.
+
 ## 0.1.0-dev — 2026-07-29 (tercera iteración local)
 
 - Esquema SQLite v2 recuperable para anotaciones, etiquetas, colecciones,

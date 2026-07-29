@@ -1260,24 +1260,27 @@ Narrador y DPI para cerrar las tareas visuales que siguen en `REVIEW`.
 - [x] Añadir acción de exportación y manejo seguro de errores.
 - [ ] Validar manualmente permisos y rutas Unicode.
 
-## YAM-053 — Pestañas documentales acotadas
+## YAM-053 — Contextos documentales acotados
 
 - Prioridad: P1
 - Estado: REVIEW
 - Dependencias: YAM-040
-- Objetivo: alternar documentos sin multiplicar handles PDF ni memoria.
-- Alcance: hasta 12 pestañas, pin, reorder, duplicados, cerrar otras/derecha,
-  reopen y estados activa/caliente/suspendida.
+- Objetivo: restaurar y alternar documentos sin multiplicar handles PDF ni
+  memoria, y sin ocupar el lector con una franja adicional.
+- Alcance interno: hasta 12 contextos, pin, reorder, duplicados,
+  close/reopen y estados activo/caliente/suspendido.
 - Criterios de aceptación: máximo dos calientes; resto suspendido; progreso
   visible; ausentes explícitos; cerrar libera documento.
 - Validación: política y reapertura probadas; integración de cambio de PDF.
 - Archivos relacionados: `lib/features/workspaces`, `lib/app/app.dart`.
 - Riesgos o limitaciones: falta prueba sostenida con 12 PDF pesados.
-- Notas técnicas: una sola pestaña activa posee el visor concreto.
+- Notas técnicas: un solo contexto activo posee el visor concreto; desde
+  2026-07-29 no existe barra de pestañas visible.
 
 ### Subtareas
 
-- [x] Implementar dominio, controlador y barra reordenable.
+- [x] Implementar dominio y controlador suspendible.
+- [x] Retirar la barra reordenable visible y conservar apertura/workspaces.
 - [x] Integrar apertura múltiple y cierre contextual.
 - [ ] Perfilar ciclo de 12 documentos pesados.
 
@@ -1286,7 +1289,7 @@ Narrador y DPI para cerrar las tareas visuales que siguen en `REVIEW`.
 - Prioridad: P1
 - Estado: REVIEW
 - Dependencias: YAM-053
-- Objetivo: guardar y restaurar conjuntos de pestañas y navegación.
+- Objetivo: guardar y restaurar conjuntos de documentos y navegación.
 - Alcance: nombre, orden, pin, documento activo, página, zoom, layout y split.
 - Criterios de aceptación: guardado transaccional; duplicar/borrar; resumen de
   ausentes; restauración parcial segura; sin abrir todos los PDF a la vez.
@@ -1654,7 +1657,8 @@ Narrador y DPI para cerrar las tareas visuales que siguen en `REVIEW`.
 - Prioridad: P1
 - Estado: REVIEW
 - Dependencias: YAM-015, YAM-053
-- Objetivo: aceptar varios PDF desde argumentos/drop y abrirlos como pestañas.
+- Objetivo: aceptar varios PDF desde argumentos/drop y registrarlos como
+  contextos documentales suspendibles.
 - Alcance: deduplicación, máximo acotado, primera activa y errores aislados.
 - Criterios de aceptación: argumentos múltiples conservan orden; drop múltiple
   no bloquea; cada documento valida; no se abren conexiones.
@@ -1667,7 +1671,7 @@ Narrador y DPI para cerrar las tareas visuales que siguen en `REVIEW`.
 ### Subtareas
 
 - [x] Aceptar y deduplicar múltiples rutas.
-- [x] Integrar apertura acotada en pestañas.
+- [x] Integrar apertura acotada en contextos internos.
 - [ ] Configurar y validar asociaciones en paquete firmado.
 
 ## YAM-073 — Gate de rendimiento de funciones avanzadas
@@ -1692,3 +1696,36 @@ Narrador y DPI para cerrar las tareas visuales que siguen en `REVIEW`.
 - [x] Ejecutar tres procesos y cinco pasadas Profile.
 - [x] Verificar integridad, frames, caché y liberación de recursos.
 - [ ] Comparar en otro hardware antes de activar gate regresivo.
+
+## YAM-074 — Biblioteca de artefactos y portadas inteligentes locales
+
+- Prioridad: P0
+- Estado: REVIEW
+- Dependencias: YAM-018, YAM-027, YAM-069, YAM-070
+- Objetivo: sustituir la lista convencional por una colección espacial sobria
+  sin perder apertura, progreso, organización, persistencia ni accesibilidad.
+- Alcance: layout determinista, artefacto visual, navegación/foco, overlays,
+  búsqueda temporal, filtros combinados, favorito, detección local de portada,
+  dos miniaturas, selección manual, esquema v3 y emblema SVG.
+- Criterios de aceptación: posiciones estables; cero solapamiento inválido;
+  teclado/ratón/contextual completos; manual no sobrescrita; caché invalidada;
+  importación no bloqueada; claro/oscuro/compacto sin overflow; build Windows.
+- Validación: scoring, fallback, metadata, migración, 100 layouts, navegación,
+  filtros, widgets, análisis, suite, integración visual y build; Narrador/DPI
+  100/150/200 % requieren revisión nativa.
+- Archivos relacionados: `features/library`, `thumbnail_service.dart`,
+  `app_database.dart`, `document_repository.dart`, tokens, branding y pruebas.
+- Riesgos o limitaciones: heurística sin comprensión semántica; perfil sostenido
+  con cientos de portadas reales y matriz Narrador/DPI permanecen pendientes.
+- Notas técnicas: seis previews a baja escala, cola serial cancelable, FNV
+  estable, slivers desde siete objetos, cero API/IA/OCR/dependencia nueva.
+
+### Subtareas
+
+- [x] Implementar esquema v3, metadata y selección manual dominante.
+- [x] Implementar scoring visual/textual, fallback y caché pequeña/grande.
+- [x] Implementar artefactos, layout, navegación, overlays y acciones.
+- [x] Reemplazar buscador permanente y franja de pestañas por overlays y filtro
+  compacto combinable.
+- [x] Añadir pruebas unitarias, repositorio, widgets y fixture visual.
+- [ ] Completar Narrador y DPI nativo 100/150/200 % para pasar a `DONE`.

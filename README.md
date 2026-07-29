@@ -12,10 +12,10 @@ Base funcional Flutter 0.1.0 para Windows, Android e iOS, validada entre el 28
 y el 29 de julio de 2026:
 
 - `flutter analyze`: aprobado, sin incidencias.
-- `flutter test`: 86 pruebas aprobadas.
+- `flutter test`: 102 pruebas aprobadas.
 - PDFium: apertura, bitmap nativo, extracción y búsqueda verificadas con un PDF
   legal generado durante la prueba.
-- SQLite: esquema, migración inicial y repositorios verificados en memoria.
+- SQLite: esquema v3, migraciones y repositorios verificados en memoria.
 - Integración Windows: aprobada sobre el lector completo con `ui.Image`,
   lectura de píxeles, pintura nativa, chrome real, búsqueda, paleta, zoom,
   avance/retroceso, marcador, anotación de página, cierre y restauración.
@@ -30,11 +30,15 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
 ## Funciones disponibles
 
 - Selector nativo, arrastrar y soltar y apertura mediante argumento.
-- Biblioteca con continuar leyendo, recientes, filtro local `Ctrl+F`, orden,
-  estado (`Todos`, `En curso`, `Sin empezar`, `Terminados`), progreso, portadas
-  diferidas y estados explícitos para ausente, cambiado y error de portada.
-- Visor continuo, de página única o de páginas enfrentadas; portada individual,
-  LTR/RTL, zoom, ajuste, rotación, pantalla completa y controles ocultables.
+- Biblioteca de artefactos con portadas como objetos espaciales, posición
+  determinista, selección/foco/hover, navegación por teclado y virtualización.
+- Búsqueda temporal `Ctrl+F`, filtros compactos combinables por estado y
+  favorito, cuatro órdenes y menú contextual completo.
+- Detección local de portada entre las primeras seis páginas, dos resoluciones
+  de caché y selector manual que nunca es reemplazado por el algoritmo.
+- Visor continuo, de página única o de páginas enfrentadas; modo libro con
+  portada individual y pliegos 2–3/4–5, LTR/RTL, zoom mínimo centrado, ajuste,
+  rotación y pantalla completa realmente inmersiva.
 - Recuperación opt-in de documento, página, zoom, posición, disposición,
   márgenes, panel, sección, ancho y visibilidad del chrome, con guarda contra
   rutas ausentes/corruptas.
@@ -52,8 +56,8 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
 - Anotaciones locales por página con nota, tipos/colores acotados, etiquetas,
   filtros, undo, estado de revisión y exportación Markdown/JSON; nunca escribe
   el PDF.
-- Pestañas acotadas con suspensión, reapertura, pin/reorder y espacios de
-  trabajo locales transaccionales.
+- Contextos de documentos acotados y suspendibles para restaurar espacios de
+  trabajo, sin una franja de pestañas visible sobre el lector.
 - Búsqueda global FTS5 opt-in sobre metadatos, páginas y anotaciones, cancelable
   y borrable, sin OCR ni consultas persistidas.
 - Colecciones manuales, etiquetas y vistas inteligentes; importación de carpeta
@@ -63,25 +67,27 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
   limpios.
 - Ajustes de apariencia, lectura, barra, atajos, biblioteca, historial, copias y
   privacidad; perfil inicial para tinta electrónica y previsualización ligera.
-- Sistema visual editorial de segunda generación con tokens semánticos,
+- Sistema visual editorial monocromático con tokens semánticos,
   tipografía Segoe UI Variable, tema claro/oscuro y breakpoints únicos en
   680/1100 px.
-- Densidad cómoda/compacta persistente, miniaturas limitadas por tamaño
-  físico/DPR y movimiento reducido coherente, sin dependencias nuevas.
+- Densidad cómoda/compacta persistente, miniaturas de alta densidad ajustadas al
+  tamaño físico/DPR y movimiento reducido coherente, sin dependencias nuevas.
+- Navegación primaria con `←`/`→`, tema oscuro disponible incluso en modo seguro
+  e iconos de plataforma derivados exactamente de la imagen original.
 - Restauración del tamaño y posición de la ventana de escritorio.
 - Confirmación antes de abrir enlaces externos y bloqueo de esquemas no seguros.
 
 ## Capturas
 
-![Biblioteca filtrada por colección en Windows](docs/screenshots/windows-library-third-generation-collection-filtered.png)
+![Biblioteca de artefactos centrada en Windows](docs/screenshots/windows-library-artifacts.png)
 
-![Anotaciones locales en el lector Windows](docs/screenshots/windows-reader-third-generation-annotations.png)
+![Lector centrado con miniaturas de alta densidad](docs/screenshots/windows-reader-redesign-thumbnails.png)
 
-![Biblioteca compacta en tema oscuro](docs/screenshots/windows-library-third-generation-compact-dark.png)
+![Menú compacto del lector sin barra de pestañas](docs/screenshots/windows-reader-redesign-menu.png)
 
 Son capturas reproducibles de la aplicación Release y de la integración
-Windows con PDFium; no son mockups. Búsqueda, paleta, variante compacta y tema
-claro están también en [`docs/screenshots`](docs/screenshots).
+Windows con PDFium; no son mockups. Búsqueda, paleta, variantes compactas y
+tema oscuro están también en [`docs/screenshots`](docs/screenshots).
 
 ## Requisitos
 
@@ -168,6 +174,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - El visor usa páginas completas virtualizadas; el contrato admite regiones,
   pero todavía no hay teselas.
 - No hay OCR: un escaneo sin texto muestra el estado correspondiente.
+- La selección automática de portada usa texto extraíble y análisis visual
+  ligero; no pretende reconocer semántica editorial ni sustituye la corrección
+  manual.
 - La selección geométrica nativa para highlight/subrayado/tachado está
   bloqueada por el adaptador actual; hoy se crean notas ligadas a página.
 - Split/comparación tienen dominio y política serializables, pero no se anuncian

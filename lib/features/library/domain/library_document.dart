@@ -1,4 +1,5 @@
 import '../../reader/domain/reader_models.dart';
+import 'document_cover.dart';
 
 final class LibraryDocument {
   const LibraryDocument({
@@ -21,6 +22,8 @@ final class LibraryDocument {
     this.isMissing = false,
     this.hasFileChanged = false,
     this.thumbnailPath,
+    this.coverMetadata,
+    this.isFavorite = false,
   });
 
   final String id;
@@ -42,6 +45,8 @@ final class LibraryDocument {
   final bool hasFileChanged;
   final String fingerprint;
   final String? thumbnailPath;
+  final DocumentCoverMetadata? coverMetadata;
+  final bool isFavorite;
 
   LibraryDocument copyWith({
     String? path,
@@ -62,6 +67,8 @@ final class LibraryDocument {
     bool? hasFileChanged,
     String? fingerprint,
     String? thumbnailPath,
+    DocumentCoverMetadata? coverMetadata,
+    bool? isFavorite,
   }) => LibraryDocument(
     id: id,
     path: path ?? this.path,
@@ -82,5 +89,7 @@ final class LibraryDocument {
     hasFileChanged: hasFileChanged ?? this.hasFileChanged,
     fingerprint: fingerprint ?? this.fingerprint,
     thumbnailPath: thumbnailPath ?? this.thumbnailPath,
+    coverMetadata: coverMetadata ?? this.coverMetadata,
+    isFavorite: isFavorite ?? this.isFavorite,
   );
 }

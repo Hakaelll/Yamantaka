@@ -53,6 +53,8 @@ abstract final class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: tokens.appBackground,
+      canvasColor: tokens.appBackground,
+      disabledColor: tokens.textMuted.withValues(alpha: 0.55),
       fontFamily: 'Segoe UI Variable',
       fontFamilyFallback: const ['Segoe UI', 'Roboto', 'sans-serif'],
       visualDensity: density == AppInterfaceDensity.compact
@@ -153,6 +155,7 @@ abstract final class AppTheme {
       primaryTextTheme: textTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: tokens.surfacePrimary,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: tokens.textPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -172,6 +175,7 @@ abstract final class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: tokens.surfacePrimary,
+        surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           side: BorderSide(color: tokens.borderSubtle),
@@ -180,6 +184,7 @@ abstract final class AppTheme {
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: tokens.surfaceElevated,
+        surfaceTintColor: Colors.transparent,
         elevation: 8,
         shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.16),
         shape: RoundedRectangleBorder(
@@ -313,13 +318,131 @@ abstract final class AppTheme {
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: tokens.surfaceElevated,
+        surfaceTintColor: Colors.transparent,
         elevation: 6,
+        menuPadding: const EdgeInsets.symmetric(vertical: AppSpacing.space6),
         shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
         shape: RoundedRectangleBorder(
           side: BorderSide(color: tokens.borderSubtle),
           borderRadius: BorderRadius.circular(AppRadii.field),
         ),
         textStyle: textTheme.bodyMedium,
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(tokens.surfaceElevated),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          elevation: const WidgetStatePropertyAll(6),
+          shadowColor: WidgetStatePropertyAll(
+            Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
+          ),
+          side: WidgetStatePropertyAll(BorderSide(color: tokens.borderSubtle)),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.field),
+            ),
+          ),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(vertical: AppSpacing.space6),
+          ),
+        ),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: textTheme.bodyMedium,
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(tokens.surfaceElevated),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          side: WidgetStatePropertyAll(BorderSide(color: tokens.borderSubtle)),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.field),
+            ),
+          ),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: tokens.surfaceElevated,
+        modalBackgroundColor: tokens.surfaceElevated,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
+        elevation: 8,
+        modalElevation: 8,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: tokens.borderSubtle),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadii.dialog),
+          ),
+        ),
+      ),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: tokens.surfaceSecondary,
+        indicatorColor: tokens.selectionBackground,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        selectedIconTheme: IconThemeData(color: tokens.textPrimary, size: 20),
+        unselectedIconTheme: IconThemeData(
+          color: tokens.textSecondary,
+          size: 20,
+        ),
+        selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
+          color: tokens.textPrimary,
+        ),
+        unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(
+          color: tokens.textSecondary,
+        ),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: tokens.surfaceSecondary,
+        selectedColor: tokens.selectionBackground,
+        disabledColor: tokens.surfaceSunken,
+        side: BorderSide(color: tokens.borderSubtle),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        labelStyle: textTheme.labelMedium,
+        secondaryLabelStyle: textTheme.labelMedium?.copyWith(
+          color: tokens.textPrimary,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space6),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return tokens.accentPrimary;
+          }
+          return Colors.transparent;
+        }),
+        checkColor: WidgetStatePropertyAll(
+          isDark ? tokens.appBackground : Colors.white,
+        ),
+        side: BorderSide(color: tokens.borderStrong),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.indicator),
+        ),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? tokens.accentPrimary
+              : tokens.textSecondary,
+        ),
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.hovered)
+              ? tokens.textSecondary
+              : tokens.borderStrong,
+        ),
+        trackColor: WidgetStatePropertyAll(
+          tokens.surfaceSunken.withValues(alpha: 0.45),
+        ),
+        thickness: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.hovered) ? 8 : 6,
+        ),
+        radius: const Radius.circular(AppRadii.indicator),
+        crossAxisMargin: AppSpacing.space4,
+        mainAxisMargin: AppSpacing.space8,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,

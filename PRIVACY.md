@@ -73,6 +73,19 @@ instala watcher ni escanea en segundo plano. Recuperar documentos solo
 autoasocia una huella exacta. Candidatos ambiguos o de baja confianza no mutan
 datos.
 
+## Portadas locales
+
+La portada automática se calcula en el dispositivo con PDFium sobre un máximo
+de seis páginas a baja resolución. Usa métricas visuales simples y, cuando ya
+existe extracción fiable, longitud/líneas y marcadores de índice. No usa OCR,
+modelo de IA, API, cuenta, subida ni conexión. Las dos miniaturas PNG y sus
+metadatos viven en la caché local y se eliminan al limpiar caché o retirar el
+documento; el PDF original nunca se modifica.
+
+La página elegida manualmente se guarda como preferencia local. La puntuación y
+confianza automáticas no se muestran ni se registran en logs. La búsqueda de
+biblioteca permanece solo en memoria.
+
 ## Diagnóstico y modo seguro
 
 El informe diagnóstico usa campos permitidos: versión, sistema, arquitectura,

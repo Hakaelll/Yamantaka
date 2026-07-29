@@ -28,6 +28,14 @@ void main() {
     );
     expect(
       shortcuts,
+      contains(const SingleActivator(LogicalKeyboardKey.arrowRight)),
+    );
+    expect(
+      shortcuts,
+      contains(const SingleActivator(LogicalKeyboardKey.arrowLeft)),
+    );
+    expect(
+      shortcuts,
       contains(const SingleActivator(LogicalKeyboardKey.space, shift: true)),
     );
 
@@ -38,6 +46,8 @@ void main() {
 
   test('custom shortcuts are validated, conflict-free and reversible', () {
     final current = AppCommandRegistry.resolvedTokens('{}');
+    expect(current[AppCommandId.nextPage], 'arrow-right');
+    expect(current[AppCommandId.previousPage], 'arrow-left');
     expect(
       AppCommandRegistry.assignmentError(
         AppCommandId.search,

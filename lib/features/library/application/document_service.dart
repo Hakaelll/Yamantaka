@@ -9,6 +9,7 @@ import '../../../core/errors/app_failure.dart';
 import '../../../core/platform/path_normalizer.dart';
 import '../../reader/domain/reader_models.dart';
 import '../domain/library_document.dart';
+import '../domain/document_cover.dart';
 import '../../../storage/repositories/document_repository.dart';
 
 final class InspectedFile {
@@ -121,10 +122,25 @@ final class DocumentService {
       preferredViewMode: existing?.preferredViewMode ?? ReaderMode.document,
       preferredTheme: existing?.preferredTheme ?? ReaderTheme.ivory,
       fingerprint: file.fingerprint,
-      thumbnailPath: existing?.fingerprint == file.fingerprint
+      thumbnailPath:
+          existing?.fingerprint == file.fingerprint ||
+              existing?.coverMetadata?.selectionMode ==
+                  CoverSelectionMode.manual
           ? existing?.thumbnailPath
           : null,
+      coverMetadata:
+          existing?.fingerprint == file.fingerprint ||
+              existing?.coverMetadata?.selectionMode ==
+                  CoverSelectionMode.manual
+          ? existing?.coverMetadata
+          : null,
+      isFavorite: existing?.isFavorite ?? false,
     );
+    if (existing != null &&
+        existing.fingerprint != file.fingerprint &&
+        existing.coverMetadata?.selectionMode != CoverSelectionMode.manual) {
+      _repository.invalidateCover(existing.id);
+    }
     _repository.save(document);
     return document;
   }

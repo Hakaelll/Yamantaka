@@ -339,10 +339,12 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _SwitchSetting(
             label: 'Generar portadas',
-            description: 'Crea vistas previas locales de la primera página.',
+            description:
+                'Elige localmente la mejor de las seis primeras páginas y '
+                'guarda miniaturas nítidas.',
             value: settings.generateCovers,
             onChanged: (value) =>
-                _update(settings.copyWith(generateCovers: value)),
+                unawaited(_setCoverGeneration(settings, value)),
           ),
           _DropdownSetting(
             label: 'Tamaño máximo de caché',
@@ -512,7 +514,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             'fuera del PDF y pueden exportarse en Markdown o JSON.\n\n'
             'Búsqueda global: Ctrl+Mayús+F desde la biblioteca. La indexación '
             'es opcional, cancelable y permanece en este dispositivo.\n\n'
-            'Espacios de trabajo: guarda pestañas, posiciones y el panel para '
+            'Espacios de trabajo: guarda documentos, posiciones y el panel para '
             'restaurar una sesión. Los PDF nunca se copian.\n\n'
             'Teclado: Ctrl+K abre comandos, Ctrl+F busca en la superficie '
             'actual, F11 entra o sale de pantalla completa y Escape cierra la '
@@ -759,6 +761,16 @@ final class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _update(AppSettings settings) =>
       widget.services.settings.update(settings);
+
+  Future<void> _setCoverGeneration(AppSettings settings, bool enabled) async {
+    await _update(settings.copyWith(generateCovers: enabled));
+    if (!enabled) return;
+    for (final document in widget.services.library.documents) {
+      if (!document.isMissing) {
+        widget.services.thumbnails.enqueueCover(document);
+      }
+    }
+  }
 
   Future<void> _runWithNotice(
     BuildContext context,

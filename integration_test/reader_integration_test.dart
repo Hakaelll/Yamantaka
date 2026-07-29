@@ -188,6 +188,30 @@ void main() {
     expect(find.byKey(const Key('reader-progress')), findsOneWidget);
     expect(find.text('Documento'), findsOneWidget);
 
+    await _bounded(viewController.zoomBy(1.5), 'zoom before minimum');
+    await tester.pump();
+    await _bounded(viewController.zoomBy(0.01), 'minimum zoom');
+    await tester.pump();
+    await _expectActivePageCentered(tester);
+    await _captureReaderState(tester, suffix: '-minimum-zoom');
+    await _bounded(reader.fitPage(), 'restore fit-page zoom');
+    await tester.pump();
+
+    await _bounded(reader.toggleFullScreen(), 'enter immersive fullscreen');
+    await tester.pump();
+    expect(find.byKey(const Key('reader-top-bar')), findsNothing);
+    expect(find.byKey(const Key('reader-bottom-controls')), findsNothing);
+    expect(find.byKey(const Key('reader-progress')), findsNothing);
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
+    await tester.pump();
+    await _expectActivePageCentered(tester);
+    await _captureReaderState(tester, suffix: '-fullscreen');
+    await _bounded(reader.leaveFullScreen(), 'leave immersive fullscreen');
+    await tester.pump();
+    expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+
     final actualDocument = reader.document!;
     reader.document = actualDocument.copyWith(
       path: r'C:\Fixtures\fixture.pdf',
@@ -195,7 +219,9 @@ void main() {
     );
     await tester.pump();
     await tester.tap(find.byTooltip('Más opciones'));
-    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+    await _captureReaderState(tester, suffix: '-menu');
     await tester.tap(find.text('Información del documento'));
     await tester.pump(const Duration(milliseconds: 250));
     expect(
@@ -210,6 +236,17 @@ void main() {
     await tester.tap(find.text('Cerrar'));
     await tester.pump();
     reader.document = actualDocument;
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Miniaturas (Ctrl+J)'));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('reader-side-panel')), findsOneWidget);
+    expect(find.byType(RawImage), findsWidgets);
+    await _captureReaderState(tester, suffix: '-thumbnails');
+    await tester.tap(find.byTooltip('Cerrar panel'));
     await tester.pump();
 
     await tester.tap(find.byTooltip('Buscar (Ctrl+F)'));
@@ -276,6 +313,17 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     expect(find.byKey(const Key('reader-top-bar')).hitTestable(), findsNothing);
     await _captureReaderState(tester, suffix: '-book');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await _pumpUntil(
+      tester,
+      () => reader.currentPageIndex == 1,
+      reason: 'book mode to advance from cover to the 2-3 spread',
+    );
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
+    await tester.pump(const Duration(seconds: 4));
+    await _captureReaderState(tester, suffix: '-book-spread');
     reader.setReaderMode(ReaderMode.document);
     await tester.pump();
 
@@ -348,6 +396,32 @@ Future<void> _verifyReaderPaint(WidgetTester tester) async {
     }
     expect(darkPixels, greaterThan(100));
     await _writeCapture(image);
+  } finally {
+    image.dispose();
+  }
+}
+
+Future<void> _expectActivePageCentered(WidgetTester tester) async {
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const Key('native-viewer-boundary')),
+  );
+  final image = await boundary.toImage();
+  try {
+    final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    expect(rgba, isNotNull);
+    final y = image.height ~/ 2;
+    final whiteColumns = <int>[];
+    for (var x = 0; x < image.width; x++) {
+      final offset = (y * image.width + x) * 4;
+      if (rgba!.getUint8(offset) >= 248 &&
+          rgba.getUint8(offset + 1) >= 248 &&
+          rgba.getUint8(offset + 2) >= 248) {
+        whiteColumns.add(x);
+      }
+    }
+    expect(whiteColumns, isNotEmpty);
+    final pageCenter = (whiteColumns.first + whiteColumns.last) / 2;
+    expect(pageCenter, closeTo(image.width / 2, 3));
   } finally {
     image.dispose();
   }

@@ -1,18 +1,27 @@
 // ignore_for_file: prefer_initializing_formals
 
+import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:path/path.dart' as p;
 
 import '../../core/errors/app_failure.dart';
 import '../../core/logging/app_logger.dart';
+import '../../features/library/domain/document_cover.dart';
+import '../../features/library/domain/library_document.dart';
 import '../../storage/paths/app_paths.dart';
 import '../../storage/repositories/document_repository.dart';
 import '../pdf_document_engine.dart';
 
 final class ThumbnailService {
-  const ThumbnailService({
+  static const double coverPreviewScale = 0.40;
+  static const double smallCoverScale = 0.48;
+  static const double largeCoverScale = 1.00;
+
+  ThumbnailService({
     required PdfDocumentEngine engine,
     required AppPaths paths,
     required DocumentRepository documents,
@@ -29,31 +38,184 @@ final class ThumbnailService {
   final DocumentRepository _documents;
   final AppLogger _logger;
   final int Function() _maxCacheBytes;
+  void Function()? onCoverUpdated;
+  final Set<String> _cancelledDocumentIds = <String>{};
+  Future<void> _backgroundQueue = Future<void>.value();
 
   Future<String?> generateCover({
     required String libraryDocumentId,
     required String engineDocumentId,
   }) async {
-    final outputPath = p.join(
-      _paths.thumbnailDirectory.path,
-      '$libraryDocumentId.png',
+    final document = _documents.byId(libraryDocumentId);
+    if (document == null) return null;
+    final valid = document.coverMetadata?.isValidFor(
+      modifiedAt: document.fileModifiedAt,
+      currentAlgorithmVersion: CoverSelectionPolicy.algorithmVersion,
     );
+    if (valid == true && await _coverFilesExist(document.coverMetadata!)) {
+      return document.coverMetadata!.smallThumbnailPath;
+    }
+    final manual = document.coverMetadata;
+    if (manual?.selectionMode == CoverSelectionMode.manual) {
+      return _renderAndPersist(
+        document: document,
+        engineDocumentId: engineDocumentId,
+        pageIndex: manual!.sourcePageIndex.clamp(0, document.pageCount - 1),
+        confidence: 1,
+        selectionMode: CoverSelectionMode.manual,
+      );
+    }
+    return _detectAndGenerate(document, engineDocumentId);
+  }
+
+  void enqueueCover(LibraryDocument document) {
+    _cancelledDocumentIds.remove(document.id);
+    _backgroundQueue = _backgroundQueue
+        .catchError((Object error) {
+          _logger.warning('Previous cover queue task failed.', error);
+        })
+        .then((_) async {
+          if (_cancelledDocumentIds.contains(document.id)) return;
+          final current = _documents.byId(document.id);
+          if (current == null ||
+              current.isMissing ||
+              current.coverMetadata?.selectionMode ==
+                  CoverSelectionMode.manual) {
+            return;
+          }
+          final valid = current.coverMetadata?.isValidFor(
+            modifiedAt: current.fileModifiedAt,
+            currentAlgorithmVersion: CoverSelectionPolicy.algorithmVersion,
+          );
+          if (valid == true && await _coverFilesExist(current.coverMetadata!)) {
+            return;
+          }
+          String? engineDocumentId;
+          try {
+            final opened = await _engine.openDocument(current.path);
+            engineDocumentId = opened.documentId;
+            if (!_cancelledDocumentIds.contains(current.id)) {
+              await _detectAndGenerate(current, opened.documentId);
+            }
+          } on Object catch (error) {
+            _logger.warning('Queued cover generation failed.', error);
+          } finally {
+            if (engineDocumentId != null) {
+              await _engine.closeDocument(engineDocumentId);
+            }
+          }
+        });
+  }
+
+  void cancel(String documentId) {
+    _cancelledDocumentIds.add(documentId);
+  }
+
+  Future<List<CoverPreview>> previewPages(
+    LibraryDocument document, {
+    int maximumPages = CoverSelectionPolicy.maximumCandidatePages,
+  }) async {
+    final opened = await _engine.openDocument(document.path);
     try {
-      final rendered = await _engine.renderPage(
-        documentId: engineDocumentId,
-        pageIndex: 0,
-        scale: 0.3,
+      final previews = <CoverPreview>[];
+      final count = math.min(maximumPages, opened.pageCount);
+      for (var pageIndex = 0; pageIndex < count; pageIndex++) {
+        final rendered = await _engine.renderPage(
+          documentId: opened.documentId,
+          pageIndex: pageIndex,
+          scale: coverPreviewScale,
+        );
+        try {
+          final bytes = await _pngBytes(rendered.image);
+          if (bytes != null) {
+            previews.add(CoverPreview(pageIndex: pageIndex, pngBytes: bytes));
+          }
+        } finally {
+          rendered.dispose();
+        }
+      }
+      return previews;
+    } finally {
+      await _engine.closeDocument(opened.documentId);
+    }
+  }
+
+  Future<void> setManualCover(LibraryDocument document, int pageIndex) async {
+    final opened = await _engine.openDocument(document.path);
+    try {
+      if (pageIndex < 0 || pageIndex >= opened.pageCount) {
+        throw RangeError.range(pageIndex, 0, opened.pageCount - 1, 'pageIndex');
+      }
+      await _renderAndPersist(
+        document: document,
+        engineDocumentId: opened.documentId,
+        pageIndex: pageIndex,
+        confidence: 1,
+        selectionMode: CoverSelectionMode.manual,
       );
-      final data = await rendered.image.toByteData(
-        format: ui.ImageByteFormat.png,
+    } finally {
+      await _engine.closeDocument(opened.documentId);
+    }
+  }
+
+  Future<void> restoreAutomaticCover(LibraryDocument document) async {
+    await _deleteCoverFiles(document.coverMetadata);
+    _documents.invalidateCover(document.id);
+    final opened = await _engine.openDocument(document.path);
+    try {
+      await _detectAndGenerate(document, opened.documentId);
+    } finally {
+      await _engine.closeDocument(opened.documentId);
+    }
+  }
+
+  Future<void> removeForDocument(LibraryDocument document) async {
+    cancel(document.id);
+    await _deleteCoverFiles(document.coverMetadata);
+    _documents.invalidateCover(document.id);
+  }
+
+  Future<String?> _detectAndGenerate(
+    LibraryDocument document,
+    String engineDocumentId,
+  ) async {
+    try {
+      final candidateCount = math.min(
+        CoverSelectionPolicy.maximumCandidatePages,
+        document.pageCount,
       );
-      if (data == null) return null;
-      await File(
-        outputPath,
-      ).writeAsBytes(data.buffer.asUint8List(), flush: true);
-      _documents.updateThumbnail(libraryDocumentId, outputPath);
-      await trimToLimit();
-      return outputPath;
+      final metrics = <CoverCandidateMetrics>[];
+      for (var pageIndex = 0; pageIndex < candidateCount; pageIndex++) {
+        if (_cancelledDocumentIds.contains(document.id)) return null;
+        final rendered = await _engine.renderPage(
+          documentId: engineDocumentId,
+          pageIndex: pageIndex,
+          scale: 0.16,
+        );
+        try {
+          String text = '';
+          try {
+            text = await _engine.extractPageText(
+              documentId: engineDocumentId,
+              pageIndex: pageIndex,
+            );
+          } on Object {
+            // Visual scoring remains available for scanned documents.
+          }
+          metrics.add(await _measure(rendered.image, pageIndex, text));
+        } finally {
+          rendered.dispose();
+        }
+      }
+      if (metrics.isEmpty) return null;
+      final selected = CoverSelectionPolicy.choose(metrics);
+      return _renderAndPersist(
+        document: document,
+        engineDocumentId: engineDocumentId,
+        pageIndex: selected.metrics.pageIndex,
+        confidence: selected.confidence,
+        selectionMode: CoverSelectionMode.automatic,
+      );
     } on Object catch (error, stackTrace) {
       _logger.warning('Cover generation failed.', error);
       Error.throwWithStackTrace(
@@ -67,6 +229,123 @@ final class ThumbnailService {
     }
   }
 
+  Future<String?> _renderAndPersist({
+    required LibraryDocument document,
+    required String engineDocumentId,
+    required int pageIndex,
+    required double confidence,
+    required CoverSelectionMode selectionMode,
+  }) async {
+    final previousMetadata = document.coverMetadata;
+    final cacheStamp = DateTime.now().microsecondsSinceEpoch;
+    final smallPath = p.join(
+      _paths.thumbnailDirectory.path,
+      '${document.id}-v${CoverSelectionPolicy.algorithmVersion}'
+      '-$cacheStamp-small.png',
+    );
+    final largePath = p.join(
+      _paths.thumbnailDirectory.path,
+      '${document.id}-v${CoverSelectionPolicy.algorithmVersion}'
+      '-$cacheStamp-large.png',
+    );
+    final renders = <({double scale, String path})>[
+      (scale: smallCoverScale, path: smallPath),
+      (scale: largeCoverScale, path: largePath),
+    ];
+    var pageAspectRatio = 0.704;
+    for (final target in renders) {
+      final rendered = await _engine.renderPage(
+        documentId: engineDocumentId,
+        pageIndex: pageIndex,
+        scale: target.scale,
+      );
+      try {
+        pageAspectRatio = rendered.image.width / rendered.image.height;
+        final bytes = await _pngBytes(rendered.image);
+        if (bytes == null) return null;
+        await File(target.path).writeAsBytes(bytes, flush: true);
+      } finally {
+        rendered.dispose();
+      }
+    }
+    final metadata = DocumentCoverMetadata(
+      documentId: document.id,
+      sourcePageIndex: pageIndex,
+      smallThumbnailPath: smallPath,
+      largeThumbnailPath: largePath,
+      generatedAt: DateTime.now().toUtc(),
+      sourceModifiedAt: document.fileModifiedAt,
+      confidence: confidence,
+      selectionMode: selectionMode,
+      algorithmVersion: CoverSelectionPolicy.algorithmVersion,
+      cropMode: CoverCropMode.contain,
+      pageAspectRatio: pageAspectRatio.clamp(0.1, 10),
+    );
+    _documents.saveCover(metadata);
+    await _deleteCoverFiles(previousMetadata);
+    await trimToLimit();
+    onCoverUpdated?.call();
+    return smallPath;
+  }
+
+  Future<CoverCandidateMetrics> _measure(
+    ui.Image image,
+    int pageIndex,
+    String text,
+  ) async {
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (data == null || image.width == 0 || image.height == 0) {
+      return CoverCandidateMetrics(
+        pageIndex: pageIndex,
+        uniformSpaceRatio: 1,
+        edgeDensity: 0,
+        luminanceContrast: 0,
+        textLength: text.trim().length,
+        lineCount: _lineCount(text),
+        hasContentsMarker: _hasContentsMarker(text),
+      );
+    }
+    final bytes = data.buffer.asUint8List(
+      data.offsetInBytes,
+      data.lengthInBytes,
+    );
+    final stepX = math.max(1, image.width ~/ 48);
+    final stepY = math.max(1, image.height ~/ 48);
+    var samples = 0;
+    var uniformSamples = 0;
+    var edges = 0;
+    var sum = 0.0;
+    var squareSum = 0.0;
+    for (var y = 0; y < image.height; y += stepY) {
+      double? previous;
+      for (var x = 0; x < image.width; x += stepX) {
+        final offset = (y * image.width + x) * 4;
+        final luminance =
+            (bytes[offset] * 0.2126 +
+                bytes[offset + 1] * 0.7152 +
+                bytes[offset + 2] * 0.0722) /
+            255;
+        samples++;
+        sum += luminance;
+        squareSum += luminance * luminance;
+        if (luminance >= 0.94 || luminance <= 0.06) uniformSamples++;
+        if (previous != null && (luminance - previous).abs() > 0.16) edges++;
+        previous = luminance;
+      }
+    }
+    final mean = sum / samples;
+    final variance = math.max(0, squareSum / samples - mean * mean);
+    return CoverCandidateMetrics(
+      pageIndex: pageIndex,
+      uniformSpaceRatio: uniformSamples / samples,
+      edgeDensity: edges / samples,
+      luminanceContrast: math.sqrt(variance),
+      textLength: text.trim().length,
+      lineCount: _lineCount(text),
+      hasContentsMarker: _hasContentsMarker(text),
+    );
+  }
+
   Future<void> clear() async {
     final directory = _paths.thumbnailDirectory;
     if (await directory.exists()) {
@@ -77,7 +356,6 @@ final class ThumbnailService {
     _documents.clearThumbnailPaths();
   }
 
-  /// Removes oldest cached covers until the configured byte budget is met.
   Future<void> trimToLimit() async {
     final files = <({File file, FileStat stat})>[];
     var totalBytes = 0;
@@ -97,6 +375,36 @@ final class ThumbnailService {
       await entry.file.delete();
       _documents.clearThumbnailPath(entry.file.path);
       totalBytes -= entry.stat.size;
+    }
+  }
+
+  static Future<Uint8List?> _pngBytes(ui.Image image) async {
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    return data?.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+  }
+
+  static int _lineCount(String text) =>
+      text.trim().isEmpty ? 0 : text.trim().split(RegExp(r'\r?\n')).length;
+
+  static bool _hasContentsMarker(String text) {
+    final normalized = text.toLowerCase();
+    return RegExp(
+      r'\b(índice|indice|contenido|contents|table of contents|chapter|capítulo)\b',
+    ).hasMatch(normalized);
+  }
+
+  static Future<bool> _coverFilesExist(DocumentCoverMetadata metadata) async =>
+      File(metadata.smallThumbnailPath).existsSync() &&
+      File(metadata.largeThumbnailPath).existsSync();
+
+  static Future<void> _deleteCoverFiles(DocumentCoverMetadata? metadata) async {
+    if (metadata == null) return;
+    for (final path in {
+      metadata.smallThumbnailPath,
+      metadata.largeThumbnailPath,
+    }) {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
     }
   }
 }

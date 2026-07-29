@@ -32,7 +32,7 @@ void main() {
         .map((row) => row['name'])
         .toSet();
 
-    expect(version, 2);
+    expect(version, 3);
     expect(
       tables,
       containsAll({
@@ -45,6 +45,7 @@ void main() {
         'collections',
         'workspaces',
         'library_search',
+        'document_covers',
       }),
     );
   });

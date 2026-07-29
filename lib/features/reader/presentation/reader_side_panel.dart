@@ -1,6 +1,8 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/app_config.dart';
 import '../../../app/theme/app_components.dart';
@@ -136,6 +138,7 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
     ReaderPanelSection.thumbnails => _ThumbnailPanel(
       controller: widget.controller,
       engine: widget.engine,
+      panelWidth: widget.width,
     ),
     ReaderPanelSection.outline => _OutlinePanel(controller: widget.controller),
     ReaderPanelSection.bookmarks => _BookmarksPanel(
@@ -215,17 +218,27 @@ final class _PanelResizeHandle extends StatelessWidget {
 }
 
 final class _ThumbnailPanel extends StatefulWidget {
-  const _ThumbnailPanel({required this.controller, required this.engine});
+  const _ThumbnailPanel({
+    required this.controller,
+    required this.engine,
+    required this.panelWidth,
+  });
 
   final ReaderController controller;
   final PdfDocumentEngine engine;
+  final double panelWidth;
 
   @override
   State<_ThumbnailPanel> createState() => _ThumbnailPanelState();
 }
 
 final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
-  final Map<int, Future<RenderedPdfPage>> _renderRequests = {};
+  static const _maximumRetainedRequests = 18;
+  final LinkedHashMap<
+    ({int pageIndex, int scaleMilli}),
+    Future<RenderedPdfPage>
+  >
+  _renderRequests = LinkedHashMap();
   String? _documentId;
 
   @override
@@ -248,12 +261,21 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
   Widget build(BuildContext context) {
     final opened = widget.controller.openedDocument;
     if (opened == null) return const SizedBox.shrink();
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0);
     return ListView.builder(
       key: const PageStorageKey('reader-thumbnails'),
       padding: const EdgeInsets.all(AppSpacing.space12),
       itemCount: opened.pageCount,
       itemBuilder: (context, index) {
         final selected = index == widget.controller.currentPageIndex;
+        final pageSize = opened.pageSizes[index];
+        final renderScale =
+            ((widget.panelWidth - AppSpacing.space40) *
+                    pixelRatio *
+                    1.12 /
+                    pageSize.width)
+                .clamp(0.45, 1.2)
+                .toDouble();
         return Semantics(
           button: true,
           selected: selected,
@@ -292,11 +314,14 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
                           opened.pageSizes[index].height,
                       child: FutureBuilder<RenderedPdfPage>(
                         future: _renderRequests.putIfAbsent(
-                          index,
-                          () => widget.engine.renderPage(
+                          (
+                            pageIndex: index,
+                            scaleMilli: (renderScale * 1000).round(),
+                          ),
+                          () => _requestThumbnail(
                             documentId: opened.documentId,
                             pageIndex: index,
-                            scale: 0.2,
+                            scale: renderScale,
                           ),
                         ),
                         builder: (context, snapshot) {
@@ -304,6 +329,7 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
                             return RawImage(
                               image: snapshot.data!.image,
                               fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
                             );
                           }
                           if (snapshot.hasError) {
@@ -344,6 +370,21 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
           ),
         );
       },
+    );
+  }
+
+  Future<RenderedPdfPage> _requestThumbnail({
+    required String documentId,
+    required int pageIndex,
+    required double scale,
+  }) {
+    while (_renderRequests.length >= _maximumRetainedRequests) {
+      _renderRequests.remove(_renderRequests.keys.first);
+    }
+    return widget.engine.renderPage(
+      documentId: documentId,
+      pageIndex: pageIndex,
+      scale: scale,
     );
   }
 }

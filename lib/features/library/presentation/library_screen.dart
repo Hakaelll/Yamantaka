@@ -4,96 +4,17 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../app/app_config.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_density.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../organization/application/organization_controller.dart';
 import '../../organization/domain/organization_models.dart';
 import '../application/library_controller.dart';
+import '../application/library_filter.dart';
 import '../domain/library_document.dart';
+import 'artifact_library.dart';
 
-enum LibrarySortOrder { lastOpened, title, progress }
-
-enum LibraryReadingState { all, inProgress, notStarted, completed }
-
-extension LibraryReadingStateLabel on LibraryReadingState {
-  String get label => switch (this) {
-    LibraryReadingState.all => 'Todos',
-    LibraryReadingState.inProgress => 'En curso',
-    LibraryReadingState.notStarted => 'Sin empezar',
-    LibraryReadingState.completed => 'Terminados',
-  };
-}
-
-final class LibraryFilterResult {
-  const LibraryFilterResult({required this.documents, required this.counts});
-
-  final List<LibraryDocument> documents;
-  final Map<LibraryReadingState, int> counts;
-}
-
-LibraryFilterResult evaluateLibraryDocuments(
-  Iterable<LibraryDocument> documents, {
-  String query = '',
-  LibrarySortOrder sortOrder = LibrarySortOrder.lastOpened,
-  LibraryReadingState readingState = LibraryReadingState.all,
-}) {
-  final normalizedQuery = query.trim().toLowerCase();
-  final visible = <LibraryDocument>[];
-  final counts = <LibraryReadingState, int>{
-    for (final state in LibraryReadingState.values) state: 0,
-  };
-  for (final document in documents) {
-    final matchesText =
-        normalizedQuery.isEmpty ||
-        document.title?.toLowerCase().contains(normalizedQuery) == true ||
-        document.author?.toLowerCase().contains(normalizedQuery) == true ||
-        document.fileName.toLowerCase().contains(normalizedQuery);
-    if (!matchesText) continue;
-    final documentState = _readingStateOf(document);
-    counts[LibraryReadingState.all] = counts[LibraryReadingState.all]! + 1;
-    counts[documentState] = counts[documentState]! + 1;
-    if (readingState == LibraryReadingState.all ||
-        readingState == documentState) {
-      visible.add(document);
-    }
-  }
-  visible.sort((left, right) {
-    final comparison = switch (sortOrder) {
-      LibrarySortOrder.lastOpened => right.lastOpenedAt.compareTo(
-        left.lastOpenedAt,
-      ),
-      LibrarySortOrder.title => _documentLabel(
-        left,
-      ).compareTo(_documentLabel(right)),
-      LibrarySortOrder.progress => right.readingProgress.compareTo(
-        left.readingProgress,
-      ),
-    };
-    if (comparison != 0) return comparison;
-    return right.lastOpenedAt.compareTo(left.lastOpenedAt);
-  });
-  return LibraryFilterResult(documents: visible, counts: counts);
-}
-
-List<LibraryDocument> filterAndSortLibraryDocuments(
-  Iterable<LibraryDocument> documents, {
-  String query = '',
-  LibrarySortOrder sortOrder = LibrarySortOrder.lastOpened,
-  LibraryReadingState readingState = LibraryReadingState.all,
-}) => evaluateLibraryDocuments(
-  documents,
-  query: query,
-  sortOrder: sortOrder,
-  readingState: readingState,
-).documents;
-
-LibraryReadingState _readingStateOf(LibraryDocument document) {
-  if (document.readingProgress >= 1) return LibraryReadingState.completed;
-  if (document.readingProgress > 0) return LibraryReadingState.inProgress;
-  return LibraryReadingState.notStarted;
-}
+export '../application/library_filter.dart';
 
 final class LibraryScreen extends StatefulWidget {
   const LibraryScreen({
@@ -107,6 +28,10 @@ final class LibraryScreen extends StatefulWidget {
     this.onReadingFilterChanged,
     this.onDocumentInfo,
     this.onRelocateDocument,
+    this.onToggleFavorite,
+    this.onChangeCover,
+    this.onRevealDocument,
+    this.onRemoveDocument,
     this.organization,
     this.onGlobalSearch,
     this.onOpenPaths,
@@ -125,6 +50,10 @@ final class LibraryScreen extends StatefulWidget {
   final ValueChanged<LibraryReadingState>? onReadingFilterChanged;
   final Future<void> Function(LibraryDocument document)? onDocumentInfo;
   final Future<void> Function(LibraryDocument document)? onRelocateDocument;
+  final Future<void> Function(LibraryDocument document)? onToggleFavorite;
+  final Future<void> Function(LibraryDocument document)? onChangeCover;
+  final Future<void> Function(LibraryDocument document)? onRevealDocument;
+  final Future<void> Function(LibraryDocument document)? onRemoveDocument;
   final OrganizationController? organization;
   final VoidCallback? onGlobalSearch;
   final Future<void> Function(List<String> paths)? onOpenPaths;
@@ -138,17 +67,16 @@ final class LibraryScreen extends StatefulWidget {
 }
 
 final class _LibraryScreenState extends State<LibraryScreen> {
-  final TextEditingController _filterController = TextEditingController();
-  final FocusNode _filterFocusNode = FocusNode(debugLabel: 'library-filter');
   bool _dragging = false;
-  String _query = '';
-  LibrarySortOrder _sortOrder = LibrarySortOrder.lastOpened;
   late LibraryReadingState _readingState;
 
   @override
   void initState() {
     super.initState();
     _readingState = widget.initialReadingFilter;
+    if (widget.controller.readingState == LibraryReadingState.all.name) {
+      widget.controller.readingState = _readingState.name;
+    }
   }
 
   @override
@@ -161,19 +89,10 @@ final class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   @override
-  void dispose() {
-    _filterController.dispose();
-    _filterFocusNode.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final compact = context.windowClass == AppWindowClass.compact;
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyF, control: true):
-            _focusFilter,
         if (widget.onGlobalSearch != null)
           const SingleActivator(
             LogicalKeyboardKey.keyF,
@@ -202,7 +121,7 @@ final class _LibraryScreenState extends State<LibraryScreen> {
           },
           child: Scaffold(
             appBar: AppBar(
-              title: const Text(AppConfig.productName),
+              title: const Text('Biblioteca'),
               actions: [
                 if (widget.safeMode)
                   const Tooltip(
@@ -213,39 +132,54 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                       child: Icon(Icons.health_and_safety_outlined),
                     ),
                   ),
-                if (widget.organization != null)
-                  IconButton(
-                    tooltip: 'Colecciones',
-                    onPressed: _showCollections,
-                    icon: const Icon(Icons.folder_copy_outlined),
-                  ),
-                if (widget.onWorkspaces != null)
-                  IconButton(
-                    tooltip: 'Espacios de trabajo',
-                    onPressed: widget.onWorkspaces,
-                    icon: const Icon(Icons.space_dashboard_outlined),
-                  ),
-                if (widget.onImportFolder != null)
-                  IconButton(
-                    tooltip: 'Importar carpeta',
-                    onPressed: widget.onImportFolder,
-                    icon: const Icon(Icons.create_new_folder_outlined),
-                  ),
-                if (widget.onRecoverFolder != null &&
-                    widget.controller.documents.any(
-                      (document) => document.isMissing,
-                    ))
-                  IconButton(
-                    tooltip: 'Recuperar documentos movidos',
-                    onPressed: widget.onRecoverFolder,
-                    icon: const Icon(Icons.find_replace_rounded),
-                  ),
-                if (widget.onGlobalSearch != null)
-                  IconButton(
-                    tooltip: 'Buscar en la biblioteca (Ctrl+Mayús+F)',
-                    onPressed: widget.onGlobalSearch,
-                    icon: const Icon(Icons.manage_search_rounded),
-                  ),
+                PopupMenuButton<_LibraryAppMenuAction>(
+                  tooltip: 'Organizar y más acciones',
+                  onSelected: (action) {
+                    switch (action) {
+                      case _LibraryAppMenuAction.collections:
+                        _showCollections();
+                      case _LibraryAppMenuAction.workspaces:
+                        widget.onWorkspaces?.call();
+                      case _LibraryAppMenuAction.importFolder:
+                        widget.onImportFolder?.call();
+                      case _LibraryAppMenuAction.recover:
+                        widget.onRecoverFolder?.call();
+                      case _LibraryAppMenuAction.globalSearch:
+                        widget.onGlobalSearch?.call();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (widget.organization != null)
+                      const PopupMenuItem(
+                        value: _LibraryAppMenuAction.collections,
+                        child: Text('Colecciones'),
+                      ),
+                    if (widget.onWorkspaces != null)
+                      const PopupMenuItem(
+                        value: _LibraryAppMenuAction.workspaces,
+                        child: Text('Espacios de trabajo'),
+                      ),
+                    if (widget.onImportFolder != null)
+                      const PopupMenuItem(
+                        value: _LibraryAppMenuAction.importFolder,
+                        child: Text('Importar carpeta'),
+                      ),
+                    if (widget.onRecoverFolder != null &&
+                        widget.controller.documents.any(
+                          (document) => document.isMissing,
+                        ))
+                      const PopupMenuItem(
+                        value: _LibraryAppMenuAction.recover,
+                        child: Text('Recuperar documentos movidos'),
+                      ),
+                    if (widget.onGlobalSearch != null)
+                      const PopupMenuItem(
+                        value: _LibraryAppMenuAction.globalSearch,
+                        child: Text('Búsqueda global'),
+                      ),
+                  ],
+                  icon: const Icon(Icons.more_horiz_rounded),
+                ),
                 if (compact)
                   IconButton(
                     key: const Key('library-open-button'),
@@ -281,21 +215,17 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                     onOpenPath: widget.onOpenPath,
                     onPickDocument: widget.onPickDocument,
                     showRecents: widget.showRecents,
-                    filterController: _filterController,
-                    filterFocusNode: _filterFocusNode,
-                    query: _query,
-                    sortOrder: _sortOrder,
                     readingState: _readingState,
-                    onQueryChanged: (value) => setState(() => _query = value),
-                    onClearQuery: _clearFilter,
-                    onSortChanged: (value) =>
-                        setState(() => _sortOrder = value),
                     onReadingStateChanged: (value) {
                       setState(() => _readingState = value);
                       widget.onReadingFilterChanged?.call(value);
                     },
                     onDocumentInfo: widget.onDocumentInfo,
                     onRelocateDocument: widget.onRelocateDocument,
+                    onToggleFavorite: widget.onToggleFavorite,
+                    onChangeCover: widget.onChangeCover,
+                    onRevealDocument: widget.onRevealDocument,
+                    onRemoveDocument: widget.onRemoveDocument,
                     documentPredicate: widget.organization?.includes,
                   ),
                 ),
@@ -414,21 +344,6 @@ final class _LibraryScreenState extends State<LibraryScreen> {
       organization.selectCollection(created.id);
     }
   }
-
-  void _focusFilter() {
-    if (!widget.showRecents) return;
-    _filterFocusNode.requestFocus();
-    _filterController.selection = TextSelection(
-      baseOffset: 0,
-      extentOffset: _filterController.text.length,
-    );
-  }
-
-  void _clearFilter() {
-    _filterController.clear();
-    setState(() => _query = '');
-    _filterFocusNode.requestFocus();
-  }
 }
 
 final class _LibraryBody extends StatelessWidget {
@@ -437,17 +352,14 @@ final class _LibraryBody extends StatelessWidget {
     required this.onOpenPath,
     required this.onPickDocument,
     required this.showRecents,
-    required this.filterController,
-    required this.filterFocusNode,
-    required this.query,
-    required this.sortOrder,
     required this.readingState,
-    required this.onQueryChanged,
-    required this.onClearQuery,
-    required this.onSortChanged,
     required this.onReadingStateChanged,
     required this.onDocumentInfo,
     required this.onRelocateDocument,
+    required this.onToggleFavorite,
+    required this.onChangeCover,
+    required this.onRevealDocument,
+    required this.onRemoveDocument,
     this.documentPredicate,
   });
 
@@ -455,17 +367,14 @@ final class _LibraryBody extends StatelessWidget {
   final Future<void> Function(String path) onOpenPath;
   final Future<void> Function() onPickDocument;
   final bool showRecents;
-  final TextEditingController filterController;
-  final FocusNode filterFocusNode;
-  final String query;
-  final LibrarySortOrder sortOrder;
   final LibraryReadingState readingState;
-  final ValueChanged<String> onQueryChanged;
-  final VoidCallback onClearQuery;
-  final ValueChanged<LibrarySortOrder> onSortChanged;
   final ValueChanged<LibraryReadingState> onReadingStateChanged;
   final Future<void> Function(LibraryDocument document)? onDocumentInfo;
   final Future<void> Function(LibraryDocument document)? onRelocateDocument;
+  final Future<void> Function(LibraryDocument document)? onToggleFavorite;
+  final Future<void> Function(LibraryDocument document)? onChangeCover;
+  final Future<void> Function(LibraryDocument document)? onRevealDocument;
+  final Future<void> Function(LibraryDocument document)? onRemoveDocument;
   final bool Function(String documentId)? documentPredicate;
 
   @override
@@ -491,315 +400,31 @@ final class _LibraryBody extends StatelessWidget {
     if (controller.documents.isEmpty) {
       return EmptyLibraryState(onOpen: onPickDocument);
     }
-    final filterResult = evaluateLibraryDocuments(
-      controller.documents.where(
-        (document) => documentPredicate?.call(document.id) ?? true,
-      ),
-      query: query,
-      sortOrder: sortOrder,
-      readingState: readingState,
-    );
-    final visibleDocuments = filterResult.documents;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final padding = AppSpacing.pagePadding(constraints.maxWidth);
-        final continueReading = controller.continueReading;
-        final compact =
-            AppBreakpoints.classify(constraints.maxWidth) ==
-            AppWindowClass.compact;
-        final filterBar = _LibraryFilterBar(
-          controller: filterController,
-          focusNode: filterFocusNode,
-          query: query,
-          sortOrder: sortOrder,
-          resultCount: visibleDocuments.length,
-          counts: filterResult.counts,
-          readingState: readingState,
-          onQueryChanged: onQueryChanged,
-          onClear: onClearQuery,
-          onSortChanged: onSortChanged,
-          onReadingStateChanged: onReadingStateChanged,
-        );
-        return Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppSizes.contentMaxWidth,
-            ),
-            child: CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    padding,
-                    AppSpacing.space32,
-                    padding,
-                    AppSpacing.space12,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: Text(
-                      'Biblioteca',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                ),
-                if (continueReading != null) ...[
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      padding,
-                      AppSpacing.space16,
-                      padding,
-                      AppSpacing.space12,
-                    ),
-                    sliver: const SliverToBoxAdapter(
-                      child: AppSectionHeader(
-                        title: 'Continuar leyendo',
-                        description: 'Retoma exactamente donde lo dejaste.',
-                      ),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: EdgeInsets.symmetric(horizontal: padding),
-                    sliver: SliverToBoxAdapter(
-                      child: ContinueReadingCard(
-                        document: continueReading,
-                        onOpen: () => onOpenPath(continueReading.path),
-                        onInfo: onDocumentInfo == null
-                            ? null
-                            : () => onDocumentInfo!(continueReading),
-                      ),
-                    ),
-                  ),
-                ],
-                if (showRecents) ...[
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      padding,
-                      context.appDensity.sectionSpacing,
-                      padding,
-                      AppSpacing.space12,
-                    ),
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          AppSectionHeader(
-                            title: 'Recientes',
-                            description: _libraryResultDescription(
-                              visibleDocuments.length,
-                              controller.documents.length,
-                              query,
-                              readingState,
-                            ),
-                          ),
-                          SizedBox(
-                            height: compact
-                                ? AppSpacing.space12
-                                : AppSpacing.space16,
-                          ),
-                          filterBar,
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      padding,
-                      0,
-                      padding,
-                      AppSpacing.space48,
-                    ),
-                    sliver: visibleDocuments.isEmpty
-                        ? SliverToBoxAdapter(
-                            child: _NoLibraryResults(
-                              query: query,
-                              onClear: onClearQuery,
-                            ),
-                          )
-                        : SliverList.separated(
-                            itemCount: visibleDocuments.length,
-                            separatorBuilder: (_, _) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final document = visibleDocuments[index];
-                              return RecentDocumentItem(
-                                document: document,
-                                onOpen: () => document.isMissing
-                                    ? (onRelocateDocument?.call(document) ??
-                                          onPickDocument())
-                                    : onOpenPath(document.path),
-                                onInfo: onDocumentInfo == null
-                                    ? null
-                                    : () => onDocumentInfo!(document),
-                              );
-                            },
-                          ),
-                  ),
-                ] else
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      padding,
-                      AppSpacing.space32,
-                      padding,
-                      AppSpacing.space48,
-                    ),
-                    sliver: SliverToBoxAdapter(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: OutlinedButton.icon(
-                          onPressed: onPickDocument,
-                          icon: const Icon(Icons.file_open_outlined, size: 18),
-                          label: const Text('Abrir otro PDF'),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-final class _LibraryFilterBar extends StatelessWidget {
-  const _LibraryFilterBar({
-    required this.controller,
-    required this.focusNode,
-    required this.query,
-    required this.sortOrder,
-    required this.resultCount,
-    required this.counts,
-    required this.readingState,
-    required this.onQueryChanged,
-    required this.onClear,
-    required this.onSortChanged,
-    required this.onReadingStateChanged,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final String query;
-  final LibrarySortOrder sortOrder;
-  final int resultCount;
-  final Map<LibraryReadingState, int> counts;
-  final LibraryReadingState readingState;
-  final ValueChanged<String> onQueryChanged;
-  final VoidCallback onClear;
-  final ValueChanged<LibrarySortOrder> onSortChanged;
-  final ValueChanged<LibraryReadingState> onReadingStateChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: const Key('library-filter'),
-                  controller: controller,
-                  focusNode: focusNode,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Filtrar biblioteca',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: query.isEmpty
-                        ? null
-                        : IconButton(
-                            key: const Key('library-filter-clear'),
-                            tooltip: 'Limpiar filtro',
-                            onPressed: onClear,
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                  ),
-                  onChanged: onQueryChanged,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.space8),
-              PopupMenuButton<LibrarySortOrder>(
-                key: const Key('library-sort'),
-                initialValue: sortOrder,
-                tooltip: 'Ordenar biblioteca',
-                onSelected: onSortChanged,
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: LibrarySortOrder.lastOpened,
-                    child: Text('Última apertura'),
-                  ),
-                  PopupMenuItem(
-                    value: LibrarySortOrder.title,
-                    child: Text('Título'),
-                  ),
-                  PopupMenuItem(
-                    value: LibrarySortOrder.progress,
-                    child: Text('Progreso'),
-                  ),
-                ],
-                icon: const Icon(Icons.sort_rounded),
-              ),
-              Semantics(
-                liveRegion: true,
-                label:
-                    '$resultCount ${resultCount == 1 ? 'resultado' : 'resultados'}',
-                child: const SizedBox.shrink(),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.space8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SegmentedButton<LibraryReadingState>(
-              key: const Key('library-reading-state'),
-              showSelectedIcon: false,
-              selected: {readingState},
-              onSelectionChanged: (selection) =>
-                  onReadingStateChanged(selection.first),
-              segments: [
-                for (final state in LibraryReadingState.values)
-                  ButtonSegment(
-                    value: state,
-                    label: Text('${state.label} ${counts[state] ?? 0}'),
-                    tooltip: '${state.label}: ${counts[state] ?? 0} documentos',
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _NoLibraryResults extends StatelessWidget {
-  const _NoLibraryResults({required this.query, required this.onClear});
-
-  final String query;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.space40),
-        child: Column(
-          children: [
-            Icon(Icons.search_off_rounded, color: context.appColors.textMuted),
-            const SizedBox(height: AppSpacing.space8),
-            Text(
-              'No hay documentos que coincidan con “$query”.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: AppSpacing.space12),
-            TextButton(onPressed: onClear, child: const Text('Limpiar filtro')),
-          ],
+    final documents = controller.documents
+        .where((document) => documentPredicate?.call(document.id) ?? true)
+        .toList(growable: false);
+    if (!showRecents) {
+      return Center(
+        child: OutlinedButton.icon(
+          onPressed: onPickDocument,
+          icon: const Icon(Icons.file_open_outlined, size: 18),
+          label: const Text('Abrir otro PDF'),
         ),
-      ),
+      );
+    }
+    return ArtifactLibraryView(
+      controller: controller,
+      documents: documents,
+      onOpenPath: onOpenPath,
+      onPickDocument: onPickDocument,
+      initialReadingState: readingState,
+      onReadingStateChanged: onReadingStateChanged,
+      onDocumentInfo: onDocumentInfo,
+      onRelocateDocument: onRelocateDocument,
+      onToggleFavorite: onToggleFavorite,
+      onChangeCover: onChangeCover,
+      onRevealDocument: onRevealDocument,
+      onRemoveDocument: onRemoveDocument,
     );
   }
 }
@@ -1186,9 +811,6 @@ String _relativeDate(DateTime value) {
       '${local.month.toString().padLeft(2, '0')}/${local.year}';
 }
 
-String _documentLabel(LibraryDocument document) =>
-    (document.title ?? document.fileName).toLowerCase();
-
 String _readingStateDescription(LibraryDocument document) {
   if (document.readingProgress >= 1) return 'Terminado';
   if (document.readingProgress > 0) {
@@ -1197,14 +819,10 @@ String _readingStateDescription(LibraryDocument document) {
   return 'Sin empezar';
 }
 
-String _libraryResultDescription(
-  int visible,
-  int total,
-  String query,
-  LibraryReadingState readingState,
-) {
-  if (query.trim().isEmpty && readingState == LibraryReadingState.all) {
-    return '$total ${total == 1 ? 'documento' : 'documentos'}';
-  }
-  return '$visible de $total ${total == 1 ? 'documento' : 'documentos'}';
+enum _LibraryAppMenuAction {
+  collections,
+  workspaces,
+  importFolder,
+  recover,
+  globalSearch,
 }

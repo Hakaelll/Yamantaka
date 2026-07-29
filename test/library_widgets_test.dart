@@ -263,20 +263,37 @@ void main() {
         );
         await tester.pump();
         expect(tester.takeException(), isNull, reason: 'viewport width $width');
-        expect(find.byKey(const Key('library-filter')), findsOneWidget);
+        expect(find.byKey(const Key('library-filter')), findsNothing);
+        if (width == 1100) {
+          final alpha = tester.getCenter(
+            find.byKey(const ValueKey('artifact-alpha')),
+          );
+          final beta = tester.getCenter(
+            find.byKey(const ValueKey('artifact-beta')),
+          );
+          expect((alpha.dx + beta.dx) / 2, closeTo(width / 2, 4));
+        }
       }
+
+      controller.selectDocument(null);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('artifact-alpha')));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(controller.selectedDocumentId, 'alpha');
+      expect(find.text('Alpha'), findsOneWidget);
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await tester.pump();
+      expect(find.byKey(const Key('library-filter')), findsOneWidget);
       final field = tester.widget<EditableText>(find.byType(EditableText));
       expect(field.focusNode.hasFocus, isTrue);
 
       await tester.enterText(find.byKey(const Key('library-filter')), 'ana');
       await tester.pump();
-      expect(find.byKey(const ValueKey('recent-alpha')), findsOneWidget);
-      expect(find.byKey(const ValueKey('recent-beta')), findsNothing);
+      expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
+      expect(find.byKey(const ValueKey('artifact-beta')), findsNothing);
 
       await tester.enterText(
         find.byKey(const Key('library-filter')),
@@ -284,10 +301,10 @@ void main() {
       );
       await tester.pump();
       expect(find.textContaining('No hay documentos'), findsOneWidget);
-      await tester.tap(find.text('Limpiar filtro'));
+      await tester.tap(find.text('Restablecer'));
       await tester.pump();
-      expect(find.byKey(const ValueKey('recent-alpha')), findsOneWidget);
-      expect(find.byKey(const ValueKey('recent-beta')), findsOneWidget);
+      expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
+      expect(find.byKey(const ValueKey('artifact-beta')), findsOneWidget);
     },
   );
 
@@ -353,20 +370,24 @@ void main() {
       );
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(find.text('Todos 3'), findsOneWidget);
-      expect(find.text('En curso 1'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('library-filter-button')));
+      await tester.pumpAndSettle();
+      expect(find.text('Todos · 3'), findsOneWidget);
+      expect(find.text('En curso · 1'), findsOneWidget);
 
-      await tester.tap(find.text('En curso 1'));
-      await tester.pump();
+      await tester.tap(find.text('En curso · 1'), warnIfMissed: false);
+      await tester.pumpAndSettle();
       expect(selected, LibraryReadingState.inProgress);
-      expect(find.byKey(const ValueKey('recent-active')), findsOneWidget);
-      expect(find.byKey(const ValueKey('recent-new')), findsNothing);
-      expect(find.byKey(const ValueKey('recent-done')), findsNothing);
+      expect(find.byKey(const ValueKey('artifact-active')), findsOneWidget);
+      expect(find.byKey(const ValueKey('artifact-new')), findsNothing);
+      expect(find.byKey(const ValueKey('artifact-done')), findsNothing);
 
-      await tester.tap(find.text('Todos 3'));
-      await tester.pump();
-      expect(find.byKey(const ValueKey('recent-new')), findsOneWidget);
-      expect(find.byKey(const ValueKey('recent-done')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('library-filter-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Todos · 3'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('artifact-new')), findsOneWidget);
+      expect(find.byKey(const ValueKey('artifact-done')), findsOneWidget);
     },
   );
 

@@ -12,6 +12,7 @@ final class ReaderBottomControls extends StatelessWidget {
     required this.compact,
     required this.onGoToPage,
     required this.onChooseTheme,
+    required this.facingNavigation,
     this.shortcutOverrides = '{}',
   });
 
@@ -19,6 +20,7 @@ final class ReaderBottomControls extends StatelessWidget {
   final bool compact;
   final VoidCallback onGoToPage;
   final VoidCallback onChooseTheme;
+  final bool facingNavigation;
   final String shortcutOverrides;
 
   @override
@@ -59,8 +61,8 @@ final class ReaderBottomControls extends StatelessWidget {
                     'Página anterior',
                     AppCommandId.previousPage,
                   ),
-                  onPressed: controller.canGoBack
-                      ? controller.previousPage
+                  onPressed: controller.canGoBackBy(facing: facingNavigation)
+                      ? () => controller.previousPage(facing: facingNavigation)
                       : null,
                   icon: const Icon(Icons.chevron_left_rounded),
                 ),
@@ -84,8 +86,8 @@ final class ReaderBottomControls extends StatelessWidget {
                     'Página siguiente',
                     AppCommandId.nextPage,
                   ),
-                  onPressed: controller.canGoForward
-                      ? controller.nextPage
+                  onPressed: controller.canGoForwardBy(facing: facingNavigation)
+                      ? () => controller.nextPage(facing: facingNavigation)
                       : null,
                   icon: const Icon(Icons.chevron_right_rounded),
                 ),

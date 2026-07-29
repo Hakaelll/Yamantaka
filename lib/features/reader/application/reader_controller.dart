@@ -103,6 +103,10 @@ final class ReaderController extends ChangeNotifier {
   int get pageCount => openedDocument?.pageCount ?? 0;
   bool get canGoBack => currentPageIndex > 0;
   bool get canGoForward => currentPageIndex + 1 < pageCount;
+  bool canGoBackBy({bool facing = false}) =>
+      _previousPageTarget(facing: facing) != currentPageIndex;
+  bool canGoForwardBy({bool facing = false}) =>
+      _nextPageTarget(facing: facing) != currentPageIndex;
 
   Future<bool> openPath(String path, {String? password}) async {
     pendingPath = path;
@@ -247,14 +251,37 @@ final class ReaderController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> previousPage() async {
-    if (!canGoBack) return;
-    await viewController.goToPage(currentPageIndex - 1);
+  Future<void> previousPage({bool facing = false}) async {
+    final target = _previousPageTarget(facing: facing);
+    if (target == currentPageIndex) return;
+    await viewController.goToPage(target);
   }
 
-  Future<void> nextPage() async {
-    if (!canGoForward) return;
-    await viewController.goToPage(currentPageIndex + 1);
+  Future<void> nextPage({bool facing = false}) async {
+    final target = _nextPageTarget(facing: facing);
+    if (target == currentPageIndex) return;
+    await viewController.goToPage(target);
+  }
+
+  int _previousPageTarget({required bool facing}) {
+    if (pageCount <= 0) return currentPageIndex;
+    if (!facing) return (currentPageIndex - 1).clamp(0, pageCount - 1);
+    if (currentPageIndex <= 2) return 0;
+    final spreadStart = currentPageIndex.isOdd
+        ? currentPageIndex
+        : currentPageIndex - 1;
+    return (spreadStart - 2).clamp(0, pageCount - 1);
+  }
+
+  int _nextPageTarget({required bool facing}) {
+    if (pageCount <= 0) return currentPageIndex;
+    if (!facing) return (currentPageIndex + 1).clamp(0, pageCount - 1);
+    if (currentPageIndex == 0) return pageCount > 1 ? 1 : 0;
+    final spreadStart = currentPageIndex.isOdd
+        ? currentPageIndex
+        : currentPageIndex - 1;
+    final target = spreadStart + 2;
+    return target < pageCount ? target : currentPageIndex;
   }
 
   Future<void> firstPage() => viewController.goToPage(0);
@@ -355,7 +382,7 @@ final class ReaderController extends ChangeNotifier {
     preferences = current.copyWith(
       viewMode: mode,
       pageLayout: mode == ReaderMode.book
-          ? PageLayoutMode.single
+          ? PageLayoutMode.facing
           : current.pageLayout,
     );
     _scheduleSave();

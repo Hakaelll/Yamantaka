@@ -33,7 +33,7 @@ import 'package:yamantaka/storage/repositories/workspace_repository.dart';
 import 'support/stub_pdf_engine.dart';
 
 void main() {
-  group('database schema v2', () {
+  group('database schema v3', () {
     test('creates strict capability tables and FTS index', () {
       final database = AppDatabase.inMemory(AppLogger());
       addTearDown(database.close);
@@ -120,7 +120,7 @@ void main() {
 
       expect(
         migrated.database.select('PRAGMA user_version').first.columnAt(0),
-        2,
+        AppConfig.databaseVersion,
       );
       expect(
         directory

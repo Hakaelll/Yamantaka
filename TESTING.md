@@ -4,7 +4,7 @@
 
 - `dart format`: código Dart formateado.
 - `flutter analyze`: aprobado sin incidencias.
-- `flutter test --reporter compact`: 86 pruebas aprobadas.
+- `flutter test --reporter compact`: 102 pruebas aprobadas.
 - Integración Windows: lector, biblioteca y perfil aprobados individualmente
   sobre PDFium real; el agregado encontró la incidencia de arranque del runner
   documentada más abajo.
@@ -120,6 +120,12 @@ Las capturas DPI-aware de una ventana Release se generan con
 | Lector contextual | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | Barra jerárquica y PDF dominante; `windows-reader-contextual.png` |
 | Panel redimensionado | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | Panel acoplado sin tapar chrome/PDF; `windows-reader-contextual-panel-resized.png` |
 | Información documental | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | Diálogo estable y ruta de fixture anonimizada; `windows-reader-contextual-info.png` |
+| Lector rediseñado | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | PDF centrado y barra de pestañas retirada; `windows-reader-redesign.png` |
+| Menú del lector | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | Menú compacto con iconos, grupos y atajos; `windows-reader-redesign-menu.png` |
+| Miniaturas del lector | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | Texto legible, escala ligada al panel/DPR y lienzo restante centrado; `windows-reader-redesign-thumbnails.png` |
+| Zoom mínimo | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | Página completa y centro horizontal verificado por píxeles; `windows-reader-redesign-minimum-zoom.png` |
+| Pantalla completa | Integración Windows, 1200×800 lógicos/DPR 1 | Marfil | Solo lienzo y documento, sin chrome/panel/progreso; `windows-reader-redesign-fullscreen.png` |
+| Pliego de libro | Integración Windows, 1200×800 lógicos/DPR 1 | Marfil | Portada aislada y páginas 2–3 emparejadas; `windows-reader-redesign-book-spread.png` |
 
 Las capturas viven en `docs/screenshots`. Las variantes con sufijos
 `-search`, `-facing`, `-palette` y `-book` registran los estados del lector.
@@ -173,8 +179,8 @@ La suite añade cobertura de:
 - anotaciones CRUD, filtros, rectángulos normalizados, rotación, huella,
   revisión/undo y exportación Markdown/JSON;
 - colecciones, vistas inteligentes y relaciones sin borrar documentos;
-- pestañas activa/warm/suspendida, máximo, close/reopen y workspaces/split
-  serializado;
+- contextos documentales activo/warm/suspendido, máximo, close/reopen y
+  workspaces/split serializado, sin franja visual sobre el lector;
 - historial atrás/adelante y frontera exacta de split;
 - búsqueda unificada por metadato, página y anotación, además de clear FTS;
 - safe mode tras tres arranques y diagnóstico sin datos privados;
@@ -198,3 +204,34 @@ clasifica como regresión funcional.
 Pendientes manuales explícitos: selección geométrica del PDF, split con dos
 visores, comparación, Narrador, DPI nativo 100/150/200 %, paths Unicode/largos,
 permisos/reparse points de carpetas y otro equipo/GPU.
+
+## Biblioteca de artefactos — evidencia 2026-07-29
+
+Cobertura automatizada añadida:
+
+- preferencia razonable por página uno, portada posterior evidente y fallback;
+- persistencia manual, no sobrescritura, invalidación automática y favorito;
+- migración/esquema v3 e integridad;
+- jitter estable y acotado, separación para 100 objetos y orden de flechas;
+- búsqueda temporal, filtro combinado, título vacío y archivo ausente;
+- composición compacta/680/1100, claro/oscuro y contraste AA.
+- centrado horizontal de la biblioteca, menú compacto sin pestañas y aplicación
+  del tema semántico a superficies globales;
+- escalas mínimas de portada, versión de caché y miniaturas laterales
+  dependientes de ancho/DPI.
+- iconos de Android, iOS y Windows derivados directamente de la imagen original
+  entregada, sin reinterpretarla ni insertarla dentro de la interfaz.
+
+Comandos de validación:
+
+```powershell
+flutter analyze
+flutter test
+flutter test integration_test/library_visual_test.dart -d windows `
+  --dart-define=YAMANTAKA_LIBRARY_CAPTURE_PATH=docs/screenshots/windows-library-artifacts.png
+flutter build windows --release
+```
+
+La revisión nativa debe comparar la captura base, colección, filtrada,
+compacta y compacta oscura. Narrador y DPI 100/150/200 % continúan como
+`REVIEW`; no se sustituyen por una aserción de widget.

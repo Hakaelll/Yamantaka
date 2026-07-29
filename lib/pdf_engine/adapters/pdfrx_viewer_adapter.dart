@@ -67,6 +67,8 @@ final class _PdfrxViewer extends StatefulWidget {
 final class _PdfrxViewerState extends State<_PdfrxViewer> {
   late final pdfrx.PdfViewerController _controller;
   late final pdfrx.PdfDocumentRefDirect _documentRef;
+  Size? _viewportSize;
+  bool _recenterScheduled = false;
 
   Duration get _motionDuration => widget.configuration.reduceMotion
       ? Duration.zero
@@ -91,7 +93,14 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      _handleViewportSize(constraints.biggest);
+      return _buildViewer(context);
+    },
+  );
+
+  Widget _buildViewer(BuildContext context) {
     final viewer = pdfrx.PdfViewer(
       _documentRef,
       controller: _controller,
@@ -109,6 +118,12 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
         horizontalCacheExtent: 0.5,
         verticalCacheExtent: 0.75,
         enableKeyboardNavigation: false,
+        // The minimum zoom is one complete page. Allowing several horizontal
+        // page slots to fit at once makes pdfrx center the whole document
+        // layout instead of the active page at the lowest zoom.
+        sizeDelegateProvider: const pdfrx.PdfViewerSizeDelegateProviderSmart(
+          maxPagesVisible: 1,
+        ),
         linkHandlerParams: pdfrx.PdfLinkHandlerParams(
           enableAutoLinkDetection: false,
           onLinkTap: _handleLink,
@@ -184,6 +199,57 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     return turns == 0 ? viewer : RotatedBox(quarterTurns: turns, child: viewer);
   }
 
+  void _handleViewportSize(Size nextSize) {
+    if (!nextSize.width.isFinite ||
+        !nextSize.height.isFinite ||
+        nextSize.isEmpty) {
+      return;
+    }
+    final previous = _viewportSize;
+    _viewportSize = nextSize;
+    if (previous == null ||
+        ((previous.width - nextSize.width).abs() < 0.5 &&
+            (previous.height - nextSize.height).abs() < 0.5) ||
+        _recenterScheduled) {
+      return;
+    }
+    _recenterScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recenterScheduled = false;
+      if (!mounted || !_controller.isReady) return;
+      unawaited(
+        _recenterAfterResize().catchError((Object _) {
+          // A resize can race with closing the document.
+        }),
+      );
+    });
+  }
+
+  Future<void> _recenterAfterResize() async {
+    final pageNumber = _controller.pageNumber ?? widget.initialPageIndex + 1;
+    switch (widget.configuration.initialZoomMode) {
+      case PdfViewZoomMode.custom:
+        await _centerPageAtZoom(
+          _controller,
+          pageNumber: pageNumber,
+          zoom: _controller.currentZoom,
+          duration: Duration.zero,
+        );
+      case PdfViewZoomMode.fitWidth:
+        await _fitWidth(
+          _controller,
+          pageNumber: pageNumber,
+          duration: Duration.zero,
+        );
+      case PdfViewZoomMode.fitPage:
+        await _fitPage(
+          _controller,
+          pageNumber: pageNumber,
+          duration: Duration.zero,
+        );
+    }
+  }
+
   void _onTransformChanged() {
     if (!_controller.isReady) return;
     final pageIndex = (_controller.pageNumber ?? 1) - 1;
@@ -205,9 +271,10 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   Future<void> _restoreInitialView(pdfrx.PdfViewerController controller) async {
     switch (widget.configuration.initialZoomMode) {
       case PdfViewZoomMode.custom:
-        await controller.setZoom(
-          controller.centerPosition,
-          widget.configuration.initialZoom.clamp(
+        await _centerPageAtZoom(
+          controller,
+          pageNumber: widget.initialPageIndex + 1,
+          zoom: widget.configuration.initialZoom.clamp(
             controller.minScale,
             controller.maxScale,
           ),
@@ -241,6 +308,24 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
       );
     }
     _onTransformChanged();
+  }
+
+  Future<void> _centerPageAtZoom(
+    pdfrx.PdfViewerController controller, {
+    required int pageNumber,
+    required double zoom,
+    required Duration duration,
+  }) {
+    final layouts = controller.layout.pageLayouts;
+    if (layouts.isEmpty) return Future<void>.value();
+    final index = (pageNumber - 1).clamp(0, layouts.length - 1);
+    final rect = widget.configuration.flow == PdfViewFlow.facing
+        ? _spreadRect(controller, pageNumber)
+        : layouts[index].inflate(widget.configuration.margin);
+    return controller.goTo(
+      controller.calcMatrixFor(rect.center, zoom: zoom),
+      duration: duration,
+    );
   }
 
   Future<void> _fitPage(

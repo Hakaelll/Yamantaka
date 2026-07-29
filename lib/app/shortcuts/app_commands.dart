@@ -170,6 +170,11 @@ abstract final class AppCommandRegistry {
       activator: SingleActivator(LogicalKeyboardKey.keyD, control: true),
     ),
     AppShortcutChoice(
+      token: 'arrow-right',
+      label: '→',
+      activator: SingleActivator(LogicalKeyboardKey.arrowRight),
+    ),
+    AppShortcutChoice(
       token: 'page-down',
       label: 'Av Pág',
       activator: SingleActivator(LogicalKeyboardKey.pageDown),
@@ -178,6 +183,11 @@ abstract final class AppCommandRegistry {
       token: 'ctrl-right',
       label: 'Ctrl+→',
       activator: SingleActivator(LogicalKeyboardKey.arrowRight, control: true),
+    ),
+    AppShortcutChoice(
+      token: 'arrow-left',
+      label: '←',
+      activator: SingleActivator(LogicalKeyboardKey.arrowLeft),
     ),
     AppShortcutChoice(
       token: 'page-up',
@@ -250,8 +260,8 @@ abstract final class AppCommandRegistry {
     AppCommandId.goToPage: 'ctrl-l',
     AppCommandId.togglePanel: 'ctrl-j',
     AppCommandId.toggleBookmark: 'ctrl-b',
-    AppCommandId.nextPage: 'page-down',
-    AppCommandId.previousPage: 'page-up',
+    AppCommandId.nextPage: 'arrow-right',
+    AppCommandId.previousPage: 'arrow-left',
     AppCommandId.zoomIn: 'ctrl-plus',
     AppCommandId.zoomOut: 'ctrl-minus',
     AppCommandId.fullScreen: 'f11',
@@ -284,12 +294,12 @@ abstract final class AppCommandRegistry {
     AppCommandDefinition(
       id: AppCommandId.nextPage,
       label: 'Página siguiente',
-      shortcutLabel: 'Av Pág',
+      shortcutLabel: '→',
     ),
     AppCommandDefinition(
       id: AppCommandId.previousPage,
       label: 'Página anterior',
-      shortcutLabel: 'Re Pág',
+      shortcutLabel: '←',
     ),
     AppCommandDefinition(
       id: AppCommandId.togglePanel,
@@ -472,13 +482,13 @@ abstract final class AppCommandRegistry {
       const SingleActivator(LogicalKeyboardKey.escape): action(
         AppCommandId.escape,
       ),
-      const SingleActivator(LogicalKeyboardKey.arrowRight): action(
+      const SingleActivator(LogicalKeyboardKey.pageDown): action(
         AppCommandId.nextPage,
       ),
       const SingleActivator(LogicalKeyboardKey.space): action(
         AppCommandId.nextPage,
       ),
-      const SingleActivator(LogicalKeyboardKey.arrowLeft): action(
+      const SingleActivator(LogicalKeyboardKey.pageUp): action(
         AppCommandId.previousPage,
       ),
       const SingleActivator(LogicalKeyboardKey.space, shift: true): action(

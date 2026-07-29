@@ -35,6 +35,7 @@ void main() {
     for (var index = 0; index < 4; index++) {
       final file = File('${directory.path}/sample-$index.pdf');
       await file.writeAsBytes(const [0x25, 0x50, 0x44, 0x46]);
+      final cover = await _createCover(directory, index);
       final fileStat = await file.stat();
       documents.save(
         LibraryDocument(
@@ -57,6 +58,7 @@ void main() {
           lastPageIndex: const [0, 42, 139, 12][index],
           readingProgress: const [0.0, 0.35, 1.0, 0.08][index],
           fingerprint: 'sample-$index',
+          thumbnailPath: cover.path,
         ),
       );
     }
@@ -100,9 +102,13 @@ void main() {
 
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('artifact-sample-3')));
+    await tester.pumpAndSettle();
     await _capture(tester, capturePath);
 
-    await tester.tap(find.byTooltip('Colecciones'));
+    await tester.tap(find.byTooltip('Organizar y más acciones'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Colecciones'));
     await tester.pumpAndSettle();
     await _capture(tester, _suffix(capturePath, '-collections'));
     await tester.scrollUntilVisible(
@@ -121,7 +127,9 @@ void main() {
     organization.clearSelection();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('En curso 2'));
+    await tester.tap(find.byKey(const Key('library-filter-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('En curso · 2'), warnIfMissed: false);
     await tester.pumpAndSettle();
     await _capture(tester, _suffix(capturePath, '-in-progress'));
 
@@ -148,3 +156,40 @@ Future<void> _capture(WidgetTester tester, String path) async {
 
 String _suffix(String path, String suffix) =>
     path.replaceFirst(RegExp(r'\.png$'), '$suffix.png');
+
+Future<File> _createCover(Directory directory, int index) async {
+  const colors = [
+    Color(0xFFDDD8CC),
+    Color(0xFFB8C0B8),
+    Color(0xFFC7BDB6),
+    Color(0xFFD1CEC4),
+  ];
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawRect(
+    const Rect.fromLTWH(0, 0, 400, 560),
+    Paint()..color = colors[index],
+  );
+  canvas.drawRect(
+    Rect.fromLTWH(42, 74 + index * 18, 316, 3),
+    Paint()..color = const Color(0xFF2C2D29),
+  );
+  canvas.drawCircle(
+    Offset(200, 246 + index * 24),
+    52 + index * 8,
+    Paint()
+      ..color = const Color(0xFF2C2D29)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5,
+  );
+  canvas.drawRect(
+    const Rect.fromLTWH(42, 472, 150, 10),
+    Paint()..color = const Color(0xFF2C2D29),
+  );
+  final image = await recorder.endRecording().toImage(400, 560);
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  final file = File('${directory.path}/cover-$index.png');
+  await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+  return file;
+}

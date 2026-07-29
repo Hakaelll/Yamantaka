@@ -85,6 +85,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   FocusNode? _focusBeforePanel;
   Object? _viewerCacheKey;
   Widget? _viewerCache;
+  bool _facingNavigationActive = false;
 
   bool get _isBookMode =>
       widget.controller.preferences?.viewMode == ReaderMode.book;
@@ -209,10 +210,15 @@ final class _ReaderScreenState extends State<ReaderScreen> {
             PageLayoutMode.facing =>
               canUseFacing ? PdfViewFlow.facing : PdfViewFlow.single,
           };
-    final controlsShown = _controlsVisible;
+    final immersive = controller.isFullScreen;
+    final facingNavigation = _isBookMode && requestedFlow == PdfViewFlow.facing;
+    _facingNavigationActive = facingNavigation;
+    final controlsShown = _controlsVisible && !immersive;
     final outerWindowClass = AppBreakpoints.classify(constraints.maxWidth);
     final panelDocked =
-        _panel != null && outerWindowClass == AppWindowClass.expanded;
+        !immersive &&
+        _panel != null &&
+        outerWindowClass == AppWindowClass.expanded;
     final reservedPanelWidth = panelDocked ? panelWidth : 0.0;
     final windowClass = AppBreakpoints.classify(
       constraints.maxWidth - reservedPanelWidth,
@@ -272,76 +278,87 @@ final class _ReaderScreenState extends State<ReaderScreen> {
             ),
           ),
           if (_isBookMode)
-            ..._pageTurnZones(controller: controller, panelWidth: panelWidth),
-          Positioned(
-            left: 0,
-            top: 0,
-            right: reservedPanelWidth,
-            child: AnimatedSlide(
-              duration: _controlMotion,
-              curve: Curves.easeOutCubic,
-              offset: controlsShown ? Offset.zero : const Offset(0, -1),
-              child: AnimatedOpacity(
+            ..._pageTurnZones(
+              controller: controller,
+              panelWidth: immersive ? 0 : panelWidth,
+              facingNavigation: facingNavigation,
+              panelVisible: !immersive && _panel != null,
+            ),
+          if (!immersive)
+            Positioned(
+              left: 0,
+              top: 0,
+              right: reservedPanelWidth,
+              child: AnimatedSlide(
                 duration: _controlMotion,
-                opacity: controlsShown ? 1 : 0,
-                child: IgnorePointer(
-                  ignoring: !controlsShown,
-                  child: ReaderTopBar(
-                    key: const Key('reader-top-bar'),
-                    controller: controller,
-                    compact: windowClass == AppWindowClass.compact,
-                    expanded: windowClass == AppWindowClass.expanded,
-                    activePanel: _panel,
-                    showModeControls: widget.showModeControls,
-                    showPanelControls: widget.showPanelControls,
-                    shortcutOverrides: widget.shortcutOverrides,
-                    onBack: widget.onBack,
-                    onSearch: () => _showPanel(ReaderPanelSection.search),
-                    onCommandPalette: () => _showCommandPalette(context),
-                    onShowThumbnails: () =>
-                        _showPanel(ReaderPanelSection.thumbnails),
-                    onShowOutline: () => _showPanel(ReaderPanelSection.outline),
-                    onShowBookmarks: () =>
-                        _showPanel(ReaderPanelSection.bookmarks),
-                    onShowAnnotations: () =>
-                        _showPanel(ReaderPanelSection.annotations),
-                    onAdjustMargins: () => _showMarginChooser(context),
-                    onDocumentInfo:
-                        widget.onDocumentInfo ??
-                        () => _showDocumentInfo(context),
-                    onToggleChrome: _toggleChrome,
-                    onOpenSettings: widget.onOpenSettings,
+                curve: Curves.easeOutCubic,
+                offset: controlsShown ? Offset.zero : const Offset(0, -1),
+                child: AnimatedOpacity(
+                  duration: _controlMotion,
+                  opacity: controlsShown ? 1 : 0,
+                  child: IgnorePointer(
+                    ignoring: !controlsShown,
+                    child: ReaderTopBar(
+                      key: const Key('reader-top-bar'),
+                      controller: controller,
+                      compact: windowClass == AppWindowClass.compact,
+                      expanded: windowClass == AppWindowClass.expanded,
+                      activePanel: _panel,
+                      showModeControls: widget.showModeControls,
+                      showPanelControls: widget.showPanelControls,
+                      shortcutOverrides: widget.shortcutOverrides,
+                      onBack: widget.onBack,
+                      onOpenDocument: () => unawaited(widget.onOpenDocument()),
+                      onSearch: () => _showPanel(ReaderPanelSection.search),
+                      onCommandPalette: () => _showCommandPalette(context),
+                      onShowThumbnails: () =>
+                          _showPanel(ReaderPanelSection.thumbnails),
+                      onShowOutline: () =>
+                          _showPanel(ReaderPanelSection.outline),
+                      onShowBookmarks: () =>
+                          _showPanel(ReaderPanelSection.bookmarks),
+                      onShowAnnotations: () =>
+                          _showPanel(ReaderPanelSection.annotations),
+                      onAdjustMargins: () => _showMarginChooser(context),
+                      onDocumentInfo:
+                          widget.onDocumentInfo ??
+                          () => _showDocumentInfo(context),
+                      onToggleFullScreen: _toggleFullScreen,
+                      onToggleChrome: _toggleChrome,
+                      onOpenSettings: widget.onOpenSettings,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            left: AppSpacing.space12,
-            right: AppSpacing.space12 + reservedPanelWidth,
-            bottom: AppSpacing.space12,
-            child: AnimatedSlide(
-              duration: _controlMotion,
-              curve: Curves.easeOutCubic,
-              offset: controlsShown ? Offset.zero : const Offset(0, 1.3),
-              child: AnimatedOpacity(
+          if (!immersive)
+            Positioned(
+              left: AppSpacing.space12,
+              right: AppSpacing.space12 + reservedPanelWidth,
+              bottom: AppSpacing.space12,
+              child: AnimatedSlide(
                 duration: _controlMotion,
-                opacity: controlsShown ? 1 : 0,
-                child: IgnorePointer(
-                  ignoring: !controlsShown,
-                  child: ReaderBottomControls(
-                    key: const Key('reader-bottom-controls'),
-                    controller: controller,
-                    compact: windowClass == AppWindowClass.compact,
-                    onGoToPage: () => _showGoToPage(context),
-                    onChooseTheme: () => _showThemeChooser(context),
-                    shortcutOverrides: widget.shortcutOverrides,
+                curve: Curves.easeOutCubic,
+                offset: controlsShown ? Offset.zero : const Offset(0, 1.3),
+                child: AnimatedOpacity(
+                  duration: _controlMotion,
+                  opacity: controlsShown ? 1 : 0,
+                  child: IgnorePointer(
+                    ignoring: !controlsShown,
+                    child: ReaderBottomControls(
+                      key: const Key('reader-bottom-controls'),
+                      controller: controller,
+                      compact: windowClass == AppWindowClass.compact,
+                      onGoToPage: () => _showGoToPage(context),
+                      onChooseTheme: () => _showThemeChooser(context),
+                      facingNavigation: facingNavigation,
+                      shortcutOverrides: widget.shortcutOverrides,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          if (_panel != null && !panelDocked)
+          if (!immersive && _panel != null && !panelDocked)
             Positioned.fill(
               child: GestureDetector(
                 key: const Key('reader-panel-scrim'),
@@ -350,7 +367,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 child: ColoredBox(color: Colors.black.withValues(alpha: 0.18)),
               ),
             ),
-          if (_panel != null)
+          if (!immersive && _panel != null)
             Positioned(
               top: 0,
               bottom: 0,
@@ -379,7 +396,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 ),
               ),
             ),
-          if (widget.showProgress)
+          if (!immersive && widget.showProgress)
             Positioned(
               left: 0,
               right: reservedPanelWidth,
@@ -396,10 +413,11 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 backgroundColor: Colors.transparent,
               ),
             ),
-          if (controller.annotations?.pageHasAnnotations(
-                controller.currentPageIndex,
-              ) ??
-              false)
+          if (!immersive &&
+              (controller.annotations?.pageHasAnnotations(
+                    controller.currentPageIndex,
+                  ) ??
+                  false))
             Positioned(
               left: AppSpacing.space12,
               top: controlsShown
@@ -431,6 +449,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   List<Widget> _pageTurnZones({
     required ReaderController controller,
     required double panelWidth,
+    required bool facingNavigation,
+    required bool panelVisible,
   }) {
     final rtl = widget.readingDirection == ReadingDirection.rightToLeft;
     Widget zone({
@@ -439,7 +459,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       required VoidCallback action,
     }) => Positioned(
       left: left ? 0 : null,
-      right: left ? null : (_panel == null ? 0 : panelWidth),
+      right: left ? null : (panelVisible ? panelWidth : 0),
       top: AppSizes.topBarHeight,
       bottom: AppSizes.bottomControlHeight + AppSpacing.space24,
       width: AppSizes.readerEdgeNavigation,
@@ -458,12 +478,16 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       zone(
         left: true,
         label: rtl ? 'Página siguiente' : 'Página anterior',
-        action: rtl ? controller.nextPage : controller.previousPage,
+        action: rtl
+            ? () => controller.nextPage(facing: facingNavigation)
+            : () => controller.previousPage(facing: facingNavigation),
       ),
       zone(
         left: false,
         label: rtl ? 'Página anterior' : 'Página siguiente',
-        action: rtl ? controller.previousPage : controller.nextPage,
+        action: rtl
+            ? () => controller.previousPage(facing: facingNavigation)
+            : () => controller.nextPage(facing: facingNavigation),
       ),
     ];
   }
@@ -547,13 +571,14 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     AppCommandId.zoomIn: () => unawaited(widget.controller.zoomBy(1.18)),
     AppCommandId.zoomOut: () => unawaited(widget.controller.zoomBy(0.85)),
     AppCommandId.resetZoom: () => unawaited(widget.controller.fitPage()),
-    AppCommandId.fullScreen: () =>
-        unawaited(widget.controller.toggleFullScreen()),
+    AppCommandId.fullScreen: _toggleFullScreen,
     AppCommandId.toggleChrome: _toggleChrome,
     AppCommandId.escape: _escape,
-    AppCommandId.nextPage: () => unawaited(widget.controller.nextPage()),
-    AppCommandId.previousPage: () =>
-        unawaited(widget.controller.previousPage()),
+    AppCommandId.nextPage: () =>
+        unawaited(widget.controller.nextPage(facing: _facingNavigationActive)),
+    AppCommandId.previousPage: () => unawaited(
+      widget.controller.previousPage(facing: _facingNavigationActive),
+    ),
     AppCommandId.firstPage: () => unawaited(widget.controller.firstPage()),
     AppCommandId.lastPage: () => unawaited(widget.controller.lastPage()),
     AppCommandId.bookMode: () =>
@@ -605,20 +630,34 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   void _escape() {
-    if (_panel != null) {
+    if (widget.controller.isFullScreen) {
+      unawaited(_leaveFullScreen());
+    } else if (_panel != null) {
       _closePanel();
-    } else {
-      unawaited(widget.controller.leaveFullScreen());
     }
   }
 
+  void _toggleFullScreen() => unawaited(_toggleFullScreenNow());
+
+  Future<void> _toggleFullScreenNow() async {
+    _controlsTimer?.cancel();
+    await widget.controller.toggleFullScreen();
+    if (!widget.controller.isFullScreen) _revealControls();
+  }
+
+  Future<void> _leaveFullScreen() async {
+    await widget.controller.leaveFullScreen();
+    _revealControls();
+  }
+
   void _toggleChrome() {
+    if (widget.controller.isFullScreen) return;
     setState(() => _controlsVisible = !_controlsVisible);
     widget.onChromeVisibilityChanged?.call(_controlsVisible);
   }
 
   void _revealControls() {
-    if (!mounted) return;
+    if (!mounted || widget.controller.isFullScreen) return;
     if (!_controlsVisible) {
       setState(() => _controlsVisible = true);
       widget.onChromeVisibilityChanged?.call(true);

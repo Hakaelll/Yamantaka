@@ -1,5 +1,6 @@
 // ignore_for_file: prefer_initializing_formals
 
+import 'dart:async';
 import 'dart:io';
 
 import '../core/logging/app_logger.dart';
@@ -133,6 +134,7 @@ final class AppServices {
     final search = SearchController(engine, viewController, logger);
     final navigationHistory = NavigationHistoryController();
     final library = LibraryController(documents, logger);
+    thumbnails.onCoverUpdated = () => unawaited(library.load());
     final reader = ReaderController(
       documentService: documentService,
       documents: documents,
@@ -140,7 +142,7 @@ final class AppServices {
       sessions: sessions,
       engine: engine,
       thumbnails: thumbnails,
-      windowService: const DesktopWindowService(),
+      windowService: DesktopWindowService(),
       logger: logger,
       annotations: annotations,
       bookmarks: bookmarks,
@@ -197,6 +199,7 @@ final class AppServices {
       documents,
       documentService,
       engine,
+      thumbnails,
     );
     final documentRecovery = DocumentRecoveryService(
       documents,
@@ -215,6 +218,11 @@ final class AppServices {
       settings: settings,
     );
     await library.load();
+    if (settings.settings.generateCovers) {
+      for (final document in library.documents) {
+        if (!document.isMissing) thumbnails.enqueueCover(document);
+      }
+    }
     return AppServices._(
       paths: paths,
       database: database,

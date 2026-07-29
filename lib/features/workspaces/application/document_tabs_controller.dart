@@ -38,7 +38,8 @@ final class DocumentTabsController extends ChangeNotifier {
           .lastOrNull;
       if (disposable == null) {
         throw StateError(
-          'El límite de pestañas está ocupado por pestañas fijadas.',
+          'El límite de documentos abiertos está ocupado por documentos '
+          'fijados.',
         );
       }
       close(disposable.id);

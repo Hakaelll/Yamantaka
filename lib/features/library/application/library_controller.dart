@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../app/app_config.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../storage/repositories/document_repository.dart';
@@ -15,6 +14,12 @@ final class LibraryController extends ChangeNotifier {
   List<LibraryDocument> documents = const [];
   bool isLoading = false;
   AppFailure? error;
+  String? selectedDocumentId;
+  double scrollOffset = 0;
+  String query = '';
+  String sortOrder = 'lastOpened';
+  String readingState = 'all';
+  bool favoritesOnly = false;
 
   LibraryDocument? get continueReading => documents
       .where(
@@ -31,7 +36,14 @@ final class LibraryController extends ChangeNotifier {
     notifyListeners();
     try {
       _repository.refreshMissingState();
-      documents = _repository.recent(limit: AppConfig.maxRecentDocuments);
+      documents = _repository.all();
+      if (selectedDocumentId != null &&
+          !documents.any((document) => document.id == selectedDocumentId)) {
+        selectedDocumentId = null;
+      }
+      if (selectedDocumentId == null && documents.length == 1) {
+        selectedDocumentId = documents.single.id;
+      }
     } on Object catch (exception, stackTrace) {
       _logger.error('Library load failed.', exception, stackTrace);
       error = AppFailure(
@@ -47,6 +59,17 @@ final class LibraryController extends ChangeNotifier {
 
   Future<void> deleteHistory() async {
     _repository.deleteHistory();
+    await load();
+  }
+
+  void selectDocument(String? documentId) {
+    if (selectedDocumentId == documentId) return;
+    selectedDocumentId = documentId;
+    notifyListeners();
+  }
+
+  Future<void> toggleFavorite(String documentId) async {
+    _repository.toggleFavorite(documentId);
     await load();
   }
 }

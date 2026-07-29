@@ -75,7 +75,7 @@ void main() {
     await tester.pump();
     expect(harness.controller.preferences!.horizontalMargin, 28);
 
-    await tester.tap(find.byTooltip('Página siguiente (Av Pág)'));
+    await tester.tap(find.byTooltip('Página siguiente (→)'));
     await tester.pump();
     expect(harness.controller.currentPageIndex, 1);
     expect(find.text('2 / 3'), findsOneWidget);
@@ -102,6 +102,101 @@ void main() {
     ]) {
       expect(find.text(label), findsOneWidget);
     }
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets(
+    'reader overflow is compact and replaces the document tab strip',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await _ReaderHarness.create(ready: true);
+
+      await tester.pumpWidget(_app(harness));
+      await tester.pump();
+      await tester.tap(find.byTooltip('Más opciones'));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+
+      expect(find.text('Abrir otro PDF…'), findsOneWidget);
+      expect(find.text('Información del documento'), findsOneWidget);
+      expect(find.text('Miniaturas'), findsNothing);
+      expect(find.textContaining('pestaña'), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await harness.dispose();
+    },
+  );
+
+  testWidgets(
+    'fullscreen leaves only the document and Escape restores chrome',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await _ReaderHarness.create(ready: true);
+
+      await tester.pumpWidget(_app(harness));
+      await tester.pump();
+      expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+      expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+      await tester.pump();
+
+      expect(harness.windowService.fullScreen, isTrue);
+      expect(harness.controller.isFullScreen, isTrue);
+      expect(find.byKey(const Key('test-pdf-viewer')), findsOneWidget);
+      expect(find.byKey(const Key('reader-top-bar')), findsNothing);
+      expect(find.byKey(const Key('reader-bottom-controls')), findsNothing);
+      expect(find.byKey(const Key('reader-progress')), findsNothing);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+
+      expect(harness.windowService.fullScreen, isFalse);
+      expect(harness.controller.isFullScreen, isFalse);
+      expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+      expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await harness.dispose();
+    },
+  );
+
+  testWidgets('book mode pairs cover, spreads and arrow-key navigation', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true, pageCount: 6);
+    final adapter = _RecordingViewerAdapter();
+
+    harness.controller.setReaderMode(ReaderMode.book);
+    await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
+    await tester.pump();
+
+    expect(harness.controller.preferences!.pageLayout, PageLayoutMode.facing);
+    expect(adapter.configuration?.flow, PdfViewFlow.facing);
+    expect(find.byTooltip('Página siguiente (→)'), findsOneWidget);
+
+    for (final expectedPage in const [1, 3, 5, 5]) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(harness.controller.currentPageIndex, expectedPage);
+    }
+    for (final expectedPage in const [3, 1, 0]) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(harness.controller.currentPageIndex, expectedPage);
+    }
+
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
   });
@@ -337,6 +432,7 @@ final class _ReaderHarness {
     required this.database,
     required this.bookmarks,
     required this.search,
+    required this.windowService,
   });
 
   final ReaderController controller;
@@ -345,8 +441,12 @@ final class _ReaderHarness {
   final AppDatabase database;
   final BookmarkController bookmarks;
   final app_search.SearchController search;
+  final FakeWindowService windowService;
 
-  static Future<_ReaderHarness> create({required bool ready}) async {
+  static Future<_ReaderHarness> create({
+    required bool ready,
+    int pageCount = 3,
+  }) async {
     final logger = AppLogger(minimumLevel: LogLevel.error);
     final database = AppDatabase.inMemory(logger);
     final documents = DocumentRepository(database);
@@ -354,6 +454,7 @@ final class _ReaderHarness {
     final viewController = PdfViewController();
     final bookmarks = BookmarkController(BookmarkRepository(database));
     final search = app_search.SearchController(engine, viewController, logger);
+    final windowService = FakeWindowService();
     final directory = Directory.current;
     final thumbnails = Directory('${directory.path}/build/test-covers');
     final thumbnailService = ThumbnailService(
@@ -374,7 +475,7 @@ final class _ReaderHarness {
       sessions: ReadingSessionRepository(database),
       engine: engine,
       thumbnails: thumbnailService,
-      windowService: FakeWindowService(),
+      windowService: windowService,
       logger: logger,
       bookmarks: bookmarks,
       search: search,
@@ -391,7 +492,7 @@ final class _ReaderHarness {
         path: '${directory.path}/book.pdf',
         normalizedPath: '${directory.path}/book.pdf',
         fileName: 'book.pdf',
-        pageCount: 3,
+        pageCount: pageCount,
         fileSize: 100,
         fileModifiedAt: now,
         addedAt: now,
@@ -401,22 +502,18 @@ final class _ReaderHarness {
       documents.save(document);
       controller
         ..document = document
-        ..openedDocument = const OpenedPdfDocument(
+        ..openedDocument = OpenedPdfDocument(
           documentId: 'pdf-1',
           path: 'book.pdf',
-          pageCount: 3,
-          pageSizes: [
-            PdfPageSize(600, 800),
-            PdfPageSize(600, 800),
-            PdfPageSize(600, 800),
-          ],
+          pageCount: pageCount,
+          pageSizes: List.filled(pageCount, const PdfPageSize(600, 800)),
           isEncrypted: false,
         )
         ..preferences = const DocumentPreferences(documentId: 'doc-1')
         ..status = ReaderStatus.ready;
       bookmarks.load(document.id);
       viewController.attach(
-        pageCount: 3,
+        pageCount: pageCount,
         currentPageIndex: 0,
         zoom: 1,
         goToPage: (page) async {
@@ -437,6 +534,7 @@ final class _ReaderHarness {
       database: database,
       bookmarks: bookmarks,
       search: search,
+      windowService: windowService,
     );
   }
 

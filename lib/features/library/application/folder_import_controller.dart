@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../../../pdf_engine/pdf_document_engine.dart';
+import '../../../pdf_engine/cache/thumbnail_service.dart';
 import '../../../storage/repositories/document_repository.dart';
 import 'document_service.dart';
 
@@ -45,11 +46,17 @@ final class FolderImportSummary {
 }
 
 final class FolderImportController extends ChangeNotifier {
-  FolderImportController(this._documents, this._documentService, this._engine);
+  FolderImportController(
+    this._documents,
+    this._documentService,
+    this._engine, [
+    this._thumbnails,
+  ]);
 
   final DocumentRepository _documents;
   final DocumentService _documentService;
   final PdfDocumentEngine _engine;
+  final ThumbnailService? _thumbnails;
 
   List<FolderImportCandidate> candidates = const [];
   bool isScanning = false;
@@ -159,10 +166,11 @@ final class FolderImportController extends ChangeNotifier {
       try {
         final opened = await _engine.openDocument(candidate.path);
         engineDocumentId = opened.documentId;
-        _documentService.register(
+        final document = _documentService.register(
           file: candidate.inspected!,
           pageCount: opened.pageCount,
         );
+        _thumbnails?.enqueueCover(document);
         imported++;
       } on Object {
         // The per-file result remains available in the final summary.
