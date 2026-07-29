@@ -1,11 +1,11 @@
 enum ReaderMode { document, book }
 
 enum ReaderTheme {
-  light(0xFFF5F5F3, 'Claro'),
-  ivory(0xFFECE7D8, 'Marfil'),
-  sepia(0xFFD8CBB4, 'Sepia'),
-  gray(0xFFB9BAB7, 'Gris'),
-  dark(0xFF242422, 'Oscuro'),
+  light(0xFFF3F3F1, 'Claro'),
+  ivory(0xFFEAE5D8, 'Marfil'),
+  sepia(0xFFD8CAB2, 'Sepia'),
+  gray(0xFFB9BAB6, 'Gris'),
+  dark(0xFF222320, 'Oscuro'),
   black(0xFF000000, 'Negro');
 
   const ReaderTheme(this.colorValue, this.label);

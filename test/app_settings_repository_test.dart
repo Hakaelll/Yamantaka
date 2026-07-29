@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yamantaka/app/theme/app_density.dart';
 import 'package:yamantaka/features/reader/domain/reader_models.dart';
 import 'package:yamantaka/storage/repositories/app_settings_repository.dart';
 
@@ -14,6 +15,7 @@ void main() {
         showProgress: false,
         reduceMotion: true,
         disableAnimations: true,
+        interfaceDensity: AppInterfaceDensity.compact,
         defaultViewMode: 'book',
         defaultPageLayout: 'facing',
         defaultZoomMode: 'fitWidth',
@@ -25,6 +27,18 @@ void main() {
         generateCovers: false,
         maxCacheMegabytes: 128,
         recordReadingSessions: false,
+        readingHistoryLimit: 500,
+        libraryReadingFilter: 'inProgress',
+        readerPanelWidth: 416,
+        readerPanelSection: 'bookmarks',
+        readerPanelOpen: true,
+        readerChromeVisible: false,
+        showReaderModeControls: false,
+        showReaderPanelControls: false,
+        shortcutOverrides: '{"search":"ctrl-shift-f"}',
+        restoreLastSession: false,
+        startInLibrary: true,
+        lastDocumentPath: r'C:\Books\book.pdf',
         languageCode: 'es',
         windowWidth: 1360,
         windowHeight: 820,
@@ -39,7 +53,20 @@ void main() {
       expect(actual.defaultReaderTheme, 'sepia');
       expect(actual.readingDirection, ReadingDirection.rightToLeft);
       expect(actual.visualProfile, ReaderVisualProfile.electronicInk);
+      expect(actual.interfaceDensity, AppInterfaceDensity.compact);
       expect(actual.recordReadingSessions, isFalse);
+      expect(actual.readingHistoryLimit, 500);
+      expect(actual.libraryReadingFilter, 'inProgress');
+      expect(actual.readerPanelWidth, 416);
+      expect(actual.readerPanelSection, 'bookmarks');
+      expect(actual.readerPanelOpen, isTrue);
+      expect(actual.readerChromeVisible, isFalse);
+      expect(actual.showReaderModeControls, isFalse);
+      expect(actual.showReaderPanelControls, isFalse);
+      expect(actual.shortcutOverrides, '{"search":"ctrl-shift-f"}');
+      expect(actual.restoreLastSession, isFalse);
+      expect(actual.startInLibrary, isTrue);
+      expect(actual.lastDocumentPath, r'C:\Books\book.pdf');
       expect(actual.languageCode, 'es');
       expect(actual.windowWidth, 1360);
       expect(actual.windowHeight, 820);
@@ -62,16 +89,21 @@ void main() {
     expect(actual.languageCode, 'es');
     expect(actual.windowWidth, 1120);
     expect(actual.windowHeight, 760);
+    expect(actual.readerPanelWidth, 320);
+    expect(actual.restoreLastSession, isTrue);
+    expect(actual.lastDocumentPath, isEmpty);
   });
 
   test('unknown persisted enum names fall back to safe defaults', () async {
     final preferences = _MemoryPreferences()
       ..values['readingDirection'] = 'sideways'
-      ..values['visualProfile'] = 'crt';
+      ..values['visualProfile'] = 'crt'
+      ..values['interfaceDensity'] = 'microscopic';
     final actual = await AppSettingsRepository(preferences).load();
 
     expect(actual.readingDirection, ReadingDirection.leftToRight);
     expect(actual.visualProfile, ReaderVisualProfile.standard);
+    expect(actual.interfaceDensity, AppInterfaceDensity.comfortable);
   });
 }
 

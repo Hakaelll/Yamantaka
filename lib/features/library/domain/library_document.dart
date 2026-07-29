@@ -19,6 +19,7 @@ final class LibraryDocument {
     this.preferredViewMode = ReaderMode.document,
     this.preferredTheme = ReaderTheme.ivory,
     this.isMissing = false,
+    this.hasFileChanged = false,
     this.thumbnailPath,
   });
 
@@ -38,6 +39,7 @@ final class LibraryDocument {
   final ReaderMode preferredViewMode;
   final ReaderTheme preferredTheme;
   final bool isMissing;
+  final bool hasFileChanged;
   final String fingerprint;
   final String? thumbnailPath;
 
@@ -57,6 +59,7 @@ final class LibraryDocument {
     ReaderMode? preferredViewMode,
     ReaderTheme? preferredTheme,
     bool? isMissing,
+    bool? hasFileChanged,
     String? fingerprint,
     String? thumbnailPath,
   }) => LibraryDocument(
@@ -76,6 +79,7 @@ final class LibraryDocument {
     preferredViewMode: preferredViewMode ?? this.preferredViewMode,
     preferredTheme: preferredTheme ?? this.preferredTheme,
     isMissing: isMissing ?? this.isMissing,
+    hasFileChanged: hasFileChanged ?? this.hasFileChanged,
     fingerprint: fingerprint ?? this.fingerprint,
     thumbnailPath: thumbnailPath ?? this.thumbnailPath,
   );

@@ -1,13 +1,17 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../app/app_config.dart';
 import '../../../app/shortcuts/app_commands.dart';
+import '../../../app/theme/app_components.dart';
+import '../../../app/theme/app_tokens.dart';
+import '../../../pdf_engine/models/pdf_models.dart';
 import '../../../pdf_engine/pdf_document_engine.dart';
 import '../../../pdf_engine/presentation/pdf_viewer_adapter.dart';
 import '../../command_palette/presentation/command_palette.dart';
+import '../../library/domain/library_document.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
 import 'reader_bottom_controls.dart';
@@ -26,6 +30,20 @@ final class ReaderScreen extends StatefulWidget {
     required this.reduceMotion,
     required this.showProgress,
     required this.readingDirection,
+    this.visualProfile = ReaderVisualProfile.standard,
+    this.initialPanelWidth = AppSizes.sidePanelWidth,
+    this.initialPanelSection = '',
+    this.initialPanelOpen = false,
+    this.initialChromeVisible = true,
+    this.showModeControls = true,
+    this.showPanelControls = true,
+    this.shortcutOverrides = '{}',
+    this.recentDocuments = const [],
+    this.onOpenPath,
+    this.onPanelWidthChanged,
+    this.onPanelChanged,
+    this.onChromeVisibilityChanged,
+    this.onDocumentInfo,
   });
 
   final ReaderController controller;
@@ -37,6 +55,20 @@ final class ReaderScreen extends StatefulWidget {
   final bool reduceMotion;
   final bool showProgress;
   final ReadingDirection readingDirection;
+  final ReaderVisualProfile visualProfile;
+  final double initialPanelWidth;
+  final String initialPanelSection;
+  final bool initialPanelOpen;
+  final bool initialChromeVisible;
+  final bool showModeControls;
+  final bool showPanelControls;
+  final String shortcutOverrides;
+  final List<LibraryDocument> recentDocuments;
+  final Future<void> Function(String path)? onOpenPath;
+  final ValueChanged<double>? onPanelWidthChanged;
+  final ValueChanged<ReaderPanelSection?>? onPanelChanged;
+  final ValueChanged<bool>? onChromeVisibilityChanged;
+  final VoidCallback? onDocumentInfo;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -44,40 +76,61 @@ final class ReaderScreen extends StatefulWidget {
 
 final class _ReaderScreenState extends State<ReaderScreen> {
   ReaderPanelSection? _panel;
-  bool _controlsVisible = true;
+  late bool _controlsVisible;
+  late double _panelWidthValue;
   Timer? _controlsTimer;
+  Timer? _panelSaveTimer;
+  FocusNode? _focusBeforePanel;
+  Object? _viewerCacheKey;
+  Widget? _viewerCache;
 
   bool get _isBookMode =>
       widget.controller.preferences?.viewMode == ReaderMode.book;
 
-  Duration get _animationDuration =>
-      widget.reduceMotion ? Duration.zero : const Duration(milliseconds: 140);
+  bool get _isElectronicInk =>
+      widget.visualProfile == ReaderVisualProfile.electronicInk;
+
+  Duration get _controlMotion =>
+      AppMotion.whenAllowed(widget.reduceMotion, AppMotion.fast);
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _revealControls());
+    _controlsVisible = widget.initialChromeVisible;
+    _panelWidthValue = widget.initialPanelWidth
+        .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth)
+        .toDouble();
+    if (widget.initialPanelOpen) {
+      _panel = ReaderPanelSection.values
+          .where((section) => section.name == widget.initialPanelSection)
+          .firstOrNull;
+    }
+    if (_controlsVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _revealControls());
+    }
   }
 
   @override
   void dispose() {
     _controlsTimer?.cancel();
+    _panelSaveTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final combined = Listenable.merge([
-      widget.controller,
-      widget.controller.viewController,
-      widget.controller.bookmarks,
-    ]);
     return ListenableBuilder(
-      listenable: combined,
+      listenable: widget.controller,
       builder: (context, _) {
         if (widget.controller.status == ReaderStatus.loading) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: AppStatusView(
+              icon: Icons.picture_as_pdf_outlined,
+              title: 'Abriendo documento',
+              message:
+                  'Preparando páginas, posición y preferencias de lectura.',
+              loading: true,
+            ),
           );
         }
         if (widget.controller.status != ReaderStatus.ready ||
@@ -91,7 +144,10 @@ final class _ReaderScreenState extends State<ReaderScreen> {
           );
         }
         return CallbackShortcuts(
-          bindings: AppCommandRegistry.shortcuts(_commandActions(context)),
+          bindings: AppCommandRegistry.shortcuts(
+            _commandActions(context),
+            overrides: widget.shortcutOverrides,
+          ),
           child: Focus(
             autofocus: true,
             onKeyEvent: (_, event) {
@@ -111,7 +167,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 child: Scaffold(
                   body: LayoutBuilder(
                     builder: (context, constraints) =>
-                        _buildReader(context, constraints.maxWidth),
+                        _buildReader(context, constraints),
                   ),
                 ),
               ),
@@ -122,28 +178,58 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
-  Widget _buildReader(BuildContext context, double availableWidth) {
+  Widget _buildReader(BuildContext context, BoxConstraints constraints) {
     final controller = widget.controller;
     final opened = controller.openedDocument!;
     final preferences = controller.preferences!;
-    final readerBackground = Color(preferences.readingTheme.colorValue);
-    final requestedFlow = switch (preferences.pageLayout) {
-      PageLayoutMode.continuous => PdfViewFlow.continuous,
-      PageLayoutMode.single => PdfViewFlow.single,
-      PageLayoutMode.facing =>
-        availableWidth >= 900 ? PdfViewFlow.facing : PdfViewFlow.single,
-    };
-    final controlsShown = !_isBookMode || _controlsVisible;
+    final readerBackground = _isElectronicInk
+        ? const Color(0xFFFFFFFF)
+        : Color(preferences.readingTheme.colorValue);
+    final panelWidth = _panelWidth(constraints.maxWidth);
+    final currentSize =
+        opened.pageSizes[controller.currentPageIndex.clamp(
+          0,
+          opened.pageSizes.length - 1,
+        )];
+    final canUseFacing = ReaderLayoutPolicy.shouldUseFacing(
+      viewportWidth: constraints.maxWidth,
+      viewportHeight: constraints.maxHeight,
+      pageAspectRatio: currentSize.width / currentSize.height,
+      occupiedPanelWidth: _panel == null ? 0 : panelWidth,
+      visualMargin:
+          (preferences.horizontalMargin + preferences.verticalMargin) / 2,
+    );
+    final requestedFlow = _isElectronicInk
+        ? PdfViewFlow.single
+        : switch (preferences.pageLayout) {
+            PageLayoutMode.continuous => PdfViewFlow.continuous,
+            PageLayoutMode.single => PdfViewFlow.single,
+            PageLayoutMode.facing =>
+              canUseFacing ? PdfViewFlow.facing : PdfViewFlow.single,
+          };
+    final controlsShown = _controlsVisible;
+    final outerWindowClass = AppBreakpoints.classify(constraints.maxWidth);
+    final panelDocked =
+        _panel != null && outerWindowClass == AppWindowClass.expanded;
+    final reservedPanelWidth = panelDocked ? panelWidth : 0.0;
+    final windowClass = AppBreakpoints.classify(
+      constraints.maxWidth - reservedPanelWidth,
+    );
+
     return ColoredBox(
       color: readerBackground,
       child: Stack(
         children: [
-          Positioned.fill(
+          Positioned(
+            left: 0,
+            top: 0,
+            right: reservedPanelWidth,
+            bottom: 0,
             child: Semantics(
               label:
                   'Documento PDF, página ${controller.currentPageIndex + 1} '
                   'de ${controller.pageCount}',
-              child: widget.viewerAdapter.buildViewer(
+              child: _cachedViewer(
                 document: opened,
                 controller: controller.viewController,
                 configuration: PdfViewConfiguration(
@@ -154,7 +240,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                       2,
                   flow: requestedFlow,
                   rotation: preferences.pageRotation,
-                  reduceMotion: widget.reduceMotion,
+                  reduceMotion: widget.reduceMotion || _isElectronicInk,
                   initialZoom: preferences.zoomLevel,
                   initialZoomMode: switch (preferences.zoomMode) {
                     ZoomMode.custom => PdfViewZoomMode.custom,
@@ -166,99 +252,132 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                       widget.readingDirection == ReadingDirection.rightToLeft
                       ? PdfViewReadingDirection.rightToLeft
                       : PdfViewReadingDirection.leftToRight,
+                  pageShadow: _pageShadow(context, preferences.readingTheme),
                 ),
                 initialPageIndex: controller.currentPageIndex,
                 onPageChanged: controller.onPageChanged,
                 onError: (error) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('No se pudo renderizar la página.'),
+                      content: Text(
+                        'No se pudo renderizar esta página. '
+                        'Prueba a cambiar de página o reabrir el documento.',
+                      ),
                     ),
                   );
                 },
               ),
             ),
           ),
-          if (_isBookMode) ...[
-            Positioned(
-              left: 0,
-              top: 64,
-              bottom: 64,
-              width: 64,
-              child: Semantics(
-                button: true,
-                label: 'Página anterior',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: controller.previousPage,
-                ),
-              ),
-            ),
-            Positioned(
-              right: _panel == null ? 0 : 304,
-              top: 64,
-              bottom: 64,
-              width: 64,
-              child: Semantics(
-                button: true,
-                label: 'Página siguiente',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: controller.nextPage,
-                ),
-              ),
-            ),
-          ],
-          AnimatedSlide(
-            duration: _animationDuration,
-            offset: controlsShown ? Offset.zero : const Offset(0, -1),
-            child: IgnorePointer(
-              ignoring: !controlsShown,
-              child: ReaderTopBar(
-                controller: controller,
-                onBack: widget.onBack,
-                onSearch: () => _showPanel(ReaderPanelSection.search),
-                onCommandPalette: () => _showCommandPalette(context),
-                onShowThumbnails: () =>
-                    _showPanel(ReaderPanelSection.thumbnails),
-                onShowOutline: () => _showPanel(ReaderPanelSection.outline),
-                onShowBookmarks: () => _showPanel(ReaderPanelSection.bookmarks),
-                onAdjustMargins: () => _showMarginChooser(context),
-                onOpenSettings: widget.onOpenSettings,
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
+          if (_isBookMode)
+            ..._pageTurnZones(controller: controller, panelWidth: panelWidth),
+          Positioned(
+            left: 0,
+            top: 0,
+            right: reservedPanelWidth,
             child: AnimatedSlide(
-              duration: _animationDuration,
-              offset: controlsShown ? Offset.zero : const Offset(0, 1),
-              child: IgnorePointer(
-                ignoring: !controlsShown,
-                child: ReaderBottomControls(
-                  controller: controller,
-                  onGoToPage: () => _showGoToPage(context),
-                  onChooseTheme: () => _showThemeChooser(context),
+              duration: _controlMotion,
+              curve: Curves.easeOutCubic,
+              offset: controlsShown ? Offset.zero : const Offset(0, -1),
+              child: AnimatedOpacity(
+                duration: _controlMotion,
+                opacity: controlsShown ? 1 : 0,
+                child: IgnorePointer(
+                  ignoring: !controlsShown,
+                  child: ReaderTopBar(
+                    key: const Key('reader-top-bar'),
+                    controller: controller,
+                    compact: windowClass == AppWindowClass.compact,
+                    expanded: windowClass == AppWindowClass.expanded,
+                    activePanel: _panel,
+                    showModeControls: widget.showModeControls,
+                    showPanelControls: widget.showPanelControls,
+                    shortcutOverrides: widget.shortcutOverrides,
+                    onBack: widget.onBack,
+                    onSearch: () => _showPanel(ReaderPanelSection.search),
+                    onCommandPalette: () => _showCommandPalette(context),
+                    onShowThumbnails: () =>
+                        _showPanel(ReaderPanelSection.thumbnails),
+                    onShowOutline: () => _showPanel(ReaderPanelSection.outline),
+                    onShowBookmarks: () =>
+                        _showPanel(ReaderPanelSection.bookmarks),
+                    onAdjustMargins: () => _showMarginChooser(context),
+                    onDocumentInfo:
+                        widget.onDocumentInfo ??
+                        () => _showDocumentInfo(context),
+                    onToggleChrome: _toggleChrome,
+                    onOpenSettings: widget.onOpenSettings,
+                  ),
                 ),
               ),
             ),
           ),
+          Positioned(
+            left: AppSpacing.space12,
+            right: AppSpacing.space12 + reservedPanelWidth,
+            bottom: AppSpacing.space12,
+            child: AnimatedSlide(
+              duration: _controlMotion,
+              curve: Curves.easeOutCubic,
+              offset: controlsShown ? Offset.zero : const Offset(0, 1.3),
+              child: AnimatedOpacity(
+                duration: _controlMotion,
+                opacity: controlsShown ? 1 : 0,
+                child: IgnorePointer(
+                  ignoring: !controlsShown,
+                  child: ReaderBottomControls(
+                    key: const Key('reader-bottom-controls'),
+                    controller: controller,
+                    compact: windowClass == AppWindowClass.compact,
+                    onGoToPage: () => _showGoToPage(context),
+                    onChooseTheme: () => _showThemeChooser(context),
+                    shortcutOverrides: widget.shortcutOverrides,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_panel != null && !panelDocked)
+            Positioned.fill(
+              child: GestureDetector(
+                key: const Key('reader-panel-scrim'),
+                behavior: HitTestBehavior.opaque,
+                onTap: _closePanel,
+                child: ColoredBox(color: Colors.black.withValues(alpha: 0.18)),
+              ),
+            ),
           if (_panel != null)
             Positioned(
               top: 0,
               bottom: 0,
               right: 0,
-              child: ReaderSidePanel(
-                section: _panel!,
-                controller: controller,
-                engine: widget.engine,
-                onClose: () => setState(() => _panel = null),
+              width: panelWidth,
+              child: TweenAnimationBuilder<double>(
+                key: ValueKey(_panel),
+                duration: AppMotion.whenAllowed(
+                  widget.reduceMotion,
+                  AppMotion.panel,
+                ),
+                curve: Curves.easeOutCubic,
+                tween: Tween(begin: 1, end: 0),
+                builder: (context, offset, child) => Transform.translate(
+                  offset: Offset(panelWidth * offset, 0),
+                  child: child,
+                ),
+                child: ReaderSidePanel(
+                  section: _panel!,
+                  controller: controller,
+                  engine: widget.engine,
+                  width: panelWidth,
+                  onClose: _closePanel,
+                  onWidthChanged: _resizePanel,
+                ),
               ),
             ),
           if (widget.showProgress)
             Positioned(
               left: 0,
-              right: _panel == null ? 0 : 304,
+              right: reservedPanelWidth,
               bottom: 0,
               child: LinearProgressIndicator(
                 key: const Key('reader-progress'),
@@ -268,7 +387,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                         pageIndex: controller.currentPageIndex,
                         pageCount: controller.pageCount,
                       ),
-                minHeight: 3,
+                minHeight: 2,
                 backgroundColor: Colors.transparent,
               ),
             ),
@@ -277,17 +396,128 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  List<Widget> _pageTurnZones({
+    required ReaderController controller,
+    required double panelWidth,
+  }) {
+    final rtl = widget.readingDirection == ReadingDirection.rightToLeft;
+    Widget zone({
+      required bool left,
+      required String label,
+      required VoidCallback action,
+    }) => Positioned(
+      left: left ? 0 : null,
+      right: left ? null : (_panel == null ? 0 : panelWidth),
+      top: AppSizes.topBarHeight,
+      bottom: AppSizes.bottomControlHeight + AppSpacing.space24,
+      width: AppSizes.readerEdgeNavigation,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkWell(
+          key: Key(left ? 'reader-left-zone' : 'reader-right-zone'),
+          onTap: action,
+          hoverColor: Colors.white.withValues(alpha: 0.06),
+          focusColor: Colors.white.withValues(alpha: 0.10),
+        ),
+      ),
+    );
+    return [
+      zone(
+        left: true,
+        label: rtl ? 'Página siguiente' : 'Página anterior',
+        action: rtl ? controller.nextPage : controller.previousPage,
+      ),
+      zone(
+        left: false,
+        label: rtl ? 'Página anterior' : 'Página siguiente',
+        action: rtl ? controller.previousPage : controller.nextPage,
+      ),
+    ];
+  }
+
+  BoxShadow? _pageShadow(BuildContext context, ReaderTheme theme) {
+    if (_isElectronicInk ||
+        theme == ReaderTheme.dark ||
+        theme == ReaderTheme.black) {
+      return null;
+    }
+    return BoxShadow(
+      color: context.appColors.readerPageShadow,
+      blurRadius: theme == ReaderTheme.gray ? 2 : 3,
+      spreadRadius: 0,
+      offset: const Offset(0, 1),
+    );
+  }
+
+  double _panelWidth(double viewportWidth) {
+    if (AppBreakpoints.classify(viewportWidth) == AppWindowClass.compact) {
+      return math.min(_panelWidthValue, viewportWidth * 0.86);
+    }
+    return _panelWidthValue;
+  }
+
+  Widget _cachedViewer({
+    required OpenedPdfDocument document,
+    required PdfViewController controller,
+    required PdfViewConfiguration configuration,
+    required int initialPageIndex,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<Object> onError,
+  }) {
+    final key = (
+      document.documentId,
+      configuration.backgroundColor,
+      configuration.margin,
+      configuration.flow,
+      configuration.rotation,
+      configuration.reduceMotion,
+      configuration.readingDirection,
+    );
+    if (_viewerCacheKey != key || _viewerCache == null) {
+      _viewerCacheKey = key;
+      _viewerCache = RepaintBoundary(
+        key: ValueKey('reader-viewer-${document.documentId}'),
+        child: widget.viewerAdapter.buildViewer(
+          document: document,
+          controller: controller,
+          configuration: configuration,
+          initialPageIndex: initialPageIndex,
+          onPageChanged: onPageChanged,
+          onError: onError,
+        ),
+      );
+    }
+    return _viewerCache!;
+  }
+
+  void _resizePanel(double width) {
+    final next = width
+        .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth)
+        .toDouble();
+    if ((next - _panelWidthValue).abs() < 0.5) return;
+    setState(() => _panelWidthValue = next);
+    _panelSaveTimer?.cancel();
+    _panelSaveTimer = Timer(const Duration(milliseconds: 240), () {
+      widget.onPanelWidthChanged?.call(_panelWidthValue);
+    });
+  }
+
   Map<AppCommandId, VoidCallback> _commandActions(BuildContext context) => {
     AppCommandId.openDocument: () => unawaited(widget.onOpenDocument()),
     AppCommandId.search: () => _showPanel(ReaderPanelSection.search),
     AppCommandId.commandPalette: () => _showCommandPalette(context),
     AppCommandId.goToPage: () => _showGoToPage(context),
+    AppCommandId.togglePanel: () => _panel == null
+        ? _showPanel(ReaderPanelSection.thumbnails)
+        : _closePanel(),
     AppCommandId.toggleBookmark: widget.controller.toggleBookmark,
     AppCommandId.zoomIn: () => unawaited(widget.controller.zoomBy(1.18)),
     AppCommandId.zoomOut: () => unawaited(widget.controller.zoomBy(0.85)),
     AppCommandId.resetZoom: () => unawaited(widget.controller.fitPage()),
     AppCommandId.fullScreen: () =>
         unawaited(widget.controller.toggleFullScreen()),
+    AppCommandId.toggleChrome: _toggleChrome,
     AppCommandId.escape: _escape,
     AppCommandId.nextPage: () => unawaited(widget.controller.nextPage()),
     AppCommandId.previousPage: () =>
@@ -304,33 +534,64 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     AppCommandId.fitWidth: () => unawaited(widget.controller.fitWidth()),
     AppCommandId.fitPage: () => unawaited(widget.controller.fitPage()),
     AppCommandId.changeReaderTheme: () => _showThemeChooser(context),
+    AppCommandId.documentInfo:
+        widget.onDocumentInfo ?? () => _showDocumentInfo(context),
     AppCommandId.settings: widget.onOpenSettings,
   };
 
   void _showPanel(ReaderPanelSection section) {
+    if (_panel == section) {
+      _closePanel();
+      return;
+    }
+    _focusBeforePanel ??= FocusManager.instance.primaryFocus;
     setState(() {
-      _panel = _panel == section ? null : section;
+      _panel = section;
       _controlsVisible = true;
+    });
+    widget.onPanelChanged?.call(section);
+    widget.onChromeVisibilityChanged?.call(true);
+  }
+
+  void _closePanel() {
+    if (_panel == null) return;
+    setState(() => _panel = null);
+    widget.onPanelChanged?.call(null);
+    final previousFocus = _focusBeforePanel;
+    _focusBeforePanel = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (previousFocus?.canRequestFocus ?? false) {
+        previousFocus?.requestFocus();
+      }
     });
   }
 
   void _escape() {
     if (_panel != null) {
-      setState(() => _panel = null);
+      _closePanel();
     } else {
       unawaited(widget.controller.leaveFullScreen());
     }
   }
 
+  void _toggleChrome() {
+    setState(() => _controlsVisible = !_controlsVisible);
+    widget.onChromeVisibilityChanged?.call(_controlsVisible);
+  }
+
   void _revealControls() {
     if (!mounted) return;
-    if (!_controlsVisible) setState(() => _controlsVisible = true);
+    if (!_controlsVisible) {
+      setState(() => _controlsVisible = true);
+      widget.onChromeVisibilityChanged?.call(true);
+    }
     _controlsTimer?.cancel();
     final preferences = widget.controller.preferences;
     if (_isBookMode && (preferences?.controlsAutoHide ?? true)) {
-      _controlsTimer = Timer(AppConfig.controlsAutoHideDelay, () {
+      _controlsTimer = Timer(AppMotion.controlsAutoHide, () {
         if (mounted && _panel == null) {
           setState(() => _controlsVisible = false);
+          widget.onChromeVisibilityChanged?.call(false);
         }
       });
     }
@@ -340,7 +601,15 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     _controlsTimer?.cancel();
     await showDialog<void>(
       context: context,
-      builder: (_) => CommandPalette(actions: _commandActions(context)),
+      builder: (_) => CommandPalette(
+        actions: _commandActions(context),
+        reduceMotion: widget.reduceMotion,
+        shortcutOverrides: widget.shortcutOverrides,
+        recentDocuments: widget.recentDocuments,
+        onOpenRecent: widget.onOpenPath == null
+            ? null
+            : (document) => unawaited(widget.onOpenPath!(document.path)),
+      ),
     );
     _revealControls();
   }
@@ -353,15 +622,19 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Ir a página'),
-        content: TextField(
-          key: const Key('go-to-page-field'),
-          controller: textController,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            helperText: 'Entre 1 y ${widget.controller.pageCount}',
+        content: SizedBox(
+          width: 320,
+          child: TextField(
+            key: const Key('go-to-page-field'),
+            controller: textController,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'Número de página',
+              helperText: 'Entre 1 y ${widget.controller.pageCount}',
+            ),
+            onSubmitted: (value) => Navigator.pop(context, int.tryParse(value)),
           ),
-          onSubmitted: (value) => Navigator.pop(context, int.tryParse(value)),
         ),
         actions: [
           TextButton(
@@ -384,7 +657,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     final selected = await showDialog<ReaderTheme>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('Tema de lectura'),
+        title: const Text('Entorno de lectura'),
         children: [
           RadioGroup<ReaderTheme>(
             groupValue: widget.controller.preferences?.readingTheme,
@@ -402,9 +675,11 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                         decoration: BoxDecoration(
                           color: Color(theme.colorValue),
                           border: Border.all(
-                            color: Theme.of(context).dividerColor,
+                            color: context.appColors.borderStrong,
                           ),
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(
+                            AppRadii.indicator,
+                          ),
                         ),
                       ),
                     ),
@@ -416,6 +691,66 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       ),
     );
     if (selected != null) widget.controller.setTheme(selected);
+  }
+
+  Future<void> _showDocumentInfo(BuildContext context) async {
+    final document = widget.controller.document;
+    if (document == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.info_outline_rounded),
+        title: const Text('Información del documento'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SelectionArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _DocumentInfoLine(
+                  label: 'Título',
+                  value: document.title ?? document.fileName,
+                ),
+                if (document.author case final author?)
+                  _DocumentInfoLine(label: 'Autor', value: author),
+                _DocumentInfoLine(
+                  label: 'Páginas',
+                  value: '${document.pageCount}',
+                ),
+                _DocumentInfoLine(
+                  label: 'Tamaño',
+                  value: _formatFileSize(document.fileSize),
+                ),
+                _DocumentInfoLine(
+                  label: 'Modificado',
+                  value: MaterialLocalizations.of(
+                    context,
+                  ).formatFullDate(document.fileModifiedAt.toLocal()),
+                ),
+                _DocumentInfoLine(label: 'Ubicación', value: document.path),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: document.path));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Ruta copiada.')));
+            },
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('Copiar ruta'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showMarginChooser(BuildContext context) async {
@@ -432,7 +767,13 @@ final class _ReaderScreenState extends State<ReaderScreen> {
             width: 360,
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'Separa la página del borde sin modificar el PDF.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: AppSpacing.space16),
                 Slider(
                   value: margin.clamp(8, 72),
                   min: 8,
@@ -441,7 +782,13 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                   label: '${margin.round()} px',
                   onChanged: (value) => setDialogState(() => margin = value),
                 ),
-                Text('${margin.round()} px'),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    '${margin.round()} px',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ),
               ],
             ),
           ),
@@ -462,6 +809,37 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   }
 }
 
+final class _DocumentInfoLine extends StatelessWidget {
+  const _DocumentInfoLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.space12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatFileSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  final kib = bytes / 1024;
+  if (kib < 1024) return '${kib.toStringAsFixed(1)} KiB';
+  return '${(kib / 1024).toStringAsFixed(1)} MiB';
+}
+
 final class _ReaderErrorState extends StatelessWidget {
   const _ReaderErrorState({required this.message, required this.onBack});
 
@@ -471,20 +849,13 @@ final class _ReaderErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline_rounded, size: 48),
-            const SizedBox(height: 16),
-            Text(message),
-            const SizedBox(height: 20),
-            OutlinedButton(
-              onPressed: onBack,
-              child: const Text('Volver a la biblioteca'),
-            ),
-          ],
-        ),
+      body: AppStatusView(
+        icon: Icons.error_outline_rounded,
+        title: 'No se pudo mostrar el documento',
+        message: message,
+        action: onBack,
+        actionLabel: 'Volver a la biblioteca',
+        tone: AppStatusTone.error,
       ),
     );
   }

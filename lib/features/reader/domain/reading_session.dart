@@ -17,3 +17,15 @@ final class ReadingSession {
   final int endPage;
   final int activeSeconds;
 }
+
+final class ReadingHistoryEntry {
+  const ReadingHistoryEntry({
+    required this.session,
+    required this.documentTitle,
+    required this.documentPath,
+  });
+
+  final ReadingSession session;
+  final String documentTitle;
+  final String documentPath;
+}

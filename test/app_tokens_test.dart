@@ -1,0 +1,95 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:yamantaka/app/theme/app_density.dart';
+import 'package:yamantaka/app/theme/app_theme.dart';
+import 'package:yamantaka/app/theme/app_tokens.dart';
+
+void main() {
+  group('responsive window classes', () {
+    test('use the documented non-overlapping breakpoints', () {
+      expect(AppBreakpoints.classify(0), AppWindowClass.compact);
+      expect(AppBreakpoints.classify(679), AppWindowClass.compact);
+      expect(AppBreakpoints.classify(680), AppWindowClass.medium);
+      expect(AppBreakpoints.classify(1099), AppWindowClass.medium);
+      expect(AppBreakpoints.classify(1100), AppWindowClass.expanded);
+      expect(AppBreakpoints.classify(1920), AppWindowClass.expanded);
+    });
+
+    test('page padding grows deliberately with the window class', () {
+      expect(AppSpacing.pagePadding(679), AppSpacing.space20);
+      expect(AppSpacing.pagePadding(680), AppSpacing.space28);
+      expect(AppSpacing.pagePadding(1100), AppSpacing.space40);
+    });
+  });
+
+  group('facing-page policy', () {
+    test('rejects widths below expanded even near the boundary', () {
+      expect(
+        ReaderLayoutPolicy.shouldUseFacing(
+          viewportWidth: 1099,
+          viewportHeight: 800,
+          pageAspectRatio: 0.75,
+        ),
+        isFalse,
+      );
+    });
+
+    test('accepts a readable spread at expanded desktop size', () {
+      expect(
+        ReaderLayoutPolicy.shouldUseFacing(
+          viewportWidth: 1100,
+          viewportHeight: 800,
+          pageAspectRatio: 0.75,
+        ),
+        isTrue,
+      );
+    });
+
+    test('accounts for an open panel and a short viewport', () {
+      expect(
+        ReaderLayoutPolicy.shouldUseFacing(
+          viewportWidth: 1100,
+          viewportHeight: 800,
+          pageAspectRatio: 0.75,
+          occupiedPanelWidth: AppSizes.sidePanelWidth,
+        ),
+        isTrue,
+      );
+      expect(
+        ReaderLayoutPolicy.shouldUseFacing(
+          viewportWidth: 1100,
+          viewportHeight: 460,
+          pageAspectRatio: 0.75,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  test('light and dark themes expose semantic color tokens', () {
+    final light = AppTheme.light().extension<AppColorTokens>()!;
+    final dark = AppTheme.dark().extension<AppColorTokens>()!;
+
+    expect(light.appBackground, const Color(0xFFF1F0EC));
+    expect(light.accentPrimary, const Color(0xFF655D4C));
+    expect(dark.appBackground, const Color(0xFF171816));
+    expect(dark.textPrimary, const Color(0xFFECECE7));
+  });
+
+  test(
+    'compact density preserves control targets and tightens shared tokens',
+    () {
+      final theme = AppTheme.light(density: AppInterfaceDensity.compact);
+      final density = theme.extension<AppDensityTokens>()!;
+      final iconMinimum = theme.iconButtonTheme.style!.minimumSize!.resolve({});
+
+      expect(theme.visualDensity.vertical, -1);
+      expect(density.interfaceDensity, AppInterfaceDensity.compact);
+      expect(
+        density.listRowVerticalPadding,
+        lessThan(AppDensityTokens.comfortable.listRowVerticalPadding),
+      );
+      expect(iconMinimum, const Size.square(AppSizes.desktopControlExtent));
+    },
+  );
+}

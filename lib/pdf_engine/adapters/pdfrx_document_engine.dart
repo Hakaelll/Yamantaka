@@ -11,6 +11,42 @@ import '../cache/sized_lru_cache.dart';
 import '../models/pdf_models.dart';
 import '../pdf_document_engine.dart';
 
+final class PdfEngineDiagnostics {
+  const PdfEngineDiagnostics({
+    required this.renderRequests,
+    required this.cacheHits,
+    required this.cacheMisses,
+    required this.deduplicatedRenders,
+    required this.cancelledRenders,
+    required this.cachedPages,
+    required this.cachedBytes,
+    required this.pendingRenders,
+    required this.openDocuments,
+  });
+
+  final int renderRequests;
+  final int cacheHits;
+  final int cacheMisses;
+  final int deduplicatedRenders;
+  final int cancelledRenders;
+  final int cachedPages;
+  final int cachedBytes;
+  final int pendingRenders;
+  final int openDocuments;
+
+  Map<String, int> toJson() => {
+    'render_requests': renderRequests,
+    'cache_hits': cacheHits,
+    'cache_misses': cacheMisses,
+    'deduplicated_renders': deduplicatedRenders,
+    'cancelled_renders': cancelledRenders,
+    'cached_pages': cachedPages,
+    'cached_bytes': cachedBytes,
+    'pending_renders': pendingRenders,
+    'open_documents': openDocuments,
+  };
+}
+
 final class PdfrxDocumentEngine implements PdfDocumentEngine {
   PdfrxDocumentEngine(this._logger)
     : _renderCache = SizedLruCache<_RenderKey, RenderedPdfPage>(
@@ -29,6 +65,21 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
   int _nextDocumentId = 0;
   int _renderCacheHits = 0;
   int _renderCacheMisses = 0;
+  int _renderRequests = 0;
+  int _deduplicatedRenders = 0;
+  int _cancelledRenders = 0;
+
+  PdfEngineDiagnostics get diagnostics => PdfEngineDiagnostics(
+    renderRequests: _renderRequests,
+    cacheHits: _renderCacheHits,
+    cacheMisses: _renderCacheMisses,
+    deduplicatedRenders: _deduplicatedRenders,
+    cancelledRenders: _cancelledRenders,
+    cachedPages: _renderCache.length,
+    cachedBytes: _renderCache.currentBytes,
+    pendingRenders: _pendingRenders.length,
+    openDocuments: _documents.length,
+  );
 
   pdfrx.PdfDocument documentFor(String documentId) {
     final document = _documents[documentId];
@@ -155,6 +206,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     PdfRenderRegion? region,
     PdfOperationToken? cancellationToken,
   }) {
+    _renderRequests++;
     final safeScale = scale.clamp(0.1, 6.0);
     final key = _RenderKey(
       documentId: documentId,
@@ -172,13 +224,18 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       );
       return Future.value(cached);
     }
+    final pending = _pendingRenders[key];
+    if (pending != null) {
+      _deduplicatedRenders++;
+      return pending;
+    }
     _renderCacheMisses++;
-    return _pendingRenders.putIfAbsent(
-      key,
-      () => _render(key, safeScale, region, cancellationToken).whenComplete(() {
-        _pendingRenders.remove(key);
-      }),
-    );
+    final render = _render(key, safeScale, region, cancellationToken)
+        .whenComplete(() {
+          _pendingRenders.remove(key);
+        });
+    _pendingRenders[key] = render;
+    return render;
   }
 
   Future<RenderedPdfPage> _render(
@@ -189,6 +246,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
   ) async {
     final stopwatch = Stopwatch()..start();
     if (operationToken?.isCancelled ?? false) {
+      _cancelledRenders++;
       throw const AppFailure(FailureKind.cancelled, 'Renderizado cancelado.');
     }
     final document = documentFor(key.documentId);
@@ -223,6 +281,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       );
       if (rendered == null || (operationToken?.isCancelled ?? false)) {
         rendered?.dispose();
+        _cancelledRenders++;
         throw const AppFailure(FailureKind.cancelled, 'Renderizado cancelado.');
       }
       final image = await rendered.createImage();
@@ -243,6 +302,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       rethrow;
     } on Object catch (error, stackTrace) {
       if (renderToken.isCanceled) {
+        _cancelledRenders++;
         throw const AppFailure(FailureKind.cancelled, 'Renderizado cancelado.');
       }
       _logger.error('Page render failed.', error, stackTrace);
@@ -369,6 +429,9 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     _renderCache.clear();
     _renderCacheHits = 0;
     _renderCacheMisses = 0;
+    _renderRequests = 0;
+    _deduplicatedRenders = 0;
+    _cancelledRenders = 0;
     for (final cache in _textCache.values) {
       cache.clear();
     }

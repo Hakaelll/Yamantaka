@@ -142,12 +142,16 @@ final class DocumentRepository {
 
   int refreshMissingState() {
     var changed = 0;
-    for (final document in recent(limit: 10000)) {
-      final missing = !File(document.path).existsSync();
-      if (missing != document.isMissing) {
+    final rows = _database.database.select(
+      'SELECT id, path, is_missing FROM documents',
+    );
+    for (final row in rows) {
+      final missing = !File(row['path'] as String).existsSync();
+      final wasMissing = (row['is_missing'] as int) == 1;
+      if (missing != wasMissing) {
         _database.database.execute(
           'UPDATE documents SET is_missing = ? WHERE id = ?',
-          [missing ? 1 : 0, document.id],
+          [missing ? 1 : 0, row['id']],
         );
         changed++;
       }
@@ -159,34 +163,67 @@ final class DocumentRepository {
     _database.database.execute('DELETE FROM documents');
   }
 
-  LibraryDocument _fromRow(Row row) => LibraryDocument(
-    id: row['id'] as String,
-    path: row['path'] as String,
-    normalizedPath: row['normalized_path'] as String,
-    fileName: row['file_name'] as String,
-    title: row['title'] as String?,
-    author: row['author'] as String?,
-    pageCount: row['page_count'] as int,
-    fileSize: row['file_size'] as int,
-    fileModifiedAt: DateTime.parse(row['file_modified_at'] as String),
-    addedAt: DateTime.parse(row['added_at'] as String),
-    lastOpenedAt: DateTime.parse(row['last_opened_at'] as String),
-    lastPageIndex: row['last_page_index'] as int,
-    readingProgress: row['reading_progress'] as double,
-    preferredViewMode: _enumByName(
-      ReaderMode.values,
-      row['preferred_view_mode'] as String,
-      ReaderMode.document,
-    ),
-    preferredTheme: _enumByName(
-      ReaderTheme.values,
-      row['preferred_theme'] as String,
-      ReaderTheme.ivory,
-    ),
-    isMissing: (row['is_missing'] as int) == 1,
-    fingerprint: row['fingerprint'] as String,
-    thumbnailPath: row['thumbnail_path'] as String?,
-  );
+  void resetProgress(String documentId) {
+    _database.database.execute(
+      '''
+      UPDATE documents
+      SET last_page_index = 0, reading_progress = 0
+      WHERE id = ?
+      ''',
+      [documentId],
+    );
+  }
+
+  void remove(String documentId) {
+    _database.database.execute('DELETE FROM documents WHERE id = ?', [
+      documentId,
+    ]);
+  }
+
+  LibraryDocument _fromRow(Row row) {
+    final path = row['path'] as String;
+    final storedSize = row['file_size'] as int;
+    final storedModifiedAt = DateTime.parse(row['file_modified_at'] as String);
+    var hasFileChanged = false;
+    try {
+      final stat = File(path).statSync();
+      hasFileChanged =
+          stat.type != FileSystemEntityType.notFound &&
+          (stat.size != storedSize ||
+              stat.modified.toUtc() != storedModifiedAt.toUtc());
+    } on FileSystemException {
+      // Missing and inaccessible files are represented by is_missing instead.
+    }
+    return LibraryDocument(
+      id: row['id'] as String,
+      path: path,
+      normalizedPath: row['normalized_path'] as String,
+      fileName: row['file_name'] as String,
+      title: row['title'] as String?,
+      author: row['author'] as String?,
+      pageCount: row['page_count'] as int,
+      fileSize: storedSize,
+      fileModifiedAt: storedModifiedAt,
+      addedAt: DateTime.parse(row['added_at'] as String),
+      lastOpenedAt: DateTime.parse(row['last_opened_at'] as String),
+      lastPageIndex: row['last_page_index'] as int,
+      readingProgress: row['reading_progress'] as double,
+      preferredViewMode: _enumByName(
+        ReaderMode.values,
+        row['preferred_view_mode'] as String,
+        ReaderMode.document,
+      ),
+      preferredTheme: _enumByName(
+        ReaderTheme.values,
+        row['preferred_theme'] as String,
+        ReaderTheme.ivory,
+      ),
+      isMissing: (row['is_missing'] as int) == 1,
+      hasFileChanged: hasFileChanged,
+      fingerprint: row['fingerprint'] as String,
+      thumbnailPath: row['thumbnail_path'] as String?,
+    );
+  }
 
   static String _date(DateTime value) => value.toUtc().toIso8601String();
 

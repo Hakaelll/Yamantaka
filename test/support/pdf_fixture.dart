@@ -3,10 +3,13 @@ import 'dart:typed_data';
 
 const testPdfPassword = 'yamantaka-test';
 
-Uint8List createTestPdf() {
+Uint8List createTestPdf({bool includeThirdPage = false}) {
   final objects = <String>[
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>',
+    if (includeThirdPage)
+      '<< /Type /Pages /Kids [3 0 R 5 0 R 8 0 R] /Count 3 >>'
+    else
+      '<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] '
         '/Resources << /Font << /F1 4 0 R >> >> /Contents 6 0 R >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
@@ -14,7 +17,126 @@ Uint8List createTestPdf() {
         '/Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>',
     _stream('BT /F1 18 Tf 36 340 Td (Yamantaka page one) Tj ET'),
     _stream('BT /F1 18 Tf 36 340 Td (Yamantaka page two) Tj ET'),
+    if (includeThirdPage) ...[
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] '
+          '/Resources << /Font << /F1 4 0 R >> >> /Contents 9 0 R >>',
+      _stream('BT /F1 18 Tf 36 340 Td (Yamantaka page three) Tj ET'),
+    ],
   ];
+  final buffer = StringBuffer('%PDF-1.4\n');
+  final offsets = <int>[0];
+  for (var index = 0; index < objects.length; index++) {
+    offsets.add(utf8.encode(buffer.toString()).length);
+    buffer
+      ..write('${index + 1} 0 obj\n')
+      ..write(objects[index])
+      ..write('\nendobj\n');
+  }
+  final xrefOffset = utf8.encode(buffer.toString()).length;
+  buffer
+    ..write('xref\n0 ${objects.length + 1}\n')
+    ..write('0000000000 65535 f \n');
+  for (final offset in offsets.skip(1)) {
+    buffer.write('${offset.toString().padLeft(10, '0')} 00000 n \n');
+  }
+  buffer
+    ..write('trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n')
+    ..write('startxref\n$xrefOffset\n%%EOF\n');
+  return Uint8List.fromList(utf8.encode(buffer.toString()));
+}
+
+Uint8List createPdfWithPageCount(int pageCount) {
+  if (pageCount < 1 || pageCount > 1000) {
+    throw RangeError.range(pageCount, 1, 1000, 'pageCount');
+  }
+  final pageObjects = [
+    for (var index = 0; index < pageCount; index++) 4 + index * 2,
+  ];
+  final objects = <String>[
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [${pageObjects.map((id) => '$id 0 R').join(' ')}] '
+        '/Count $pageCount >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  for (var index = 0; index < pageCount; index++) {
+    final contentObject = 5 + index * 2;
+    objects
+      ..add(
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+        '/Resources << /Font << /F1 3 0 R >> >> '
+        '/Contents $contentObject 0 R >>',
+      )
+      ..add(
+        _stream(
+          'BT /F1 18 Tf 54 720 Td '
+          '(Yamantaka performance page ${index + 1}) Tj ET',
+        ),
+      );
+  }
+  final buffer = StringBuffer('%PDF-1.4\n');
+  final offsets = <int>[0];
+  for (var index = 0; index < objects.length; index++) {
+    offsets.add(utf8.encode(buffer.toString()).length);
+    buffer
+      ..write('${index + 1} 0 obj\n')
+      ..write(objects[index])
+      ..write('\nendobj\n');
+  }
+  final xrefOffset = utf8.encode(buffer.toString()).length;
+  buffer
+    ..write('xref\n0 ${objects.length + 1}\n')
+    ..write('0000000000 65535 f \n');
+  for (final offset in offsets.skip(1)) {
+    buffer.write('${offset.toString().padLeft(10, '0')} 00000 n \n');
+  }
+  buffer
+    ..write('trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n')
+    ..write('startxref\n$xrefOffset\n%%EOF\n');
+  return Uint8List.fromList(utf8.encode(buffer.toString()));
+}
+
+Uint8List createHeavyVectorPdf({int pageCount = 8, int shapesPerPage = 1200}) {
+  if (pageCount < 1 || pageCount > 100) {
+    throw RangeError.range(pageCount, 1, 100, 'pageCount');
+  }
+  if (shapesPerPage < 1 || shapesPerPage > 5000) {
+    throw RangeError.range(shapesPerPage, 1, 5000, 'shapesPerPage');
+  }
+  final pageObjects = [
+    for (var index = 0; index < pageCount; index++) 4 + index * 2,
+  ];
+  final objects = <String>[
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [${pageObjects.map((id) => '$id 0 R').join(' ')}] '
+        '/Count $pageCount >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  for (var page = 0; page < pageCount; page++) {
+    final contentObject = 5 + page * 2;
+    final drawing = StringBuffer('q\n');
+    for (var shape = 0; shape < shapesPerPage; shape++) {
+      final column = shape % 30;
+      final row = (shape ~/ 30) % 38;
+      final shade = ((shape + page) % 9 + 1) / 10;
+      drawing
+        ..writeln('${shade.toStringAsFixed(1)} g')
+        ..writeln('${20 + column * 19} ${30 + row * 19} 12 12 re f');
+    }
+    drawing
+      ..writeln('0 g')
+      ..writeln(
+        'BT /F1 18 Tf 54 752 Td '
+        '(Yamantaka heavy fixture ${page + 1}) Tj ET',
+      )
+      ..writeln('Q');
+    objects
+      ..add(
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+        '/Resources << /Font << /F1 3 0 R >> >> '
+        '/Contents $contentObject 0 R >>',
+      )
+      ..add(_stream(drawing.toString()));
+  }
   final buffer = StringBuffer('%PDF-1.4\n');
   final offsets = <int>[0];
   for (var index = 0; index < objects.length; index++) {

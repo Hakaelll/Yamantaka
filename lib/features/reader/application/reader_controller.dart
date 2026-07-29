@@ -24,6 +24,8 @@ import '../domain/reading_session.dart';
 
 enum ReaderStatus { idle, loading, ready, failure }
 
+int _defaultHistoryLimit() => 250;
+
 final class ReaderController extends ChangeNotifier {
   ReaderController({
     required DocumentService documentService,
@@ -39,6 +41,7 @@ final class ReaderController extends ChangeNotifier {
     required this.viewController,
     required bool Function() shouldGenerateCovers,
     required bool Function() shouldRecordSessions,
+    int Function()? readingHistoryLimit,
     required bool Function() shouldRestorePosition,
     required DocumentPreferences Function(String documentId) defaultPreferences,
   }) : _documentService = documentService,
@@ -51,6 +54,7 @@ final class ReaderController extends ChangeNotifier {
        _logger = logger,
        _shouldGenerateCovers = shouldGenerateCovers,
        _shouldRecordSessions = shouldRecordSessions,
+       _readingHistoryLimit = readingHistoryLimit ?? _defaultHistoryLimit,
        _shouldRestorePosition = shouldRestorePosition,
        _defaultPreferences = defaultPreferences {
     viewController.addListener(_onViewerStateChanged);
@@ -66,6 +70,7 @@ final class ReaderController extends ChangeNotifier {
   final AppLogger _logger;
   final bool Function() _shouldGenerateCovers;
   final bool Function() _shouldRecordSessions;
+  final int Function() _readingHistoryLimit;
   final bool Function() _shouldRestorePosition;
   final DocumentPreferences Function(String documentId) _defaultPreferences;
   final BookmarkController bookmarks;
@@ -139,7 +144,10 @@ final class ReaderController extends ChangeNotifier {
         await _engine.closeDocument(newlyOpened.documentId);
       }
       error = failure;
-      status = ReaderStatus.failure;
+      status = openedDocument == null
+          ? ReaderStatus.failure
+          : ReaderStatus.ready;
+      pendingPath = null;
       notifyListeners();
       return false;
     } on Object catch (exception, stackTrace) {
@@ -152,7 +160,10 @@ final class ReaderController extends ChangeNotifier {
         'No se pudo abrir el documento.',
         debugMessage: exception.toString(),
       );
-      status = ReaderStatus.failure;
+      status = openedDocument == null
+          ? ReaderStatus.failure
+          : ReaderStatus.ready;
+      pendingPath = null;
       notifyListeners();
       return false;
     }
@@ -235,6 +246,21 @@ final class ReaderController extends ChangeNotifier {
 
   Future<void> goToPage(int oneBasedPage) =>
       viewController.goToPage(oneBasedPage.clamp(1, pageCount) - 1);
+
+  Future<void> resetProgress() async {
+    final currentDocument = document;
+    if (currentDocument == null) return;
+    await viewController.goToPage(0);
+    currentPageIndex = 0;
+    _documents.resetProgress(currentDocument.id);
+    final currentPreferences = preferences;
+    if (currentPreferences != null) {
+      preferences = currentPreferences.copyWith(scrollOffset: 0);
+      _preferences.save(preferences!);
+    }
+    document = currentDocument.copyWith(lastPageIndex: 0, readingProgress: 0);
+    notifyListeners();
+  }
 
   Future<void> zoomBy(double factor) async {
     _setZoomMode(ZoomMode.custom);
@@ -379,6 +405,7 @@ final class ReaderController extends ChangeNotifier {
     final libraryDocument = document;
     if (libraryDocument == null || !_shouldRecordSessions()) return;
     _session = _sessions.start(libraryDocument.id, currentPageIndex);
+    _sessions.trimToLimit(_readingHistoryLimit());
     _activityTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_isVisible &&
           DateTime.now().difference(_lastActivity) <

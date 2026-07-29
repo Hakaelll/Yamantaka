@@ -12,43 +12,64 @@ Base funcional Flutter 0.1.0 para Windows, Android e iOS, validada entre el 28
 y el 29 de julio de 2026:
 
 - `flutter analyze`: aprobado, sin incidencias.
-- `flutter test`: 34 pruebas aprobadas.
+- `flutter test`: 66 pruebas aprobadas.
 - PDFium: apertura, bitmap nativo, extracción y búsqueda verificadas con un PDF
   legal generado durante la prueba.
 - SQLite: esquema, migración inicial y repositorios verificados en memoria.
-- Integración Windows: aprobada con `ui.Image`, lectura de píxeles, pintura
-  nativa, zoom, avance/retroceso, búsqueda, marcador, cierre y restauración.
+- Integración Windows: aprobada sobre el lector completo con `ui.Image`,
+  lectura de píxeles, pintura nativa, chrome real, búsqueda, paleta, zoom,
+  avance/retroceso, marcador, cierre y restauración.
 - `flutter build windows --release`: aprobado; el ejecutable se abrió con un
   PDF real mediante argumento, mostró una ventana receptiva y no abrió
   conexiones TCP durante el smoke.
+- Perfil Windows/Profile: cinco pasadas con 40 PDF, 100 páginas y carga
+  vectorial pesada; cero frames fuera de presupuesto en el escenario medido.
 
 El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
 
 ## Funciones disponibles
 
 - Selector nativo, arrastrar y soltar y apertura mediante argumento.
-- Biblioteca con continuar leyendo, recientes, progreso, portadas diferidas,
-  detección de ausentes y relocalización por huella parcial.
+- Biblioteca con continuar leyendo, recientes, filtro local `Ctrl+F`, orden,
+  estado (`Todos`, `En curso`, `Sin empezar`, `Terminados`), progreso, portadas
+  diferidas y estados explícitos para ausente, cambiado y error de portada.
 - Visor continuo, de página única o de páginas enfrentadas; portada individual,
   LTR/RTL, zoom, ajuste, rotación, pantalla completa y controles ocultables.
-- Restauración con debounce de página, zoom, posición aproximada, tema,
-  disposición y márgenes.
+- Recuperación opt-in de documento, página, zoom, posición, disposición,
+  márgenes, panel, sección, ancho y visibilidad del chrome, con guarda contra
+  rutas ausentes/corruptas.
 - Modo libro y seis fondos no destructivos: claro, marfil, sepia, gris, oscuro
   y negro.
-- Búsqueda cancelable, índice, miniaturas y un único panel lateral.
+- Búsqueda cancelable, índice, miniaturas y un único panel lateral perezoso,
+  redimensionable entre 280 y 480 px con ratón o teclado.
 - Marcadores locales con etiqueta opcional.
-- Paleta extensible `Ctrl+K` y registro central de atajos.
-- Ajustes de apariencia, lectura, biblioteca, caché y privacidad; perfil inicial
-  para tinta electrónica.
+- Paleta `Ctrl+K` con comandos y hasta ocho documentos recientes; registro
+  central y personalización segura de atajos importantes.
+- Ficha local del documento desde biblioteca/lector con copiar/mostrar,
+  localizar, continuar, reiniciar o retirar sin borrar el PDF.
+- Historial local acotado y opcional; copia de seguridad JSON versionada con
+  vista previa, validación, prebackup e importación transaccional, nunca PDF.
+- Ajustes de apariencia, lectura, barra, atajos, biblioteca, historial, copias y
+  privacidad; perfil inicial para tinta electrónica y previsualización ligera.
+- Sistema visual editorial de segunda generación con tokens semánticos,
+  tipografía Segoe UI Variable, tema claro/oscuro y breakpoints únicos en
+  680/1100 px.
+- Densidad cómoda/compacta persistente, miniaturas limitadas por tamaño
+  físico/DPR y movimiento reducido coherente, sin dependencias nuevas.
 - Restauración del tamaño y posición de la ventana de escritorio.
 - Confirmación antes de abrir enlaces externos y bloqueo de esquemas no seguros.
 
 ## Capturas
 
-![Primera página en el visor nativo de Windows](docs/screenshots/windows-native-reader.png)
+![Biblioteca por estado de lectura en Windows](docs/screenshots/windows-library-reading-states.png)
 
-Captura real de la superficie Flutter durante la integración Windows. Verifica
-la portada individual de la vista enfrentada; no es un mockup.
+![Lector contextual con PDFium real en Windows](docs/screenshots/windows-reader-contextual.png)
+
+![Ajustes de escritorio en tema oscuro](docs/screenshots/windows-settings-dark.png)
+
+Son capturas reproducibles de la aplicación Release y de la integración
+Windows con PDFium; no son mockups. Búsqueda, paleta, variante compacta y tema
+claro están también en [`docs/screenshots`](docs/screenshots).
 
 ## Requisitos
 
@@ -81,10 +102,11 @@ flutter run -d windows -- "C:\libros\ejemplo.pdf"
 ## Compilación y pruebas
 
 ```powershell
-dart format --output=none --set-exit-if-changed lib test integration_test tool
+dart format --output=none --set-exit-if-changed `
+  lib test integration_test tool test_driver
 flutter analyze
 flutter test
-flutter test integration_test -d windows
+flutter test integration_test/reader_integration_test.dart -d windows
 flutter build windows --release
 ```
 
@@ -96,13 +118,32 @@ Para crear el PDF legal y reproducible usado en el smoke test:
 dart run tool/create_test_pdf.dart build/manual/yamantaka-smoke.pdf
 ```
 
+Los fixtures y el perfil de interfaz se regeneran con:
+
+```powershell
+dart run tool/create_performance_fixtures.dart build/performance/fixtures
+flutter drive --driver=test_driver/performance_driver.dart `
+  --target=integration_test/performance_profile_test.dart `
+  -d windows --profile
+```
+
+Las capturas de una ventana Release se pueden repetir con:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File tool/capture_windows_window.ps1 `
+  -TargetProcessId <PID> `
+  -OutputPath docs/screenshots/windows-library-wide.png `
+  -Width 1200 -Height 800
+```
+
 ## Estructura
 
 - `lib/app`: arranque, composición, tema, comandos y atajos.
 - `lib/core`: errores, resultados, plataforma y logging privado.
 - `lib/features`: biblioteca, lector, búsqueda, marcadores y ajustes.
 - `lib/pdf_engine`: contrato del motor, modelos, visor adaptado y caché.
-- `lib/storage`: SQLite, rutas, migración y repositorios.
+- `lib/storage`: SQLite, rutas, repositorios y copia de seguridad local.
 - `test`: pruebas unitarias, de widgets, SQLite y PDFium.
 - `integration_test`: flujo nativo con un PDF generado durante la prueba.
 - `tool`: utilidades reproducibles de desarrollo y validación.
@@ -117,10 +158,11 @@ dart run tool/create_test_pdf.dart build/manual/yamantaka-smoke.pdf
 - No hay OCR: un escaneo sin texto muestra el estado correspondiente.
 - Android/iOS están inicializados, pero sus toolchains y UX nativa no se han
   validado.
-- Existe una línea base Release de arranque y memoria para el fixture pequeño;
-  la matriz con documentos largos, mediana/p95 y fluidez sigue pendiente.
-- Falta completar la matriz extensa de PDFs patológicos, DPI, teclado y lector
-  de pantalla descrita en `TESTING.md`.
+- Existe un perfil reproducible de 40 documentos, 100 páginas y carga vectorial
+  en un equipo; aún faltan 1000 páginas, páginas raster extremas y otras GPU.
+- Falta completar la matriz extensa de PDFs patológicos, DPI 100/150/200 %,
+  tabulación completa y lector de pantalla descrita en `TESTING.md`; en esta
+  iteración se verificó Windows a 125 %.
 - pdfrx 2.4.7 lleva un parche local de ciclo de vida del codec; debe retirarse
   cuando una versión upstream corregida supere la misma captura nativa.
 - El build de desarrollo no está firmado ni empaquetado para distribución.
@@ -130,6 +172,7 @@ IA, EPUB ni formatos distintos de PDF.
 
 ## Próximo paso
 
-Completar la matriz manual ampliada y las mediciones reproducibles de
-[TESTING.md](TESTING.md) y [PERFORMANCE.md](PERFORMANCE.md); después validar
-Android y, en macOS, iOS.
+Ejecutar YAM-041 para cerrar tabulación, Narrador y DPI nativo 100/150/200 %;
+después medir YAM-042 (teselas en páginas extremas) y preparar YAM-043 (notas
+locales ligeras). El orden y los criterios completos permanecen en
+[NEXT_TODOS.md](NEXT_TODOS.md).

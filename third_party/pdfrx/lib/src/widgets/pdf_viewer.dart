@@ -1,4 +1,4 @@
-// ignore_for_file: public_member_api_docs
+// ignore_for_file: public_member_api_docs, curly_braces_in_flow_control_structures
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -4504,14 +4504,14 @@ class PdfViewerController extends ValueListenable<Matrix4> {
       fontManager,
       onLoadComplete: (result) async {
         if (verbose) {
-          for (final font in result.loaded) {
-            debugPrint(
-              'Loaded font "${font.resolvedFace}" for "${font.targetFace}" '
-              'from ${font.source} (${font.length} bytes)',
-            );
+          if (result.loaded.isNotEmpty) {
+            debugPrint('PdfViewer: Loaded ${result.loaded.length} embedded fonts.');
           }
           for (final failure in result.failed) {
-            debugPrint('Failed to load font for ${failure.query}: ${failure.error}');
+            debugPrint(
+              'PdfViewer: Failed to load an embedded font '
+              '[${failure.error.runtimeType}].',
+            );
           }
         }
         if (result.hasLoadedFonts) {

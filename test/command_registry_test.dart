@@ -20,6 +20,10 @@ void main() {
     expect(shortcuts, contains(const SingleActivator(LogicalKeyboardKey.f11)));
     expect(
       shortcuts,
+      contains(const SingleActivator(LogicalKeyboardKey.keyH, control: true)),
+    );
+    expect(
+      shortcuts,
       contains(const SingleActivator(LogicalKeyboardKey.pageDown)),
     );
     expect(
@@ -30,5 +34,52 @@ void main() {
     shortcuts[const SingleActivator(LogicalKeyboardKey.keyO, control: true)]
         ?.call();
     expect(calls, 1);
+  });
+
+  test('custom shortcuts are validated, conflict-free and reversible', () {
+    final current = AppCommandRegistry.resolvedTokens('{}');
+    expect(
+      AppCommandRegistry.assignmentError(
+        AppCommandId.search,
+        current[AppCommandId.commandPalette]!,
+        current,
+      ),
+      contains('asignada'),
+    );
+    expect(
+      AppCommandRegistry.assignmentError(
+        AppCommandId.escape,
+        'ctrl-g',
+        current,
+      ),
+      contains('reservada'),
+    );
+
+    current[AppCommandId.openDocument] = 'ctrl-shift-o';
+    current[AppCommandId.search] = 'ctrl-shift-f';
+    final encoded = AppCommandRegistry.encodeOverrides(current);
+    final resolved = AppCommandRegistry.resolvedTokens(encoded);
+    expect(resolved[AppCommandId.search], 'ctrl-shift-f');
+    expect(resolved[AppCommandId.openDocument], 'ctrl-shift-o');
+    expect(
+      AppCommandRegistry.shortcutLabel(AppCommandId.search, encoded),
+      'Ctrl+Mayús+F',
+    );
+    expect(
+      AppCommandRegistry.resolvedTokens('{}'),
+      AppCommandRegistry.defaultTokens,
+    );
+    expect(
+      AppCommandRegistry.configurableIds,
+      containsAll({
+        AppCommandId.openDocument,
+        AppCommandId.togglePanel,
+        AppCommandId.nextPage,
+        AppCommandId.previousPage,
+        AppCommandId.zoomIn,
+        AppCommandId.zoomOut,
+        AppCommandId.toggleChrome,
+      }),
+    );
   });
 }

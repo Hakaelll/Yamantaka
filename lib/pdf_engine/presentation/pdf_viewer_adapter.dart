@@ -19,6 +19,7 @@ final class PdfViewConfiguration {
     this.initialZoomMode = PdfViewZoomMode.fitPage,
     this.initialScrollOffset = 0,
     this.readingDirection = PdfViewReadingDirection.leftToRight,
+    this.pageShadow,
   });
 
   final Color backgroundColor;
@@ -30,6 +31,7 @@ final class PdfViewConfiguration {
   final PdfViewZoomMode initialZoomMode;
   final double initialScrollOffset;
   final PdfViewReadingDirection readingDirection;
+  final BoxShadow? pageShadow;
 }
 
 final class PdfViewController extends ChangeNotifier {

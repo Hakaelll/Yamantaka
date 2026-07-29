@@ -151,3 +151,143 @@ antes de cada distribución.
   versión hospedada supere análisis, integración, captura y Release.
 
 El detalle exacto está en `third_party/pdfrx/PATCHES.md`.
+
+## ADR-010 — Tokens visuales y política responsive
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: la primera interfaz mezclaba valores directos, tarjetas genéricas
+  y breakpoints solapados de 900/999 px; esto impedía razonar sobre contraste,
+  densidad y legibilidad de páginas enfrentadas.
+- Opciones: incorporar un design-system externo, mantener valores por widget o
+  centralizar un sistema pequeño sobre las primitivas de Material.
+- Decisión: usar `ThemeExtension<AppColorTokens>` y clases inmutables para
+  espacios, tamaños, radios y movimiento; definir clases no solapadas `<680`,
+  `680–1099` y `>=1100`; permitir vista enfrentada solo si quedan al menos
+  340 px legibles por página tras considerar panel, márgenes, altura y aspecto.
+- Motivo: mantiene el producto ligero, hace claro/oscuro/e-ink coherentes y
+  permite probar la política sin acoplarla a un widget.
+- Consecuencias: los widgets visuales consumen tokens semánticos y las nuevas
+  superficies deben superar pruebas en las fronteras exactas.
+- Riesgos: los breakpoints simulados no sustituyen escalado nativo, táctil ni
+  hardware e-ink; esas validaciones permanecen en YAM-022 a YAM-024.
+
+## ADR-011 — Interacción de biblioteca sin índice adicional
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: la biblioteca necesita filtro, orden y densidad configurables sin
+  aumentar consumo, dependencias ni superficie de datos privados.
+- Opciones: incorporar un buscador indexado, consultar SQLite por cada tecla,
+  cargar un paquete de componentes o transformar la lista acotada en memoria.
+- Decisión: filtrar y ordenar los 40 recientes ya cargados; mantener la consulta
+  efímera; modelar densidad cómoda/compacta como preferencia tipada y
+  `ThemeExtension`; decodificar portadas al tamaño físico de su caja según DPR.
+- Motivo: el límite de recientes hace que una pasada local sea determinista y
+  barata; los tokens reutilizan Material y la decodificación evita bitmaps de
+  interfaz sobredimensionados.
+- Consecuencias: `Ctrl+F` pertenece a la biblioteca fuera del lector; el cambio
+  de densidad reconstruye el tema, pero no el contenido PDF ni su zoom; no se
+  añade ninguna dependencia ni tabla.
+- Riesgos: si el límite de biblioteca crece varios órdenes de magnitud habrá que
+  medir antes de conservar este enfoque; DPI simulado no reemplaza el perfil
+  nativo pendiente.
+
+## ADR-012 — Estado de lectura, panel y reconstrucciones
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: YAM-030/032 necesitan filtros y resize sin añadir tablas, consultas
+  por tecla, escrituras por píxel ni renders PDF redundantes.
+- Decisión: derivar el estado desde `reading_progress` en una pasada; persistir
+  solo el enum de estado, nunca el texto; mantener panel 280–480 px como estado
+  de vista y guardar con debounce de 240 ms; cachear el widget del adaptador por
+  configuración lógica de render.
+- Motivo: el conjunto está acotado a 40 recientes y Flutter ya ofrece las
+  primitivas de selector, foco, resize y composición.
+- Consecuencias: no cambia el esquema SQLite ni `pubspec`; solo se monta una
+  sección lateral y el visor no se reconstruye por chrome/panel.
+- Riesgos: una biblioteca futura mucho mayor o multi-ventana requerirá volver a
+  medir y separar preferencias por ventana.
+
+## ADR-013 — Atajos mediante opciones predefinidas
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: capturar combinaciones arbitrarias multiplica conflictos de layout,
+  teclado/plataforma y accesibilidad.
+- Decisión: permitir únicamente comandos importantes y activadores
+  predefinidos; validar conflictos, descartar JSON inválido, reservar Escape,
+  Inicio, Fin y navegación básica; resolver tooltips/menús/paleta desde el mismo
+  registro.
+- Motivo: ofrece personalización útil y reversible sin un editor global de
+  teclas ni otra dependencia.
+- Consecuencias: el shell consume el override de Abrir y el lector consume los
+  demás; restaurar defaults equivale a guardar `{}`.
+- Riesgos: no se cubren todos los layouts físicos; nuevas opciones exigen
+  prueba de conflicto y etiqueta localizada.
+
+## ADR-014 — Copia local JSON validada
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: una copia directa de SQLite es compacta, pero dificulta validar
+  compatibilidad, previsualizar y restaurar ajustes de otro almacén.
+- Opciones: copiar DB, ZIP propietario, JSON versionado o paquete externo.
+- Decisión: JSON explícito `yamantaka-local-backup` versión 1, tablas/columnas
+  allowlist, escalares validados, recuentos de vista previa, prebackup automático
+  e importación transaccional.
+- Motivo: es legible, probado y no necesita dependencia ni esquema nuevo.
+- Consecuencias: incluye rutas/metadatos sensibles, pero declara
+  `containsPdfFiles: false`; nunca incluye el contenido PDF.
+- Riesgos: archivos grandes de historial pueden crecer; límites y versiones
+  futuras deben validarse antes de mutar.
+
+## ADR-015 — Historial mínimo y recuperación opt-in
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: recuperar contexto e historial aporta continuidad, pero no debe
+  convertirse en analítica ni bucle de apertura.
+- Decisión: reutilizar `reading_sessions`, limitar 50–1000, permitir desactivar
+  y limpiar; persistir última ruta/contexto de UI solo localmente; intentar
+  restauración una vez y limpiar la ruta tras ausencia/fallo.
+- Motivo: aprovecha datos ya existentes y evita tabla, eventos personales y
+  procesos en segundo plano.
+- Consecuencias: “Iniciar siempre en biblioteca” tiene prioridad; una ruta
+  explícita de línea de comandos gana a cualquier restauración.
+- Riesgos: un cierre entre debounces recupera el último estado estable, no el
+  evento más reciente.
+
+## ADR-016 — Identidad segura para relocalización
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: “Localizar” no debe asociar silenciosamente otro PDF al registro
+  ausente.
+- Decisión: inspeccionar el archivo elegido y exigir la huella parcial ya
+  almacenada; si no coincide, no se muta la biblioteca. Un archivo disponible
+  se marca visualmente como cambiado cuando tamaño o modificación difieren.
+- Motivo: mantiene continuidad para un movimiento real y evita mezclar
+  progreso/marcadores de documentos distintos.
+- Consecuencias: una versión editada debe abrirse normalmente y se registrará
+  como actualización por ruta o documento distinto según identidad.
+- Riesgos: una huella parcial no es prueba criptográfica del contenido
+  completo, pero es suficiente para la relocalización local y acotada actual.
+
+## ADR-017 — Diagnóstico Profile sin datos privados
+
+- Fecha: 2026-07-29
+- Estado: aceptada
+- Contexto: YAM-011/034 requiere caché, frames y memoria medibles, mientras
+  privacidad prohíbe telemetría y rutas/títulos en logs.
+- Decisión: generar fixtures sin copyright; devolver contadores enteros del
+  motor solo en memoria; escribir el informe desde el driver de prueba bajo
+  `build/`; redaccionar la traza de `PdfDocumentRef` del fork; hacer que
+  `AppLogger` retenga solo `runtimeType` y nunca el texto/stack de excepciones.
+- Motivo: hace el perfil reproducible y auditable sin instrumentación remota ni
+  datos de usuario.
+- Consecuencias: el JSON declara `contains_paths_or_titles: false`; las cifras
+  siempre incluyen modo, DPI, tamaño y número de pasadas.
+- Riesgos: un único equipo y proceso no representa otras GPU ni una prueba de
+  fugas sostenida; YAM-041/048 conservan esa ampliación.

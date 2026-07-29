@@ -32,13 +32,16 @@ final class AppLogger {
     StackTrace? stackTrace,
   ]) {
     if (level.index < minimumLevel.index) return;
-    sink?.call(level, message, error, stackTrace);
+    // Exception strings and stack traces commonly embed document or workspace
+    // paths. Preserve the failure category without forwarding private values.
+    final safeMessage = error == null
+        ? message
+        : '$message [${error.runtimeType}]';
+    sink?.call(level, safeMessage, null, null);
     developer.log(
-      message,
+      safeMessage,
       name: 'yamantaka',
       level: _developerLevel(level),
-      error: error,
-      stackTrace: stackTrace,
     );
   }
 

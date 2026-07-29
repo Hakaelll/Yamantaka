@@ -4,15 +4,18 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:yamantaka/app/theme/app_theme.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/core/platform/window_service.dart';
 import 'package:yamantaka/features/bookmarks/application/bookmark_controller.dart';
 import 'package:yamantaka/features/library/application/document_service.dart';
 import 'package:yamantaka/features/reader/application/reader_controller.dart';
 import 'package:yamantaka/features/reader/domain/reader_models.dart';
+import 'package:yamantaka/features/reader/presentation/reader_screen.dart';
 import 'package:yamantaka/features/search/application/search_controller.dart'
     as app_search;
 import 'package:yamantaka/pdf_engine/adapters/pdfrx_document_engine.dart';
@@ -34,12 +37,16 @@ void main() {
   testWidgets('opens, renders, searches and navigates a real local PDF', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await pdfrxFlutterInitialize();
     final directory = await Directory.systemTemp.createTemp(
       'yamantaka-integration-',
     );
     final pdf = File('${directory.path}${Platform.pathSeparator}fixture.pdf');
-    await pdf.writeAsBytes(createTestPdf());
+    await pdf.writeAsBytes(createTestPdf(includeThirdPage: true));
     final diagnosticLog = <String>[];
     final logger = AppLogger(
       minimumLevel: LogLevel.debug,
@@ -97,7 +104,7 @@ void main() {
       isTrue,
     );
     final opened = reader.openedDocument!;
-    expect(opened.pageCount, 2);
+    expect(opened.pageCount, 3);
     expect(
       await _bounded(
         engine.extractPageText(documentId: opened.documentId, pageIndex: 0),
@@ -131,25 +138,25 @@ void main() {
     expect(nonWhitePixels, greaterThan(100));
 
     final adapter = PdfrxViewerAdapter(engine);
+    reader.preferences = reader.preferences!.copyWith(
+      pageLayout: PageLayoutMode.facing,
+    );
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: RepaintBoundary(
-            key: const Key('native-viewer-boundary'),
-            child: adapter.buildViewer(
-              document: opened,
-              controller: viewController,
-              configuration: const PdfViewConfiguration(
-                backgroundColor: Color(0xFFF5F5F3),
-                margin: 16,
-                flow: PdfViewFlow.facing,
-                rotation: 0,
-                reduceMotion: true,
-              ),
-              initialPageIndex: 0,
-              onPageChanged: reader.onPageChanged,
-              onError: (error) => fail('Viewer error: $error'),
-            ),
+      RepaintBoundary(
+        key: const Key('native-viewer-boundary'),
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
+          home: ReaderScreen(
+            controller: reader,
+            engine: engine,
+            viewerAdapter: adapter,
+            onBack: () async {},
+            onOpenDocument: () async {},
+            onOpenSettings: () {},
+            reduceMotion: true,
+            showProgress: true,
+            readingDirection: ReadingDirection.leftToRight,
           ),
         ),
       ),
@@ -164,7 +171,89 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 600)),
     );
     await tester.pump();
-    await _verifyViewerPaint(tester);
+    await _verifyReaderPaint(tester);
+
+    expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+    expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
+    expect(find.byKey(const Key('reader-progress')), findsOneWidget);
+    expect(find.text('Documento'), findsOneWidget);
+
+    final actualDocument = reader.document!;
+    reader.document = actualDocument.copyWith(
+      path: r'C:\Fixtures\fixture.pdf',
+      normalizedPath: r'c:\fixtures\fixture.pdf',
+    );
+    await tester.pump();
+    await tester.tap(find.byTooltip('Más opciones'));
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Información del documento'));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Información del documento'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Copiar ruta'), findsOneWidget);
+    await _captureReaderState(tester, suffix: '-info');
+    await tester.tap(find.text('Cerrar'));
+    await tester.pump();
+    reader.document = actualDocument;
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Buscar (Ctrl+F)'));
+    await tester.pump();
+    expect(find.byKey(const Key('pdf-search-field')), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('pdf-search-field')),
+      'page two',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await _pumpUntil(
+      tester,
+      () => !search.isSearching && search.matches.isNotEmpty,
+      reason: 'the reader search panel to return a match',
+    );
+    expect(search.matches.single.pageIndex, 1);
+    expect(find.text('1 de 1'), findsOneWidget);
+    await _captureReaderState(tester, suffix: '-search');
+    await tester.drag(
+      find.byKey(const Key('reader-panel-resize-handle')),
+      const Offset(-80, 0),
+    );
+    await tester.pump();
+    await _captureReaderState(tester, suffix: '-panel-resized');
+
+    await tester.tap(find.byTooltip('Cerrar panel'));
+    await tester.pump();
+    await _captureReaderState(tester, suffix: '-facing');
+    await tester.tap(find.byTooltip('Paleta de comandos (Ctrl+K)'));
+    await tester.pump();
+    expect(find.byKey(const Key('command-palette-search')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 250));
+    await _captureReaderState(tester, suffix: '-palette');
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.byKey(const Key('command-palette-search')), findsNothing);
+
+    final bookNavigation = viewController.goToPage(0);
+    await _pumpUntil(
+      tester,
+      () => reader.currentPageIndex == 0,
+      reason: 'navigation to return to the cover for book mode',
+    );
+    await _bounded(bookNavigation, 'book-mode cover navigation');
+    reader.preferences = reader.preferences!.copyWith(controlsAutoHide: true);
+    reader.setReaderMode(ReaderMode.book);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.byKey(const Key('reader-top-bar')).hitTestable(), findsNothing);
+    await _captureReaderState(tester, suffix: '-book');
+    reader.setReaderMode(ReaderMode.document);
+    await tester.pump();
 
     final initialZoom = viewController.zoom;
     final zoom = viewController.zoomBy(1.1);
@@ -217,7 +306,7 @@ void main() {
   });
 }
 
-Future<void> _verifyViewerPaint(WidgetTester tester) async {
+Future<void> _verifyReaderPaint(WidgetTester tester) async {
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(const Key('native-viewer-boundary')),
   );
@@ -234,15 +323,37 @@ Future<void> _verifyViewerPaint(WidgetTester tester) async {
       }
     }
     expect(darkPixels, greaterThan(100));
-
-    const capturePath = String.fromEnvironment('YAMANTAKA_CAPTURE_PATH');
-    if (capturePath.isNotEmpty) {
-      final png = await image.toByteData(format: ui.ImageByteFormat.png);
-      await File(capturePath).writeAsBytes(png!.buffer.asUint8List());
-    }
+    await _writeCapture(image);
   } finally {
     image.dispose();
   }
+}
+
+Future<void> _captureReaderState(
+  WidgetTester tester, {
+  required String suffix,
+}) async {
+  const capturePath = String.fromEnvironment('YAMANTAKA_CAPTURE_PATH');
+  if (capturePath.isEmpty) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const Key('native-viewer-boundary')),
+  );
+  final image = await boundary.toImage();
+  try {
+    await _writeCapture(image, suffix: suffix);
+  } finally {
+    image.dispose();
+  }
+}
+
+Future<void> _writeCapture(ui.Image image, {String suffix = ''}) async {
+  const capturePath = String.fromEnvironment('YAMANTAKA_CAPTURE_PATH');
+  if (capturePath.isEmpty) return;
+  final path = suffix.isEmpty
+      ? capturePath
+      : capturePath.replaceFirst(RegExp(r'\.png$'), '$suffix.png');
+  final png = await image.toByteData(format: ui.ImageByteFormat.png);
+  await File(path).writeAsBytes(png!.buffer.asUint8List());
 }
 
 Future<void> _pumpUntil(

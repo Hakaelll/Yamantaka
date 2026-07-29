@@ -17,6 +17,7 @@ import '../pdf_engine/cache/thumbnail_service.dart';
 import '../pdf_engine/presentation/pdf_viewer_adapter.dart';
 import '../pdf_engine/pdf_document_engine.dart';
 import '../storage/database/app_database.dart';
+import '../storage/backup/local_backup_service.dart';
 import '../storage/paths/app_paths.dart';
 import '../storage/repositories/app_settings_repository.dart';
 import '../storage/repositories/bookmark_repository.dart';
@@ -34,6 +35,10 @@ final class AppServices {
     required this.settings,
     required this.viewerAdapter,
     required this.thumbnails,
+    required this.documents,
+    required this.readingSessions,
+    required this.backups,
+    required this.documentService,
     required PdfrxDocumentEngine engine,
   }) : _engine = engine;
 
@@ -45,6 +50,10 @@ final class AppServices {
   final SettingsController settings;
   final PdfrxViewerAdapter viewerAdapter;
   final ThumbnailService thumbnails;
+  final DocumentRepository documents;
+  final ReadingSessionRepository readingSessions;
+  final LocalBackupService backups;
+  final DocumentService documentService;
   final PdfrxDocumentEngine _engine;
 
   PdfDocumentEngine get engine => _engine;
@@ -72,11 +81,12 @@ final class AppServices {
       maxCacheBytes: () => settings.settings.maxCacheMegabytes * 1024 * 1024,
     );
     final viewController = PdfViewController();
+    final documentService = DocumentService(documents);
     final bookmarks = BookmarkController(bookmarksRepository);
     final search = SearchController(engine, viewController, logger);
     final library = LibraryController(documents, logger);
     final reader = ReaderController(
-      documentService: DocumentService(documents),
+      documentService: documentService,
       documents: documents,
       preferences: documentPreferences,
       sessions: sessions,
@@ -89,6 +99,7 @@ final class AppServices {
       viewController: viewController,
       shouldGenerateCovers: () => settings.settings.generateCovers,
       shouldRecordSessions: () => settings.settings.recordReadingSessions,
+      readingHistoryLimit: () => settings.settings.readingHistoryLimit,
       shouldRestorePosition: () => settings.settings.restoreLastPosition,
       defaultPreferences: (documentId) {
         final global = settings.settings;
@@ -122,6 +133,11 @@ final class AppServices {
         );
       },
     );
+    final backups = LocalBackupService(
+      database: database,
+      paths: paths,
+      settings: settings,
+    );
     await library.load();
     return AppServices._(
       paths: paths,
@@ -132,6 +148,10 @@ final class AppServices {
       settings: settings,
       viewerAdapter: PdfrxViewerAdapter(engine),
       thumbnails: thumbnails,
+      documents: documents,
+      readingSessions: sessions,
+      backups: backups,
+      documentService: documentService,
       engine: engine,
     );
   }
@@ -164,6 +184,16 @@ final class AppServices {
       await Process.start('open', [paths.dataDirectory.path]);
     } else if (Platform.isLinux) {
       await Process.start('xdg-open', [paths.dataDirectory.path]);
+    }
+  }
+
+  Future<void> revealDocument(String path) async {
+    if (Platform.isWindows) {
+      await Process.start('explorer.exe', ['/select,', path]);
+    } else if (Platform.isMacOS) {
+      await Process.start('open', ['-R', path]);
+    } else if (Platform.isLinux) {
+      await Process.start('xdg-open', [File(path).parent.path]);
     }
   }
 

@@ -11,5 +11,4 @@ abstract final class AppConfig {
   static const int maxRecentDocuments = 40;
   static const int maxRenderCacheBytes = 96 * 1024 * 1024;
   static const Duration positionSaveDebounce = Duration(milliseconds: 450);
-  static const Duration controlsAutoHideDelay = Duration(seconds: 3);
 }

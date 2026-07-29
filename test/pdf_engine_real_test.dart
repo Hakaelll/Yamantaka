@@ -5,6 +5,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:yamantaka/core/errors/app_failure.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/pdf_engine/adapters/pdfrx_document_engine.dart';
+import 'package:yamantaka/pdf_engine/models/pdf_models.dart';
 
 import 'support/pdf_fixture.dart';
 
@@ -104,6 +105,43 @@ void main() {
       ),
     );
   });
+
+  test(
+    'render cancellation is counted without retaining pending work',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'yamantaka-cancelled-render-',
+      );
+      await pdfrxInitialize(tmpPath: directory.path);
+      final file = File(
+        '${directory.path}${Platform.pathSeparator}fixture.pdf',
+      );
+      await file.writeAsBytes(createTestPdf());
+      final engine = PdfrxDocumentEngine(
+        AppLogger(minimumLevel: LogLevel.error),
+      );
+      addTearDown(() async {
+        await engine.dispose();
+        await directory.delete(recursive: true);
+      });
+      final document = await engine.openDocument(file.path);
+      final token = PdfOperationToken()..cancel();
+
+      await expectLater(
+        engine.renderPage(
+          documentId: document.documentId,
+          pageIndex: 0,
+          scale: 1,
+          cancellationToken: token,
+        ),
+        throwsA(_failure(FailureKind.cancelled)),
+      );
+      expect(engine.diagnostics.renderRequests, 1);
+      expect(engine.diagnostics.cancelledRenders, 1);
+      expect(engine.diagnostics.pendingRenders, 0);
+      await engine.closeDocument(document.documentId);
+    },
+  );
 
   test('PDFium requires, rejects and accepts a real PDF password', () async {
     final directory = await Directory.systemTemp.createTemp(

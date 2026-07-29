@@ -75,7 +75,7 @@ void main() {
     await tester.pump();
     expect(harness.controller.preferences!.horizontalMargin, 28);
 
-    await tester.tap(find.byTooltip('Página siguiente'));
+    await tester.tap(find.byTooltip('Página siguiente (Av Pág)'));
     await tester.pump();
     expect(harness.controller.currentPageIndex, 1);
     expect(find.text('2 / 3'), findsOneWidget);
@@ -85,8 +85,9 @@ void main() {
     expect(find.text('Buscar'), findsWidgets);
     expect(find.byTooltip('Cerrar panel'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Cerrar panel'));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
+    expect(find.byTooltip('Cerrar panel'), findsNothing);
     await tester.tap(find.byTooltip('Tema de lectura'));
     // A determinate progress bar keeps its theme animation scheduled, so this
     // test advances a bounded frame instead of waiting for global quiescence.
@@ -104,6 +105,161 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
   });
+
+  testWidgets('reader composes without overflow across all window classes', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true);
+
+    for (final size in const [
+      Size(640, 720),
+      Size(679, 720),
+      Size(680, 720),
+      Size(1099, 720),
+      Size(1100, 720),
+      Size(1440, 900),
+    ]) {
+      tester.view.physicalSize = size;
+      await tester.pumpWidget(_app(harness));
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: 'viewport $size');
+      expect(find.byKey(const Key('test-pdf-viewer')), findsOneWidget);
+      expect(
+        find.byType(SegmentedButton<ReaderMode>),
+        size.width < 680 ? findsNothing : findsOneWidget,
+      );
+    }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('facing flow is enabled only when both pages remain legible', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true);
+    final adapter = _RecordingViewerAdapter();
+    harness.controller.preferences = harness.controller.preferences!.copyWith(
+      pageLayout: PageLayoutMode.facing,
+    );
+
+    tester.view.physicalSize = const Size(1099, 800);
+    await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
+    await tester.pump();
+    expect(adapter.configuration?.flow, PdfViewFlow.single);
+
+    tester.view.physicalSize = const Size(1100, 800);
+    await tester.pump();
+    expect(adapter.configuration?.flow, PdfViewFlow.facing);
+
+    tester.view.physicalSize = const Size(1100, 460);
+    await tester.pump();
+    expect(adapter.configuration?.flow, PdfViewFlow.single);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('electronic ink profile forces a static single-page canvas', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true);
+    final adapter = _RecordingViewerAdapter();
+    harness.controller.preferences = harness.controller.preferences!.copyWith(
+      pageLayout: PageLayoutMode.facing,
+      readingTheme: ReaderTheme.sepia,
+    );
+
+    await tester.pumpWidget(
+      _app(
+        harness,
+        viewerAdapter: adapter,
+        visualProfile: ReaderVisualProfile.electronicInk,
+      ),
+    );
+    await tester.pump();
+
+    expect(adapter.configuration?.flow, PdfViewFlow.single);
+    expect(adapter.configuration?.reduceMotion, isTrue);
+    expect(adapter.configuration?.pageShadow, isNull);
+    expect(adapter.configuration?.backgroundColor, Colors.white);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets(
+    'side panel resizes with debounce and does not rebuild the PDF viewer',
+    (tester) async {
+      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await _ReaderHarness.create(ready: true);
+      final adapter = _CountingViewerAdapter();
+      double? persistedWidth;
+
+      await tester.pumpWidget(
+        _app(
+          harness,
+          viewerAdapter: adapter,
+          initialPanelOpen: true,
+          initialPanelSection: 'search',
+          onPanelWidthChanged: (value) => persistedWidth = value,
+        ),
+      );
+      await tester.pump();
+      expect(adapter.buildCount, 1);
+      expect(find.byKey(const Key('pdf-search-field')), findsOneWidget);
+      expect(find.bySemanticsLabel('Ancho del panel lateral'), findsOneWidget);
+
+      final handle = find.byKey(const Key('reader-panel-resize-handle'));
+      await tester.drag(handle, const Offset(-96, 0));
+      await tester.pump();
+      final draggedWidth = tester
+          .getSize(find.byKey(const Key('reader-side-panel')))
+          .width;
+      expect(draggedWidth, inInclusiveRange(380, 416));
+      expect(adapter.buildCount, 1);
+      expect(persistedWidth, isNull);
+      await tester.pump(const Duration(milliseconds: 260));
+      expect(persistedWidth, closeTo(draggedWidth, 1));
+
+      await tester.tap(handle);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(
+        tester.getSize(find.byKey(const Key('reader-side-panel'))).width,
+        closeTo(draggedWidth + 16, 1),
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(find.byKey(const Key('reader-side-panel')), findsNothing);
+
+      await tester.tap(find.byTooltip('Miniaturas (Ctrl+J)'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const Key('pdf-search-field')), findsNothing);
+      expect(find.text('No disponible'), findsWidgets);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(find.byKey(const Key('reader-side-panel')), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await harness.dispose();
+    },
+  );
 
   testWidgets('a relevant key reveals hidden book controls and navigates', (
     tester,
@@ -148,17 +304,28 @@ void main() {
   );
 }
 
-Widget _app(_ReaderHarness harness) => MaterialApp(
+Widget _app(
+  _ReaderHarness harness, {
+  PdfViewerAdapter viewerAdapter = const _FakeViewerAdapter(),
+  ReaderVisualProfile visualProfile = ReaderVisualProfile.standard,
+  bool initialPanelOpen = false,
+  String initialPanelSection = '',
+  ValueChanged<double>? onPanelWidthChanged,
+}) => MaterialApp(
   home: ReaderScreen(
     controller: harness.controller,
     engine: harness.engine,
-    viewerAdapter: const _FakeViewerAdapter(),
+    viewerAdapter: viewerAdapter,
     onBack: () async {},
     onOpenDocument: () async {},
     onOpenSettings: () {},
     reduceMotion: true,
     showProgress: true,
     readingDirection: ReadingDirection.leftToRight,
+    visualProfile: visualProfile,
+    initialPanelOpen: initialPanelOpen,
+    initialPanelSection: initialPanelSection,
+    onPanelWidthChanged: onPanelWidthChanged,
   ),
 );
 
@@ -296,4 +463,50 @@ final class _FakeViewerAdapter implements PdfViewerAdapter {
   }) => const ColoredBox(key: Key('test-pdf-viewer'), color: Colors.white);
 }
 
-final class _FakePdfEngine extends StubPdfDocumentEngine {}
+final class _RecordingViewerAdapter implements PdfViewerAdapter {
+  PdfViewConfiguration? configuration;
+
+  @override
+  Widget buildViewer({
+    required OpenedPdfDocument document,
+    required PdfViewController controller,
+    required PdfViewConfiguration configuration,
+    required int initialPageIndex,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<Object> onError,
+  }) {
+    this.configuration = configuration;
+    return const ColoredBox(key: Key('test-pdf-viewer'), color: Colors.white);
+  }
+}
+
+final class _CountingViewerAdapter implements PdfViewerAdapter {
+  int buildCount = 0;
+
+  @override
+  Widget buildViewer({
+    required OpenedPdfDocument document,
+    required PdfViewController controller,
+    required PdfViewConfiguration configuration,
+    required int initialPageIndex,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<Object> onError,
+  }) {
+    buildCount++;
+    return const ColoredBox(key: Key('test-pdf-viewer'), color: Colors.white);
+  }
+}
+
+final class _FakePdfEngine extends StubPdfDocumentEngine {
+  @override
+  Future<RenderedPdfPage> renderPage({
+    required String documentId,
+    required int pageIndex,
+    required double scale,
+    int rotation = 0,
+    PdfRenderRegion? region,
+    PdfOperationToken? cancellationToken,
+  }) async {
+    throw StateError('No bitmap in the widget harness.');
+  }
+}

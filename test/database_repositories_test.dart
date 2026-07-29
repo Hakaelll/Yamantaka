@@ -165,6 +165,32 @@ void main() {
     expect(row['active_seconds'], 42);
     expect(row['ended_at'], isNotNull);
   });
+
+  test('reading history is bounded, ordered and individually clearable', () {
+    documents.save(_document());
+    final repository = ReadingSessionRepository(database);
+    for (var index = 0; index < 30; index++) {
+      final session = repository.start('doc-1', index % 5);
+      repository.finish(
+        id: session.id,
+        endPage: (index % 5) + 1,
+        activeSeconds: index,
+      );
+    }
+    repository.trimToLimit(25);
+    final history = repository.history(limit: 100);
+    expect(history, hasLength(25));
+    expect(history.first.documentTitle, 'book.pdf');
+    expect(
+      history.first.session.startedAt.isAfter(history.last.session.startedAt),
+      isTrue,
+    );
+
+    repository.delete(history.first.session.id);
+    expect(repository.history(limit: 100), hasLength(24));
+    repository.clear();
+    expect(repository.history(), isEmpty);
+  });
 }
 
 LibraryDocument _document() {

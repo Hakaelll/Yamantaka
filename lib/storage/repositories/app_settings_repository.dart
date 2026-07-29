@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/theme/app_density.dart';
 import '../../features/reader/domain/reader_models.dart';
 
 abstract interface class AppPreferencesStore {
@@ -59,6 +60,7 @@ final class AppSettings {
     this.showProgress = true,
     this.reduceMotion = false,
     this.disableAnimations = false,
+    this.interfaceDensity = AppInterfaceDensity.comfortable,
     this.defaultViewMode = 'document',
     this.defaultPageLayout = 'continuous',
     this.defaultZoomMode = 'fitPage',
@@ -70,6 +72,18 @@ final class AppSettings {
     this.generateCovers = true,
     this.maxCacheMegabytes = 256,
     this.recordReadingSessions = true,
+    this.readingHistoryLimit = 250,
+    this.libraryReadingFilter = 'all',
+    this.readerPanelWidth = 320,
+    this.readerPanelSection = '',
+    this.readerPanelOpen = false,
+    this.readerChromeVisible = true,
+    this.showReaderModeControls = true,
+    this.showReaderPanelControls = true,
+    this.shortcutOverrides = '{}',
+    this.restoreLastSession = true,
+    this.startInLibrary = false,
+    this.lastDocumentPath = '',
     this.languageCode = 'es',
     this.windowWidth = 1120,
     this.windowHeight = 760,
@@ -83,6 +97,7 @@ final class AppSettings {
   final bool showProgress;
   final bool reduceMotion;
   final bool disableAnimations;
+  final AppInterfaceDensity interfaceDensity;
   final String defaultViewMode;
   final String defaultPageLayout;
   final String defaultZoomMode;
@@ -94,6 +109,18 @@ final class AppSettings {
   final bool generateCovers;
   final int maxCacheMegabytes;
   final bool recordReadingSessions;
+  final int readingHistoryLimit;
+  final String libraryReadingFilter;
+  final double readerPanelWidth;
+  final String readerPanelSection;
+  final bool readerPanelOpen;
+  final bool readerChromeVisible;
+  final bool showReaderModeControls;
+  final bool showReaderPanelControls;
+  final String shortcutOverrides;
+  final bool restoreLastSession;
+  final bool startInLibrary;
+  final String lastDocumentPath;
   final String languageCode;
   final double windowWidth;
   final double windowHeight;
@@ -107,6 +134,7 @@ final class AppSettings {
     bool? showProgress,
     bool? reduceMotion,
     bool? disableAnimations,
+    AppInterfaceDensity? interfaceDensity,
     String? defaultViewMode,
     String? defaultPageLayout,
     String? defaultZoomMode,
@@ -118,6 +146,18 @@ final class AppSettings {
     bool? generateCovers,
     int? maxCacheMegabytes,
     bool? recordReadingSessions,
+    int? readingHistoryLimit,
+    String? libraryReadingFilter,
+    double? readerPanelWidth,
+    String? readerPanelSection,
+    bool? readerPanelOpen,
+    bool? readerChromeVisible,
+    bool? showReaderModeControls,
+    bool? showReaderPanelControls,
+    String? shortcutOverrides,
+    bool? restoreLastSession,
+    bool? startInLibrary,
+    String? lastDocumentPath,
     String? languageCode,
     double? windowWidth,
     double? windowHeight,
@@ -130,6 +170,7 @@ final class AppSettings {
     showProgress: showProgress ?? this.showProgress,
     reduceMotion: reduceMotion ?? this.reduceMotion,
     disableAnimations: disableAnimations ?? this.disableAnimations,
+    interfaceDensity: interfaceDensity ?? this.interfaceDensity,
     defaultViewMode: defaultViewMode ?? this.defaultViewMode,
     defaultPageLayout: defaultPageLayout ?? this.defaultPageLayout,
     defaultZoomMode: defaultZoomMode ?? this.defaultZoomMode,
@@ -141,6 +182,20 @@ final class AppSettings {
     generateCovers: generateCovers ?? this.generateCovers,
     maxCacheMegabytes: maxCacheMegabytes ?? this.maxCacheMegabytes,
     recordReadingSessions: recordReadingSessions ?? this.recordReadingSessions,
+    readingHistoryLimit: readingHistoryLimit ?? this.readingHistoryLimit,
+    libraryReadingFilter: libraryReadingFilter ?? this.libraryReadingFilter,
+    readerPanelWidth: readerPanelWidth ?? this.readerPanelWidth,
+    readerPanelSection: readerPanelSection ?? this.readerPanelSection,
+    readerPanelOpen: readerPanelOpen ?? this.readerPanelOpen,
+    readerChromeVisible: readerChromeVisible ?? this.readerChromeVisible,
+    showReaderModeControls:
+        showReaderModeControls ?? this.showReaderModeControls,
+    showReaderPanelControls:
+        showReaderPanelControls ?? this.showReaderPanelControls,
+    shortcutOverrides: shortcutOverrides ?? this.shortcutOverrides,
+    restoreLastSession: restoreLastSession ?? this.restoreLastSession,
+    startInLibrary: startInLibrary ?? this.startInLibrary,
+    lastDocumentPath: lastDocumentPath ?? this.lastDocumentPath,
     languageCode: languageCode ?? this.languageCode,
     windowWidth: windowWidth ?? this.windowWidth,
     windowHeight: windowHeight ?? this.windowHeight,
@@ -163,6 +218,11 @@ final class AppSettingsRepository {
     showProgress: await _preferences.getBool('showProgress') ?? true,
     reduceMotion: await _preferences.getBool('reduceMotion') ?? false,
     disableAnimations: await _preferences.getBool('disableAnimations') ?? false,
+    interfaceDensity: _enumByName(
+      AppInterfaceDensity.values,
+      await _preferences.getString('interfaceDensity'),
+      AppInterfaceDensity.comfortable,
+    ),
     defaultViewMode:
         await _preferences.getString('defaultViewMode') ?? 'document',
     defaultPageLayout:
@@ -187,6 +247,30 @@ final class AppSettingsRepository {
     maxCacheMegabytes: await _preferences.getInt('maxCacheMegabytes') ?? 256,
     recordReadingSessions:
         await _preferences.getBool('recordReadingSessions') ?? true,
+    readingHistoryLimit:
+        (await _preferences.getInt('readingHistoryLimit') ?? 250).clamp(
+          25,
+          1000,
+        ),
+    libraryReadingFilter:
+        await _preferences.getString('libraryReadingFilter') ?? 'all',
+    readerPanelWidth: (await _preferences.getDouble('readerPanelWidth') ?? 320)
+        .clamp(280, 480),
+    readerPanelSection:
+        await _preferences.getString('readerPanelSection') ?? '',
+    readerPanelOpen: await _preferences.getBool('readerPanelOpen') ?? false,
+    readerChromeVisible:
+        await _preferences.getBool('readerChromeVisible') ?? true,
+    showReaderModeControls:
+        await _preferences.getBool('showReaderModeControls') ?? true,
+    showReaderPanelControls:
+        await _preferences.getBool('showReaderPanelControls') ?? true,
+    shortcutOverrides:
+        await _preferences.getString('shortcutOverrides') ?? '{}',
+    restoreLastSession:
+        await _preferences.getBool('restoreLastSession') ?? true,
+    startInLibrary: await _preferences.getBool('startInLibrary') ?? false,
+    lastDocumentPath: await _preferences.getString('lastDocumentPath') ?? '',
     languageCode: await _preferences.getString('languageCode') ?? 'es',
     windowWidth: await _preferences.getDouble('windowWidth') ?? 1120,
     windowHeight: await _preferences.getDouble('windowHeight') ?? 760,
@@ -202,6 +286,10 @@ final class AppSettingsRepository {
       _preferences.setBool('showProgress', settings.showProgress),
       _preferences.setBool('reduceMotion', settings.reduceMotion),
       _preferences.setBool('disableAnimations', settings.disableAnimations),
+      _preferences.setString(
+        'interfaceDensity',
+        settings.interfaceDensity.name,
+      ),
       _preferences.setString('defaultViewMode', settings.defaultViewMode),
       _preferences.setString('defaultPageLayout', settings.defaultPageLayout),
       _preferences.setString('defaultZoomMode', settings.defaultZoomMode),
@@ -219,6 +307,27 @@ final class AppSettingsRepository {
         'recordReadingSessions',
         settings.recordReadingSessions,
       ),
+      _preferences.setInt('readingHistoryLimit', settings.readingHistoryLimit),
+      _preferences.setString(
+        'libraryReadingFilter',
+        settings.libraryReadingFilter,
+      ),
+      _preferences.setDouble('readerPanelWidth', settings.readerPanelWidth),
+      _preferences.setString('readerPanelSection', settings.readerPanelSection),
+      _preferences.setBool('readerPanelOpen', settings.readerPanelOpen),
+      _preferences.setBool('readerChromeVisible', settings.readerChromeVisible),
+      _preferences.setBool(
+        'showReaderModeControls',
+        settings.showReaderModeControls,
+      ),
+      _preferences.setBool(
+        'showReaderPanelControls',
+        settings.showReaderPanelControls,
+      ),
+      _preferences.setString('shortcutOverrides', settings.shortcutOverrides),
+      _preferences.setBool('restoreLastSession', settings.restoreLastSession),
+      _preferences.setBool('startInLibrary', settings.startInLibrary),
+      _preferences.setString('lastDocumentPath', settings.lastDocumentPath),
       _preferences.setString('languageCode', settings.languageCode),
       _preferences.setDouble('windowWidth', settings.windowWidth),
       _preferences.setDouble('windowHeight', settings.windowHeight),

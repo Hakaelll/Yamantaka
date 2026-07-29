@@ -428,7 +428,10 @@ class PdfDocumentListenable extends Listenable {
             report = PdfDownloadReport(downloaded: cur, total: total, elapsedTime: stopwatch.elapsed);
           }
         });
-        debugPrint('PdfDocument initial load: ${ref.key} (${stopwatch.elapsedMilliseconds} ms)');
+        debugPrint(
+          'PdfDocument initial load completed '
+          '(${stopwatch.elapsedMilliseconds} ms)',
+        );
       } catch (err, stackTrace) {
         setError(err, stackTrace);
         return report?.copyWith(elapsedTime: stopwatch.elapsed);

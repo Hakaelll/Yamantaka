@@ -16,8 +16,14 @@ final class LibraryController extends ChangeNotifier {
   bool isLoading = false;
   AppFailure? error;
 
-  LibraryDocument? get continueReading =>
-      documents.where((document) => !document.isMissing).firstOrNull;
+  LibraryDocument? get continueReading => documents
+      .where(
+        (document) =>
+            !document.isMissing &&
+            document.readingProgress > 0 &&
+            document.readingProgress < 1,
+      )
+      .firstOrNull;
 
   Future<void> load() async {
     isLoading = true;
