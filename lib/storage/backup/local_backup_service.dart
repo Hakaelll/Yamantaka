@@ -361,7 +361,7 @@ final class LocalBackupService {
         AppInterfaceDensity.comfortable,
       ),
       defaultViewMode: string('defaultViewMode', 'document'),
-      defaultPageLayout: string('defaultPageLayout', 'continuous'),
+      defaultPageLayout: string('defaultPageLayout', 'single'),
       defaultZoomMode: string('defaultZoomMode', 'fitPage'),
       readingDirection: enumValue(
         ReadingDirection.values,

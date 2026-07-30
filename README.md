@@ -37,8 +37,9 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
 - Detección local de portada entre las primeras seis páginas, dos resoluciones
   de caché y selector manual que nunca es reemplazado por el algoritmo.
 - Visor continuo, de página única o de páginas enfrentadas; modo libro con
-  portada individual y pliegos 2–3/4–5, LTR/RTL, zoom mínimo centrado, ajuste,
-  rotación y pantalla completa realmente inmersiva.
+  portada individual y pliegos 2–3/4–5 compactos, LTR/RTL, lomo discreto,
+  zoom/paneo centrados, ajuste de página/ancho, teclado completo y pantalla
+  completa realmente inmersiva.
 - Recuperación opt-in de documento, página, zoom, posición, disposición,
   márgenes, panel, sección, ancho y visibilidad del chrome, con guarda contra
   rutas ausentes/corruptas.
@@ -74,6 +75,8 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
   tamaño físico/DPR y movimiento reducido coherente, sin dependencias nuevas.
 - Navegación primaria con `←`/`→`, tema oscuro disponible incluso en modo seguro
   e iconos de plataforma derivados exactamente de la imagen original.
+- Favicon e iconos web/PWA derivados de la misma imagen original, listos para
+  el contenedor web de Flutter.
 - Restauración del tamaño y posición de la ventana de escritorio.
 - Confirmación antes de abrir enlaces externos y bloqueo de esquemas no seguros.
 

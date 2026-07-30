@@ -29,7 +29,8 @@ Este documento representa el estado operativo del proyecto.
 
 - Primer hito funcional de Windows: completado.
 - Visor PDF real: operativo.
-- Modo libro: implementado y pendiente de validación visual ampliada.
+- Modo libro: geometría, navegación y zoom rehechos; pendiente la matriz nativa
+  ampliada de DPI/Narrador.
 - Persistencia local: operativa.
 - Pruebas automáticas: operativas.
 - Rendimiento avanzado: perfil reproducible Windows/Profile completado.
@@ -167,13 +168,28 @@ Narrador y DPI para cerrar las tareas visuales que siguen en `REVIEW`.
   laterales, ocultación y pantalla completa.
 - Criterios de aceptación: todos los modos funcionales y evidencia visual
   nativa en tamaños/DPI representativos.
-- Validación: lógica y widgets aprobados; captura Windows confirma portada
-  individual en vista enfrentada.
+- Validación: navegación pura y widgets aprobados para 1/2/par/impar,
+  Documento↔Libro, teclado completo y campos de texto; integración Windows
+  2026-07-30 con PDFium real confirma por píxeles portada/pliego centrados, lomo
+  compacto, zoom mínimo, ajuste, fullscreen y transición 1→2–3.
 - Archivos relacionados: `lib/features/reader/presentation`,
-  `test/reader_models_test.dart`, `test/reader_widgets_test.dart`,
+  `lib/pdf_engine/presentation/reader_viewport_metrics.dart`,
+  `test/reader_models_test.dart`, `test/reader_viewport_metrics_test.dart`,
+  `test/reader_widgets_test.dart`, `integration_test/reader_integration_test.dart`,
   `docs/screenshots`
-- Riesgos o limitaciones: falta matriz nativa de DPI, anchos y tema oscuro.
-- Notas técnicas: no cambia a `DONE` hasta completar esa matriz.
+- Riesgos o limitaciones: falta matriz nativa manual a 100/150/200 % y Narrador;
+  125 % ya tenía inspección de la iteración visual anterior.
+- Notas técnicas: `ReadingUnitNavigation` centraliza índices/indicadores y
+  `ReaderViewportMetrics` layout/fit/centrado/paneo. No cambia a `DONE` hasta
+  completar YAM-041.
+
+### Subtareas
+
+- [x] Compactar y centrar portada/pliegos con lomo acotado y bordes alineados.
+- [x] Unificar navegación visible/teclado y mostrar `2–3 / total`.
+- [x] Normalizar zoom, paneo, ajuste y resize contra la unidad activa.
+- [x] Probar dominio, widgets y PDFium real con aserciones por píxeles.
+- [ ] Completar DPI nativo 100/150/200 % y Narrador mediante YAM-041.
 
 ## YAM-008 — Búsqueda, panel y marcadores
 

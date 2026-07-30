@@ -62,7 +62,7 @@ final class AppSettings {
     this.disableAnimations = false,
     this.interfaceDensity = AppInterfaceDensity.comfortable,
     this.defaultViewMode = 'document',
-    this.defaultPageLayout = 'continuous',
+    this.defaultPageLayout = 'single',
     this.defaultZoomMode = 'fitPage',
     this.readingDirection = ReadingDirection.leftToRight,
     this.visualProfile = ReaderVisualProfile.standard,
@@ -226,7 +226,7 @@ final class AppSettingsRepository {
     defaultViewMode:
         await _preferences.getString('defaultViewMode') ?? 'document',
     defaultPageLayout:
-        await _preferences.getString('defaultPageLayout') ?? 'continuous',
+        await _preferences.getString('defaultPageLayout') ?? 'single',
     defaultZoomMode:
         await _preferences.getString('defaultZoomMode') ?? 'fitPage',
     readingDirection: _enumByName(

@@ -25,6 +25,7 @@ final class ReaderTopBar extends StatelessWidget
     required this.onShowBookmarks,
     required this.onShowAnnotations,
     required this.onAdjustMargins,
+    required this.onModeChanged,
     required this.onDocumentInfo,
     required this.onToggleFullScreen,
     required this.onToggleChrome,
@@ -47,6 +48,7 @@ final class ReaderTopBar extends StatelessWidget
   final VoidCallback onShowBookmarks;
   final VoidCallback onShowAnnotations;
   final VoidCallback onAdjustMargins;
+  final ValueChanged<ReaderMode> onModeChanged;
   final VoidCallback onDocumentInfo;
   final VoidCallback onToggleFullScreen;
   final VoidCallback onToggleChrome;
@@ -110,29 +112,9 @@ final class ReaderTopBar extends StatelessWidget
             ],
             if (!compact && showModeControls) ...[
               const SizedBox(width: AppSpacing.space12),
-              SegmentedButton<ReaderMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: ReaderMode.document,
-                    icon: Icon(Icons.description_outlined, size: 17),
-                    label: Text('Documento'),
-                    tooltip: 'Modo documento',
-                  ),
-                  ButtonSegment(
-                    value: ReaderMode.book,
-                    icon: Icon(Icons.menu_book_outlined, size: 17),
-                    label: Text('Libro'),
-                    tooltip: 'Modo libro',
-                  ),
-                ],
-                selected: {preferences.viewMode},
-                showSelectedIcon: false,
-                onSelectionChanged: (selection) =>
-                    controller.setReaderMode(selection.first),
-                style: const ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
+              _ReaderModeSelector(
+                selected: preferences.viewMode,
+                onSelected: onModeChanged,
               ),
               const SizedBox(width: AppSpacing.space8),
             ],
@@ -341,9 +323,9 @@ final class ReaderTopBar extends StatelessWidget
       case _ReaderMenuAction.openDocument:
         onOpenDocument();
       case _ReaderMenuAction.documentMode:
-        controller.setReaderMode(ReaderMode.document);
+        onModeChanged(ReaderMode.document);
       case _ReaderMenuAction.bookMode:
-        controller.setReaderMode(ReaderMode.book);
+        onModeChanged(ReaderMode.book);
       case _ReaderMenuAction.commandPalette:
         onCommandPalette();
       case _ReaderMenuAction.thumbnails:
@@ -367,6 +349,134 @@ final class ReaderTopBar extends StatelessWidget
       case _ReaderMenuAction.settings:
         onOpenSettings();
     }
+  }
+}
+
+final class _ReaderModeSelector extends StatelessWidget {
+  const _ReaderModeSelector({required this.selected, required this.onSelected});
+
+  final ReaderMode selected;
+  final ValueChanged<ReaderMode> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Modo de visualización',
+      explicitChildNodes: true,
+      child: Material(
+        key: const Key('reader-mode-selector'),
+        color: context.appColors.surfaceSecondary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.field),
+          side: BorderSide(color: context.appColors.borderSubtle),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ReaderModeSegment(
+              mode: ReaderMode.document,
+              label: 'Documento',
+              tooltip: 'Documento: mostrar una página',
+              icon: Icons.description_outlined,
+              selected: selected == ReaderMode.document,
+              onTap: onSelected,
+            ),
+            _ReaderModeSegment(
+              mode: ReaderMode.book,
+              label: 'Libro',
+              tooltip: 'Libro: mostrar páginas enfrentadas',
+              icon: Icons.menu_book_outlined,
+              selected: selected == ReaderMode.book,
+              onTap: onSelected,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+final class _ReaderModeSegment extends StatelessWidget {
+  const _ReaderModeSegment({
+    required this.mode,
+    required this.label,
+    required this.tooltip,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ReaderMode mode;
+  final String label;
+  final String tooltip;
+  final IconData icon;
+  final bool selected;
+  final ValueChanged<ReaderMode> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : AppMotion.fast;
+    final foreground = selected ? colors.textPrimary : colors.textSecondary;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Tooltip(
+        message: tooltip,
+        child: InkWell(
+          onTap: () => onTap(mode),
+          hoverColor: colors.accentHover.withValues(alpha: 0.08),
+          focusColor: colors.focusRing.withValues(alpha: 0.12),
+          child: AnimatedContainer(
+            duration: motion,
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 32),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.space12,
+              vertical: AppSpacing.space6,
+            ),
+            decoration: BoxDecoration(
+              color: selected ? colors.surfaceElevated : Colors.transparent,
+              border: Border(
+                bottom: BorderSide(
+                  color: selected ? colors.textPrimary : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: foreground),
+                const SizedBox(width: AppSpacing.space6),
+                AnimatedDefaultTextStyle(
+                  duration: motion,
+                  curve: Curves.easeOutCubic,
+                  style:
+                      Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: foreground,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ) ??
+                      TextStyle(
+                        color: foreground,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                  child: Text(label),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

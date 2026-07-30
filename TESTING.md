@@ -1,10 +1,10 @@
 # Pruebas
 
-## Estado verificado — 2026-07-29
+## Estado verificado — 2026-07-30
 
 - `dart format`: código Dart formateado.
 - `flutter analyze`: aprobado sin incidencias.
-- `flutter test --reporter compact`: 102 pruebas aprobadas.
+- `flutter test --reporter compact`: 113 pruebas aprobadas.
 - Integración Windows: lector, biblioteca y perfil aprobados individualmente
   sobre PDFium real; el agregado encontró la incidencia de arranque del runner
   documentada más abajo.
@@ -19,6 +19,10 @@
   y 800×760 físicos (mínimo nativo); bundle verificado sin dependencias nuevas.
 - Perfil Windows: cinco pasadas Profile con 40 documentos, PDF de 100 páginas,
   fixture vectorial pesado, caché/deduplicación, RSS y frames.
+- Refinamiento del lector: dominio/widgets cubren portada, pliegos pares e
+  impares, lomo, alineación, centrado/paneo, ajuste, selector y teclado completo;
+  la integración Windows aislada vuelve a aprobar y valida por píxeles dos
+  páginas próximas y el conjunto centrado.
 
 No hay pruebas omitidas marcadas como aprobadas.
 
@@ -61,7 +65,8 @@ Las capturas DPI-aware de una ventana Release se generan con
 
 ## Cobertura automatizada
 
-- Dominio: progreso, límites, portada, pares enfrentados, página impar y RTL.
+- Dominio: progreso, límites, portada, pares enfrentados, página impar, RTL,
+  indicadores de pliego y normalización de viewport.
 - Responsive: fronteras exactas 679/680/1099/1100 px, padding por clase,
   composición del lector a 640/679/680/1099/1100/1440 px y filas de biblioteca
   a 420/679/680/1099/1100 px.
@@ -86,8 +91,9 @@ Las capturas DPI-aware de una ventana Release se generan con
   recientes, vacío, selección con flechas/Enter y scroll inmediato con
   movimiento reducido.
 - Widgets: biblioteca vacía/ausente, lector, progreso, panel, seis temas,
-  márgenes, teclado, `Ctrl+F`, filtro/orden, densidad, Escape, perfil e-ink y
-  ausencia de overflow a 420/680/1100 px.
+  márgenes, selector Documento/Libro, flechas, `PageUp`/`PageDown`,
+  `Home`/`End`, espacio/Mayús+espacio, exclusión de campos de texto, `Ctrl+F`,
+  filtro/orden, densidad, Escape, perfil e-ink y ausencia de overflow.
 - Motor real: PDF legal generado durante el test, apertura PDFium, bitmap
   visible, extracción, búsqueda y AES-128 con contraseña.
 - Integración Windows: lector real completo, pintura de página, chrome,
@@ -125,7 +131,7 @@ Las capturas DPI-aware de una ventana Release se generan con
 | Miniaturas del lector | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | Texto legible, escala ligada al panel/DPR y lienzo restante centrado; `windows-reader-redesign-thumbnails.png` |
 | Zoom mínimo | Integración Windows, 1200×800 lógicos/DPR 1 | Claro/marfil | Página completa y centro horizontal verificado por píxeles; `windows-reader-redesign-minimum-zoom.png` |
 | Pantalla completa | Integración Windows, 1200×800 lógicos/DPR 1 | Marfil | Solo lienzo y documento, sin chrome/panel/progreso; `windows-reader-redesign-fullscreen.png` |
-| Pliego de libro | Integración Windows, 1200×800 lógicos/DPR 1 | Marfil | Portada aislada y páginas 2–3 emparejadas; `windows-reader-redesign-book-spread.png` |
+| Pliego de libro | Integración Windows, 1200×800 lógicos/DPR 1 | Marfil | Páginas 2–3 próximas, borde superior alineado, lomo acotado y conjunto centrado comprobado por píxeles; `windows-reader-redesign-book-spread.png` |
 
 Las capturas viven en `docs/screenshots`. Las variantes con sufijos
 `-search`, `-facing`, `-palette` y `-book` registran los estados del lector.

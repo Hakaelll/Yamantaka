@@ -184,18 +184,109 @@ void main() {
 
     expect(harness.controller.preferences!.pageLayout, PageLayoutMode.facing);
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
-    expect(find.byTooltip('Página siguiente (→)'), findsOneWidget);
+    expect(find.byTooltip('Apertura siguiente (→)'), findsOneWidget);
+    expect(find.text('1 / 6'), findsOneWidget);
 
     for (final expectedPage in const [1, 3, 5, 5]) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
       expect(harness.controller.currentPageIndex, expectedPage);
     }
+    expect(find.text('6 / 6'), findsOneWidget);
     for (final expectedPage in const [3, 1, 0]) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pump();
       expect(harness.controller.currentPageIndex, expectedPage);
     }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('mode selector is explicit and each mode owns its layout', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true, pageCount: 6);
+    final adapter = _RecordingViewerAdapter();
+
+    await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
+    await tester.pump();
+    expect(find.byKey(const Key('reader-mode-selector')), findsOneWidget);
+    expect(find.byTooltip('Documento: mostrar una página'), findsOneWidget);
+    expect(
+      find.byTooltip('Libro: mostrar páginas enfrentadas'),
+      findsOneWidget,
+    );
+    expect(adapter.configuration?.flow, PdfViewFlow.single);
+
+    await tester.tap(find.byTooltip('Libro: mostrar páginas enfrentadas'));
+    await tester.pump();
+    expect(harness.controller.preferences!.viewMode, ReaderMode.book);
+    expect(harness.controller.preferences!.pageLayout, PageLayoutMode.facing);
+    expect(adapter.configuration?.flow, PdfViewFlow.facing);
+
+    await tester.tap(find.byTooltip('Documento: mostrar una página'));
+    await tester.pump();
+    expect(harness.controller.preferences!.viewMode, ReaderMode.document);
+    expect(harness.controller.preferences!.pageLayout, PageLayoutMode.single);
+    expect(adapter.configuration?.flow, PdfViewFlow.single);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('all reading keys share navigation and text input keeps them', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true, pageCount: 6);
+    harness.controller.setReaderMode(ReaderMode.book);
+
+    await tester.pumpWidget(_app(harness));
+    await tester.pump();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 1);
+    expect(find.text('2–3 / 6'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 0);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 1);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 0);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.end);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 5);
+    await tester.sendKeyEvent(LogicalKeyboardKey.home);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 0);
+
+    await tester.tap(find.byTooltip('Buscar (Ctrl+F)'));
+    await tester.pump();
+    final searchField = find.byKey(const Key('pdf-search-field'));
+    expect(searchField, findsOneWidget);
+    await tester.tap(searchField);
+    await tester.enterText(searchField, 'consulta');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 0);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
@@ -223,7 +314,7 @@ void main() {
       expect(tester.takeException(), isNull, reason: 'viewport $size');
       expect(find.byKey(const Key('test-pdf-viewer')), findsOneWidget);
       expect(
-        find.byType(SegmentedButton<ReaderMode>),
+        find.byKey(const Key('reader-mode-selector')),
         size.width < 680 ? findsNothing : findsOneWidget,
       );
     }
@@ -232,7 +323,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('facing flow is enabled only when both pages remain legible', (
+  testWidgets('book flow remains a compact spread at every reader width', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -240,22 +331,23 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final harness = await _ReaderHarness.create(ready: true);
     final adapter = _RecordingViewerAdapter();
-    harness.controller.preferences = harness.controller.preferences!.copyWith(
-      pageLayout: PageLayoutMode.facing,
-    );
+    harness.controller.setReaderMode(ReaderMode.book);
 
-    tester.view.physicalSize = const Size(1099, 800);
+    tester.view.physicalSize = const Size(640, 800);
     await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
     await tester.pump();
-    expect(adapter.configuration?.flow, PdfViewFlow.single);
+    expect(adapter.configuration?.flow, PdfViewFlow.facing);
+    expect(adapter.configuration?.spineGap, 10);
 
-    tester.view.physicalSize = const Size(1100, 800);
+    tester.view.physicalSize = const Size(1200, 800);
     await tester.pump();
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
+    expect(adapter.configuration?.spineGap, 14);
 
-    tester.view.physicalSize = const Size(1100, 460);
+    tester.view.physicalSize = const Size(1200, 460);
     await tester.pump();
-    expect(adapter.configuration?.flow, PdfViewFlow.single);
+    expect(adapter.configuration?.flow, PdfViewFlow.facing);
+    expect(adapter.configuration?.margin, 16);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();

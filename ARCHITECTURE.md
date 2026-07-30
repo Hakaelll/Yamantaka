@@ -47,6 +47,28 @@ se guarda después de 240 ms sin cambios. `PdfrxDocumentEngine.diagnostics`
 expone únicamente contadores locales de solicitudes, caché, deduplicación,
 cancelación y recursos abiertos para pruebas/Profile; no persiste ni transmite.
 
+`ReadingUnitNavigation` define la unidad que se lee: una página en Documento y
+portada/pliego en Libro. Barra inferior, zonas laterales, flechas, `PageUp`,
+`PageDown`, `Home`, `End` y espacio llaman a las mismas operaciones de
+`ReaderController`; ningún widget calcula índices por su cuenta. Cambiar de modo
+normaliza la página activa y hace que Documento posea la disposición de una
+página y Libro la enfrentada.
+
+`ReaderViewportMetrics` es la única geometría de los modos paginados. Calcula
+slots, márgenes discretos, lomo de 10–16 px, rectángulo de página/pliego, escala
+de ajuste y centro permitido. El normalizador de `pdfrx` lo aplica a cada
+transformación: si el contenido cabe elimina offsets residuales y, si desborda,
+limita el paneo sin perder zonas. El mismo cálculo se reutiliza en zoom manual,
+ajuste de página/ancho y resize. Cada instancia nativa adjunta el
+`PdfViewController` con un propietario para que la destrucción tardía de una
+vista anterior no desconecte la nueva durante un cambio de modo.
+
+El layout reserva de antemano el tamaño de todas las páginas. `pdfrx` mantiene
+el bitmap anterior durante el render progresivo y se configura con caché
+horizontal de una unidad adyacente, precarga vertical para continuo y límite
+global de memoria; la caché LRU/cancelación del motor sigue siendo el único
+almacén adicional.
+
 ## Persistencia
 
 SQLite v3 guarda documentos, preferencias, marcadores, sesiones, anotaciones,

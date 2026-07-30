@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart' as pdfrx;
@@ -8,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/app_config.dart';
 import '../models/pdf_models.dart';
 import '../presentation/pdf_viewer_adapter.dart';
+import '../presentation/reader_viewport_metrics.dart';
 import 'pdfrx_document_engine.dart';
 
 final class PdfrxViewerAdapter implements PdfViewerAdapter {
@@ -69,6 +69,7 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   late final pdfrx.PdfDocumentRefDirect _documentRef;
   Size? _viewportSize;
   bool _recenterScheduled = false;
+  final Object _attachmentOwner = Object();
 
   Duration get _motionDuration => widget.configuration.reduceMotion
       ? Duration.zero
@@ -88,7 +89,7 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   @override
   void dispose() {
     _controller.removeListener(_onTransformChanged);
-    widget.bridgeController.detach();
+    widget.bridgeController.detach(owner: _attachmentOwner);
     super.dispose();
   }
 
@@ -109,20 +110,55 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
         backgroundColor: widget.configuration.backgroundColor,
         margin: widget.configuration.margin,
         pageDropShadow: widget.configuration.pageShadow,
+        normalizeMatrix: widget.configuration.flow == PdfViewFlow.continuous
+            ? null
+            : (matrix, viewSize, layout, controller) {
+                if (controller == null ||
+                    !controller.isReady ||
+                    layout.pageLayouts.isEmpty) {
+                  return matrix;
+                }
+                final zoom = pdfrx.PdfMatrix4Ext(matrix).zoom
+                    .clamp(controller.minScale, controller.maxScale)
+                    .toDouble();
+                final proposedCenter = pdfrx.PdfMatrix4Ext(
+                  matrix,
+                ).calcPosition(viewSize);
+                final unitRect = ReaderViewportMetrics.nearestReadingUnitRect(
+                  pageRects: layout.pageLayouts,
+                  proposedCenter: proposedCenter,
+                  facing: widget.configuration.flow == PdfViewFlow.facing,
+                );
+                final normalizedCenter = ReaderViewportMetrics.normalizeCenter(
+                  proposedCenter: proposedCenter,
+                  viewport: viewSize,
+                  contentRect: unitRect,
+                  zoom: zoom,
+                  margin: widget.configuration.viewportMargin / zoom,
+                );
+                return controller.calcMatrixFor(
+                  normalizedCenter,
+                  zoom: zoom,
+                  viewSize: viewSize,
+                );
+              },
         layoutPages: switch (widget.configuration.flow) {
           PdfViewFlow.continuous => null,
           PdfViewFlow.single => _singlePageLayout,
           PdfViewFlow.facing => _facingPageLayout,
         },
-        maxImageBytesCachedOnMemory: 96 * 1024 * 1024,
-        horizontalCacheExtent: 0.5,
-        verticalCacheExtent: 0.75,
+        maxImageBytesCachedOnMemory: 112 * 1024 * 1024,
+        horizontalCacheExtent:
+            widget.configuration.flow == PdfViewFlow.continuous ? 0.5 : 1.1,
+        verticalCacheExtent: widget.configuration.flow == PdfViewFlow.continuous
+            ? 1.25
+            : 0.5,
         enableKeyboardNavigation: false,
-        // The minimum zoom is one complete page. Allowing several horizontal
-        // page slots to fit at once makes pdfrx center the whole document
-        // layout instead of the active page at the lowest zoom.
+        // A small range below native fit-page leaves room for the persistent
+        // chrome-safe margin. The custom normalizer still constrains the
+        // active page/spread, so adjacent horizontal slots cannot take focus.
         sizeDelegateProvider: const pdfrx.PdfViewerSizeDelegateProviderSmart(
-          maxPagesVisible: 1,
+          maxPagesVisible: 1.25,
         ),
         linkHandlerParams: pdfrx.PdfLinkHandlerParams(
           enableAutoLinkDetection: false,
@@ -161,12 +197,12 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
                 duration: _motionDuration,
               );
             },
-            zoomBy: (factor) => controller.setZoom(
-              controller.centerPosition,
-              (controller.currentZoom * factor).clamp(
-                controller.minScale,
-                controller.maxScale,
-              ),
+            zoomBy: (factor) => _setCustomZoom(
+              controller,
+              pageNumber: controller.pageNumber ?? 1,
+              zoom: (controller.currentZoom * factor)
+                  .clamp(controller.minScale, controller.maxScale)
+                  .toDouble(),
               duration: _motionDuration,
             ),
             fitWidth: () => _fitWidth(
@@ -179,9 +215,17 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
               pageNumber: controller.pageNumber ?? 1,
               duration: _motionDuration,
             ),
+            owner: _attachmentOwner,
           );
           unawaited(_restoreInitialView(controller));
         },
+        loadingBannerBuilder: (context, bytesDownloaded, totalBytes) =>
+            const Center(
+              child: SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
         errorBannerBuilder: (context, error, stackTrace, documentRef) {
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => widget.onError(error),
@@ -229,11 +273,12 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     final pageNumber = _controller.pageNumber ?? widget.initialPageIndex + 1;
     switch (widget.configuration.initialZoomMode) {
       case PdfViewZoomMode.custom:
-        await _centerPageAtZoom(
+        await _setCustomZoom(
           _controller,
           pageNumber: pageNumber,
           zoom: _controller.currentZoom,
           duration: Duration.zero,
+          preserveFocalPoint: true,
         );
       case PdfViewZoomMode.fitWidth:
         await _fitWidth(
@@ -271,13 +316,12 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   Future<void> _restoreInitialView(pdfrx.PdfViewerController controller) async {
     switch (widget.configuration.initialZoomMode) {
       case PdfViewZoomMode.custom:
-        await _centerPageAtZoom(
+        await _setCustomZoom(
           controller,
           pageNumber: widget.initialPageIndex + 1,
-          zoom: widget.configuration.initialZoom.clamp(
-            controller.minScale,
-            controller.maxScale,
-          ),
+          zoom: widget.configuration.initialZoom
+              .clamp(controller.minScale, controller.maxScale)
+              .toDouble(),
           duration: Duration.zero,
         );
       case PdfViewZoomMode.fitWidth:
@@ -310,20 +354,27 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     _onTransformChanged();
   }
 
-  Future<void> _centerPageAtZoom(
+  Future<void> _setCustomZoom(
     pdfrx.PdfViewerController controller, {
     required int pageNumber,
     required double zoom,
     required Duration duration,
+    bool preserveFocalPoint = false,
   }) {
-    final layouts = controller.layout.pageLayouts;
-    if (layouts.isEmpty) return Future<void>.value();
-    final index = (pageNumber - 1).clamp(0, layouts.length - 1);
-    final rect = widget.configuration.flow == PdfViewFlow.facing
-        ? _spreadRect(controller, pageNumber)
-        : layouts[index].inflate(widget.configuration.margin);
+    final rect = _readingUnitRect(controller, pageNumber);
+    if (rect.isEmpty) return Future<void>.value();
+    final proposedCenter = preserveFocalPoint
+        ? controller.centerPosition
+        : rect.center;
+    final normalizedCenter = ReaderViewportMetrics.normalizeCenter(
+      proposedCenter: proposedCenter,
+      viewport: controller.viewSize,
+      contentRect: rect,
+      zoom: zoom,
+      margin: widget.configuration.viewportMargin / zoom,
+    );
     return controller.goTo(
-      controller.calcMatrixFor(rect.center, zoom: zoom),
+      controller.calcMatrixFor(normalizedCenter, zoom: zoom),
       duration: duration,
     );
   }
@@ -333,14 +384,17 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     required int pageNumber,
     required Duration duration,
   }) {
-    if (widget.configuration.flow != PdfViewFlow.facing) {
-      return controller.goTo(
-        controller.calcMatrixForPage(pageNumber: pageNumber),
-        duration: duration,
-      );
-    }
+    final rect = _readingUnitRect(controller, pageNumber);
+    if (rect.isEmpty) return Future<void>.value();
+    final zoom = ReaderViewportMetrics.fitPageZoom(
+      viewport: controller.viewSize,
+      contentRect: rect,
+      margin: widget.configuration.viewportMargin,
+      minimum: controller.minScale,
+      maximum: controller.maxScale,
+    );
     return controller.goTo(
-      controller.calcMatrixForRect(_spreadRect(controller, pageNumber)),
+      controller.calcMatrixFor(rect.center, zoom: zoom),
       duration: duration,
     );
   }
@@ -350,42 +404,40 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     required int pageNumber,
     required Duration duration,
   }) async {
-    if (widget.configuration.flow != PdfViewFlow.facing) {
-      final matrix = controller.calcMatrixFitWidthForPage(
-        pageNumber: pageNumber,
-      );
-      if (matrix != null) {
-        await controller.goTo(matrix, duration: duration);
-      }
-      return;
-    }
-    final rect = _spreadRect(controller, pageNumber);
-    final availableWidth = math.max(
-      1,
-      controller.viewSize.width - widget.configuration.margin * 2,
+    final rect = _readingUnitRect(controller, pageNumber);
+    if (rect.isEmpty) return;
+    final zoom = ReaderViewportMetrics.fitWidthZoom(
+      viewport: controller.viewSize,
+      contentRect: rect,
+      margin: widget.configuration.viewportMargin,
+      minimum: controller.minScale,
+      maximum: controller.maxScale,
     );
-    final zoom = (availableWidth / rect.width).clamp(
-      controller.minScale,
-      controller.maxScale,
+    final visibleHeight = controller.viewSize.height / zoom;
+    final topAlignedCenter = Offset(
+      rect.center.dx,
+      rect.top - widget.configuration.viewportMargin / zoom + visibleHeight / 2,
+    );
+    final normalizedCenter = ReaderViewportMetrics.normalizeCenter(
+      proposedCenter: topAlignedCenter,
+      viewport: controller.viewSize,
+      contentRect: rect,
+      zoom: zoom,
+      margin: widget.configuration.viewportMargin / zoom,
     );
     await controller.goTo(
-      controller.calcMatrixFor(rect.center, zoom: zoom),
+      controller.calcMatrixFor(normalizedCenter, zoom: zoom),
       duration: duration,
     );
   }
 
-  Rect _spreadRect(pdfrx.PdfViewerController controller, int pageNumber) {
+  Rect _readingUnitRect(pdfrx.PdfViewerController controller, int pageNumber) {
     final layouts = controller.layout.pageLayouts;
-    final index = (pageNumber - 1).clamp(0, layouts.length - 1);
-    if (index == 0) {
-      return layouts.first.inflate(widget.configuration.margin);
-    }
-    final start = index.isOdd ? index : index - 1;
-    var rect = layouts[start];
-    if (start + 1 < layouts.length) {
-      rect = rect.expandToInclude(layouts[start + 1]);
-    }
-    return rect.inflate(widget.configuration.margin);
+    return ReaderViewportMetrics.readingUnitRect(
+      pageRects: layouts,
+      pageIndex: pageNumber - 1,
+      facing: widget.configuration.flow == PdfViewFlow.facing,
+    );
   }
 
   void _handleLink(pdfrx.PdfLink link) {
@@ -442,88 +494,19 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     List<pdfrx.PdfPage> pages,
     pdfrx.PdfViewerParams params,
   ) {
-    if (pages.isEmpty) {
-      return pdfrx.PdfPageLayout(
-        pageLayouts: const [],
-        documentSize: Size.zero,
-      );
-    }
-    final margin = params.margin;
-    final widestSpread = pages.length == 1
-        ? pages.first.width
-        : pages
-                      .skip(1)
-                      .fold<double>(
-                        0,
-                        (widest, page) => math.max(widest, page.width),
-                      ) *
-                  2 +
-              margin;
-    final spreadWidth = math.max(pages.first.width, widestSpread) + margin * 2;
-    final documentHeight =
-        pages.fold<double>(0, (height, page) => math.max(height, page.height)) +
-        margin * 2;
-    final rects = List<Rect>.filled(pages.length, Rect.zero);
-    var x = margin;
-    rects[0] = Rect.fromLTWH(
-      x + (spreadWidth - margin * 2 - pages[0].width) / 2,
-      (documentHeight - pages[0].height) / 2,
-      pages[0].width,
-      pages[0].height,
+    final geometry = ReaderViewportMetrics.facingPageLayout(
+      pageSizes: pages
+          .map((page) => Size(page.width, page.height))
+          .toList(growable: false),
+      outerMargin: params.margin,
+      spineGap: widget.configuration.spineGap,
+      rightToLeft:
+          widget.configuration.readingDirection ==
+          PdfViewReadingDirection.rightToLeft,
     );
-    x += spreadWidth;
-    for (var index = 1; index < pages.length; index += 2) {
-      final first = pages[index];
-      final second = index + 1 < pages.length ? pages[index + 1] : null;
-      if (second == null) {
-        rects[index] = Rect.fromLTWH(
-          x + (spreadWidth - first.width) / 2,
-          (documentHeight - first.height) / 2,
-          first.width,
-          first.height,
-        );
-        x += spreadWidth;
-        continue;
-      }
-      final left =
-          widget.configuration.readingDirection ==
-              PdfViewReadingDirection.leftToRight
-          ? first
-          : second;
-      final right =
-          widget.configuration.readingDirection ==
-              PdfViewReadingDirection.leftToRight
-          ? second
-          : first;
-      final pairWidth = left.width + margin + right.width;
-      final startX = x + (spreadWidth - pairWidth) / 2;
-      final leftIndex =
-          widget.configuration.readingDirection ==
-              PdfViewReadingDirection.leftToRight
-          ? index
-          : index + 1;
-      rects[leftIndex] = Rect.fromLTWH(
-        startX,
-        (documentHeight - left.height) / 2,
-        left.width,
-        left.height,
-      );
-      final rightIndex =
-          widget.configuration.readingDirection ==
-              PdfViewReadingDirection.leftToRight
-          ? index + 1
-          : index;
-      rects[rightIndex] = Rect.fromLTWH(
-        startX + left.width + margin,
-        (documentHeight - right.height) / 2,
-        right.width,
-        right.height,
-      );
-      x += spreadWidth;
-    }
     return pdfrx.PdfPageLayout(
-      pageLayouts: rects,
-      documentSize: Size(x + margin, documentHeight),
+      pageLayouts: geometry.pageRects,
+      documentSize: geometry.documentSize,
     );
   }
 
@@ -531,38 +514,15 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     List<pdfrx.PdfPage> pages,
     pdfrx.PdfViewerParams params,
   ) {
-    if (pages.isEmpty) {
-      return pdfrx.PdfPageLayout(
-        pageLayouts: const [],
-        documentSize: Size.zero,
-      );
-    }
-    final margin = params.margin;
-    final widestPage = pages.fold<double>(
-      0,
-      (width, page) => math.max(width, page.width),
+    final geometry = ReaderViewportMetrics.singlePageLayout(
+      pageSizes: pages
+          .map((page) => Size(page.width, page.height))
+          .toList(growable: false),
+      outerMargin: params.margin,
     );
-    // A single page occupies a spread-sized horizontal slot. This keeps the
-    // adjacent page outside the viewport after fit-page/fit-width.
-    final slotWidth = widestPage * 2 + margin * 3;
-    final documentHeight =
-        pages.fold<double>(0, (height, page) => math.max(height, page.height)) +
-        margin * 2;
-    final rects = <Rect>[];
-    for (var index = 0; index < pages.length; index++) {
-      final page = pages[index];
-      rects.add(
-        Rect.fromLTWH(
-          index * slotWidth + (slotWidth - page.width) / 2,
-          (documentHeight - page.height) / 2,
-          page.width,
-          page.height,
-        ),
-      );
-    }
     return pdfrx.PdfPageLayout(
-      pageLayouts: rects,
-      documentSize: Size(slotWidth * pages.length, documentHeight),
+      pageLayouts: geometry.pageRects,
+      documentSize: geometry.documentSize,
     );
   }
 }

@@ -12,6 +12,8 @@ final class PdfViewConfiguration {
   const PdfViewConfiguration({
     required this.backgroundColor,
     required this.margin,
+    required this.viewportMargin,
+    required this.spineGap,
     required this.flow,
     required this.rotation,
     required this.reduceMotion,
@@ -24,6 +26,8 @@ final class PdfViewConfiguration {
 
   final Color backgroundColor;
   final double margin;
+  final double viewportMargin;
+  final double spineGap;
   final PdfViewFlow flow;
   final int rotation;
   final bool reduceMotion;
@@ -40,6 +44,7 @@ final class PdfViewController extends ChangeNotifier {
   double zoom = 1;
   double scrollOffset = 0;
   bool isReady = false;
+  Object? _attachmentOwner;
 
   Future<void> Function(int pageIndex)? _goToPage;
   Future<void> Function(double factor)? _zoomBy;
@@ -70,6 +75,7 @@ final class PdfViewController extends ChangeNotifier {
     required Future<void> Function(double factor) zoomBy,
     required Future<void> Function() fitWidth,
     required Future<void> Function() fitPage,
+    Object? owner,
   }) {
     this.pageCount = pageCount;
     this.currentPageIndex = currentPageIndex;
@@ -78,6 +84,7 @@ final class PdfViewController extends ChangeNotifier {
     _zoomBy = zoomBy;
     _fitWidth = fitWidth;
     _fitPage = fitPage;
+    _attachmentOwner = owner;
     isReady = true;
     notifyListeners();
   }
@@ -89,9 +96,11 @@ final class PdfViewController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void detach() {
+  void detach({Object? owner}) {
+    if (owner != null && !identical(owner, _attachmentOwner)) return;
     isReady = false;
     scrollOffset = 0;
+    _attachmentOwner = null;
     _goToPage = null;
     _zoomBy = null;
     _fitWidth = null;

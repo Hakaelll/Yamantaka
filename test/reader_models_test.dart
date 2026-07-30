@@ -38,6 +38,89 @@ void main() {
     });
   });
 
+  group('ReadingUnitNavigation', () {
+    test('handles one and two-page books without invalid indexes', () {
+      expect(
+        ReadingUnitNavigation.nextTarget(
+          pageIndex: 0,
+          pageCount: 1,
+          mode: ReaderMode.book,
+        ),
+        0,
+      );
+      expect(
+        ReadingUnitNavigation.nextTarget(
+          pageIndex: 0,
+          pageCount: 2,
+          mode: ReaderMode.book,
+        ),
+        1,
+      );
+      expect(
+        ReadingUnitNavigation.previousTarget(
+          pageIndex: 1,
+          pageCount: 2,
+          mode: ReaderMode.book,
+        ),
+        0,
+      );
+    });
+
+    test('walks cover and spreads for even and odd page counts', () {
+      int walk(int page, int count) => ReadingUnitNavigation.nextTarget(
+        pageIndex: page,
+        pageCount: count,
+        mode: ReaderMode.book,
+      );
+
+      expect([0, walk(0, 6), walk(1, 6), walk(3, 6)], [0, 1, 3, 5]);
+      expect([0, walk(0, 5), walk(1, 5), walk(3, 5)], [0, 1, 3, 3]);
+      expect(
+        ReadingUnitNavigation.previousTarget(
+          pageIndex: 2,
+          pageCount: 6,
+          mode: ReaderMode.book,
+        ),
+        0,
+      );
+    });
+
+    test('produces reader-facing page indicators', () {
+      expect(
+        ReadingUnitNavigation.indicator(
+          pageIndex: 0,
+          pageCount: 24,
+          mode: ReaderMode.book,
+        ),
+        '1 / 24',
+      );
+      expect(
+        ReadingUnitNavigation.indicator(
+          pageIndex: 2,
+          pageCount: 24,
+          mode: ReaderMode.book,
+        ),
+        '2–3 / 24',
+      );
+      expect(
+        ReadingUnitNavigation.indicator(
+          pageIndex: 23,
+          pageCount: 24,
+          mode: ReaderMode.book,
+        ),
+        '24 / 24',
+      );
+      expect(
+        ReadingUnitNavigation.indicator(
+          pageIndex: 3,
+          pageCount: 8,
+          mode: ReaderMode.document,
+        ),
+        '4 / 8',
+      );
+    });
+  });
+
   test(
     'visual profiles and reading directions remain explicit domain values',
     () {

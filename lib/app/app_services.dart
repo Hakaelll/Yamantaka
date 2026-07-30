@@ -177,7 +177,7 @@ final class AppServices {
           pageLayout: enumValue(
             PageLayoutMode.values,
             global.defaultPageLayout,
-            PageLayoutMode.continuous,
+            PageLayoutMode.single,
           ),
           horizontalMargin: global.defaultMargin,
           verticalMargin: global.defaultMargin,

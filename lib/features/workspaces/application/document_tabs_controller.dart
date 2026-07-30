@@ -60,7 +60,7 @@ final class DocumentTabsController extends ChangeNotifier {
         title: document.title ?? document.fileName,
         pageIndex: document.lastPageIndex,
         zoomLevel: 1,
-        pageLayout: PageLayoutMode.continuous.name,
+        pageLayout: PageLayoutMode.single.name,
         readingMode: document.preferredViewMode.name,
         scrollOffset: 0,
         readingProgress: document.readingProgress,

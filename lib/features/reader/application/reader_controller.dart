@@ -103,10 +103,11 @@ final class ReaderController extends ChangeNotifier {
   int get pageCount => openedDocument?.pageCount ?? 0;
   bool get canGoBack => currentPageIndex > 0;
   bool get canGoForward => currentPageIndex + 1 < pageCount;
-  bool canGoBackBy({bool facing = false}) =>
-      _previousPageTarget(facing: facing) != currentPageIndex;
-  bool canGoForwardBy({bool facing = false}) =>
-      _nextPageTarget(facing: facing) != currentPageIndex;
+  ReaderMode get readerMode => preferences?.viewMode ?? ReaderMode.document;
+  bool get canGoToPreviousReadingUnit =>
+      _previousReadingUnitTarget() != _canonicalReadingUnitPage();
+  bool get canGoToNextReadingUnit =>
+      _nextReadingUnitTarget() != _canonicalReadingUnitPage();
 
   Future<bool> openPath(String path, {String? password}) async {
     pendingPath = path;
@@ -251,43 +252,50 @@ final class ReaderController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> previousPage({bool facing = false}) async {
-    final target = _previousPageTarget(facing: facing);
-    if (target == currentPageIndex) return;
+  Future<void> goToPreviousReadingUnit() async {
+    final target = _previousReadingUnitTarget();
+    if (target == _canonicalReadingUnitPage()) return;
     await viewController.goToPage(target);
   }
 
-  Future<void> nextPage({bool facing = false}) async {
-    final target = _nextPageTarget(facing: facing);
-    if (target == currentPageIndex) return;
+  Future<void> goToNextReadingUnit() async {
+    final target = _nextReadingUnitTarget();
+    if (target == _canonicalReadingUnitPage()) return;
     await viewController.goToPage(target);
   }
 
-  int _previousPageTarget({required bool facing}) {
-    if (pageCount <= 0) return currentPageIndex;
-    if (!facing) return (currentPageIndex - 1).clamp(0, pageCount - 1);
-    if (currentPageIndex <= 2) return 0;
-    final spreadStart = currentPageIndex.isOdd
-        ? currentPageIndex
-        : currentPageIndex - 1;
-    return (spreadStart - 2).clamp(0, pageCount - 1);
-  }
+  int _canonicalReadingUnitPage() => ReadingUnitNavigation.canonicalPage(
+    pageIndex: currentPageIndex,
+    pageCount: pageCount,
+    mode: readerMode,
+  );
 
-  int _nextPageTarget({required bool facing}) {
-    if (pageCount <= 0) return currentPageIndex;
-    if (!facing) return (currentPageIndex + 1).clamp(0, pageCount - 1);
-    if (currentPageIndex == 0) return pageCount > 1 ? 1 : 0;
-    final spreadStart = currentPageIndex.isOdd
-        ? currentPageIndex
-        : currentPageIndex - 1;
-    final target = spreadStart + 2;
-    return target < pageCount ? target : currentPageIndex;
-  }
+  int _previousReadingUnitTarget() => ReadingUnitNavigation.previousTarget(
+    pageIndex: currentPageIndex,
+    pageCount: pageCount,
+    mode: readerMode,
+  );
 
-  Future<void> firstPage() => viewController.goToPage(0);
+  int _nextReadingUnitTarget() => ReadingUnitNavigation.nextTarget(
+    pageIndex: currentPageIndex,
+    pageCount: pageCount,
+    mode: readerMode,
+  );
 
-  Future<void> lastPage() =>
-      viewController.goToPage((pageCount - 1).clamp(0, pageCount));
+  Future<void> goToFirstReadingUnit() => viewController.goToPage(0);
+
+  Future<void> goToLastReadingUnit() => viewController.goToPage(
+    ReadingUnitNavigation.lastTarget(pageCount: pageCount, mode: readerMode),
+  );
+
+  String readingUnitIndicator({
+    ReadingDirection direction = ReadingDirection.leftToRight,
+  }) => ReadingUnitNavigation.indicator(
+    pageIndex: currentPageIndex,
+    pageCount: pageCount,
+    mode: readerMode,
+    direction: direction,
+  );
 
   Future<void> goToPage(int oneBasedPage) => navigateTo(
     oneBasedPage.clamp(1, pageCount) - 1,
@@ -379,11 +387,17 @@ final class ReaderController extends ChangeNotifier {
   void setReaderMode(ReaderMode mode) {
     final current = preferences;
     if (current == null) return;
+    final canonicalPage = ReadingUnitNavigation.canonicalPage(
+      pageIndex: currentPageIndex,
+      pageCount: pageCount,
+      mode: mode,
+    );
+    currentPageIndex = canonicalPage;
     preferences = current.copyWith(
       viewMode: mode,
       pageLayout: mode == ReaderMode.book
           ? PageLayoutMode.facing
-          : current.pageLayout,
+          : PageLayoutMode.single,
     );
     _scheduleSave();
     notifyListeners();
@@ -400,7 +414,15 @@ final class ReaderController extends ChangeNotifier {
   void setPageLayout(PageLayoutMode layout) {
     final current = preferences;
     if (current == null) return;
-    preferences = current.copyWith(pageLayout: layout);
+    final mode = layout == PageLayoutMode.facing
+        ? ReaderMode.book
+        : ReaderMode.document;
+    currentPageIndex = ReadingUnitNavigation.canonicalPage(
+      pageIndex: currentPageIndex,
+      pageCount: pageCount,
+      mode: mode,
+    );
+    preferences = current.copyWith(pageLayout: layout, viewMode: mode);
     _scheduleSave();
     notifyListeners();
   }

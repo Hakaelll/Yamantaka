@@ -17,6 +17,11 @@
 - Corrige el modo oscuro aun durante un arranque seguro, convierte `←`/`→` en
   la navegación principal y hace que el modo libro avance por pliegos:
   portada, 2–3, 4–5 y sucesivos.
+- Rehace el viewport del lector con pliegos compactos, lomo de 10–16 px,
+  normalización de paneo/zoom, ajuste sobre la unidad completa, indicador
+  `2–3 / total` y una sola navegación para botones y teclado.
+- Sustituye el selector de modos por un control segmentado monocromático con
+  forma, peso, subrayado, hover, semántica y tooltips explícitos.
 - Biblioteca espacial monocromática con portadas flotantes, jitter estable,
   virtualización, selección, foco, hover, teclado y menú contextual.
 - Búsqueda temporal y filtros/orden compactos; favorito persistente y
@@ -26,6 +31,7 @@
 - Tokens claro/oscuro refinados e iconos de aplicación generados directamente
   desde la imagen original entregada, sin reinterpretarla ni introducirla como
   decoración dentro de la interfaz.
+- Añade favicon `.ico`/`.png` e iconos web/PWA desde esa misma imagen original.
 - Transición corta de opacidad/escala entre biblioteca y lector, respetando
   tanto la preferencia de animación como la reducción de movimiento del sistema.
 - Nuevas pruebas de scoring, persistencia, layout, navegación, filtros,

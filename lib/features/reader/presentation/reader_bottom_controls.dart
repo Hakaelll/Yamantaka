@@ -12,7 +12,7 @@ final class ReaderBottomControls extends StatelessWidget {
     required this.compact,
     required this.onGoToPage,
     required this.onChooseTheme,
-    required this.facingNavigation,
+    required this.readingDirection,
     this.shortcutOverrides = '{}',
   });
 
@@ -20,7 +20,7 @@ final class ReaderBottomControls extends StatelessWidget {
   final bool compact;
   final VoidCallback onGoToPage;
   final VoidCallback onChooseTheme;
-  final bool facingNavigation;
+  final ReadingDirection readingDirection;
   final String shortcutOverrides;
 
   @override
@@ -37,6 +37,9 @@ final class ReaderBottomControls extends StatelessWidget {
   Widget _buildControls(BuildContext context) {
     final preferences = controller.preferences;
     if (preferences == null) return const SizedBox.shrink();
+    final facing = preferences.viewMode == ReaderMode.book;
+    final previousLabel = facing ? 'Apertura anterior' : 'Página anterior';
+    final nextLabel = facing ? 'Apertura siguiente' : 'Página siguiente';
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: compact ? 520 : 680),
@@ -58,11 +61,11 @@ final class ReaderBottomControls extends StatelessWidget {
                 const SizedBox(width: AppSpacing.space4),
                 IconButton(
                   tooltip: _shortcutTooltip(
-                    'Página anterior',
+                    previousLabel,
                     AppCommandId.previousPage,
                   ),
-                  onPressed: controller.canGoBackBy(facing: facingNavigation)
-                      ? () => controller.previousPage(facing: facingNavigation)
+                  onPressed: controller.canGoToPreviousReadingUnit
+                      ? controller.goToPreviousReadingUnit
                       : null,
                   icon: const Icon(Icons.chevron_left_rounded),
                 ),
@@ -75,19 +78,17 @@ final class ReaderBottomControls extends StatelessWidget {
                     key: const Key('reader-page-indicator'),
                     onPressed: onGoToPage,
                     child: Text(
-                      '${controller.currentPageIndex + 1} / '
-                      '${controller.pageCount}',
+                      controller.readingUnitIndicator(
+                        direction: readingDirection,
+                      ),
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
                   ),
                 ),
                 IconButton(
-                  tooltip: _shortcutTooltip(
-                    'Página siguiente',
-                    AppCommandId.nextPage,
-                  ),
-                  onPressed: controller.canGoForwardBy(facing: facingNavigation)
-                      ? () => controller.nextPage(facing: facingNavigation)
+                  tooltip: _shortcutTooltip(nextLabel, AppCommandId.nextPage),
+                  onPressed: controller.canGoToNextReadingUnit
+                      ? controller.goToNextReadingUnit
                       : null,
                   icon: const Icon(Icons.chevron_right_rounded),
                 ),

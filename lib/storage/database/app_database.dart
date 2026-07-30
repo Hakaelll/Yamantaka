@@ -264,7 +264,7 @@ final class AppDatabase {
                 CHECK(is_pinned IN (0, 1)),
               page_index INTEGER NOT NULL DEFAULT 0 CHECK(page_index >= 0),
               zoom_level REAL NOT NULL DEFAULT 1 CHECK(zoom_level > 0),
-              page_layout TEXT NOT NULL DEFAULT 'continuous',
+              page_layout TEXT NOT NULL DEFAULT 'single',
               reading_mode TEXT NOT NULL DEFAULT 'document',
               scroll_offset REAL NOT NULL DEFAULT 0,
               UNIQUE(workspace_id, document_id)

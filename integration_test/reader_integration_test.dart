@@ -323,9 +323,16 @@ void main() {
       () => Future<void>.delayed(const Duration(milliseconds: 500)),
     );
     await tester.pump(const Duration(seconds: 4));
+    expect(find.text('2–3 / 3'), findsOneWidget);
+    await _expectFacingSpreadCompact(tester);
     await _captureReaderState(tester, suffix: '-book-spread');
     reader.setReaderMode(ReaderMode.document);
     await tester.pump();
+    await _pumpUntil(
+      tester,
+      () => viewController.isReady,
+      reason: 'document-mode viewer to reattach',
+    );
 
     final initialZoom = viewController.zoom;
     final zoom = viewController.zoomBy(1.1);
@@ -422,6 +429,42 @@ Future<void> _expectActivePageCentered(WidgetTester tester) async {
     expect(whiteColumns, isNotEmpty);
     final pageCenter = (whiteColumns.first + whiteColumns.last) / 2;
     expect(pageCenter, closeTo(image.width / 2, 3));
+  } finally {
+    image.dispose();
+  }
+}
+
+Future<void> _expectFacingSpreadCompact(WidgetTester tester) async {
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const Key('native-viewer-boundary')),
+  );
+  final image = await boundary.toImage();
+  try {
+    final rgba = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    expect(rgba, isNotNull);
+    final y = image.height ~/ 2;
+    final runs = <(int, int)>[];
+    int? runStart;
+    for (var x = 0; x < image.width; x++) {
+      final offset = (y * image.width + x) * 4;
+      final white =
+          rgba!.getUint8(offset) >= 248 &&
+          rgba.getUint8(offset + 1) >= 248 &&
+          rgba.getUint8(offset + 2) >= 248;
+      if (white && runStart == null) runStart = x;
+      if (!white && runStart != null) {
+        if (x - runStart > 30) runs.add((runStart, x - 1));
+        runStart = null;
+      }
+    }
+    if (runStart != null && image.width - runStart > 30) {
+      runs.add((runStart, image.width - 1));
+    }
+    expect(runs, hasLength(2));
+    final gap = runs[1].$1 - runs[0].$2 - 1;
+    expect(gap, inInclusiveRange(4, 40));
+    final spreadCenter = (runs.first.$1 + runs.last.$2) / 2;
+    expect(spreadCenter, closeTo(image.width / 2, 4));
   } finally {
     image.dispose();
   }
