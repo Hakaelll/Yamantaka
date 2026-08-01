@@ -3,7 +3,6 @@ import 'package:yamantaka/app/app_config.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/application/document_service.dart';
 import 'package:yamantaka/features/library/application/duplicate_resolution_service.dart';
-import 'package:yamantaka/features/library/application/library_filter.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
 import 'package:yamantaka/features/library/domain/import_queue.dart';
 import 'package:yamantaka/features/library/domain/library_query.dart';

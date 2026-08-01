@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/features/library/domain/authorized_folder_watch.dart';
 
@@ -5,12 +7,18 @@ void main() {
   test(
     'events outside authorized roots are ignored and accepted events debounce',
     () {
+      final root = '${Directory.systemTemp.path}${Platform.pathSeparator}Books';
+      final other =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}Other';
       final watch = AuthorizedFolderWatch(debounce: const Duration(seconds: 1))
-        ..authorize('C:/Books');
-      expect(watch.accept('C:/Other/book.pdf'), FolderWatchDecision.ignored);
+        ..authorize(root);
+      expect(
+        watch.accept('$other${Platform.pathSeparator}book.pdf'),
+        FolderWatchDecision.ignored,
+      );
       final at = DateTime.utc(2026, 1, 1);
       expect(
-        watch.accept('C:/Books/book.pdf', at: at),
+        watch.accept('$root${Platform.pathSeparator}book.pdf', at: at),
         FolderWatchDecision.queuedForRevalidation,
       );
       expect(
@@ -23,16 +31,21 @@ void main() {
   );
 
   test('pausing clears pending work and revoking a root is immediate', () {
-    final watch = AuthorizedFolderWatch()..authorize('C:/Books');
+    final books = '${Directory.systemTemp.path}${Platform.pathSeparator}Books';
+    final other = '${Directory.systemTemp.path}${Platform.pathSeparator}Other';
+    final watch = AuthorizedFolderWatch()..authorize(books);
     final at = DateTime.utc(2026, 1, 1);
-    watch.accept('C:/Books/book.pdf', at: at);
+    watch.accept('$books${Platform.pathSeparator}book.pdf', at: at);
     watch.setPaused(true);
     expect(watch.pendingCount, 0);
-    expect(watch.accept('C:/Books/other.pdf'), FolderWatchDecision.paused);
+    expect(
+      watch.accept('$books${Platform.pathSeparator}other.pdf'),
+      FolderWatchDecision.paused,
+    );
     watch.setPaused(false);
-    watch.authorize('C:/Other');
-    watch.accept('C:/Other/a.pdf', at: at);
-    watch.revoke('C:/Other');
+    watch.authorize(other);
+    watch.accept('$other${Platform.pathSeparator}a.pdf', at: at);
+    watch.revoke(other);
     expect(watch.pendingCount, 0);
   });
 }

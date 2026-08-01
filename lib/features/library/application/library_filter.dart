@@ -89,5 +89,6 @@ LibraryReadingState readingStateOf(LibraryDocument document) {
 }
 
 String documentLabel(LibraryDocument document) {
-  return document.effectiveTitle.trim().toLowerCase();
+  final title = document.effectiveTitle.trim();
+  return (title.isEmpty ? document.fileName : title).toLowerCase();
 }

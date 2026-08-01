@@ -3,7 +3,7 @@ import 'package:yamantaka/core/backup/backup_manifest.dart';
 
 void main() {
   test('backup manifest round trips without PDF payloads', () {
-    const manifest = BackupManifest(
+    final manifest = BackupManifest(
       format: 'yamantaka-local-backup',
       version: 3,
       schemaVersion: 3,

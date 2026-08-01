@@ -392,62 +392,62 @@ void main() {
   );
 
   testWidgets('library selection mode supports multiple accessible items', (
-    (tester) async {
-      final database = AppDatabase.inMemory(
-        AppLogger(minimumLevel: LogLevel.error),
-      );
-      addTearDown(database.close);
-      final repository = DocumentRepository(database)
-        ..save(
-          _document(
-            id: 'alpha',
-            fileName: 'alpha.pdf',
-            openedAt: DateTime.utc(2026, 7, 29),
-          ),
-        )
-        ..save(
-          _document(
-            id: 'beta',
-            fileName: 'beta.pdf',
-            openedAt: DateTime.utc(2026, 7, 28),
-          ),
-        );
-      final controller = LibraryController(
-        repository,
-        AppLogger(minimumLevel: LogLevel.error),
-      );
-      await controller.load();
-      tester.view.physicalSize = const Size(1100, 760);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light(),
-          home: LibraryScreen(
-            controller: controller,
-            onOpenPath: (_) async {},
-            onPickDocument: () async {},
-            onOpenSettings: () {},
-            showRecents: true,
-          ),
+    tester,
+  ) async {
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    addTearDown(database.close);
+    final repository = DocumentRepository(database)
+      ..save(
+        _document(
+          id: 'alpha',
+          fileName: 'alpha.pdf',
+          openedAt: DateTime.utc(2026, 7, 29),
+        ),
+      )
+      ..save(
+        _document(
+          id: 'beta',
+          fileName: 'beta.pdf',
+          openedAt: DateTime.utc(2026, 7, 28),
         ),
       );
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('library-selection-mode-button')));
-      await tester.tap(find.byKey(const ValueKey('artifact-alpha')));
-      await tester.tap(find.byKey(const ValueKey('artifact-beta')));
-      await tester.pump();
+    final controller = LibraryController(
+      repository,
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    await controller.load();
+    tester.view.physicalSize = const Size(1100, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      expect(find.text('2 seleccionados'), findsWidgets);
-      expect(find.byIcon(Icons.check_rounded), findsNWidgets(2));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: LibraryScreen(
+          controller: controller,
+          onOpenPath: (_) async {},
+          onPickDocument: () async {},
+          onOpenSettings: () {},
+          showRecents: true,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('library-selection-mode-button')));
+    await tester.tap(find.byKey(const ValueKey('artifact-alpha')));
+    await tester.tap(find.byKey(const ValueKey('artifact-beta')));
+    await tester.pump(const Duration(milliseconds: 50));
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pump();
-      expect(find.text('2 seleccionados'), findsNothing);
-    },
-  ));
+    expect(find.text('2 seleccionados'), findsWidgets);
+    expect(find.byIcon(Icons.check_rounded), findsNWidgets(2));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.text('2 seleccionados'), findsNothing);
+  });
 
   testWidgets('thumbnail decoding is bounded by its physical display size', (
     tester,

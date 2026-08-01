@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:math' as math;
 
 import '../../../storage/database/app_database.dart';
@@ -201,20 +203,42 @@ final class DuplicateResolutionService {
     final db = _database.database;
     db.execute(
       '''
-      INSERT INTO bookmarks(
-        id, document_id, page_index, label, created_at, updated_at
-      )
-      SELECT id, ?, page_index, label, created_at, updated_at
-      FROM bookmarks WHERE document_id = ?
-      ON CONFLICT(document_id, page_index) DO UPDATE SET
-        label = COALESCE(bookmarks.label, excluded.label),
-        updated_at = CASE
-          WHEN bookmarks.updated_at >= excluded.updated_at
-          THEN bookmarks.updated_at ELSE excluded.updated_at END
+      UPDATE bookmarks
+      SET label = COALESCE(
+            label,
+            (SELECT incoming.label FROM bookmarks AS incoming
+             WHERE incoming.document_id = ?
+               AND incoming.page_index = bookmarks.page_index)
+          ),
+          updated_at = MAX(
+            updated_at,
+            (SELECT incoming.updated_at FROM bookmarks AS incoming
+             WHERE incoming.document_id = ?
+               AND incoming.page_index = bookmarks.page_index)
+          )
+      WHERE document_id = ?
+        AND EXISTS (
+          SELECT 1 FROM bookmarks AS incoming
+          WHERE incoming.document_id = ?
+            AND incoming.page_index = bookmarks.page_index
+        )
       ''',
-      [existingId, incomingId],
+      [incomingId, incomingId, existingId, incomingId],
     );
-    db.execute('DELETE FROM bookmarks WHERE document_id = ?', [incomingId]);
+    db.execute(
+      '''
+      DELETE FROM bookmarks
+      WHERE document_id = ?
+        AND page_index IN (
+          SELECT page_index FROM bookmarks WHERE document_id = ?
+        )
+      ''',
+      [incomingId, existingId],
+    );
+    db.execute('UPDATE bookmarks SET document_id = ? WHERE document_id = ?', [
+      existingId,
+      incomingId,
+    ]);
   }
 
   void _mergePreferences(String existingId, String incomingId) {

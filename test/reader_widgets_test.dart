@@ -40,7 +40,13 @@ void main() {
 
     await tester.pumpWidget(_app(harness));
 
-    expect(find.text('El PDF de prueba está dañado.'), findsOneWidget);
+    expect(find.text('El PDF no se puede abrir'), findsOneWidget);
+    expect(
+      find.text(
+        'El archivo puede estar dañado o usar una variante no compatible.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Volver a la biblioteca'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
@@ -289,6 +295,32 @@ void main() {
     expect(harness.controller.currentPageIndex, 0);
 
     await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('arrow keys navigate while the PDF canvas owns focus', (
+    tester,
+  ) async {
+    final harness = await _ReaderHarness.create(ready: true);
+    final viewerFocus = FocusNode(debugLabel: 'embedded PDF canvas');
+    final adapter = _KeyboardConsumingViewerAdapter(viewerFocus);
+
+    await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
+    await tester.pump();
+    viewerFocus.requestFocus();
+    await tester.pump();
+    expect(viewerFocus.hasPrimaryFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 1);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    expect(harness.controller.currentPageIndex, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    viewerFocus.dispose();
     await harness.dispose();
   });
 
@@ -668,6 +700,30 @@ final class _RecordingViewerAdapter implements PdfViewerAdapter {
     this.configuration = configuration;
     return const ColoredBox(key: Key('test-pdf-viewer'), color: Colors.white);
   }
+}
+
+final class _KeyboardConsumingViewerAdapter implements PdfViewerAdapter {
+  const _KeyboardConsumingViewerAdapter(this.focusNode);
+
+  final FocusNode focusNode;
+
+  @override
+  Widget buildViewer({
+    required OpenedPdfDocument document,
+    required PdfViewController controller,
+    required PdfViewConfiguration configuration,
+    required int initialPageIndex,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<Object> onError,
+  }) => Focus(
+    focusNode: focusNode,
+    onKeyEvent: (_, event) =>
+        event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+            event.logicalKey == LogicalKeyboardKey.arrowRight
+        ? KeyEventResult.handled
+        : KeyEventResult.ignored,
+    child: const ColoredBox(key: Key('test-pdf-viewer'), color: Colors.white),
+  );
 }
 
 final class _CountingViewerAdapter implements PdfViewerAdapter {

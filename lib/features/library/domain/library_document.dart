@@ -140,8 +140,8 @@ final class LibraryDocument {
     final nextNote = identical(note, _keepMetadataValue)
         ? libraryNote
         : _normalizedLibraryNote(note as String?);
-    final baseTitle = this.sourceTitle ?? this.title;
-    final baseAuthor = this.sourceAuthor ?? this.author;
+    final baseTitle = sourceTitle ?? this.title;
+    final baseAuthor = sourceAuthor ?? this.author;
     return LibraryDocument(
       id: id,
       path: path,

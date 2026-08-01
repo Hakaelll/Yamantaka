@@ -1,18 +1,18 @@
-import '../lib/core/async/job_coordinator.dart';
-import '../lib/core/lifecycle/lifecycle_tracker.dart';
-import '../lib/core/memory/memory_governor.dart';
-import '../lib/core/performance/prefetch_planner.dart';
-import '../lib/core/performance/progressive_open.dart';
-import '../lib/core/security/local_input_policy.dart';
-import '../lib/core/platform/print_request.dart';
-import '../lib/core/platform/single_instance_protocol.dart';
-import '../lib/core/platform/window_geometry.dart';
-import '../lib/core/privacy/diagnostics_redactor.dart';
-import '../lib/core/recovery/recovery_policy.dart';
-import '../lib/features/library/domain/library_query.dart';
-import '../lib/features/navigation/domain/unified_navigation.dart';
-import '../lib/features/reader/domain/reader_models.dart';
-import '../lib/features/workspaces/domain/split_sync.dart';
+import 'package:yamantaka/core/async/job_coordinator.dart';
+import 'package:yamantaka/core/lifecycle/lifecycle_tracker.dart';
+import 'package:yamantaka/core/memory/memory_governor.dart';
+import 'package:yamantaka/core/performance/prefetch_planner.dart';
+import 'package:yamantaka/core/performance/progressive_open.dart';
+import 'package:yamantaka/core/platform/print_request.dart';
+import 'package:yamantaka/core/platform/single_instance_protocol.dart';
+import 'package:yamantaka/core/platform/window_geometry.dart';
+import 'package:yamantaka/core/privacy/diagnostics_redactor.dart';
+import 'package:yamantaka/core/recovery/recovery_policy.dart';
+import 'package:yamantaka/core/security/local_input_policy.dart';
+import 'package:yamantaka/features/library/domain/library_query.dart';
+import 'package:yamantaka/features/navigation/domain/unified_navigation.dart';
+import 'package:yamantaka/features/reader/domain/reader_models.dart';
+import 'package:yamantaka/features/workspaces/domain/split_sync.dart';
 import 'sha256.dart';
 
 Future<void> main() async {

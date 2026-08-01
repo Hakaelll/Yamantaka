@@ -106,6 +106,7 @@ final class _SearchEngine extends StubPdfDocumentEngine {
   Future<String> extractPageText({
     required String documentId,
     required int pageIndex,
+    PdfOperationToken? cancellationToken,
   }) async => pageTexts[pageIndex];
 
   @override

@@ -112,9 +112,8 @@ void main() {
       );
       addTearDown(() => directory.deleteSync(recursive: true));
       final path = '${directory.path}${Platform.pathSeparator}legacy.sqlite3';
-      final legacy = sqlite3.open(path)
-        ..execute('CREATE TABLE documents(id TEXT NOT NULL PRIMARY KEY) STRICT')
-        ..execute('PRAGMA user_version = 1');
+      final legacy = sqlite3.open(path);
+      _createVersionOneSchema(legacy);
       legacy.close();
 
       final migrated = AppDatabase.open(path, AppLogger());
@@ -633,6 +632,81 @@ void main() {
   });
 }
 
+void _createVersionOneSchema(Database database) {
+  database
+    ..execute('''
+      CREATE TABLE documents (
+        id TEXT NOT NULL PRIMARY KEY,
+        path TEXT NOT NULL,
+        normalized_path TEXT NOT NULL UNIQUE,
+        file_name TEXT NOT NULL,
+        title TEXT,
+        author TEXT,
+        page_count INTEGER NOT NULL CHECK(page_count >= 0),
+        file_size INTEGER NOT NULL CHECK(file_size >= 0),
+        file_modified_at TEXT NOT NULL,
+        added_at TEXT NOT NULL,
+        last_opened_at TEXT NOT NULL,
+        last_page_index INTEGER NOT NULL DEFAULT 0 CHECK(last_page_index >= 0),
+        reading_progress REAL NOT NULL DEFAULT 0
+          CHECK(reading_progress BETWEEN 0 AND 1),
+        preferred_view_mode TEXT NOT NULL DEFAULT 'document',
+        preferred_theme TEXT NOT NULL DEFAULT 'ivory',
+        is_missing INTEGER NOT NULL DEFAULT 0 CHECK(is_missing IN (0, 1)),
+        fingerprint TEXT NOT NULL,
+        thumbnail_path TEXT
+      ) STRICT
+    ''')
+    ..execute('''
+      CREATE TABLE document_preferences (
+        document_id TEXT NOT NULL PRIMARY KEY
+          REFERENCES documents(id) ON DELETE CASCADE,
+        view_mode TEXT NOT NULL,
+        reading_theme TEXT NOT NULL,
+        zoom_mode TEXT NOT NULL,
+        zoom_level REAL NOT NULL CHECK(zoom_level > 0),
+        page_layout TEXT NOT NULL,
+        page_rotation INTEGER NOT NULL DEFAULT 0,
+        horizontal_margin REAL NOT NULL DEFAULT 32,
+        vertical_margin REAL NOT NULL DEFAULT 24,
+        controls_auto_hide INTEGER NOT NULL DEFAULT 1
+          CHECK(controls_auto_hide IN (0, 1)),
+        scroll_offset REAL NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      ) STRICT
+    ''')
+    ..execute('''
+      CREATE TABLE bookmarks (
+        id TEXT NOT NULL PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        page_index INTEGER NOT NULL CHECK(page_index >= 0),
+        label TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(document_id, page_index)
+      ) STRICT
+    ''')
+    ..execute('''
+      CREATE TABLE reading_sessions (
+        id TEXT NOT NULL PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        start_page INTEGER NOT NULL CHECK(start_page >= 0),
+        end_page INTEGER NOT NULL CHECK(end_page >= 0),
+        active_seconds INTEGER NOT NULL DEFAULT 0 CHECK(active_seconds >= 0)
+      ) STRICT
+    ''')
+    ..execute('''
+      CREATE TABLE app_metadata (
+        key TEXT NOT NULL PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT
+    ''')
+    ..execute('PRAGMA user_version = 1');
+}
+
 LibraryDocument _document({
   String id = 'document-1',
   String path = r'C:\library\document.pdf',
@@ -697,6 +771,7 @@ final class _RecordingPdfEngine extends StubPdfDocumentEngine {
   Future<String> extractPageText({
     required String documentId,
     required int pageIndex,
+    PdfOperationToken? cancellationToken,
   }) async {
     onExtract?.call(pageIndex);
     return pageText(pageIndex);

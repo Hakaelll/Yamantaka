@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -377,8 +379,9 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
             bytes: estimatedBytes,
             priority: MemoryPriority.visible,
           );
-          if (activeReservation != null)
+          if (activeReservation != null) {
             _uncachedMemory[image] = activeReservation;
+          }
           (_uncachedImages[key.documentId] ??= <ui.Image>{}).add(image);
         }
         _logger.debug(

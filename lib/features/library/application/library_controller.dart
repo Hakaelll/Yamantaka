@@ -61,7 +61,7 @@ final class LibraryController extends ChangeNotifier {
       totalDocuments = page.total;
       hasMore = page.hasMore;
       if (selectedDocumentId != null &&
-          !documents.any((document) => document.id == selectedDocumentId)) {
+          _repository.byId(selectedDocumentId!) == null) {
         selectedDocumentId = null;
       }
       if (selectedDocumentId == null && documents.length == 1) {

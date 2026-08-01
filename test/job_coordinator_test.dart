@@ -109,6 +109,7 @@ void main() {
     final coordinator = JobCoordinator(maxConcurrent: 1);
     addTearDown(coordinator.dispose);
     final blocker = Completer<void>();
+    coordinator.setBackgroundPaused(true);
     final background = coordinator.submit<int>(
       key: 'background',
       category: JobCategory.indexing,
@@ -116,7 +117,6 @@ void main() {
       generation: 1,
       task: (_) async => 1,
     );
-    coordinator.setBackgroundPaused(true);
     expect(coordinator.snapshot.queued, 1);
 
     final visible = coordinator.submit<int>(

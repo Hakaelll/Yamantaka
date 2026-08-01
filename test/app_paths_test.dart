@@ -11,6 +11,9 @@ void main() {
     File('${root.path}/.yamantaka-portable').writeAsStringSync('1');
     final paths = await AppPaths.create(executablePath: executable.path);
     expect(paths.isPortable, isTrue);
-    expect(paths.dataDirectory.path, '${root.path}\data');
+    expect(
+      paths.dataDirectory.path,
+      '${root.path}${Platform.pathSeparator}data',
+    );
   });
 }

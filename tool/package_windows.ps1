@@ -13,6 +13,7 @@ $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $outputRoot = [System.IO.Path]::GetFullPath((Join-Path $root $OutputDirectory))
 $bundle = Join-Path $outputRoot 'yamantaka'
+$failurePath = Join-Path $outputRoot 'release-failure.json'
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $toolStateRoot = Join-Path $root 'build/verification/tool-state'
 New-Item -ItemType Directory -Force -Path $toolStateRoot | Out-Null
@@ -95,10 +96,12 @@ try {
             exitCode = $buildExitCode
             error = $_.Exception.Message
         }
-        $failurePath = Join-Path $outputRoot 'release-failure.json'
         $failure | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 $failurePath
         Write-Host "Release failure report: $failurePath" -ForegroundColor Red
         throw
+    }
+    if (Test-Path -LiteralPath $failurePath) {
+        Remove-Item -LiteralPath $failurePath -Force
     }
     $releaseRoot = Join-Path $root 'build/windows/x64/runner/Release'
     if (-not (Test-Path $releaseRoot)) { throw "Release directory not found: $releaseRoot" }
@@ -119,6 +122,7 @@ try {
     }
     if ($RequireSignature -and -not $signed) { throw 'A signed package was required but no certificate was supplied.' }
     $commit = (git rev-parse HEAD).Trim()
+    $dirty = @((git status --porcelain)).Count -gt 0
     $files = Get-ChildItem -LiteralPath $bundle -File -Recurse | ForEach-Object {
         [ordered]@{
             path = $_.FullName.Substring($bundle.Length + 1).Replace('\', '/')
@@ -132,6 +136,7 @@ try {
         productVersion = $Version
         buildNumber = $BuildNumber
         commit = $commit
+        dirty = $dirty
         generatedAt = [DateTime]::UtcNow.ToString('o')
         signed = $signed
         distribution = if ($Portable) { 'portable' } else { 'installed-bundle' }

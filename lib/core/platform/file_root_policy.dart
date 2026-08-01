@@ -16,7 +16,9 @@ final class AuthorizedFileRoot {
     }
     return value == root ||
         value.startsWith(
-          '${root.endsWith(Platform.pathSeparator) ? root : '$root${Platform.pathSeparator}'}',
+          root.endsWith(Platform.pathSeparator)
+              ? root
+              : '$root${Platform.pathSeparator}',
         );
   }
 

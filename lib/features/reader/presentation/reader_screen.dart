@@ -90,6 +90,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   Timer? _controlsTimer;
   Timer? _panelSaveTimer;
   final FocusNode _readerFocusNode = FocusNode(debugLabel: 'PDF reader');
+  final GlobalKey _viewerRegionKey = GlobalKey(debugLabel: 'PDF viewer region');
   FocusNode? _focusBeforePanel;
   String? _focusedDocumentId;
   Object? _viewerCacheKey;
@@ -107,6 +108,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_handleHardwareNavigation);
     _controlsVisible = widget.initialChromeVisible;
     _panelWidthValue = widget.initialPanelWidth
         .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth)
@@ -123,6 +125,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleHardwareNavigation);
     _controlsTimer?.cancel();
     _panelSaveTimer?.cancel();
     _readerFocusNode.dispose();
@@ -173,10 +176,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
           );
         }
         return CallbackShortcuts(
-          bindings: AppCommandRegistry.shortcuts(
-            _commandActions(context),
-            overrides: widget.shortcutOverrides,
-          ),
+          bindings: _shortcutBindings(context),
           child: Focus(
             focusNode: _readerFocusNode,
             autofocus: true,
@@ -266,6 +266,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                   '${_isBookMode ? 'Modo Libro' : 'Modo Documento'}, '
                   '${controller.readingUnitIndicator(direction: widget.readingDirection)}',
               child: Listener(
+                key: _viewerRegionKey,
                 behavior: HitTestBehavior.translucent,
                 onPointerDown: (_) => _requestReaderFocus(),
                 child: TweenAnimationBuilder<double>(
@@ -614,6 +615,75 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     if (focusContext == null) return false;
     return focusContext.widget is EditableText ||
         focusContext.findAncestorWidgetOfExactType<EditableText>() != null;
+  }
+
+  bool get _readerCanvasHasFocus {
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    if (identical(primaryFocus, _readerFocusNode)) return true;
+    final focusContext = primaryFocus?.context;
+    final viewerContext = _viewerRegionKey.currentContext;
+    if (focusContext == null || viewerContext == null) return false;
+    if (identical(focusContext, viewerContext)) return true;
+    var isInsideViewer = false;
+    focusContext.visitAncestorElements((element) {
+      if (identical(element, viewerContext)) {
+        isInsideViewer = true;
+        return false;
+      }
+      return true;
+    });
+    return isInsideViewer;
+  }
+
+  bool _handleHardwareNavigation(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+    if (!mounted ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        widget.controller.status != ReaderStatus.ready ||
+        _textInputHasFocus ||
+        !_readerCanvasHasFocus) {
+      return false;
+    }
+    final keyboard = HardwareKeyboard.instance;
+    if (keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isShiftPressed) {
+      return false;
+    }
+    final shortcuts = AppCommandRegistry.resolvedTokens(
+      widget.shortcutOverrides,
+    );
+    Future<void> Function()? navigation;
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+        shortcuts[AppCommandId.nextPage] == 'arrow-right') {
+      navigation = widget.controller.goToNextReadingUnit;
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+        shortcuts[AppCommandId.previousPage] == 'arrow-left') {
+      navigation = widget.controller.goToPreviousReadingUnit;
+    }
+    if (navigation == null) return false;
+    widget.controller.registerActivity();
+    _revealControls();
+    unawaited(navigation());
+    return true;
+  }
+
+  Map<ShortcutActivator, VoidCallback> _shortcutBindings(BuildContext context) {
+    final bindings = AppCommandRegistry.shortcuts(
+      _commandActions(context),
+      overrides: widget.shortcutOverrides,
+    );
+    final shortcuts = AppCommandRegistry.resolvedTokens(
+      widget.shortcutOverrides,
+    );
+    if (shortcuts[AppCommandId.nextPage] == 'arrow-right') {
+      bindings.remove(const SingleActivator(LogicalKeyboardKey.arrowRight));
+    }
+    if (shortcuts[AppCommandId.previousPage] == 'arrow-left') {
+      bindings.remove(const SingleActivator(LogicalKeyboardKey.arrowLeft));
+    }
+    return bindings;
   }
 
   void _runReaderNavigation(Future<void> Function() action) {

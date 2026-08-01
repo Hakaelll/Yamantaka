@@ -1300,7 +1300,7 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                                   ))
                                               .ceil(),
                                       gaplessPlayback: true,
-                                      filterQuality: FilterQuality.high,
+                                      filterQuality: FilterQuality.low,
                                       errorBuilder: (_, _, _) =>
                                           _ArtifactPlaceholder(
                                             document: widget.document,

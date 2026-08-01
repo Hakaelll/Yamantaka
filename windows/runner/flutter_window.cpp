@@ -29,7 +29,7 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   activation_channel_ = std::make_unique<
       flutter::MethodChannel<flutter::EncodableValue>>(
-      flutter_controller_->engine()->binary_messenger(),
+      flutter_controller_->engine()->messenger(),
       "yamantaka/activation", &flutter::StandardMethodCodec::GetInstance());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 

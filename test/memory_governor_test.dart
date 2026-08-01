@@ -63,7 +63,7 @@ void main() {
     expect(
       governor.reserve(
         owner: MemoryOwner.prefetch,
-        bytes: 20,
+        bytes: 16,
         priority: MemoryPriority.prefetch,
       ),
       isNotNull,

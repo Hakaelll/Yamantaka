@@ -778,7 +778,7 @@ final class _DocumentCover extends StatelessWidget {
                 cacheWidth: cacheWidth,
                 cacheHeight: cacheHeight,
                 gaplessPlayback: true,
-                filterQuality: FilterQuality.high,
+                filterQuality: FilterQuality.low,
                 errorBuilder: (_, _, _) => ColoredBox(
                   color: context.appColors.surfaceSunken,
                   child: Center(

@@ -231,8 +231,10 @@ abstract final class ReaderViewportMetrics {
             boundedRect.left + visibleWidth / 2,
             boundedRect.right - visibleWidth / 2,
           );
-    final y = boundedRect.height <= visibleHeight && centerVerticallyWhenFits
-        ? boundedRect.center.dy
+    final y = boundedRect.height <= visibleHeight
+        ? centerVerticallyWhenFits
+              ? boundedRect.center.dy
+              : proposedCenter.dy
         : proposedCenter.dy.clamp(
             boundedRect.top + visibleHeight / 2,
             boundedRect.bottom - visibleHeight / 2,
