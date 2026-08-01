@@ -81,6 +81,13 @@ La evolución se evaluará en siete dimensiones inseparables:
 Esta línea base no equivale a una certificación de versión. Los gates definidos
 a continuación son la única vía para declarar un hito publicable.
 
+Revisión técnica del 2026-08-01: las tareas marcadas `REVIEW` tienen una
+implementación local y documentación/test de contrato en este checkout, pero
+conservan sus casillas abiertas hasta producir la evidencia indicada en cada
+tarea. La trazabilidad ejecutada y sus bloqueos están en
+`docs/verification/todo-traceability.md`; `YAM-106` sigue siendo el único
+`BLOCKED` por dependencia upstream externa.
+
 ## 4. Estados, prioridades, esfuerzo y áreas
 
 ### Estados
@@ -196,7 +203,7 @@ resolverse dentro del repositorio.
 
 #### YAM-100 — Gate reproducible de Windows
 
-- Estado: READY
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 0
@@ -233,7 +240,7 @@ resolverse dentro del repositorio.
 
 #### YAM-101 — Matriz nativa de resoluciones y DPI
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 0
@@ -268,7 +275,7 @@ resolverse dentro del repositorio.
 
 #### YAM-102 — Regresión visual automatizada
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 0
@@ -302,7 +309,7 @@ resolverse dentro del repositorio.
 
 #### YAM-103 — Corpus legal de PDF patológicos
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 0
@@ -336,7 +343,7 @@ resolverse dentro del repositorio.
 
 #### YAM-104 — Auditoría de ownership y ciclo de vida
 
-- Estado: READY
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 0
@@ -370,7 +377,7 @@ resolverse dentro del repositorio.
 
 #### YAM-105 — Coordinador único de trabajos asíncronos
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: XL
 - Fase: 0
@@ -474,7 +481,7 @@ resolverse dentro del repositorio.
 
 #### YAM-111 — Gobernador global de memoria
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 1
@@ -542,7 +549,7 @@ resolverse dentro del repositorio.
 
 #### YAM-113 — Apertura progresiva de documentos largos
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 1
@@ -575,7 +582,7 @@ resolverse dentro del repositorio.
 
 #### YAM-114 — Restauración precisa del viewport
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 1
@@ -673,7 +680,7 @@ resolverse dentro del repositorio.
 
 #### YAM-117 — Búsqueda visible dentro del documento
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 1
@@ -704,7 +711,7 @@ resolverse dentro del repositorio.
 
 #### YAM-118 — Navegación unificada del lector
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 1
@@ -737,7 +744,7 @@ resolverse dentro del repositorio.
 
 #### YAM-119 — Panel lateral eficiente y accesible
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 1
@@ -930,7 +937,7 @@ resolverse dentro del repositorio.
 
 #### YAM-130 — Biblioteca escalable a 5.000 documentos
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: XL
 - Fase: 2
@@ -962,7 +969,7 @@ resolverse dentro del repositorio.
 
 #### YAM-131 — Cola de importación recuperable
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 2
@@ -993,7 +1000,7 @@ resolverse dentro del repositorio.
 
 #### YAM-132 — Duplicados y fusión segura de metadatos
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 2
@@ -1025,7 +1032,7 @@ resolverse dentro del repositorio.
 
 #### YAM-133 — Recuperación y carpetas autorizadas
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: XL
 - Fase: 2
@@ -1056,7 +1063,7 @@ resolverse dentro del repositorio.
 
 #### YAM-134 — Organización y vistas inteligentes
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 2
@@ -1087,7 +1094,7 @@ resolverse dentro del repositorio.
 
 #### YAM-135 — Acciones masivas accesibles
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P2
 - Esfuerzo: L
 - Fase: 2
@@ -1119,7 +1126,7 @@ resolverse dentro del repositorio.
 
 #### YAM-136 — Pipeline de portadas mejorado
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 2
@@ -1151,7 +1158,7 @@ resolverse dentro del repositorio.
 
 #### YAM-137 — Editor local de metadatos
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P2
 - Esfuerzo: M
 - Fase: 2
@@ -1182,7 +1189,7 @@ resolverse dentro del repositorio.
 
 #### YAM-138 — Índice local incremental
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 2
@@ -1248,7 +1255,7 @@ resolverse dentro del repositorio.
 
 #### YAM-140 — Auditoría completa del sistema visual
 
-- Estado: READY
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 3
@@ -1281,7 +1288,7 @@ resolverse dentro del repositorio.
 
 #### YAM-141 — Refinamiento visual de la biblioteca
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 3
@@ -1313,7 +1320,7 @@ resolverse dentro del repositorio.
 
 #### YAM-142 — Simplificación del chrome del lector
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 3
@@ -1345,7 +1352,7 @@ resolverse dentro del repositorio.
 
 #### YAM-143 — Reorganización integral de Ajustes
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: XL
 - Fase: 3
@@ -1410,7 +1417,7 @@ resolverse dentro del repositorio.
 
 #### YAM-145 — Estados vacíos, carga y error coherentes
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 3
@@ -1473,7 +1480,7 @@ resolverse dentro del repositorio.
 
 #### YAM-147 — Layout adaptativo de escritorio
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 3
@@ -1505,7 +1512,7 @@ resolverse dentro del repositorio.
 
 #### YAM-148 — Accesibilidad completa con Narrador
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: XL
 - Fase: 3
@@ -1538,7 +1545,7 @@ resolverse dentro del repositorio.
 
 #### YAM-149 — Alto contraste, movimiento reducido y tinta electrónica
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 3
@@ -1573,7 +1580,7 @@ resolverse dentro del repositorio.
 
 #### YAM-150 — Arranque perezoso
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 4
@@ -1606,7 +1613,7 @@ resolverse dentro del repositorio.
 
 #### YAM-151 — Estado granular y reducción de rebuilds
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 4
@@ -1636,7 +1643,7 @@ resolverse dentro del repositorio.
 
 #### YAM-152 — Trabajos CPU/IO en segundo plano
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: XL
 - Fase: 4
@@ -1668,7 +1675,7 @@ resolverse dentro del repositorio.
 
 #### YAM-153 — Optimización y mantenimiento SQLite
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 4
@@ -1701,7 +1708,7 @@ resolverse dentro del repositorio.
 
 #### YAM-154 — Gate de rendimiento
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 4
@@ -1734,7 +1741,7 @@ resolverse dentro del repositorio.
 
 #### YAM-155 — Pruebas sostenidas de recursos
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 4
@@ -1766,7 +1773,7 @@ resolverse dentro del repositorio.
 
 #### YAM-156 — Eficiencia energética e inactividad
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: M
 - Fase: 4
@@ -1796,7 +1803,7 @@ resolverse dentro del repositorio.
 
 #### YAM-157 — Backup y restauración de nueva generación
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: XL
 - Fase: 4
@@ -1829,7 +1836,7 @@ resolverse dentro del repositorio.
 
 #### YAM-158 — Recuperación y safe mode endurecidos
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 4
@@ -1861,7 +1868,7 @@ resolverse dentro del repositorio.
 
 #### YAM-159 — Centro de privacidad y almacenamiento
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 4
@@ -1892,7 +1899,7 @@ resolverse dentro del repositorio.
 
 #### YAM-160 — Endurecimiento de seguridad local
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 4
@@ -1924,7 +1931,7 @@ resolverse dentro del repositorio.
 
 #### YAM-161 — Diagnóstico local redactado
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: M
 - Fase: 4
@@ -1958,7 +1965,7 @@ resolverse dentro del repositorio.
 
 #### YAM-170 — Instalador firmado y reproducible
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: XL
 - Fase: 5
@@ -1989,7 +1996,7 @@ resolverse dentro del repositorio.
 
 #### YAM-171 — Asociación PDF e instancia única
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 5
@@ -2020,7 +2027,7 @@ resolverse dentro del repositorio.
 
 #### YAM-172 — Ventana, monitores y cambios de DPI
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 5
@@ -2052,7 +2059,7 @@ resolverse dentro del repositorio.
 
 #### YAM-173 — Paquete portable y desinstalación segura
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 5
@@ -2084,7 +2091,7 @@ resolverse dentro del repositorio.
 
 #### YAM-174 — Localización castellano/inglés
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: XL
 - Fase: 5
@@ -2115,7 +2122,7 @@ resolverse dentro del repositorio.
 
 #### YAM-175 — Ayuda integrada y primer arranque
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P1
 - Esfuerzo: L
 - Fase: 5
@@ -2147,7 +2154,7 @@ resolverse dentro del repositorio.
 
 #### YAM-176 — Checklist de release candidate
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: L
 - Fase: 5
@@ -2180,7 +2187,7 @@ resolverse dentro del repositorio.
 
 #### YAM-177 — Periodo de estabilidad previo a 1.0
 
-- Estado: PLANNED
+- Estado: REVIEW
 - Prioridad: P0
 - Esfuerzo: XL
 - Fase: 5

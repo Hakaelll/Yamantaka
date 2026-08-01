@@ -9,6 +9,7 @@ import 'dart:ui' as ui;
 import 'package:path/path.dart' as p;
 
 import '../../core/errors/app_failure.dart';
+import '../../core/async/job_coordinator.dart';
 import '../../core/logging/app_logger.dart';
 import '../../features/library/domain/document_cover.dart';
 import '../../features/library/domain/library_document.dart';
@@ -28,20 +29,24 @@ final class ThumbnailService {
     required DocumentRepository documents,
     required AppLogger logger,
     required int Function() maxCacheBytes,
+    JobCoordinator? jobs,
   }) : _engine = engine,
        _paths = paths,
        _documents = documents,
        _logger = logger,
-       _maxCacheBytes = maxCacheBytes;
+       _maxCacheBytes = maxCacheBytes,
+       _jobs = jobs;
 
   final PdfDocumentEngine _engine;
   final AppPaths _paths;
   final DocumentRepository _documents;
   final AppLogger _logger;
   final int Function() _maxCacheBytes;
+  final JobCoordinator? _jobs;
   void Function()? onCoverUpdated;
   final Set<String> _cancelledDocumentIds = <String>{};
   final Map<String, PdfOperationToken> _activeCoverTokens = {};
+  final Map<String, JobHandle<void>> _activeCoverJobs = {};
   final Map<String, int> _coverGenerations = <String, int>{};
   int _coverQueueGeneration = 0;
   Future<void> _backgroundQueue = Future<void>.value();
@@ -49,6 +54,7 @@ final class ThumbnailService {
   Future<String?> generateCover({
     required String libraryDocumentId,
     required String engineDocumentId,
+    PdfOperationToken? cancellationToken,
   }) async {
     final document = _documents.byId(libraryDocumentId);
     if (document == null) return null;
@@ -67,71 +73,134 @@ final class ThumbnailService {
         pageIndex: manual!.sourcePageIndex.clamp(0, document.pageCount - 1),
         confidence: 1,
         selectionMode: CoverSelectionMode.manual,
+        cancellationToken: cancellationToken,
       );
     }
-    return _detectAndGenerate(document, engineDocumentId);
+    return _detectAndGenerate(
+      document,
+      engineDocumentId,
+      cancellationToken: cancellationToken,
+    );
   }
 
-  void enqueueCover(LibraryDocument document) {
+  void enqueueCover(
+    LibraryDocument document, {
+    JobPriority priority = JobPriority.background,
+  }) {
     _activeCoverTokens.remove(document.id)?.cancel();
     _cancelledDocumentIds.remove(document.id);
     final documentGeneration = (_coverGenerations[document.id] ?? 0) + 1;
     _coverGenerations[document.id] = documentGeneration;
     final queueGeneration = _coverQueueGeneration;
-    _backgroundQueue = _backgroundQueue
-        .catchError((Object error) {
-          _logger.warning('Previous cover queue task failed.', error);
-        })
-        .then((_) async {
-          if (queueGeneration != _coverQueueGeneration) return;
-          if (_coverGenerations[document.id] != documentGeneration) return;
-          if (_cancelledDocumentIds.contains(document.id)) return;
-          final current = _documents.byId(document.id);
-          if (current == null ||
-              current.isMissing ||
-              current.coverMetadata?.selectionMode ==
-                  CoverSelectionMode.manual) {
-            return;
-          }
-          final valid = current.coverMetadata?.isValidFor(
-            modifiedAt: current.fileModifiedAt,
-            currentAlgorithmVersion: CoverSelectionPolicy.algorithmVersion,
+    Future<void> schedule() => _scheduleCover(
+      document,
+      documentGeneration: documentGeneration,
+      queueGeneration: queueGeneration,
+      priority: priority,
+    );
+    if (_jobs == null) {
+      // The fallback is used by small unit/integration harnesses without the
+      // application scheduler; retain serial IO there.
+      _backgroundQueue = _backgroundQueue
+          .catchError((Object error) {
+            _logger.warning('Previous cover queue task failed.', error);
+          })
+          .then((_) => schedule());
+    } else {
+      // With the coordinator, submit immediately so a visible card can jump
+      // ahead of background covers while the category limit still bounds IO.
+      unawaited(schedule());
+    }
+  }
+
+  /// Promotes a card that entered the viewport without exposing scheduler
+  /// details to presentation widgets.
+  void promoteVisibleCover(LibraryDocument document) =>
+      enqueueCover(document, priority: JobPriority.visible);
+
+  Future<void> _scheduleCover(
+    LibraryDocument requested, {
+    required int documentGeneration,
+    required int queueGeneration,
+    required JobPriority priority,
+  }) async {
+    if (queueGeneration != _coverQueueGeneration ||
+        _coverGenerations[requested.id] != documentGeneration ||
+        _cancelledDocumentIds.contains(requested.id)) {
+      return;
+    }
+    final current = _documents.byId(requested.id);
+    if (current == null ||
+        current.isMissing ||
+        current.coverMetadata?.selectionMode == CoverSelectionMode.manual) {
+      return;
+    }
+    final valid = current.coverMetadata?.isValidFor(
+      modifiedAt: current.fileModifiedAt,
+      currentAlgorithmVersion: CoverSelectionPolicy.algorithmVersion,
+    );
+    if (valid == true && await _coverFilesExist(current.coverMetadata!)) return;
+
+    Future<void> execute(JobCancellationToken? schedulerToken) async {
+      String? engineDocumentId;
+      final cancellationToken = PdfOperationToken();
+      void cancelNative() => cancellationToken.cancel();
+      schedulerToken?.addListener(cancelNative);
+      _activeCoverTokens[current.id] = cancellationToken;
+      try {
+        if (cancellationToken.isCancelled) return;
+        final opened = await _engine.openDocument(current.path);
+        engineDocumentId = opened.documentId;
+        if (!_cancelledDocumentIds.contains(current.id) &&
+            !cancellationToken.isCancelled) {
+          await _detectAndGenerate(
+            current,
+            opened.documentId,
+            cancellationToken: cancellationToken,
           );
-          if (valid == true && await _coverFilesExist(current.coverMetadata!)) {
-            return;
-          }
-          String? engineDocumentId;
-          final cancellationToken = PdfOperationToken();
-          _activeCoverTokens[current.id] = cancellationToken;
-          try {
-            if (cancellationToken.isCancelled) return;
-            final opened = await _engine.openDocument(current.path);
-            engineDocumentId = opened.documentId;
-            if (!_cancelledDocumentIds.contains(current.id) &&
-                !cancellationToken.isCancelled) {
-              await _detectAndGenerate(
-                current,
-                opened.documentId,
-                cancellationToken: cancellationToken,
-              );
-            }
-          } on Object catch (error) {
-            _logger.warning('Queued cover generation failed.', error);
-          } finally {
-            if (identical(_activeCoverTokens[current.id], cancellationToken)) {
-              _activeCoverTokens.remove(current.id);
-            }
-            if (engineDocumentId != null) {
-              await _engine.closeDocument(engineDocumentId);
-            }
-          }
-        });
+        }
+      } on Object catch (error) {
+        _logger.warning('Queued cover generation failed.', error);
+      } finally {
+        schedulerToken?.removeListener(cancelNative);
+        if (identical(_activeCoverTokens[current.id], cancellationToken)) {
+          _activeCoverTokens.remove(current.id);
+        }
+        if (engineDocumentId != null) {
+          await _engine.closeDocument(engineDocumentId);
+        }
+      }
+    }
+
+    final jobs = _jobs;
+    if (jobs == null) {
+      await execute(null);
+      return;
+    }
+    final handle = jobs.submit<void>(
+      key: 'cover:${current.id}',
+      category: JobCategory.thumbnail,
+      priority: priority,
+      generation: documentGeneration,
+      task: execute,
+    );
+    _activeCoverJobs[current.id] = handle;
+    try {
+      await handle.future;
+    } on JobCancelled {
+      // Cancellation is expected when the document changes or closes.
+    } finally {
+      if (identical(_activeCoverJobs[current.id], handle)) {
+        _activeCoverJobs.remove(current.id);
+      }
+    }
   }
 
   void cancel(String documentId) {
     _cancelledDocumentIds.add(documentId);
     _coverGenerations[documentId] = (_coverGenerations[documentId] ?? 0) + 1;
     _activeCoverTokens.remove(documentId)?.cancel();
+    _activeCoverJobs.remove(documentId)?.cancel();
   }
 
   Future<List<CoverPreview>> previewPages(
@@ -224,6 +293,7 @@ final class ThumbnailService {
           text = await _engine.extractPageText(
             documentId: engineDocumentId,
             pageIndex: pageIndex,
+            cancellationToken: cancellationToken,
           );
         } on Object {
           // Visual scoring remains available for scanned documents.
@@ -404,7 +474,11 @@ final class ThumbnailService {
     for (final token in _activeCoverTokens.values) {
       token.cancel();
     }
+    for (final job in _activeCoverJobs.values) {
+      job.cancel();
+    }
     _activeCoverTokens.clear();
+    _activeCoverJobs.clear();
     _coverGenerations.clear();
     final directory = _paths.thumbnailDirectory;
     if (await directory.exists()) {

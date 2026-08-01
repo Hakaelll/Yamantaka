@@ -1,0 +1,88 @@
+{
+  "format": "yamantaka-visual-manifest",
+  "version": 1,
+  "fixturePolicy": "synthetic-local-only",
+  "fontPolicy": "Segoe UI Variable, Segoe UI, fallback",
+  "animations": "disabled-by-scenario",
+  "clock": "fixed-by-test-harness-when-available",
+  "scenarios": [
+    {
+      "name": "library-wide-light",
+      "baseline": "../screenshots/windows-library-wide.png",
+      "candidate": "../../build/verification/visual/candidates/library-wide-light.png",
+      "width": 1600,
+      "height": 900,
+      "dpr": 1.0,
+      "theme": "light",
+      "density": "comfortable",
+      "channelTolerance": 2,
+      "maxChangedRatio": 0.0,
+      "allowBaselineUpdate": true
+    },
+    {
+      "name": "library-compact-dark",
+      "baseline": "../screenshots/windows-library-compact-dark.png",
+      "candidate": "../../build/verification/visual/candidates/library-compact-dark.png",
+      "width": 1366,
+      "height": 768,
+      "dpr": 1.25,
+      "theme": "dark",
+      "density": "compact",
+      "channelTolerance": 2,
+      "maxChangedRatio": 0.0,
+      "allowBaselineUpdate": true
+    },
+    {
+      "name": "reader-fullhd",
+      "baseline": "../screenshots/windows-native-reader.png",
+      "candidate": "../../build/verification/visual/candidates/reader-fullhd.png",
+      "width": 1920,
+      "height": 1080,
+      "dpr": 1.0,
+      "theme": "light",
+      "density": "comfortable",
+      "channelTolerance": 2,
+      "maxChangedRatio": 0.0,
+      "allowBaselineUpdate": true
+    },
+    {
+      "name": "reader-book-2k",
+      "baseline": "../screenshots/windows-reader-redesign-book-spread.png",
+      "candidate": "../../build/verification/visual/candidates/reader-book-2k.png",
+      "width": 2560,
+      "height": 1440,
+      "dpr": 1.5,
+      "theme": "light",
+      "density": "comfortable",
+      "channelTolerance": 2,
+      "maxChangedRatio": 0.0,
+      "allowBaselineUpdate": true
+    },
+    {
+      "name": "settings-16x10",
+      "baseline": "../screenshots/windows-settings-wide.png",
+      "candidate": "../../build/verification/visual/candidates/settings-16x10.png",
+      "width": 1920,
+      "height": 1200,
+      "dpr": 1.25,
+      "theme": "light",
+      "density": "comfortable",
+      "channelTolerance": 2,
+      "maxChangedRatio": 0.0,
+      "allowBaselineUpdate": true
+    },
+    {
+      "name": "reader-4k",
+      "baseline": "../screenshots/windows-reader-redesign-fullscreen.png",
+      "candidate": "../../build/verification/visual/candidates/reader-4k.png",
+      "width": 3840,
+      "height": 2160,
+      "dpr": 2.0,
+      "theme": "light",
+      "density": "comfortable",
+      "channelTolerance": 2,
+      "maxChangedRatio": 0.0,
+      "allowBaselineUpdate": true
+    }
+  ]
+}

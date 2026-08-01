@@ -43,7 +43,8 @@ final class ReadingSessionRepository {
   List<ReadingHistoryEntry> history({int limit = 250}) {
     final rows = _database.database.select(
       '''
-      SELECT s.*, COALESCE(d.title, d.file_name) AS document_title, d.path
+      SELECT s.*, COALESCE(d.title_override, d.title, d.file_name)
+        AS document_title, d.path
       FROM reading_sessions s
       JOIN documents d ON d.id = s.document_id
       WHERE s.ended_at IS NOT NULL

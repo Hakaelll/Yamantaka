@@ -1,12 +1,17 @@
 import 'dart:collection';
 
 final class SizedLruCache<K, V extends Object> {
-  SizedLruCache({required this.maxBytes, required this.sizeOf, this.onEvict})
-    : assert(maxBytes >= 0);
+  SizedLruCache({
+    required this.maxBytes,
+    required this.sizeOf,
+    this.onEvict,
+    this.onEvictEntry,
+  }) : assert(maxBytes >= 0);
 
   final int maxBytes;
   final int Function(V value) sizeOf;
   final void Function(V value)? onEvict;
+  final void Function(K key, V value)? onEvictEntry;
   final LinkedHashMap<K, V> _entries = LinkedHashMap<K, V>();
   int _currentBytes = 0;
 
@@ -24,6 +29,7 @@ final class SizedLruCache<K, V extends Object> {
     final replaced = _entries.remove(key);
     if (replaced != null) {
       _currentBytes -= sizeOf(replaced);
+      onEvictEntry?.call(key, replaced);
       onEvict?.call(replaced);
     }
     _entries[key] = value;
@@ -37,16 +43,16 @@ final class SizedLruCache<K, V extends Object> {
       final value = _entries.remove(key);
       if (value != null) {
         _currentBytes -= sizeOf(value);
+        onEvictEntry?.call(key, value);
         onEvict?.call(value);
       }
     }
   }
 
   void clear() {
-    if (onEvict != null) {
-      for (final value in _entries.values) {
-        onEvict!(value);
-      }
+    for (final entry in _entries.entries) {
+      onEvictEntry?.call(entry.key, entry.value);
+      onEvict?.call(entry.value);
     }
     _entries.clear();
     _currentBytes = 0;
@@ -57,6 +63,7 @@ final class SizedLruCache<K, V extends Object> {
       final oldestKey = _entries.keys.first;
       final oldest = _entries.remove(oldestKey)!;
       _currentBytes -= sizeOf(oldest);
+      onEvictEntry?.call(oldestKey, oldest);
       onEvict?.call(oldest);
     }
   }

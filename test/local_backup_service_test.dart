@@ -55,6 +55,7 @@ void main() {
           addedAt: now,
           lastOpenedAt: now,
           readingProgress: 0.5,
+          libraryNote: 'Restore this note',
           fingerprint: 'fingerprint',
         ),
       );
@@ -85,6 +86,7 @@ void main() {
 
       expect(File(safetyPath).existsSync(), isTrue);
       expect(documents.byId('doc-1')?.readingProgress, 0.5);
+      expect(documents.byId('doc-1')?.libraryNote, 'Restore this note');
       expect(bookmarks.forDocument('doc-1').single.label, 'Capítulo');
       expect(sessions.history(), hasLength(1));
       expect(settings.settings.darkMode, isTrue);

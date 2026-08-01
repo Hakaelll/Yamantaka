@@ -5,6 +5,7 @@ import 'package:pdfrx/pdfrx.dart' as pdfrx;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/app_config.dart';
+import '../../core/security/local_input_policy.dart';
 import '../models/pdf_models.dart';
 import '../presentation/pdf_viewer_adapter.dart';
 import '../presentation/reader_viewport_metrics.dart';
@@ -532,8 +533,8 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
 
   Future<void> _confirmExternalLink(Uri uri) async {
     if (!mounted) return;
-    final scheme = uri.scheme.toLowerCase();
-    if (scheme != 'http' && scheme != 'https' && scheme != 'mailto') {
+    final authorized = LocalInputPolicy.authorizedExternalUri(uri);
+    if (authorized == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -548,7 +549,7 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
       builder: (context) => AlertDialog(
         title: const Text('Abrir enlace externo'),
         content: SelectableText(
-          'Este enlace saldrá de ${AppConfig.productName}:\n\n$uri',
+          'Este enlace saldrá de ${AppConfig.productName}:\n\n$authorized',
         ),
         actions: [
           TextButton(
@@ -563,7 +564,10 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
       ),
     );
     if (approved != true || !mounted) return;
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final launched = await launchUrl(
+      authorized,
+      mode: LaunchMode.externalApplication,
+    );
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo abrir el enlace.')),

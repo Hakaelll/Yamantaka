@@ -8,6 +8,8 @@ import '../../../app/shortcuts/app_commands.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_density.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/privacy/storage_catalog.dart';
+import '../../../core/privacy/local_storage_service.dart';
 import '../../../storage/repositories/app_settings_repository.dart';
 import '../../../storage/backup/local_backup_service.dart';
 import '../../reader/domain/reader_models.dart';
@@ -73,6 +75,15 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         description: 'Tema, controles y perfil de pantalla.',
         children: [
           _AppearancePreview(settings: settings),
+          _DropdownSetting(
+            label: 'Idioma',
+            description:
+                'Aplica el catálogo castellano o inglés sin reiniciar.',
+            value: settings.languageCode,
+            values: const {'es': 'Castellano', 'en': 'English'},
+            onChanged: (value) =>
+                _update(settings.copyWith(languageCode: value)),
+          ),
           _SwitchSetting(
             label: 'Tema oscuro de la aplicación',
             description: 'Afecta a la biblioteca, el lector y los ajustes.',
@@ -430,6 +441,28 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         id: _SettingsSectionId.backup,
         description: 'Copia local versionada, validada y sin archivos PDF.',
         children: [
+          _StorageSummary(
+            service: widget.services.storage,
+            onClearRebuildable: () async {
+              await _runWithNotice(
+                context,
+                widget.services.clearCache,
+                'Cachés recreables eliminadas.',
+              );
+              if (mounted) setState(() {});
+            },
+            onClearBackups: () async {
+              await _confirmAndRun(
+                context,
+                title: '¿Eliminar copias locales?',
+                body:
+                    'Solo se eliminarán copias de seguridad ya exportadas. '
+                    'Los PDF y la biblioteca permanecerán intactos.',
+                action: widget.services.storage.clearBackups,
+              );
+              if (mounted) setState(() {});
+            },
+          ),
           _ActionSetting(
             label: 'Exportar copia local',
             description:
@@ -816,6 +849,78 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (confirmed == true) await action();
+  }
+}
+
+final class _StorageSummary extends StatelessWidget {
+  const _StorageSummary({
+    required this.service,
+    required this.onClearRebuildable,
+    required this.onClearBackups,
+  });
+
+  final LocalStorageService service;
+  final Future<void> Function() onClearRebuildable;
+  final Future<void> Function() onClearBackups;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: service.measure(),
+      builder: (context, snapshot) {
+        final entries = snapshot.data;
+        if (entries is! List<StorageEntry>) {
+          return const ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('Almacenamiento local'),
+            subtitle: Text('Calculando tamaños…'),
+          );
+        }
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.space12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Almacenamiento local',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: AppSpacing.space8),
+                for (final entry in entries)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(entry.category.name),
+                    subtitle: Text(entry.description),
+                    trailing: Text(_formatStorageBytes(entry.bytes)),
+                  ),
+                const SizedBox(height: AppSpacing.space4),
+                Text(
+                  'Los archivos PDF originales no se borran desde estas acciones.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: AppSpacing.space8),
+                Wrap(
+                  spacing: AppSpacing.space8,
+                  runSpacing: AppSpacing.space8,
+                  children: [
+                    OutlinedButton(
+                      onPressed: onClearRebuildable,
+                      child: const Text('Limpiar recreables'),
+                    ),
+                    OutlinedButton(
+                      onPressed: onClearBackups,
+                      child: const Text('Eliminar copias'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -1373,6 +1478,15 @@ final class _ActionSetting extends StatelessWidget {
           : OutlinedButton(onPressed: onPressed, child: Text(actionLabel)),
     );
   }
+}
+
+String _formatStorageBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  if (bytes < 1024 * 1024 * 1024) {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
 }
 
 String _formatDuration(int seconds) {

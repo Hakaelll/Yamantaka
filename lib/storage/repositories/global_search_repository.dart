@@ -62,8 +62,12 @@ final class GlobalSearchRepository {
         [
           document.id,
           GlobalSearchKind.metadata.name,
-          document.title ?? document.fileName,
-          [document.author, document.fileName].whereType<String>().join(' '),
+          document.effectiveTitle,
+          [
+            document.effectiveAuthor,
+            document.fileName,
+            document.libraryNote,
+          ].whereType<String>().join(' '),
           _documentTags(document.id),
         ],
       )
@@ -88,6 +92,41 @@ final class GlobalSearchRepository {
       );
   }
 
+  /// Updates metadata rows immediately after a local title, author or note
+  /// edit without forcing a full PDF re-index. Page text remains untouched.
+  void refreshMetadataEntry(LibraryDocument document) {
+    final db = _database.database;
+    final body = [
+      document.effectiveAuthor,
+      document.fileName,
+      document.libraryNote,
+    ].whereType<String>().join(' ');
+    db
+      ..execute('UPDATE library_search SET title = ? WHERE document_id = ?', [
+        document.effectiveTitle,
+        document.id,
+      ])
+      ..execute(
+        'DELETE FROM library_search WHERE document_id = ? AND page_index = -1 '
+        'AND kind = ?',
+        [document.id, GlobalSearchKind.metadata.name],
+      )
+      ..execute(
+        '''
+        INSERT INTO library_search(
+          document_id, page_index, kind, title, body, tags
+        ) VALUES (?, -1, ?, ?, ?, ?)
+        ''',
+        [
+          document.id,
+          GlobalSearchKind.metadata.name,
+          document.effectiveTitle,
+          body,
+          _documentTags(document.id),
+        ],
+      );
+  }
+
   void addPage({
     required LibraryDocument document,
     required int pageIndex,
@@ -104,7 +143,7 @@ final class GlobalSearchRepository {
           document.id,
           pageIndex,
           GlobalSearchKind.pageText.name,
-          document.title ?? document.fileName,
+          document.effectiveTitle,
           text,
           _documentTags(document.id),
         ],
@@ -153,7 +192,7 @@ final class GlobalSearchRepository {
         document_id, page_index, kind, title, body, tags
       )
       SELECT a.document_id, a.page_index, '${GlobalSearchKind.annotation.name}',
-        COALESCE(d.title, d.file_name),
+        COALESCE(d.title_override, d.title, d.file_name),
         COALESCE(a.selected_text, '') || ' ' || COALESCE(a.note, ''),
         COALESCE((
           SELECT group_concat(t.name, ' ')
@@ -178,7 +217,7 @@ final class GlobalSearchRepository {
           document_id, page_index, kind, title, body, tags
         )
         SELECT cd.document_id, -1, '${GlobalSearchKind.collection.name}',
-          COALESCE(d.title, d.file_name), c.name, ''
+        COALESCE(d.title_override, d.title, d.file_name), c.name, ''
         FROM collection_documents cd
         JOIN collections c ON c.id = cd.collection_id
         JOIN documents d ON d.id = cd.document_id
@@ -188,7 +227,7 @@ final class GlobalSearchRepository {
           document_id, page_index, kind, title, body, tags
         )
         SELECT dt.document_id, -1, '${GlobalSearchKind.tag.name}',
-          COALESCE(d.title, d.file_name), '', t.name
+        COALESCE(d.title_override, d.title, d.file_name), '', t.name
         FROM document_tags dt
         JOIN tags t ON t.id = dt.tag_id
         JOIN documents d ON d.id = dt.document_id
@@ -207,9 +246,27 @@ final class GlobalSearchRepository {
       [document.id],
     );
     if (rows.isEmpty) return true;
-    return rows.first['fingerprint'] != document.fingerprint ||
+    if (rows.first['fingerprint'] != document.fingerprint ||
         rows.first['status'] == IndexDocumentStatus.failed.name ||
-        rows.first['status'] == IndexDocumentStatus.indexing.name;
+        rows.first['status'] == IndexDocumentStatus.indexing.name) {
+      return true;
+    }
+    final metadataRows = _database.database.select(
+      '''
+      SELECT title, body FROM library_search
+      WHERE document_id = ? AND page_index = -1 AND kind = ?
+      LIMIT 1
+      ''',
+      [document.id, GlobalSearchKind.metadata.name],
+    );
+    if (metadataRows.isEmpty) return true;
+    final expectedBody = [
+      document.effectiveAuthor,
+      document.fileName,
+      document.libraryNote,
+    ].whereType<String>().join(' ');
+    return metadataRows.first['title'] != document.effectiveTitle ||
+        metadataRows.first['body'] != expectedBody;
   }
 
   int get indexedDocumentCount =>

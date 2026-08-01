@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../app/app_config.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/errors/failure_presentation.dart';
 import '../../../pdf_engine/models/pdf_models.dart';
 import '../../../pdf_engine/pdf_document_engine.dart';
 import '../../annotations/domain/annotation.dart';
@@ -1142,13 +1143,18 @@ final class _SearchPanel extends StatelessWidget {
               message: 'Prueba otra palabra o una frase más corta.',
             ),
           if (search.error case final error?)
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.space16),
-              child: AppStatusLabel(
-                icon: Icons.error_outline_rounded,
-                label: error.userMessage,
-                tone: AppStatusTone.error,
-              ),
+            Builder(
+              builder: (context) {
+                final presentation = FailurePresentations.forFailure(error);
+                return Padding(
+                  padding: const EdgeInsets.all(AppSpacing.space16),
+                  child: AppStatusLabel(
+                    icon: Icons.error_outline_rounded,
+                    label: '${presentation.title}: ${presentation.message}',
+                    tone: AppStatusTone.error,
+                  ),
+                );
+              },
             ),
           Expanded(
             child: ListView.separated(

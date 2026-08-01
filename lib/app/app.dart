@@ -3,16 +3,26 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../core/errors/app_failure.dart';
+import '../core/errors/failure_presentation.dart';
+import '../core/i18n/app_localizations.dart';
+import '../core/performance/startup_timeline.dart';
+import '../core/platform/activation_channel.dart';
 import '../features/library/domain/library_document.dart';
+import '../features/library/domain/library_selection.dart';
+import '../features/library/domain/metadata_editor.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/library/presentation/document_cover_picker.dart';
 import '../features/library/presentation/folder_import_dialog.dart';
+import '../features/help/presentation/help_center_dialog.dart';
+import '../features/help/presentation/welcome_dialog.dart';
 import '../features/navigation/application/navigation_history_controller.dart';
 import '../features/reader/application/reader_controller.dart';
+import '../features/reader/domain/reader_models.dart';
 import '../features/reader/presentation/reader_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/search/domain/global_search_models.dart';
@@ -63,6 +73,11 @@ final class _YamantakaAppState extends State<YamantakaApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(
+      ActivationChannel.install((paths) async {
+        if (mounted) await _openPaths(paths);
+      }),
+    );
     widget.services.reader.addListener(_syncActiveTab);
     if (_isDesktop) windowManager.addListener(this);
     final startupPaths = widget.initialPaths.isNotEmpty
@@ -72,19 +87,81 @@ final class _YamantakaAppState extends State<YamantakaApp>
         : [widget.initialPath!];
     if (startupPaths.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        _completeFirstFrame();
         unawaited(_openPaths(startupPaths));
       });
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(_restoreLastSession());
+        _completeFirstFrame();
+        unawaited(_showWelcomeOrRestore());
       });
     }
+  }
+
+  Future<void> _showWelcomeOrRestore() async {
+    if (!mounted || widget.services.safeMode) {
+      await _restoreLastSession();
+      return;
+    }
+    if (widget.services.settings.settings.hasSeenWelcome) {
+      await _restoreLastSession();
+      return;
+    }
+    final action = await showDialog<WelcomeAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const WelcomeDialog(),
+    );
+    await widget.services.settings.update(
+      widget.services.settings.settings.copyWith(hasSeenWelcome: true),
+    );
+    if (!mounted) return;
+    switch (action) {
+      case WelcomeAction.open:
+        await _pickAndOpen();
+      case WelcomeAction.help:
+        await _showHelp();
+        await _restoreLastSession();
+      case WelcomeAction.dismiss:
+      case null:
+        await _restoreLastSession();
+    }
+  }
+
+  Future<void> _showHelp() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => HelpCenterDialog(
+        language: AppLanguageCode.fromCode(
+          widget.services.settings.settings.languageCode,
+        ),
+      ),
+    );
+  }
+
+  void _completeFirstFrame() {
+    widget.services.startup.complete(StartupPhase.firstFrame);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     widget.services.reader.setVisible(
       state == AppLifecycleState.resumed || state == AppLifecycleState.inactive,
+    );
+    widget.services.folderWatch.setPaused(
+      state == AppLifecycleState.hidden ||
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.detached,
+    );
+    widget.services.jobs.setBackgroundPaused(
+      state == AppLifecycleState.hidden ||
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.detached,
+    );
+    widget.services.libraryIndex.setBackgroundPaused(
+      state == AppLifecycleState.hidden ||
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.detached,
     );
   }
 
@@ -94,6 +171,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
     WidgetsBinding.instance.removeObserver(this);
     widget.services.reader.removeListener(_syncActiveTab);
     if (_isDesktop) windowManager.removeListener(this);
+    unawaited(ActivationChannel.uninstall());
     unawaited(_saveWindowBounds().whenComplete(widget.services.dispose));
     super.dispose();
   }
@@ -118,12 +196,34 @@ final class _YamantakaAppState extends State<YamantakaApp>
         // Safe mode suppresses risky restoration/indexing paths, but it must
         // never discard presentation preferences such as the selected theme.
         final settings = widget.services.settings.settings;
+        final systemHighContrast = WidgetsBinding
+            .instance
+            .platformDispatcher
+            .accessibilityFeatures
+            .highContrast;
+        final highContrast =
+            systemHighContrast ||
+            settings.visualProfile == ReaderVisualProfile.electronicInk;
         return MaterialApp(
           navigatorKey: _navigatorKey,
           title: AppConfig.productName,
+          locale: Locale(AppLanguageCode.fromCode(settings.languageCode).code),
+          supportedLocales: const [Locale('es'), Locale('en')],
+          localizationsDelegates: const [
+            YamantakaLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.light(density: settings.interfaceDensity),
-          darkTheme: AppTheme.dark(density: settings.interfaceDensity),
+          theme: AppTheme.light(
+            density: settings.interfaceDensity,
+            highContrast: highContrast,
+          ),
+          darkTheme: AppTheme.dark(
+            density: settings.interfaceDensity,
+            highContrast: highContrast,
+          ),
           themeMode: resolveAppThemeMode(
             settings,
             safeMode: widget.services.safeMode,
@@ -198,6 +298,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
           ),
         ),
       ),
+      onBulkOperation: _runBulkOperation,
       onDocumentInfo: _showDocumentInfo,
       onRelocateDocument: _relocateDocument,
       onToggleFavorite: _toggleFavorite,
@@ -205,6 +306,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
       onRevealDocument: (document) =>
           widget.services.revealDocument(document.path),
       onRemoveDocument: _removeDocument,
+      onDocumentVisible: widget.services.thumbnails.promoteVisibleCover,
       organization: widget.services.organization,
       onGlobalSearch: _showGlobalSearch,
       onOpenPaths: _openPaths,
@@ -336,7 +438,9 @@ final class _YamantakaAppState extends State<YamantakaApp>
       barrierDismissible: false,
       builder: (context) => FolderImportDialog(
         controller: widget.services.folderImport,
-        onImport: () async {
+        directoryPath: directory,
+        onImport: (watchRoot) async {
+          if (watchRoot) widget.services.folderWatch.authorize(directory);
           final summary = await widget.services.folderImport.importNew();
           await widget.services.library.load();
           if (context.mounted) Navigator.pop(context);
@@ -451,15 +555,15 @@ final class _YamantakaAppState extends State<YamantakaApp>
     final annotations = widget.services.annotations.annotations;
     final content = format == _AnnotationExportFormat.markdown
         ? widget.services.annotationExporter.toMarkdown(
-            title: document.title ?? document.fileName,
-            author: document.author,
+            title: document.effectiveTitle,
+            author: document.effectiveAuthor,
             progress: document.readingProgress,
             annotations: annotations,
           )
         : widget.services.annotationExporter.toVersionedJson(
             documentId: document.id,
-            title: document.title ?? document.fileName,
-            author: document.author,
+            title: document.effectiveTitle,
+            author: document.effectiveAuthor,
             progress: document.readingProgress,
             annotations: annotations,
           );
@@ -511,12 +615,12 @@ final class _YamantakaAppState extends State<YamantakaApp>
       );
       return;
     }
-    final message =
-        widget.services.reader.error?.userMessage ??
-        'No se pudo abrir el documento.';
-    ScaffoldMessenger.of(
-      _navigatorKey.currentContext ?? context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    final presentation = FailurePresentations.forFailure(
+      widget.services.reader.error,
+    );
+    ScaffoldMessenger.of(_navigatorKey.currentContext ?? context).showSnackBar(
+      SnackBar(content: Text('${presentation.title}: ${presentation.message}')),
+    );
   }
 
   Future<void> _activateTab(DocumentTab tab) async {
@@ -659,10 +763,10 @@ final class _YamantakaAppState extends State<YamantakaApp>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  document.title ?? document.fileName,
+                  document.effectiveTitle,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                if (document.author case final author?) ...[
+                if (document.effectiveAuthor case final author?) ...[
                   const SizedBox(height: AppSpacing.space4),
                   Text(author),
                 ],
@@ -690,6 +794,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
                       'página ${document.lastPageIndex + 1}',
                 ),
                 _DocumentMetadataLine(label: 'Estado', value: readingState),
+                if (document.libraryNote case final note?)
+                  _DocumentMetadataLine(label: 'Nota', value: note),
                 _DocumentMetadataLine(
                   label: 'Modificado',
                   value: _formatLocalDate(document.fileModifiedAt),
@@ -707,6 +813,12 @@ final class _YamantakaAppState extends State<YamantakaApp>
           ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () =>
+                Navigator.pop(context, _DocumentInfoAction.editMetadata),
+            icon: const Icon(Icons.edit_note_rounded, size: 18),
+            label: const Text('Editar metadata'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, _DocumentInfoAction.remove),
             child: const Text('Retirar'),
@@ -757,6 +869,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
       case _DocumentInfoAction.copyPath:
         await Clipboard.setData(ClipboardData(text: document.path));
         _showNotice('Ruta copiada.');
+      case _DocumentInfoAction.editMetadata:
+        await _editDocumentMetadata(document);
       case _DocumentInfoAction.reveal:
         await widget.services.revealDocument(document.path);
       case _DocumentInfoAction.resetProgress:
@@ -788,6 +902,90 @@ final class _YamantakaAppState extends State<YamantakaApp>
     }
   }
 
+  Future<void> _editDocumentMetadata(LibraryDocument document) async {
+    final title = TextEditingController(text: document.titleOverride ?? '');
+    final author = TextEditingController(text: document.authorOverride ?? '');
+    final note = TextEditingController(text: document.libraryNote ?? '');
+    final edited = await showDialog<MetadataEditState>(
+      context: _navigatorKey.currentContext!,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.edit_note_rounded),
+        title: const Text('Editar metadata local'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: title,
+                  autofocus: true,
+                  maxLength: 512,
+                  decoration: const InputDecoration(
+                    labelText: 'Título',
+                    helperText: 'Vacío restaura el título original.',
+                  ),
+                ),
+                TextField(
+                  controller: author,
+                  maxLength: 512,
+                  decoration: const InputDecoration(labelText: 'Autor'),
+                ),
+                TextField(
+                  controller: note,
+                  maxLength: 4000,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'Nota de biblioteca',
+                    helperText: 'Se guarda fuera del PDF.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              context,
+              MetadataEditState(
+                sourceTitle: document.sourceTitle ?? document.title,
+                sourceAuthor: document.sourceAuthor ?? document.author,
+                titleOverride: title.text,
+                authorOverride: author.text,
+                libraryNote: note.text,
+              ),
+            ),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    title.dispose();
+    author.dispose();
+    note.dispose();
+    if (!mounted || edited == null) return;
+    try {
+      final value = edited.normalized();
+      widget.services.documents.updateLocalMetadata(
+        document.id,
+        title: value.titleOverride,
+        author: value.authorOverride,
+        note: value.libraryNote,
+      );
+      widget.services.libraryIndex.refreshMetadata(document.id);
+      await widget.services.library.reload();
+      _showNotice('Metadata local guardada.');
+    } on ArgumentError catch (error) {
+      _showNotice(error.message?.toString() ?? 'La metadata no es válida.');
+    }
+  }
+
   Future<void> _relocateDocument(LibraryDocument document) async {
     final selected = await _pickPdf();
     if (selected == null) return;
@@ -803,7 +1001,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
         return;
       }
     } on AppFailure catch (failure) {
-      _showNotice(failure.userMessage);
+      final presentation = FailurePresentations.forFailure(failure);
+      _showNotice('${presentation.title}: ${presentation.message}');
       return;
     }
     await _openPath(selected.path);
@@ -814,6 +1013,38 @@ final class _YamantakaAppState extends State<YamantakaApp>
     _showNotice(
       document.isFavorite ? 'Quitado de favoritos.' : 'Añadido a favoritos.',
     );
+  }
+
+  Future<BulkOperationSummary> _runBulkOperation(
+    BulkLibraryAction action,
+    Iterable<String> documentIds, {
+    String? targetId,
+  }) async {
+    final ids = documentIds.toList(growable: false);
+    final currentId = widget.services.reader.document?.id;
+    final removesCurrent =
+        action == BulkLibraryAction.removeFromLibrary &&
+        currentId != null &&
+        ids.contains(currentId) &&
+        widget.services.reader.status == ReaderStatus.ready;
+    if (removesCurrent) await widget.services.reader.closeDocument();
+    final summary = await widget.services.bulkOperations.execute(
+      action,
+      ids,
+      targetId: targetId,
+    );
+    widget.services.organization.reload();
+    await widget.services.library.load();
+    if (removesCurrent) {
+      await widget.services.settings.update(
+        widget.services.settings.settings.copyWith(
+          lastDocumentPath: '',
+          readerPanelOpen: false,
+        ),
+      );
+      if (mounted) setState(() => _page = _AppPage.library);
+    }
+    return summary;
   }
 
   Future<void> _changeDocumentCover(LibraryDocument document) async {
@@ -932,6 +1163,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
 enum _AppPage { library, reader, settings }
 
 enum _DocumentInfoAction {
+  editMetadata,
   copyPath,
   reveal,
   resetProgress,

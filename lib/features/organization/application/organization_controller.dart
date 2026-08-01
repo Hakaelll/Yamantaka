@@ -54,6 +54,11 @@ final class OrganizationController extends ChangeNotifier {
     reload();
   }
 
+  void assignTagToDocument(String tagId, String documentId) {
+    _repository.assignTagToDocument(tagId, documentId);
+    reload();
+  }
+
   void selectCollection(String? id) {
     selectedCollectionId = id;
     selectedSmartCollection = null;

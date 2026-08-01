@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.1.0-dev — 2026-08-01 (gates, ownership y almacenamiento local)
+
+- Añade un coordinador único de trabajos con generaciones, prioridades,
+  deduplicación y cancelación compartida para importación, portadas e índice.
+- Endurece lifecycle, cuotas de memoria, apertura progresiva, seguridad de
+  contraseñas/enlaces y diagnóstico local redactado.
+- Añade manifest/hash de backup v5, escritura recuperable con archivo previo,
+  notas locales por documento y límites de tamaño,
+  catálogo de almacenamiento con limpieza explícita y modo portable.
+- Añade protocolo de instancia única Windows, canal de activación, matriz
+  visual, corpus sintético, benchmark, soak y empaquetado reproducible.
+- Añade cola de importación persistente, observación de carpetas autorizadas,
+  resolución transaccional de duplicados, edición local de metadatos e índice
+  FTS5 que refleja los overrides.
+- La suite Flutter/PDFium y los gates nativos siguen pendientes mientras no haya
+  una caché de Pub completa y un host Windows con toolchain/certificado.
+- Centraliza la presentación segura de `FailureKind`, corrige textos de error
+  con Unicode y evita exponer mensajes privados en biblioteca, lector,
+  búsqueda y apertura de documentos.
+- La importación permite autorizar una raíz de observación de forma explícita;
+  el watcher normaliza duplicados, pausa con el ciclo de vida y solo solicita
+  revalidación.
+- Conecta las acciones masivas de biblioteca a la UI con Ctrl/Shift, resumen
+  por elemento, confirmación segura, etiquetas/colecciones, archivo local y
+  retirada sin tocar el PDF; el coordinador también evita que el trabajo de
+  fondo quede hambriento tras una ráfaga visible.
+
 ## 0.1.0-dev — 2026-08-01 (endurecimiento de viewport y render)
 
 - Corrige el ownership de imagenes renderizadas: la cache LRU posee las

@@ -22,6 +22,7 @@ final class SearchController extends ChangeNotifier {
   bool isSearching = false;
   bool noExtractableText = false;
   AppFailure? error;
+  int _generation = 0;
 
   PdfSearchMatch? get activeMatch =>
       activeIndex >= 0 && activeIndex < matches.length
@@ -39,6 +40,7 @@ final class SearchController extends ChangeNotifier {
     final documentId = _documentId;
     query = value.trim();
     cancel();
+    final generation = _generation;
     if (documentId == null || query.isEmpty) {
       reset();
       return;
@@ -57,25 +59,33 @@ final class SearchController extends ChangeNotifier {
         query: query,
         cancellationToken: token,
       );
-      if (token.isCancelled) return;
+      if (token.isCancelled || generation != _generation) return;
       matches = results;
       activeIndex = results.isEmpty ? -1 : 0;
       if (results.isEmpty) {
-        noExtractableText = await _hasNoExtractableText(documentId, token);
+        noExtractableText = await _hasNoExtractableText(
+          documentId,
+          token,
+          generation,
+        );
       } else {
-        await _goToActive();
+        await _goToActive(generation: generation);
       }
     } on AppFailure catch (failure) {
-      if (failure.kind != FailureKind.cancelled) error = failure;
+      if (generation == _generation && !token.isCancelled) {
+        if (failure.kind != FailureKind.cancelled) error = failure;
+      }
     } on Object catch (exception, stackTrace) {
-      _logger.error('PDF search failed.', exception, stackTrace);
-      error = AppFailure(
-        FailureKind.unknown,
-        'No se pudo completar la búsqueda.',
-        debugMessage: exception.toString(),
-      );
+      if (generation == _generation && !token.isCancelled) {
+        _logger.error('PDF search failed.', exception, stackTrace);
+        error = AppFailure(
+          FailureKind.unknown,
+          'No se pudo completar la búsqueda.',
+          debugMessage: exception.toString(),
+        );
+      }
     } finally {
-      if (identical(_token, token)) {
+      if (identical(_token, token) && generation == _generation) {
         isSearching = false;
         notifyListeners();
       }
@@ -85,12 +95,14 @@ final class SearchController extends ChangeNotifier {
   Future<bool> _hasNoExtractableText(
     String documentId,
     PdfOperationToken token,
+    int generation,
   ) async {
     for (var page = 0; page < _pageCount; page++) {
-      if (token.isCancelled) return false;
+      if (token.isCancelled || generation != _generation) return false;
       final text = await _engine.extractPageText(
         documentId: documentId,
         pageIndex: page,
+        cancellationToken: token,
       );
       if (text.trim().isNotEmpty) return false;
     }
@@ -118,12 +130,14 @@ final class SearchController extends ChangeNotifier {
     await _goToActive();
   }
 
-  Future<void> _goToActive() async {
+  Future<void> _goToActive({int? generation}) async {
+    if (generation != null && generation != _generation) return;
     final match = activeMatch;
     if (match != null) await _viewerController.goToPage(match.pageIndex);
   }
 
   void cancel() {
+    _generation++;
     final changed = _token != null || isSearching;
     _token?.cancel();
     _token = null;

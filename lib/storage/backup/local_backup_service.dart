@@ -3,6 +3,10 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+
+import '../../app/app_config.dart';
+import '../../core/backup/backup_manifest.dart';
 import '../../app/theme/app_density.dart';
 import '../../features/reader/domain/reader_models.dart';
 import '../../features/settings/application/settings_controller.dart';
@@ -38,7 +42,8 @@ final class LocalBackupService {
        _settings = settings;
 
   static const format = 'yamantaka-local-backup';
-  static const version = 2;
+  static const version = 5;
+  static const maxBackupBytes = 128 * 1024 * 1024;
 
   final AppDatabase _database;
   final AppPaths _paths;
@@ -46,10 +51,36 @@ final class LocalBackupService {
 
   Future<void> exportTo(String path) async {
     final payload = _snapshot();
-    await File(path).writeAsString(
-      const JsonEncoder.withIndent('  ').convert(payload),
-      flush: true,
-    );
+    final destination = File(path);
+    final partial = File('$path.part');
+    final previous = File('$path.previous');
+    var movedPrevious = false;
+    var installed = false;
+    try {
+      await partial.writeAsString(
+        const JsonEncoder.withIndent('  ').convert(payload),
+        flush: true,
+      );
+      if (await previous.exists()) await previous.delete();
+      if (await destination.exists()) {
+        await destination.rename(previous.path);
+        movedPrevious = true;
+      }
+      await partial.rename(destination.path);
+      installed = true;
+      if (movedPrevious && await previous.exists()) {
+        await previous.delete();
+      }
+    } on Object {
+      if (await partial.exists()) await partial.delete();
+      if (!installed &&
+          movedPrevious &&
+          !await destination.exists() &&
+          await previous.exists()) {
+        await previous.rename(destination.path);
+      }
+      rethrow;
+    }
   }
 
   Future<BackupPreview> preview(String path) async {
@@ -74,114 +105,146 @@ final class LocalBackupService {
     await exportTo(safetyPath);
 
     final tables = payload['tables']! as Map<String, dynamic>;
+    final previousSettings = _settings.settings;
     final database = _database.database;
-    database.execute('BEGIN IMMEDIATE');
+    var committed = false;
     try {
-      database
-        ..execute('DELETE FROM workspace_tabs')
-        ..execute('DELETE FROM workspaces')
-        ..execute('DELETE FROM collection_documents')
-        ..execute('DELETE FROM collections')
-        ..execute('DELETE FROM document_tags')
-        ..execute('DELETE FROM annotation_tags')
-        ..execute('DELETE FROM tags')
-        ..execute('DELETE FROM annotations')
-        ..execute('DELETE FROM reading_profiles')
-        ..execute('DELETE FROM library_search')
-        ..execute('DELETE FROM search_index_state')
-        ..execute('DELETE FROM reading_sessions')
-        ..execute('DELETE FROM bookmarks')
-        ..execute('DELETE FROM document_preferences')
-        ..execute('DELETE FROM documents')
-        ..execute('DELETE FROM app_metadata');
-      _restoreTable(
-        'documents',
-        _documentColumns,
-        tables['documents']! as List,
-      );
-      _restoreTable(
-        'document_preferences',
-        _preferenceColumns,
-        tables['document_preferences']! as List,
-      );
-      _restoreTable(
-        'bookmarks',
-        _bookmarkColumns,
-        tables['bookmarks']! as List,
-      );
-      _restoreTable(
-        'reading_sessions',
-        _sessionColumns,
-        tables['reading_sessions']! as List,
-      );
-      _restoreTable(
-        'annotations',
-        _annotationColumns,
-        tables['annotations']! as List,
-      );
-      _restoreTable('tags', _tagColumns, tables['tags']! as List);
-      _restoreTable(
-        'annotation_tags',
-        _annotationTagColumns,
-        tables['annotation_tags']! as List,
-      );
-      _restoreTable(
-        'document_tags',
-        _documentTagColumns,
-        tables['document_tags']! as List,
-      );
-      _restoreTable(
-        'collections',
-        _collectionColumns,
-        tables['collections']! as List,
-      );
-      _restoreTable(
-        'collection_documents',
-        _collectionDocumentColumns,
-        tables['collection_documents']! as List,
-      );
-      _restoreTable(
-        'reading_profiles',
-        _readingProfileColumns,
-        tables['reading_profiles']! as List,
-      );
-      _restoreTable(
-        'workspaces',
-        _workspaceColumns,
-        tables['workspaces']! as List,
-      );
-      _restoreTable(
-        'workspace_tabs',
-        _workspaceTabColumns,
-        tables['workspace_tabs']! as List,
-      );
-      _restoreTable(
-        'app_metadata',
-        _metadataColumns,
-        tables['app_metadata']! as List,
-      );
-      database.execute('COMMIT');
-    } catch (_) {
-      database.execute('ROLLBACK');
-      rethrow;
-    }
+      database.execute('BEGIN IMMEDIATE');
+      try {
+        _replaceTables(tables);
+        database.execute('COMMIT');
+        committed = true;
+      } catch (_) {
+        database.execute('ROLLBACK');
+        rethrow;
+      }
 
-    final rawSettings = payload['settings'];
-    if (rawSettings is Map<String, dynamic>) {
-      await _settings.update(_settingsFromMap(rawSettings));
+      final rawSettings = payload['settings'];
+      if (rawSettings is Map<String, dynamic>) {
+        await _settings.updateStrict(_settingsFromMap(rawSettings));
+      }
+    } catch (_) {
+      if (committed) await _restoreSafetyDatabase(safetyPath);
+      try {
+        await _settings.updateStrict(previousSettings);
+      } on Object {
+        // Preserve the original import error; the next startup can use the
+        // pre-import file if the preference store is unavailable.
+      }
+      rethrow;
     }
     return safetyPath;
   }
 
-  Map<String, dynamic> _snapshot() => {
-    'format': format,
-    'version': version,
-    'exportedAt': DateTime.now().toUtc().toIso8601String(),
-    'containsPdfFiles': false,
-    'settings': _settingsToMap(_settings.settings),
-    'tables': {
+  void _replaceTables(Map<String, dynamic> tables) {
+    final database = _database.database;
+    database
+      ..execute('DELETE FROM workspace_tabs')
+      ..execute('DELETE FROM workspaces')
+      ..execute('DELETE FROM collection_documents')
+      ..execute('DELETE FROM collections')
+      ..execute('DELETE FROM document_tags')
+      ..execute('DELETE FROM annotation_tags')
+      ..execute('DELETE FROM tags')
+      ..execute('DELETE FROM annotations')
+      ..execute('DELETE FROM reading_profiles')
+      ..execute('DELETE FROM library_search')
+      ..execute('DELETE FROM search_index_state')
+      ..execute('DELETE FROM reading_sessions')
+      ..execute('DELETE FROM bookmarks')
+      ..execute('DELETE FROM document_preferences')
+      ..execute('DELETE FROM document_notes')
+      ..execute('DELETE FROM documents')
+      ..execute('DELETE FROM app_metadata');
+    _restoreTable('documents', _documentColumns, tables['documents']! as List);
+    _restoreTable(
+      'document_preferences',
+      _preferenceColumns,
+      tables['document_preferences']! as List,
+    );
+    _restoreTable(
+      'document_notes',
+      _noteColumns,
+      tables['document_notes']! as List,
+    );
+    _restoreTable('bookmarks', _bookmarkColumns, tables['bookmarks']! as List);
+    _restoreTable(
+      'reading_sessions',
+      _sessionColumns,
+      tables['reading_sessions']! as List,
+    );
+    _restoreTable(
+      'annotations',
+      _annotationColumns,
+      tables['annotations']! as List,
+    );
+    _restoreTable('tags', _tagColumns, tables['tags']! as List);
+    _restoreTable(
+      'annotation_tags',
+      _annotationTagColumns,
+      tables['annotation_tags']! as List,
+    );
+    _restoreTable(
+      'document_tags',
+      _documentTagColumns,
+      tables['document_tags']! as List,
+    );
+    _restoreTable(
+      'collections',
+      _collectionColumns,
+      tables['collections']! as List,
+    );
+    _restoreTable(
+      'collection_documents',
+      _collectionDocumentColumns,
+      tables['collection_documents']! as List,
+    );
+    _restoreTable(
+      'reading_profiles',
+      _readingProfileColumns,
+      tables['reading_profiles']! as List,
+    );
+    _restoreTable(
+      'workspaces',
+      _workspaceColumns,
+      tables['workspaces']! as List,
+    );
+    _restoreTable(
+      'workspace_tabs',
+      _workspaceTabColumns,
+      tables['workspace_tabs']! as List,
+    );
+    _restoreTable(
+      'app_metadata',
+      _metadataColumns,
+      tables['app_metadata']! as List,
+    );
+  }
+
+  Future<void> _restoreSafetyDatabase(String safetyPath) async {
+    try {
+      final safety = await _readAndValidate(safetyPath);
+      final tables = safety['tables']! as Map<String, dynamic>;
+      final database = _database.database;
+      database.execute('BEGIN IMMEDIATE');
+      try {
+        _replaceTables(tables);
+        database.execute('COMMIT');
+      } catch (_) {
+        database.execute('ROLLBACK');
+        rethrow;
+      }
+    } on Object {
+      // The original import error remains the actionable one. The pre-import
+      // file is deliberately retained for manual recovery.
+    }
+  }
+
+  Map<String, dynamic> _snapshot() {
+    final tables = <String, List<Map<String, Object?>>>{
       'documents': _tableRows('documents'),
       'document_preferences': _tableRows('document_preferences'),
+      'document_notes': _tableRows('document_notes'),
       'bookmarks': _tableRows('bookmarks'),
       'reading_sessions': _tableRows('reading_sessions'),
       'annotations': _tableRows('annotations'),
@@ -194,8 +257,42 @@ final class LocalBackupService {
       'workspaces': _tableRows('workspaces'),
       'workspace_tabs': _tableRows('workspace_tabs'),
       'app_metadata': _tableRows('app_metadata'),
-    },
-  };
+    };
+    final exportedAt = DateTime.now().toUtc();
+    final settings = _settingsToMap(_settings.settings);
+    final manifest = BackupManifest(
+      format: format,
+      version: version,
+      schemaVersion: AppConfig.databaseVersion,
+      exportedAt: exportedAt,
+      containsPdfFiles: false,
+      categories: [
+        for (final entry in tables.entries)
+          BackupCategory(
+            name: entry.key,
+            rows: entry.value.length,
+            sha256: _hashRows(entry.value),
+          ),
+        BackupCategory(
+          name: 'settings',
+          rows: 1,
+          sha256: _hashRows([settings]),
+        ),
+      ],
+    );
+    return {
+      'format': format,
+      'version': version,
+      'exportedAt': exportedAt.toIso8601String(),
+      'containsPdfFiles': false,
+      'manifest': manifest.toJson(),
+      'settings': settings,
+      'tables': tables,
+    };
+  }
+
+  static String _hashRows(List<Map<String, Object?>> rows) =>
+      sha256.convert(utf8.encode(const JsonEncoder().convert(rows))).toString();
 
   List<Map<String, Object?>> _tableRows(String table) {
     final rows = _database.database.select('SELECT * FROM $table');
@@ -210,10 +307,15 @@ final class LocalBackupService {
     if (!await file.exists()) {
       throw const FormatException('La copia seleccionada no existe.');
     }
+    if (await file.length() > maxBackupBytes) {
+      throw const FormatException('La copia supera el tamaño permitido.');
+    }
     final decoded = jsonDecode(await file.readAsString());
     if (decoded is! Map<String, dynamic> ||
         decoded['format'] != format ||
-        (decoded['version'] != 1 && decoded['version'] != version) ||
+        decoded['version'] is! int ||
+        (decoded['version'] as int) < 1 ||
+        (decoded['version'] as int) > version ||
         decoded['containsPdfFiles'] != false ||
         DateTime.tryParse(decoded['exportedAt']?.toString() ?? '') == null) {
       throw const FormatException(
@@ -239,8 +341,21 @@ final class LocalBackupService {
         tables.putIfAbsent(name, () => <Object?>[]);
       }
     }
-    _validateTable(tables, 'documents', _documentColumns);
+    // Notes were introduced after the v1-v4 backup formats. Treat an absent
+    // table as an empty table so older backups remain importable.
+    tables.putIfAbsent('document_notes', () => <Object?>[]);
+    final backupVersion = decoded['version'] as int;
+    _validateTable(
+      tables,
+      'documents',
+      backupVersion >= 4
+          ? _documentColumns
+          : backupVersion >= 3
+          ? _v3DocumentColumns
+          : _legacyDocumentColumns,
+    );
     _validateTable(tables, 'document_preferences', _preferenceColumns);
+    _validateTable(tables, 'document_notes', _noteColumns);
     _validateTable(tables, 'bookmarks', _bookmarkColumns);
     _validateTable(tables, 'reading_sessions', _sessionColumns);
     _validateTable(tables, 'annotations', _annotationColumns);
@@ -255,6 +370,56 @@ final class LocalBackupService {
     _validateTable(tables, 'app_metadata', _metadataColumns);
     if (decoded['settings'] is! Map<String, dynamic>) {
       throw const FormatException('La copia no contiene ajustes válidos.');
+    }
+    final rawManifest = decoded['manifest'];
+    if (rawManifest != null) {
+      if (rawManifest is! Map<String, dynamic>) {
+        throw const FormatException('El manifest de la copia no es valido.');
+      }
+      final manifest = BackupManifest.fromJson(rawManifest);
+      if (manifest.format != format ||
+          manifest.version != decoded['version'] ||
+          manifest.schemaVersion > AppConfig.databaseVersion ||
+          manifest.containsPdfFiles) {
+        throw const FormatException(
+          'La copia requiere una version incompatible.',
+        );
+      }
+      final expected = {
+        for (final category in manifest.categories) category.name: category,
+      };
+      for (final entry in tables.entries) {
+        final category = expected[entry.key];
+        if (category == null) continue;
+        final rows = entry.value as List;
+        final normalized = [
+          for (final raw in rows)
+            if (raw is Map<String, dynamic>)
+              <String, Object?>{
+                for (final item in raw.entries) item.key: item.value,
+              },
+        ];
+        if (category.rows != normalized.length ||
+            _hashRows(normalized) != category.sha256) {
+          throw FormatException(
+            'La categoria ${entry.key} no coincide con su hash.',
+          );
+        }
+      }
+      final settings = decoded['settings'] as Map<String, dynamic>;
+      final settingsCategory = expected['settings'];
+      if (settingsCategory != null && settingsCategory.rows != 1) {
+        throw const FormatException('La categoría de ajustes no es válida.');
+      }
+      if (settingsCategory != null &&
+          _hashRows([
+                <String, Object?>{
+                  for (final entry in settings.entries) entry.key: entry.value,
+                },
+              ]) !=
+              settingsCategory.sha256) {
+        throw const FormatException('Los ajustes no coinciden con su hash.');
+      }
     }
     return decoded;
   }
@@ -291,7 +456,9 @@ final class LocalBackupService {
     for (final raw in rows) {
       final row = raw as Map<String, dynamic>;
       _database.database.execute(sql, [
-        for (final column in columns) row[column],
+        for (final column in columns)
+          row[column] ??
+              (table == 'documents' && column == 'is_favorite' ? 0 : null),
       ]);
     }
   }
@@ -328,6 +495,7 @@ final class LocalBackupService {
     'startInLibrary': value.startInLibrary,
     'lastDocumentPath': value.lastDocumentPath,
     'languageCode': value.languageCode,
+    'hasSeenWelcome': value.hasSeenWelcome,
     'windowWidth': value.windowWidth,
     'windowHeight': value.windowHeight,
     'windowX': value.windowX,
@@ -392,6 +560,7 @@ final class LocalBackupService {
       startInLibrary: boolean('startInLibrary', false),
       lastDocumentPath: string('lastDocumentPath', ''),
       languageCode: string('languageCode', 'es'),
+      hasSeenWelcome: boolean('hasSeenWelcome', false),
       windowWidth: number('windowWidth', 1120).clamp(640, 10000),
       windowHeight: number('windowHeight', 760).clamp(480, 10000),
       windowX: map['windowX'] is num
@@ -405,6 +574,54 @@ final class LocalBackupService {
 }
 
 const _documentColumns = <String>[
+  'id',
+  'path',
+  'normalized_path',
+  'file_name',
+  'title',
+  'author',
+  'page_count',
+  'file_size',
+  'file_modified_at',
+  'added_at',
+  'last_opened_at',
+  'last_page_index',
+  'reading_progress',
+  'preferred_view_mode',
+  'preferred_theme',
+  'is_missing',
+  'fingerprint',
+  'thumbnail_path',
+  'is_favorite',
+  'source_title',
+  'source_author',
+  'title_override',
+  'author_override',
+];
+
+const _v3DocumentColumns = <String>[
+  'id',
+  'path',
+  'normalized_path',
+  'file_name',
+  'title',
+  'author',
+  'page_count',
+  'file_size',
+  'file_modified_at',
+  'added_at',
+  'last_opened_at',
+  'last_page_index',
+  'reading_progress',
+  'preferred_view_mode',
+  'preferred_theme',
+  'is_missing',
+  'fingerprint',
+  'thumbnail_path',
+  'is_favorite',
+];
+
+const _legacyDocumentColumns = <String>[
   'id',
   'path',
   'normalized_path',
@@ -439,6 +656,8 @@ const _preferenceColumns = <String>[
   'scroll_offset',
   'updated_at',
 ];
+
+const _noteColumns = <String>['document_id', 'note', 'updated_at'];
 
 const _bookmarkColumns = <String>[
   'id',

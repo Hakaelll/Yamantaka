@@ -58,7 +58,7 @@ final class _DocumentCoverPickerDialogState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              widget.document.title ?? widget.document.fileName,
+              widget.document.effectiveTitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall,

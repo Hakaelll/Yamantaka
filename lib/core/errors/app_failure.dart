@@ -12,6 +12,8 @@ enum FailureKind {
   thumbnailFailed,
   restoreFailed,
   cancelled,
+  invalidInput,
+  unauthorizedLink,
   unknown,
 }
 
@@ -24,5 +26,5 @@ final class AppFailure implements Exception {
   final String? debugMessage;
 
   @override
-  String toString() => 'AppFailure($kind, $debugMessage)';
+  String toString() => 'AppFailure(${kind.name})';
 }

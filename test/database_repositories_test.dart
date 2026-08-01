@@ -1,11 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yamantaka/app/app_config.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/application/document_service.dart';
+import 'package:yamantaka/features/library/application/duplicate_resolution_service.dart';
+import 'package:yamantaka/features/library/application/library_filter.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
+import 'package:yamantaka/features/library/domain/import_queue.dart';
+import 'package:yamantaka/features/library/domain/library_query.dart';
 import 'package:yamantaka/features/reader/domain/reader_models.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/repositories/bookmark_repository.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
+import 'package:yamantaka/storage/repositories/import_queue_repository.dart';
 import 'package:yamantaka/storage/repositories/preferences_repository.dart';
 import 'package:yamantaka/storage/repositories/reading_session_repository.dart';
 
@@ -32,7 +38,7 @@ void main() {
         .map((row) => row['name'])
         .toSet();
 
-    expect(version, 3);
+    expect(version, AppConfig.databaseVersion);
     expect(
       tables,
       containsAll({
@@ -66,6 +72,96 @@ void main() {
     expect(recent.single.lastPageIndex, 4);
     expect(recent.single.readingProgress, 0.4);
   });
+
+  test(
+    'duplicate merge keeps local relations and never touches PDF paths',
+    () async {
+      final existing = _document().copyWith(
+        path: r'C:\Books\existing.pdf',
+        normalizedPath: r'c:\books\existing.pdf',
+        fileName: 'existing.pdf',
+        title: 'Local title',
+        fingerprint: 'same-fingerprint',
+        isFavorite: true,
+        libraryNote: 'Existing note',
+      );
+      final incoming = _document().copyWith(
+        id: 'doc-2',
+        path: r'D:\Books\incoming.pdf',
+        normalizedPath: r'd:\books\incoming.pdf',
+        fileName: 'incoming.pdf',
+        title: 'Incoming title',
+        fingerprint: 'same-fingerprint',
+        lastPageIndex: 8,
+        readingProgress: 0.8,
+        libraryNote: 'Incoming note',
+      );
+      documents.save(existing);
+      documents.save(incoming);
+      BookmarkRepository(database).add(incoming.id, 8, label: 'Keep me');
+
+      String? backupPath;
+      final service = DuplicateResolutionService(
+        database: database,
+        documents: documents,
+        createPreBackup: () async {
+          backupPath = 'pre-merge.json';
+          return backupPath!;
+        },
+      );
+      final result = await service.resolve(
+        existingId: existing.id,
+        incomingId: incoming.id,
+        action: DuplicateResolutionAction.merge,
+      );
+
+      expect(result.preBackupPath, 'pre-merge.json');
+      expect(backupPath, isNotNull);
+      expect(documents.byId(incoming.id), isNull);
+      expect(documents.byId(existing.id)?.path, existing.path);
+      expect(documents.byId(existing.id)?.readingProgress, 0.8);
+      expect(documents.byId(existing.id)?.libraryNote, 'Existing note');
+      expect(
+        BookmarkRepository(database).forDocument(existing.id),
+        hasLength(1),
+      );
+    },
+  );
+
+  test('library notes round-trip, can be cleared, and are searchable', () {
+    final original = _document().copyWith(libraryNote: 'Project reading note');
+    documents.save(original);
+
+    expect(documents.byId(original.id)?.libraryNote, 'Project reading note');
+    expect(
+      documents.page(const LibraryQuery(text: 'reading note')).documents,
+      hasLength(1),
+    );
+
+    documents.updateLibraryNote(original.id, '   ');
+    expect(documents.byId(original.id)?.libraryNote, isNull);
+  });
+
+  test(
+    'confirmed import queue survives a restart and reopens running work',
+    () {
+      final queueRepository = ImportQueueRepository(database);
+      final queue = ImportQueue(maxPending: 4)
+        ..enqueue(
+          const ImportQueueItem(
+            id: 'queued',
+            path: r'C:\Books\queued.pdf',
+            normalizedPath: r'c:\books\queued.pdf',
+          ),
+        );
+      queue.claimNext();
+      queueRepository.save(queue);
+
+      final restored = queueRepository.load();
+      expect(restored.items.single.id, 'queued');
+      expect(restored.items.single.state, ImportWorkState.pending);
+    },
+  );
 
   test(
     'document identity follows a moved file and invalidates changed covers',

@@ -347,6 +347,73 @@ final class AppDatabase {
       });
       logger.info('Migrated database schema to version 3.');
     }
+    final versionAfterCovers =
+        database.select('PRAGMA user_version').first.columnAt(0) as int;
+    if (versionAfterCovers < 4) {
+      _transaction(() {
+        database
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_missing_opened '
+            'ON documents(is_missing, last_opened_at DESC)',
+          )
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_favorite_opened '
+            'ON documents(is_favorite, last_opened_at DESC)',
+          )
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_title_nocase '
+            'ON documents(title COLLATE NOCASE)',
+          )
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_modified '
+            'ON documents(file_modified_at DESC)',
+          )
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_search_state_status '
+            'ON search_index_state(status, updated_at DESC)',
+          )
+          ..execute('PRAGMA user_version = 4');
+      });
+      logger.info('Migrated database schema to version 4.');
+    }
+    final versionAfterIndexes =
+        database.select('PRAGMA user_version').first.columnAt(0) as int;
+    if (versionAfterIndexes < 5) {
+      _transaction(() {
+        database
+          ..execute('ALTER TABLE documents ADD COLUMN source_title TEXT')
+          ..execute('ALTER TABLE documents ADD COLUMN source_author TEXT')
+          ..execute('ALTER TABLE documents ADD COLUMN title_override TEXT')
+          ..execute('ALTER TABLE documents ADD COLUMN author_override TEXT')
+          ..execute(
+            'UPDATE documents SET source_title = title '
+            'WHERE source_title IS NULL',
+          )
+          ..execute(
+            'UPDATE documents SET source_author = author '
+            'WHERE source_author IS NULL',
+          )
+          ..execute('PRAGMA user_version = 5');
+      });
+      logger.info('Migrated database schema to version 5.');
+    }
+    final versionAfterMetadata =
+        database.select('PRAGMA user_version').first.columnAt(0) as int;
+    if (versionAfterMetadata < 6) {
+      _transaction(() {
+        database
+          ..execute('''
+            CREATE TABLE document_notes (
+              document_id TEXT NOT NULL PRIMARY KEY
+                REFERENCES documents(id) ON DELETE CASCADE,
+              note TEXT NOT NULL CHECK(length(note) <= 4000),
+              updated_at TEXT NOT NULL
+            ) STRICT
+          ''')
+          ..execute('PRAGMA user_version = 6');
+      });
+      logger.info('Migrated database schema to version 6.');
+    }
   }
 
   void _transaction(void Function() operation) {
@@ -377,6 +444,7 @@ final class AppDatabase {
         ..execute('DELETE FROM reading_sessions')
         ..execute('DELETE FROM bookmarks')
         ..execute('DELETE FROM document_preferences')
+        ..execute('DELETE FROM document_notes')
         ..execute('DELETE FROM documents')
         ..execute('DELETE FROM app_metadata');
     });
@@ -406,6 +474,7 @@ final class AppDatabase {
   int tableCount(String table) {
     const allowed = {
       'documents',
+      'document_notes',
       'annotations',
       'collections',
       'tags',

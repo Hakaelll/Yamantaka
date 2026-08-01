@@ -18,12 +18,23 @@ final class SettingsController extends ChangeNotifier {
   }
 
   Future<void> update(AppSettings next) async {
+    try {
+      await updateStrict(next);
+    } on Object catch (error, stackTrace) {
+      _logger.error('Global settings save failed.', error, stackTrace);
+    }
+  }
+
+  Future<void> updateStrict(AppSettings next) async {
+    final previous = settings;
     settings = next;
     notifyListeners();
     try {
       await _repository.save(next);
-    } on Object catch (error, stackTrace) {
-      _logger.error('Global settings save failed.', error, stackTrace);
+    } on Object {
+      settings = previous;
+      notifyListeners();
+      rethrow;
     }
   }
 

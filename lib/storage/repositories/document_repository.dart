@@ -4,6 +4,7 @@ import 'package:sqlite3/common.dart' show Row;
 
 import '../../features/library/domain/library_document.dart';
 import '../../features/library/domain/document_cover.dart';
+import '../../features/library/domain/library_query.dart';
 import '../../features/reader/domain/reader_models.dart';
 import '../database/app_database.dart';
 
@@ -25,6 +26,34 @@ final class DocumentRepository {
       '$_documentSelect ORDER BY d.last_opened_at DESC',
     );
     return rows.map(_fromRow).toList(growable: false);
+  }
+
+  LibraryPage page([LibraryQuery query = const LibraryQuery()]) {
+    final normalized = query.normalized();
+    final where = _whereClause(normalized);
+    final rows = _database.database.select(
+      '$_documentSelect WHERE ${where.sql} '
+      'ORDER BY ${_sortColumn(normalized.sort)} LIMIT ? OFFSET ?',
+      [...where.parameters, normalized.limit, normalized.offset],
+    );
+    final total =
+        _database.database
+                .select(
+                  'SELECT COUNT(*) FROM documents d '
+                  'LEFT JOIN document_notes n ON n.document_id = d.id '
+                  'WHERE ${where.sql}',
+                  where.parameters,
+                )
+                .first
+                .columnAt(0)
+            as int;
+    final documents = rows.map(_fromRow).toList(growable: false);
+    return LibraryPage(
+      documents: documents,
+      offset: normalized.offset,
+      total: total,
+      hasMore: normalized.offset + documents.length < total,
+    );
   }
 
   LibraryDocument? byId(String id) {
@@ -59,8 +88,9 @@ final class DocumentRepository {
         id, path, normalized_path, file_name, title, author, page_count,
         file_size, file_modified_at, added_at, last_opened_at, last_page_index,
         reading_progress, preferred_view_mode, preferred_theme, is_missing,
-        fingerprint, thumbnail_path, is_favorite
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        fingerprint, thumbnail_path, is_favorite, source_title, source_author,
+        title_override, author_override
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         path = excluded.path,
         normalized_path = excluded.normalized_path,
@@ -78,15 +108,19 @@ final class DocumentRepository {
         is_missing = excluded.is_missing,
         fingerprint = excluded.fingerprint,
         thumbnail_path = excluded.thumbnail_path,
-        is_favorite = excluded.is_favorite
+        is_favorite = excluded.is_favorite,
+        source_title = excluded.source_title,
+        source_author = excluded.source_author,
+        title_override = excluded.title_override,
+        author_override = excluded.author_override
       ''',
       [
         document.id,
         document.path,
         document.normalizedPath,
         document.fileName,
-        document.title,
-        document.author,
+        document.sourceTitle ?? document.title,
+        document.sourceAuthor ?? document.author,
         document.pageCount,
         document.fileSize,
         _date(document.fileModifiedAt),
@@ -100,7 +134,101 @@ final class DocumentRepository {
         document.fingerprint,
         document.thumbnailPath,
         document.isFavorite ? 1 : 0,
+        document.sourceTitle ?? document.title,
+        document.sourceAuthor ?? document.author,
+        document.titleOverride,
+        document.authorOverride,
       ],
+    );
+    final note = _cleanNote(document.libraryNote);
+    if (note == null) {
+      _database.database.execute(
+        'DELETE FROM document_notes WHERE document_id = ?',
+        [document.id],
+      );
+    } else {
+      _database.database.execute(
+        '''
+        INSERT INTO document_notes(document_id, note, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(document_id) DO UPDATE SET
+          note = excluded.note,
+          updated_at = excluded.updated_at
+        ''',
+        [document.id, note, _date(DateTime.now())],
+      );
+    }
+  }
+
+  LibraryDocument? updateMetadataOverrides(
+    String documentId, {
+    Object? title = _keepMetadata,
+    Object? author = _keepMetadata,
+  }) => updateLocalMetadata(documentId, title: title, author: author);
+
+  /// Updates all local metadata fields in one transaction so a failed note
+  /// validation cannot leave title/author and note out of sync.
+  LibraryDocument? updateLocalMetadata(
+    String documentId, {
+    Object? title = _keepMetadata,
+    Object? author = _keepMetadata,
+    Object? note = _keepMetadata,
+  }) {
+    final current = byId(documentId);
+    if (current == null) return null;
+    final nextTitle = identical(title, _keepMetadata)
+        ? current.titleOverride
+        : _cleanMetadata(title as String?);
+    final nextAuthor = identical(author, _keepMetadata)
+        ? current.authorOverride
+        : _cleanMetadata(author as String?);
+    final nextNote = identical(note, _keepMetadata)
+        ? current.libraryNote
+        : _cleanNote(note as String?);
+    final database = _database.database;
+    database.execute('BEGIN IMMEDIATE');
+    try {
+      database.execute(
+        'UPDATE documents SET title_override = ?, author_override = ? '
+        'WHERE id = ?',
+        [nextTitle, nextAuthor, documentId],
+      );
+      _writeLibraryNote(database, documentId, nextNote);
+      database.execute('COMMIT');
+    } catch (_) {
+      database.execute('ROLLBACK');
+      rethrow;
+    }
+    return byId(documentId);
+  }
+
+  LibraryDocument? clearMetadataOverrides(String documentId) =>
+      updateMetadataOverrides(documentId, title: null, author: null);
+
+  LibraryDocument? updateLibraryNote(String documentId, String? note) {
+    return updateLocalMetadata(documentId, note: note);
+  }
+
+  static void _writeLibraryNote(
+    dynamic database,
+    String documentId,
+    String? note,
+  ) {
+    if (note == null) {
+      database.execute('DELETE FROM document_notes WHERE document_id = ?', [
+        documentId,
+      ]);
+      return;
+    }
+    database.execute(
+      '''
+      INSERT INTO document_notes(document_id, note, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(document_id) DO UPDATE SET
+        note = excluded.note,
+        updated_at = excluded.updated_at
+      ''',
+      [documentId, note, _date(DateTime.now())],
     );
   }
 
@@ -195,6 +323,13 @@ final class DocumentRepository {
       WHERE id = ?
       ''',
       [documentId],
+    );
+  }
+
+  void setFavorite(String documentId, bool value) {
+    _database.database.execute(
+      'UPDATE documents SET is_favorite = ? WHERE id = ?',
+      [value ? 1 : 0, documentId],
     );
   }
 
@@ -302,8 +437,13 @@ final class DocumentRepository {
       path: path,
       normalizedPath: row['normalized_path'] as String,
       fileName: row['file_name'] as String,
-      title: row['title'] as String?,
-      author: row['author'] as String?,
+      title: (row['title_override'] as String?) ?? row['title'] as String?,
+      author: (row['author_override'] as String?) ?? row['author'] as String?,
+      sourceTitle: row['source_title'] as String? ?? row['title'] as String?,
+      sourceAuthor: row['source_author'] as String? ?? row['author'] as String?,
+      titleOverride: row['title_override'] as String?,
+      authorOverride: row['author_override'] as String?,
+      libraryNote: row['library_note'] as String?,
       pageCount: row['page_count'] as int,
       fileSize: storedSize,
       fileModifiedAt: storedModifiedAt,
@@ -344,15 +484,64 @@ final class DocumentRepository {
       c.algorithm_version AS cover_algorithm_version,
       c.crop_mode AS cover_crop_mode
       , c.page_aspect_ratio AS cover_page_aspect_ratio
+      , n.note AS library_note
     FROM documents d
     LEFT JOIN document_covers c ON c.document_id = d.id
+    LEFT JOIN document_notes n ON n.document_id = d.id
   ''';
 
   static String _date(DateTime value) => value.toUtc().toIso8601String();
+
+  ({String sql, List<Object?> parameters}) _whereClause(LibraryQuery query) {
+    final conditions = <String>['1 = 1'];
+    final parameters = <Object?>[];
+    if (!query.includeMissing) conditions.add('d.is_missing = 0');
+    if (query.favoritesOnly) conditions.add('d.is_favorite = 1');
+    final text = query.text.toLowerCase();
+    if (text.isNotEmpty) {
+      conditions.add(
+        '(lower(d.file_name) LIKE ? OR '
+        'lower(coalesce(d.title_override, d.title, \'\')) LIKE ? OR '
+        'lower(coalesce(d.author_override, d.author, \'\')) LIKE ? OR '
+        'lower(coalesce(n.note, \'\')) LIKE ?)',
+      );
+      final pattern = '%$text%';
+      parameters.addAll([pattern, pattern, pattern, pattern]);
+    }
+    return (sql: conditions.join(' AND '), parameters: parameters);
+  }
+
+  static String _sortColumn(LibraryQuerySort sort) => switch (sort) {
+    LibraryQuerySort.lastOpened => 'd.last_opened_at DESC',
+    LibraryQuerySort.added => 'd.added_at DESC',
+    LibraryQuerySort.title =>
+      'lower(coalesce(d.title_override, d.title, d.file_name)) ASC',
+    LibraryQuerySort.progress => 'd.reading_progress DESC',
+  };
 
   static T _enumByName<T extends Enum>(
     List<T> values,
     String name,
     T fallback,
   ) => values.where((value) => value.name == name).firstOrNull ?? fallback;
+
+  static String? _cleanMetadata(String? value) {
+    final clean = value?.trim();
+    if (clean == null || clean.isEmpty) return null;
+    if (clean.length > 512) {
+      throw ArgumentError.value(value, 'metadata', 'Maximum length is 512.');
+    }
+    return clean;
+  }
+
+  static String? _cleanNote(String? value) {
+    final clean = value?.trim();
+    if (clean == null || clean.isEmpty) return null;
+    if (clean.length > 4000) {
+      throw ArgumentError.value(value, 'note', 'Maximum length is 4000.');
+    }
+    return clean;
+  }
 }
+
+const Object _keepMetadata = Object();

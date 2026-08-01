@@ -15,6 +15,7 @@ base class StubPdfDocumentEngine implements PdfDocumentEngine {
   Future<String> extractPageText({
     required String documentId,
     required int pageIndex,
+    PdfOperationToken? cancellationToken,
   }) async => '';
 
   @override

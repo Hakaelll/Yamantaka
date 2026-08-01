@@ -3,14 +3,22 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../core/async/job_coordinator.dart';
+import '../core/lifecycle/lifecycle_tracker.dart';
 import '../core/logging/app_logger.dart';
+import '../core/memory/memory_governor.dart';
+import '../core/performance/startup_timeline.dart';
+import '../core/privacy/local_storage_service.dart';
 import '../core/platform/window_service.dart';
 import '../features/annotations/application/annotation_controller.dart';
 import '../features/annotations/application/annotation_export_service.dart';
 import '../features/bookmarks/application/bookmark_controller.dart';
 import '../features/library/application/document_service.dart';
+import '../features/library/application/duplicate_resolution_service.dart';
+import '../features/library/application/library_bulk_operation_service.dart';
 import '../features/library/application/library_controller.dart';
 import '../features/library/application/folder_import_controller.dart';
+import '../features/library/application/folder_watch_controller.dart';
 import '../features/library/application/document_recovery_service.dart';
 import '../features/navigation/application/navigation_history_controller.dart';
 import '../features/diagnostics/application/diagnostics_service.dart';
@@ -35,6 +43,7 @@ import '../storage/repositories/annotation_repository.dart';
 import '../storage/repositories/bookmark_repository.dart';
 import '../storage/repositories/document_repository.dart';
 import '../storage/repositories/global_search_repository.dart';
+import '../storage/repositories/import_queue_repository.dart';
 import '../storage/repositories/organization_repository.dart';
 import '../storage/repositories/preferences_repository.dart';
 import '../storage/repositories/reading_session_repository.dart';
@@ -62,14 +71,24 @@ final class AppServices {
     required this.globalSearch,
     required this.libraryIndex,
     required this.folderImport,
+    required this.folderWatch,
     required this.documentRecovery,
     required this.diagnostics,
     required this.readingProfiles,
     required this.safeMode,
     required this.backups,
     required this.documentService,
+    required this.bulkOperations,
+    required this.duplicateResolution,
+    required this.jobs,
+    required this.memory,
+    required this.lifecycle,
+    required this.startup,
+    required this.storage,
+    required void Function() memorySettingsListener,
     required PdfrxDocumentEngine engine,
-  }) : _engine = engine;
+  }) : _engine = engine,
+       _memorySettingsListener = memorySettingsListener;
 
   final AppPaths paths;
   final AppDatabase database;
@@ -89,13 +108,22 @@ final class AppServices {
   final GlobalLibrarySearchController globalSearch;
   final LibraryIndexController libraryIndex;
   final FolderImportController folderImport;
+  final FolderWatchController folderWatch;
   final DocumentRecoveryService documentRecovery;
   final DiagnosticsService diagnostics;
   final ReadingProfilesController readingProfiles;
   final bool safeMode;
   final LocalBackupService backups;
   final DocumentService documentService;
+  final LibraryBulkOperationService bulkOperations;
+  final DuplicateResolutionService duplicateResolution;
+  final JobCoordinator jobs;
+  final MemoryGovernor memory;
+  final LifecycleTracker lifecycle;
+  final StartupTimeline startup;
+  final LocalStorageService storage;
   final PdfrxDocumentEngine _engine;
+  final void Function() _memorySettingsListener;
 
   PdfDocumentEngine get engine => _engine;
 
@@ -103,8 +131,11 @@ final class AppServices {
     required AppPaths paths,
     required AppLogger logger,
     SettingsController? preloadedSettings,
+    StartupTimeline? startupTimeline,
   }) async {
+    final startup = startupTimeline ?? StartupTimeline();
     final database = AppDatabase.open(paths.databasePath, logger);
+    final storage = LocalStorageService(paths);
     final safeMode = database.recordStartup();
     final documents = DocumentRepository(database);
     final documentPreferences = DocumentPreferencesRepository(database);
@@ -120,13 +151,55 @@ final class AppServices {
         preloadedSettings ??
         SettingsController(AppSettingsRepository(), logger);
     if (!settings.isLoaded) await settings.load();
-    final engine = PdfrxDocumentEngine(logger);
+    final lifecycle = LifecycleTracker();
+    final jobs = JobCoordinator(
+      maxConcurrent: 4,
+      categoryLimits: {
+        JobCategory.render: 2,
+        JobCategory.thumbnail: 1,
+        JobCategory.indexing: 1,
+        JobCategory.import: 2,
+        JobCategory.backup: 1,
+        JobCategory.recovery: 1,
+        JobCategory.maintenance: 1,
+      },
+      lifecycle: lifecycle,
+    );
+    final memory = MemoryGovernor(
+      limitBytes: settings.settings.maxCacheMegabytes * 1024 * 1024,
+      minimumVisibleBytes: 32 * 1024 * 1024,
+    );
+    void syncMemoryLimit() {
+      memory.setLimit(settings.settings.maxCacheMegabytes * 1024 * 1024);
+    }
+
+    settings.addListener(syncMemoryLimit);
+    final engine = PdfrxDocumentEngine(
+      logger,
+      lifecycle: lifecycle,
+      memory: memory,
+    );
     final thumbnails = ThumbnailService(
       engine: engine,
       paths: paths,
       documents: documents,
       logger: logger,
       maxCacheBytes: () => settings.settings.maxCacheMegabytes * 1024 * 1024,
+      jobs: jobs,
+    );
+    final bulkOperations = LibraryBulkOperationService(
+      documents: documents,
+      organization: organizationRepository,
+      regenerateCover: (documentId) async {
+        final document = documents.byId(documentId);
+        if (document != null && !document.isMissing) {
+          await thumbnails.restoreAutomaticCover(document);
+        }
+      },
+      cleanupBeforeRemoval: (documentId) async {
+        final document = documents.byId(documentId);
+        if (document != null) await thumbnails.removeForDocument(document);
+      },
     );
     final viewController = PdfViewController();
     final documentService = DocumentService(documents);
@@ -194,13 +267,20 @@ final class AppServices {
       documents,
       globalSearchRepository,
       engine,
+      jobs,
     );
     final folderImport = FolderImportController(
       documents,
       documentService,
       engine,
       thumbnails,
+      jobs,
+      ImportQueueRepository(database),
     );
+    final folderWatch = FolderWatchController();
+    folderWatch.onRevalidationReady = (events) {
+      if (events.isNotEmpty) unawaited(library.load());
+    };
     final documentRecovery = DocumentRecoveryService(
       documents,
       documentService,
@@ -210,12 +290,33 @@ final class AppServices {
       paths: paths,
       engine: engine,
       safeMode: safeMode,
+      jobs: jobs,
+      memory: memory,
+      lifecycle: lifecycle,
+      startup: startup,
     );
     final readingProfiles = ReadingProfilesController(reader);
     final backups = LocalBackupService(
       database: database,
       paths: paths,
       settings: settings,
+    );
+    final duplicateResolution = DuplicateResolutionService(
+      database: database,
+      documents: documents,
+      createPreBackup: () async {
+        final backupsDirectory = Directory(
+          '${paths.dataDirectory.path}/backups',
+        );
+        await backupsDirectory.create(recursive: true);
+        final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(
+          ':',
+          '-',
+        );
+        final path = '${backupsDirectory.path}/pre-merge-$stamp.json';
+        await backups.exportTo(path);
+        return path;
+      },
     );
     await library.load();
     if (settings.settings.generateCovers) {
@@ -242,12 +343,21 @@ final class AppServices {
       globalSearch: globalSearch,
       libraryIndex: libraryIndex,
       folderImport: folderImport,
+      folderWatch: folderWatch,
       documentRecovery: documentRecovery,
       diagnostics: diagnostics,
       readingProfiles: readingProfiles,
       safeMode: safeMode,
       backups: backups,
       documentService: documentService,
+      bulkOperations: bulkOperations,
+      duplicateResolution: duplicateResolution,
+      jobs: jobs,
+      memory: memory,
+      lifecycle: lifecycle,
+      startup: startup,
+      storage: storage,
+      memorySettingsListener: syncMemoryLimit,
       engine: engine,
     );
   }
@@ -255,6 +365,7 @@ final class AppServices {
   Future<void> clearCache() async {
     _engine.clearCaches();
     await thumbnails.clear();
+    await storage.clearRebuildable();
     await library.load();
   }
 
@@ -264,6 +375,7 @@ final class AppServices {
     database.clearUserData();
     await settings.clear();
     await clearCache();
+    await storage.clearBackups();
     await library.load();
   }
 
@@ -303,10 +415,14 @@ final class AppServices {
     globalSearch.dispose();
     libraryIndex.dispose();
     folderImport.dispose();
+    folderWatch.dispose();
     readingProfiles.dispose();
     library.dispose();
+    settings.removeListener(_memorySettingsListener);
     settings.dispose();
+    await jobs.dispose();
     await _engine.dispose();
+    lifecycle.dispose();
     database.markCleanShutdown();
     database.close();
   }

@@ -245,9 +245,9 @@ final class _CommandPaletteState extends State<CommandPalette> {
     }
     if (widget.onOpenRecent != null) {
       for (final document in widget.recentDocuments) {
-        final label = document.title ?? document.fileName;
+        final label = document.effectiveTitle;
         final searchable =
-            '$label ${document.author ?? ''} ${document.fileName}'
+            '$label ${document.effectiveAuthor ?? ''} ${document.fileName} ${document.libraryNote ?? ''}'
                 .toLowerCase();
         if (normalized.isEmpty || searchable.contains(normalized)) {
           entries.add(_PaletteEntry.document(document));
@@ -337,9 +337,9 @@ final class _PaletteEntry {
 
   factory _PaletteEntry.document(LibraryDocument document) => _PaletteEntry._(
     key: 'recent-${document.id}',
-    label: document.title ?? document.fileName,
+    label: document.effectiveTitle,
     icon: Icons.history_rounded,
-    subtitle: document.author ?? 'Documento reciente',
+    subtitle: document.effectiveAuthor ?? 'Documento reciente',
     document: document,
   );
 

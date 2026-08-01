@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -175,7 +173,7 @@ final class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
     );
     if (location == null) return;
     try {
-      await File(location.path).writeAsString(report.toJson(), flush: true);
+      await widget.services.diagnostics.exportTo(report, location.path);
       if (mounted) {
         ScaffoldMessenger.of(
           context,

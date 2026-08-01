@@ -35,9 +35,11 @@ LibraryFilterResult evaluateLibraryDocuments(
   for (final document in documents) {
     final matchesText =
         normalizedQuery.isEmpty ||
-        document.title?.toLowerCase().contains(normalizedQuery) == true ||
-        document.author?.toLowerCase().contains(normalizedQuery) == true ||
-        document.fileName.toLowerCase().contains(normalizedQuery);
+        document.effectiveTitle.toLowerCase().contains(normalizedQuery) ||
+        document.effectiveAuthor?.toLowerCase().contains(normalizedQuery) ==
+            true ||
+        document.fileName.toLowerCase().contains(normalizedQuery) ||
+        document.libraryNote?.toLowerCase().contains(normalizedQuery) == true;
     if (!matchesText || (favoritesOnly && !document.isFavorite)) continue;
     final documentState = readingStateOf(document);
     counts[LibraryReadingState.all] = counts[LibraryReadingState.all]! + 1;
@@ -87,7 +89,5 @@ LibraryReadingState readingStateOf(LibraryDocument document) {
 }
 
 String documentLabel(LibraryDocument document) {
-  final title = document.title?.trim();
-  return (title == null || title.isEmpty ? document.fileName : title)
-      .toLowerCase();
+  return document.effectiveTitle.trim().toLowerCase();
 }

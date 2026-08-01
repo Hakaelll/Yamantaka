@@ -12,7 +12,9 @@ import 'package:yamantaka/features/diagnostics/application/diagnostics_service.d
 import 'package:yamantaka/features/library/application/document_recovery_service.dart';
 import 'package:yamantaka/features/library/application/document_service.dart';
 import 'package:yamantaka/features/library/application/folder_import_controller.dart';
+import 'package:yamantaka/features/library/application/library_bulk_operation_service.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
+import 'package:yamantaka/features/library/domain/library_selection.dart';
 import 'package:yamantaka/features/navigation/application/navigation_history_controller.dart';
 import 'package:yamantaka/features/organization/domain/organization_models.dart';
 import 'package:yamantaka/features/profiles/domain/reading_profile.dart';
@@ -33,7 +35,7 @@ import 'package:yamantaka/storage/repositories/workspace_repository.dart';
 import 'support/stub_pdf_engine.dart';
 
 void main() {
-  group('database schema v3', () {
+  group('database schema', () {
     test('creates strict capability tables and FTS index', () {
       final database = AppDatabase.inMemory(AppLogger());
       addTearDown(database.close);
@@ -281,6 +283,28 @@ void main() {
       organization.deleteCollection(collection.id);
       expect(documents.byId(document.id), isNotNull);
     });
+
+    test(
+      'bulk metadata actions remain local and report each document',
+      () async {
+        final organization = OrganizationRepository(database);
+        final service = LibraryBulkOperationService(
+          documents: documents,
+          organization: organization,
+        );
+
+        final summary = await service.execute(BulkLibraryAction.favorite, [
+          document.id,
+          'missing-document',
+        ]);
+
+        expect(summary.succeeded, 1);
+        expect(summary.failed, 1);
+        expect(summary.isPartial, isTrue);
+        expect(documents.byId(document.id)?.isFavorite, isTrue);
+        expect(File(document.path).existsSync(), isFalse);
+      },
+    );
 
     test(
       'tags merge transactionally and deleting tags preserves documents',

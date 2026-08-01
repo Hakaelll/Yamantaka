@@ -4,38 +4,47 @@ import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../application/folder_import_controller.dart';
 
-final class FolderImportDialog extends StatelessWidget {
+final class FolderImportDialog extends StatefulWidget {
   const FolderImportDialog({
     super.key,
     required this.controller,
     required this.onImport,
+    required this.directoryPath,
   });
 
   final FolderImportController controller;
-  final Future<void> Function() onImport;
+  final Future<void> Function(bool watchRoot) onImport;
+  final String directoryPath;
+
+  @override
+  State<FolderImportDialog> createState() => _FolderImportDialogState();
+}
+
+final class _FolderImportDialogState extends State<FolderImportDialog> {
+  bool _watchRoot = false;
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 640),
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 700),
         child: ListenableBuilder(
-          listenable: controller,
+          listenable: widget.controller,
           builder: (context, _) {
-            final newCount = controller.candidates
+            final newCount = widget.controller.candidates
                 .where(
                   (item) => item.status == FolderCandidateStatus.newDocument,
                 )
                 .length;
-            final duplicates = controller.candidates
+            final duplicates = widget.controller.candidates
                 .where((item) => item.status == FolderCandidateStatus.duplicate)
                 .length;
-            final inaccessible = controller.candidates
+            final inaccessible = widget.controller.candidates
                 .where(
                   (item) => item.status == FolderCandidateStatus.inaccessible,
                 )
                 .length;
-            final invalid = controller.candidates
+            final invalid = widget.controller.candidates
                 .where((item) => item.status == FolderCandidateStatus.invalid)
                 .length;
             return Column(
@@ -52,7 +61,7 @@ final class FolderImportDialog extends StatelessWidget {
                       ),
                       IconButton(
                         tooltip: 'Cerrar',
-                        onPressed: controller.isImporting
+                        onPressed: widget.controller.isImporting
                             ? null
                             : () => Navigator.pop(context),
                         icon: const Icon(Icons.close_rounded),
@@ -60,11 +69,29 @@ final class FolderImportDialog extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (controller.isScanning || controller.isImporting)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.space16,
+                    0,
+                    AppSpacing.space16,
+                    AppSpacing.space8,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      widget.directoryPath,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ),
+                if (widget.controller.isScanning ||
+                    widget.controller.isImporting)
                   LinearProgressIndicator(
-                    value: controller.total == 0
+                    value: widget.controller.total == 0
                         ? null
-                        : controller.processed / controller.total,
+                        : widget.controller.processed / widget.controller.total,
                   ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -77,7 +104,7 @@ final class FolderImportDialog extends StatelessWidget {
                     children: [
                       _CountChip(
                         label: 'Encontrados',
-                        value: controller.candidates.length,
+                        value: widget.controller.candidates.length,
                       ),
                       _CountChip(label: 'Nuevos', value: newCount),
                       _CountChip(label: 'Duplicados', value: duplicates),
@@ -88,20 +115,21 @@ final class FolderImportDialog extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 Expanded(
-                  child: controller.candidates.isEmpty
+                  child: widget.controller.candidates.isEmpty
                       ? AppStatusView(
                           icon: Icons.folder_off_outlined,
-                          title: controller.isScanning
+                          title: widget.controller.isScanning
                               ? 'Buscando PDF'
                               : 'No se encontraron PDF',
                           message:
                               'Ningún archivo se añadirá sin confirmación.',
-                          loading: controller.isScanning,
+                          loading: widget.controller.isScanning,
                         )
                       : ListView.builder(
-                          itemCount: controller.candidates.length,
+                          itemCount: widget.controller.candidates.length,
                           itemBuilder: (context, index) {
-                            final candidate = controller.candidates[index];
+                            final candidate =
+                                widget.controller.candidates[index];
                             return ListTile(
                               leading: Icon(_icon(candidate.status)),
                               title: Text(
@@ -115,14 +143,30 @@ final class FolderImportDialog extends StatelessWidget {
                         ),
                 ),
                 const Divider(height: 1),
+                CheckboxListTile(
+                  value: _watchRoot,
+                  onChanged: widget.controller.isImporting
+                      ? null
+                      : (value) => setState(() => _watchRoot = value ?? false),
+                  title: const Text(
+                    'Observar esta carpeta después de importar',
+                  ),
+                  subtitle: const Text(
+                    'Solo revalidará cambios. No importará, moverá ni borrará PDF automáticamente.',
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  dense: true,
+                ),
+                const Divider(height: 1),
                 Padding(
                   padding: const EdgeInsets.all(AppSpacing.space16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      if (controller.isScanning || controller.isImporting)
+                      if (widget.controller.isScanning ||
+                          widget.controller.isImporting)
                         TextButton(
-                          onPressed: controller.cancel,
+                          onPressed: widget.controller.cancel,
                           child: const Text('Cancelar proceso'),
                         )
                       else
@@ -134,10 +178,10 @@ final class FolderImportDialog extends StatelessWidget {
                       FilledButton.icon(
                         onPressed:
                             newCount == 0 ||
-                                controller.isScanning ||
-                                controller.isImporting
+                                widget.controller.isScanning ||
+                                widget.controller.isImporting
                             ? null
-                            : onImport,
+                            : () => widget.onImport(_watchRoot),
                         icon: const Icon(Icons.library_add_outlined, size: 18),
                         label: Text('Añadir $newCount'),
                       ),

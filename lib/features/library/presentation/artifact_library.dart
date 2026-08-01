@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme/app_tokens.dart';
@@ -9,6 +11,8 @@ import '../application/library_controller.dart';
 import '../application/library_filter.dart';
 import '../domain/library_artifact_layout.dart';
 import '../domain/library_document.dart';
+import '../domain/library_selection.dart';
+import '../../organization/domain/organization_models.dart';
 
 final class ArtifactLibraryView extends StatefulWidget {
   const ArtifactLibraryView({
@@ -19,12 +23,16 @@ final class ArtifactLibraryView extends StatefulWidget {
     required this.onPickDocument,
     required this.initialReadingState,
     required this.onReadingStateChanged,
+    this.onBulkOperation,
+    this.collections = const [],
+    this.tags = const [],
     this.onDocumentInfo,
     this.onRelocateDocument,
     this.onToggleFavorite,
     this.onChangeCover,
     this.onRevealDocument,
     this.onRemoveDocument,
+    this.onDocumentVisible,
   });
 
   final LibraryController controller;
@@ -33,21 +41,26 @@ final class ArtifactLibraryView extends StatefulWidget {
   final Future<void> Function() onPickDocument;
   final LibraryReadingState initialReadingState;
   final ValueChanged<LibraryReadingState> onReadingStateChanged;
+  final BulkOperationHandler? onBulkOperation;
+  final List<DocumentCollection> collections;
+  final List<DocumentTag> tags;
   final Future<void> Function(LibraryDocument document)? onDocumentInfo;
   final Future<void> Function(LibraryDocument document)? onRelocateDocument;
   final Future<void> Function(LibraryDocument document)? onToggleFavorite;
   final Future<void> Function(LibraryDocument document)? onChangeCover;
   final Future<void> Function(LibraryDocument document)? onRevealDocument;
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
+  final ValueChanged<LibraryDocument>? onDocumentVisible;
 
   @override
   State<ArtifactLibraryView> createState() => _ArtifactLibraryViewState();
 }
 
 final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
-  late final ScrollController _scrollController = ScrollController(
-    initialScrollOffset: widget.controller.scrollOffset,
-  )..addListener(_rememberScroll);
+  late final ScrollController _scrollController =
+      ScrollController(initialScrollOffset: widget.controller.scrollOffset)
+        ..addListener(_rememberScroll)
+        ..addListener(_loadMoreIfNeeded);
   late final TextEditingController _searchController = TextEditingController(
     text: widget.controller.query,
   );
@@ -58,6 +71,10 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   late LibrarySortOrder _sortOrder;
   late bool _favoritesOnly;
   late bool _searchOpen;
+  bool _selectionMode = false;
+  final LibrarySelection _selection = LibrarySelection();
+  String? _selectionAnchorId;
+  Timer? _queryDebounce;
 
   @override
   void initState() {
@@ -85,7 +102,9 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   void dispose() {
     _scrollController
       ..removeListener(_rememberScroll)
+      ..removeListener(_loadMoreIfNeeded)
       ..dispose();
+    _queryDebounce?.cancel();
     _searchController.dispose();
     _libraryFocusNode.dispose();
     _searchFocusNode.dispose();
@@ -106,6 +125,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       result.documents,
       widget.controller.selectedDocumentId,
     );
+    _selection.retain(result.documents.map((document) => document.id));
     final hovered = _documentById(result.documents, _hoveredDocumentId);
     final describedDocument = hovered ?? selected;
     final activeFilter =
@@ -144,16 +164,26 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
               children: [
                 _LibraryCommandBar(
                   resultCount: result.documents.length,
-                  totalCount: widget.documents.length,
+                  totalCount: widget.controller.totalDocuments,
                   query: widget.controller.query,
                   counts: result.counts,
                   readingState: _readingState,
                   sortOrder: _sortOrder,
                   favoritesOnly: _favoritesOnly,
                   activeFilter: activeFilter,
+                  selectionMode: _selectionMode,
+                  selectedCount: _selection.length,
                   onSearch: _openSearch,
                   onFilter: _applyFilterCommand,
+                  onToggleSelectionMode: _toggleSelectionMode,
                 ),
+                if (_selectionMode && _selection.isNotEmpty)
+                  _BulkActionBar(
+                    selectedCount: _selection.length,
+                    onClear: _clearSelection,
+                    onAction: _runBulkAction,
+                    canRun: widget.onBulkOperation != null,
+                  ),
                 Expanded(
                   child: result.documents.isEmpty
                       ? _NoArtifactResults(
@@ -165,6 +195,8 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                           documents: result.documents,
                           selectedDocumentId:
                               widget.controller.selectedDocumentId,
+                          selectedDocumentIds: _selection.ids.toSet(),
+                          selectionMode: _selectionMode,
                           reserveInfoSpace: describedDocument != null,
                           reduceMotion: reduceMotion,
                           onSelect: _select,
@@ -172,6 +204,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                           onHover: (documentId) =>
                               setState(() => _hoveredDocumentId = documentId),
                           onMenu: _showDocumentMenu,
+                          onDocumentVisible: widget.onDocumentVisible,
                         ),
                 ),
               ],
@@ -214,6 +247,12 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     widget.controller.scrollOffset = _scrollController.offset;
   }
 
+  void _loadMoreIfNeeded() {
+    if (!_scrollController.hasClients || !widget.controller.hasMore) return;
+    if (_scrollController.position.extentAfter > 720) return;
+    unawaited(widget.controller.loadNextPage());
+  }
+
   void _openSearch() {
     if (!_searchOpen) setState(() => _searchOpen = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -229,12 +268,17 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     _searchController.clear();
     widget.controller.query = '';
     setState(() => _searchOpen = false);
+    unawaited(widget.controller.reload());
     _libraryFocusNode.requestFocus();
   }
 
   void _updateQuery(String value) {
     widget.controller.query = value;
     setState(() {});
+    _queryDebounce?.cancel();
+    _queryDebounce = Timer(const Duration(milliseconds: 180), () {
+      if (mounted) unawaited(widget.controller.reload());
+    });
   }
 
   void _handleEscape() {
@@ -244,12 +288,54 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     }
     if (widget.controller.selectedDocumentId != null) {
       widget.controller.selectDocument(null);
+      _clearSelection();
+      return;
+    }
+    if (_selection.isNotEmpty || _selectionMode) {
+      _clearSelection();
       return;
     }
     _libraryFocusNode.requestFocus();
   }
 
   void _select(LibraryDocument document) {
+    final keyboard = HardwareKeyboard.instance;
+    final range =
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
+    final additive =
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlLeft) ||
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.controlRight) ||
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.metaLeft) ||
+        keyboard.logicalKeysPressed.contains(LogicalKeyboardKey.metaRight);
+    if (_selectionMode || range || additive) {
+      final visible = evaluateLibraryDocuments(
+        widget.documents,
+        query: widget.controller.query,
+        sortOrder: _sortOrder,
+        readingState: _readingState,
+        favoritesOnly: _favoritesOnly,
+      ).documents;
+      if (range && _selectionAnchorId != null) {
+        _selection.selectRange(
+          visible.map((item) => item.id).toList(growable: false),
+          _selectionAnchorId!,
+          document.id,
+          additive: additive,
+        );
+      } else {
+        _selection.toggle(
+          document.id,
+          selected: _selectionMode
+              ? null
+              : additive
+              ? !_selection.contains(document.id)
+              : true,
+        );
+      }
+      _selectionAnchorId = document.id;
+      setState(() {});
+    }
     widget.controller.selectDocument(document.id);
     _libraryFocusNode.requestFocus();
   }
@@ -272,11 +358,216 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   }
 
   void _deleteSelected(List<LibraryDocument> documents) {
+    if (_selection.isNotEmpty) {
+      unawaited(_runBulkAction(BulkLibraryAction.removeFromLibrary));
+      return;
+    }
     final selected = _documentById(
       documents,
       widget.controller.selectedDocumentId,
     );
     if (selected != null) widget.onRemoveDocument?.call(selected);
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _selectionMode = !_selectionMode;
+      if (!_selectionMode) _selection.clear();
+    });
+    if (_selectionMode) {
+      unawaited(
+        SemanticsService.sendAnnouncement(
+          View.of(context),
+          'Modo de selección activado. Seleccionados ${_selection.length}.',
+          Directionality.of(context),
+        ),
+      );
+    }
+    _libraryFocusNode.requestFocus();
+  }
+
+  void _clearSelection() {
+    if (_selection.isEmpty && !_selectionMode) return;
+    setState(() {
+      _selection.clear();
+      _selectionAnchorId = null;
+      _selectionMode = false;
+    });
+    widget.controller.selectDocument(null);
+    _libraryFocusNode.requestFocus();
+  }
+
+  Future<void> _runBulkAction(BulkLibraryAction action) async {
+    final handler = widget.onBulkOperation;
+    if (handler == null || _selection.isEmpty) return;
+    final targetId = switch (action) {
+      BulkLibraryAction.assignTag => await _chooseTag(),
+      BulkLibraryAction.addToCollection => await _chooseCollection(
+        title: 'Añadir a colección',
+      ),
+      BulkLibraryAction.removeFromCollection => await _chooseCollection(
+        title: 'Quitar de colección',
+      ),
+      _ => null,
+    };
+    if ((action == BulkLibraryAction.assignTag ||
+            action == BulkLibraryAction.addToCollection ||
+            action == BulkLibraryAction.removeFromCollection) &&
+        targetId == null) {
+      return;
+    }
+    if (BulkOperationPolicy.requiresConfirmation(action)) {
+      final confirmed = await _confirmBulkRemoval();
+      if (!confirmed) return;
+    }
+    final ids = _selection.ids;
+    late final BulkOperationSummary summary;
+    try {
+      summary = await handler(action, ids, targetId: targetId);
+    } on Object {
+      _showLocalNotice(
+        'La acción no se pudo completar. No se ha tocado ningún PDF.',
+      );
+      return;
+    }
+    if (!mounted) return;
+    final failedIds = summary.results
+        .where((result) => !result.success)
+        .map((result) => result.id)
+        .toList(growable: false);
+    setState(() {
+      _selection.clear();
+      for (final id in failedIds) {
+        _selection.toggle(id, selected: true);
+      }
+      _selectionAnchorId = null;
+      _selectionMode = failedIds.isNotEmpty;
+    });
+    widget.controller.selectDocument(null);
+    await _showBulkSummary(summary);
+    _libraryFocusNode.requestFocus();
+  }
+
+  Future<String?> _chooseCollection({required String title}) async {
+    if (widget.collections.isEmpty) {
+      _showLocalNotice('No hay colecciones creadas.');
+      return null;
+    }
+    return showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(title),
+        children: [
+          for (final collection in widget.collections)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, collection.id),
+              child: Semantics(
+                button: true,
+                label:
+                    '${collection.name}, ${collection.documentCount} documentos',
+                child: Text(collection.name),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _chooseTag() async {
+    if (widget.tags.isEmpty) {
+      _showLocalNotice('No hay etiquetas creadas.');
+      return null;
+    }
+    return showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Asignar etiqueta'),
+        children: [
+          for (final tag in widget.tags)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, tag.id),
+              child: Semantics(
+                button: true,
+                label: '${tag.name}, ${tag.usageCount} usos',
+                child: Text(tag.name),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _confirmBulkRemoval() async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Retirar documentos'),
+          content: Text(
+            'Se retirarán ${_selection.length} documentos de la biblioteca. '
+            'Los PDF originales no se borrarán.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Retirar'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  Future<void> _showBulkSummary(BulkOperationSummary summary) async {
+    final labels = <String, String>{
+      for (final document in widget.documents)
+        document.id: document.effectiveTitle,
+    };
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Acción completada'),
+        content: SizedBox(
+          width: 460,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Text(
+                '${summary.succeeded} correctos · ${summary.failed} con error',
+              ),
+              const SizedBox(height: AppSpacing.space12),
+              for (final result in summary.results)
+                ListTile(
+                  dense: true,
+                  leading: Icon(
+                    result.success
+                        ? Icons.check_circle_outline
+                        : Icons.error_outline,
+                  ),
+                  title: Text(labels[result.id] ?? 'Documento seleccionado'),
+                  subtitle: result.success
+                      ? null
+                      : Text(result.errorCode ?? 'operation_failed'),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLocalNotice(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _navigate(
@@ -413,6 +704,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       widget.controller.favoritesOnly = _favoritesOnly;
     });
     widget.onReadingStateChanged(_readingState);
+    unawaited(widget.controller.reload());
   }
 
   void _resetFilters() {
@@ -432,8 +724,11 @@ final class _LibraryCommandBar extends StatelessWidget {
     required this.sortOrder,
     required this.favoritesOnly,
     required this.activeFilter,
+    required this.selectionMode,
+    required this.selectedCount,
     required this.onSearch,
     required this.onFilter,
+    required this.onToggleSelectionMode,
   });
 
   final int resultCount;
@@ -444,8 +739,11 @@ final class _LibraryCommandBar extends StatelessWidget {
   final LibrarySortOrder sortOrder;
   final bool favoritesOnly;
   final bool activeFilter;
+  final bool selectionMode;
+  final int selectedCount;
   final VoidCallback onSearch;
   final ValueChanged<_FilterCommand> onFilter;
+  final VoidCallback onToggleSelectionMode;
 
   @override
   Widget build(BuildContext context) {
@@ -465,6 +763,36 @@ final class _LibraryCommandBar extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const Spacer(),
+          if (selectedCount > 0)
+            Semantics(
+              liveRegion: true,
+              label: '$selectedCount documentos seleccionados',
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.space8,
+                ),
+                child: Text(
+                  '$selectedCount seleccionados',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+            ),
+          IconButton(
+            key: const Key('library-selection-mode-button'),
+            tooltip: selectionMode
+                ? 'Salir del modo de selección'
+                : 'Seleccionar varios documentos',
+            onPressed: onToggleSelectionMode,
+            icon: Badge(
+              isLabelVisible: selectedCount > 0,
+              label: Text('$selectedCount'),
+              child: Icon(
+                selectionMode
+                    ? Icons.check_box_outlined
+                    : Icons.checklist_rounded,
+              ),
+            ),
+          ),
           IconButton(
             key: const Key('library-search-button'),
             tooltip: 'Buscar en la biblioteca (Ctrl+F)',
@@ -541,28 +869,121 @@ final class _LibraryCommandBar extends StatelessWidget {
   }
 }
 
+final class _BulkActionBar extends StatelessWidget {
+  const _BulkActionBar({
+    required this.selectedCount,
+    required this.onClear,
+    required this.onAction,
+    required this.canRun,
+  });
+
+  final int selectedCount;
+  final VoidCallback onClear;
+  final ValueChanged<BulkLibraryAction> onAction;
+  final bool canRun;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: 'Acciones para $selectedCount documentos seleccionados',
+      child: Material(
+        color: context.appColors.surfaceSecondary,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.space20,
+            AppSpacing.space4,
+            AppSpacing.space12,
+            AppSpacing.space4,
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.select_all_rounded, size: 18),
+              const SizedBox(width: AppSpacing.space8),
+              Expanded(child: Text('$selectedCount seleccionados')),
+              PopupMenuButton<BulkLibraryAction>(
+                enabled: canRun,
+                tooltip: 'Acciones masivas',
+                onSelected: onAction,
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: BulkLibraryAction.favorite,
+                    child: Text('Marcar como favorito'),
+                  ),
+                  PopupMenuItem(
+                    value: BulkLibraryAction.unfavorite,
+                    child: Text('Quitar de favoritos'),
+                  ),
+                  PopupMenuItem(
+                    value: BulkLibraryAction.assignTag,
+                    child: Text('Asignar etiqueta'),
+                  ),
+                  PopupMenuItem(
+                    value: BulkLibraryAction.addToCollection,
+                    child: Text('Añadir a colección'),
+                  ),
+                  PopupMenuItem(
+                    value: BulkLibraryAction.removeFromCollection,
+                    child: Text('Quitar de colección'),
+                  ),
+                  PopupMenuItem(
+                    value: BulkLibraryAction.archive,
+                    child: Text('Archivar'),
+                  ),
+                  PopupMenuItem(
+                    value: BulkLibraryAction.regenerateCover,
+                    child: Text('Regenerar portadas'),
+                  ),
+                  PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: BulkLibraryAction.removeFromLibrary,
+                    child: Text('Retirar de la biblioteca'),
+                  ),
+                ],
+                icon: const Icon(Icons.more_horiz_rounded),
+              ),
+              IconButton(
+                tooltip: 'Limpiar selección',
+                onPressed: onClear,
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 final class _ArtifactCanvas extends StatelessWidget {
   const _ArtifactCanvas({
     required this.controller,
     required this.documents,
     required this.selectedDocumentId,
+    required this.selectedDocumentIds,
+    required this.selectionMode,
     required this.reserveInfoSpace,
     required this.reduceMotion,
     required this.onSelect,
     required this.onOpen,
     required this.onHover,
     required this.onMenu,
+    this.onDocumentVisible,
   });
 
   final ScrollController controller;
   final List<LibraryDocument> documents;
   final String? selectedDocumentId;
+  final Set<String> selectedDocumentIds;
+  final bool selectionMode;
   final bool reserveInfoSpace;
   final bool reduceMotion;
   final ValueChanged<LibraryDocument> onSelect;
   final ValueChanged<LibraryDocument> onOpen;
   final ValueChanged<String?> onHover;
   final void Function(LibraryDocument document, Offset position) onMenu;
+  final ValueChanged<LibraryDocument>? onDocumentVisible;
 
   @override
   Widget build(BuildContext context) {
@@ -616,13 +1037,18 @@ final class _ArtifactCanvas extends StatelessWidget {
                               key: ValueKey('artifact-${document.id}'),
                               document: document,
                               width: metrics.artifactWidth,
-                              selected: selectedDocumentId == document.id,
+                              selected: selectionMode
+                                  ? selectedDocumentIds.contains(document.id)
+                                  : selectedDocumentId == document.id,
+                              selectionMode: selectionMode,
                               reduceMotion: reduceMotion,
                               onSelect: () => onSelect(document),
                               onOpen: () => onOpen(document),
                               onHover: (hovered) =>
                                   onHover(hovered ? document.id : null),
                               onMenu: (position) => onMenu(document, position),
+                              onVisible: () =>
+                                  onDocumentVisible?.call(document),
                             ),
                           ),
                         ),
@@ -658,13 +1084,17 @@ final class _ArtifactCanvas extends StatelessWidget {
                       key: ValueKey('artifact-${document.id}'),
                       document: document,
                       width: metrics.artifactWidth,
-                      selected: selectedDocumentId == document.id,
+                      selected: selectionMode
+                          ? selectedDocumentIds.contains(document.id)
+                          : selectedDocumentId == document.id,
+                      selectionMode: selectionMode,
                       reduceMotion: reduceMotion,
                       onSelect: () => onSelect(document),
                       onOpen: () => onOpen(document),
                       onHover: (hovered) =>
                           onHover(hovered ? document.id : null),
                       onMenu: (position) => onMenu(document, position),
+                      onVisible: () => onDocumentVisible?.call(document),
                     ),
                   );
                 },
@@ -683,21 +1113,25 @@ final class ArtifactDocument extends StatefulWidget {
     required this.document,
     required this.width,
     required this.selected,
+    required this.selectionMode,
     required this.reduceMotion,
     required this.onSelect,
     required this.onOpen,
     required this.onHover,
     required this.onMenu,
+    this.onVisible,
   });
 
   final LibraryDocument document;
   final double width;
   final bool selected;
+  final bool selectionMode;
   final bool reduceMotion;
   final VoidCallback onSelect;
   final VoidCallback onOpen;
   final ValueChanged<bool> onHover;
   final ValueChanged<Offset> onMenu;
+  final VoidCallback? onVisible;
 
   @override
   State<ArtifactDocument> createState() => _ArtifactDocumentState();
@@ -706,6 +1140,14 @@ final class ArtifactDocument extends StatefulWidget {
 final class _ArtifactDocumentState extends State<ArtifactDocument> {
   bool _hovered = false;
   bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onVisible?.call();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -740,12 +1182,23 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
       button: true,
       selected: widget.selected,
       label: _artifactSemanticLabel(widget.document),
-      hint: 'Un clic selecciona; doble clic o Enter abre; menú contextual',
+      hint: widget.selectionMode
+          ? 'Un clic alterna la selección; Ctrl y Shift amplían la selección'
+          : 'Un clic selecciona; doble clic o Enter abre; menú contextual',
       child: Focus(
         onFocusChange: (focused) {
           setState(() => _focused = focused);
-          if (focused) widget.onSelect();
+          if (focused && !widget.selectionMode) widget.onSelect();
           widget.onHover(focused);
+        },
+        onKeyEvent: (_, event) {
+          if (widget.selectionMode &&
+              event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onSelect();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
         },
         child: MouseRegion(
           onEnter: (_) {
@@ -899,6 +1352,28 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                 ),
                               ),
                             ),
+                          if (widget.selectionMode && widget.selected)
+                            Positioned(
+                              left: AppSpacing.space8,
+                              top: AppSpacing.space8,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: context.appColors.surfacePrimary,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: context.appColors.accentPrimary,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(2),
+                                  child: Icon(
+                                    Icons.check_rounded,
+                                    size: 16,
+                                    color: context.appColors.accentPrimary,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -921,7 +1396,7 @@ final class _ArtifactPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = (document.title ?? document.fileName).trim();
+    final label = document.effectiveTitle.trim();
     final initial = label.isEmpty
         ? 'PDF'
         : label.characters.first.toUpperCase();
@@ -990,20 +1465,16 @@ final class DocumentInfoOverlay extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Tooltip(
-                message: (document.title?.trim().isNotEmpty ?? false)
-                    ? document.title!
-                    : 'Documento sin título',
+                message: document.effectiveTitle,
                 child: Text(
-                  (document.title?.trim().isNotEmpty ?? false)
-                      ? document.title!
-                      : 'Documento sin título',
+                  document.effectiveTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-              if (document.author case final author?)
+              if (document.effectiveAuthor case final author?)
                 Text(
                   author,
                   maxLines: 1,
@@ -1020,6 +1491,14 @@ final class DocumentInfoOverlay extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (document.libraryNote case final note?)
+                Text(
+                  note,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
             ],
           ),
         ),
@@ -1151,7 +1630,7 @@ LibraryDocument? _documentById(
 }
 
 String _artifactSemanticLabel(LibraryDocument document) {
-  final title = document.title ?? document.fileName;
+  final title = document.effectiveTitle;
   if (document.isMissing) return '$title, archivo no encontrado';
   if (document.readingProgress >= 1) return '$title, terminado';
   if (document.readingProgress > 0) {

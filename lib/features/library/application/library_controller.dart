@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../storage/repositories/document_repository.dart';
 import '../domain/library_document.dart';
+import '../domain/library_query.dart';
 
 final class LibraryController extends ChangeNotifier {
   LibraryController(this._repository, this._logger);
@@ -12,7 +15,10 @@ final class LibraryController extends ChangeNotifier {
   final AppLogger _logger;
 
   List<LibraryDocument> documents = const [];
+  int totalDocuments = 0;
+  bool hasMore = false;
   bool isLoading = false;
+  bool isLoadingMore = false;
   AppFailure? error;
   String? selectedDocumentId;
   double scrollOffset = 0;
@@ -20,6 +26,8 @@ final class LibraryController extends ChangeNotifier {
   String sortOrder = 'lastOpened';
   String readingState = 'all';
   bool favoritesOnly = false;
+  LibraryQuery? _activeQuery;
+  int _loadGeneration = 0;
 
   LibraryDocument? get continueReading => documents
       .where(
@@ -30,13 +38,28 @@ final class LibraryController extends ChangeNotifier {
       )
       .firstOrNull;
 
-  Future<void> load() async {
-    isLoading = true;
+  Future<void> load({LibraryQuery? query}) async {
+    final requested = (query ?? _queryFromState()).normalized();
+    _activeQuery = requested;
+    final generation = ++_loadGeneration;
+    final append = requested.offset > 0 && documents.isNotEmpty;
+    if (append) {
+      isLoadingMore = true;
+    } else {
+      isLoading = true;
+      isLoadingMore = false;
+    }
     error = null;
     notifyListeners();
     try {
       _repository.refreshMissingState();
-      documents = _repository.all();
+      final page = _repository.page(requested);
+      if (generation != _loadGeneration) return;
+      documents = append
+          ? List.unmodifiable([...documents, ...page.documents])
+          : page.documents;
+      totalDocuments = page.total;
+      hasMore = page.hasMore;
       if (selectedDocumentId != null &&
           !documents.any((document) => document.id == selectedDocumentId)) {
         selectedDocumentId = null;
@@ -52,10 +75,42 @@ final class LibraryController extends ChangeNotifier {
         debugMessage: exception.toString(),
       );
     } finally {
-      isLoading = false;
-      notifyListeners();
+      if (generation == _loadGeneration) {
+        if (append) {
+          isLoadingMore = false;
+        } else {
+          isLoading = false;
+        }
+        notifyListeners();
+      }
     }
   }
+
+  Future<void> reload() => load(query: _queryFromState());
+
+  Future<void> loadNextPage() {
+    final active = _activeQuery;
+    if (active == null || !hasMore || isLoading || isLoadingMore) {
+      return Future<void>.value();
+    }
+    return load(query: active.copyWith(offset: active.offset + active.limit));
+  }
+
+  void setQuery(String value) {
+    query = value;
+    unawaited(reload());
+  }
+
+  LibraryQuery _queryFromState() => LibraryQuery(
+    text: query,
+    favoritesOnly: favoritesOnly,
+    sort: switch (sortOrder) {
+      'added' => LibraryQuerySort.added,
+      'title' => LibraryQuerySort.title,
+      'progress' => LibraryQuerySort.progress,
+      _ => LibraryQuerySort.lastOpened,
+    },
+  );
 
   Future<void> deleteHistory() async {
     _repository.deleteHistory();

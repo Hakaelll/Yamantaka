@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../../app/app_config.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/performance/progressive_open.dart';
 import '../../../core/platform/window_service.dart';
 import '../../../pdf_engine/cache/thumbnail_service.dart';
 import '../../../pdf_engine/models/pdf_models.dart';
@@ -92,13 +93,19 @@ final class ReaderController extends ChangeNotifier {
   List<PdfOutlineItem> outline = const [];
   int currentPageIndex = 0;
   bool isFullScreen = false;
+  ProgressiveOpenState openProgress = const ProgressiveOpenState(
+    phase: ProgressiveOpenPhase.idle,
+    generation: 0,
+  );
 
   Timer? _saveTimer;
   Timer? _activityTimer;
+  PdfOperationToken? _coverToken;
   ReadingSession? _session;
   DateTime _lastActivity = DateTime.now();
   int _activeSeconds = 0;
   bool _isVisible = true;
+  int _openGeneration = 0;
 
   int get pageCount => openedDocument?.pageCount ?? 0;
   bool get canGoBack => currentPageIndex > 0;
@@ -110,6 +117,11 @@ final class ReaderController extends ChangeNotifier {
       _nextReadingUnitTarget() != _canonicalReadingUnitPage();
 
   Future<bool> openPath(String path, {String? password}) async {
+    final openGeneration = ++_openGeneration;
+    openProgress = ProgressiveOpenState(
+      phase: ProgressiveOpenPhase.nativeOpen,
+      generation: openGeneration,
+    );
     pendingPath = path;
     status = ReaderStatus.loading;
     error = null;
@@ -121,6 +133,15 @@ final class ReaderController extends ChangeNotifier {
         inspected.path,
         password: password,
       );
+      openProgress = ProgressiveOpenState(
+        phase: ProgressiveOpenPhase.firstLayout,
+        generation: openGeneration,
+        pageIndex: 0,
+      );
+      if (openGeneration != _openGeneration) {
+        await _engine.closeDocument(newlyOpened.documentId);
+        return false;
+      }
       final libraryDocument = _documentService.register(
         file: inspected,
         pageCount: newlyOpened.pageCount,
@@ -149,9 +170,19 @@ final class ReaderController extends ChangeNotifier {
       );
       outline = const [];
       status = ReaderStatus.ready;
+      openProgress = ProgressiveOpenState(
+        phase: ProgressiveOpenPhase.firstRender,
+        generation: openGeneration,
+        pageIndex: currentPageIndex,
+      );
       pendingPath = null;
       registerActivity();
       _startSession();
+      openProgress = ProgressiveOpenState(
+        phase: ProgressiveOpenPhase.enrichment,
+        generation: openGeneration,
+        pageIndex: currentPageIndex,
+      );
       notifyListeners();
       unawaited(_loadOutline());
       if (_shouldGenerateCovers() &&
@@ -164,7 +195,12 @@ final class ReaderController extends ChangeNotifier {
       if (newlyOpened != null) {
         await _engine.closeDocument(newlyOpened.documentId);
       }
+      if (openGeneration != _openGeneration) return false;
       error = failure;
+      openProgress = ProgressiveOpenPolicy.failure(
+        openProgress,
+        failure.kind.name,
+      );
       status = openedDocument == null
           ? ReaderStatus.failure
           : ReaderStatus.ready;
@@ -175,12 +211,14 @@ final class ReaderController extends ChangeNotifier {
       if (newlyOpened != null) {
         await _engine.closeDocument(newlyOpened.documentId);
       }
+      if (openGeneration != _openGeneration) return false;
       _logger.error('Reader open flow failed.', exception, stackTrace);
       error = AppFailure(
         FailureKind.unknown,
         'No se pudo abrir el documento.',
         debugMessage: exception.toString(),
       );
+      openProgress = ProgressiveOpenPolicy.failure(openProgress, 'unknown');
       status = openedDocument == null
           ? ReaderStatus.failure
           : ReaderStatus.ready;
@@ -197,10 +235,23 @@ final class ReaderController extends ChangeNotifier {
       final result = await _engine.getOutline(opened.documentId);
       if (openedDocument?.documentId == opened.documentId) {
         outline = result;
+        openProgress = ProgressiveOpenState(
+          phase: ProgressiveOpenPhase.complete,
+          generation: openProgress.generation,
+          pageIndex: currentPageIndex,
+        );
         notifyListeners();
       }
     } on Object catch (exception) {
       _logger.warning('Outline load failed.', exception);
+      if (openedDocument?.documentId == opened.documentId) {
+        openProgress = ProgressiveOpenState(
+          phase: ProgressiveOpenPhase.complete,
+          generation: openProgress.generation,
+          pageIndex: currentPageIndex,
+        );
+        notifyListeners();
+      }
     }
   }
 
@@ -208,17 +259,25 @@ final class ReaderController extends ChangeNotifier {
     final libraryDocument = document;
     final opened = openedDocument;
     if (libraryDocument == null || opened == null) return;
+    final token = PdfOperationToken();
+    _coverToken?.cancel();
+    _coverToken = token;
     try {
       await _thumbnails.generateCover(
         libraryDocumentId: libraryDocument.id,
         engineDocumentId: opened.documentId,
+        cancellationToken: token,
       );
     } on Object {
       // Thumbnail failure is already logged and must never block reading.
+    } finally {
+      if (identical(_coverToken, token)) _coverToken = null;
     }
   }
 
   Future<void> closeDocument() async {
+    _openGeneration++;
+    openProgress = ProgressiveOpenPolicy.cancel(openProgress);
     await _closeCurrent();
     status = ReaderStatus.idle;
     error = null;
@@ -228,6 +287,8 @@ final class ReaderController extends ChangeNotifier {
 
   Future<void> _closeCurrent() async {
     _saveTimer?.cancel();
+    _coverToken?.cancel();
+    _coverToken = null;
     _savePositionNow();
     _finishSession();
     search.reset();
@@ -545,6 +606,8 @@ final class ReaderController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _openGeneration++;
+    openProgress = ProgressiveOpenPolicy.cancel(openProgress);
     viewController.removeListener(_onViewerStateChanged);
     _saveTimer?.cancel();
     _activityTimer?.cancel();

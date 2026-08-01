@@ -73,6 +73,14 @@ final class OrganizationRepository {
     return collections().firstWhere((collection) => collection.id == id);
   }
 
+  DocumentCollection ensureCollection(String name, {String icon = 'folder'}) {
+    final normalized = name.trim().toLowerCase();
+    for (final collection in collections()) {
+      if (collection.name.trim().toLowerCase() == normalized) return collection;
+    }
+    return createCollection(name, icon: icon);
+  }
+
   void renameCollection(String id, String name) {
     final cleanName = _validatedName(name);
     _database.database.execute(

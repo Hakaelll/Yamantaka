@@ -85,6 +85,7 @@ final class AppSettings {
     this.startInLibrary = false,
     this.lastDocumentPath = '',
     this.languageCode = 'es',
+    this.hasSeenWelcome = false,
     this.windowWidth = 1120,
     this.windowHeight = 760,
     this.windowX,
@@ -122,6 +123,7 @@ final class AppSettings {
   final bool startInLibrary;
   final String lastDocumentPath;
   final String languageCode;
+  final bool hasSeenWelcome;
   final double windowWidth;
   final double windowHeight;
   final double? windowX;
@@ -159,6 +161,7 @@ final class AppSettings {
     bool? startInLibrary,
     String? lastDocumentPath,
     String? languageCode,
+    bool? hasSeenWelcome,
     double? windowWidth,
     double? windowHeight,
     double? windowX,
@@ -197,6 +200,7 @@ final class AppSettings {
     startInLibrary: startInLibrary ?? this.startInLibrary,
     lastDocumentPath: lastDocumentPath ?? this.lastDocumentPath,
     languageCode: languageCode ?? this.languageCode,
+    hasSeenWelcome: hasSeenWelcome ?? this.hasSeenWelcome,
     windowWidth: windowWidth ?? this.windowWidth,
     windowHeight: windowHeight ?? this.windowHeight,
     windowX: windowX ?? this.windowX,
@@ -272,6 +276,7 @@ final class AppSettingsRepository {
     startInLibrary: await _preferences.getBool('startInLibrary') ?? false,
     lastDocumentPath: await _preferences.getString('lastDocumentPath') ?? '',
     languageCode: await _preferences.getString('languageCode') ?? 'es',
+    hasSeenWelcome: await _preferences.getBool('hasSeenWelcome') ?? false,
     windowWidth: await _preferences.getDouble('windowWidth') ?? 1120,
     windowHeight: await _preferences.getDouble('windowHeight') ?? 760,
     windowX: await _preferences.getDouble('windowX'),
@@ -329,6 +334,7 @@ final class AppSettingsRepository {
       _preferences.setBool('startInLibrary', settings.startInLibrary),
       _preferences.setString('lastDocumentPath', settings.lastDocumentPath),
       _preferences.setString('languageCode', settings.languageCode),
+      _preferences.setBool('hasSeenWelcome', settings.hasSeenWelcome),
       _preferences.setDouble('windowWidth', settings.windowWidth),
       _preferences.setDouble('windowHeight', settings.windowHeight),
       if (settings.windowX != null)

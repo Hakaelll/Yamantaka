@@ -8,14 +8,14 @@ El nombre visible está centralizado en `lib/app/app_config.dart`.
 
 ## Estado verificado
 
-Base funcional Flutter 0.1.0 para Windows, Android e iOS, validada entre el 28
-y el 29 de julio de 2026:
+Base funcional Flutter 0.1.0 para Windows, Android e iOS, con una línea base
+validada entre el 28 y el 29 de julio de 2026:
 
 - `flutter analyze`: aprobado, sin incidencias.
 - `flutter test`: 102 pruebas aprobadas.
 - PDFium: apertura, bitmap nativo, extracción y búsqueda verificadas con un PDF
   legal generado durante la prueba.
-- SQLite: esquema v3, migraciones y repositorios verificados en memoria.
+- SQLite: esquema v6, migraciones y repositorios verificados en memoria.
 - Integración Windows: aprobada sobre el lector completo con `ui.Image`,
   lectura de píxeles, pintura nativa, chrome real, búsqueda, paleta, zoom,
   avance/retroceso, marcador, anotación de página, cierre y restauración.
@@ -24,6 +24,11 @@ y el 29 de julio de 2026:
   conexiones TCP durante el smoke.
 - Perfil Windows/Profile: cinco pasadas con 40 PDF, 100 páginas y carga
   vectorial pesada; cero frames fuera de presupuesto en el escenario medido.
+
+La reconstrucción local del 1 de agosto añade migración de esquema v6, backup
+v5, cola persistente y metadatos locales. Su suite completa debe repetirse en
+un host con la caché de Pub y el toolchain nativo disponibles; esos resultados
+históricos no certifican por sí solos este árbol de trabajo.
 
 El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
 
@@ -52,8 +57,12 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
   central y personalización segura de atajos importantes.
 - Ficha local del documento desde biblioteca/lector con copiar/mostrar,
   localizar, continuar, reiniciar o retirar sin borrar el PDF.
+- Editor de metadatos locales para título, autor y nota de biblioteca; los
+  overrides se conservan fuera del PDF y se incluyen de forma explícita en el
+  índice y en el backup.
 - Historial local acotado y opcional; copia de seguridad JSON versionada con
-  vista previa, validación, prebackup e importación transaccional, nunca PDF.
+  vista previa, validación, prebackup e importación transaccional, nunca PDF
+  (formato actual v5, compatible con v1–v4).
 - Anotaciones locales por página con nota, tipos/colores acotados, etiquetas,
   filtros, undo, estado de revisión y exportación Markdown/JSON; nunca escribe
   el PDF.
@@ -62,7 +71,12 @@ El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
 - Búsqueda global FTS5 opt-in sobre metadatos, páginas y anotaciones, cancelable
   y borrable, sin OCR ni consultas persistidas.
 - Colecciones manuales, etiquetas y vistas inteligentes; importación de carpeta
-  con preview y recuperación conservadora por huella.
+  con preview, cola recuperable y recuperación conservadora por huella; la
+  observación de carpetas solo se activa con confirmación explícita y convierte
+  eventos en revalidaciones.
+- Selección múltiple accesible en biblioteca con Ctrl/Shift, acciones locales de
+  favoritos, etiquetas, colecciones, archivo, portadas y retirada confirmada;
+  cada lote conserva el resultado individual y nunca modifica el PDF.
 - Historial de navegación atrás/adelante, scrubber para documentos largos, seis
   perfiles base, diagnóstico redaccionado y safe mode tras tres cierres no
   limpios.
@@ -131,6 +145,23 @@ flutter test integration_test/reader_integration_test.dart -d windows
 flutter build windows --release
 ```
 
+Para ejecutar el gate reproducible completo en Windows:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File tool/verify_windows.ps1
+```
+
+El gate conserva los informes bajo `build/verification` y falla si el checkout
+está sucio, falta una dependencia offline, no pasa el análisis, falla el
+corpus, el benchmark, el build o la regresión visual. Para una iteración local
+intencionada puede usarse `-AllowDirty`; no descarga dependencias sin permiso.
+La matriz nativa de DPI requiere además `-DpiScaleConfirmed` después de que el
+host confirme realmente cada escala; `-SkipDpiMatrix` solo sirve para aislar
+otras fases y nunca convierte la evidencia visual en aprobada.
+La trazabilidad de la hoja de ruta está en
+[`docs/verification/todo-traceability.md`](docs/verification/todo-traceability.md).
+
 El ejecutable Release se genera en
 `build\windows\x64\runner\Release\yamantaka.exe`.
 Para crear el PDF legal y reproducible usado en el smoke test:
@@ -196,6 +227,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 - pdfrx 2.4.7 lleva un parche local de ciclo de vida del codec; debe retirarse
   cuando una versión upstream corregida supere la misma captura nativa.
 - El build de desarrollo no está firmado ni empaquetado para distribución.
+- La cola de importación y la observación de carpetas autorizadas persisten y
+  revalidan trabajo local, pero ningún evento de carpeta importa, mueve o
+  elimina un PDF automáticamente.
 
 No se incluyen edición/firma del PDF, anotación geométrica sin selección nativa,
 nube, cuentas, telemetría,
@@ -203,7 +237,7 @@ IA, EPUB ni formatos distintos de PDF.
 
 ## Próximo paso
 
-Resolver YAM-050 (selección/geométrica nativa), prototipar y medir YAM-062
-(split con dos visores reales) y cerrar YAM-041 (Narrador y DPI nativo
-100/150/200 %). El orden y los criterios completos permanecen en
-[NEXT_TODOS.md](NEXT_TODOS.md).
+Repetir `tool/verify_windows.ps1` en un checkout limpio con la caché de Pub y
+el toolchain nativo disponibles; después cerrar la evidencia de selección
+geométrica, split real, Narrador y DPI nativo. El orden y los criterios
+completos permanecen en [NEXT_TODOS.md](NEXT_TODOS.md).

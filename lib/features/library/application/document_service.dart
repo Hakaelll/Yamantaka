@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/errors/app_failure.dart';
 import '../../../core/platform/path_normalizer.dart';
+import '../../../core/security/local_input_policy.dart';
 import '../../reader/domain/reader_models.dart';
 import '../domain/library_document.dart';
 import '../domain/document_cover.dart';
@@ -36,7 +37,7 @@ final class DocumentService {
   final DocumentRepository _repository;
 
   Future<InspectedFile> inspect(String inputPath) async {
-    final path = inputPath.trim().replaceAll('"', '');
+    final path = LocalInputPolicy.boundedPath(inputPath);
     if (path.isEmpty || p.extension(path).toLowerCase() != '.pdf') {
       throw const AppFailure(
         FailureKind.unsupportedFormat,
@@ -109,6 +110,11 @@ final class DocumentService {
       fileName: file.fileName,
       title: existing?.title,
       author: existing?.author,
+      sourceTitle: existing?.sourceTitle,
+      sourceAuthor: existing?.sourceAuthor,
+      titleOverride: existing?.titleOverride,
+      authorOverride: existing?.authorOverride,
+      libraryNote: existing?.libraryNote,
       pageCount: pageCount,
       fileSize: file.fileSize,
       fileModifiedAt: file.modifiedAt,

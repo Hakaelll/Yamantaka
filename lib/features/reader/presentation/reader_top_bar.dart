@@ -87,7 +87,7 @@ final class ReaderTopBar extends StatelessWidget
               child: Tooltip(
                 message: document.fileName,
                 child: Text(
-                  document.title ?? document.fileName,
+                  document.effectiveTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall,

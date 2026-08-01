@@ -1,5 +1,7 @@
 #include "flutter_window.h"
 
+#include <string.h>
+
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -25,6 +27,10 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  activation_channel_ = std::make_unique<
+      flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->binary_messenger(),
+      "yamantaka/activation", &flutter::StandardMethodCodec::GetInstance());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -41,6 +47,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
+    activation_channel_.reset();
     flutter_controller_ = nullptr;
   }
 
@@ -62,6 +69,20 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case WM_COPYDATA: {
+      const auto* data = reinterpret_cast<const COPYDATASTRUCT*>(lparam);
+      if (data != nullptr && data->dwData == 0x59414D41 &&
+          data->lpData != nullptr && data->cbData > 0 &&
+          data->cbData <= 64 * 1024 && activation_channel_) {
+        const auto* bytes = static_cast<const char*>(data->lpData);
+        const auto length = strnlen_s(bytes, data->cbData);
+        activation_channel_->InvokeMethod(
+            "open", std::make_unique<flutter::EncodableValue>(
+                         std::string(bytes, length)));
+        return TRUE;
+      }
+      break;
+    }
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;

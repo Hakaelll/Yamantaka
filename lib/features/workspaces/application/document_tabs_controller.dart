@@ -57,7 +57,7 @@ final class DocumentTabsController extends ChangeNotifier {
         id: id,
         documentId: document.id,
         path: document.path,
-        title: document.title ?? document.fileName,
+        title: document.effectiveTitle,
         pageIndex: document.lastPageIndex,
         zoomLevel: 1,
         pageLayout: PageLayoutMode.single.name,
@@ -88,9 +88,9 @@ final class DocumentTabsController extends ChangeNotifier {
     if (target == null) return null;
     final index = tabs.indexOf(target);
     tabs = tabs.where((tab) => tab.id != id).toList(growable: false);
-    _closedTabs
-      ..add(target)
-      ..removeRange(0, (_closedTabs.length - 10).clamp(0, 10));
+    _closedTabs.add(target);
+    final overflow = _closedTabs.length - 10;
+    if (overflow > 0) _closedTabs.removeRange(0, overflow);
     if (activeTabId == id) {
       activeTabId = tabs.isEmpty
           ? null

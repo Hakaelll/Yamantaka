@@ -32,7 +32,7 @@ final class WorkspaceRepository {
                 id: tabRow['id'] as String,
                 documentId: document.id,
                 path: document.path,
-                title: document.title ?? document.fileName,
+                title: document.effectiveTitle,
                 pageIndex: tabRow['page_index'] as int,
                 zoomLevel: tabRow['zoom_level'] as double,
                 pageLayout: tabRow['page_layout'] as String,

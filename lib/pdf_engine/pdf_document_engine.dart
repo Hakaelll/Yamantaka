@@ -21,6 +21,7 @@ abstract interface class PdfDocumentEngine {
   Future<String> extractPageText({
     required String documentId,
     required int pageIndex,
+    PdfOperationToken? cancellationToken,
   });
 
   Future<List<PdfSearchMatch>> searchText({

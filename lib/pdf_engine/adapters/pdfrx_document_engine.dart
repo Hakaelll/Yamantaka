@@ -7,7 +7,10 @@ import 'package:pdfrx/pdfrx.dart' as pdfrx;
 
 import '../../app/app_config.dart';
 import '../../core/errors/app_failure.dart';
+import '../../core/lifecycle/lifecycle_tracker.dart';
 import '../../core/logging/app_logger.dart';
+import '../../core/memory/memory_governor.dart';
+import '../../core/security/local_input_policy.dart';
 import '../cache/sized_lru_cache.dart';
 import '../models/pdf_models.dart';
 import '../pdf_document_engine.dart';
@@ -49,27 +52,46 @@ final class PdfEngineDiagnostics {
 }
 
 final class PdfrxDocumentEngine implements PdfDocumentEngine {
-  PdfrxDocumentEngine(this._logger)
-    : _renderCache = SizedLruCache<_RenderKey, ui.Image>(
-        maxBytes: AppConfig.maxRenderCacheBytes,
-        sizeOf: (image) => image.width * image.height * 4,
-        onEvict: (image) => image.dispose(),
-      );
+  PdfrxDocumentEngine(
+    this._logger, {
+    LifecycleTracker? lifecycle,
+    MemoryGovernor? memory,
+  }) : _lifecycle = lifecycle,
+       _memory = memory {
+    _renderCache = SizedLruCache<_RenderKey, ui.Image>(
+      maxBytes: AppConfig.maxRenderCacheBytes,
+      sizeOf: (image) => image.width * image.height * 4,
+      onEvict: (image) => image.dispose(),
+      onEvictEntry: _onCacheEntryEvicted,
+    );
+  }
 
   final AppLogger _logger;
+  final LifecycleTracker? _lifecycle;
+  final MemoryGovernor? _memory;
   final Map<String, pdfrx.PdfDocument> _documents = {};
   final Map<String, Map<int, String>> _textCache = {};
   final Map<_RenderKey, Future<RenderedPdfPage>> _pendingRenders = {};
   final Map<_RenderKey, pdfrx.PdfPageRenderCancellationToken>
   _activeRenderTokens = {};
-  final SizedLruCache<_RenderKey, ui.Image> _renderCache;
+  late final SizedLruCache<_RenderKey, ui.Image> _renderCache;
   final Map<String, Set<ui.Image>> _uncachedImages = {};
+  final Map<String, LifecycleLease> _documentLeases = {};
+  final Map<_RenderKey, LifecycleLease> _renderLeases = {};
+  final Map<_RenderKey, LifecycleLease> _cacheLeases = {};
+  final Map<_RenderKey, MemoryReservation> _cacheMemory = {};
+  final Map<ui.Image, MemoryReservation> _uncachedMemory = {};
   int _nextDocumentId = 0;
   int _renderCacheHits = 0;
   int _renderCacheMisses = 0;
   int _renderRequests = 0;
   int _deduplicatedRenders = 0;
   int _cancelledRenders = 0;
+
+  void _onCacheEntryEvicted(_RenderKey key, ui.Image image) {
+    _cacheLeases.remove(key)?.release();
+    _cacheMemory.remove(key)?.release();
+  }
 
   PdfEngineDiagnostics get diagnostics => PdfEngineDiagnostics(
     renderRequests: _renderRequests,
@@ -100,6 +122,9 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     String? password,
   }) async {
     final stopwatch = Stopwatch()..start();
+    final boundedPassword = password == null
+        ? null
+        : LocalInputPolicy.boundedPassword(password);
     try {
       if (!await _hasPdfHeader(path)) {
         throw const AppFailure(
@@ -110,9 +135,9 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       }
       final document = await pdfrx.PdfDocument.openFile(
         path,
-        passwordProvider: password == null
+        passwordProvider: boundedPassword == null
             ? null
-            : pdfrx.createSimplePasswordProvider(password),
+            : pdfrx.createSimplePasswordProvider(boundedPassword),
         firstAttemptByEmptyPassword: true,
         useProgressiveLoading: false,
       );
@@ -126,6 +151,8 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       final documentId =
           'pdf-${DateTime.now().microsecondsSinceEpoch}-${_nextDocumentId++}';
       _documents[documentId] = document;
+      final lease = _lifecycle?.acquire(ResourceKind.document);
+      if (lease != null) _documentLeases[documentId] = lease;
       _textCache[documentId] = {};
       final opened = OpenedPdfDocument(
         documentId: documentId,
@@ -150,10 +177,10 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
         );
       }
       throw AppFailure(
-        password == null
+        boundedPassword == null
             ? FailureKind.passwordRequired
             : FailureKind.wrongPassword,
-        password == null
+        boundedPassword == null
             ? 'Este PDF requiere una contraseña.'
             : 'La contraseña no es correcta.',
         debugMessage: error.message,
@@ -196,6 +223,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     _disposeUncachedImages(documentId);
     _textCache.remove(documentId);
     final document = _documents.remove(documentId);
+    _documentLeases.remove(documentId)?.release();
     await document?.dispose();
     _logger.debug('Closed PDF document.');
   }
@@ -280,6 +308,8 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       throw const AppFailure(FailureKind.cancelled, 'Renderizado cancelado.');
     }
     final document = documentFor(key.documentId);
+    final renderLease = _lifecycle?.acquire(ResourceKind.render);
+    if (renderLease != null) _renderLeases[key] = renderLease;
     _validatePageIndex(document, key.pageIndex);
     final page = await document.pages[key.pageIndex].ensureLoaded();
     final renderToken = page.createCancellationToken();
@@ -329,9 +359,26 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
           );
         }
         final estimatedBytes = image.width * image.height * 4;
-        if (estimatedBytes <= _renderCache.maxBytes) {
+        final memoryReservation = _memory?.reserve(
+          owner: MemoryOwner.renderCache,
+          bytes: estimatedBytes,
+          priority: MemoryPriority.cache,
+        );
+        if (estimatedBytes <= _renderCache.maxBytes &&
+            (_memory == null || memoryReservation != null)) {
           _renderCache.put(key, image);
+          if (memoryReservation != null) _cacheMemory[key] = memoryReservation;
+          final cacheLease = _lifecycle?.acquire(ResourceKind.image);
+          if (cacheLease != null) _cacheLeases[key] = cacheLease;
         } else {
+          memoryReservation?.release();
+          final activeReservation = _memory?.reserve(
+            owner: MemoryOwner.activePage,
+            bytes: estimatedBytes,
+            priority: MemoryPriority.visible,
+          );
+          if (activeReservation != null)
+            _uncachedMemory[image] = activeReservation;
           (_uncachedImages[key.documentId] ??= <ui.Image>{}).add(image);
         }
         _logger.debug(
@@ -363,6 +410,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     } finally {
       operationToken?.removeCancellationListener(cancelNativeRender);
       _activeRenderTokens.remove(key);
+      _renderLeases.remove(key)?.release();
     }
   }
 
@@ -370,12 +418,25 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
   Future<String> extractPageText({
     required String documentId,
     required int pageIndex,
+    PdfOperationToken? cancellationToken,
   }) async {
+    if (cancellationToken?.isCancelled ?? false) {
+      throw const AppFailure(
+        FailureKind.cancelled,
+        'Extracción de texto cancelada.',
+      );
+    }
     final document = documentFor(documentId);
     _validatePageIndex(document, pageIndex);
     final cached = _textCache[documentId]?[pageIndex];
     if (cached != null) return cached;
     final page = await document.pages[pageIndex].ensureLoaded();
+    if (cancellationToken?.isCancelled ?? false) {
+      throw const AppFailure(
+        FailureKind.cancelled,
+        'Extracción de texto cancelada.',
+      );
+    }
     final text = await page.loadText();
     final value = text?.fullText ?? '';
     _textCache[documentId]?[pageIndex] = value;
@@ -404,6 +465,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       final text = await extractPageText(
         documentId: documentId,
         pageIndex: pageIndex,
+        cancellationToken: cancellationToken,
       );
       final normalizedText = text.toLowerCase();
       var offset = 0;
@@ -480,8 +542,17 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       token.cancel();
     }
     _renderCache.clear();
+    for (final lease in _cacheLeases.values) {
+      lease.release();
+    }
+    _cacheLeases.clear();
+    for (final reservation in _cacheMemory.values) {
+      reservation.release();
+    }
+    _cacheMemory.clear();
     for (final images in _uncachedImages.values) {
       for (final image in images) {
+        _uncachedMemory.remove(image)?.release();
         image.dispose();
       }
     }
@@ -509,6 +580,10 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     _textCache.clear();
     final documents = _documents.values.toList(growable: false);
     _documents.clear();
+    for (final lease in _documentLeases.values) {
+      lease.release();
+    }
+    _documentLeases.clear();
     await Future.wait(documents.map((document) => document.dispose()));
   }
 
@@ -530,6 +605,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     final images = _uncachedImages.remove(documentId);
     if (images == null) return;
     for (final image in images) {
+      _uncachedMemory.remove(image)?.release();
       image.dispose();
     }
   }

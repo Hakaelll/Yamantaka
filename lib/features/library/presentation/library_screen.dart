@@ -7,11 +7,13 @@ import 'package:flutter/services.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_density.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/errors/failure_presentation.dart';
 import '../../organization/application/organization_controller.dart';
 import '../../organization/domain/organization_models.dart';
 import '../application/library_controller.dart';
 import '../application/library_filter.dart';
 import '../domain/library_document.dart';
+import '../domain/library_selection.dart';
 import 'artifact_library.dart';
 
 export '../application/library_filter.dart';
@@ -26,12 +28,14 @@ final class LibraryScreen extends StatefulWidget {
     required this.showRecents,
     this.initialReadingFilter = LibraryReadingState.all,
     this.onReadingFilterChanged,
+    this.onBulkOperation,
     this.onDocumentInfo,
     this.onRelocateDocument,
     this.onToggleFavorite,
     this.onChangeCover,
     this.onRevealDocument,
     this.onRemoveDocument,
+    this.onDocumentVisible,
     this.organization,
     this.onGlobalSearch,
     this.onOpenPaths,
@@ -48,12 +52,14 @@ final class LibraryScreen extends StatefulWidget {
   final bool showRecents;
   final LibraryReadingState initialReadingFilter;
   final ValueChanged<LibraryReadingState>? onReadingFilterChanged;
+  final BulkOperationHandler? onBulkOperation;
   final Future<void> Function(LibraryDocument document)? onDocumentInfo;
   final Future<void> Function(LibraryDocument document)? onRelocateDocument;
   final Future<void> Function(LibraryDocument document)? onToggleFavorite;
   final Future<void> Function(LibraryDocument document)? onChangeCover;
   final Future<void> Function(LibraryDocument document)? onRevealDocument;
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
+  final ValueChanged<LibraryDocument>? onDocumentVisible;
   final OrganizationController? organization;
   final VoidCallback? onGlobalSearch;
   final Future<void> Function(List<String> paths)? onOpenPaths;
@@ -220,13 +226,17 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                       setState(() => _readingState = value);
                       widget.onReadingFilterChanged?.call(value);
                     },
+                    onBulkOperation: widget.onBulkOperation,
                     onDocumentInfo: widget.onDocumentInfo,
                     onRelocateDocument: widget.onRelocateDocument,
                     onToggleFavorite: widget.onToggleFavorite,
                     onChangeCover: widget.onChangeCover,
                     onRevealDocument: widget.onRevealDocument,
                     onRemoveDocument: widget.onRemoveDocument,
+                    onDocumentVisible: widget.onDocumentVisible,
                     documentPredicate: widget.organization?.includes,
+                    collections: widget.organization?.collections ?? const [],
+                    tags: widget.organization?.tags ?? const [],
                   ),
                 ),
                 if (_dragging)
@@ -354,13 +364,17 @@ final class _LibraryBody extends StatelessWidget {
     required this.showRecents,
     required this.readingState,
     required this.onReadingStateChanged,
+    this.onBulkOperation,
     required this.onDocumentInfo,
     required this.onRelocateDocument,
     required this.onToggleFavorite,
     required this.onChangeCover,
     required this.onRevealDocument,
     required this.onRemoveDocument,
+    this.onDocumentVisible,
     this.documentPredicate,
+    this.collections = const [],
+    this.tags = const [],
   });
 
   final LibraryController controller;
@@ -369,17 +383,21 @@ final class _LibraryBody extends StatelessWidget {
   final bool showRecents;
   final LibraryReadingState readingState;
   final ValueChanged<LibraryReadingState> onReadingStateChanged;
+  final BulkOperationHandler? onBulkOperation;
   final Future<void> Function(LibraryDocument document)? onDocumentInfo;
   final Future<void> Function(LibraryDocument document)? onRelocateDocument;
   final Future<void> Function(LibraryDocument document)? onToggleFavorite;
   final Future<void> Function(LibraryDocument document)? onChangeCover;
   final Future<void> Function(LibraryDocument document)? onRevealDocument;
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
+  final ValueChanged<LibraryDocument>? onDocumentVisible;
   final bool Function(String documentId)? documentPredicate;
+  final List<DocumentCollection> collections;
+  final List<DocumentTag> tags;
 
   @override
   Widget build(BuildContext context) {
-    if (controller.isLoading) {
+    if (controller.isLoading && controller.documents.isEmpty) {
       return const AppStatusView(
         icon: Icons.library_books_outlined,
         title: 'Preparando tu biblioteca',
@@ -388,10 +406,11 @@ final class _LibraryBody extends StatelessWidget {
       );
     }
     if (controller.error case final error?) {
+      final presentation = FailurePresentations.forFailure(error);
       return AppStatusView(
         icon: Icons.error_outline_rounded,
-        title: 'No pudimos cargar la biblioteca',
-        message: error.userMessage,
+        title: presentation.title,
+        message: presentation.message,
         action: controller.load,
         actionLabel: 'Reintentar',
         tone: AppStatusTone.error,
@@ -419,12 +438,16 @@ final class _LibraryBody extends StatelessWidget {
       onPickDocument: onPickDocument,
       initialReadingState: readingState,
       onReadingStateChanged: onReadingStateChanged,
+      onBulkOperation: onBulkOperation,
+      collections: collections,
+      tags: tags,
       onDocumentInfo: onDocumentInfo,
       onRelocateDocument: onRelocateDocument,
       onToggleFavorite: onToggleFavorite,
       onChangeCover: onChangeCover,
       onRevealDocument: onRevealDocument,
       onRemoveDocument: onRemoveDocument,
+      onDocumentVisible: onDocumentVisible,
     );
   }
 }
@@ -466,7 +489,7 @@ final class ContinueReadingCard extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          'Continuar leyendo ${document.title ?? document.fileName}, '
+          'Continuar leyendo ${document.effectiveTitle}, '
           '${(document.readingProgress * 100).round()} por ciento',
       child: Material(
         color: context.appColors.surfacePrimary,
@@ -503,12 +526,12 @@ final class ContinueReadingCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            document.title ?? document.fileName,
+                            document.effectiveTitle,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
-                          if (document.author case final author?) ...[
+                          if (document.effectiveAuthor case final author?) ...[
                             const SizedBox(height: AppSpacing.space4),
                             Text(
                               author,
@@ -633,7 +656,7 @@ final class RecentDocumentItem extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            document.title ?? document.fileName,
+                            document.effectiveTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.titleMedium,

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../app/shortcuts/app_commands.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/errors/failure_presentation.dart';
 import '../../../pdf_engine/models/pdf_models.dart';
 import '../../../pdf_engine/pdf_document_engine.dart';
 import '../../../pdf_engine/presentation/pdf_viewer_adapter.dart';
@@ -162,10 +163,12 @@ final class _ReaderScreenState extends State<ReaderScreen> {
         if (widget.controller.status != ReaderStatus.ready ||
             widget.controller.openedDocument == null ||
             widget.controller.preferences == null) {
+          final presentation = FailurePresentations.forFailure(
+            widget.controller.error,
+          );
           return _ReaderErrorState(
-            message:
-                widget.controller.error?.userMessage ??
-                'No hay un documento abierto.',
+            title: presentation.title,
+            message: presentation.message,
             onBack: widget.onBack,
           );
         }
@@ -928,9 +931,9 @@ final class _ReaderScreenState extends State<ReaderScreen> {
               children: [
                 _DocumentInfoLine(
                   label: 'Título',
-                  value: document.title ?? document.fileName,
+                  value: document.effectiveTitle,
                 ),
-                if (document.author case final author?)
+                if (document.effectiveAuthor case final author?)
                   _DocumentInfoLine(label: 'Autor', value: author),
                 _DocumentInfoLine(
                   label: 'Páginas',
@@ -1059,8 +1062,13 @@ String _formatFileSize(int bytes) {
 }
 
 final class _ReaderErrorState extends StatelessWidget {
-  const _ReaderErrorState({required this.message, required this.onBack});
+  const _ReaderErrorState({
+    required this.title,
+    required this.message,
+    required this.onBack,
+  });
 
+  final String title;
   final String message;
   final VoidCallback onBack;
 
@@ -1069,7 +1077,7 @@ final class _ReaderErrorState extends StatelessWidget {
     return Scaffold(
       body: AppStatusView(
         icon: Icons.error_outline_rounded,
-        title: 'No se pudo mostrar el documento',
+        title: title,
         message: message,
         action: onBack,
         actionLabel: 'Volver a la biblioteca',

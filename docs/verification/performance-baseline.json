@@ -1,0 +1,9 @@
+{
+  "format": "yamantaka-library-benchmark",
+  "version": 1,
+  "hardware": "fill-per-release-host",
+  "documents": 5000,
+  "pageSize": 80,
+  "queryP95Us": 50000,
+  "containsPersonalData": false
+}

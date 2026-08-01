@@ -6,26 +6,41 @@ import 'app_tokens.dart';
 abstract final class AppTheme {
   static ThemeData light({
     AppInterfaceDensity density = AppInterfaceDensity.comfortable,
+    bool highContrast = false,
   }) => _build(
     brightness: Brightness.light,
     tokens: AppColorTokens.light,
     density: density,
+    highContrast: highContrast,
   );
 
   static ThemeData dark({
     AppInterfaceDensity density = AppInterfaceDensity.comfortable,
+    bool highContrast = false,
   }) => _build(
     brightness: Brightness.dark,
     tokens: AppColorTokens.dark,
     density: density,
+    highContrast: highContrast,
   );
 
   static ThemeData _build({
     required Brightness brightness,
     required AppColorTokens tokens,
     required AppInterfaceDensity density,
+    required bool highContrast,
   }) {
     final isDark = brightness == Brightness.dark;
+    if (highContrast) {
+      tokens = tokens.copyWith(
+        textPrimary: isDark ? Colors.white : Colors.black,
+        textSecondary: isDark ? Colors.white : const Color(0xFF202020),
+        textMuted: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF303030),
+        borderSubtle: isDark ? Colors.white : Colors.black,
+        borderStrong: isDark ? Colors.white : Colors.black,
+        focusRing: isDark ? const Color(0xFFFFFF00) : const Color(0xFF0000A0),
+      );
+    }
     final densityTokens = switch (density) {
       AppInterfaceDensity.comfortable => AppDensityTokens.comfortable,
       AppInterfaceDensity.compact => AppDensityTokens.compact,
