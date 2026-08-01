@@ -1009,35 +1009,42 @@ final class _SettingsNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.space4),
-      child: Material(
-        color: selected
-            ? context.appColors.selectionBackground
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadii.control),
-        child: InkWell(
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: section.label,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.space4),
+        child: Material(
+          color: selected
+              ? context.appColors.selectionBackground
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadii.control),
-          onTap: onPressed,
-          child: Container(
-            height: AppSizes.desktopControlExtent,
-            decoration: BoxDecoration(
-              border: Border(
-                left: BorderSide(
-                  color: selected
-                      ? context.appColors.accentPrimary
-                      : Colors.transparent,
-                  width: 2,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            onTap: onPressed,
+            child: Container(
+              height: AppSizes.desktopControlExtent,
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(
+                    color: selected
+                        ? context.appColors.accentPrimary
+                        : Colors.transparent,
+                    width: 2,
+                  ),
                 ),
               ),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space12),
-            child: Row(
-              children: [
-                Icon(section.icon, size: 18),
-                const SizedBox(width: AppSpacing.space12),
-                Expanded(child: Text(section.label)),
-              ],
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.space12,
+              ),
+              child: Row(
+                children: [
+                  Icon(section.icon, size: 18),
+                  const SizedBox(width: AppSpacing.space12),
+                  Expanded(child: Text(section.label)),
+                ],
+              ),
             ),
           ),
         ),
@@ -1085,7 +1092,7 @@ final class _AppearancePreview extends StatelessWidget {
                     : [
                         BoxShadow(
                           color: context.appColors.readerPageShadow,
-                          blurRadius: 3,
+                          blurRadius: AppShadow.readerPageBlur,
                           offset: const Offset(0, 1),
                         ),
                       ],

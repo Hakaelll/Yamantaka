@@ -37,6 +37,10 @@ final class PdfRenderRegion {
   final double height;
 }
 
+/// A rendered page whose image is owned by the PDF engine.
+///
+/// Consumers may read or encode [image], but must not dispose it. The engine
+/// releases the image when its cache entry is evicted or the document closes.
 final class RenderedPdfPage {
   const RenderedPdfPage({
     required this.image,
@@ -49,8 +53,6 @@ final class RenderedPdfPage {
   final double scale;
 
   int get estimatedBytes => image.width * image.height * 4;
-
-  void dispose() => image.dispose();
 }
 
 final class PdfSearchMatch {
@@ -93,8 +95,37 @@ final class PdfLink {
 
 final class PdfOperationToken {
   bool _cancelled = false;
+  final Set<void Function()> _cancellationListeners = <void Function()>{};
 
   bool get isCancelled => _cancelled;
 
-  void cancel() => _cancelled = true;
+  void addCancellationListener(void Function() listener) {
+    if (_cancelled) {
+      try {
+        listener();
+      } on Object {
+        // Cancellation must remain best-effort for an obsolete job.
+      }
+      return;
+    }
+    _cancellationListeners.add(listener);
+  }
+
+  void removeCancellationListener(void Function() listener) {
+    _cancellationListeners.remove(listener);
+  }
+
+  void cancel() {
+    if (_cancelled) return;
+    _cancelled = true;
+    final listeners = _cancellationListeners.toList(growable: false);
+    _cancellationListeners.clear();
+    for (final listener in listeners) {
+      try {
+        listener();
+      } on Object {
+        // A cancellation callback must not prevent the remaining callbacks.
+      }
+    }
+  }
 }

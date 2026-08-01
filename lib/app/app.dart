@@ -235,6 +235,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
         widget.services.settings.settings.reduceMotion ||
         widget.services.settings.settings.disableAnimations,
     showProgress: widget.services.settings.settings.showProgress,
+    controlsAutoHide: widget.services.settings.settings.autoHideControls,
     readingDirection: widget.services.settings.settings.readingDirection,
     visualProfile: widget.services.settings.settings.visualProfile,
     initialPanelWidth: widget.services.settings.settings.readerPanelWidth,

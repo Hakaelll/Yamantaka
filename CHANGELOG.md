@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0-dev — 2026-08-01 (endurecimiento de viewport y render)
+
+- Corrige el ownership de imagenes renderizadas: la cache LRU posee las
+  `ui.Image` y los consumidores no pueden invalidarlas al generar miniaturas.
+- Propaga cancelacion al token nativo de pdfrx, cancela miniaturas obsoletas y
+  elimina PNG parciales si una portada no llega a persistirse.
+- Restaura zoom y posicion en historial, protege navegacion con documento vacio
+  y mantiene `Ajustar ancho` alineado al inicio del contenido.
+- Ajusta biblioteca y portadas para DPI alto y escritorios 16:9/16:10,
+  1920x1080 y 2560x1440; evita overflow en anchos compactos.
+- Reserva Page Up/Page Down para navegacion, refuerza semantica de ajustes y
+  añade pruebas de token, viewport, layout de escritorio y shortcuts.
+- No se crea commit. La suite Flutter completa y las capturas nativas quedan
+  condicionadas por la indisponibilidad local de dependencias de Pub.
+
 ## 0.1.0-dev — 2026-07-29 (biblioteca de artefactos)
 
 - Extiende el rediseño monocromático al lector, paneles, menús, diálogos,

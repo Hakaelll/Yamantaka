@@ -40,6 +40,9 @@ Este documento representa el estado operativo del proyecto.
 - Interfaz ligera: filtro, orden, densidad y presupuesto de miniaturas
   implementados sin dependencias nuevas; estados de lectura, barra contextual,
   panel perezoso y acciones locales ampliados.
+- Endurecimiento 2026-08-01: ownership de imagenes de cache, cancelacion
+  nativa, restauracion de historial, slots compactos y perfiles de escritorio
+  16:9/16:10/Full HD/2K implementados; verificacion nativa continua en REVIEW.
 
 | Área | Estado | Próximo objetivo |
 | --- | --- | --- |
@@ -1745,3 +1748,32 @@ Narrador y DPI para cerrar las tareas visuales que siguen en `REVIEW`.
   compacto combinable.
 - [x] Añadir pruebas unitarias, repositorio, widgets y fixture visual.
 - [ ] Completar Narrador y DPI nativo 100/150/200 % para pasar a `DONE`.
+
+## YAM-075 — Ownership de render y perfiles de escritorio
+
+- Prioridad: P0
+- Estado: REVIEW
+- Dependencias: YAM-034, YAM-070, YAM-074
+- Objetivo: cerrar invalidacion de imagenes cacheadas, cancelacion de trabajos
+  obsoletos y geometria segura para escritorios habituales.
+- Alcance: `RenderedPdfPage` prestado, cache LRU por bytes, tokens nativos,
+  miniaturas cancelables, historial con zoom/offset, `Ajustar ancho` top-align,
+  compactos sin overflow y perfiles 16:9/16:10/1920x1080/2560x1440.
+- Criterios de aceptacion: ningun consumidor dispone imagenes del motor;
+  cancelar no publica resultados obsoletos ni deja PNG parcial; historial y
+  resize conservan unidad/zoom/offset; columnas y slots caben en la ventana.
+- Validacion: formato, analisis de modulos independientes, pruebas nuevas y
+  `git diff --check` aprobados. Suite Flutter/Pub, build Windows, capturas,
+  Narrador y DPI nativo requieren desbloquear dependencias/runner.
+- Archivos relacionados: `pdf_engine`, `reader`, `features/library`, tokens y
+  `test/pdf_operation_token_test.dart`.
+- Riesgos o limitaciones: falta ejecutar el runner nativo en este entorno y no
+  se debe marcar `DONE` solo con pruebas de widget.
+
+### Subtareas
+
+- [x] Separar imagen prestada de la propiedad de cache y liberar excedentes.
+- [x] Propagar cancelacion a pdfrx y limpiar trabajos/archivos obsoletos.
+- [x] Cubrir layout compacto, Full HD/2K, viewport y shortcuts reservados.
+- [ ] Ejecutar suite Flutter completa, build Windows y diez capturas nuevas.
+- [ ] Completar Narrador y DPI nativo 100/125/150/200 % para pasar a `DONE`.

@@ -50,6 +50,7 @@ final class PdfViewController extends ChangeNotifier {
   Future<void> Function(double factor)? _zoomBy;
   Future<void> Function()? _fitWidth;
   Future<void> Function()? _fitPage;
+  Future<void> Function(double zoom, double scrollOffset)? _restorePosition;
 
   Future<void> goToPage(int pageIndex) async {
     if (_goToPage case final callback?) await callback(pageIndex);
@@ -67,6 +68,15 @@ final class PdfViewController extends ChangeNotifier {
     if (_fitPage case final callback?) await callback();
   }
 
+  Future<void> restorePosition({
+    required double zoom,
+    required double scrollOffset,
+  }) async {
+    if (_restorePosition case final callback?) {
+      await callback(zoom, scrollOffset);
+    }
+  }
+
   void attach({
     required int pageCount,
     required int currentPageIndex,
@@ -75,6 +85,7 @@ final class PdfViewController extends ChangeNotifier {
     required Future<void> Function(double factor) zoomBy,
     required Future<void> Function() fitWidth,
     required Future<void> Function() fitPage,
+    Future<void> Function(double zoom, double scrollOffset)? restorePosition,
     Object? owner,
   }) {
     this.pageCount = pageCount;
@@ -84,6 +95,7 @@ final class PdfViewController extends ChangeNotifier {
     _zoomBy = zoomBy;
     _fitWidth = fitWidth;
     _fitPage = fitPage;
+    _restorePosition = restorePosition;
     _attachmentOwner = owner;
     isReady = true;
     notifyListeners();
@@ -98,6 +110,16 @@ final class PdfViewController extends ChangeNotifier {
 
   void detach({Object? owner}) {
     if (owner != null && !identical(owner, _attachmentOwner)) return;
+    final wasAttached =
+        isReady ||
+        pageCount != 0 ||
+        currentPageIndex != 0 ||
+        zoom != 1 ||
+        scrollOffset != 0 ||
+        _attachmentOwner != null;
+    pageCount = 0;
+    currentPageIndex = 0;
+    zoom = 1;
     isReady = false;
     scrollOffset = 0;
     _attachmentOwner = null;
@@ -105,6 +127,8 @@ final class PdfViewController extends ChangeNotifier {
     _zoomBy = null;
     _fitWidth = null;
     _fitPage = null;
+    _restorePosition = null;
+    if (wasAttached) notifyListeners();
   }
 }
 

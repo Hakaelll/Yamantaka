@@ -215,6 +215,12 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
               pageNumber: controller.pageNumber ?? 1,
               duration: _motionDuration,
             ),
+            restorePosition: (zoom, scrollOffset) => _restorePosition(
+              controller,
+              pageNumber: controller.pageNumber ?? 1,
+              zoom: zoom,
+              scrollOffset: scrollOffset,
+            ),
             owner: _attachmentOwner,
           );
           unawaited(_restoreInitialView(controller));
@@ -350,8 +356,37 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
         zoom: controller.currentZoom,
         duration: Duration.zero,
       );
+    } else if (widget.configuration.initialScrollOffset > 0) {
+      await _restoreInitialPageOffset(controller);
     }
     _onTransformChanged();
+  }
+
+  Future<void> _restoreInitialPageOffset(
+    pdfrx.PdfViewerController controller,
+  ) async {
+    final rect = _readingUnitRect(controller, widget.initialPageIndex + 1);
+    if (rect.isEmpty) return;
+    final zoom = controller.currentZoom;
+    final visibleHeight = controller.viewSize.height / zoom;
+    final margin = widget.configuration.viewportMargin / zoom;
+    final boundedRect = rect.inflate(margin);
+    if (boundedRect.height <= visibleHeight) return;
+    final targetTop =
+        rect.top +
+        rect.height * widget.configuration.initialScrollOffset.clamp(0.0, 1.0);
+    final targetCenter = Offset(rect.center.dx, targetTop + visibleHeight / 2);
+    final normalizedCenter = ReaderViewportMetrics.normalizeCenter(
+      proposedCenter: targetCenter,
+      viewport: controller.viewSize,
+      contentRect: rect,
+      zoom: zoom,
+      margin: margin,
+    );
+    await controller.goTo(
+      controller.calcMatrixFor(normalizedCenter, zoom: zoom),
+      duration: Duration.zero,
+    );
   }
 
   Future<void> _setCustomZoom(
@@ -424,10 +459,56 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
       contentRect: rect,
       zoom: zoom,
       margin: widget.configuration.viewportMargin / zoom,
+      centerVerticallyWhenFits: false,
     );
     await controller.goTo(
       controller.calcMatrixFor(normalizedCenter, zoom: zoom),
       duration: duration,
+    );
+  }
+
+  Future<void> _restorePosition(
+    pdfrx.PdfViewerController controller, {
+    required int pageNumber,
+    required double zoom,
+    required double scrollOffset,
+  }) async {
+    final rect = _readingUnitRect(controller, pageNumber);
+    if (rect.isEmpty) return;
+    final safeZoom = zoom
+        .clamp(controller.minScale, controller.maxScale)
+        .toDouble();
+    if (widget.configuration.flow == PdfViewFlow.continuous) {
+      final pageIndex = (pageNumber - 1).clamp(
+        0,
+        controller.layout.pageLayouts.length - 1,
+      );
+      final pageRect = controller.layout.pageLayouts[pageIndex];
+      await controller.goToPosition(
+        documentOffset: Offset(
+          pageRect.left,
+          pageRect.top + pageRect.height * scrollOffset.clamp(0.0, 1.0),
+        ),
+        zoom: safeZoom,
+        duration: Duration.zero,
+      );
+      return;
+    }
+    final visibleHeight = controller.viewSize.height / safeZoom;
+    final targetCenter = Offset(
+      rect.center.dx,
+      rect.top + rect.height * scrollOffset.clamp(0.0, 1.0) + visibleHeight / 2,
+    );
+    final normalizedCenter = ReaderViewportMetrics.normalizeCenter(
+      proposedCenter: targetCenter,
+      viewport: controller.viewSize,
+      contentRect: rect,
+      zoom: safeZoom,
+      margin: widget.configuration.viewportMargin / safeZoom,
+    );
+    await controller.goTo(
+      controller.calcMatrixFor(normalizedCenter, zoom: safeZoom),
+      duration: Duration.zero,
     );
   }
 

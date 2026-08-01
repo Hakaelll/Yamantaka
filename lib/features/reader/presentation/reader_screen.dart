@@ -32,6 +32,7 @@ final class ReaderScreen extends StatefulWidget {
     required this.showProgress,
     required this.readingDirection,
     this.visualProfile = ReaderVisualProfile.standard,
+    this.controlsAutoHide,
     this.initialPanelWidth = AppSizes.sidePanelWidth,
     this.initialPanelSection = '',
     this.initialPanelOpen = false,
@@ -58,6 +59,10 @@ final class ReaderScreen extends StatefulWidget {
   final bool showProgress;
   final ReadingDirection readingDirection;
   final ReaderVisualProfile visualProfile;
+
+  /// Overrides the document preference when the global setting changes while
+  /// a reader is already open.
+  final bool? controlsAutoHide;
   final double initialPanelWidth;
   final String initialPanelSection;
   final bool initialPanelOpen;
@@ -121,6 +126,21 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     _panelSaveTimer?.cancel();
     _readerFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant ReaderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controlsAutoHide == widget.controlsAutoHide) return;
+    _controlsTimer?.cancel();
+    if (widget.controlsAutoHide == false) {
+      if (!_controlsVisible) {
+        setState(() => _controlsVisible = true);
+        widget.onChromeVisibilityChanged?.call(true);
+      }
+    } else {
+      _revealControls();
+    }
   }
 
   @override
@@ -240,8 +260,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
             bottom: 0,
             child: Semantics(
               label:
-                  'Documento PDF, página ${controller.currentPageIndex + 1} '
-                  'de ${controller.pageCount}',
+                  '${_isBookMode ? 'Modo Libro' : 'Modo Documento'}, '
+                  '${controller.readingUnitIndicator(direction: widget.readingDirection)}',
               child: Listener(
                 behavior: HitTestBehavior.translucent,
                 onPointerDown: (_) => _requestReaderFocus(),
@@ -300,7 +320,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
               ),
             ),
           ),
-          if (_isBookMode)
+          if (_isBookMode && !immersive)
             ..._pageTurnZones(
               controller: controller,
               panelWidth: immersive ? 0 : panelWidth,
@@ -522,7 +542,9 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     }
     return BoxShadow(
       color: context.appColors.readerPageShadow,
-      blurRadius: theme == ReaderTheme.gray ? 2 : 3,
+      blurRadius: theme == ReaderTheme.gray
+          ? AppShadow.readerGrayPageBlur
+          : AppShadow.readerPageBlur,
       spreadRadius: 0,
       offset: const Offset(0, 1),
     );
@@ -719,7 +741,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     }
     _controlsTimer?.cancel();
     final preferences = widget.controller.preferences;
-    if (_isBookMode && (preferences?.controlsAutoHide ?? true)) {
+    if (_isBookMode &&
+        (widget.controlsAutoHide ?? preferences?.controlsAutoHide ?? true)) {
       _controlsTimer = Timer(AppMotion.controlsAutoHide, () {
         if (mounted && _panel == null) {
           setState(() => _controlsVisible = false);

@@ -66,6 +66,23 @@ void main() {
         isFalse,
       );
     });
+
+    test('accepts the common 16:9, 16:10 and 2K desktop viewports', () {
+      for (final viewport in [
+        const Size(1920, 1080),
+        const Size(1920, 1200),
+        const Size(2560, 1440),
+      ]) {
+        expect(
+          ReaderLayoutPolicy.shouldUseFacing(
+            viewportWidth: viewport.width,
+            viewportHeight: viewport.height,
+            pageAspectRatio: 0.704,
+          ),
+          isTrue,
+        );
+      }
+    });
   });
 
   test('light and dark themes expose semantic color tokens', () {

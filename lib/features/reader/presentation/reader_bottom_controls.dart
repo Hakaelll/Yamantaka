@@ -45,7 +45,7 @@ final class ReaderBottomControls extends StatelessWidget {
         constraints: BoxConstraints(maxWidth: compact ? 520 : 680),
         child: Material(
           color: context.appColors.surfaceElevated,
-          elevation: 3,
+          elevation: AppElevation.raised,
           shadowColor: Colors.black.withValues(alpha: 0.14),
           shape: RoundedRectangleBorder(
             side: BorderSide(color: context.appColors.borderSubtle),

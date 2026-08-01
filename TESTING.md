@@ -241,3 +241,37 @@ flutter build windows --release
 La revisión nativa debe comparar la captura base, colección, filtrada,
 compacta y compacta oscura. Narrador y DPI 100/150/200 % continúan como
 `REVIEW`; no se sustituyen por una aserción de widget.
+
+## Iteracion 2026-08-01 — verificacion y limites del entorno
+
+Cambios cubiertos por pruebas nuevas:
+
+- `PdfOperationToken`: listener inmediato tras cancelacion, eliminacion de
+  listener e idempotencia.
+- `ReaderViewportMetrics`: modo top-aligned para `Ajustar ancho` y geometria
+  estable en escritorios 1920x1080, 1920x1200 y 2560x1440.
+- `LibraryArtifactLayout`: slots horizontales seguros en compactos y 8/10
+  columnas para contenido Full HD/2K.
+- `AppCommandRegistry`: Page Up/Page Down no se pueden reasignar.
+- `PdfViewController`: restauracion de posicion y detach neutral sin estado
+  residual.
+
+Comandos ejecutados con el SDK local:
+
+```powershell
+dart format lib test integration_test tool test_driver
+dart analyze lib/features/library/domain/library_artifact_layout.dart
+dart analyze lib/pdf_engine/models/pdf_models.dart
+dart analyze lib/pdf_engine/presentation/reader_viewport_metrics.dart
+dart analyze lib/app/shortcuts/app_commands.dart
+git diff --check
+```
+
+El formato y el analisis de los modulos independientes terminaron sin issues.
+`flutter test --reporter compact`, `flutter analyze`, build Windows y las
+capturas de integracion se intentaron con el SDK local, pero el entorno no
+pudo resolver `test`/`flutter_lints` desde Pub (`socket error` hacia
+`pub.dev`). La solicitud de acceso externo fue rechazada por la politica de
+seguridad; no se hizo bypass ni se modifico el lockfile. Por tanto, los
+resultados nativos, la matriz Narrador/DPI 100/125/150/200 y las diez capturas
+de esta iteracion siguen en `REVIEW`.

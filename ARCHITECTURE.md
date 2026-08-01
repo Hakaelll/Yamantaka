@@ -202,3 +202,35 @@ defecto, sin restaurar workspace/documento y sin borrar datos. Diagnóstico
 consume una allowlist de versión, plataforma, esquema, conteos, integridad,
 caché y métricas del motor; enmascara rutas y excluye títulos, consultas y
 contenido de anotaciones.
+
+## Iteracion de escritorio y ciclo de vida de render — 2026-08-01
+
+El contrato `RenderedPdfPage` devuelve una imagen prestada por el motor. La
+cache LRU conserva `ui.Image` directamente y es la unica propietaria de su
+liberacion al desalojar, limpiar o cerrar un documento. Las miniaturas, el
+panel lateral y otros consumidores solo leen o codifican la imagen; nunca la
+disponen. Las imagenes que superan el presupuesto se rastrean por documento y
+se liberan al cerrar o limpiar para no convertir una pagina grande en una
+fuga.
+
+`PdfOperationToken` tiene listeners de cancelacion. El motor conecta cada
+operacion con el token nativo de pdfrx y comprueba la cancelacion antes de
+publicar una imagen en cache. Las portadas en segundo plano y las miniaturas
+del panel cancelan trabajos obsoletos, deduplican por pagina/escala y limpian
+archivos parciales si la operacion no llega a persistirse.
+
+El viewport sigue siendo la fuente unica para unidad de lectura, ajuste,
+centrado, top-align de `Ajustar ancho` y restauracion de zoom/offset del
+historial. El lector conserva el mismo contrato para Documento y Libro,
+incluye portada sola y pliegues 2-3, 4-5, y oculta tambien las zonas laterales
+de avance en pantalla completa.
+
+La politica de escritorio valida explicitamente 16:9, 16:10, 1920x1080 y
+2560x1440. La biblioteca ajusta slots horizontales independientes de la
+altura de fila: evita overflow en compactos y usa hasta 8 columnas en Full HD
+y 10 en 2K cuando hay muchos artefactos. Portadas y miniaturas solicitan
+ancho/alto a DPR y filtrado de alta calidad.
+
+Los atajos Page Up/Page Down permanecen reservados para navegacion estructural;
+el registro rechaza asignaciones y overrides persistidos que intenten
+usarlos para otra accion.

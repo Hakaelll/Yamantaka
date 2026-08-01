@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:pdfrx/pdfrx.dart' as pdfrx;
 
@@ -49,10 +50,10 @@ final class PdfEngineDiagnostics {
 
 final class PdfrxDocumentEngine implements PdfDocumentEngine {
   PdfrxDocumentEngine(this._logger)
-    : _renderCache = SizedLruCache<_RenderKey, RenderedPdfPage>(
+    : _renderCache = SizedLruCache<_RenderKey, ui.Image>(
         maxBytes: AppConfig.maxRenderCacheBytes,
-        sizeOf: (page) => page.estimatedBytes,
-        onEvict: (page) => page.dispose(),
+        sizeOf: (image) => image.width * image.height * 4,
+        onEvict: (image) => image.dispose(),
       );
 
   final AppLogger _logger;
@@ -61,7 +62,8 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
   final Map<_RenderKey, Future<RenderedPdfPage>> _pendingRenders = {};
   final Map<_RenderKey, pdfrx.PdfPageRenderCancellationToken>
   _activeRenderTokens = {};
-  final SizedLruCache<_RenderKey, RenderedPdfPage> _renderCache;
+  final SizedLruCache<_RenderKey, ui.Image> _renderCache;
+  final Map<String, Set<ui.Image>> _uncachedImages = {};
   int _nextDocumentId = 0;
   int _renderCacheHits = 0;
   int _renderCacheMisses = 0;
@@ -191,6 +193,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     _pendingRenders.removeWhere((key, _) => key.documentId == documentId);
     _activeRenderTokens.removeWhere((key, _) => key.documentId == documentId);
     _renderCache.removeWhere((key) => key.documentId == documentId);
+    _disposeUncachedImages(documentId);
     _textCache.remove(documentId);
     final document = _documents.remove(documentId);
     await document?.dispose();
@@ -207,6 +210,12 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     PdfOperationToken? cancellationToken,
   }) {
     _renderRequests++;
+    if (cancellationToken?.isCancelled ?? false) {
+      _cancelledRenders++;
+      return Future.error(
+        const AppFailure(FailureKind.cancelled, 'Renderizado cancelado.'),
+      );
+    }
     final safeScale = scale.clamp(0.1, 6.0);
     final key = _RenderKey(
       documentId: documentId,
@@ -222,12 +231,21 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
         'Render cache hit ($_renderCacheHits hits, '
         '$_renderCacheMisses misses, ${_renderCache.length} pages).',
       );
-      return Future.value(cached);
+      return _guardRenderForCaller(
+        Future.value(
+          RenderedPdfPage(
+            image: cached,
+            pageIndex: key.pageIndex,
+            scale: safeScale,
+          ),
+        ),
+        cancellationToken,
+      );
     }
     final pending = _pendingRenders[key];
     if (pending != null) {
       _deduplicatedRenders++;
-      return pending;
+      return _guardRenderForCaller(pending, cancellationToken);
     }
     _renderCacheMisses++;
     final render = _render(key, safeScale, region, cancellationToken)
@@ -235,7 +253,19 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
           _pendingRenders.remove(key);
         });
     _pendingRenders[key] = render;
-    return render;
+    return _guardRenderForCaller(render, cancellationToken);
+  }
+
+  Future<RenderedPdfPage> _guardRenderForCaller(
+    Future<RenderedPdfPage> render,
+    PdfOperationToken? cancellationToken,
+  ) async {
+    final page = await render;
+    if (cancellationToken?.isCancelled ?? false) {
+      _cancelledRenders++;
+      throw const AppFailure(FailureKind.cancelled, 'Renderizado cancelado.');
+    }
+    return page;
   }
 
   Future<RenderedPdfPage> _render(
@@ -253,6 +283,8 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     _validatePageIndex(document, key.pageIndex);
     final page = await document.pages[key.pageIndex].ensureLoaded();
     final renderToken = page.createCancellationToken();
+    void cancelNativeRender() => renderToken.cancel();
+    operationToken?.addCancellationListener(cancelNativeRender);
     _activeRenderTokens[key] = renderToken;
     if (operationToken?.isCancelled ?? false) {
       renderToken.cancel();
@@ -279,25 +311,42 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
         backgroundColor: 0xFFFFFFFF,
         cancellationToken: renderToken,
       );
-      if (rendered == null || (operationToken?.isCancelled ?? false)) {
+      if (rendered == null ||
+          renderToken.isCanceled ||
+          (operationToken?.isCancelled ?? false)) {
         rendered?.dispose();
         _cancelledRenders++;
         throw const AppFailure(FailureKind.cancelled, 'Renderizado cancelado.');
       }
-      final image = await rendered.createImage();
-      rendered.dispose();
-      final result = RenderedPdfPage(
-        image: image,
-        pageIndex: key.pageIndex,
-        scale: scale,
-      );
-      _renderCache.put(key, result);
-      _logger.debug(
-        'Rendered page ${key.pageIndex + 1} in '
-        '${stopwatch.elapsedMilliseconds} ms; '
-        '${_renderCache.currentBytes} cache bytes retained.',
-      );
-      return result;
+      try {
+        final image = await rendered.createImage();
+        if (renderToken.isCanceled || (operationToken?.isCancelled ?? false)) {
+          image.dispose();
+          _cancelledRenders++;
+          throw const AppFailure(
+            FailureKind.cancelled,
+            'Renderizado cancelado.',
+          );
+        }
+        final estimatedBytes = image.width * image.height * 4;
+        if (estimatedBytes <= _renderCache.maxBytes) {
+          _renderCache.put(key, image);
+        } else {
+          (_uncachedImages[key.documentId] ??= <ui.Image>{}).add(image);
+        }
+        _logger.debug(
+          'Rendered page ${key.pageIndex + 1} in '
+          '${stopwatch.elapsedMilliseconds} ms; '
+          '${_renderCache.currentBytes} cache bytes retained.',
+        );
+        return RenderedPdfPage(
+          image: image,
+          pageIndex: key.pageIndex,
+          scale: scale,
+        );
+      } finally {
+        rendered.dispose();
+      }
     } on AppFailure {
       rethrow;
     } on Object catch (error, stackTrace) {
@@ -312,6 +361,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
         debugMessage: error.toString(),
       );
     } finally {
+      operationToken?.removeCancellationListener(cancelNativeRender);
       _activeRenderTokens.remove(key);
     }
   }
@@ -426,7 +476,16 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
 
   @override
   void clearCaches() {
+    for (final token in _activeRenderTokens.values) {
+      token.cancel();
+    }
     _renderCache.clear();
+    for (final images in _uncachedImages.values) {
+      for (final image in images) {
+        image.dispose();
+      }
+    }
+    _uncachedImages.clear();
     _renderCacheHits = 0;
     _renderCacheMisses = 0;
     _renderRequests = 0;
@@ -465,6 +524,14 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
         }
       }),
     );
+  }
+
+  void _disposeUncachedImages(String documentId) {
+    final images = _uncachedImages.remove(documentId);
+    if (images == null) return;
+    for (final image in images) {
+      image.dispose();
+    }
   }
 
   PdfOutlineItem _mapOutline(pdfrx.PdfOutlineNode node) => PdfOutlineItem(

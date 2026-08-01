@@ -185,7 +185,7 @@ abstract final class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: tokens.surfaceElevated,
         surfaceTintColor: Colors.transparent,
-        elevation: 8,
+        elevation: AppElevation.popup,
         shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.16),
         shape: RoundedRectangleBorder(
           side: BorderSide(color: tokens.borderStrong),
@@ -319,7 +319,7 @@ abstract final class AppTheme {
       popupMenuTheme: PopupMenuThemeData(
         color: tokens.surfaceElevated,
         surfaceTintColor: Colors.transparent,
-        elevation: 6,
+        elevation: AppElevation.overlay,
         menuPadding: const EdgeInsets.symmetric(vertical: AppSpacing.space6),
         shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
         shape: RoundedRectangleBorder(
@@ -332,7 +332,7 @@ abstract final class AppTheme {
         style: MenuStyle(
           backgroundColor: WidgetStatePropertyAll(tokens.surfaceElevated),
           surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-          elevation: const WidgetStatePropertyAll(6),
+          elevation: const WidgetStatePropertyAll(AppElevation.overlay),
           shadowColor: WidgetStatePropertyAll(
             Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
           ),
@@ -365,8 +365,8 @@ abstract final class AppTheme {
         modalBackgroundColor: tokens.surfaceElevated,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
-        elevation: 8,
-        modalElevation: 8,
+        elevation: AppElevation.popup,
+        modalElevation: AppElevation.popup,
         shape: RoundedRectangleBorder(
           side: BorderSide(color: tokens.borderSubtle),
           borderRadius: const BorderRadius.vertical(

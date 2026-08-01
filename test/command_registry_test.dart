@@ -92,4 +92,19 @@ void main() {
       }),
     );
   });
+
+  test('structural page navigation shortcuts cannot be reassigned', () {
+    final current = AppCommandRegistry.resolvedTokens('{}');
+    final error = AppCommandRegistry.assignmentError(
+      AppCommandId.zoomIn,
+      'page-down',
+      current,
+    );
+
+    expect(error, isNotNull);
+    expect(
+      AppCommandRegistry.decodeOverrides('{"zoomIn":"page-down"}'),
+      isEmpty,
+    );
+  });
 }

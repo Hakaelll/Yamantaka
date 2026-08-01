@@ -121,7 +121,7 @@ final class _DocumentCoverPickerDialogState
                                     Uint8List.fromList(preview.pngBytes),
                                   ),
                                   fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.low,
+                                  filterQuality: FilterQuality.high,
                                 ),
                                 Positioned(
                                   left: 2,

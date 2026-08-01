@@ -274,6 +274,11 @@ objetivos de 40 × 40; táctil, 48 × 48.
 La interfaz es compacta, no apretada. No se usan márgenes propios de una
 landing page ni grandes huecos sin una función de ritmo.
 
+Los perfiles de escritorio de referencia son 1920x1080, 1920x1200 y 2560x1440;
+el panel lateral se resta del viewport antes de calcular la geometria del PDF.
+El PDF conserva escala legible y el espacio horizontal sobrante se mantiene
+equilibrado, sin estirar la pagina para llenar un monitor ultrawide.
+
 La preferencia de densidad tiene dos variantes tipadas:
 
 - cómoda: filas recientes con 12 px verticales, ajustes con 16 px y secciones
@@ -379,6 +384,12 @@ Cada portada solicita una decodificación ajustada a caja física/DPR, usa la
 miniatura pequeña a distancia y la grande al seleccionar. El placeholder es una
 placa neutra con inicial o estado de error. Título, autor, progreso y fecha solo
 aparecen para selección, hover o foco en un bloque tipográfico ligero.
+
+En escritorio se validan dos familias de proporcion: 16:9 y 16:10. En 1920x1080
+la cuadricula de muchos documentos llega a ocho columnas; en 2560x1440 puede
+llegar a diez. Los slots horizontales y la altura de fila son independientes,
+por lo que una ventana compacta no fuerza una portada de 240 px ni produce
+overflow. Todas las imagenes solicitan cacheWidth/cacheHeight ajustados a DPR.
 
 El estado vacío contiene mensaje corto, explicación local-first y una sola
 acción principal. Un archivo ausente reduce contraste y anuncia “Localizar”; un

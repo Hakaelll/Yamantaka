@@ -741,7 +741,7 @@ final class _DocumentCover extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: context.appColors.readerPageShadow,
-              blurRadius: 3,
+              blurRadius: AppShadow.readerPageBlur,
               offset: const Offset(0, 1),
             ),
           ],
@@ -754,7 +754,8 @@ final class _DocumentCover extends StatelessWidget {
                 fit: BoxFit.cover,
                 cacheWidth: cacheWidth,
                 cacheHeight: cacheHeight,
-                filterQuality: FilterQuality.low,
+                gaplessPlayback: true,
+                filterQuality: FilterQuality.high,
                 errorBuilder: (_, _, _) => ColoredBox(
                   color: context.appColors.surfaceSunken,
                   child: Center(

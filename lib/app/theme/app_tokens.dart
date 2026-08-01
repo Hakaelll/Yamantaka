@@ -65,6 +65,24 @@ abstract final class AppRadii {
   static const double touchSurface = 10;
 }
 
+abstract final class AppElevation {
+  static const double flat = 0;
+  static const double control = 2;
+  static const double raised = 3;
+  static const double overlay = 6;
+  static const double popup = 8;
+}
+
+abstract final class AppShadow {
+  static const double readerPageBlur = 3;
+  static const double readerGrayPageBlur = 2;
+  static const double readerPanelBlur = 8;
+  static const double artifactRestBlur = 8;
+  static const double artifactSelectedBlur = 18;
+  static const double artifactRestOffset = 4;
+  static const double artifactSelectedOffset = 9;
+}
+
 abstract final class AppMotion {
   static const Duration instant = Duration.zero;
   static const Duration feedback = Duration(milliseconds: 80);

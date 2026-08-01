@@ -190,6 +190,43 @@ void main() {
       expect(metrics.cellExtent - metrics.artifactWidth, greaterThan(24));
     });
 
+    test('keeps narrow layouts inside the viewport', () {
+      for (final width in [320.0, 480.0, 679.0]) {
+        final metrics = LibraryArtifactLayout.metricsFor(
+          viewportWidth: width,
+          documentCount: 6,
+        );
+
+        expect(metrics.columns, greaterThanOrEqualTo(1));
+        expect(
+          metrics.artifactWidth,
+          lessThanOrEqualTo(metrics.horizontalCellExtent),
+        );
+        expect(
+          metrics.artifactWidth * metrics.columns +
+              (metrics.horizontalCellExtent - metrics.artifactWidth) *
+                  (metrics.columns - 1),
+          lessThanOrEqualTo(width + 0.001),
+        );
+      }
+    });
+
+    test('uses additional columns for common 16:9 and 2K desktop widths', () {
+      final fullHd = LibraryArtifactLayout.metricsFor(
+        viewportWidth: 1840,
+        documentCount: 100,
+      );
+      final twoK = LibraryArtifactLayout.metricsFor(
+        viewportWidth: 2400,
+        documentCount: 100,
+      );
+
+      expect(fullHd.columns, 8);
+      expect(twoK.columns, 10);
+      expect(fullHd.artifactWidth, lessThanOrEqualTo(184));
+      expect(twoK.artifactWidth, lessThanOrEqualTo(184));
+    });
+
     test('keyboard navigation follows the predictable visual grid', () {
       expect(
         LibraryArtifactLayout.indexAfterNavigation(

@@ -19,16 +19,24 @@ final class ArtifactGridMetrics {
     required this.columns,
     required this.artifactWidth,
     required this.artifactHeight,
+    required this.horizontalCellExtent,
     required this.cellExtent,
   });
 
   final int columns;
   final double artifactWidth;
   final double artifactHeight;
+
+  /// The horizontal slot allocated to each artifact in the sparse canvas.
+  final double horizontalCellExtent;
+
+  /// The vertical slot allocated to each artifact row.
   final double cellExtent;
 }
 
 abstract final class LibraryArtifactLayout {
+  static const double gridGap = 16;
+
   static ArtifactJitter jitterFor(String stableId) {
     final hash = _stableHash(stableId);
     double signed(int shift, int mask) {
@@ -48,35 +56,58 @@ abstract final class LibraryArtifactLayout {
     required double viewportWidth,
     required int documentCount,
   }) {
-    final usableWidth = math.max(280.0, viewportWidth);
+    final usableWidth = math.max(1.0, viewportWidth);
     if (documentCount <= 1) {
-      final width = math.min(210.0, usableWidth * 0.46);
+      final width = math.min(210.0, usableWidth * 0.66);
       return ArtifactGridMetrics(
         columns: 1,
         artifactWidth: width,
         artifactHeight: width * 1.42,
-        cellExtent: width * 1.78,
+        horizontalCellExtent: width,
+        cellExtent: width * 1.42 + 32,
       );
     }
     if (documentCount <= 6) {
-      final columns = documentCount <= 3 ? documentCount : 3;
-      final width = math.min(172.0, (usableWidth - 96) / columns * 0.68);
+      final desiredColumns = documentCount <= 3 ? documentCount : 3;
+      final columns = math.min(
+        desiredColumns,
+        math.max(1, ((usableWidth + 16) / 188).floor()),
+      );
+      final slotWidth = (usableWidth - gridGap * (columns - 1)) / columns;
+      final width = math.min(172.0, slotWidth * 0.78);
       return ArtifactGridMetrics(
         columns: columns,
         artifactWidth: width,
         artifactHeight: width * 1.42,
-        cellExtent: width * 1.72,
+        horizontalCellExtent: slotWidth,
+        cellExtent: width * 1.42 + 32,
       );
     }
-    final targetCellWidth = usableWidth < 680 ? 150.0 : 196.0;
-    final columns = (usableWidth / targetCellWidth).floor().clamp(2, 7);
-    final cellWidth = usableWidth / columns;
-    final width = math.min(158.0, cellWidth * 0.68);
+    final targetCellWidth = switch (usableWidth) {
+      < 680 => 176.0,
+      < 1600 => 204.0,
+      < 2200 => 220.0,
+      _ => 236.0,
+    };
+    final maximumColumns = switch (usableWidth) {
+      < 680 => 4,
+      < 1600 => 7,
+      < 2200 => 8,
+      _ => 10,
+    };
+    final minimumColumns = usableWidth < 188 ? 1 : 2;
+    final columns = (usableWidth / targetCellWidth).floor().clamp(
+      minimumColumns,
+      maximumColumns,
+    );
+    final cellWidth = (usableWidth - gridGap * (columns - 1)) / columns;
+    final width = math.min(184.0, cellWidth * 0.72);
     return ArtifactGridMetrics(
       columns: columns,
       artifactWidth: width,
       artifactHeight: width * 1.42,
-      cellExtent: width * 1.74,
+      horizontalCellExtent: cellWidth,
+      cellExtent: width * 1.42 + 32,
     );
   }
 

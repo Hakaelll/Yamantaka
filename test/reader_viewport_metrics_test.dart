@@ -97,6 +97,19 @@ void main() {
       expect(center.dy, 1150);
     });
 
+    test('can preserve a top-aligned fit-width viewport when content fits', () {
+      final center = ReaderViewportMetrics.normalizeCenter(
+        proposedCenter: const Offset(600, 180),
+        viewport: const Size(1200, 800),
+        contentRect: const Rect.fromLTWH(300, 100, 600, 600),
+        zoom: 1,
+        margin: 20,
+        centerVerticallyWhenFits: false,
+      );
+
+      expect(center, const Offset(600, 180));
+    });
+
     test('fit modes use the complete spread and stable limits', () {
       const viewport = Size(1200, 800);
       const spread = Rect.fromLTWH(0, 0, 1214, 800);

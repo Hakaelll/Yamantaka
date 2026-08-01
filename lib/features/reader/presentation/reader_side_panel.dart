@@ -74,7 +74,7 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 8,
+                  blurRadius: AppShadow.readerPanelBlur,
                   offset: const Offset(-2, 0),
                 ),
               ],
@@ -239,6 +239,8 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
     Future<RenderedPdfPage>
   >
   _renderRequests = LinkedHashMap();
+  final Map<({int pageIndex, int scaleMilli}), PdfOperationToken>
+  _renderTokens = {};
   String? _documentId;
 
   @override
@@ -248,10 +250,17 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
   }
 
   @override
+  void dispose() {
+    _cancelThumbnailRequests();
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant _ThumbnailPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     final nextDocumentId = widget.controller.openedDocument?.documentId;
     if (_documentId != nextDocumentId) {
+      _cancelThumbnailRequests();
       _renderRequests.clear();
       _documentId = nextDocumentId;
     }
@@ -379,13 +388,26 @@ final class _ThumbnailPanelState extends State<_ThumbnailPanel> {
     required double scale,
   }) {
     while (_renderRequests.length >= _maximumRetainedRequests) {
-      _renderRequests.remove(_renderRequests.keys.first);
+      final oldestKey = _renderRequests.keys.first;
+      _renderTokens.remove(oldestKey)?.cancel();
+      _renderRequests.remove(oldestKey);
     }
+    final key = (pageIndex: pageIndex, scaleMilli: (scale * 1000).round());
+    final token = PdfOperationToken();
+    _renderTokens[key] = token;
     return widget.engine.renderPage(
       documentId: documentId,
       pageIndex: pageIndex,
       scale: scale,
+      cancellationToken: token,
     );
+  }
+
+  void _cancelThumbnailRequests() {
+    for (final token in _renderTokens.values) {
+      token.cancel();
+    }
+    _renderTokens.clear();
   }
 }
 

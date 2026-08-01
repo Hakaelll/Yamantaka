@@ -92,6 +92,9 @@ abstract final class AppCommandRegistry {
     AppCommandId.toggleChrome,
   };
 
+  /// These activators remain available to structural reader navigation.
+  static const reservedShortcutTokens = <String>{'page-down', 'page-up'};
+
   static const shortcutChoices = <AppShortcutChoice>[
     AppShortcutChoice(
       token: 'ctrl-o',
@@ -395,6 +398,7 @@ abstract final class AppCommandRegistry {
         final token = entry.value;
         if (id != null &&
             configurableIds.contains(id) &&
+            !reservedShortcutTokens.contains(token) &&
             token is String &&
             shortcutChoices.any((choice) => choice.token == token)) {
           result[id] = token;
@@ -412,6 +416,7 @@ abstract final class AppCommandRegistry {
       final token = overrides[id];
       if (token != null &&
           token != defaultTokens[id] &&
+          !reservedShortcutTokens.contains(token) &&
           shortcutChoices.any((choice) => choice.token == token)) {
         normalized[id.name] = token;
       }
@@ -440,6 +445,9 @@ abstract final class AppCommandRegistry {
     Map<AppCommandId, String> current,
   ) {
     if (!configurableIds.contains(id)) return 'Esta acción está reservada.';
+    if (reservedShortcutTokens.contains(token)) {
+      return 'Esta combinación está reservada para la navegación.';
+    }
     if (!shortcutChoices.any((choice) => choice.token == token)) {
       return 'La combinación no está permitida.';
     }

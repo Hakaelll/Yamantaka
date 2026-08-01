@@ -595,22 +595,21 @@ final class _ArtifactCanvas extends StatelessWidget {
                   constraints: BoxConstraints(
                     maxWidth:
                         metrics.artifactWidth * metrics.columns +
-                        (metrics.cellExtent - metrics.artifactWidth) *
+                        (metrics.horizontalCellExtent - metrics.artifactWidth) *
                             math.max(0, metrics.columns - 1),
                   ),
                   child: Wrap(
                     alignment: WrapAlignment.center,
                     runAlignment: WrapAlignment.center,
-                    spacing: documents.length == 1
-                        ? 0
-                        : metrics.cellExtent - metrics.artifactWidth,
+                    spacing: math.max(
+                      0,
+                      metrics.horizontalCellExtent - metrics.artifactWidth,
+                    ),
                     runSpacing: AppSpacing.space24,
                     children: [
                       for (final document in documents)
                         SizedBox(
-                          width: documents.length == 1
-                              ? math.max(metrics.artifactWidth, 240)
-                              : metrics.artifactWidth,
+                          width: metrics.artifactWidth,
                           height: metrics.artifactHeight + AppSpacing.space24,
                           child: Center(
                             child: ArtifactDocument(
@@ -781,22 +780,35 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                       height: fittedHeight,
                       decoration: BoxDecoration(
                         color: context.appColors.surfaceSunken,
-                        borderRadius: BorderRadius.circular(2.5),
-                        border: _focused
-                            ? Border.all(
-                                color: context.appColors.focusRing,
-                                width: 1.5,
-                              )
-                            : null,
+                        borderRadius: BorderRadius.circular(AppRadii.indicator),
+                        border: Border.all(
+                          color: _focused
+                              ? context.appColors.focusRing
+                              : widget.selected
+                              ? context.appColors.accentPrimary
+                              : context.appColors.borderSubtle,
+                          width: _focused
+                              ? 2
+                              : widget.selected
+                              ? 1.5
+                              : 1,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: context.appColors.readerPageShadow
                                 .withValues(
                                   alpha: widget.selected ? 0.72 : 0.38,
                                 ),
-                            blurRadius: widget.selected ? 18 : 8,
+                            blurRadius: widget.selected
+                                ? AppShadow.artifactSelectedBlur
+                                : AppShadow.artifactRestBlur,
                             spreadRadius: widget.selected ? 1 : 0,
-                            offset: Offset(0, widget.selected ? 9 : 4),
+                            offset: Offset(
+                              0,
+                              widget.selected
+                                  ? AppShadow.artifactSelectedOffset
+                                  : AppShadow.artifactRestOffset,
+                            ),
                           ),
                         ],
                       ),
@@ -828,9 +840,14 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                                     context,
                                                   ))
                                               .ceil(),
-                                      filterQuality: widget.selected
-                                          ? FilterQuality.high
-                                          : FilterQuality.medium,
+                                      cacheHeight:
+                                          (fittedHeight *
+                                                  MediaQuery.devicePixelRatioOf(
+                                                    context,
+                                                  ))
+                                              .ceil(),
+                                      gaplessPlayback: true,
+                                      filterQuality: FilterQuality.high,
                                       errorBuilder: (_, _, _) =>
                                           _ArtifactPlaceholder(
                                             document: widget.document,
@@ -972,14 +989,19 @@ final class DocumentInfoOverlay extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                (document.title?.trim().isNotEmpty ?? false)
+              Tooltip(
+                message: (document.title?.trim().isNotEmpty ?? false)
                     ? document.title!
                     : 'Documento sin título',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium,
+                child: Text(
+                  (document.title?.trim().isNotEmpty ?? false)
+                      ? document.title!
+                      : 'Documento sin título',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
               if (document.author case final author?)
                 Text(
@@ -1025,7 +1047,7 @@ final class _SearchOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: context.appColors.surfaceElevated,
-      elevation: 8,
+      elevation: AppElevation.popup,
       shadowColor: context.appColors.readerPageShadow,
       borderRadius: BorderRadius.circular(AppRadii.field),
       child: ConstrainedBox(

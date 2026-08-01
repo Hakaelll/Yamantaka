@@ -5,6 +5,10 @@ abstract interface class PdfDocumentEngine {
 
   Future<void> closeDocument(String documentId);
 
+  /// Returns an image borrowed from the engine cache.
+  ///
+  /// Callers must not dispose the returned image; closing the document or
+  /// clearing the engine cache releases it.
   Future<RenderedPdfPage> renderPage({
     required String documentId,
     required int pageIndex,

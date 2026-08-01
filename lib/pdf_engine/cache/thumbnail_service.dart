@@ -14,6 +14,7 @@ import '../../features/library/domain/document_cover.dart';
 import '../../features/library/domain/library_document.dart';
 import '../../storage/paths/app_paths.dart';
 import '../../storage/repositories/document_repository.dart';
+import '../models/pdf_models.dart';
 import '../pdf_document_engine.dart';
 
 final class ThumbnailService {
@@ -40,6 +41,9 @@ final class ThumbnailService {
   final int Function() _maxCacheBytes;
   void Function()? onCoverUpdated;
   final Set<String> _cancelledDocumentIds = <String>{};
+  final Map<String, PdfOperationToken> _activeCoverTokens = {};
+  final Map<String, int> _coverGenerations = <String, int>{};
+  int _coverQueueGeneration = 0;
   Future<void> _backgroundQueue = Future<void>.value();
 
   Future<String?> generateCover({
@@ -69,12 +73,18 @@ final class ThumbnailService {
   }
 
   void enqueueCover(LibraryDocument document) {
+    _activeCoverTokens.remove(document.id)?.cancel();
     _cancelledDocumentIds.remove(document.id);
+    final documentGeneration = (_coverGenerations[document.id] ?? 0) + 1;
+    _coverGenerations[document.id] = documentGeneration;
+    final queueGeneration = _coverQueueGeneration;
     _backgroundQueue = _backgroundQueue
         .catchError((Object error) {
           _logger.warning('Previous cover queue task failed.', error);
         })
         .then((_) async {
+          if (queueGeneration != _coverQueueGeneration) return;
+          if (_coverGenerations[document.id] != documentGeneration) return;
           if (_cancelledDocumentIds.contains(document.id)) return;
           final current = _documents.byId(document.id);
           if (current == null ||
@@ -91,15 +101,26 @@ final class ThumbnailService {
             return;
           }
           String? engineDocumentId;
+          final cancellationToken = PdfOperationToken();
+          _activeCoverTokens[current.id] = cancellationToken;
           try {
+            if (cancellationToken.isCancelled) return;
             final opened = await _engine.openDocument(current.path);
             engineDocumentId = opened.documentId;
-            if (!_cancelledDocumentIds.contains(current.id)) {
-              await _detectAndGenerate(current, opened.documentId);
+            if (!_cancelledDocumentIds.contains(current.id) &&
+                !cancellationToken.isCancelled) {
+              await _detectAndGenerate(
+                current,
+                opened.documentId,
+                cancellationToken: cancellationToken,
+              );
             }
           } on Object catch (error) {
             _logger.warning('Queued cover generation failed.', error);
           } finally {
+            if (identical(_activeCoverTokens[current.id], cancellationToken)) {
+              _activeCoverTokens.remove(current.id);
+            }
             if (engineDocumentId != null) {
               await _engine.closeDocument(engineDocumentId);
             }
@@ -109,6 +130,8 @@ final class ThumbnailService {
 
   void cancel(String documentId) {
     _cancelledDocumentIds.add(documentId);
+    _coverGenerations[documentId] = (_coverGenerations[documentId] ?? 0) + 1;
+    _activeCoverTokens.remove(documentId)?.cancel();
   }
 
   Future<List<CoverPreview>> previewPages(
@@ -125,13 +148,9 @@ final class ThumbnailService {
           pageIndex: pageIndex,
           scale: coverPreviewScale,
         );
-        try {
-          final bytes = await _pngBytes(rendered.image);
-          if (bytes != null) {
-            previews.add(CoverPreview(pageIndex: pageIndex, pngBytes: bytes));
-          }
-        } finally {
-          rendered.dispose();
+        final bytes = await _pngBytes(rendered.image);
+        if (bytes != null) {
+          previews.add(CoverPreview(pageIndex: pageIndex, pngBytes: bytes));
         }
       }
       return previews;
@@ -177,8 +196,9 @@ final class ThumbnailService {
 
   Future<String?> _detectAndGenerate(
     LibraryDocument document,
-    String engineDocumentId,
-  ) async {
+    String engineDocumentId, {
+    PdfOperationToken? cancellationToken,
+  }) async {
     try {
       final candidateCount = math.min(
         CoverSelectionPolicy.maximumCandidatePages,
@@ -186,25 +206,34 @@ final class ThumbnailService {
       );
       final metrics = <CoverCandidateMetrics>[];
       for (var pageIndex = 0; pageIndex < candidateCount; pageIndex++) {
-        if (_cancelledDocumentIds.contains(document.id)) return null;
+        if (_cancelledDocumentIds.contains(document.id) ||
+            (cancellationToken?.isCancelled ?? false)) {
+          throw const AppFailure(
+            FailureKind.cancelled,
+            'Generación de portada cancelada.',
+          );
+        }
         final rendered = await _engine.renderPage(
           documentId: engineDocumentId,
           pageIndex: pageIndex,
           scale: 0.16,
+          cancellationToken: cancellationToken,
         );
+        String text = '';
         try {
-          String text = '';
-          try {
-            text = await _engine.extractPageText(
-              documentId: engineDocumentId,
-              pageIndex: pageIndex,
-            );
-          } on Object {
-            // Visual scoring remains available for scanned documents.
-          }
-          metrics.add(await _measure(rendered.image, pageIndex, text));
-        } finally {
-          rendered.dispose();
+          text = await _engine.extractPageText(
+            documentId: engineDocumentId,
+            pageIndex: pageIndex,
+          );
+        } on Object {
+          // Visual scoring remains available for scanned documents.
+        }
+        metrics.add(await _measure(rendered.image, pageIndex, text));
+        if (cancellationToken?.isCancelled ?? false) {
+          throw const AppFailure(
+            FailureKind.cancelled,
+            'Generación de portada cancelada.',
+          );
         }
       }
       if (metrics.isEmpty) return null;
@@ -215,7 +244,10 @@ final class ThumbnailService {
         pageIndex: selected.metrics.pageIndex,
         confidence: selected.confidence,
         selectionMode: CoverSelectionMode.automatic,
+        cancellationToken: cancellationToken,
       );
+    } on AppFailure {
+      rethrow;
     } on Object catch (error, stackTrace) {
       _logger.warning('Cover generation failed.', error);
       Error.throwWithStackTrace(
@@ -235,6 +267,7 @@ final class ThumbnailService {
     required int pageIndex,
     required double confidence,
     required CoverSelectionMode selectionMode,
+    PdfOperationToken? cancellationToken,
   }) async {
     final previousMetadata = document.coverMetadata;
     final cacheStamp = DateTime.now().microsecondsSinceEpoch;
@@ -253,39 +286,59 @@ final class ThumbnailService {
       (scale: largeCoverScale, path: largePath),
     ];
     var pageAspectRatio = 0.704;
-    for (final target in renders) {
-      final rendered = await _engine.renderPage(
-        documentId: engineDocumentId,
-        pageIndex: pageIndex,
-        scale: target.scale,
-      );
-      try {
+    var persisted = false;
+    try {
+      for (final target in renders) {
+        if (cancellationToken?.isCancelled ?? false) {
+          throw const AppFailure(
+            FailureKind.cancelled,
+            'Generación de portada cancelada.',
+          );
+        }
+        final rendered = await _engine.renderPage(
+          documentId: engineDocumentId,
+          pageIndex: pageIndex,
+          scale: target.scale,
+          cancellationToken: cancellationToken,
+        );
         pageAspectRatio = rendered.image.width / rendered.image.height;
         final bytes = await _pngBytes(rendered.image);
         if (bytes == null) return null;
         await File(target.path).writeAsBytes(bytes, flush: true);
-      } finally {
-        rendered.dispose();
+      }
+      if (cancellationToken?.isCancelled ?? false) {
+        throw const AppFailure(
+          FailureKind.cancelled,
+          'Generación de portada cancelada.',
+        );
+      }
+      final metadata = DocumentCoverMetadata(
+        documentId: document.id,
+        sourcePageIndex: pageIndex,
+        smallThumbnailPath: smallPath,
+        largeThumbnailPath: largePath,
+        generatedAt: DateTime.now().toUtc(),
+        sourceModifiedAt: document.fileModifiedAt,
+        confidence: confidence,
+        selectionMode: selectionMode,
+        algorithmVersion: CoverSelectionPolicy.algorithmVersion,
+        cropMode: CoverCropMode.contain,
+        pageAspectRatio: pageAspectRatio.clamp(0.1, 10),
+      );
+      _documents.saveCover(metadata);
+      await _deleteCoverFiles(previousMetadata);
+      await trimToLimit();
+      onCoverUpdated?.call();
+      persisted = true;
+      return smallPath;
+    } finally {
+      if (!persisted) {
+        for (final path in [smallPath, largePath]) {
+          final file = File(path);
+          if (await file.exists()) await file.delete();
+        }
       }
     }
-    final metadata = DocumentCoverMetadata(
-      documentId: document.id,
-      sourcePageIndex: pageIndex,
-      smallThumbnailPath: smallPath,
-      largeThumbnailPath: largePath,
-      generatedAt: DateTime.now().toUtc(),
-      sourceModifiedAt: document.fileModifiedAt,
-      confidence: confidence,
-      selectionMode: selectionMode,
-      algorithmVersion: CoverSelectionPolicy.algorithmVersion,
-      cropMode: CoverCropMode.contain,
-      pageAspectRatio: pageAspectRatio.clamp(0.1, 10),
-    );
-    _documents.saveCover(metadata);
-    await _deleteCoverFiles(previousMetadata);
-    await trimToLimit();
-    onCoverUpdated?.call();
-    return smallPath;
   }
 
   Future<CoverCandidateMetrics> _measure(
@@ -347,6 +400,12 @@ final class ThumbnailService {
   }
 
   Future<void> clear() async {
+    _coverQueueGeneration++;
+    for (final token in _activeCoverTokens.values) {
+      token.cancel();
+    }
+    _activeCoverTokens.clear();
+    _coverGenerations.clear();
     final directory = _paths.thumbnailDirectory;
     if (await directory.exists()) {
       await for (final entity in directory.list(followLinks: false)) {

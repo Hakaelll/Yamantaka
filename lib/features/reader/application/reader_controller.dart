@@ -297,11 +297,14 @@ final class ReaderController extends ChangeNotifier {
     direction: direction,
   );
 
-  Future<void> goToPage(int oneBasedPage) => navigateTo(
-    oneBasedPage.clamp(1, pageCount) - 1,
-    reason: NavigationReason.distantPage,
-    label: 'Página $oneBasedPage',
-  );
+  Future<void> goToPage(int oneBasedPage) {
+    if (pageCount == 0) return Future<void>.value();
+    return navigateTo(
+      oneBasedPage.clamp(1, pageCount) - 1,
+      reason: NavigationReason.distantPage,
+      label: 'Página $oneBasedPage',
+    );
+  }
 
   Future<void> navigateTo(
     int pageIndex, {
@@ -324,12 +327,24 @@ final class ReaderController extends ChangeNotifier {
 
   Future<void> historyBack() async {
     final location = navigationHistory?.back();
-    if (location != null) await viewController.goToPage(location.pageIndex);
+    if (location != null) {
+      await viewController.goToPage(location.pageIndex);
+      await viewController.restorePosition(
+        zoom: location.zoom,
+        scrollOffset: location.offset,
+      );
+    }
   }
 
   Future<void> historyForward() async {
     final location = navigationHistory?.forward();
-    if (location != null) await viewController.goToPage(location.pageIndex);
+    if (location != null) {
+      await viewController.goToPage(location.pageIndex);
+      await viewController.restorePosition(
+        zoom: location.zoom,
+        scrollOffset: location.offset,
+      );
+    }
   }
 
   Future<void> resetProgress() async {

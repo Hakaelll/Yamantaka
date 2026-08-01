@@ -217,6 +217,7 @@ abstract final class ReaderViewportMetrics {
     required Rect contentRect,
     required double zoom,
     double margin = 0,
+    bool centerVerticallyWhenFits = true,
   }) {
     if (contentRect.isEmpty || viewport.isEmpty || zoom <= 0) {
       return proposedCenter;
@@ -230,7 +231,7 @@ abstract final class ReaderViewportMetrics {
             boundedRect.left + visibleWidth / 2,
             boundedRect.right - visibleWidth / 2,
           );
-    final y = boundedRect.height <= visibleHeight
+    final y = boundedRect.height <= visibleHeight && centerVerticallyWhenFits
         ? boundedRect.center.dy
         : proposedCenter.dy.clamp(
             boundedRect.top + visibleHeight / 2,
