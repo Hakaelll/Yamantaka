@@ -1,1779 +1,2371 @@
 # Próximas tareas de Yamantaka
 
-Este documento representa el estado operativo del proyecto.
+Hoja de ruta operativa para la evolución de Yamantaka en Windows.
 
-## Estados
+Última reconstrucción completa: 2026-08-01.
 
-- `TODO`: todavía no iniciado.
-- `IN_PROGRESS`: en desarrollo.
-- `BLOCKED`: no puede continuar por una dependencia externa o técnica.
-- `REVIEW`: implementación terminada pendiente de validación.
-- `DONE`: criterios de aceptación comprobados.
+Este documento contiene únicamente trabajo futuro. El historial de trabajo
+terminado vive en Git y en CHANGELOG.md; no se duplican aquí tareas cerradas ni
+se mantienen tickets DONE como relleno.
 
-## Prioridades
+## 1. Visión del producto
 
-- `P0`: bloquea una versión utilizable o corrige un problema crítico.
-- `P1`: mejora importante para calidad, estabilidad o experiencia.
-- `P2`: mejora planificada que no bloquea la versión actual.
-- `P3`: exploración o función futura.
+Yamantaka debe convertirse en un lector PDF para Windows rápido, silencioso,
+fiable y agradable durante sesiones prolongadas. La aplicación debe sentirse
+como una herramienta editorial de escritorio: el documento domina, las
+acciones aparecen cuando son necesarias y cada superficie conserva una
+jerarquía monocromática clara.
 
-## Reglas
+La evolución se evaluará en siete dimensiones inseparables:
 
-- Una tarea solo pasa a `DONE` cuando sus criterios de aceptación han sido
-  comprobados.
-- Las tareas visuales requieren inspección manual o evidencia visual.
-- Las tareas de rendimiento requieren mediciones reales.
-- Las tareas multiplataforma requieren validación en la plataforma indicada.
+- Funcionamiento: cada flujo principal debe ser completo, recuperable y
+  coherente entre ratón, teclado y comandos.
+- Rendimiento: apertura, render, navegación, búsqueda y biblioteca deben tener
+  presupuestos medidos, no impresiones subjetivas.
+- Eficiencia: no se harán trabajos repetidos, invisibles u obsoletos; toda
+  operación costosa será priorizable, deduplicable y cancelable.
+- Limpieza visual: menos chrome, menos ruido, más ritmo y mayor protagonismo del
+  PDF y de las portadas.
+- Calidad visual: tipografía, iconos, foco, estados, movimiento, contraste y
+  layouts responderán a un sistema común.
+- Accesibilidad: la aplicación completa será utilizable con teclado, Narrador,
+  alto contraste, movimiento reducido y escalas de Windows habituales.
+- Fiabilidad: documentos, base de datos, copias, ventanas y recursos nativos
+  deben sobrevivir a cierres, errores, archivos extraños y sesiones largas.
 
-## Resumen del proyecto
+## 2. Límites innegociables
 
-- Primer hito funcional de Windows: completado.
-- Visor PDF real: operativo.
-- Modo libro: geometría, navegación y zoom rehechos; pendiente la matriz nativa
-  ampliada de DPI/Narrador.
-- Persistencia local: operativa.
-- Pruebas automáticas: operativas.
-- Rendimiento avanzado: perfil reproducible Windows/Profile completado.
-- Android e iOS: pendientes de validación.
-- Empaquetado público: pendiente.
-- Sistema visual: segunda generación implementada y validada en Windows.
-- Interfaz ligera: filtro, orden, densidad y presupuesto de miniaturas
-  implementados sin dependencias nuevas; estados de lectura, barra contextual,
-  panel perezoso y acciones locales ampliados.
-- Endurecimiento 2026-08-01: ownership de imagenes de cache, cancelacion
-  nativa, restauracion de historial, slots compactos y perfiles de escritorio
-  16:9/16:10/Full HD/2K implementados; verificacion nativa continua en REVIEW.
+- Windows es la única plataforma de esta hoja de ruta.
+- El único formato de lectura es PDF.
+- Todo dato de biblioteca, progreso, historial, búsqueda, colección, perfil,
+  espacio de trabajo o anotación permanece local.
+- No habrá cuentas, nube, sincronización remota, telemetría, publicidad,
+  analítica, IA ni OCR.
+- La aplicación no abrirá conexiones de red durante el uso normal.
+- Un PDF nunca se copia, mueve, modifica o elimina sin una acción explícita y
+  confirmada por el usuario.
+- Las anotaciones y metadatos propios se guardan fuera del PDF.
+- La detección automática de portada puede sugerir, pero nunca sustituye una
+  portada elegida manualmente.
+- El emblema se limita al icono de aplicación, ejecutable, instalador y
+  superficies de plataforma. No aparece en biblioteca ni lector.
+- No se añadirá una franja visible de pestañas sobre el documento.
+- No se introducirán gradientes decorativos, colores saturados, glassmorphism,
+  sombras pesadas ni componentes de aspecto genérico.
+- Toda dependencia nueva exige justificación, licencia compatible, impacto de
+  bundle medido, mantenimiento razonable y una decisión arquitectónica.
 
-| Área | Estado | Próximo objetivo |
-| --- | --- | --- |
-| Motor PDF | Operativo | Eliminar parche cuando upstream lo permita |
-| Biblioteca | Estados/filtro/densidad y acciones locales validados | Accesibilidad nativa restante |
-| Lector | Barra contextual, panel y recuperación validados | DPI y Narrador restantes |
-| Modo libro | Review | Validación visual y refinamiento |
-| Windows | Primer hito validado | Endurecimiento y empaquetado |
-| Android | Pendiente | Instalar toolchain y validar |
-| iOS | Pendiente | Validar en macOS |
+## 3. Línea base real — 2026-08-01
 
-Siguientes objetivos prioritarios: **YAM-050**, resolver selección y geometría
-nativas; **YAM-062**, implementar split con dos visores medidos; y **YAM-041**,
-completar la matriz nativa de
-Narrador y DPI para cerrar las tareas visuales que siguen en `REVIEW`.
+- Versión actual: 0.1.0+1.
+- Rama de referencia: main, commit 0191676.
+- Windows dispone de biblioteca local, importación, portadas, lector PDFium,
+  modos Documento y Libro, búsqueda, índice, miniaturas, marcadores,
+  anotaciones locales, colecciones, espacios de trabajo, perfiles, historial,
+  copias, diagnóstico y safe mode.
+- El sistema visual editorial monocromático, el tema oscuro, la densidad
+  cómoda/compacta y los breakpoints 680/1100 ya existen.
+- El motor mantiene una LRU por bytes, deduplicación de renders, cancelación
+  nativa y ownership explícito de imágenes.
+- La biblioteca ya adapta portadas a DPR y contempla 16:9, 16:10, Full HD y 2K.
+- Existen pruebas unitarias, de widgets, SQLite, PDFium, integración Windows y
+  perfiles reproducibles.
+- La documentación registra validaciones históricas, pero el último
+  endurecimiento no pudo repetir la suite completa por falta de resolución de
+  dependencias de Pub. YAM-100 debe restablecer una evidencia limpia antes de
+  considerar una versión candidata.
+- El parche local de pdfrx sigue siendo una deuda controlada.
+- Selección geométrica, teselas, split real, comparación y multi-window no se
+  anuncian como funciones disponibles.
 
-## YAM-001 — Inspección inicial
+Esta línea base no equivale a una certificación de versión. Los gates definidos
+a continuación son la única vía para declarar un hito publicable.
 
+## 4. Estados, prioridades, esfuerzo y áreas
+
+### Estados
+
+- READY: definición completa, sin decisión pendiente y preparada para empezar.
+- PLANNED: definida, pero espera dependencias o una fase posterior.
+- IN_PROGRESS: implementación activa con una persona o agente responsable.
+- BLOCKED: no puede avanzar por una dependencia externa demostrada.
+- REVIEW: implementación terminada pendiente de evidencia o revisión.
+- DONE: criterios de aceptación comprobados y evidencia enlazada.
+
+Una dependencia interna pendiente no convierte una tarea en BLOCKED; permanece
+PLANNED. BLOCKED se reserva para impedimentos externos o técnicos que no puedan
+resolverse dentro del repositorio.
+
+### Prioridades
+
+- P0: bloquea estabilidad, integridad, accesibilidad básica o publicación.
+- P1: mejora sustancial de funcionamiento, rendimiento o experiencia.
+- P2: capacidad avanzada que puede esperar a una base estable.
+- P3: exploración futura sin compromiso de entrega.
+
+### Esfuerzo
+
+- S: hasta dos días de trabajo acotado.
+- M: hasta una semana.
+- L: entre una y tres semanas.
+- XL: más de tres semanas; debe dividirse antes de pasar a IN_PROGRESS.
+
+### Áreas
+
+- FUNC: funcionamiento y capacidades del producto.
+- PERF: rendimiento, memoria, latencia y energía.
+- EFF: eficiencia de arquitectura y ejecución.
+- VIS: limpieza, calidad y coherencia visual.
+- A11Y: teclado, foco, Narrador, contraste y adaptación.
+- REL: fiabilidad, recuperación, integridad y seguridad.
+- WIN: integración, empaquetado y comportamiento de Windows.
+
+## 5. Gates globales de versión
+
+### G1 — Calidad reproducible
+
+- Una máquina Windows limpia restaura dependencias y ejecuta formato, análisis,
+  suite Flutter, pruebas PDFium, integración y build Release con un solo flujo
+  documentado.
+- El flujo no modifica archivos versionados ni depende de pasos manuales
+  ocultos.
+- Una ejecución fallida conserva logs suficientes y devuelve un código de error
+  inequívoco.
+
+### G2 — Integridad y ciclo de vida
+
+- Cerrar cada documento deja cero handles de PDF, renders activos, listeners
+  propios e imágenes retenidas por las caches de Yamantaka.
+- Migraciones, backup, restauración y limpieza son transaccionales o
+  recuperables.
+- Un cierre forzado no provoca bucles de restauración ni pérdida silenciosa de
+  datos confirmados.
+
+### G3 — Rendimiento
+
+- Ventana visible en frío: p95 igual o inferior a 1,2 s en el equipo de
+  referencia.
+- Build de frame: p95 igual o inferior a 8 ms en biblioteca y lector.
+- Menos del 1 % de frames supera 16,7 ms en los escenarios de interacción.
+- Consultas de biblioteca e índice: p95 inferior a 20 ms con 5.000 documentos.
+- Cada escenario nuevo conserva como máximo un 10 % de regresión frente a la
+  línea base versionada o documenta y aprueba el intercambio.
+- No se fija un umbral RSS universal; se exigen contadores propios a cero tras
+  cerrar y una tendencia estable durante pruebas sostenidas.
+
+### G4 — Experiencia visual y adaptable
+
+- No existe overflow, recorte accidental ni solapamiento en 1366×768,
+  1600×900, 1920×1080, 1920×1200, 2560×1440 y 3840×2160.
+- Se validan DPI 100, 125, 150, 175 y 200 %.
+- Biblioteca, lector, panel, paleta, ajustes y diálogos tienen evidencia en
+  claro, oscuro y alto contraste cuando corresponda.
+- El PDF conserva escala legible y nunca se estira para rellenar espacio
+  ultrawide.
+
+### G5 — Accesibilidad
+
+- Todos los flujos principales se completan con teclado.
+- Tab y Shift+Tab siguen un orden predecible y Escape devuelve el foco al
+  origen correcto.
+- Narrador anuncia nombre, rol, estado, valor y cambios relevantes una sola vez.
+- Texto normal cumple contraste WCAG AA; foco y componentes no textuales
+  alcanzan 3:1 contra superficies adyacentes.
+- Movimiento reducido elimina animaciones no esenciales sin romper feedback.
+
+### G6 — Privacidad y seguridad
+
+- Un smoke Release confirma cero conexiones TCP/UDP iniciadas por la
+  aplicación.
+- Logs y diagnósticos no contienen rutas, títulos, consultas, contraseñas,
+  texto PDF ni contenido de anotaciones.
+- Enlaces externos requieren confirmación y solo admiten esquemas autorizados.
+- Borrar datos explica exactamente qué se eliminará y nunca borra PDF.
+
+### G7 — Distribución Windows
+
+- Instalación limpia, actualización, reparación, desinstalación y paquete
+  portable tienen procedimientos verificados.
+- Firma, licencias, asociación PDF, argumentos, multi-monitor y rollback se
+  comprueban antes de una release candidate.
+- No quedan P0 o P1 abiertos para publicar 1.0.
+
+## 6. Roadmap detallado
+
+### Fase 0 — Base de calidad y desbloqueos
+
+#### YAM-100 — Gate reproducible de Windows
+
+- Estado: READY
 - Prioridad: P0
-- Estado: DONE
+- Esfuerzo: L
+- Fase: 0
+- Áreas: EFF, REL, WIN
 - Dependencias: ninguna
-- Objetivo: conocer el punto de partida y preparar el toolchain real.
-- Alcance: repositorio, instrucciones, Flutter, Windows y Visual Studio.
-- Criterios de aceptación: estructura e instrucciones inspeccionadas; estado
-  de Flutter, Windows y Visual Studio registrado.
-- Validación: inspección inicial completada; SDK Flutter local instalado y
-  excluido de Git.
-- Archivos relacionados: `README.md`, `NEXT_TODOS.md`, `.gitignore`
-- Riesgos o limitaciones: el SDK local no está añadido al `PATH` global.
-- Notas técnicas: el repositorio inicial no contenía una aplicación funcional.
+- Problema: la validación actual está repartida entre comandos, scripts y
+  documentación; además, una cache incompleta de Pub puede impedir incluso
+  analizar el proyecto.
+- Resultado esperado: cualquier colaborador puede demostrar desde un checkout
+  limpio si Yamantaka está preparado para integrarse o publicarse.
+- Cambios funcionales y técnicos:
+  - Crear un entrypoint PowerShell único con fases independientes y códigos de
+    salida acumulados.
+  - Verificar SDK, Visual Studio, PDFium, dependencias, espacio de disco y
+    permisos antes de compilar.
+  - Ejecutar formato en modo comprobación, análisis, suite, PDFium real,
+    integración Windows, perfil mínimo, build Release y smoke.
+  - Guardar logs y metadatos no privados bajo build/verification.
+- Visual y accesibilidad: el gate ejecutará capturas en resoluciones de
+  referencia y reportará estados ausentes, no los marcará como aprobados.
+- Rendimiento, memoria y privacidad: los informes incluirán tiempos, tamaño del
+  bundle y contadores del motor; excluirán rutas y títulos.
+- Casos límite y errores: offline con cache válida, cache incompleta, SDK
+  distinto, ausencia de toolchain C++, build bloqueado y proceso nativo colgado.
+- Criterios de aceptación:
+  - [ ] Un comando ejecuta todas las fases desde un checkout limpio.
+  - [ ] Cada fase puede repetirse de forma aislada.
+  - [ ] Un fallo devuelve código distinto de cero y conserva diagnóstico.
+  - [ ] El flujo no altera archivos versionados.
+- Validación: ejecución limpia, ejecución offline con cache preparada y tres
+  fallos inyectados: dependencia ausente, test fallido y build fallido.
+- Riesgos y fuera de alcance: no instalará software ni descargará dependencias
+  sin consentimiento; no sustituye CI remota.
 
-### Validación completada
+#### YAM-101 — Matriz nativa de resoluciones y DPI
 
-- [x] Repositorio e instrucciones inspeccionados.
-- [x] Flutter 3.44.8 y Dart 3.12.2 disponibles.
-- [x] Toolchain Windows identificado.
-
-## YAM-002 — Decisiones y diseño inicial
-
+- Estado: PLANNED
 - Prioridad: P0
-- Estado: DONE
-- Dependencias: YAM-001
-- Objetivo: fijar motor, persistencia, estado, paquetes y dirección visual.
-- Alcance: ADR, arquitectura modular, privacidad y primer sistema de diseño.
-- Criterios de aceptación: alternativas, licencias, riesgos y arquitectura
-  documentados antes del visor completo.
-- Validación: ADR-001 a ADR-009 y documentación arquitectónica inspeccionados.
-- Archivos relacionados: `DECISIONS.md`, `DESIGN.md`, `ARCHITECTURE.md`
-- Riesgos o limitaciones: el sistema visual inicial requería centralización.
-- Notas técnicas: `pdfrx`/PDFium queda detrás de contratos propios.
+- Esfuerzo: L
+- Fase: 0
+- Áreas: VIS, A11Y, WIN
+- Dependencias: YAM-100
+- Problema: una captura a un único tamaño no demuestra que la interfaz funcione
+  en los monitores y escalas habituales de PC.
+- Resultado esperado: biblioteca y lector mantienen jerarquía, legibilidad y
+  controles accesibles en ventanas compactas, Full HD, 16:10, 2K y 4K.
+- Cambios funcionales y técnicos:
+  - Crear una matriz ejecutable para 1366×768, 1600×900, 1920×1080,
+    1920×1200, 2560×1440 y 3840×2160.
+  - Repetir los casos a 100/125/150/175/200 % de escala de Windows.
+  - Registrar tamaño físico, tamaño lógico, DPR, tema, densidad y panel.
+  - Cubrir biblioteca vacía/poblada, selección, lector Documento/Libro,
+    fullscreen, ajustes, paleta y diálogos críticos.
+- Visual y accesibilidad: no habrá recortes, objetivos inaccesibles, texto bajo
+  chrome, spreads descentrados ni foco fuera de pantalla.
+- Rendimiento, memoria y privacidad: las capturas usarán fixtures generados;
+  no se guardarán documentos o títulos reales.
+- Casos límite y errores: ventana menor que el mínimo, cambio de DPI en vivo,
+  monitor desconectado, taskbar lateral y panel al ancho máximo.
+- Criterios de aceptación:
+  - [ ] Todos los perfiles tienen resultado y evidencia.
+  - [ ] Full HD y 2K conservan densidad editorial sin huecos arbitrarios.
+  - [ ] 16:10 aprovecha altura sin agrandar el chrome.
+  - [ ] 4K no decodifica imágenes por encima del tamaño físico necesario.
+- Validación: checklist nativo, capturas y recorrido de teclado/Narrador en cada
+  familia de layout.
+- Riesgos y fuera de alcance: no se simulará Narrador mediante widgets; cada
+  DPI real exige cambiar la sesión o el monitor de Windows.
 
-## YAM-003 — Esqueleto multiplataforma
+#### YAM-102 — Regresión visual automatizada
 
+- Estado: PLANNED
 - Prioridad: P0
-- Estado: DONE
-- Dependencias: YAM-002
-- Objetivo: crear la aplicación Flutter y sus servicios base.
-- Alcance: Windows, Android, iOS, configuración, tema, logging y errores.
-- Criterios de aceptación: arranque, composición e interfaces analizadas sin
-  fallos.
-- Validación: `flutter analyze` aprobado el 2026-07-28 y revalidado al inicio
-  de la segunda iteración el 2026-07-29.
-- Archivos relacionados: `lib/app`, `lib/core`, `windows`, `android`, `ios`
-- Riesgos o limitaciones: Android/iOS aún no tienen toolchain validado.
-- Notas técnicas: el nombre visible vive en `AppConfig.productName`.
+- Esfuerzo: L
+- Fase: 0
+- Áreas: VIS, A11Y, REL
+- Dependencias: YAM-100, YAM-101
+- Problema: las revisiones visuales manuales detectan problemas, pero no
+  protegen cada cambio posterior ni garantizan fixtures equivalentes.
+- Resultado esperado: los cambios de layout, tokens o estados producen
+  diferencias revisables y reproducibles antes de integrarse.
+- Cambios funcionales y técnicos:
+  - Definir fixtures deterministas sin copyright para todos los estados.
+  - Separar capturas de widgets, integración PDFium y ventana Release.
+  - Normalizar tamaño, DPR, fuentes, animaciones, reloj y datos.
+  - Generar manifiesto con escenario, commit, resolución, tema y tolerancia.
+  - Mantener baselines explícitos y requerir aprobación para actualizarlos.
+- Visual y accesibilidad: incluir foco visible, texto largo, alto contraste,
+  movimiento reducido y estados que no dependan solo del color.
+- Rendimiento, memoria y privacidad: ejecutar escenarios de captura fuera del
+  benchmark; los fixtures nunca usarán rutas o contenido privado.
+- Casos límite y errores: fuente no disponible, banner de debug, ventana host,
+  animación incompleta y diferencia por subpíxel.
+- Criterios de aceptación:
+  - [ ] Una diferencia no aprobada falla el gate.
+  - [ ] Cada baseline identifica su escenario y configuración.
+  - [ ] Las tolerancias no ocultan cambios de geometría o contraste.
+  - [ ] El proceso distingue artefactos del host de la UI de Yamantaka.
+- Validación: modificar de forma controlada un token, un texto y una geometría;
+  confirmar detección y restaurar baseline.
+- Riesgos y fuera de alcance: las capturas no sustituyen Narrador, percepción
+  humana ni pruebas de interacción.
 
-## YAM-004 — SQLite y biblioteca funcional
+#### YAM-103 — Corpus legal de PDF patológicos
 
+- Estado: PLANNED
 - Prioridad: P0
-- Estado: DONE
-- Dependencias: YAM-003
-- Objetivo: mantener biblioteca, historial y progreso exclusivamente en local.
-- Alcance: cinco tablas, migración, recientes, ausentes, continuar y portadas.
-- Criterios de aceptación: repositorios probados; documentos sin duplicados;
-  portada invalidada cuando cambia la huella.
-- Validación: pruebas SQLite y widgets aprobadas dentro de las 34 pruebas
-  históricas.
-- Archivos relacionados: `lib/storage`, `lib/features/library`,
-  `test/database_repositories_test.dart`, `test/library_widgets_test.dart`
-- Riesgos o limitaciones: la relocalización avanzada sigue siendo manual.
-- Notas técnicas: identidad mediante ruta normalizada, tamaño, fecha y hash
-  parcial.
+- Esfuerzo: L
+- Fase: 0
+- Áreas: FUNC, PERF, REL
+- Dependencias: YAM-100
+- Problema: los fixtures pequeños no cubren documentos que fuerzan memoria,
+  parser, render, búsqueda o recuperación.
+- Resultado esperado: errores y documentos extremos se manejan sin bloqueo,
+  fuga, pérdida de estado ni mensajes ambiguos.
+- Cambios funcionales y técnicos:
+  - Generar PDF vacío, corrupto, truncado, cifrado, 1.000 páginas, página
+    raster extrema, vectorial pesada, tamaños mixtos, rotaciones y enlaces.
+  - Versionar generadores y hashes, no binarios grandes salvo necesidad.
+  - Definir resultado esperado para apertura, render, texto, búsqueda y cierre.
+  - Añadir límites de tiempo, memoria y tamaño de imagen por escenario.
+- Visual y accesibilidad: cada fallo tendrá título, explicación, acción segura
+  y foco inicial/restaurado.
+- Rendimiento, memoria y privacidad: corpus sintético, sin copyright; todos los
+  recursos propios deben quedar a cero al cerrar.
+- Casos límite y errores: contraseña incorrecta, contraseña cancelada, cero
+  páginas, página de dimensiones inválidas y operación cancelada a mitad.
+- Criterios de aceptación:
+  - [ ] Cada familia de PDF tiene generador, hash y expectativa.
+  - [ ] Ningún caso bloquea indefinidamente el hilo UI.
+  - [ ] Corrupción no registra contenido ni provoca crash del proceso.
+  - [ ] Cierre posterior conserva contadores de lifecycle a cero.
+- Validación: suite PDFium real, integración Windows y repetición de apertura y
+  cierre de cada fixture.
+- Riesgos y fuera de alcance: no es fuzzing de seguridad exhaustivo ni valida
+  todos los productores PDF existentes.
 
-## YAM-005 — Apertura y motor PDF
+#### YAM-104 — Auditoría de ownership y ciclo de vida
 
+- Estado: READY
 - Prioridad: P0
-- Estado: DONE
-- Dependencias: YAM-003
-- Objetivo: abrir, renderizar e inspeccionar PDF reales sin bloquear la UI.
-- Alcance: selector, drop, argumento, PDFium, texto, búsqueda, índice y enlaces.
-- Criterios de aceptación: PDF real visible; cierre libera el documento;
-  errores y contraseña tipados.
-- Validación: bitmap, `ui.Image`, lectura de píxeles, pintura y cierre aprobados
-  en Windows.
-- Archivos relacionados: `lib/pdf_engine`, `lib/features/reader`,
-  `test/pdf_engine_real_test.dart`, `integration_test/reader_integration_test.dart`
-- Riesgos o limitaciones: parche local temporal documentado en YAM-014.
-- Notas técnicas: PDFium se consume exclusivamente mediante
-  `PdfDocumentEngine`/`PdfViewerAdapter`.
+- Esfuerzo: L
+- Fase: 0
+- Áreas: EFF, PERF, REL
+- Dependencias: ninguna
+- Problema: la aplicación combina controladores Flutter, handles PDFium,
+  imágenes, caches, listeners, timers y trabajos asíncronos con propietarios
+  distintos.
+- Resultado esperado: cada recurso tiene un único propietario, un punto de
+  cierre y una política clara para cambios de documento, ventana o sesión.
+- Cambios funcionales y técnicos:
+  - Inventariar creación, transferencia y dispose de recursos.
+  - Documentar ownership entre AppServices, controlador de lector, adaptadores,
+    caches, paneles y ventanas.
+  - Añadir aserciones y contadores de debug para recursos vivos.
+  - Eliminar listeners duplicados y callbacks que sobrevivan a su superficie.
+- Visual y accesibilidad: cerrar o cambiar documento no dejará overlays,
+  anuncios o foco ligados al contexto anterior.
+- Rendimiento, memoria y privacidad: el cierre debe cancelar trabajo obsoleto y
+  liberar recursos propios; el diagnóstico no incluirá identificadores privados.
+- Casos límite y errores: cierre durante render, búsqueda, importación,
+  thumbnail, backup, resize o reapertura de sesión.
+- Criterios de aceptación:
+  - [ ] Todo recurso inventariado tiene propietario y cierre.
+  - [ ] No existe dispose doble de una imagen prestada.
+  - [ ] Cien ciclos de abrir/cerrar terminan con contadores propios a cero.
+  - [ ] Callbacks tardíos no actualizan controladores ya separados.
+- Validación: tests de lifecycle, integración repetida y perfil de handles.
+- Riesgos y fuera de alcance: el RSS del runtime puede no volver al baseline;
+  se medirán recursos propios y tendencia sostenida.
 
-## YAM-006 — Navegación y restauración
+#### YAM-105 — Coordinador único de trabajos asíncronos
 
+- Estado: PLANNED
 - Prioridad: P0
-- Estado: DONE
-- Dependencias: YAM-004, YAM-005
-- Objetivo: conservar continuidad de lectura entre sesiones.
-- Alcance: anterior/siguiente, página, zoom, ajuste, disposición, rotación y
-  scroll relativo.
-- Criterios de aceptación: página, zoom y offset persistidos con debounce y
-  restaurados.
-- Validación: widgets verifican persistencia; integración nativa verifica
-  zoom, avance, retroceso, cierre y reapertura.
-- Archivos relacionados: `lib/features/reader`,
-  `test/reader_widgets_test.dart`, `integration_test/reader_integration_test.dart`
-- Riesgos o limitaciones: el offset es una fracción aproximada, no una
-  coordenada tipográfica.
-- Notas técnicas: la escritura no ocurre por cada píxel.
+- Esfuerzo: XL
+- Fase: 0
+- Áreas: FUNC, EFF, PERF, REL
+- Dependencias: YAM-104
+- Problema: importación, portadas, renders, búsqueda, indexación, backup y
+  recuperación tienen colas y tokens relacionados pero no una política común.
+- Resultado esperado: el trabajo visible gana prioridad, el obsoleto se
+  cancela y el usuario entiende qué sigue activo.
+- Cambios funcionales y técnicos:
+  - Diseñar un contrato de trabajo con identidad, categoría, prioridad,
+    generación, progreso, cancelación y limpieza.
+  - Deduplicar por clave estable y compartir resultados solo entre consumidores
+    todavía válidos.
+  - Limitar concurrencia por CPU, IO, PDFium y memoria.
+  - Integrar primero portadas, miniaturas e índice antes de migrar otros flujos.
+- Visual y accesibilidad: progreso y cancelación se anuncian sin banners
+  repetidos; los trabajos de fondo no roban foco.
+- Rendimiento, memoria y privacidad: no persistir consultas, rutas o contenido
+  dentro de la cola; pausar trabajo no esencial bajo presión.
+- Casos límite y errores: consumidor cancelado de un trabajo compartido,
+  prioridad que cambia, cierre de app y fallo de cleanup.
+- Criterios de aceptación:
+  - [ ] Ningún resultado obsoleto actualiza la UI.
+  - [ ] Trabajos iguales no duplican CPU, IO ni imagen.
+  - [ ] Cancelar una vista no invalida consumidores todavía activos.
+  - [ ] El diagnóstico muestra solo categoría, tiempos y contadores.
+- Validación: pruebas de orden, deduplicación, cancelación, fairness y cierre;
+  integración con al menos tres categorías.
+- Riesgos y fuera de alcance: debe dividirse antes de IN_PROGRESS; no se
+  construirá un framework genérico ajeno a las necesidades de Yamantaka.
+
+#### YAM-106 — Retirada controlada del parche local de pdfrx
 
-## YAM-007 — Modo libro
-
-- Prioridad: P0
-- Estado: REVIEW
-- Dependencias: YAM-006
-- Objetivo: ofrecer una lectura silenciosa, adaptable y prolongada.
-- Alcance: una/dos páginas, portada sola, LTR/RTL, seis canvas, márgenes,
-  laterales, ocultación y pantalla completa.
-- Criterios de aceptación: todos los modos funcionales y evidencia visual
-  nativa en tamaños/DPI representativos.
-- Validación: navegación pura y widgets aprobados para 1/2/par/impar,
-  Documento↔Libro, teclado completo y campos de texto; integración Windows
-  2026-07-30 con PDFium real confirma por píxeles portada/pliego centrados, lomo
-  compacto, zoom mínimo, ajuste, fullscreen y transición 1→2–3.
-- Archivos relacionados: `lib/features/reader/presentation`,
-  `lib/pdf_engine/presentation/reader_viewport_metrics.dart`,
-  `test/reader_models_test.dart`, `test/reader_viewport_metrics_test.dart`,
-  `test/reader_widgets_test.dart`, `integration_test/reader_integration_test.dart`,
-  `docs/screenshots`
-- Riesgos o limitaciones: falta matriz nativa manual a 100/150/200 % y Narrador;
-  125 % ya tenía inspección de la iteración visual anterior.
-- Notas técnicas: `ReadingUnitNavigation` centraliza índices/indicadores y
-  `ReaderViewportMetrics` layout/fit/centrado/paneo. No cambia a `DONE` hasta
-  completar YAM-041.
-
-### Subtareas
-
-- [x] Compactar y centrar portada/pliegos con lomo acotado y bordes alineados.
-- [x] Unificar navegación visible/teclado y mostrar `2–3 / total`.
-- [x] Normalizar zoom, paneo, ajuste y resize contra la unidad activa.
-- [x] Probar dominio, widgets y PDFium real con aserciones por píxeles.
-- [ ] Completar DPI nativo 100/150/200 % y Narrador mediante YAM-041.
-
-## YAM-008 — Búsqueda, panel y marcadores
-
-- Prioridad: P0
-- Estado: DONE
-- Dependencias: YAM-004, YAM-005
-- Objetivo: localizar contenido y conservar puntos de lectura.
-- Alcance: búsqueda cancelable, navegación de resultados, panel único y
-  marcadores con etiqueta.
-- Criterios de aceptación: búsqueda PDFium y persistencia SQLite recuperable.
-- Validación: búsquedas, cancelación, documento sin texto y marcador restaurado
-  están cubiertos por pruebas.
-- Archivos relacionados: `lib/features/search`, `lib/features/bookmarks`,
-  `lib/features/reader/presentation/reader_side_panel.dart`
-- Riesgos o limitaciones: no existe OCR.
-- Notas técnicas: el panel muestra una sola sección cada vez.
-
-## YAM-009 — Comandos, atajos y ajustes
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-006
-- Objetivo: centralizar entrada y preferencias sin recargar la interfaz.
-- Alcance: registro de comandos, atajos, `Ctrl+K`, apariencia, lectura, caché y
-  privacidad.
-- Criterios de aceptación: atajos solicitados, preferencias persistentes y
-  perfil de tinta electrónica tipado.
-- Validación: registro, filtrado/ejecución de paleta y ajustes globales
-  aprobados por pruebas.
-- Archivos relacionados: `lib/app/shortcuts`,
-  `lib/features/command_palette`, `lib/features/settings`
-- Riesgos o limitaciones: la personalización se limita deliberadamente a
-  opciones prevalidadas; no existe captura arbitraria de teclas.
-- Notas técnicas: idioma, geometría de ventana y overrides JSON también se
-  persisten; YAM-037 documenta la ampliación.
-
-## YAM-010 — Pruebas automáticas
-
-- Prioridad: P0
-- Estado: DONE
-- Dependencias: YAM-004 a YAM-009
-- Objetivo: proteger dominio, persistencia, widgets y flujo PDF nativo.
-- Alcance: unitarias, widgets, PDFium real e integración Windows.
-- Criterios de aceptación: suite estándar e integración aprobadas sin fixtures
-  con copyright.
-- Validación: línea base de 34 pruebas preservada y ampliada a 66; captura con
-  píxeles reales e integración revalidadas el 2026-07-29.
-- Archivos relacionados: `test`, `integration_test`, `TESTING.md`
-- Riesgos o limitaciones: la matriz visual amplia solo está automatizada en
-  parte; DPI y tecnología asistiva siguen siendo manuales.
-- Notas técnicas: el PDF textual y el AES-128 se generan de forma controlada.
-
-### Validación completada
-
-- [x] `flutter analyze`.
-- [x] Pruebas unitarias.
-- [x] Pruebas de widgets.
-- [x] Integración nativa Windows.
-- [x] PDF corrupto, vacío y contraseña real.
-
-## YAM-011 — Rendimiento y caché
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-005
-- Objetivo: limitar recursos y medir sesiones reales.
-- Alcance: LRU por bytes, render bajo demanda, deduplicación, cancelación y
-  métricas.
-- Criterios de aceptación: cachés probadas y mediana/p95/memoria con PDF largo.
-- Validación: cinco pasadas Windows/Profile con PDF de 100 páginas y fixture
-  vectorial pesado; mediana/p95, frames, RSS, caché, deduplicación y cierre
-  registrados el 2026-07-29 en `PERFORMANCE.md`.
-- Archivos relacionados: `lib/pdf_engine/cache`, `PERFORMANCE.md`
-- Riesgos o limitaciones: una página extrema puede superar temporalmente el
-  presupuesto; todavía no hay teselas.
-- Notas técnicas: el RSS mínimo tras volver a biblioteca quedó 3,1 MiB por
-  debajo del pico, aunque el asignador del sistema no vuelve a la línea base;
-  una página extrema continúa justificando una futura evaluación de teselas.
-
-## YAM-012 — Validación Windows del primer hito
-
-- Prioridad: P0
-- Estado: DONE
-- Dependencias: YAM-003 a YAM-010
-- Objetivo: demostrar que el MVP se compila y ejecuta en el destino principal.
-- Alcance: doctor, análisis, tests, integración, Release y smoke.
-- Criterios de aceptación: ejecutable receptivo con PDF real, persistencia local
-  y sin conexiones TCP.
-- Validación: Build Tools 2022 17.14.37, SDK 10.0.26100.0, 34 pruebas,
-  integración, captura y Release aprobados.
-- Archivos relacionados: todo el repositorio, `TESTING.md`, `PERFORMANCE.md`
-- Riesgos o limitaciones: no equivale a la matriz ampliada de YAM-015.
-- Notas técnicas: Modo de desarrollador de Windows activo.
-
-## YAM-013 — Validación móvil
-
-- Prioridad: P2
-- Estado: TODO
-- Dependencias: YAM-012
-- Objetivo: comprobar compilación, entrada y almacenamiento en Android/iOS.
-- Alcance: Android/tables Android; iOS/iPadOS en macOS.
-- Criterios de aceptación: build y ejecución por plataforma, permisos y flujo
-  táctil verificados.
-- Validación: no ejecutada.
-- Archivos relacionados: `android`, `ios`, `ROADMAP.md`
-- Riesgos o limitaciones: Android SDK ausente; iOS requiere macOS/Xcode.
-- Notas técnicas: no declarar soporte validado antes de disponer del toolchain.
-
-## YAM-014 — Retirar parche local de pdfrx
-
-- Prioridad: P1
-- Estado: TODO
-- Dependencias: versión upstream corregida de `pdfrx`
-- Objetivo: volver al paquete hospedado sin recuperar la pantalla en blanco.
-- Alcance: eliminar `third_party/pdfrx`, restaurar lockfile y repetir gates.
-- Criterios de aceptación: análisis, suite vigente, integración, captura de
-  píxeles y Release aprobados con upstream.
-- Validación: no ejecutable hasta que exista una versión candidata.
-- Archivos relacionados: `third_party/pdfrx`, `pubspec.yaml`, `pubspec.lock`,
-  `DECISIONS.md`
-- Riesgos o limitaciones: divergencia de upstream.
-- Notas técnicas: el parche MIT mantiene el codec hasta `getNextFrame()` y
-  reporta errores antes silenciados. En esta iteración se eliminó además una
-  traza de upstream que exponía la ruta local; retirar el fork sigue dependiendo
-  de una versión hospedada validable.
-
-## YAM-015 — Endurecimiento Windows ampliado
-
-- Prioridad: P1
-- Estado: TODO
-- Dependencias: YAM-011, YAM-012
-- Objetivo: validar entradas, DPI, accesibilidad y memoria más allá del smoke.
-- Alcance: escaneado, grande, Unicode/ruta larga, selector/drop, modos, atajos,
-  DPI, lector de pantalla, limpieza y relocalización.
-- Criterios de aceptación: matriz registrada con equipo, build, documentos,
-  mediana y p95 reales.
-- Validación: corrupto, vacío, contraseña y smoke pequeño ya cubiertos; resto
-  pendiente.
-- Archivos relacionados: `TESTING.md`, `PERFORMANCE.md`, `docs/screenshots`
-- Riesgos o limitaciones: necesita PDFs controlados y tiempo de prueba manual.
-- Notas técnicas: no mezclar evidencia automatizada con validación manual.
-
-## YAM-016 — Empaquetado y firma de Windows
-
-- Prioridad: P2
-- Estado: TODO
-- Dependencias: YAM-015
-- Objetivo: preparar una distribución verificable.
-- Alcance: MSIX o instalador ligero, identidad, firma, instalación y
-  desinstalación.
-- Criterios de aceptación: paquete firmado; conservación/eliminación optativa
-  de datos probada.
-- Validación: no ejecutada.
-- Archivos relacionados: `windows`, `README.md`, `DECISIONS.md`, `PRIVACY.md`
-- Riesgos o limitaciones: requiere certificado y decisión de distribución.
-- Notas técnicas: el bundle actual no está firmado y no es una publicación.
-
-## YAM-017 — Sistema visual de segunda generación
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-007, YAM-009, YAM-012
-- Objetivo: crear un sistema coherente, moderno, minimalista y reutilizable.
-- Alcance: `DESIGN.md`, tokens, tipografía, color, bordes, iconografía,
-  densidades, claro/oscuro y seis canvas de lectura.
-- Criterios de aceptación: tokens documentados/aplicados; interfaz coherente;
-  capturas en varios anchos; análisis y pruebas aprobados.
-- Validación: línea base de 34 pruebas y capturas 1200/700; revalidada con 66
-  pruebas, integración Windows, Profile, Release y capturas contextuales.
-- Archivos relacionados: `DESIGN.md`, `lib/app/theme`, componentes visuales,
-  `docs/screenshots`
-- Riesgos o limitaciones: contraste formal y DPI distintos de 125 % continúan
-  en YAM-022.
-- Notas técnicas: no se añaden paquetes visuales.
-
-### Subtareas
-
-- [x] Reescribir `DESIGN.md`.
-- [x] Centralizar colores, espacios, tamaños, radios y movimiento.
-- [x] Aplicar claro/oscuro y fallback de tinta electrónica.
-- [x] Corregir política responsive 900/999.
-- [x] Capturar y revisar resultados finales.
-
-## YAM-018 — Refinamiento visual de la biblioteca
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-017
-- Objetivo: hacer de la biblioteca una entrada editorial centrada en continuar.
-- Alcance: encabezado, continuar, recientes, portadas, vacío, carga, error y
-  ausentes.
-- Criterios de aceptación: continuar dominante; abrir localizable; teclado;
-  composición estrecha; lista sin tarjetas; miniaturas progresivas.
-- Validación: widgets a 420/679/680/1099/1100 px, estado ausente, cambiado,
-  vacío, filtro recuperable, `Ctrl+F`, acción de información y selector por
-  estado; capturas ancha/compacta/claro/oscuro a 125 %. Falta recorrido nativo
-  completo por Tab/Shift+Tab y Narrador.
-- Archivos relacionados: `lib/features/library/presentation`,
-  `test/library_widgets_test.dart`, `docs/screenshots`
-- Riesgos o limitaciones: las portadas asíncronas no deben bloquear la carga.
-- Notas técnicas: la segunda generación elimina tarjetas elevadas y mantiene
-  la acción principal en el app bar y el bloque editorial.
-
-### Subtareas
-
-- [x] Composición editorial expandida.
-- [x] Variante compacta deliberada.
-- [x] Estados carga/vacío/error/ausente.
-- [x] Pruebas de overflow.
-- [ ] Recorrido manual completo de foco y teclado.
-
-## YAM-019 — Refinamiento visual del lector
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-017
-- Objetivo: reducir ruido y aumentar la sensación de lectura.
-- Alcance: barra, navegación, zoom, progreso, modos, controles contextuales,
-  fullscreen y ocultación.
-- Criterios de aceptación: PDF dominante; acciones accesibles; modo libro
-  desaparece; fluidez/memoria sin regresión significativa.
-- Validación: pruebas de widgets a seis anchos, reglas de legibilidad y e-ink;
-  integración Windows del lector completo con PDFium; capturas de documento,
-  búsqueda y paleta; smoke Release sin regresión observada.
-- Archivos relacionados: `lib/features/reader/presentation`,
-  `lib/pdf_engine/adapters/pdfrx_viewer_adapter.dart`, pruebas/capturas
-- Riesgos o limitaciones: overlays no deben desplazar ni bloquear el PDF.
-- Notas técnicas: la vista enfrentada conserva portada y dirección actuales.
-
-### Subtareas
-
-- [x] Barra superior adaptable.
-- [x] Control inferior compacto.
-- [x] Política legible de vista enfrentada.
-- [x] Sombra según canvas/e-ink.
-
-## YAM-020 — Paneles, diálogos y paleta de comandos
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-017
-- Objetivo: unificar superficies temporales y su foco.
-- Alcance: panel, búsqueda, marcadores, índice, miniaturas, paleta, diálogos,
-  menús y tooltips.
-- Criterios de aceptación: una capa secundaria; dimensiones coherentes; Escape;
-  foco restaurado; teclado completo; movimiento reducido.
-- Validación: búsqueda, panel redimensionable y paleta capturados con PDFium
-  real; arriba/abajo/Enter/Escape, foco inicial, sección única y movimiento
-  reducido probados. Falta recorrido nativo completo de Tab y restauración de
-  foco con Narrador.
-- Archivos relacionados: `reader_side_panel.dart`, `command_palette.dart`,
-  tema y pruebas
-- Riesgos o limitaciones: el foco de Flutter/Windows requiere validación nativa.
-- Notas técnicas: la selección explícita vive en la paleta; los paneles
-  compacto/medio usan scrim y restituyen el foco solicitado antes de abrir.
-
-### Subtareas
-
-- [x] Panel responsive con scrim.
-- [x] Selección/Enter/arriba/abajo en paleta.
-- [x] Diálogos y tooltips tematizados.
-- [x] Escape automatizado.
-- [ ] Tabulación, foco restaurado y lector de pantalla en Windows.
-
-## YAM-021 — Estados visuales y retroalimentación
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-017
-- Objetivo: explicar operaciones y errores sin añadir ruido.
-- Alcance: carga, apertura, render, búsqueda, vacío, sin texto, ausente, error,
-  contraseña y avisos reversibles.
-- Criterios de aceptación: feedback inmediato; mensajes accionables; color no
-  exclusivo; sin spinner indefinido sin contexto.
-- Validación: pruebas de biblioteca vacía/ausente, lector en error, búsqueda
-  vacía/con resultado, perfil e-ink e integración real; contraseña real
-  validada en motor y diálogo actualizado con error contextual.
-- Archivos relacionados: biblioteca, lector, panel, `app.dart`, pruebas
-- Riesgos o limitaciones: demasiados avisos pueden competir con la lectura.
-- Notas técnicas: los `AppFailure` existentes se conservan.
-
-### Subtareas
-
-- [x] Sustituir spinners aislados por estados con texto y geometría estable.
-- [x] Diferenciar vacío, ausente, sin texto, sin resultados y error.
-- [x] Añadir acción recuperable cuando existe.
-- [x] Mantener feedback local mediante snackbars.
-
-## YAM-022 — Validación visual y regresión
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-017 a YAM-021
-- Objetivo: validar sistemáticamente la calidad visual.
-- Alcance: capturas, DPI 100/125/150/200 %, tres anchos, claro/oscuro, seis
-  canvas, texto, foco, contraste y movimiento reducido.
-- Criterios de aceptación: matriz en `docs/screenshots`; sin overflow, cortes,
-  saltos ni controles inaccesibles; golden tests solo donde sean estables.
-- Validación: capturas a 125 % en ancho compacto/ancho y tema claro/oscuro;
-  integración a DPR 1 para lector/búsqueda/paleta/modo libro; fronteras,
-  overflow, movimiento reducido y contraste WCAG AA automatizable aprobados.
-  Quedan DPI nativo 100/150/200 %, matriz comparable de seis canvas y Narrador.
-- Archivos relacionados: `docs/screenshots`, `TESTING.md`, pruebas visuales
-- Riesgos o limitaciones: DPR simulado no sustituye DPI nativo de Windows.
-- Notas técnicas: `TESTING.md` registra entorno/método y
-  `tool/capture_windows_window.ps1` evita virtualización DPI.
-
-### Subtareas
-
-- [x] Capturas de Biblioteca, lector, búsqueda, paleta y Ajustes.
-- [x] Claro/oscuro y responsive automatizado.
-- [x] Captura nativa a 125 %.
-- [ ] DPI nativo 100/150/200 %.
-- [x] Contraste formal de pares semánticos.
-- [ ] Seis canvas comparables y lector de pantalla.
-
-## YAM-023 — Preparación visual para tablet
-
-- Prioridad: P2
-- Estado: REVIEW
-- Dependencias: YAM-017, YAM-019
-- Objetivo: separar composición de escritorio y táctil.
-- Alcance: breakpoints, 48 × 48, controles inferiores, orientación, gestos,
-  página única y enfrentada horizontal.
-- Criterios de aceptación: nada esencial depende de hover; navegación
-  independiente de entrada; composición cambia sin duplicar dominio.
-- Validación: breakpoints, política de página única/enfrentada, controles
-  compactos y ausencia de dependencia funcional de hover probados en widgets;
-  dispositivo/emulador y orientación real pendientes.
-- Archivos relacionados: tema, presentación del lector, `android`
-- Riesgos o limitaciones: no declarar UX táctil validada desde Windows.
-- Notas técnicas: la segunda generación deja tokens de 48 px y política
-  preparada sin afirmar UX táctil validada.
-
-### Subtareas
-
-- [x] Separar clase de ventana y dominio de navegación.
-- [x] Mantener acciones esenciales fuera de hover.
-- [x] Preparar control de 48 × 48 y composición compacta.
-- [ ] Validar táctil, gestos y orientaciones en dispositivo/emulador.
-
-## YAM-024 — Perfil de tinta electrónica completo
-
-- Prioridad: P2
-- Estado: TODO
-- Dependencias: YAM-013, YAM-023
-- Objetivo: convertir el perfil tipado en experiencia e-ink verificada.
-- Alcance: cero animación, alto contraste, opacidad plena, página única,
-  navegación paginada, refresco completo y botones físicos.
-- Criterios de aceptación: comportamiento medido en dispositivo o emulador
-  apropiado.
-- Validación: no ejecutada; no debe implementarse completamente sin hardware.
-- Archivos relacionados: ajustes, lector, Android, documentación
-- Riesgos o limitaciones: refresco y botones dependen del fabricante.
-- Notas técnicas: esta iteración solo puede reforzar el fallback visual
-  estándar sin simular capacidades físicas.
-
-### Subtareas
-
-- [x] Forzar canvas blanco, página única, cero sombra y movimiento reducido.
-- [x] Probar el fallback a nivel de configuración del visor.
-- [ ] Medir refresco completo y ghosting.
-- [ ] Mapear botones físicos por fabricante.
-- [ ] Validar en hardware o emulador e-ink apropiado.
-
-## YAM-025 — Biblioteca instantánea y orientada a teclado
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-018
-- Objetivo: localizar y ordenar documentos sin abandonar la biblioteca ni
-  introducir una base de búsqueda secundaria.
-- Alcance: filtro local por título, autor y archivo; orden por última apertura,
-  título y progreso; contador de resultados; estado vacío recuperable; acceso
-  directo con `Ctrl+F`.
-- Criterios de aceptación: filtrado y orden deterministas; el foco llega al
-  campo desde teclado; limpiar restaura la lista; cero consultas de red o
-  escrituras adicionales; composición sin overflow en 420/680/1100 px.
-- Validación: filtro/orden cubiertos por pruebas deterministas; `Ctrl+F`, foco,
-  limpiar y estado sin coincidencias aprobados en widgets; composición
-  comprobada a 420/680/1100 px y capturada en Release ancho/compacto.
-- Archivos relacionados: biblioteca, comandos, pruebas de widgets
-- Riesgos o limitaciones: la biblioteca conserva un máximo de 40 recientes, por
-  lo que el filtrado en memoria es más simple y rápido que crear otro índice.
-- Notas técnicas: normalización local insensible a mayúsculas; no se registra
-  ni persiste el texto buscado.
-
-### Subtareas
-
-- [x] Añadir filtro y orden responsive.
-- [x] Añadir `Ctrl+F`, limpiar y estado sin coincidencias.
-- [x] Cubrir dominio, teclado y fronteras responsive.
-
-## YAM-026 — Densidad de interfaz adaptable y persistente
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-017, YAM-018
-- Objetivo: permitir una interfaz cómoda o compacta sin duplicar componentes ni
-  reducir la legibilidad del documento.
-- Alcance: preferencia tipada, persistencia, tokens de densidad, tema Material,
-  filas de biblioteca y ajustes.
-- Criterios de aceptación: cambio inmediato y reversible; controles esenciales
-  conservan un objetivo mínimo de 40 px en escritorio; la preferencia sobrevive
-  al reinicio; el lector no cambia el tamaño del contenido PDF.
-- Validación: preferencia tipada guardada/restaurada y fallback probado; tokens
-  cómoda/compacta aplicados a tema, biblioteca y ajustes; objetivo de 40 px
-  protegido por prueba y PDF no modificado por la densidad.
-- Archivos relacionados: tema, ajustes, persistencia, biblioteca, pruebas
-- Riesgos o limitaciones: densidad compacta no equivale a escala tipográfica ni
-  debe aplicarse como zoom al documento.
-- Notas técnicas: usar `ThemeExtension` y constantes; ninguna dependencia
-  visual nueva.
-
-### Subtareas
-
-- [x] Modelar y persistir densidad cómoda/compacta.
-- [x] Aplicar tokens compartidos a superficies frecuentes.
-- [x] Verificar objetivos, tema y restauración.
-
-## YAM-027 — Portadas y listas con presupuesto de memoria
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-011, YAM-018
-- Objetivo: mantener la biblioteca fluida evitando decodificar miniaturas por
-  encima de su tamaño visible.
-- Alcance: `cacheWidth`/`cacheHeight` según DPR, calidad de filtrado apropiada,
-  aislamiento de repintado, lista virtualizada y ausencia de efectos costosos.
-- Criterios de aceptación: cada portada solicita un bitmap acotado por su caja
-  física; fallos siguen mostrando fallback; no se añade caché paralela; la lista
-  continúa usando slivers con extensión conocida cuando sea aplicable.
-- Validación: `ResizeImage` solicita 88×120 px para una portada visible de
-  44×60 a DPR 2; calidad baja, fallback, `RepaintBoundary` y slivers
-  preservados; integración y Release aprobados.
-- Archivos relacionados: biblioteca, caché de portadas, pruebas de widgets
-- Riesgos o limitaciones: el motor conserva la caché de archivo existente; esta
-  tarea limita la imagen decodificada en memoria de interfaz.
-- Notas técnicas: priorizar `FilterQuality.low` para miniaturas pequeñas.
-
-### Subtareas
-
-- [x] Acotar decodificación por DPR.
-- [x] Aislar repintado de portadas.
-- [x] Añadir una prueba que proteja el presupuesto.
-
-## YAM-028 — Interacción coherente con foco y movimiento reducido
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-020, YAM-025
-- Objetivo: hacer predecibles las superficies temporales y la búsqueda para
-  teclado y perfiles sin animación.
-- Alcance: foco inicial, Escape, anuncios semánticos de resultados, navegación
-  de la paleta sin animación cuando se solicita y tooltips de atajos.
-- Criterios de aceptación: ninguna animación programática permanece en la
-  paleta con movimiento reducido; resultados y estados vacíos tienen semántica;
-  teclado y ratón ejecutan la misma acción.
-- Validación: foco local y `Ctrl+F` aprobados; contador semántico y estado vacío
-  implementados; scroll de paleta inmediato con movimiento reducido, Escape y
-  ejecución por teclado conservados; transición global de tema queda en cero.
-- Archivos relacionados: paleta, biblioteca, lector, pruebas de widgets
-- Riesgos o limitaciones: la validación con lector de pantalla nativo sigue
-  perteneciendo a YAM-020/YAM-022.
-- Notas técnicas: no simular tecnología asistiva nativa con una prueba widget.
-
-### Subtareas
-
-- [x] Propagar movimiento reducido a la paleta.
-- [x] Completar foco y semántica de búsqueda.
-- [x] Probar navegación sin animación y restauración funcional.
-
-## YAM-029 — Presupuesto de regresión para interfaz ligera
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-025 a YAM-028
-- Objetivo: impedir que las mejoras visuales degraden tamaño, reconstrucciones o
-  estabilidad responsive.
-- Alcance: gates de formato/análisis/tests, ausencia de nuevas dependencias,
-  límites de recientes/miniaturas, fronteras de ancho y build Release.
-- Criterios de aceptación: suite completa aprobada; build Release aprobado; sin
-  overflow; ninguna dependencia de producción nueva; documentación registra
-  decisiones y límites verificables.
-- Validación: formato, análisis, 66 pruebas, integración Windows con PDFium,
-  perfil y Release aprobados; bundle de 19 archivos y 39,19 MiB; `pubspec.yaml` y
-  `pubspec.lock` sin cambios; capturas Release revisadas sin overflow.
-- Archivos relacionados: `pubspec.yaml`, pruebas, `TESTING.md`,
-  `PERFORMANCE.md`, `DECISIONS.md`
-- Riesgos o limitaciones: el perfil actual cubre 100 páginas y carga vectorial;
-  1000 páginas, DPI múltiples y GPU distintas continúan en YAM-015/YAM-046.
-- Notas técnicas: los gates funcionales no se presentan como benchmark.
-
-### Subtareas
-
-- [x] Ampliar pruebas focalizadas.
-- [x] Ejecutar gates completos y Release.
-- [x] Registrar tamaño y ausencia de dependencias nuevas.
-
-## YAM-030 — Biblioteca por estado de lectura
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-025
-- Objetivo: encontrar con rapidez qué empezar, continuar o terminar sin
-  convertir la biblioteca en un gestor pesado.
-- Alcance: filtros `Todos`, `En curso`, `Sin empezar` y `Terminados`; recuentos
-  locales; combinación con texto/orden; persistencia opcional del último filtro.
-- Criterios de aceptación: clasificación derivada del progreso existente; una
-  sola pasada sobre un máximo de 40 recientes; teclado completo; estado vacío
-  recuperable; sin nuevas tablas ni dependencias.
-- Validación: evaluación combinada texto/estado/orden y recuentos probada; el
-  selector funciona a 420/680/1100 px, expone semántica, conserva el estado y
-  no conserva la consulta; capturas Windows claro/oscuro inspeccionadas.
-- Archivos relacionados: `library_screen.dart`,
-  `app_settings_repository.dart`, pruebas y capturas de biblioteca
-- Riesgos o limitaciones: el 100 % es una señal de navegación, no una
-  certificación de que la persona terminó de leer.
-- Notas técnicas: una sola iteración filtra texto y cuenta estados; solo se
-  ordena la lista resultante. El bloque Continuar excluye 0 %, 100 % y ausentes.
-
-### Subtareas
-
-- [x] Modelar filtros combinables y estables.
-- [x] Diseñar selector responsive sin aumentar el app bar.
-- [x] Probar combinaciones, foco, semántica y 420/680/1100 px.
-
-## YAM-031 — Barra del lector contextual y eficiente
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-019, YAM-028
-- Objetivo: mostrar solo acciones relevantes al estado actual y trasladar las
-  secundarias a un overflow consistente.
-- Alcance: prioridades por ancho, estado activo visible, menú único de acciones
-  secundarias, tooltips con atajo y personalización mínima persistente.
-- Criterios de aceptación: PDF conserva el área dominante; ningún control salta
-  de posición durante render/búsqueda; acciones disponibles en teclado/paleta;
-  máximo una reconstrucción de chrome por cambio de estado lógico.
-- Validación: jerarquía compacta/media/expandida y overflow único aprobados;
-  grupos modo/panel persistentes; estados activos tienen forma/semántica;
-  tooltips muestran atajos vigentes; una prueba demuestra que panel, resize y
-  estado del visor no reconstruyen el adaptador PDF.
-- Archivos relacionados: `reader_top_bar.dart`,
-  `reader_bottom_controls.dart`, `reader_screen.dart`, comandos y ajustes
-- Riesgos o limitaciones: demasiada personalización aumenta soporte; limitar a
-  mostrar/ocultar grupos predefinidos.
-- Notas técnicas: el visor queda cacheado por configuración lógica; barra y
-  controles inferiores escuchan únicamente el estado que consumen.
-
-### Subtareas
-
-- [x] Definir jerarquía de acciones por clase de ventana.
-- [x] Implementar overflow y estado activo accesible.
-- [x] Proteger reconstrucciones y cubrir atajos existentes.
-
-## YAM-032 — Panel lateral redimensionable y perezoso
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-020, YAM-029
-- Objetivo: adaptar miniaturas, índice, búsqueda y marcadores al documento sin
-  cargar contenido de secciones invisibles.
-- Alcance: ancho redimensionable con límites, restauración local por ventana,
-  sección única montada, colapso rápido y divisor accesible por teclado.
-- Criterios de aceptación: 280–480 px; el PDF recibe el ancho restante sin
-  overflow; se construye solo la sección activa; ancho persistido con debounce;
-  movimiento reducido respetado.
-- Validación: ratón, flechas y semántica de incremento/decremento probados;
-  límites 280–480, debounce de 240 ms, restauración y cierre por Escape
-  aprobados; solo la sección activa aparece en árbol y el adaptador PDF mantiene
-  un único build durante el arrastre.
-- Archivos relacionados: `reader_side_panel.dart`, `reader_screen.dart`,
-  ajustes, persistencia y pruebas de widgets
-- Riesgos o limitaciones: el redimensionado continuo no debe escribir por cada
-  píxel ni provocar renders PDF redundantes.
-- Notas técnicas: las miniaturas visibles reutilizan futuros por índice y
-  conservan el scroll mediante `PageStorage`.
-
-### Subtareas
-
-- [x] Añadir divisor y límites tipados.
-- [x] Persistir ancho con debounce y restauración segura.
-- [x] Instrumentar builds/renders durante el arrastre.
-
-## YAM-033 — Accesibilidad nativa de interfaz completa
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-018, YAM-020, YAM-028
-- Objetivo: cerrar la validación que mantiene varias tareas visuales en review.
-- Alcance: recorrido Tab/Shift+Tab, orden de foco, restitución tras diálogos,
-  nombres/estados semánticos, Narrador de Windows y contraste formal.
-- Criterios de aceptación: matriz nativa grabada para biblioteca, lector,
-  paneles, paleta y ajustes; ninguna trampa de foco; anuncios sin duplicados;
-  contraste de texto/controles documentado.
-- Validación: pares semánticos cumplen WCAG AA automatizable; botones de icono,
-  estados, progreso, selector, resultados, divisor y superficies temporales
-  tienen nombres/valores; Enter/Space/Escape, foco inicial y navegación de
-  paleta están probados. Narrador y recorrido nativo completo siguen pendientes.
-- Archivos relacionados: todas las superficies, `TESTING.md`, capturas
-- Riesgos o limitaciones: las pruebas widget ayudan, pero Narrador y foco
-  nativo requieren ejecución manual en Windows.
-- Notas técnicas: esta tarea puede cerrar YAM-018/YAM-020 y parte de YAM-022.
-
-### Subtareas
-
-- [x] Automatizar contraste, etiquetas, roles, estados y teclado.
-- [x] Documentar una matriz manual reproducible.
-- [ ] Ejecutar recorrido nativo con Narrador.
-- [ ] Registrar resultado observado y corregir cualquier hallazgo nativo.
-
-## YAM-034 — Perfil de rendimiento de la interfaz
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-011, YAM-029 a YAM-032
-- Objetivo: convertir los presupuestos estructurales en mediciones repetibles de
-  fluidez, memoria y reconstrucciones.
-- Alcance: biblioteca con 40 portadas, filtro rápido, cambio de densidad,
-  apertura/cierre de panel, 100 páginas y retorno a biblioteca.
-- Criterios de aceptación: mediana/p95 de interacción, frames lentos, pico de
-  memoria y memoria liberada registrados en Profile/Release; comparación contra
-  la línea base; sin rutas ni títulos en logs.
-- Validación: cinco pasadas Windows/Profile a 125 % con 40 documentos, PDF de
-  100 páginas y PDF vectorial pesado. Biblioteca 123,420/135,266 ms y lector
-  83,997/87,589 ms (mediana/p95 de la secuencia); frames build 3,294/6,360 ms y
-  2,684/5,570 ms; cero presupuestos perdidos; pico 283,3 MiB y 3,1 MiB
-  liberados respecto al mínimo tras retorno.
-- Archivos relacionados: `performance_profile_test.dart`,
-  `performance_driver.dart`, generador de fixtures y `PERFORMANCE.md`
-- Riesgos o limitaciones: un único equipo no representa todas las GPU/DPI.
-- Notas técnicas: el JSON no contiene rutas/títulos; la instrumentación del
-  motor solo expone contadores locales consultables y no emite telemetría.
-
-### Subtareas
-
-- [x] Crear fixtures reproducibles de biblioteca, documento largo y pesado.
-- [x] Registrar cinco pasadas, apertura/render, caché, RSS y frames a 125 %.
-- [x] Conservar 100/200 % como matriz nativa pendiente, sin simularla.
-
-## YAM-035 — Información y acciones del documento
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-030, YAM-031
-- Objetivo: consultar y actuar sobre un documento sin convertir Yamantaka en
-  gestor de archivos.
-- Alcance: ficha accesible desde lector y biblioteca; título, autor, archivo,
-  páginas, tamaño, última apertura, progreso, página, estado, ruta, modificación
-  y presencia; copiar, mostrar, abrir/continuar, localizar, reiniciar y retirar.
-- Criterios de aceptación: todos los datos proceden del estado local; retirar no
-  borra el PDF; las acciones destructivas confirman; relocalizar exige la misma
-  huella; un archivo cambiado o ausente se diferencia sin depender del color.
-- Validación: acceso independiente desde fila probado; diálogo integrado en la
-  aplicación; cambio/ausencia/error de portada tienen icono y texto; integración
-  y build Windows aprobados.
-- Archivos relacionados: `app.dart`, biblioteca, repositorio de documentos,
-  barra/paleta del lector y pruebas
-- Riesgos o limitaciones: una modificación legítima cambia la huella; puede
-  abrirse como versión nueva, pero no se fuerza una relocalización ambigua.
-- Notas técnicas: “Mostrar” delega al explorador del sistema; copiar ruta solo
-  ocurre por acción explícita.
-
-### Subtareas
-
-- [x] Crear una ficha local compartida por biblioteca y lector.
-- [x] Añadir acciones seguras y confirmaciones explícitas.
-- [x] Detectar ausencia/cambio y corregir el flujo de relocalización.
-
-## YAM-036 — Selector rápido de documentos
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-009, YAM-031
-- Objetivo: cambiar entre documentos recientes sin abandonar el teclado.
-- Alcance: los ocho recientes se integran en la paleta existente; búsqueda por
-  título, autor y archivo; progreso discreto; abrir otro PDF y continuar.
-- Criterios de aceptación: una sola paleta/consulta; flechas y Enter ejecutan;
-  resultados limitados; ningún índice, red, persistencia de consulta ni PDF
-  adicional abierto.
-- Validación: filtrado y ejecución por Enter probados; integración Windows
-  confirma acciones y documentos recientes dentro del mismo overlay.
-- Archivos relacionados: `command_palette.dart`, `app_commands.dart`,
-  `reader_screen.dart`, pruebas de paleta
-- Riesgos o limitaciones: se limita a ocho recientes para conservar escaneo,
-  navegación y composición constantes.
-- Notas técnicas: un fallo al abrir otro PDF conserva el documento actual.
-
-### Subtareas
-
-- [x] Unificar comandos y documentos recientes en el mismo modelo visual.
-- [x] Añadir búsqueda y navegación de teclado compartidas.
-- [x] Proteger el lector actual frente a una apertura fallida.
-
-## YAM-037 — Atajos configurables
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-009, YAM-031
-- Objetivo: personalizar atajos importantes sin permitir combinaciones
-  imposibles ni duplicar el registro de comandos.
-- Alcance: abrir, buscar, paleta, ir a página, panel, página siguiente/anterior,
-  zoom, pantalla completa, chrome y marcador; opciones predefinidas y reset.
-- Criterios de aceptación: conflicto/restricción detectados; Escape, Inicio, Fin
-  y flechas básicas reservados; persistencia JSON validada; tooltips, menús,
-  paleta y shell usan la combinación resuelta; defaults reversibles.
-- Validación: conflictos, entrada inválida, round-trip, restauración y bindings
-  probados; navegación/zoom/panel/chrome comparten las acciones del registro.
-- Archivos relacionados: `app_commands.dart`, ajustes, lector, persistencia y
-  pruebas del registro
-- Riesgos o limitaciones: no se admite captura arbitraria de teclas; la lista
-  segura evita diferencias de teclado y soporte ilimitado.
-- Notas técnicas: las flechas y Space permanecen como navegación básica además
-  del atajo configurable de página.
-
-### Subtareas
-
-- [x] Ampliar el registro sin crear rutas de ejecución paralelas.
-- [x] Validar/persistir asignaciones y conflictos.
-- [x] Propagar etiquetas actuales a tooltips, menús y paleta.
-
-## YAM-038 — Copia de seguridad local
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-004, YAM-009
-- Objetivo: exportar y restaurar datos locales de forma explícita y auditable.
-- Alcance: JSON versionado con ajustes, biblioteca, progreso, marcadores,
-  sesiones, preferencias y metadatos; vista previa e importación transaccional.
-- Criterios de aceptación: nunca incluye bytes PDF; valida formato, versión,
-  tablas, columnas, tipos y recuentos antes de mutar; crea copia previa; informa
-  errores y no usa red.
-- Validación: round-trip de datos/ajustes, previsualización, copia de seguridad
-  previa y rechazo sin mutación de un archivo inválido probados.
-- Archivos relacionados: `local_backup_service.dart`, ajustes, pruebas y
-  documentación de privacidad
-- Riesgos o limitaciones: contiene metadatos y rutas locales sensibles; debe
-  almacenarse con el mismo cuidado que la biblioteca.
-- Notas técnicas: el esquema SQLite sigue en versión 1; la restauración usa una
-  transacción y orden compatible con claves foráneas.
-
-### Subtareas
-
-- [x] Definir formato JSON y validación exhaustiva.
-- [x] Añadir exportación, vista previa, confirmación e importación segura.
-- [x] Probar round-trip y rechazo sin sobrescritura silenciosa.
-
-## YAM-039 — Historial de lectura local
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-004, YAM-038
-- Objetivo: retomar actividad reciente sin convertir sesiones en analítica.
-- Alcance: lista agrupada en hoy/esta semana/anteriores; página final y duración
-  ya disponible; limpiar una/todas; desactivar y limitar entre 50 y 1000.
-- Criterios de aceptación: orden descendente y límite estable; limpieza
-  confirmada; desactivar impide nuevas sesiones; ningún cálculo conductual,
-  red, identificador externo o consulta privada.
-- Validación: orden, límite, IDs monotónicos, borrado individual/todos y
-  preferencias probados; superficie local integrada en Ajustes.
-- Archivos relacionados: repositorio de sesiones, lector, ajustes y pruebas
-- Riesgos o limitaciones: sesiones antiguas importadas pueden carecer de una
-  duración final si el cierre anterior fue abrupto.
-- Notas técnicas: no se añade tabla; se reutiliza `reading_sessions`.
-
-### Subtareas
-
-- [x] Exponer historial acotado y operaciones de limpieza.
-- [x] Añadir agrupación, activación y límite configurables.
-- [x] Evitar colisiones temporales en sesiones rápidas.
-
-## YAM-040 — Recuperación de sesión y cierre seguro
-
-- Prioridad: P1
-- Estado: DONE
-- Dependencias: YAM-006, YAM-032
-- Objetivo: volver al contexto de lectura tras cierre o reinicio sin crear
-  bucles cuando el archivo ya no es utilizable.
-- Alcance: documento opt-in, página, zoom, disposición, offset, panel, sección,
-  ancho y chrome; opción de iniciar siempre en biblioteca.
-- Criterios de aceptación: una sola tentativa por arranque; ruta explícita tiene
-  prioridad; ausencia/fallo limpia el intento; inicio en biblioteca bloquea la
-  reapertura; cerrar desde la aplicación limpia el documento pendiente.
-- Validación: política pura probada para ruta explícita, desactivación, inicio
-  en biblioteca, ruta vacía/ausente y caso válido; preferencias de lector/panel
-  cubiertas por repositorios y widgets.
-- Archivos relacionados: `app.dart`, ajustes, lector, persistencia y
-  `session_recovery_test.dart`
-- Riesgos o limitaciones: un cierre del proceso durante el debounce puede
-  recuperar el último estado estable, no necesariamente el último píxel.
-- Notas técnicas: el PDF nunca se copia ni se mantiene abierto entre procesos.
-
-### Subtareas
-
-- [x] Persistir el contexto mínimo de UI con debounce.
-- [x] Implementar política opt-in y prioridad de biblioteca.
-- [x] Añadir guardas contra archivos ausentes, corruptos y bucles.
-
-## YAM-041 — Laboratorio nativo de accesibilidad y DPI
-
-- Prioridad: P1
-- Estado: TODO
-- Dependencias: YAM-007, YAM-018, YAM-020, YAM-022, YAM-033
-- Objetivo: cerrar con evidencia nativa las tareas que no pueden validarse desde
-  widgets ni DPR simulado.
-- Alcance: script/checklist guiado para 100/125/150/200 %, claro/oscuro,
-  cómoda/compacta, seis canvas, Tab/Shift+Tab y Narrador en biblioteca, lector,
-  panel, paleta, ficha documental, copias e historial.
-- Criterios de aceptación: cada caso registra build, escala, tema, acción,
-  resultado esperado/observado, captura y tecnología asistiva; ningún foco
-  atrapado, anuncio duplicado, corte u objetivo inaccesible.
-- Validación: pendiente; solo 125 % y automatización están disponibles.
-- Archivos relacionados: `TESTING.md`, `docs/screenshots`, scripts de captura
-- Riesgos o limitaciones: requiere cambio de escala de sesión y operación manual
-  de Narrador; no debe automatizarse fingiendo equivalencia.
-- Notas técnicas: siguiente objetivo prioritario. Sus hallazgos deben corregirse
-  antes de pasar YAM-007/018/020/022/033 a `DONE`.
-
-### Subtareas
-
-- [ ] Preparar una ejecución limpia y nomenclatura de evidencias.
-- [ ] Completar cuatro DPI y dos temas con densidades/canvas.
-- [ ] Recorrer Narrador y teclado, corregir y repetir casos fallidos.
-
-## YAM-042 — Teselas adaptativas para páginas extremas
-
-- Prioridad: P1
-- Estado: TODO
-- Dependencias: YAM-011, YAM-034
-- Objetivo: impedir picos desproporcionados cuando una página rasterizada
-  excede por sí sola el presupuesto LRU.
-- Alcance: decisión por tamaño físico/zoom, regiones visibles con prefetch
-  acotado, cancelación por generación, composición sin costuras y fallback a
-  página completa para casos baratos.
-- Criterios de aceptación: página extrema controlada no retiene un bitmap mayor
-  que el presupuesto definido; scroll/zoom no muestra huecos persistentes;
-  solicitudes obsoletas se cancelan/deduplican; páginas normales no regresan.
-- Validación: pendiente; requiere fixtures raster/vector extremos y perfil
-  comparativo en Profile.
-- Archivos relacionados: contrato `PdfRenderRegion`, motor, adaptador, caché,
-  pruebas e `PERFORMANCE.md`
-- Riesgos o limitaciones: teselas elevan complejidad, bordes y número de renders;
-  solo se implementarán si la medición justifica el coste.
-- Notas técnicas: mantener un único caché por bytes y una clave con región,
-  escala y rotación; no crear otra caché de imágenes.
-
-### Subtareas
-
-- [ ] Fijar umbral desde mediciones de páginas extremas.
-- [ ] Prototipar planificador cancelable y composición estable.
-- [ ] Comparar memoria, p95, calidad visual y bundle con página completa.
-
-## YAM-043 — Notas locales ligadas a página
-
-- Prioridad: P2
-- Estado: REVIEW
-- Dependencias: YAM-008, YAM-038
-- Objetivo: ampliar marcadores con notas breves sin modificar el PDF.
-- Alcance: texto local opcional, edición desde marcador/ficha, búsqueda por
-  metadatos en la paleta, exportación/importación y limpieza explícita.
-- Criterios de aceptación: límite de longitud; autosave con debounce; navegación
-  por teclado; nota nunca se registra ni se incrusta en el archivo; migración y
-  backup versionados; 40 documentos no requieren índice nuevo.
-- Validación: cubierta por migración v2, repositorio, backup v2, exportación,
-  tests unitarios y captura Windows; queda revisión manual de edición extensa.
-- Archivos relacionados: dominio/repositorio de marcadores, panel, paleta,
-  backup, migración y privacidad
-- Riesgos o limitaciones: las notas son datos sensibles y elevan el impacto de
-  una copia local; deben estar claramente incluidas en exportación/limpieza.
-- Notas técnicas: evitar un editor rico o sistema general de anotaciones.
-
-### Subtareas
-
-- [ ] Diseñar migración mínima y límite de texto.
-- [ ] Añadir edición accesible y búsqueda local acotada.
-- [ ] Extender backup, privacidad y pruebas de recuperación.
-
-## YAM-044 — Colecciones locales manuales
-
-- Prioridad: P2
-- Estado: REVIEW
-- Dependencias: YAM-030, YAM-038
-- Objetivo: agrupar documentos sin carpetas virtuales pesadas ni mover archivos.
-- Alcance: pocas colecciones nombradas, asignación desde ficha, filtro de
-  biblioteca, estado vacío, backup y limpieza.
-- Criterios de aceptación: relación SQLite mínima; ningún escaneo de disco;
-  filtro se combina en una pasada con texto/estado/orden; nombres limitados y
-  accesibles; borrar una colección no borra documentos ni PDF.
-- Validación: cubierta por repositorio SQLite, filtros, backup, tests y capturas
-  Windows; queda revisión manual de gestión completa y teclado.
-- Archivos relacionados: biblioteca, repositorios, backup, ajustes y pruebas
-- Riesgos o limitaciones: demasiadas etiquetas convertirían la interfaz en un
-  gestor documental; no se incluyen reglas automáticas en esta tarea.
-- Notas técnicas: medir antes de aumentar el límite actual de 40 recientes.
-
-### Subtareas
-
-- [ ] Validar el modelo colección-documento y su migración.
-- [ ] Diseñar selector editorial compacto, sin nube de chips.
-- [ ] Cubrir combinación de filtros, backup y borrado seguro.
-
-## YAM-045 — Ventanas de lectura independientes
-
-- Prioridad: P2
-- Estado: TODO
-- Dependencias: YAM-015, YAM-031, YAM-040
-- Objetivo: permitir comparar o consultar dos PDF sin duplicar estado global.
-- Alcance: estudio Windows de una ventana de biblioteca y hasta dos lectores,
-  comandos/contexto por ventana, cierre, restauración opt-in y presupuesto de
-  memoria agregado.
-- Criterios de aceptación: cada ventana posee documento/panel/chrome/foco;
-  cierre libera PDFium y listeners; atajos actúan solo en la ventana activa;
-  memoria total permanece acotada.
-- Validación: pendiente; primero requiere un prototipo y perfil nativo.
-- Archivos relacionados: shell, `AppServices`, ventana, lector y rendimiento
-- Riesgos o limitaciones: Flutter desktop multi-window puede exigir plugin o
-  código nativo; no se añadirá dependencia sin ADR y medición de bundle.
-- Notas técnicas: no implementar como dos visores invisibles en el mismo árbol.
-
-### Subtareas
-
-- [ ] Investigar soporte nativo y ownership de servicios.
-- [ ] Prototipar ciclo de vida con dos fixtures y cierre repetido.
-- [ ] Decidir mediante ADR antes de exponer UI estable.
-
-## YAM-046 — Copias cifradas y retención
-
-- Prioridad: P2
-- Estado: TODO
-- Dependencias: YAM-038
-- Objetivo: ofrecer protección opcional para copias que contienen rutas,
-  progreso, historial y futuras notas.
-- Alcance: evaluación de cifrado autenticado local, derivación de clave,
-  versión de contenedor, contraseña no persistida, política de retención y
-  compatibilidad con JSON sin cifrar.
-- Criterios de aceptación: formato autenticado y versionado; contraseña nunca en
-  logs/almacén; error no muta datos; copia previa sigue disponible; licencia,
-  mantenimiento y coste de cualquier dependencia documentados.
-- Validación: pendiente.
-- Archivos relacionados: backup, privacidad, decisiones, ajustes y pruebas
-- Riesgos o limitaciones: criptografía propia es inaceptable y puede requerir
-  una dependencia auditada; recuperación de contraseña no es posible.
-- Notas técnicas: mantener exportación sin cifrar para interoperabilidad y
-  advertir claramente su sensibilidad.
-
-### Subtareas
-
-- [ ] Evaluar primitivas de plataforma y paquetes mantenidos.
-- [ ] Especificar contenedor, KDF, AEAD y migración.
-- [ ] Añadir vectores de prueba, corrupción y contraseña errónea.
-
-## YAM-047 — Localización preparada
-
-- Prioridad: P2
-- Estado: TODO
-- Dependencias: YAM-017, YAM-033
-- Objetivo: separar texto de presentación para añadir idiomas sin degradar
-  accesibilidad ni tamaño.
-- Alcance: inventario de cadenas, ARB/generación oficial de Flutter, plurales,
-  fechas, tooltips, semántica y fallback español.
-- Criterios de aceptación: español no cambia visualmente; una localización de
-  prueba cubre expansión 30–50 % y RTL de texto sin alterar dirección del PDF;
-  cero paquete de runtime innecesario.
-- Validación: pendiente.
-- Archivos relacionados: presentación, configuración Flutter, pruebas
-  responsive y documentación
-- Riesgos o limitaciones: internacionalizar todo de una vez genera diffs grandes;
-  migrar por superficies con gates de captura.
-- Notas técnicas: la dirección del idioma de UI y la dirección de lectura del
-  documento son preferencias distintas.
-
-### Subtareas
-
-- [ ] Inventariar cadenas y definir convención de claves.
-- [ ] Migrar shell/biblioteca/lector con fallback.
-- [ ] Probar expansión, pluralización, semántica y RTL de UI.
-
-## YAM-048 — Historial de perfiles y detector de regresiones
-
-- Prioridad: P2
-- Estado: TODO
-- Dependencias: YAM-034
-- Objetivo: comparar distribuciones de rendimiento sin convertir una ejecución
-  aislada en umbral arbitrario.
-- Alcance: normalizar JSON de perfil, conservar baselines versionadas sin datos
-  privados, comparar hardware/build equivalentes y emitir informe local.
-- Criterios de aceptación: identifica mediana/p95, frames, RSS, caché y bundle;
-  rechaza comparaciones de DPI/modo/hardware incompatibles; no sube resultados;
-  umbrales se fijan tras al menos tres baselines comparables.
-- Validación: pendiente.
-- Archivos relacionados: `test_driver`, `tool`, `PERFORMANCE.md` y CI futuro
-- Riesgos o limitaciones: ruido térmico/antivirus/GPU puede producir falsos
-  positivos; el informe debe mostrar distribución y entorno.
-- Notas técnicas: conservar únicamente métricas, nunca rutas, títulos o
-  consultas.
-
-### Subtareas
-
-- [ ] Versionar el esquema de resultados y anonimizar entorno.
-- [ ] Crear comparador local con tolerancias justificadas.
-- [ ] Reunir tres baselines antes de activar un gate.
-
-## YAM-049 — Anotaciones locales normalizadas
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-043
-- Objetivo: modelar notas, resaltados, subrayados y tachados sin modificar PDF.
-- Alcance: CRUD SQLite, colores acotados, etiquetas, coordenadas normalizadas,
-  rotación, estado huérfano/revisión, undo y navegación.
-- Criterios de aceptación: validación geométrica y de longitud; borrado
-  recuperable inmediato; relocalización por huella; ninguna escritura al PDF.
-- Validación: tests de CRUD, filtros, rotación, huella y captura Windows.
-- Archivos relacionados: `lib/features/annotations`,
-  `lib/storage/repositories/annotation_repository.dart`, migración v2.
-- Riesgos o limitaciones: el visor aún no entrega geometría de selección nativa.
-- Notas técnicas: las coordenadas se guardan en rango 0–1 por página.
-
-### Subtareas
-
-- [x] Persistir modelo y relaciones de etiquetas.
-- [x] Integrar controlador, panel e indicadores.
-- [ ] Validar overlay real cuando exista geometría de texto.
-
-## YAM-050 — Selección contextual sobre PDF
-
-- Prioridad: P0
 - Estado: BLOCKED
-- Dependencias: YAM-049, YAM-014
-- Objetivo: crear anotaciones desde texto/área seleccionados en el visor.
-- Alcance: selección, menú contextual, copiar, color y nota asociada.
-- Criterios de aceptación: geometría por glifo estable en zoom/rotación;
-  teclado/táctil; copiar respeta privacidad; cancelación sin estado residual.
-- Validación: bloqueada por falta de contrato de selección en el adaptador.
-- Archivos relacionados: `PdfViewerAdapter`, lector y fork `pdfrx`.
-- Riesgos o limitaciones: inferir cajas desde texto extraído sería incorrecto.
-- Notas técnicas: no simular selección mediante coordenadas aproximadas.
-
-### Subtareas
-
-- [ ] Exponer selección y geometría desde el motor/visor.
-- [ ] Diseñar menú accesible para ratón, teclado y tacto.
-- [ ] Probar zoom, rotación, páginas enfrentadas y RTL.
-
-## YAM-051 — Panel de anotaciones
-
 - Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-049
-- Objetivo: consultar, filtrar, editar y saltar entre anotaciones.
-- Alcance: lista virtualizada, búsqueda local, filtros por tipo/color/etiqueta,
-  edición, copia, borrado con undo y aviso de revisión.
-- Criterios de aceptación: una sección montada; foco y semántica; navegación
-  exacta; estados vacío/error; sin registrar contenido.
-- Validación: unitarios e integración Windows con captura dedicada.
-- Archivos relacionados: `reader_side_panel.dart`, controlador de anotaciones.
-- Riesgos o limitaciones: falta validar Narrador y colecciones muy grandes.
-- Notas técnicas: consultas acotadas por documento y orden estable.
+- Esfuerzo: M
+- Fase: 0
+- Áreas: EFF, REL
+- Dependencias: YAM-100, YAM-103
+- Problema: mantener un fork local aumenta coste de actualización y riesgo de
+  divergencia, pero retirarlo sin evidencia puede reintroducir fallos nativos.
+- Resultado esperado: usar una versión upstream corregida sin perder lifecycle,
+  render, búsqueda, enlaces o compatibilidad Windows.
+- Cambios funcionales y técnicos:
+  - Vigilar una release upstream que incluya la corrección equivalente.
+  - Comparar diff, licencia, APIs, binarios y requisitos de toolchain.
+  - Ejecutar el gate completo con dependencia upstream.
+  - Eliminar third_party solo después de una comparación aprobada.
+- Visual y accesibilidad: no debe cambiar geometría, foco, texto o render del
+  lector.
+- Rendimiento, memoria y privacidad: bundle, apertura, render, caches y cierre
+  no pueden empeorar fuera del presupuesto.
+- Casos límite y errores: API incompatible, regresión del codec, cambio de
+  PDFium o falta de binarios Windows.
+- Criterios de aceptación:
+  - [ ] Existe release upstream verificable con la corrección.
+  - [ ] Todos los gates pasan sin el fork.
+  - [ ] Licencias y avisos quedan actualizados.
+  - [ ] El parche puede restaurarse mediante revert si aparece una regresión.
+- Validación: A/B del corpus, suite, integración, perfil y build Release.
+- Riesgos y fuera de alcance: permanece BLOCKED hasta existir upstream apto; no
+  se actualizará solo para obtener una versión más reciente.
 
-### Subtareas
+### Fase 1 — Motor PDF y lector
 
-- [x] Implementar filtros, menú y navegación.
-- [x] Añadir indicador por página y aviso de huérfanas.
-- [ ] Ejecutar matriz manual Narrador/DPI.
+#### YAM-110 — Renderizado adaptativo por teselas
 
-## YAM-052 — Exportación de anotaciones
-
+- Estado: PLANNED
 - Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-049, YAM-038
-- Objetivo: exportar anotaciones por acción explícita sin incluir el PDF.
-- Alcance: Markdown legible y JSON versionado con coordenadas normalizadas.
-- Criterios de aceptación: selector de destino; formato estable; etiquetas,
-  página, tipo y estado; fallo no muta datos; advertencia de sensibilidad.
-- Validación: round-trip estructural unitario y flujo de guardado integrado.
-- Archivos relacionados: `annotation_export_service.dart`, shell y privacidad.
-- Riesgos o limitaciones: el archivo exportado contiene texto privado.
-- Notas técnicas: no se exportan bytes, rutas internas ni índice FTS.
+- Esfuerzo: XL
+- Fase: 1
+- Áreas: FUNC, PERF, EFF
+- Dependencias: YAM-103, YAM-105, YAM-111
+- Problema: una página raster extrema puede superar por sí sola el presupuesto
+  de la LRU aunque solo una región sea visible.
+- Resultado esperado: navegar y ampliar páginas enormes sin picos
+  desproporcionados ni pérdida de calidad visible.
+- Cambios funcionales y técnicos:
+  - Activar teselas solo cuando dimensiones, zoom y bytes estimados superen un
+    umbral medido.
+  - Clave de cache por documento, página, región, escala, rotación y generación.
+  - Componer con solape mínimo para evitar costuras.
+  - Priorizar viewport y anillo inmediato; cancelar regiones lejanas.
+  - Mantener página completa para escenarios baratos.
+- Visual y accesibilidad: no habrá parpadeos persistentes, huecos, costuras o
+  cambios de escala al aparecer una tesela.
+- Rendimiento, memoria y privacidad: bytes combinados nunca superan el
+  presupuesto del gobernador; no se escriben teselas privadas en disco.
+- Casos límite y errores: zoom rápido, rotación, resize, cambio de página,
+  tesela fallida y documento cerrado durante composición.
+- Criterios de aceptación:
+  - [ ] Una página extrema no retiene un bitmap completo sobredimensionado.
+  - [ ] El viewport alcanza calidad final sin huecos persistentes.
+  - [ ] Navegación normal no activa teselas innecesarias.
+  - [ ] Cancelación y cierre dejan cero regiones pendientes.
+- Validación: fixtures raster/vector extremos, pruebas de planificador,
+  inspección visual y perfil comparativo.
+- Riesgos y fuera de alcance: se realizará prototipo antes de implementación;
+  no se activará si la medición no justifica la complejidad.
 
-### Subtareas
+#### YAM-111 — Gobernador global de memoria
 
-- [x] Implementar Markdown y JSON v1.
-- [x] Añadir acción de exportación y manejo seguro de errores.
-- [ ] Validar manualmente permisos y rutas Unicode.
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 1
+- Áreas: PERF, EFF, REL
+- Dependencias: YAM-104, YAM-105
+- Problema: visor, motor, portadas, miniaturas y futuros lectores tienen
+  presupuestos separados que pueden sumar un pico excesivo.
+- Resultado esperado: la aplicación adapta calidad, prefetch y retención al
+  escenario completo, no a caches aisladas.
+- Cambios funcionales y técnicos:
+  - Crear un presupuesto agregado configurable por perfil de memoria.
+  - Registrar bytes estimados por propietario y prioridad.
+  - Reducir prefetch y desalojar elementos recreables antes de afectar lo
+    visible.
+  - Reservar una cuota mínima para la unidad activa.
+  - Exponer contadores redaccionados al diagnóstico.
+- Visual y accesibilidad: degradar primero trabajo invisible; la página activa
+  no debe desaparecer ni perder foco.
+- Rendimiento, memoria y privacidad: objetivo explícito de no exceder el
+  presupuesto propio; el RSS solo se usa como señal auxiliar.
+- Casos límite y errores: dos lectores, 4K, DPR 200 %, página extrema,
+  miniaturas abiertas y limpieza de cache concurrente.
+- Criterios de aceptación:
+  - [ ] Todos los consumidores registran y liberan bytes.
+  - [ ] La suma retenida nunca supera el límite salvo una reserva documentada.
+  - [ ] Presión alta reduce prefetch antes de la calidad visible.
+  - [ ] Cerrar documento devuelve su cuota al instante lógico.
+- Validación: tests de política, perfil con escenarios combinados y contadores
+  a cero tras cierre.
+- Riesgos y fuera de alcance: no se intentará controlar el asignador del
+  runtime o la memoria interna de Windows.
 
-## YAM-053 — Contextos documentales acotados
+#### YAM-112 — Prefetch predictivo y acotado
 
+- Estado: PLANNED
 - Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-040
-- Objetivo: restaurar y alternar documentos sin multiplicar handles PDF ni
-  memoria, y sin ocupar el lector con una franja adicional.
-- Alcance interno: hasta 12 contextos, pin, reorder, duplicados,
-  close/reopen y estados activo/caliente/suspendido.
-- Criterios de aceptación: máximo dos calientes; resto suspendido; progreso
-  visible; ausentes explícitos; cerrar libera documento.
-- Validación: política y reapertura probadas; integración de cambio de PDF.
-- Archivos relacionados: `lib/features/workspaces`, `lib/app/app.dart`.
-- Riesgos o limitaciones: falta prueba sostenida con 12 PDF pesados.
-- Notas técnicas: un solo contexto activo posee el visor concreto; desde
-  2026-07-29 no existe barra de pestañas visible.
+- Esfuerzo: L
+- Fase: 1
+- Áreas: PERF, EFF
+- Dependencias: YAM-105, YAM-111
+- Problema: precargar siempre el mismo número de páginas desperdicia trabajo
+  cuando el usuario cambia de dirección, navega rápido o abre el panel.
+- Resultado esperado: la siguiente unidad aparece con menor latencia sin
+  competir con la página activa.
+- Cambios funcionales y técnicos:
+  - Calcular dirección y velocidad con una ventana temporal acotada.
+  - Prefetch por unidad de lectura: una página en Documento y spread en Libro.
+  - Reducir o pausar bajo presión, ventana inactiva o navegación aleatoria.
+  - Invalidar al cambiar zoom, rotación, layout o documento.
+- Visual y accesibilidad: no mostrar progreso del prefetch ni emitir anuncios;
+  solo mejora latencia percibida.
+- Rendimiento, memoria y privacidad: máximo de trabajos y bytes definido por el
+  gobernador; cero persistencia.
+- Casos límite y errores: salto al final, scrubber, historial atrás/adelante,
+  RTL, portada sola y documento de una página.
+- Criterios de aceptación:
+  - [ ] La unidad probable tiene mejor p95 que sin prefetch.
+  - [ ] Cambiar dirección cancela trabajo ya irrelevante.
+  - [ ] Ventana inactiva pausa prefetch no esencial.
+  - [ ] No aumenta jank ni supera memoria.
+- Validación: pruebas de política y perfil A/B con navegación lineal, alterna y
+  aleatoria.
+- Riesgos y fuera de alcance: no se aprenderán hábitos ni se persistirá
+  comportamiento del usuario.
 
-### Subtareas
+#### YAM-113 — Apertura progresiva de documentos largos
 
-- [x] Implementar dominio y controlador suspendible.
-- [x] Retirar la barra reordenable visible y conservar apertura/workspaces.
-- [x] Integrar apertura múltiple y cierre contextual.
-- [ ] Perfilar ciclo de 12 documentos pesados.
-
-## YAM-054 — Espacios de trabajo locales
-
+- Estado: PLANNED
 - Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-053
-- Objetivo: guardar y restaurar conjuntos de documentos y navegación.
-- Alcance: nombre, orden, pin, documento activo, página, zoom, layout y split.
-- Criterios de aceptación: guardado transaccional; duplicar/borrar; resumen de
-  ausentes; restauración parcial segura; sin abrir todos los PDF a la vez.
-- Validación: round-trip SQLite y diálogo Windows.
-- Archivos relacionados: repositorio/controlador/diálogo de workspaces.
-- Riesgos o limitaciones: el split se conserva como contrato, no se renderiza.
-- Notas técnicas: se persisten IDs y contexto, nunca bytes PDF.
+- Esfuerzo: L
+- Fase: 1
+- Áreas: FUNC, PERF, A11Y
+- Dependencias: YAM-103, YAM-105, YAM-111
+- Problema: obtener índice, texto, miniaturas o metadata completa antes del
+  primer uso puede retrasar innecesariamente la lectura.
+- Resultado esperado: la primera página utilizable aparece cuanto antes y el
+  trabajo secundario continúa de forma cancelable.
+- Cambios funcionales y técnicos:
+  - Separar apertura nativa, primer layout, primer render y enriquecimiento.
+  - Priorizar página restaurada o solicitada.
+  - Publicar progreso por fases, no porcentajes falsos.
+  - Permitir cancelar y volver a biblioteca sin esperar indexación.
+- Visual y accesibilidad: estado compacto con mensaje concreto; Narrador
+  anuncia fase y finalización sin repetición.
+- Rendimiento, memoria y privacidad: primer render no espera miniaturas o
+  índice; el trabajo secundario respeta ventana inactiva y presión.
+- Casos límite y errores: documento de 1.000 páginas, cifrado, corrupción
+  tardía, cierre durante indexación y reapertura inmediata.
+- Criterios de aceptación:
+  - [ ] Primer contenido visible tiene métrica independiente.
+  - [ ] Cancelar devuelve control de UI en menos de 100 ms.
+  - [ ] Indexación tardía no reemplaza estado de otro documento.
+  - [ ] Errores parciales explican qué función queda disponible.
+- Validación: integración con documentos largos, temporización por fase y
+  pruebas de carreras.
+- Riesgos y fuera de alcance: no se mostrará un porcentaje si PDFium no ofrece
+  progreso real.
 
-### Subtareas
+#### YAM-114 — Restauración precisa del viewport
 
-- [x] Persistir snapshot transaccional.
-- [x] Añadir gestión y resumen de restauración.
-- [ ] Validar 100 workspaces y conflictos de archivos movidos.
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 1
+- Áreas: FUNC, REL, VIS
+- Dependencias: YAM-101, YAM-104
+- Problema: una fracción de página aproximada puede cambiar de significado al
+  rotar, redimensionar, cambiar DPI o alternar Documento/Libro.
+- Resultado esperado: volver al mismo punto de lectura perceptible sin saltos,
+  páginas adyacentes dominantes ni zoom inesperado.
+- Cambios funcionales y técnicos:
+  - Definir ancla normalizada por página/unidad y punto focal.
+  - Separar zoom solicitado, zoom efectivo y modo de ajuste.
+  - Convertir anclas entre Documento, Libro, rotación y RTL.
+  - Aplicar resize una vez por frame estable y descartar geometría antigua.
+- Visual y accesibilidad: la unidad activa queda centrada o top-aligned según el
+  modo; el indicador anuncia la página canónica.
+- Rendimiento, memoria y privacidad: persistencia con debounce; no escribir por
+  píxel ni guardar texto.
+- Casos límite y errores: portada sola, último spread impar, página rotada,
+  panel abierto, fullscreen y monitor con otro DPI.
+- Criterios de aceptación:
+  - [ ] Reapertura conserva página, ancla, zoom y modo dentro de tolerancia.
+  - [ ] Resize no alterna entre dos centros.
+  - [ ] Ajustar ancho conserva inicio superior.
+  - [ ] Historial restaura viewport, no solo página.
+- Validación: pruebas puras de transformación, widgets y matriz Windows.
+- Riesgos y fuera de alcance: no se promete una coordenada tipográfica exacta
+  hasta disponer de selección de texto nativa.
 
-## YAM-055 — Historial de navegación significativo
+#### YAM-115 — Selección nativa de texto
 
+- Estado: PLANNED
 - Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-008, YAM-049
-- Objetivo: volver/avanzar entre saltos significativos dentro del documento.
-- Alcance: resultados, índice, marcadores, anotaciones, page dialog y atajos.
-- Criterios de aceptación: sin entradas por scroll; deduplicación; máximo
-  acotado; Alt+izquierda/derecha; limpiar al cambiar documento.
-- Validación: tests de pila, deduplicación y acciones integradas.
-- Archivos relacionados: `navigation_history_controller.dart`, lector.
-- Riesgos o limitaciones: historial efímero, no se restaura entre procesos.
-- Notas técnicas: el controlador de lectura sigue siendo dueño de la página.
+- Esfuerzo: XL
+- Fase: 1
+- Áreas: FUNC, A11Y, REL
+- Dependencias: YAM-103, YAM-104
+- Problema: el texto extraído permite buscar, pero el adaptador actual no
+  expone una selección geométrica fiable para interacción y anotaciones.
+- Resultado esperado: seleccionar texto con ratón o teclado, copiarlo de forma
+  explícita y conservar geometría correcta.
+- Cambios funcionales y técnicos:
+  - Prototipar acceso a glifos, índices y rectángulos en pdfrx/PDFium.
+  - Normalizar coordenadas para zoom, rotación, crop y spreads.
+  - Diseñar handles/selección de escritorio sin overlay pesado.
+  - Permitir selección por teclado con inicio, extensión y limpieza.
+  - Copiar solo tras comando explícito.
+- Visual y accesibilidad: highlight con contraste AA, foco independiente del
+  color y anuncio de cantidad seleccionada.
+- Rendimiento, memoria y privacidad: no persistir selección ni texto copiado;
+  extraer solo páginas necesarias.
+- Casos límite y errores: ligaduras, columnas, RTL, texto vertical, página sin
+  texto, rotación y selección que cruza páginas.
+- Criterios de aceptación:
+  - [ ] Índices y rectángulos corresponden al texto copiado.
+  - [ ] Zoom/rotación no desplazan el highlight.
+  - [ ] Teclado y ratón completan selección y cancelación.
+  - [ ] Escaneos sin texto muestran un estado claro, sin sugerir OCR.
+- Validación: corpus textual generado, pruebas geométricas e integración nativa.
+- Riesgos y fuera de alcance: requiere spike y puede dividirse; no se
+  implementará OCR ni edición del PDF.
 
-### Subtareas
+#### YAM-116 — Anotaciones geométricas locales
 
-- [x] Implementar pilas atrás/adelante.
-- [x] Registrar saltos de todas las superficies relevantes.
-- [ ] Ejecutar recorrido manual completo con teclado.
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: XL
+- Fase: 1
+- Áreas: FUNC, VIS, REL
+- Dependencias: YAM-115
+- Problema: las notas por página no pueden señalar un fragmento exacto sin
+  geometría de selección estable.
+- Resultado esperado: crear highlight, subrayado y tachado local ligados al
+  texto seleccionado y revisables si cambia el archivo.
+- Cambios funcionales y técnicos:
+  - Persistir página, índices de texto, rectángulos normalizados, estilo y
+    huella del documento.
+  - Reproyectar geometría al zoom y rotación actuales.
+  - Integrar undo, edición, eliminación, filtros y exportación.
+  - Marcar para revisión si cambia la huella o el texto no coincide.
+- Visual y accesibilidad: estilos distinguibles por forma además de color;
+  selección y anotación no competirán por foco.
+- Rendimiento, memoria y privacidad: overlays virtualizados por páginas
+  visibles; texto sensible no se registra.
+- Casos límite y errores: selección multipágina, cambio de archivo, rectángulos
+  fuera de rango, anotación solapada y backup antiguo.
+- Criterios de aceptación:
+  - [ ] El PDF nunca se modifica.
+  - [ ] Geometría sobrevive a zoom, rotación y reapertura.
+  - [ ] Cambio de huella exige revisión, no recolocación silenciosa.
+  - [ ] Exportación identifica tipo, página y texto autorizado.
+- Validación: migración, repositorio, geometría, widgets, integración y backup.
+- Riesgos y fuera de alcance: no habrá dibujo libre, firma digital ni editor de
+  PDF.
 
-## YAM-056 — Navegación visual de páginas
+#### YAM-117 — Búsqueda visible dentro del documento
 
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 1
+- Áreas: FUNC, VIS, A11Y, PERF
+- Dependencias: YAM-105, YAM-113, YAM-115
+- Problema: una lista de coincidencias no basta si el lector no muestra con
+  precisión dónde aparece el match activo.
+- Resultado esperado: buscar, entender el contexto y recorrer resultados sin
+  perder posición ni bloquear la lectura.
+- Cambios funcionales y técnicos:
+  - Resaltar coincidencias visibles y distinguir la activa.
+  - Mostrar snippets, página, recuento y progreso incremental.
+  - Navegar anterior/siguiente desde panel, teclado y comandos.
+  - Conservar la consulta solo durante la sesión actual.
+- Visual y accesibilidad: contraste y contorno distinguibles; live region
+  anuncia recuento y cambio activo una sola vez.
+- Rendimiento, memoria y privacidad: cancelación inmediata, máximo de snippets
+  retenidos y cero persistencia de consultas.
+- Casos límite y errores: consulta vacía, documento sin texto, miles de matches,
+  búsqueda cancelada y cambio de documento.
+- Criterios de aceptación:
+  - [ ] Match activo queda dentro del viewport.
+  - [ ] Resultados parciales no reordenan de forma confusa.
+  - [ ] Escape restaura foco y posición.
+  - [ ] Cierre libera token y resultados.
+- Validación: pruebas de controlador, integración PDFium, widgets y Narrador.
+- Riesgos y fuera de alcance: no hay búsqueda semántica, fuzzy u OCR.
+
+#### YAM-118 — Navegación unificada del lector
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 1
+- Áreas: FUNC, EFF, A11Y
+- Dependencias: YAM-114
+- Problema: página, spread, índice, miniatura, scrubber, historial y zonas
+  laterales pueden producir semánticas distintas si cada superficie calcula su
+  destino.
+- Resultado esperado: cualquier entrada ejecuta el mismo comando y termina en
+  la misma unidad de lectura.
+- Cambios funcionales y técnicos:
+  - Unificar destinos en un controlador de navegación.
+  - Publicar operaciones por página, unidad, historial y destino PDF.
+  - Reservar Page Up/Page Down y resolver conflictos de atajos.
+  - Separar navegación estructural de paneo.
+- Visual y accesibilidad: indicador único, foco restaurable y estados
+  disabled/available anunciados.
+- Rendimiento, memoria y privacidad: ningún comando fuerza render innecesario o
+  escritura inmediata.
+- Casos límite y errores: documento vacío, una página, final impar, RTL,
+  selección en campo de texto y tecla mantenida.
+- Criterios de aceptación:
+  - [ ] Todas las superficies producen el mismo destino canónico.
+  - [ ] Campos de texto no reciben comandos del lector.
+  - [ ] Historial evita entradas duplicadas.
+  - [ ] Límites no generan excepciones ni feedback engañoso.
+- Validación: tests de dominio, shortcuts, widgets e integración.
+- Riesgos y fuera de alcance: no se crearán bindings arbitrarios que puedan
+  interceptar atajos del sistema.
+
+#### YAM-119 — Panel lateral eficiente y accesible
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 1
+- Áreas: FUNC, PERF, VIS, A11Y
+- Dependencias: YAM-101, YAM-105, YAM-118
+- Problema: miniaturas, búsqueda, índice, marcadores y anotaciones comparten una
+  superficie con cargas y focos distintos.
+- Resultado esperado: un panel único, compacto y rápido que conserva sección,
+  ancho, scroll y foco por documento.
+- Cambios funcionales y técnicos:
+  - Virtualizar listas y miniaturas.
+  - Cargar sección activa bajo demanda y cancelar al cambiar.
+  - Separar estado de resize de contenido.
+  - Restaurar el foco al control que abrió el panel.
+  - Persistir ancho acotado y sección sin reabrir trabajos antiguos.
+- Visual y accesibilidad: divisor con objetivo suficiente, ajuste por teclado y
+  valor anunciado; una sola sección visible.
+- Rendimiento, memoria y privacidad: miniaturas por DPR, cache acotada y
+  consultas no persistidas.
+- Casos límite y errores: panel máximo en ventana compacta, resize durante
+  búsqueda, documento cerrado y sección vacía.
+- Criterios de aceptación:
+  - [ ] Abrir/cerrar no cambia el zoom del PDF.
+  - [ ] Scroll largo no construye todos los hijos.
+  - [ ] Resize funciona con ratón y teclado.
+  - [ ] Cerrar cancela renders y restaura foco.
+- Validación: widgets, perfil de scroll, integración y Narrador.
+- Riesgos y fuera de alcance: no se permitirán varios paneles simultáneos.
+
+#### YAM-120 — Vista dividida con dos lectores
+
+- Estado: PLANNED
 - Prioridad: P2
-- Estado: REVIEW
-- Dependencias: YAM-055
-- Objetivo: saltar rápido en documentos largos sin render por píxel.
-- Alcance: scrubber de página, etiqueta de sección e ingreso numérico.
-- Criterios de aceptación: solo aparece con 20+ páginas; no dispara renders
-  continuos; rango accesible; confirma un salto significativo.
-- Validación: política UI y navegación de integración.
-- Archivos relacionados: diálogo de ir a página, índice y lector.
-- Riesgos o limitaciones: preview de miniatura durante arrastre está pendiente.
-- Notas técnicas: usa estado local hasta confirmar.
+- Esfuerzo: XL
+- Fase: 1
+- Áreas: FUNC, PERF, REL, VIS
+- Dependencias: YAM-104, YAM-111, YAM-118, YAM-154
+- Problema: consultar dos documentos exige cambiar contexto repetidamente y el
+  dominio existente no demuestra dos visores reales.
+- Resultado esperado: leer dos PDF lado a lado con estado, foco y recursos
+  independientes.
+- Cambios funcionales y técnicos:
+  - Crear dos sesiones lectoras explícitas dentro del workspace.
+  - Repartir viewport y memoria con mínimos legibles.
+  - Enrutar comandos al lector enfocado.
+  - Cerrar cada visor de forma independiente.
+  - Guardar split solo con consentimiento.
+- Visual y accesibilidad: divisor accesible, lector activo perceptible sin
+  acento saturado y colapso automático cuando falta espacio.
+- Rendimiento, memoria y privacidad: presupuesto agregado obligatorio; no
+  mantener un tercer visor invisible.
+- Casos límite y errores: mismo PDF dos veces, uno cifrado, cierre de un lado,
+  ventana compacta y presión alta.
+- Criterios de aceptación:
+  - [ ] Cada lado conserva página, zoom, panel y comandos.
+  - [ ] Cerrar un lado libera sus recursos.
+  - [ ] Foco determina destino de todos los atajos.
+  - [ ] Perfil de dos lectores permanece dentro del gate.
+- Validación: dominio, widgets, integración con dos fixtures y perfil nativo.
+- Riesgos y fuera de alcance: no se expone hasta superar lifecycle y memoria.
 
-### Subtareas
+#### YAM-121 — Comparación sincronizada
 
-- [x] Añadir slider acotado y etiqueta contextual.
-- [ ] Añadir preview diferido con presupuesto medido.
-- [ ] Validar documento de 1000 páginas.
-
-## YAM-057 — Índice local de biblioteca
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-008, YAM-049
-- Objetivo: indexar metadatos, texto y anotaciones solo por opt-in.
-- Alcance: FTS5, estado incremental, pausa/cancelación, reconstrucción y borrado.
-- Criterios de aceptación: secuencial; cierra cada PDF; no OCR; errores por
-  documento; borrar elimina FTS; UI explica coste y privacidad.
-- Validación: migración/FTS, búsqueda, limpieza y benchmark de 500 documentos.
-- Archivos relacionados: repositorio/controlador/diálogo de búsqueda global.
-- Riesgos o limitaciones: el opt-in no persiste y debe reactivarse al arrancar.
-- Notas técnicas: el índice es reconstruible y no entra en backups.
-
-### Subtareas
-
-- [x] Crear FTS5 y estado incremental.
-- [x] Añadir pausa, cancelación, rebuild y clear.
-- [ ] Perfilar extracción de corpus real grande.
-
-## YAM-058 — Búsqueda unificada
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-057
-- Objetivo: consultar documentos, páginas, anotaciones, colecciones y etiquetas.
-- Alcance: Ctrl+Shift+F, filtros por tipo, paginación, snippets y apertura.
-- Criterios de aceptación: consulta escapada; resultados limitados; salto a
-  documento/página; ausencia de índice explicada; consulta no persistida.
-- Validación: tests FTS por tipo e integración de apertura.
-- Archivos relacionados: `lib/features/search`, shell y biblioteca.
-- Riesgos o limitaciones: snippets FTS pueden contener texto privado en pantalla.
-- Notas técnicas: ninguna consulta se registra ni exporta.
-
-### Subtareas
-
-- [x] Implementar modelos, repositorio y diálogo unificado.
-- [x] Integrar apertura y navegación al resultado.
-- [ ] Validar corpus multilingüe, signos y RTL.
-
-## YAM-059 — Colecciones, etiquetas y vistas inteligentes
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-044, YAM-057
-- Objetivo: organizar documentos localmente sin moverlos.
-- Alcance: colecciones manuales, pin/reorder, etiquetas reutilizables, merge,
-  relaciones y ocho vistas inteligentes.
-- Criterios de aceptación: borrar colección/etiqueta no borra PDF; filtros
-  combinables; nombres validados; backup v2; vacío explícito.
-- Validación: tests de repositorio/smart views y capturas filtradas.
-- Archivos relacionados: `lib/features/organization`, biblioteca y backup.
-- Riesgos o limitaciones: gestión avanzada de etiquetas aún no tiene UI completa.
-- Notas técnicas: vistas inteligentes son consultas locales deterministas.
-
-### Subtareas
-
-- [x] Crear esquema y repositorio.
-- [x] Integrar selector de colecciones en biblioteca.
-- [ ] Completar UI de merge/reorder/asignación masiva.
-
-## YAM-060 — Importación recursiva de carpeta
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-004
-- Objetivo: previsualizar e importar PDF de una carpeta sin bloquear la UI.
-- Alcance: recorrido cancelable, límite 5000, duplicados, inválidos, ausentes y
-  progreso secuencial.
-- Criterios de aceptación: no sigue archivos no PDF; preview antes de mutar;
-  cancelación; cada handle se cierra; errores aislados.
-- Validación: controlador y diálogo integrados; pendiente matriz de permisos.
-- Archivos relacionados: `folder_import_controller.dart`, diálogo y biblioteca.
-- Riesgos o limitaciones: enlaces/reparse points y árboles extremos requieren
-  validación nativa específica.
-- Notas técnicas: no hay watcher ni escaneo automático de fondo.
-
-### Subtareas
-
-- [x] Implementar scan/preview/import cancelables.
-- [x] Añadir estados y progreso.
-- [ ] Probar Unicode, rutas largas, permisos y reparse points.
-
-## YAM-061 — Recuperación asistida de documentos
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-016, YAM-060
-- Objetivo: relocalizar ausentes sin asociar silenciosamente otro contenido.
-- Alcance: candidatos por huella, nombre, tamaño y modificación; resumen.
-- Criterios de aceptación: solo huella exacta autoasocia; ambiguo pide decisión;
-  baja confianza no muta; operación reversible por backup.
-- Validación: scoring unitario y acción integrada.
-- Archivos relacionados: `document_recovery_service.dart`, biblioteca.
-- Riesgos o limitaciones: la búsqueda de candidatos depende de carpeta elegida.
-- Notas técnicas: el score no sustituye la verificación de identidad.
-
-### Subtareas
-
-- [x] Implementar ranking y umbrales conservadores.
-- [x] Integrar resumen sin rutas en logs.
-- [ ] Diseñar selector explícito para candidatos ambiguos.
-
-## YAM-062 — Vista dividida con dos lectores
-
-- Prioridad: P0
-- Estado: BLOCKED
-- Dependencias: YAM-053, YAM-034
-- Objetivo: mostrar dos documentos o posiciones simultáneamente.
-- Alcance: horizontal/vertical, foco activo, ratio, sincronización opcional y
-  ownership independiente.
-- Criterios de aceptación: dos visores reales; atajos al panel activo; cierre
-  libera ambos; límite adaptativo exacto; memoria y frames dentro de presupuesto.
-- Validación: solo contrato/política y frontera 1100 px están probados.
-- Archivos relacionados: `workspace_models.dart`, shell y motor PDF.
-- Riesgos o limitaciones: duplicar el visor actual sin ownership causaría fugas.
-- Notas técnicas: no se anuncia en UI hasta superar perfil nativo.
-
-### Subtareas
-
-- [x] Definir estado, orientación, ratio y política.
-- [ ] Implementar ownership de dos controladores/handles.
-- [ ] Perfilar resize, sincronización y cierre repetido.
-
-## YAM-063 — Comparación sincronizada
-
-- Prioridad: P1
-- Estado: BLOCKED
-- Dependencias: YAM-062
-- Objetivo: comparar ediciones con navegación proporcional o por página.
-- Alcance: vínculo/desvínculo, offset, páginas de distinto tamaño y foco.
-- Criterios de aceptación: sincronización no recursiva; pausa manual; indicador
-  visible; comportamiento definido ante recuentos distintos.
-- Validación: bloqueada hasta existir split real.
-- Archivos relacionados: workspaces, lectores y navegación.
-- Riesgos o limitaciones: correspondencia semántica no se puede inferir.
-- Notas técnicas: no incluye diff visual ni análisis de contenido.
-
-### Subtareas
-
-- [ ] Elegir política proporcional/página mediante prueba de usuario.
-- [ ] Añadir guardas contra feedback de scroll.
-- [ ] Validar pares de documentos heterogéneos.
-
-## YAM-064 — Perfiles de lectura
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-009, YAM-024
-- Objetivo: aplicar configuraciones coherentes por intención.
-- Alcance: Lectura, Estudio, Presentación, Noche, eInk y Comparación.
-- Criterios de aceptación: aplicación atómica; nombres accesibles; fallback;
-  safe mode ignora personalizados; sin alterar el PDF.
-- Validación: modelos/controlador y selector en ajustes.
-- Archivos relacionados: `lib/features/profiles`, ajustes y shell.
-- Riesgos o limitaciones: CRUD de perfiles personalizados queda pendiente.
-- Notas técnicas: los built-ins son inmutables y no requieren esquema complejo.
-
-### Subtareas
-
-- [x] Definir y aplicar seis perfiles base.
-- [ ] Añadir CRUD/duplicado/importación de perfiles personalizados.
-- [ ] Probar combinaciones con densidad y movimiento reducido.
-
-## YAM-065 — Modo estudio
-
+- Estado: PLANNED
 - Prioridad: P2
-- Estado: TODO
-- Dependencias: YAM-051, YAM-064
-- Objetivo: concentrar índice, anotaciones y lectura en una sesión de estudio.
-- Alcance: composición de tres zonas, atajos, sesión y recuperación.
-- Criterios de aceptación: paneles colapsables; foco lógico; documento domina;
-  una sola instancia por panel; restauración local.
-- Validación: perfil Estudio y paneles existen, composición dedicada pendiente.
-- Archivos relacionados: lector, perfiles, paneles y workspaces.
-- Riesgos o limitaciones: tres zonas pueden degradar legibilidad en ancho medio.
-- Notas técnicas: usar los paneles existentes, no duplicar controladores.
+- Esfuerzo: L
+- Fase: 1
+- Áreas: FUNC, EFF, VIS
+- Dependencias: YAM-120
+- Problema: dos documentos relacionados requieren avanzar de forma coordinada,
+  pero una sincronización rígida puede impedir inspeccionar diferencias.
+- Resultado esperado: sincronizar página, zoom o posición de forma opcional y
+  desacoplar temporalmente sin perder el vínculo.
+- Cambios funcionales y técnicos:
+  - Definir modos independiente, página, zoom y posición.
+  - Evitar bucles de eventos mediante origen y generación.
+  - Permitir offset de páginas entre documentos.
+  - Mostrar estado de vínculo y acción de resincronizar.
+- Visual y accesibilidad: indicador discreto con texto/semántica, no solo icono
+  o color.
+- Rendimiento, memoria y privacidad: sincronización no duplica render ni
+  persiste contenido.
+- Casos límite y errores: distinto número/tamaño de páginas, rotación, fin de un
+  documento y usuario manipulando ambos lados.
+- Criterios de aceptación:
+  - [ ] No existen bucles de navegación.
+  - [ ] Desacoplar conserva ambos viewports.
+  - [ ] Resincronizar tiene destino predecible.
+  - [ ] Estado se anuncia y puede cambiarse con teclado.
+- Validación: tests de política, widgets e integración.
+- Riesgos y fuera de alcance: no se compararán píxeles ni texto
+  automáticamente.
 
-### Subtareas
+#### YAM-122 — Ventanas de lectura independientes
 
-- [ ] Diseñar composición expandida/compacta.
-- [ ] Añadir sesión y atajos propios.
-- [ ] Perfilar documento largo con ambos paneles.
-
-## YAM-066 — Presentación endurecida
-
+- Estado: PLANNED
 - Prioridad: P2
-- Estado: REVIEW
-- Dependencias: YAM-007, YAM-064
-- Objetivo: aplicar una experiencia de presentación mínima y estable.
-- Alcance: perfil, página única, chrome oculto, navegación y pantalla completa.
-- Criterios de aceptación: salida evidente; controles por teclado; cursor/chrome
-  recuperables; no modificar progreso accidentalmente si se desactiva.
-- Validación: perfil, modo libro y pantalla completa automatizados.
-- Archivos relacionados: perfiles, lector y servicio de ventana.
-- Riesgos o limitaciones: keep-awake y ocultación temporal del cursor pendientes.
-- Notas técnicas: no añadir plugin sin ADR y medición.
+- Esfuerzo: XL
+- Fase: 1
+- Áreas: FUNC, REL, WIN
+- Dependencias: YAM-104, YAM-111, YAM-120
+- Problema: una sola ventana limita consultas paralelas, pero multi-window puede
+  duplicar servicios globales y romper shortcuts o cierre.
+- Resultado esperado: abrir hasta dos ventanas lectoras con contexto y recursos
+  bien delimitados.
+- Cambios funcionales y técnicos:
+  - Prototipar ownership por ventana y servicios compartidos seguros.
+  - Enrutar comandos, diálogos y notificaciones a la ventana activa.
+  - Definir restauración opt-in y límites de ventanas.
+  - Coordinar cierre del último proceso y base compartida.
+- Visual y accesibilidad: título, taskbar, foco y diálogos pertenecen a su
+  ventana; no aparecen controles globales ambiguos.
+- Rendimiento, memoria y privacidad: límite de dos lectores y presupuesto
+  agregado.
+- Casos límite y errores: cerrar principal antes que secundaria, mismo PDF,
+  monitor desconectado y actualización concurrente de progreso.
+- Criterios de aceptación:
+  - [ ] Cada ventana tiene estado y comandos propios.
+  - [ ] Base compartida no produce carreras.
+  - [ ] Cerrar todas deja cero handles.
+  - [ ] Restauración nunca abre rutas ausentes en bucle.
+- Validación: spike nativo, ADR, integración multi-window y perfil.
+- Riesgos y fuera de alcance: no se añade plugin hasta aprobar licencia,
+  mantenimiento y bundle.
 
-### Subtareas
+#### YAM-123 — Presentación y pantalla completa endurecidas
 
-- [x] Añadir perfil Presentación.
-- [ ] Implementar cursor/keep-awake con API nativa evaluada.
-- [ ] Ejecutar sesión manual multi-monitor.
-
-## YAM-067 — Diagnóstico local seguro
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-011, YAM-034
-- Objetivo: inspeccionar salud y rendimiento sin exponer contenido privado.
-- Alcance: versión, plataforma, esquema, integridad, caché, conteos, motor,
-  verificar, optimizar, limpiar y exportar informe.
-- Criterios de aceptación: rutas enmascaradas; sin títulos/consultas/notas;
-  acciones destructivas confirmadas; copia/exportación explícitas.
-- Validación: test de redacción, integridad y diálogo integrado.
-- Archivos relacionados: `lib/features/diagnostics`, ajustes y base.
-- Riesgos o limitaciones: abrir carpeta delega en el sistema por acción manual.
-- Notas técnicas: todos los campos exportables viven en allowlist.
-
-### Subtareas
-
-- [x] Implementar informe redaccionado y acciones.
-- [x] Añadir copia/exportación y confirmaciones.
-- [ ] Revisar reporte en todas las plataformas objetivo.
-
-## YAM-068 — Modo seguro de arranque
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-040, YAM-067
-- Objetivo: recuperarse de cierres repetidos sin bucle de restauración.
-- Alcance: contador de arranques no limpios, umbral tres, preferencias por
-  defecto y omisión de sesión.
-- Criterios de aceptación: tercer arranque entra en safe mode; cierre limpio
-  reinicia contador; banner/indicador; no borra datos.
-- Validación: prueba de tres reinicios y composición del shell.
-- Archivos relacionados: `AppDatabase`, `AppServices`, app y biblioteca.
-- Riesgos o limitaciones: no distingue crash de cierre forzado por el usuario.
-- Notas técnicas: estado mínimo en `app_metadata`, sin telemetría.
-
-### Subtareas
-
-- [x] Registrar arranque y cierre limpios.
-- [x] Evitar restauración y temas personalizados en modo seguro.
-- [ ] Añadir acción UI para salir/reintentar de forma explícita.
-
-## YAM-069 — Integridad y migraciones recuperables
-
-- Prioridad: P0
-- Estado: REVIEW
-- Dependencias: YAM-038, YAM-067
-- Objetivo: migrar datos privados de forma atómica y recuperable.
-- Alcance: esquema v2, copia pre-migración, transacción, integrity check y
-  compatibilidad de backup v1/v2.
-- Criterios de aceptación: fallo revierte; copia previa existe; FK válidas;
-  datos v1 sobreviven; índice reconstruible no se copia.
-- Validación: migración v1→v2, backup y `PRAGMA integrity_check` automatizados.
-- Archivos relacionados: `app_database.dart`, `local_backup_service.dart`.
-- Riesgos o limitaciones: `VACUUM INTO` depende de espacio libre suficiente.
-- Notas técnicas: nunca se reemplaza una DB sin validación posterior.
-
-### Subtareas
-
-- [x] Implementar migración transaccional y copia previa.
-- [x] Extender backup y clear policies.
-- [ ] Simular falta de espacio/corrupción en Windows.
-
-## YAM-070 — Sistema visual de tercera generación
-
-- Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-017, YAM-033
-- Objetivo: integrar superficies avanzadas sin perder ligereza editorial.
-- Alcance: tabs, panel de anotaciones, colecciones, estados compactos/oscuros,
-  semántica y feedback.
-- Criterios de aceptación: PDF domina; sin overflow; jerarquía clara; foco,
-  tooltips y objetivos; cero paquete visual nuevo.
-- Validación: 14 capturas reproducibles revisadas visualmente en Windows.
-- Archivos relacionados: presentación, tokens, `docs/screenshots`.
-- Riesgos o limitaciones: DPI 100/150/200 y Narrador siguen manuales.
-- Notas técnicas: se reutilizan tokens y primitivas Material existentes.
-
-### Subtareas
-
-- [x] Capturar lector y biblioteca en estados nuevos.
-- [x] Revisar ancha, filtrada, compacta y oscura.
-- [ ] Completar matriz nativa de accesibilidad/DPI.
-
-## YAM-071 — Ayuda contextual y privacidad visible
-
+- Estado: PLANNED
 - Prioridad: P2
-- Estado: REVIEW
-- Dependencias: YAM-067
-- Objetivo: explicar funciones sensibles desde su contexto.
-- Alcance: ayuda en ajustes, índice local, backups, recuperación y diagnóstico.
-- Criterios de aceptación: texto breve; riesgos antes de la acción; sin web
-  obligatoria; accesible por teclado y lectores de pantalla.
-- Validación: textos y navegación integrados en ajustes/diálogos.
-- Archivos relacionados: ajustes, diálogos y `PRIVACY.md`.
-- Riesgos o limitaciones: falta un centro de ayuda completo y localizable.
-- Notas técnicas: no duplicar manuales extensos dentro de la UI.
+- Esfuerzo: M
+- Fase: 1
+- Áreas: FUNC, VIS, A11Y, WIN
+- Dependencias: YAM-101, YAM-114, YAM-118
+- Problema: una sesión de presentación necesita chrome mínimo, salida clara y
+  control de suspensión sin convertir el lector en una interfaz distinta.
+- Resultado esperado: mostrar el PDF de forma inmersiva y salir siempre con
+  Escape o un control revelable.
+- Cambios funcionales y técnicos:
+  - Añadir keep-awake local y opt-in durante presentación.
+  - Ocultar panel, barras y zonas decorativas sin perder navegación.
+  - Restaurar geometría y chrome al salir.
+  - Manejar pérdida de foco, monitor y cierre.
+- Visual y accesibilidad: indicador temporal de entrada/salida, control
+  accesible y movimiento reducido.
+- Rendimiento, memoria y privacidad: no precargar todo el documento ni registrar
+  duración.
+- Casos límite y errores: Escape capturado por diálogo, taskbar, doble monitor,
+  cambio DPI y app minimizada.
+- Criterios de aceptación:
+  - [ ] Siempre existe salida por teclado.
+  - [ ] Keep-awake termina al salir o cerrar.
+  - [ ] Viewport se restaura sin salto.
+  - [ ] No queda chrome interactivo invisible.
+- Validación: widgets, integración Windows y recorrido manual en dos monitores.
+- Riesgos y fuera de alcance: no incluye control remoto ni transmisión.
 
-### Subtareas
+#### YAM-124 — Impresión local explícita
 
-- [x] Añadir ayuda a acciones nuevas de mayor riesgo.
-- [ ] Completar inventario de tooltips/semántica.
-- [ ] Validar lenguaje con prueba de usuario.
+- Estado: PLANNED
+- Prioridad: P2
+- Esfuerzo: XL
+- Fase: 1
+- Áreas: FUNC, REL, WIN
+- Dependencias: YAM-100, YAM-103, YAM-160
+- Problema: imprimir exige integración Windows segura y puede crear copias
+  temporales o exponer rutas si se delega sin contrato.
+- Resultado esperado: imprimir el PDF o un rango mediante diálogo nativo y
+  acción inequívoca.
+- Cambios funcionales y técnicos:
+  - Evaluar API nativa o dependencia mantenida mediante ADR.
+  - Delegar documento original sin copiarlo silenciosamente cuando sea posible.
+  - Soportar rango, orientación y cancelación proporcionados por Windows.
+  - Limpiar temporales si la plataforma exige generarlos.
+- Visual y accesibilidad: comando visible en ficha/paleta, diálogo nativo y
+  errores claros con foco restaurado.
+- Rendimiento, memoria y privacidad: no registrar impresora, rango o ruta; no
+  mantener documento después de cancelar.
+- Casos límite y errores: PDF cifrado, impresora ausente, spooler detenido,
+  rango inválido y cancelación.
+- Criterios de aceptación:
+  - [ ] Imprimir requiere acción explícita.
+  - [ ] Cancelar no deja temporales propios.
+  - [ ] Errores no cierran el lector.
+  - [ ] Dependencia/licencia/bundle quedan aprobados.
+- Validación: pruebas de contrato, smoke con impresora virtual y cancelación.
+- Riesgos y fuera de alcance: no incluye edición, firma ni creación de un PDF
+  alternativo.
 
-## YAM-072 — Integración Windows y apertura múltiple
+### Fase 2 — Biblioteca y organización
 
+#### YAM-130 — Biblioteca escalable a 5.000 documentos
+
+- Estado: PLANNED
 - Prioridad: P1
-- Estado: REVIEW
-- Dependencias: YAM-015, YAM-053
-- Objetivo: aceptar varios PDF desde argumentos/drop y registrarlos como
-  contextos documentales suspendibles.
-- Alcance: deduplicación, máximo acotado, primera activa y errores aislados.
-- Criterios de aceptación: argumentos múltiples conservan orden; drop múltiple
-  no bloquea; cada documento valida; no se abren conexiones.
-- Validación: bootstrap unitario, integración de drop y build Windows.
-- Archivos relacionados: bootstrap, shell, biblioteca y runner Windows.
-- Riesgos o limitaciones: asociación de archivos/Jump List/menú contextual del
-  instalador no están configurados.
-- Notas técnicas: empaquetado y firma permanecen en YAM-016.
+- Esfuerzo: XL
+- Fase: 2
+- Áreas: FUNC, PERF, EFF
+- Dependencias: YAM-153, YAM-154
+- Problema: mantener todos los documentos y cálculos visuales residentes no es
+  sostenible al crecer desde decenas a miles.
+- Resultado esperado: buscar, filtrar, ordenar y recorrer 5.000 documentos con
+  respuesta inmediata y memoria acotada.
+- Cambios funcionales y técnicos:
+  - Introducir consultas paginadas y ventanas de datos.
+  - Separar conteos/filtros del materializado de tarjetas.
+  - Mantener selección por identidad aunque salga del viewport.
+  - Virtualizar layouts y medir coste de jitter, portadas y semántica.
+- Visual y accesibilidad: posición estable, skeleton discreto y anuncio de
+  recuento sin crear miles de nodos semánticos.
+- Rendimiento, memoria y privacidad: consultas p95 inferiores a 20 ms; no cargar
+  blobs ni texto PDF en la biblioteca.
+- Casos límite y errores: cero resultados, filtro cambia durante paginación,
+  elemento retirado y orden con valores nulos.
+- Criterios de aceptación:
+  - [ ] 5.000 documentos no construyen 5.000 widgets.
+  - [ ] Scroll, selección y filtros permanecen estables.
+  - [ ] Memoria no crece linealmente con páginas ya descartadas.
+  - [ ] Consultas cumplen gate.
+- Validación: benchmark SQLite, widgets con dataset sintético e integración.
+- Riesgos y fuera de alcance: no se convierte Yamantaka en gestor documental
+  empresarial ni se escanea el disco completo.
 
-### Subtareas
+#### YAM-131 — Cola de importación recuperable
 
-- [x] Aceptar y deduplicar múltiples rutas.
-- [x] Integrar apertura acotada en contextos internos.
-- [ ] Configurar y validar asociaciones en paquete firmado.
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 2
+- Áreas: FUNC, EFF, REL, A11Y
+- Dependencias: YAM-105, YAM-130
+- Problema: una importación grande necesita progreso, cancelación y errores por
+  archivo sin bloquear registro o portada.
+- Resultado esperado: revisar una carpeta, confirmar, importar y continuar
+  usando la biblioteca mientras la cola termina.
+- Cambios funcionales y técnicos:
+  - Separar descubrimiento, inspección, registro, portada e indexación.
+  - Persistir solo trabajos confirmados que puedan reanudarse de forma segura.
+  - Aislar fallos por archivo y permitir reintento.
+  - Deduplicar rutas y huellas antes de trabajo costoso.
+- Visual y accesibilidad: resumen compacto, progreso por fases, lista de errores
+  navegable y cancelación anunciada.
+- Rendimiento, memoria y privacidad: concurrencia acotada, sin lectura completa
+  innecesaria ni rutas en logs.
+- Casos límite y errores: carpeta desconectada, permisos, symlinks, miles de
+  archivos, cancelación y cierre.
+- Criterios de aceptación:
+  - [ ] Biblioteca sigue receptiva.
+  - [ ] Cancelar detiene trabajo futuro y conserva registros válidos.
+  - [ ] Reabrir no duplica documentos.
+  - [ ] Error individual no aborta el lote.
+- Validación: tests de cola, filesystem temporal, widgets e integración.
+- Riesgos y fuera de alcance: no se monitorizan carpetas hasta YAM-133.
 
-## YAM-073 — Gate de rendimiento de funciones avanzadas
+#### YAM-132 — Duplicados y fusión segura de metadatos
 
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 2
+- Áreas: FUNC, REL
+- Dependencias: YAM-130, YAM-131
+- Problema: copias o rutas movidas pueden fragmentar progreso, etiquetas,
+  anotaciones y portadas.
+- Resultado esperado: identificar duplicados probables y resolverlos sin borrar
+  archivos ni perder información.
+- Cambios funcionales y técnicos:
+  - Clasificar coincidencia exacta, probable y solo-ruta.
+  - Mostrar diferencias de metadata antes de fusionar.
+  - Definir precedencia explícita por campo y conservar backup transaccional.
+  - Permitir mantener ambos documentos.
+- Visual y accesibilidad: comparación textual sobria, foco claro y confirmación
+  que explica que los PDF no se borran.
+- Rendimiento, memoria y privacidad: hashes progresivos y reutilizables; no
+  enviar muestras ni nombres fuera del dispositivo.
+- Casos límite y errores: archivos iguales modificados, anotaciones en conflicto,
+  ruta inaccesible y fusión interrumpida.
+- Criterios de aceptación:
+  - [ ] Nunca se fusiona automáticamente un caso probable.
+  - [ ] La operación es transaccional y reversible mediante prebackup.
+  - [ ] Progreso, historial y anotaciones tienen regla documentada.
+  - [ ] Mantener ambos sigue disponible.
+- Validación: repositorio, migración, conflictos y diálogo accesible.
+- Riesgos y fuera de alcance: no se borran duplicados físicos ni se compara
+  contenido visual página a página.
+
+#### YAM-133 — Recuperación y carpetas autorizadas
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: XL
+- Fase: 2
+- Áreas: FUNC, EFF, REL, WIN
+- Dependencias: YAM-105, YAM-130, YAM-132
+- Problema: documentos movidos quedan ausentes y una monitorización indiscriminada
+  sería costosa e invasiva.
+- Resultado esperado: relocalizar archivos de forma asistida y observar solo
+  carpetas elegidas expresamente.
+- Cambios funcionales y técnicos:
+  - Buscar por nombre, tamaño, fecha y huella dentro de una raíz confirmada.
+  - Añadir watchers con debounce, límites y pausa.
+  - Convertir eventos en revalidaciones, no en importaciones automáticas.
+  - Mostrar propuesta antes de cambiar una ruta.
+- Visual y accesibilidad: estado Ausente conserva geometría, acción Localizar y
+  explicación del alcance observado.
+- Rendimiento, memoria y privacidad: no escanear unidades completas; watchers
+  pausados cuando la carpeta no existe o la app está inactiva.
+- Casos límite y errores: unidad externa, rename masivo, tormenta de eventos,
+  symlink, permisos y dos candidatos.
+- Criterios de aceptación:
+  - [ ] Solo se observan raíces autorizadas.
+  - [ ] Ningún evento borra o importa automáticamente.
+  - [ ] Relocalización requiere confirmación si no es exacta.
+  - [ ] Pausa y retirada de permiso son inmediatas.
+- Validación: filesystem temporal, eventos simulados e integración Windows.
+- Riesgos y fuera de alcance: no hay indexador de todo el sistema.
+
+#### YAM-134 — Organización y vistas inteligentes
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 2
+- Áreas: FUNC, VIS, EFF
+- Dependencias: YAM-130, YAM-138, YAM-153
+- Problema: colecciones, etiquetas, favoritos, estado y búsqueda pueden saturar
+  la interfaz si se presentan como controles independientes permanentes.
+- Resultado esperado: guardar combinaciones útiles como vistas y recuperarlas
+  desde una superficie compacta.
+- Cambios funcionales y técnicos:
+  - Definir reglas tipadas sobre metadata local.
+  - Permitir colecciones manuales y vistas calculadas claramente diferenciadas.
+  - Guardar filtro, orden y densidad sin guardar consultas sensibles por defecto.
+  - Evaluar reglas en una consulta o pasada medible.
+- Visual y accesibilidad: selector editorial, recuento, estado vacío y acción de
+  editar; sin nube de chips.
+- Rendimiento, memoria y privacidad: reglas locales, paginadas e indexadas; las
+  consultas textuales requieren opt-in para guardarse.
+- Casos límite y errores: regla vacía, colección borrada, nombre duplicado y
+  regla incompatible tras migración.
+- Criterios de aceptación:
+  - [ ] Reglas son comprensibles y reversibles.
+  - [ ] Combinar filtros no multiplica consultas.
+  - [ ] Borrar vista no afecta documentos.
+  - [ ] Teclado completa crear, activar y eliminar.
+- Validación: dominio, repositorio, consultas, widgets y backup.
+- Riesgos y fuera de alcance: no se incluye lenguaje de consultas arbitrario.
+
+#### YAM-135 — Acciones masivas accesibles
+
+- Estado: PLANNED
+- Prioridad: P2
+- Esfuerzo: L
+- Fase: 2
+- Áreas: FUNC, VIS, A11Y, REL
+- Dependencias: YAM-130, YAM-134
+- Problema: repetir la misma acción documento a documento es ineficiente, pero
+  una selección masiva puede ocultar riesgos.
+- Resultado esperado: seleccionar varios artefactos y ejecutar acciones locales
+  seguras con resumen previo.
+- Cambios funcionales y técnicos:
+  - Añadir selección múltiple por Ctrl/Shift y comandos.
+  - Implementar favorito, etiquetas, colección, archivar, retirar y regenerar
+    portada.
+  - Separar operaciones reversibles de las que requieren confirmación.
+  - Procesar lotes con progreso y errores por elemento.
+- Visual y accesibilidad: barra contextual temporal, recuento anunciado y foco
+  visible en cada seleccionado.
+- Rendimiento, memoria y privacidad: operaciones agrupadas y transaccionales
+  cuando proceda; no cargar PDF para cambios de metadata.
+- Casos límite y errores: selección filtrada, elemento desaparece, fallo parcial
+  y Escape.
+- Criterios de aceptación:
+  - [ ] Selección no depende solo del color.
+  - [ ] Retirar nunca borra el PDF.
+  - [ ] Fallo parcial muestra resultado por elemento.
+  - [ ] Escape limpia selección y restaura foco.
+- Validación: dominio de selección, widgets, repositorio y Narrador.
+- Riesgos y fuera de alcance: no habrá mover/copiar/borrar archivos en lote.
+
+#### YAM-136 — Pipeline de portadas mejorado
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 2
+- Áreas: FUNC, PERF, VIS, REL
+- Dependencias: YAM-105, YAM-111, YAM-130
+- Problema: una cola serial segura puede tardar con miles de documentos y no
+  explica si una portada está pendiente, cancelada o fallida.
+- Resultado esperado: portadas nítidas y estables aparecen según prioridad
+  visible sin bloquear importación.
+- Cambios funcionales y técnicos:
+  - Priorizar documentos visibles, seleccionados y recién abiertos.
+  - Mantener escalas por DPR y regenerar al cambiar algoritmo.
+  - Añadir reintento acotado y estado de error persistible.
+  - Conservar selección manual como autoridad.
+  - Medir coste de scoring y codificación.
+- Visual y accesibilidad: placeholder mantiene proporción; pendiente/error se
+  distinguen por icono, texto y semántica.
+- Rendimiento, memoria y privacidad: máximo de trabajos, bytes y reintentos;
+  análisis local sin OCR.
+- Casos límite y errores: PDF cifrado, seis páginas vacías, cancelación,
+  documento retirado y cache sin espacio.
+- Criterios de aceptación:
+  - [ ] Visible gana prioridad sin starvation.
+  - [ ] Manual nunca es sobrescrita.
+  - [ ] Archivos parciales se eliminan.
+  - [ ] Cientos de portadas cumplen gate de memoria.
+- Validación: política de cola, fixtures, filesystem y perfil de biblioteca.
+- Riesgos y fuera de alcance: no se reconocerá semántica editorial mediante IA.
+
+#### YAM-137 — Editor local de metadatos
+
+- Estado: PLANNED
+- Prioridad: P2
+- Esfuerzo: M
+- Fase: 2
+- Áreas: FUNC, VIS, REL
+- Dependencias: YAM-130
+- Problema: títulos o autores extraídos pueden ser poco útiles y hoy no existe
+  una corrección local clara.
+- Resultado esperado: editar título, autor y notas de biblioteca sin tocar el
+  archivo PDF.
+- Cambios funcionales y técnicos:
+  - Separar metadata original, detectada y override local.
+  - Validar longitud, espacios y campos vacíos.
+  - Incluir overrides en backup, búsqueda e importación.
+  - Permitir restaurar valor original.
+- Visual y accesibilidad: formulario compacto con etiquetas persistentes,
+  errores asociados y foco predecible.
+- Rendimiento, memoria y privacidad: escritura SQLite pequeña y con debounce
+  solo cuando sea necesario.
+- Casos límite y errores: título vacío, caracteres Unicode, documento ausente,
+  conflicto de backup y edición concurrente.
+- Criterios de aceptación:
+  - [ ] PDF no cambia.
+  - [ ] Override domina en UI e índice.
+  - [ ] Restaurar elimina override.
+  - [ ] Backup conserva origen y override sin ambigüedad.
+- Validación: repositorio, backup, búsqueda y widgets.
+- Riesgos y fuera de alcance: no se editarán XMP, bookmarks o contenido interno.
+
+#### YAM-138 — Índice local incremental
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 2
+- Áreas: FUNC, PERF, EFF, REL
+- Dependencias: YAM-105, YAM-153
+- Problema: indexar todo de nuevo es costoso y una interrupción puede dejar
+  estados difíciles de explicar.
+- Resultado esperado: índice reconstruible, incremental, pausable y visible en
+  diagnóstico.
+- Cambios funcionales y técnicos:
+  - Versionar algoritmo y estado por documento/página.
+  - Priorizar documento activo y cambios de huella.
+  - Procesar lotes transaccionales.
+  - Exponer pausa, reanudar, reconstruir y borrar.
+  - Validar integridad entre índice y documentos.
+- Visual y accesibilidad: progreso en ajustes/privacidad, no banner permanente;
+  controles anunciados.
+- Rendimiento, memoria y privacidad: texto permanece SQLite local; consultas no
+  se registran ni persisten.
+- Casos límite y errores: cierre durante lote, disco lleno, documento cambia,
+  FTS no disponible y reconstrucción cancelada.
+- Criterios de aceptación:
+  - [ ] Reapertura continúa desde estado estable.
+  - [ ] Índice corrupto se reconstruye sin afectar metadata.
+  - [ ] Documento modificado invalida solo sus entradas.
+  - [ ] Pausa devuelve CPU/IO rápidamente.
+- Validación: migración, fallos inyectados, benchmark y búsqueda global.
+- Riesgos y fuera de alcance: no se indexan imágenes ni se hace OCR.
+
+#### YAM-139 — Espacios de trabajo y modo estudio
+
+- Estado: PLANNED
+- Prioridad: P2
+- Esfuerzo: XL
+- Fase: 2
+- Áreas: FUNC, VIS, A11Y
+- Dependencias: YAM-118, YAM-134, YAM-138
+- Problema: los contextos actuales pueden restaurar documentos, pero falta una
+  superficie coherente para sesiones de estudio sin añadir pestañas visibles.
+- Resultado esperado: fijar pocos documentos, notas y destinos dentro de un
+  workspace recuperable y discreto.
+- Cambios funcionales y técnicos:
+  - Definir inbox, documentos fijados, historial y nota de sesión.
+  - Abrir workspace desde paleta o biblioteca.
+  - Integrar split solo cuando YAM-120 esté disponible.
+  - Guardar contexto con límites y recuperación segura.
+- Visual y accesibilidad: overlay o diálogo dedicado, nunca franja persistente;
+  orden navegable y acciones con texto.
+- Rendimiento, memoria y privacidad: suspender documentos no visibles y guardar
+  solo IDs/posiciones locales.
+- Casos límite y errores: archivo ausente, workspace antiguo, más documentos que
+  límite y cierre inesperado.
+- Criterios de aceptación:
+  - [ ] No aparecen tabs sobre el lector.
+  - [ ] Reapertura falla de forma parcial y explicada.
+  - [ ] Documentos suspendidos no retienen PDFium.
+  - [ ] Teclado completa crear, abrir, ordenar y eliminar.
+- Validación: dominio, repositorio, recuperación, widgets e integración.
+- Riesgos y fuera de alcance: no hay colaboración, sincronización o canvas
+  infinito.
+
+### Fase 3 — Limpieza y evolución visual
+
+#### YAM-140 — Auditoría completa del sistema visual
+
+- Estado: READY
 - Prioridad: P0
-- Estado: REVIEW
-- Dependencias: YAM-048, YAM-053, YAM-057, YAM-069
-- Objetivo: medir búsqueda, colecciones, workspaces, frames, RSS y bundle.
-- Alcance: tres procesos sintéticos de 500 documentos y cinco pasadas Profile
-  con PDF reales controlados.
-- Criterios de aceptación: mediana/p95; integridad ok; cero handles pendientes;
-  informe sin datos privados; Release y ausencia de TCP verificadas.
-- Validación: tres JSON avanzados y `performance-profile.json`; falta otro
-  equipo/GPU para convertir cifras en umbral.
-- Archivos relacionados: `tool/benchmark_advanced_features.dart`,
-  `integration_test/performance_profile_test.dart`, `PERFORMANCE.md`.
-- Riesgos o limitaciones: un único equipo no demuestra ausencia de fugas.
-- Notas técnicas: conservar métricas bajo `build/`, nunca rutas o títulos.
+- Esfuerzo: L
+- Fase: 3
+- Áreas: VIS, EFF, A11Y
+- Dependencias: ninguna
+- Problema: aunque existen tokens, valores directos de tamaño, borde, sombra,
+  elevación o duración pueden producir divergencias.
+- Resultado esperado: todas las superficies comparten un lenguaje visual
+  pequeño, legible y fácil de ajustar.
+- Cambios funcionales y técnicos:
+  - Inventariar valores visuales y clasificarlos como token o excepción.
+  - Centralizar escalas tipográficas, espacios, tamaños, radios, bordes,
+    elevaciones, sombras y movimiento.
+  - Eliminar tokens duplicados o sin uso.
+  - Documentar cuándo una excepción está permitida.
+- Visual y accesibilidad: preservar identidad monocromática, foco fuerte y
+  contraste; reducir sombras y chrome.
+- Rendimiento, memoria y privacidad: tokens constantes; cero paquete visual
+  nuevo.
+- Casos límite y errores: tema oscuro, alto contraste, densidad compacta y
+  movimiento reducido.
+- Criterios de aceptación:
+  - [ ] No quedan valores mágicos repetidos sin justificar.
+  - [ ] Claro/oscuro comparten semántica.
+  - [ ] Cambiar un token no rompe geometría fuera de su categoría.
+  - [ ] Documentación y tests reflejan la escala final.
+- Validación: búsqueda estática, tests de tokens y revisión de capturas.
+- Riesgos y fuera de alcance: no se rediseñará branding ni se añadirá una nueva
+  librería de componentes.
 
-### Subtareas
+#### YAM-141 — Refinamiento visual de la biblioteca
 
-- [x] Ejecutar tres procesos y cinco pasadas Profile.
-- [x] Verificar integridad, frames, caché y liberación de recursos.
-- [ ] Comparar en otro hardware antes de activar gate regresivo.
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 3
+- Áreas: VIS, FUNC, A11Y, PERF
+- Dependencias: YAM-101, YAM-102, YAM-130, YAM-140
+- Problema: una colección espacial debe seguir siendo eficiente y predecible
+  cuando cambia cantidad, ventana, selección o metadata.
+- Resultado esperado: portadas con presencia editorial, información gradual y
+  navegación clara sin parecer una cuadrícula genérica.
+- Cambios funcionales y técnicos:
+  - Ajustar escala, jitter, ritmo, columnas y reserva de información.
+  - Reducir chrome de filtros y acciones permanentes.
+  - Unificar selección, foco, hover, ausente y error.
+  - Mantener slivers y caché física por DPR.
+- Visual y accesibilidad: selección no depende del color; título largo tiene
+  tooltip y semántica completa.
+- Rendimiento, memoria y privacidad: no animar listas completas ni decodificar
+  por encima del tamaño visible.
+- Casos límite y errores: 0, 1, 2, 6, 7, 100 y 5.000 elementos; portada extrema,
+  texto largo y ventana compacta.
+- Criterios de aceptación:
+  - [ ] No hay overlap o overflow en matriz.
+  - [ ] Foco visual sigue el orden de navegación.
+  - [ ] Información aparece sin salto de layout.
+  - [ ] 16:9/16:10/2K conservan densidad prevista.
+- Validación: geometría pura, widgets, capturas y perfil.
+- Riesgos y fuera de alcance: no se usa el logo ni se convierte en estantería
+  fotorrealista.
 
-## YAM-074 — Biblioteca de artefactos y portadas inteligentes locales
+#### YAM-142 — Simplificación del chrome del lector
 
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 3
+- Áreas: VIS, FUNC, A11Y
+- Dependencias: YAM-101, YAM-102, YAM-114, YAM-140
+- Problema: el lector acumula barra superior, controles inferiores, panel,
+  zonas laterales e indicadores que pueden competir con el PDF.
+- Resultado esperado: el documento domina y las acciones frecuentes siguen
+  disponibles sin menús profundos.
+- Cambios funcionales y técnicos:
+  - Auditar frecuencia de cada control.
+  - Mantener navegación, página, zoom, modo y panel en la primera capa.
+  - Mover acciones infrecuentes a menú/paleta.
+  - Unificar auto-hide global y preferencias por documento.
+  - Eliminar zonas invisibles en fullscreen.
+- Visual y accesibilidad: chrome compacto, foco visible, tooltips y etiquetas
+  semánticas completas.
+- Rendimiento, memoria y privacidad: ocultación no recrea el visor ni cambia
+  zoom; animaciones de 100–180 ms o cero.
+- Casos límite y errores: ratón quieto, teclado, campo de texto, fullscreen,
+  panel abierto y movimiento reducido.
+- Criterios de aceptación:
+  - [ ] PDF conserva viewport al mostrar/ocultar chrome.
+  - [ ] Acciones principales requieren máximo una interacción.
+  - [ ] Fullscreen no deja controles invisibles activos.
+  - [ ] Teclado revela controles y restaura foco.
+- Validación: widgets, capturas e integración.
+- Riesgos y fuera de alcance: no se ocultan funciones sin ruta alternativa.
+
+#### YAM-143 — Reorganización integral de Ajustes
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: XL
+- Fase: 3
+- Áreas: FUNC, VIS, A11Y
+- Dependencias: YAM-102, YAM-140
+- Problema: muchas capacidades locales pueden convertir Ajustes en una lista
+  extensa, difícil de buscar y con acciones de riesgo mezcladas.
+- Resultado esperado: encontrar una preferencia por intención, entender su
+  efecto y aplicarla sin alterar el contexto del lector.
+- Cambios funcionales y técnicos:
+  - Reagrupar en Apariencia, Lectura, Biblioteca, Atajos, Datos, Privacidad y
+    Avanzado.
+  - Añadir búsqueda local de etiquetas y descripciones.
+  - Separar preferencias inmediatas de operaciones.
+  - Diseñar preview ligero sin montar un PDF real.
+  - Detectar cambios externos y conflictos.
+- Visual y accesibilidad: navegación lateral en escritorio, fallback compacto,
+  encabezados persistentes y controles con labels.
+- Rendimiento, memoria y privacidad: búsqueda sobre catálogo estático; abrir
+  Ajustes no inicia indexación ni visor.
+- Casos límite y errores: ventana compacta, texto largo, reset parcial,
+  directorio no disponible y operación en progreso.
+- Criterios de aceptación:
+  - [ ] Cada ajuste tiene propietario, valor por defecto y efecto inmediato o
+    explícito.
+  - [ ] Cambiar tema/densidad no cambia zoom PDF.
+  - [ ] Reset explica alcance y conserva datos fuera de selección.
+  - [ ] Teclado y Narrador recorren todas las secciones.
+- Validación: catálogo, repositorio, widgets, capturas y Narrador.
+- Riesgos y fuera de alcance: no se añade cuenta, nube o telemetría.
+
+#### YAM-144 — Primitivas compartidas para overlays
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 3
+- Áreas: VIS, EFF, A11Y
+- Dependencias: YAM-102, YAM-140
+- Problema: diálogos, menús, paleta, tooltips y overlays pueden divergir en
+  tamaño, foco, elevación, cierre y mensajes.
+- Resultado esperado: superficies temporales coherentes y predecibles.
+- Cambios funcionales y técnicos:
+  - Crear primitivas para encabezado, acciones, ancho, scroll, loading y error.
+  - Unificar foco inicial, trampa de foco, Escape y restauración.
+  - Centralizar confirmaciones de riesgo.
+  - Definir límites por resolución y contenido.
+- Visual y accesibilidad: borde/elevación discretos, contraste AA y nombre/rol
+  correcto.
+- Rendimiento, memoria y privacidad: overlays cerrados liberan controladores y
+  no conservan entradas sensibles.
+- Casos límite y errores: overlay sobre fullscreen, diálogo anidado, texto largo,
+  teclado IME y operación asíncrona.
+- Criterios de aceptación:
+  - [ ] Escape cierra solo la capa superior.
+  - [ ] Foco vuelve al invocador.
+  - [ ] Ninguna superficie desborda ventana.
+  - [ ] Riesgo usa texto y no solo color.
+- Validación: tests de primitivas, auditoría de usos y capturas.
+- Riesgos y fuera de alcance: no se construirá un framework de UI separado de
+  Flutter/Material.
+
+#### YAM-145 — Estados vacíos, carga y error coherentes
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 3
+- Áreas: FUNC, VIS, A11Y, REL
+- Dependencias: YAM-103, YAM-140, YAM-144
+- Problema: ausencia, contraseña, corrupción, cancelación, fallo parcial y
+  recuperación requieren mensajes distintos y acciones seguras.
+- Resultado esperado: cada estado explica qué ocurrió, qué se conserva y cuál
+  es la siguiente acción recomendable.
+- Cambios funcionales y técnicos:
+  - Catalogar estados por feature y FailureKind.
+  - Asignar título, explicación, acción principal, secundaria y diagnóstico.
+  - Evitar spinners indefinidos mediante timeout y transición.
+  - Conservar geometría para reducir saltos.
+- Visual y accesibilidad: una acción principal, iconografía neutra, live region
+  para transiciones y foco inicial útil.
+- Rendimiento, memoria y privacidad: mensajes no incluyen ruta completa ni
+  debug privado.
+- Casos límite y errores: error durante error, reintento cancelado, sin espacio,
+  password errónea y archivo que desaparece.
+- Criterios de aceptación:
+  - [ ] Todos los fallos tipados tienen representación.
+  - [ ] Cancelación no se muestra como error crítico.
+  - [ ] Reintento no duplica trabajo.
+  - [ ] Narrador anuncia cambio una vez.
+- Validación: catálogo exhaustivo, widgets y corpus.
+- Riesgos y fuera de alcance: no se ocultan detalles necesarios; diagnóstico
+  ampliado queda en YAM-161.
+
+#### YAM-146 — Tipografía e iconografía
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: M
+- Fase: 3
+- Áreas: VIS, A11Y
+- Dependencias: YAM-140
+- Problema: escalas, truncado e iconos inconsistentes reducen claridad incluso
+  cuando el layout cabe.
+- Resultado esperado: lectura inmediata de jerarquía, acciones reconocibles y
+  texto legible en DPI alto.
+- Cambios funcionales y técnicos:
+  - Revisar escala tipográfica, alturas de línea y pesos.
+  - Normalizar iconos, tamaños ópticos y labels.
+  - Definir truncado, wrap y tooltip por tipo de contenido.
+  - Evitar caracteres Unicode usados como iconos de acción.
+- Visual y accesibilidad: texto ampliado no se corta; iconos tienen tooltip y
+  nombre semántico.
+- Rendimiento, memoria y privacidad: reutilizar fuentes del sistema; no añadir
+  paquetes o assets pesados.
+- Casos límite y errores: títulos CJK/RTL, rutas largas, zoom de texto y fuente
+  fallback.
+- Criterios de aceptación:
+  - [ ] Cada estilo tiene función documentada.
+  - [ ] No hay texto esencial truncado sin alternativa.
+  - [ ] Iconos iguales significan la misma acción.
+  - [ ] Matriz DPI conserva alineación.
+- Validación: capturas, auditoría semántica y prueba de strings extremos.
+- Riesgos y fuera de alcance: no se diseña una tipografía propia.
+
+#### YAM-147 — Layout adaptativo de escritorio
+
+- Estado: PLANNED
 - Prioridad: P0
-- Estado: REVIEW
-- Dependencias: YAM-018, YAM-027, YAM-069, YAM-070
-- Objetivo: sustituir la lista convencional por una colección espacial sobria
-  sin perder apertura, progreso, organización, persistencia ni accesibilidad.
-- Alcance: layout determinista, artefacto visual, navegación/foco, overlays,
-  búsqueda temporal, filtros combinados, favorito, detección local de portada,
-  dos miniaturas, selección manual, esquema v3 y emblema SVG.
-- Criterios de aceptación: posiciones estables; cero solapamiento inválido;
-  teclado/ratón/contextual completos; manual no sobrescrita; caché invalidada;
-  importación no bloqueada; claro/oscuro/compacto sin overflow; build Windows.
-- Validación: scoring, fallback, metadata, migración, 100 layouts, navegación,
-  filtros, widgets, análisis, suite, integración visual y build; Narrador/DPI
-  100/150/200 % requieren revisión nativa.
-- Archivos relacionados: `features/library`, `thumbnail_service.dart`,
-  `app_database.dart`, `document_repository.dart`, tokens, branding y pruebas.
-- Riesgos o limitaciones: heurística sin comprensión semántica; perfil sostenido
-  con cientos de portadas reales y matriz Narrador/DPI permanecen pendientes.
-- Notas técnicas: seis previews a baja escala, cola serial cancelable, FNV
-  estable, slivers desde siete objetos, cero API/IA/OCR/dependencia nueva.
+- Esfuerzo: L
+- Fase: 3
+- Áreas: VIS, FUNC, WIN
+- Dependencias: YAM-101, YAM-140
+- Problema: breakpoints generales no cubren por sí solos proporción, altura,
+  panel, DPI, ultrawide o cambios de monitor.
+- Resultado esperado: una interfaz estable para 16:9, 16:10, Full HD, 2K, 4K,
+  compacta y ultrawide.
+- Cambios funcionales y técnicos:
+  - Definir perfiles por espacio lógico disponible, no resolución física sola.
+  - Restar panel/chrome antes de calcular PDF y grid.
+  - Acotar ancho de lectura y distribuir espacio sobrante.
+  - Mantener mínimos de ventana y fallback de una columna.
+- Visual y accesibilidad: el PDF no se estira; controles no quedan lejos sin
+  razón y el orden visual coincide con foco.
+- Rendimiento, memoria y privacidad: DPR solo afecta decodificación física;
+  resize se debounced por frame.
+- Casos límite y errores: ultrawide, 4K a 200 %, ventana muy baja, taskbar y
+  cambio en vivo.
+- Criterios de aceptación:
+  - [ ] Todos los perfiles de G4 pasan.
+  - [ ] Full HD usa hasta ocho columnas y 2K hasta diez cuando procede.
+  - [ ] 16:10 aprovecha altura.
+  - [ ] Ultrawide conserva centro y escala legible.
+- Validación: métricas puras, widgets y matriz nativa.
+- Riesgos y fuera de alcance: no se optimiza para mosaicos de más de dos
+  ventanas simultáneas.
 
-### Subtareas
+#### YAM-148 — Accesibilidad completa con Narrador
 
-- [x] Implementar esquema v3, metadata y selección manual dominante.
-- [x] Implementar scoring visual/textual, fallback y caché pequeña/grande.
-- [x] Implementar artefactos, layout, navegación, overlays y acciones.
-- [x] Reemplazar buscador permanente y franja de pestañas por overlays y filtro
-  compacto combinable.
-- [x] Añadir pruebas unitarias, repositorio, widgets y fixture visual.
-- [ ] Completar Narrador y DPI nativo 100/150/200 % para pasar a `DONE`.
-
-## YAM-075 — Ownership de render y perfiles de escritorio
-
+- Estado: PLANNED
 - Prioridad: P0
-- Estado: REVIEW
-- Dependencias: YAM-034, YAM-070, YAM-074
-- Objetivo: cerrar invalidacion de imagenes cacheadas, cancelacion de trabajos
-  obsoletos y geometria segura para escritorios habituales.
-- Alcance: `RenderedPdfPage` prestado, cache LRU por bytes, tokens nativos,
-  miniaturas cancelables, historial con zoom/offset, `Ajustar ancho` top-align,
-  compactos sin overflow y perfiles 16:9/16:10/1920x1080/2560x1440.
-- Criterios de aceptacion: ningun consumidor dispone imagenes del motor;
-  cancelar no publica resultados obsoletos ni deja PNG parcial; historial y
-  resize conservan unidad/zoom/offset; columnas y slots caben en la ventana.
-- Validacion: formato, analisis de modulos independientes, pruebas nuevas y
-  `git diff --check` aprobados. Suite Flutter/Pub, build Windows, capturas,
-  Narrador y DPI nativo requieren desbloquear dependencias/runner.
-- Archivos relacionados: `pdf_engine`, `reader`, `features/library`, tokens y
-  `test/pdf_operation_token_test.dart`.
-- Riesgos o limitaciones: falta ejecutar el runner nativo en este entorno y no
-  se debe marcar `DONE` solo con pruebas de widget.
+- Esfuerzo: XL
+- Fase: 3
+- Áreas: A11Y, FUNC, WIN
+- Dependencias: YAM-101, YAM-140, YAM-147
+- Problema: semántica de widgets no demuestra comportamiento con Narrador,
+  teclado y DPI reales.
+- Resultado esperado: completar biblioteca, lector, panel, paleta, ajustes y
+  diálogos sin ratón.
+- Cambios funcionales y técnicos:
+  - Inventariar orden de foco y shortcuts por superficie.
+  - Añadir names, roles, states, values y live regions.
+  - Corregir anuncios duplicados y foco perdido.
+  - Documentar patrones de retorno tras overlay.
+  - Ejecutar matriz Narrador real.
+- Visual y accesibilidad: foco visible 3:1, objetivos de escritorio al menos
+  40×40 y estados no dependientes del color.
+- Rendimiento, memoria y privacidad: semántica virtualizada; no anunciar cientos
+  de elementos fuera del viewport.
+- Casos límite y errores: modal, fullscreen, resize, resultados dinámicos,
+  selección múltiple y movimiento reducido.
+- Criterios de aceptación:
+  - [ ] Flujos principales completados sin ratón.
+  - [ ] Narrador no duplica cambios.
+  - [ ] Foco nunca queda atrapado o perdido.
+  - [ ] Evidencia existe para cada superficie y DPI.
+- Validación: tests de semantics, checklist manual y grabación textual de
+  esperado/observado.
+- Riesgos y fuera de alcance: no se declarará DONE solo con tests Flutter.
 
-### Subtareas
+#### YAM-149 — Alto contraste, movimiento reducido y tinta electrónica
 
-- [x] Separar imagen prestada de la propiedad de cache y liberar excedentes.
-- [x] Propagar cancelacion a pdfrx y limpiar trabajos/archivos obsoletos.
-- [x] Cubrir layout compacto, Full HD/2K, viewport y shortcuts reservados.
-- [ ] Ejecutar suite Flutter completa, build Windows y diez capturas nuevas.
-- [ ] Completar Narrador y DPI nativo 100/125/150/200 % para pasar a `DONE`.
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 3
+- Áreas: VIS, A11Y, PERF, WIN
+- Dependencias: YAM-101, YAM-140, YAM-148
+- Problema: oscuro no equivale a alto contraste y un perfil e-ink requiere más
+  que desaturar colores.
+- Resultado esperado: superficies legibles con alto contraste de Windows,
+  animaciones eliminables y refresco visual contenido.
+- Cambios funcionales y técnicos:
+  - Detectar alto contraste del sistema y mapear tokens semánticos.
+  - Hacer que reduced motion elimine desplazamientos y fades no esenciales.
+  - Revisar perfil e-ink: blanco/negro, bordes claros, sin sombras y menos
+    repaints.
+  - Mantener feedback mediante forma, borde y texto.
+- Visual y accesibilidad: contraste AA/3:1 y foco siempre visible.
+- Rendimiento, memoria y privacidad: e-ink reduce animación y repaints; no cambia
+  calidad del PDF salvo opción explícita.
+- Casos límite y errores: cambio de tema en vivo, canvas oscuro, selección,
+  error y fullscreen.
+- Criterios de aceptación:
+  - [ ] Alto contraste no depende de temas personalizados.
+  - [ ] Reduced motion produce duración cero donde corresponde.
+  - [ ] E-ink elimina sombras/animación no esencial.
+  - [ ] Ningún estado desaparece por pérdida de color.
+- Validación: tests de tokens, capturas y revisión en dispositivo si está
+  disponible.
+- Riesgos y fuera de alcance: no se promete rendimiento de hardware e-ink sin
+  dispositivo real.
+
+### Fase 4 — Rendimiento, eficiencia y fiabilidad
+
+#### YAM-150 — Arranque perezoso
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 4
+- Áreas: PERF, EFF, REL
+- Dependencias: YAM-104
+- Problema: inicializar todos los servicios antes de mostrar biblioteca aumenta
+  latencia y acopla fallos secundarios al arranque.
+- Resultado esperado: ventana útil rápidamente y servicios secundarios
+  inicializados después o bajo demanda.
+- Cambios funcionales y técnicos:
+  - Medir bootstrap por servicio.
+  - Clasificar crítico, diferible y bajo demanda.
+  - Iniciar diagnóstico, índice, portadas y mantenimiento después del primer
+    frame estable.
+  - Aislar fallos secundarios y exponer reintento.
+- Visual y accesibilidad: biblioteca muestra contenido o estado inmediato, no
+  splash prolongado.
+- Rendimiento, memoria y privacidad: p95 de ventana visible ≤1,2 s; no iniciar
+  escaneos ocultos en primer frame.
+- Casos límite y errores: DB migrando, safe mode, restore opt-in, ruta explícita
+  y servicio diferido fallido.
+- Criterios de aceptación:
+  - [ ] Timeline identifica cada fase.
+  - [ ] Solo críticos bloquean primera superficie.
+  - [ ] Fallo diferido no cierra app.
+  - [ ] Gate de arranque se cumple.
+- Validación: instrumentación, procesos fríos e integración.
+- Riesgos y fuera de alcance: no se ocultan migraciones necesarias para
+  integridad.
+
+#### YAM-151 — Estado granular y reducción de rebuilds
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 4
+- Áreas: PERF, EFF
+- Dependencias: YAM-104, YAM-140
+- Problema: ChangeNotifier amplios pueden reconstruir superficies que no
+  consumen el valor modificado.
+- Resultado esperado: cambios de hover, progreso, zoom o búsqueda actualizan
+  únicamente widgets relevantes.
+- Cambios funcionales y técnicos:
+  - Perfilar rebuilds de biblioteca, lector y panel.
+  - Separar estado persistente, efímero y derivado.
+  - Introducir selectores/listenables pequeños donde la medición lo justifique.
+  - Encapsular repaints de portadas y páginas.
+- Visual y accesibilidad: optimización no retrasa foco, semántica o feedback.
+- Rendimiento, memoria y privacidad: reducir builds p95 y asignaciones sin
+  mantener copias de estado sensibles.
+- Casos límite y errores: selección rápida, zoom continuo, búsqueda incremental
+  y tema global.
+- Criterios de aceptación:
+  - [ ] Contadores muestran reducción en escenarios objetivo.
+  - [ ] No aparecen estados desincronizados.
+  - [ ] p95 de frame cumple G3.
+  - [ ] Tests existentes conservan comportamiento.
+- Validación: DevTools, contadores de debug, widgets y perfil.
+- Riesgos y fuera de alcance: no se migrará a otro framework de estado sin ADR.
+
+#### YAM-152 — Trabajos CPU/IO en segundo plano
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: XL
+- Fase: 4
+- Áreas: PERF, EFF, REL
+- Dependencias: YAM-105
+- Problema: hashing, indexación, análisis de portada y exportación pueden ocupar
+  el isolate UI.
+- Resultado esperado: operaciones pesadas avanzan sin jank y pueden cancelarse
+  o cerrarse de forma segura.
+- Cambios funcionales y técnicos:
+  - Medir primero qué trabajos superan el presupuesto.
+  - Definir mensajes serializables y resultados acotados.
+  - Mover hashing/indexación/scoring gradualmente.
+  - Mantener PDFium en el contexto seguro exigido por su binding.
+  - Integrar cancelación por generación.
+- Visual y accesibilidad: progreso no bloqueante y acciones cancelables.
+- Rendimiento, memoria y privacidad: evitar copiar bitmaps grandes entre
+  isolates; no serializar texto innecesario.
+- Casos límite y errores: isolate termina, cierre de app, trabajo compartido y
+  disco lleno.
+- Criterios de aceptación:
+  - [ ] Solo se migra trabajo medido como costoso.
+  - [ ] UI mantiene gate de frames.
+  - [ ] Cancelar no publica resultados.
+  - [ ] Fallo se recupera o informa por tarea.
+- Validación: benchmarks A/B, tests de mensajes e integración.
+- Riesgos y fuera de alcance: debe dividirse antes de IN_PROGRESS; no se moverá
+  PDFium si el binding no lo admite.
+
+#### YAM-153 — Optimización y mantenimiento SQLite
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 4
+- Áreas: PERF, EFF, REL
+- Dependencias: YAM-100, YAM-104
+- Problema: 5.000 documentos, índice y organización requieren consultas y
+  mantenimiento medidos.
+- Resultado esperado: biblioteca e índice responden dentro del gate y la base
+  puede repararse o compactarse de forma segura.
+- Cambios funcionales y técnicos:
+  - Capturar EXPLAIN QUERY PLAN para consultas críticas.
+  - Añadir solo índices con mejora demostrada.
+  - Paginar y agrupar transacciones.
+  - Programar optimize/checkpoint/compactación cuando la app esté inactiva y
+    haya espacio.
+  - Verificar integridad antes/después.
+- Visual y accesibilidad: mantenimiento manual muestra alcance y progreso;
+  automático no bloquea ni roba foco.
+- Rendimiento, memoria y privacidad: p95 <20 ms en dataset objetivo; DB nunca
+  sale del dispositivo.
+- Casos límite y errores: disco lleno, bloqueo, interrupción, índice corrupto y
+  migración antigua.
+- Criterios de aceptación:
+  - [ ] Cada índice tiene consulta y benchmark asociado.
+  - [ ] Mantenimiento es recuperable.
+  - [ ] Consultas cumplen gate.
+  - [ ] Integridad permanece ok.
+- Validación: benchmarks multiproceso, fallos inyectados y migraciones.
+- Riesgos y fuera de alcance: no se añade servidor de base de datos.
+
+#### YAM-154 — Gate de rendimiento
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 4
+- Áreas: PERF, REL, WIN
+- Dependencias: YAM-100, YAM-103
+- Problema: una única máquina y cinco pasadas internas no permiten convertir
+  observaciones en umbrales fiables.
+- Resultado esperado: detectar regresiones de arranque, frames, consultas,
+  apertura, render, búsqueda, scroll y cierre.
+- Cambios funcionales y técnicos:
+  - Versionar escenarios y baseline por hardware.
+  - Ejecutar procesos fríos y pasadas calientes.
+  - Registrar mediana, p95, máximos, bundle y contadores.
+  - Comparar con tolerancia de 10 % y exigir justificación.
+  - Añadir segundo equipo/GPU antes de fijar gate universal.
+- Visual y accesibilidad: escenarios incluyen tema, densidad, panel y DPI; el
+  benchmark no sustituye revisión visual.
+- Rendimiento, memoria y privacidad: informes redaccionados bajo build/; no
+  rutas, títulos o texto.
+- Casos límite y errores: ruido de antivirus, thermal throttling, GPU distinta y
+  corrida incompleta.
+- Criterios de aceptación:
+  - [ ] Baseline declara hardware, build y corpus.
+  - [ ] Regresión fuera de tolerancia falla.
+  - [ ] Cierre comprueba contadores propios.
+  - [ ] Dos equipos validan umbrales finales.
+- Validación: tres procesos fríos y siete pasadas por escenario.
+- Riesgos y fuera de alcance: no se publican cifras universales sin suficiente
+  muestra.
+
+#### YAM-155 — Pruebas sostenidas de recursos
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 4
+- Áreas: PERF, REL
+- Dependencias: YAM-104, YAM-105, YAM-111, YAM-154
+- Problema: una apertura limpia no revela fugas por listeners, handles, timers
+  o caches durante horas.
+- Resultado esperado: sesiones prolongadas mantienen contadores propios y
+  tendencia de memoria estables.
+- Cambios funcionales y técnicos:
+  - Crear soak de abrir/cerrar, buscar, panel, zoom, importar y limpiar.
+  - Medir handles, documentos, renders, bytes, jobs y timers.
+  - Tomar snapshots periódicos y detectar crecimiento monotónico.
+  - Repetir tras errores y cancelaciones.
+- Visual y accesibilidad: el soak verificará que la UI sigue receptiva y no
+  acumula overlays/anuncios.
+- Rendimiento, memoria y privacidad: corpus sintético; RSS como tendencia, no
+  único criterio.
+- Casos límite y errores: 500 ciclos, sleep/wake, minimización, cache clear y
+  cierre forzado.
+- Criterios de aceptación:
+  - [ ] Recursos propios vuelven a cero tras cada cierre lógico.
+  - [ ] No existe tendencia monotónica no explicada.
+  - [ ] P95 no degrada con el tiempo.
+  - [ ] Soak produce informe reproducible.
+- Validación: Profile/Release con snapshots y análisis manual.
+- Riesgos y fuera de alcance: el asignador puede retener RSS; se documentará sin
+  confundirlo con fuga.
+
+#### YAM-156 — Eficiencia energética e inactividad
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: M
+- Fase: 4
+- Áreas: PERF, EFF, WIN
+- Dependencias: YAM-105, YAM-112, YAM-150, YAM-154
+- Problema: prefetch, indexación, animaciones o timers pueden seguir consumiendo
+  recursos con la ventana minimizada o inactiva.
+- Resultado esperado: Yamantaka reduce actividad de fondo sin perder trabajo
+  confirmado.
+- Cambios funcionales y técnicos:
+  - Observar foco, visibilidad, minimización y energía cuando Windows lo permita.
+  - Pausar prefetch, portadas e índice no prioritario.
+  - Reducir timers periódicos y reanudar con backpressure.
+  - Mantener guardado crítico y cierre seguro.
+- Visual y accesibilidad: reanudar no muestra ráfagas de feedback ni roba foco.
+- Rendimiento, memoria y privacidad: medir CPU en idle y número de wakeups.
+- Casos límite y errores: presentación keep-awake, operación confirmada,
+  suspensión del sistema y reanudación con carpeta desconectada.
+- Criterios de aceptación:
+  - [ ] Idle/minimizada no mantiene trabajos no esenciales.
+  - [ ] Reanudar respeta prioridades.
+  - [ ] Datos confirmados se guardan.
+  - [ ] Presentación es excepción explícita.
+- Validación: perfil de CPU/energía, integración de lifecycle Windows.
+- Riesgos y fuera de alcance: no se prometerán métricas de batería en equipos
+  sin batería.
+
+#### YAM-157 — Backup y restauración de nueva generación
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: XL
+- Fase: 4
+- Áreas: FUNC, REL
+- Dependencias: YAM-103, YAM-153
+- Problema: al crecer metadata, índice y anotaciones aumenta el coste de una
+  restauración parcial o corrupta.
+- Resultado esperado: previsualizar, validar, restaurar y revertir datos locales
+  sin copiar PDF.
+- Cambios funcionales y técnicos:
+  - Versionar manifest, categorías y compatibilidad.
+  - Validar schema, hashes, tamaños y referencias antes de escribir.
+  - Crear prebackup y transacción de restauración.
+  - Añadir cifrado autenticado opcional solo tras ADR y auditoría.
+  - Excluir índice reconstruible cuando proceda.
+- Visual y accesibilidad: preview por categorías, riesgos antes de confirmar y
+  resultado detallado.
+- Rendimiento, memoria y privacidad: streaming y límites de tamaño; contraseña
+  nunca persistida ni registrada.
+- Casos límite y errores: contraseña errónea, espacio insuficiente, versión
+  futura, archivo truncado y cancelación.
+- Criterios de aceptación:
+  - [ ] Fallo deja estado previo intacto.
+  - [ ] Prebackup existe y se valida.
+  - [ ] PDF nunca entra en backup.
+  - [ ] Cifrado, si se adopta, es autenticado y versionado.
+- Validación: round-trip, versiones, corrupción, falta de espacio y rollback.
+- Riesgos y fuera de alcance: cifrado requiere dependencia/cripto revisada; no
+  hay recuperación de contraseña.
+
+#### YAM-158 — Recuperación y safe mode endurecidos
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 4
+- Áreas: REL, FUNC
+- Dependencias: YAM-103, YAM-104, YAM-153, YAM-157
+- Problema: cierres inesperados, migraciones fallidas, falta de espacio o base
+  corrupta necesitan rutas de recuperación distintas.
+- Resultado esperado: volver a una biblioteca utilizable sin borrar datos ni
+  repetir el fallo.
+- Cambios funcionales y técnicos:
+  - Clasificar causa probable y último checkpoint seguro.
+  - Omitir restauración/documento/feature problemática en safe mode.
+  - Ofrecer integrity check, backup, reconstrucción de índice y reintento.
+  - Registrar solo contadores y códigos redaccionados.
+- Visual y accesibilidad: banner sobrio con acción clara; modo oscuro se
+  conserva; foco llega a la recuperación.
+- Rendimiento, memoria y privacidad: safe mode desactiva trabajo secundario y no
+  expone rutas.
+- Casos límite y errores: tres cierres, crash durante recuperación, DB ilegible,
+  backup inválido y disco lleno.
+- Criterios de aceptación:
+  - [ ] No hay bucle de arranque.
+  - [ ] Ninguna acción destructiva es automática.
+  - [ ] Cierre limpio reinicia contador.
+  - [ ] Usuario puede salir o reintentar explícitamente.
+- Validación: arranques simulados, DB corrupta, migración y widgets.
+- Riesgos y fuera de alcance: no se diagnostica automáticamente la causa exacta
+  de un kill del sistema.
+
+#### YAM-159 — Centro de privacidad y almacenamiento
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 4
+- Áreas: FUNC, VIS, REL
+- Dependencias: YAM-137, YAM-138, YAM-157
+- Problema: biblioteca, portadas, índice, historial, workspaces y anotaciones
+  ocupan categorías distintas que el usuario debe entender y controlar.
+- Resultado esperado: ver tamaño, propósito y operaciones disponibles para cada
+  categoría local.
+- Cambios funcionales y técnicos:
+  - Calcular tamaños de DB, portadas, logs, diagnósticos y backups.
+  - Ofrecer limpiar cache, índice, historial, sesiones o todos los datos.
+  - Separar datos reconstruibles de datos personales.
+  - Integrar exportación previa y confirmaciones.
+- Visual y accesibilidad: tabla/lista clara, texto “los PDF no se borran” y
+  acciones con alcance.
+- Rendimiento, memoria y privacidad: cálculo incremental; no abrir cada PDF para
+  medir almacenamiento.
+- Casos límite y errores: archivo bloqueado, limpieza parcial, cálculo cancelado
+  y backup en otra ruta.
+- Criterios de aceptación:
+  - [ ] Cada categoría explica contenido y efecto.
+  - [ ] Limpiar no borra PDF.
+  - [ ] Fallo parcial se reporta.
+  - [ ] Reabrir refleja tamaño actualizado.
+- Validación: filesystem, repositorios, widgets y Narrador.
+- Riesgos y fuera de alcance: no gestiona espacio de otros programas.
+
+#### YAM-160 — Endurecimiento de seguridad local
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 4
+- Áreas: REL, FUNC, WIN
+- Dependencias: YAM-103, YAM-104
+- Problema: PDF protegidos, enlaces, rutas y errores nativos atraviesan límites
+  sensibles.
+- Resultado esperado: entradas no confiables no ejecutan acciones, filtran datos
+  o bloquean el proceso.
+- Cambios funcionales y técnicos:
+  - Revisar límites de tamaño, path normalization y validación de esquema.
+  - Aislar contraseña en memoria y borrarla al cerrar.
+  - Confirmar http/https/mailto y bloquear esquemas no autorizados.
+  - Limitar mensajes nativos y redacción de excepciones.
+  - Añadir smoke de cero red.
+- Visual y accesibilidad: confirmaciones explican destino y riesgo; password
+  tiene show/hide accesible y error no destructivo.
+- Rendimiento, memoria y privacidad: contraseña nunca se persiste; logs sin
+  rutas/texto.
+- Casos límite y errores: URI malformada, file URI, UNC, ruta larga, password
+  vacía y PDF hostil.
+- Criterios de aceptación:
+  - [ ] Esquemas no autorizados se bloquean.
+  - [ ] Contraseña no llega a repositorio/log.
+  - [ ] Smoke mantiene cero conexiones.
+  - [ ] Errores nativos se transforman en FailureKind seguro.
+- Validación: unitarias de entrada, corpus, integración y revisión de logs.
+- Riesgos y fuera de alcance: no sustituye auditoría de seguridad de PDFium.
+
+#### YAM-161 — Diagnóstico local redactado
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: M
+- Fase: 4
+- Áreas: REL, EFF
+- Dependencias: YAM-159, YAM-160
+- Problema: soporte necesita evidencia, pero rutas, títulos, consultas y notas
+  son información privada.
+- Resultado esperado: exportar voluntariamente un paquete útil y verificable
+  sin contenido personal.
+- Cambios funcionales y técnicos:
+  - Definir allowlist de versión, plataforma, esquema, conteos, integridad,
+    caches, tiempos y códigos de error.
+  - Redactar identificadores y excluir texto libre.
+  - Incluir manifest que declara campos.
+  - Mostrar preview antes de guardar.
+- Visual y accesibilidad: diálogo explica qué incluye/no incluye y permite
+  cancelar.
+- Rendimiento, memoria y privacidad: generación streaming, límite de logs y
+  verificador que falla si detecta patrones prohibidos.
+- Casos límite y errores: log malformado, ruta elegida no escribible, paquete
+  parcial y safe mode.
+- Criterios de aceptación:
+  - [ ] Preview coincide con manifest.
+  - [ ] Detector no encuentra rutas/títulos/consultas/notas.
+  - [ ] Exportación requiere acción explícita.
+  - [ ] Fallo elimina archivo parcial.
+- Validación: fixtures con secretos sembrados y escáner de salida.
+- Riesgos y fuera de alcance: no envía automáticamente el paquete.
+
+### Fase 5 — Integración y distribución Windows
+
+#### YAM-170 — Instalador firmado y reproducible
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: XL
+- Fase: 5
+- Áreas: WIN, REL
+- Dependencias: YAM-100, YAM-154, YAM-155, YAM-157, YAM-158, YAM-160
+- Problema: un build Release suelto no cubre firma, instalación, reparación,
+  desinstalación ni confianza de Windows.
+- Resultado esperado: paquete instalable, firmado, reproducible y documentado.
+- Cambios funcionales y técnicos:
+  - Comparar MSIX/MSI por asociaciones, firma, actualización manual y datos.
+  - Crear ADR y pipeline de empaquetado.
+  - Incluir licencias y metadatos correctos.
+  - Separar binarios de datos locales.
+  - Documentar renovación de certificado.
+- Visual y accesibilidad: nombre, icono, editor y diálogos del instalador
+  coherentes con la aplicación.
+- Rendimiento, memoria y privacidad: medir tamaño; instalador no añade servicios,
+  telemetría o red.
+- Casos límite y errores: actualización fallida, versión anterior, arquitectura
+  incorrecta y firma expirada.
+- Criterios de aceptación:
+  - [ ] Instalación limpia y reparación pasan.
+  - [ ] Firma es válida.
+  - [ ] Datos sobreviven actualización.
+  - [ ] Rollback tiene procedimiento probado.
+- Validación: VM Windows limpia, actualización y desinstalación.
+- Riesgos y fuera de alcance: no habrá auto-updater de red.
+
+#### YAM-171 — Asociación PDF e instancia única
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 5
+- Áreas: FUNC, WIN, REL
+- Dependencias: YAM-170
+- Problema: abrir varios PDF desde Explorer puede crear procesos competidores o
+  perder argumentos.
+- Resultado esperado: “Abrir con Yamantaka” entrega rutas válidas a una
+  instancia existente y muestra errores por archivo.
+- Cambios funcionales y técnicos:
+  - Registrar asociación opcional mediante instalador.
+  - Implementar canal local autenticado de activación.
+  - Deduplicar y conservar orden de argumentos.
+  - Llevar ventana existente al frente sin robar foco indebidamente.
+- Visual y accesibilidad: feedback por documento y acción para revisar fallos.
+- Rendimiento, memoria y privacidad: canal solo local, mensajes acotados y sin
+  persistencia.
+- Casos límite y errores: 20 archivos, ruta Unicode, proceso arrancando, canal
+  ocupado y archivo retirado.
+- Criterios de aceptación:
+  - [ ] No se pierde ningún argumento válido.
+  - [ ] Duplicados se ignoran de forma predecible.
+  - [ ] Fallo de un archivo no bloquea los demás.
+  - [ ] Desinstalar elimina asociación propia.
+- Validación: Explorer, línea de comandos, drag/drop e integración multi-launch.
+- Riesgos y fuera de alcance: no se registra como visor predeterminado sin
+  elección del usuario.
+
+#### YAM-172 — Ventana, monitores y cambios de DPI
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 5
+- Áreas: WIN, VIS, REL
+- Dependencias: YAM-101, YAM-147
+- Problema: coordenadas persistidas pueden quedar fuera de pantalla o cambiar de
+  escala al desconectar un monitor.
+- Resultado esperado: Yamantaka reaparece visible, con tamaño útil y layout
+  correcto en cualquier monitor disponible.
+- Cambios funcionales y técnicos:
+  - Persistir rect relativo, monitor y estado maximizado.
+  - Validar contra work areas actuales.
+  - Reubicar con margen seguro si el monitor falta.
+  - Recalcular viewport una sola vez tras cambio DPI.
+- Visual y accesibilidad: ningún diálogo o control queda fuera de pantalla;
+  foco se conserva.
+- Rendimiento, memoria y privacidad: persistir geometría con debounce, sin
+  nombres de documentos.
+- Casos límite y errores: monitor izquierdo con coordenadas negativas, taskbar,
+  4K→1080p, RDP y fullscreen.
+- Criterios de aceptación:
+  - [ ] Ventana siempre reaparece visible.
+  - [ ] Maximizado se restaura correctamente.
+  - [ ] Cambio DPI no altera punto de lectura.
+  - [ ] Overlays se recolocan.
+- Validación: matriz manual multi-monitor y tests de normalización.
+- Riesgos y fuera de alcance: comportamiento depende de APIs Windows y
+  window_manager.
+
+#### YAM-173 — Paquete portable y desinstalación segura
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 5
+- Áreas: WIN, REL
+- Dependencias: YAM-157, YAM-170
+- Problema: usuarios pueden preferir instalación o paquete portable y necesitan
+  saber dónde viven sus datos.
+- Resultado esperado: ambas distribuciones tienen límites y limpieza
+  comprensibles.
+- Cambios funcionales y técnicos:
+  - Definir modo instalado y portable mediante marcador explícito.
+  - Elegir rutas de datos coherentes y migración opt-in.
+  - Permitir conservar o eliminar datos al desinstalar.
+  - Evitar mezclar bases entre modos accidentalmente.
+- Visual y accesibilidad: información de ubicación y acciones en Privacidad;
+  confirmación de eliminación clara.
+- Rendimiento, memoria y privacidad: portable no escribe fuera de su ámbito
+  salvo selección del usuario.
+- Casos límite y errores: carpeta read-only, USB retirado, dos modos abiertos y
+  actualización manual.
+- Criterios de aceptación:
+  - [ ] Modos no comparten DB por accidente.
+  - [ ] Desinstalar no borra datos sin confirmación.
+  - [ ] Portable funciona sin privilegios de admin.
+  - [ ] Backup permite migrar entre modos.
+- Validación: VM, carpeta read-only, USB simulado y desinstalación.
+- Riesgos y fuera de alcance: no se garantiza ejecución desde medios que
+  bloqueen SQLite.
+
+#### YAM-174 — Localización castellano/inglés
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: XL
+- Fase: 5
+- Áreas: FUNC, VIS, A11Y
+- Dependencias: YAM-140, YAM-143, YAM-144, YAM-146
+- Problema: textos incrustados dificultan consistencia, pluralización, testing y
+  adaptación de layout.
+- Resultado esperado: seleccionar castellano o inglés y mantener todas las
+  superficies completas.
+- Cambios funcionales y técnicos:
+  - Extraer catálogo tipado.
+  - Definir plurales, parámetros y fallbacks.
+  - Persistir idioma y aplicar sin reinicio si es viable.
+  - Añadir test que detecte strings visibles no localizados.
+- Visual y accesibilidad: revisar expansión de texto, labels, tooltips y
+  anuncios de Narrador.
+- Rendimiento, memoria y privacidad: catálogos locales; cero servicio externo.
+- Casos límite y errores: clave ausente, plural cero/uno/muchos, fecha/número y
+  texto técnico.
+- Criterios de aceptación:
+  - [ ] Ninguna superficie principal mezcla idiomas.
+  - [ ] Fallback es determinista.
+  - [ ] Matriz visual pasa en ambos idiomas.
+  - [ ] Errores conservan significado.
+- Validación: tests de catálogo, screenshots y Narrador.
+- Riesgos y fuera de alcance: no se añaden otros idiomas hasta estabilizar la
+  infraestructura.
+
+#### YAM-175 — Ayuda integrada y primer arranque
+
+- Estado: PLANNED
+- Prioridad: P1
+- Esfuerzo: L
+- Fase: 5
+- Áreas: FUNC, VIS, A11Y
+- Dependencias: YAM-143, YAM-145, YAM-159, YAM-174
+- Problema: funciones locales avanzadas necesitan contexto, pero una landing
+  inicial rompería el carácter directo de la biblioteca.
+- Resultado esperado: primer arranque breve y ayuda contextual disponible sin
+  interrumpir la lectura.
+- Cambios funcionales y técnicos:
+  - Mostrar una única introducción opcional con abrir/importar, privacidad y
+    atajos.
+  - Añadir ayuda contextual a backups, índice, recuperación y diagnósticos.
+  - Mantener un centro de ayuda local buscable.
+  - Permitir reiniciar consejos.
+- Visual y accesibilidad: tipografía editorial, una acción principal, teclado y
+  Narrador; sin carrusel.
+- Rendimiento, memoria y privacidad: contenido estático local; no recopila
+  progreso de onboarding.
+- Casos límite y errores: usuario omite, safe mode, ventana compacta e idioma
+  cambia.
+- Criterios de aceptación:
+  - [ ] Biblioteca sigue siendo primera superficie útil.
+  - [ ] Ayuda explica acciones de riesgo antes de ejecutarlas.
+  - [ ] Se puede cerrar y volver a abrir.
+  - [ ] No aparece branding dentro de lector/biblioteca.
+- Validación: widgets, capturas, teclado y prueba de comprensión.
+- Riesgos y fuera de alcance: no hay tours animados, vídeos o contenido web.
+
+#### YAM-176 — Checklist de release candidate
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: L
+- Fase: 5
+- Áreas: REL, WIN
+- Dependencias: YAM-100, YAM-101, YAM-102, YAM-103, YAM-154, YAM-155,
+  YAM-160, YAM-170, YAM-171, YAM-172, YAM-173, YAM-174, YAM-175
+- Problema: publicar exige coordinar calidad, licencias, firma, migraciones,
+  instalación y privacidad.
+- Resultado esperado: una release candidate solo existe si cada gate tiene
+  evidencia fechada.
+- Cambios funcionales y técnicos:
+  - Crear checklist versionado con responsables y artefactos.
+  - Verificar versión, changelog, licencias, firma y símbolos.
+  - Probar instalación limpia, actualización, reparación y rollback.
+  - Ejecutar smoke de red, corpus, backup y asociación PDF.
+- Visual y accesibilidad: incluir matriz final de temas, DPI, Narrador y
+  resoluciones.
+- Rendimiento, memoria y privacidad: adjuntar perfiles redaccionados y tamaño de
+  bundle.
+- Casos límite y errores: gate sin evidencia, certificado expirado, baseline
+  actualizado sin aprobación y migración irreversible.
+- Criterios de aceptación:
+  - [ ] Todos los gates G1–G7 están aprobados.
+  - [ ] No hay P0/P1 abiertos.
+  - [ ] Artefactos se reproducen desde commit etiquetado.
+  - [ ] Rollback está ensayado.
+- Validación: ensayo completo en VM y equipo real.
+- Riesgos y fuera de alcance: checklist no puede dispensar un gate; cualquier
+  excepción requiere retirar la RC.
+
+#### YAM-177 — Periodo de estabilidad previo a 1.0
+
+- Estado: PLANNED
+- Prioridad: P0
+- Esfuerzo: XL
+- Fase: 5
+- Áreas: FUNC, PERF, A11Y, REL, WIN
+- Dependencias: YAM-176
+- Problema: una RC que pasa una vez no demuestra estabilidad en sesiones largas
+  o hardware distinto.
+- Resultado esperado: convertir la RC en 1.0 solo después de uso prolongado y
+  cierre de regresiones.
+- Cambios funcionales y técnicos:
+  - Congelar funciones y aceptar solo correcciones.
+  - Ejecutar sesiones de varias horas con corpus real autorizado y sintético.
+  - Repetir en al menos dos equipos/GPU y múltiples DPI.
+  - Clasificar hallazgos y reiniciar el periodo ante P0/P1.
+  - Verificar instalación, actualización y desinstalación final.
+- Visual y accesibilidad: repetir Narrador, temas y layouts después de cada
+  corrección visual.
+- Rendimiento, memoria y privacidad: soak, perfiles y smoke de cero red en cada
+  candidata.
+- Casos límite y errores: suspensión, RDP, impresora, unidades externas,
+  contraseña, falta de espacio y cierre forzado.
+- Criterios de aceptación:
+  - [ ] Periodo termina sin P0/P1.
+  - [ ] Tendencia de recursos es estable.
+  - [ ] Gates siguen verdes en commit final.
+  - [ ] Documentación y binarios coinciden.
+- Validación: informe final de estabilidad y aprobación explícita.
+- Riesgos y fuera de alcance: no se añadirán funciones durante la congelación.
+
+## 7. Orden recomendado de ejecución
+
+### Ola 1 — Preparar una base verificable
+
+1. YAM-100 — Gate reproducible.
+2. YAM-104 — Ownership y lifecycle.
+3. YAM-140 — Auditoría visual.
+
+Estas tres tareas pueden empezar en paralelo porque no dependen entre sí. Son
+las únicas marcadas READY al reconstruir la hoja de ruta.
+
+### Ola 2 — Fijar contratos y medidas
+
+- YAM-101, YAM-102 y YAM-103.
+- YAM-105 y YAM-111.
+- YAM-114 y YAM-147.
+- YAM-150, YAM-153 y YAM-154.
+
+No se implementará una optimización sin baseline, ni una nueva superficie sin
+matriz visual.
+
+### Ola 3 — Mejorar el núcleo
+
+- Motor: YAM-110, YAM-112, YAM-113 y YAM-117.
+- Lector: YAM-118, YAM-119, YAM-123 y YAM-124.
+- Biblioteca: YAM-130 a YAM-138.
+- Visual: YAM-141 a YAM-149.
+- Fiabilidad: YAM-151 a YAM-161.
+
+### Ola 4 — Funciones avanzadas
+
+- YAM-115 y YAM-116 — selección/anotación geométrica.
+- YAM-120 y YAM-121 — split y comparación.
+- YAM-122 — multi-window.
+- YAM-139 — modo estudio.
+
+Estas funciones no pasan a interfaz estable sin demostrar memoria, cierre,
+teclado y recuperación.
+
+### Ola 5 — Distribución
+
+- YAM-106 cuando upstream lo permita.
+- YAM-170 a YAM-175.
+- YAM-176 y YAM-177 como puertas finales.
+
+## 8. Tabla compacta de dependencias
+
+| Bloque | Fundamentos obligatorios | Desbloquea |
+| --- | --- | --- |
+| Calidad | YAM-100, YAM-101, YAM-102, YAM-103 | Evidencia de todas las fases |
+| Lifecycle | YAM-104, YAM-105, YAM-111 | Teselas, jobs, split, multi-window |
+| Viewport | YAM-114, YAM-118 | Panel, presentación, split, estudio |
+| Datos | YAM-153, YAM-157, YAM-158 | Escala, backup, instalador, RC |
+| Visual | YAM-140, YAM-147, YAM-148 | Biblioteca, lector, ajustes y distribución |
+| Rendimiento | YAM-150, YAM-154, YAM-155 | Funciones avanzadas y release |
+| Windows | YAM-160, YAM-170, YAM-171, YAM-172 | Release candidate |
+
+## 9. Riesgos y prototipos obligatorios
+
+### Selección geométrica
+
+La selección depende de capacidades nativas de pdfrx/PDFium. YAM-115 empezará
+con un spike. Si la geometría no puede mantenerse correctamente con rotación,
+zoom y texto complejo, no se expondrán anotaciones geométricas.
+
+### Teselas
+
+YAM-110 solo avanzará tras medir páginas extremas. La página completa seguirá
+siendo el camino por defecto para no aumentar renders, costuras y complejidad.
+
+### Split y multi-window
+
+Dos visores y varias ventanas multiplican memoria y superficies de lifecycle.
+YAM-120/YAM-122 necesitan prototipo, perfil y ADR antes de UI estable.
+
+### Impresión
+
+YAM-124 puede requerir API nativa o dependencia. No se añadirá ninguna sin
+licencia, mantenimiento, bundle y política de temporales aprobados.
+
+### Cifrado de backup
+
+YAM-157 no diseñará criptografía propia. El cifrado opcional exige formato
+autenticado, dependencia revisada y advertencia de contraseña irrecuperable.
+
+### Watchers de carpetas
+
+YAM-133 observará únicamente raíces elegidas y convertirá eventos en
+revalidaciones. Una tormenta de eventos no puede importar, borrar ni bloquear.
+
+### Firma y empaquetado
+
+YAM-170 depende de certificado y decisiones de distribución. La ausencia de
+certificado puede bloquear firma, pero no autoriza publicar sin identificar el
+riesgo.
+
+## 10. Reglas de mantenimiento del backlog
+
+- Solo puede haber una tarea IN_PROGRESS por responsable.
+- No habrá más de tres tareas READY simultáneas salvo que pertenezcan a
+  responsables y subsistemas independientes.
+- Una tarea XL debe dividirse en entregas verticales antes de IN_PROGRESS.
+- Cada cambio de estado incluirá fecha, evidencia y resultado.
+- Una tarea pasa a REVIEW solo cuando todos sus checks de implementación están
+  completos.
+- Una tarea pasa a DONE solo cuando sus criterios de aceptación y validación
+  están comprobados.
+- Las tareas visuales requieren capturas revisadas.
+- Las tareas de rendimiento requieren baseline, mediana, p95, hardware y modo
+  de build.
+- Las tareas Windows requieren ejecución nativa; widgets no sustituyen la
+  plataforma.
+- Las tareas de accesibilidad requieren Narrador real cuando así se indique.
+- Un fallo de privacidad o integridad eleva la tarea a P0.
+- No se cambia prioridad para ocultar un gate fallido.
+- El trabajo terminado se resume en CHANGELOG.md y se elimina de este archivo
+  en la siguiente reconstrucción de release.
+- Nuevas ideas deben indicar problema real, usuario afectado, aceptación y
+  coste; una lista de deseos sin validación no entra en el roadmap.
+- Toda dependencia nueva exige ADR antes de modificar pubspec.
+
+## 11. Equivalencias de referencias históricas
+
+Otros documentos todavía mencionan algunos identificadores del backlog
+anterior. Esta tabla mantiene la navegación hasta que esos documentos se
+actualicen; no restaura el contenido histórico ni convierte los aliases en
+tareas activas.
+
+| Referencia antigua | Nueva referencia |
+| --- | --- |
+| YAM-011 / YAM-034 / YAM-048 / YAM-073 | YAM-154 y YAM-155 |
+| YAM-014 | YAM-106 |
+| YAM-015 | YAM-101, YAM-154 y YAM-172 |
+| YAM-022 / YAM-023 / YAM-024 | YAM-101, YAM-102, YAM-147 y YAM-149 |
+| YAM-033 / YAM-041 | YAM-148 |
+| YAM-050 | YAM-115 y YAM-116 |
+| YAM-062 | YAM-120 |
+| YAM-063 | YAM-121 |
+| YAM-025 a YAM-029 | Línea base ya implementada; sin sucesor activo |
+
+## 12. Definición de 1.0
+
+Yamantaka 1.0 para Windows podrá proponerse únicamente cuando:
+
+- YAM-176 esté DONE y YAM-177 haya completado su periodo de estabilidad.
+- Gates G1–G7 estén aprobados en el mismo commit candidato.
+- No existan P0 o P1 abiertos.
+- Instalador, portable, asociación PDF y rollback estén verificados.
+- La matriz nativa incluya Full HD, 16:10, 2K, 4K y DPI 100–200 %.
+- Biblioteca y lector funcionen con teclado y Narrador.
+- El corpus patológico no provoque bloqueos o fugas propias.
+- Cierre deje cero documentos, renders, jobs y bytes propios retenidos.
+- Backup/restauración y safe mode estén probados ante fallos.
+- El smoke Release confirme cero conexiones de red.
+- La identidad visual siga siendo editorial, monocromática y centrada en el
+  documento.
+
+Las funciones P2 pueden quedar fuera de 1.0 si sus dependencias no están listas,
+siempre que no se anuncien ni dejen controles inactivos visibles.
