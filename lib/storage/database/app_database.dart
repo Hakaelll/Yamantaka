@@ -414,6 +414,23 @@ final class AppDatabase {
       });
       logger.info('Migrated database schema to version 6.');
     }
+    final versionAfterReaderLayout =
+        database.select('PRAGMA user_version').first.columnAt(0) as int;
+    if (versionAfterReaderLayout < 7) {
+      _transaction(() {
+        database
+          ..execute(
+            "ALTER TABLE document_preferences ADD COLUMN cover_policy TEXT "
+            "NOT NULL DEFAULT 'firstPageIsCover'",
+          )
+          ..execute(
+            "ALTER TABLE document_preferences ADD COLUMN initial_side TEXT "
+            "NOT NULL DEFAULT 'right'",
+          )
+          ..execute('PRAGMA user_version = 7');
+      });
+      logger.info('Migrated database schema to version 7.');
+    }
   }
 
   void _transaction(void Function() operation) {

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/app/theme/app_density.dart';
+import 'package:yamantaka/app/theme/app_tokens.dart';
 import 'package:yamantaka/features/reader/domain/reader_models.dart';
 import 'package:yamantaka/storage/repositories/app_settings_repository.dart';
 
@@ -89,7 +90,7 @@ void main() {
     expect(actual.languageCode, 'es');
     expect(actual.windowWidth, 1120);
     expect(actual.windowHeight, 760);
-    expect(actual.readerPanelWidth, 320);
+    expect(actual.readerPanelWidth, AppSizes.readerPanelDefault);
     expect(actual.restoreLastSession, isTrue);
     expect(actual.lastDocumentPath, isEmpty);
   });

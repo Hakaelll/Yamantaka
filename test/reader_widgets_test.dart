@@ -138,7 +138,7 @@ void main() {
   );
 
   testWidgets(
-    'fullscreen leaves only the document and Escape restores chrome',
+    'fullscreen keeps chrome orthogonal to immersive mode',
     (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1;
@@ -157,9 +157,9 @@ void main() {
       expect(harness.windowService.fullScreen, isTrue);
       expect(harness.controller.isFullScreen, isTrue);
       expect(find.byKey(const Key('test-pdf-viewer')), findsOneWidget);
-      expect(find.byKey(const Key('reader-top-bar')), findsNothing);
-      expect(find.byKey(const Key('reader-bottom-controls')), findsNothing);
-      expect(find.byKey(const Key('reader-progress')), findsNothing);
+      expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+      expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
+      expect(find.byKey(const Key('reader-progress')), findsOneWidget);
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pump();

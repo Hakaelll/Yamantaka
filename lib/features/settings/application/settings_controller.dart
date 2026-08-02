@@ -10,6 +10,10 @@ final class SettingsController extends ChangeNotifier {
   final AppLogger _logger;
   AppSettings settings = const AppSettings();
   bool isLoaded = false;
+  Object? lastError;
+  AppSettings? _undoSettings;
+
+  bool get canUndo => _undoSettings != null;
 
   Future<void> load() async {
     settings = await _repository.load();
@@ -27,15 +31,26 @@ final class SettingsController extends ChangeNotifier {
 
   Future<void> updateStrict(AppSettings next) async {
     final previous = settings;
+    _undoSettings = previous;
+    lastError = null;
     settings = next;
     notifyListeners();
     try {
       await _repository.save(next);
-    } on Object {
+    } on Object catch (error) {
       settings = previous;
+      lastError = error;
       notifyListeners();
       rethrow;
     }
+  }
+
+  Future<void> undoLastUpdate() async {
+    final previous = _undoSettings;
+    if (previous == null) return;
+    _undoSettings = null;
+    await updateStrict(previous);
+    _undoSettings = null;
   }
 
   Future<void> clear() async {

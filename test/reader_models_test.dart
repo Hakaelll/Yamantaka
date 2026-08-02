@@ -36,6 +36,34 @@ void main() {
       expect(rtl.leftPageIndex, 2);
       expect(rtl.rightPageIndex, 1);
     });
+
+    test('supports configurable parity without a cover', () {
+      final right = FacingPageSpread.forPage(
+        0,
+        5,
+        firstPageIsCover: false,
+        initialSide: ReaderInitialSide.right,
+      );
+      expect(right.rightPageIndex, 0);
+
+      final rightPair = FacingPageSpread.forPage(
+        2,
+        5,
+        firstPageIsCover: false,
+        initialSide: ReaderInitialSide.right,
+      );
+      expect(rightPair.leftPageIndex, 1);
+      expect(rightPair.rightPageIndex, 2);
+
+      final left = FacingPageSpread.forPage(
+        0,
+        5,
+        firstPageIsCover: false,
+        initialSide: ReaderInitialSide.left,
+      );
+      expect(left.leftPageIndex, 0);
+      expect(left.rightPageIndex, 1);
+    });
   });
 
   group('ReadingUnitNavigation', () {
@@ -117,6 +145,29 @@ void main() {
           mode: ReaderMode.document,
         ),
         '4 / 8',
+      );
+    });
+
+    test('advances by the configured no-cover parity', () {
+      expect(
+        ReadingUnitNavigation.nextTarget(
+          pageIndex: 0,
+          pageCount: 4,
+          mode: ReaderMode.book,
+          firstPageIsCover: false,
+          initialSide: ReaderInitialSide.right,
+        ),
+        1,
+      );
+      expect(
+        ReadingUnitNavigation.nextTarget(
+          pageIndex: 0,
+          pageCount: 4,
+          mode: ReaderMode.book,
+          firstPageIsCover: false,
+          initialSide: ReaderInitialSide.left,
+        ),
+        2,
       );
     });
   });

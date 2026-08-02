@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../models/pdf_models.dart';
+import '../../features/reader/domain/reader_models.dart';
 
 enum PdfViewFlow { continuous, single, facing }
 
@@ -22,6 +23,10 @@ final class PdfViewConfiguration {
     this.initialScrollOffset = 0,
     this.readingDirection = PdfViewReadingDirection.leftToRight,
     this.pageShadow,
+    this.physicalPageGap = 0,
+    this.spineVisualWidth = 14,
+    this.coverPolicy = ReaderCoverPolicy.firstPageIsCover,
+    this.initialSide = ReaderInitialSide.right,
   });
 
   final Color backgroundColor;
@@ -36,6 +41,12 @@ final class PdfViewConfiguration {
   final double initialScrollOffset;
   final PdfViewReadingDirection readingDirection;
   final BoxShadow? pageShadow;
+  /// Gap used by the PDF layout. The visible book channel is painted by the
+  /// presentation layer and must not inflate the spread fit rectangle.
+  final double physicalPageGap;
+  final double spineVisualWidth;
+  final ReaderCoverPolicy coverPolicy;
+  final ReaderInitialSide initialSide;
 }
 
 final class PdfViewController extends ChangeNotifier {
@@ -50,6 +61,7 @@ final class PdfViewController extends ChangeNotifier {
   Future<void> Function(double factor)? _zoomBy;
   Future<void> Function()? _fitWidth;
   Future<void> Function()? _fitPage;
+  Future<void> Function()? _actualSize;
   Future<void> Function(double zoom, double scrollOffset)? _restorePosition;
 
   Future<void> goToPage(int pageIndex) async {
@@ -66,6 +78,10 @@ final class PdfViewController extends ChangeNotifier {
 
   Future<void> fitPage() async {
     if (_fitPage case final callback?) await callback();
+  }
+
+  Future<void> actualSize() async {
+    if (_actualSize case final callback?) await callback();
   }
 
   Future<void> restorePosition({
@@ -85,6 +101,7 @@ final class PdfViewController extends ChangeNotifier {
     required Future<void> Function(double factor) zoomBy,
     required Future<void> Function() fitWidth,
     required Future<void> Function() fitPage,
+    Future<void> Function()? actualSize,
     Future<void> Function(double zoom, double scrollOffset)? restorePosition,
     Object? owner,
   }) {
@@ -95,6 +112,7 @@ final class PdfViewController extends ChangeNotifier {
     _zoomBy = zoomBy;
     _fitWidth = fitWidth;
     _fitPage = fitPage;
+    _actualSize = actualSize;
     _restorePosition = restorePosition;
     _attachmentOwner = owner;
     isReady = true;
@@ -127,6 +145,7 @@ final class PdfViewController extends ChangeNotifier {
     _zoomBy = null;
     _fitWidth = null;
     _fitPage = null;
+    _actualSize = null;
     _restorePosition = null;
     if (wasAttached) notifyListeners();
   }

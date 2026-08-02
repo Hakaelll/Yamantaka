@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 
 enum AppWindowClass { compact, medium, expanded }
 
+/// The three visual motion profiles exposed by the redesign.  The legacy
+/// boolean preferences are still read and written by the settings repository,
+/// but new UI surfaces consume this single semantic value.
+enum AppMotionPreference { full, reduced, none }
+
 abstract final class AppBreakpoints {
   static const double medium = 680;
   static const double expanded = 1100;
@@ -40,12 +45,13 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppSizes {
-  static const double topBarHeight = 46;
-  static const double bottomControlHeight = 44;
-  static const double sidePanelWidth = 320;
-  static const double sidePanelMinWidth = 280;
+  static const double topBarHeight = 48;
+  static const double libraryHeaderHeight = 56;
+  static const double bottomControlHeight = 40;
+  static const double sidePanelWidth = 336;
+  static const double sidePanelMinWidth = 288;
   static const double sidePanelMaxWidth = 480;
-  static const double compactSidePanelWidth = 304;
+  static const double compactSidePanelWidth = 360;
   static const double desktopControlExtent = 40;
   static const double touchControlExtent = 48;
   static const double dialogMaxWidth = 600;
@@ -54,15 +60,24 @@ abstract final class AppSizes {
   static const double readerMinimumPageWidth = 340;
   static const double readerMaximumPageWidth = 920;
   static const double readerEdgeNavigation = 64;
-  static const double readerSpreadGutter = 16;
+  static const double readerSpreadGutter = 12;
+  static const double topRevealZone = 24;
+  static const double topVeilDepth = 72;
+  static const double controlGroupGap = 16;
+  static const double readerPanelDefault = 336;
+  static const double settingsNavigationWidth = 220;
+  static const double settingsContentMaxWidth = 760;
+  static const double libraryHeroCoverMinWidth = 220;
+  static const double libraryHeroCoverMaxWidth = 300;
 }
 
 abstract final class AppRadii {
   static const double indicator = 2;
-  static const double control = 4;
+  static const double control = 6;
   static const double field = 6;
-  static const double dialog = 8;
+  static const double dialog = 10;
   static const double touchSurface = 10;
+  static const double floating = 8;
 }
 
 abstract final class AppElevation {
@@ -74,9 +89,9 @@ abstract final class AppElevation {
 }
 
 abstract final class AppShadow {
-  static const double readerPageBlur = 3;
-  static const double readerGrayPageBlur = 2;
-  static const double readerPanelBlur = 8;
+  static const double readerPageBlur = 10;
+  static const double readerGrayPageBlur = 6;
+  static const double readerPanelBlur = 14;
   static const double artifactRestBlur = 8;
   static const double artifactSelectedBlur = 18;
   static const double artifactRestOffset = 4;
@@ -90,6 +105,17 @@ abstract final class AppMotion {
   static const Duration standard = Duration(milliseconds: 160);
   static const Duration panel = Duration(milliseconds: 200);
   static const Duration controlsAutoHide = Duration(seconds: 3);
+  static const Duration chromeReveal = Duration(milliseconds: 120);
+  static const Duration chromeHide = Duration(milliseconds: 100);
+  static const Duration spread = Duration(milliseconds: 140);
+  static const Duration category = Duration(milliseconds: 120);
+  static const Duration hover = Duration(milliseconds: 100);
+
+  static bool isDisabled(AppMotionPreference preference) =>
+      preference == AppMotionPreference.none;
+
+  static bool isReduced(AppMotionPreference preference) =>
+      preference != AppMotionPreference.full;
 
   static Duration whenAllowed(bool reduceMotion, Duration duration) =>
       reduceMotion ? instant : duration;
@@ -144,6 +170,25 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     required this.warning,
     required this.success,
     required this.readerPageShadow,
+    this.readerBackground = const Color(0xFFE7E4DC),
+    this.libraryBackground = const Color(0xFFEDEBE5),
+    this.settingsBackground = const Color(0xFFF1EFE9),
+    this.surfaceFloating = const Color(0xFFFBF9F3),
+    this.surfaceActive = const Color(0xFFDCDAD3),
+    this.surfaceHover = const Color(0xFFE4E2DB),
+    this.surfacePressed = const Color(0xFFD3D1CA),
+    this.textTertiary = const Color(0xFF777B72),
+    this.textDisabled = const Color(0xFF9B9E97),
+    this.iconNormal = const Color(0xFF62665E),
+    this.iconActive = const Color(0xFF20221E),
+    this.iconDisabled = const Color(0xFFA4A79F),
+    this.separatorExceptional = const Color(0xFFBBB8AF),
+    this.paperWhite = const Color(0xFFF8F7F2),
+    this.ivory = const Color(0xFFEDE7D8),
+    this.nightBackground = const Color(0xFF0B0D0B),
+    this.bookSpineChannel = const Color(0xFFBDB8AD),
+    this.ambientShadow = const Color(0x1F000000),
+    this.pageShadow = const Color(0x2E000000),
   });
 
   final Color appBackground;
@@ -166,51 +211,108 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
   final Color warning;
   final Color success;
   final Color readerPageShadow;
+  final Color readerBackground;
+  final Color libraryBackground;
+  final Color settingsBackground;
+  final Color surfaceFloating;
+  final Color surfaceActive;
+  final Color surfaceHover;
+  final Color surfacePressed;
+  final Color textTertiary;
+  final Color textDisabled;
+  final Color iconNormal;
+  final Color iconActive;
+  final Color iconDisabled;
+  final Color separatorExceptional;
+  final Color paperWhite;
+  final Color ivory;
+  final Color nightBackground;
+  final Color bookSpineChannel;
+  final Color ambientShadow;
+  final Color pageShadow;
 
   static const light = AppColorTokens(
-    appBackground: Color(0xFFF1F0EC),
-    surfacePrimary: Color(0xFFF7F6F2),
-    surfaceSecondary: Color(0xFFF4F3EF),
-    surfaceElevated: Color(0xFFFCFBF8),
-    surfaceSunken: Color(0xFFE8E7E1),
-    textPrimary: Color(0xFF171816),
-    textSecondary: Color(0xFF696B65),
+    appBackground: Color(0xFFECEAE4),
+    surfacePrimary: Color(0xFFF4F2EC),
+    surfaceSecondary: Color(0xFFF0EEE8),
+    surfaceElevated: Color(0xFFF7F5EF),
+    surfaceSunken: Color(0xFFE2E0D8),
+    textPrimary: Color(0xFF1C1E1A),
+    textSecondary: Color(0xFF5D6159),
     textMuted: Color(0xFF8C8D87),
-    borderSubtle: Color(0xFFD9D8D2),
-    borderStrong: Color(0xFFC0C1BA),
+    borderSubtle: Color(0xFFD5D2CA),
+    borderStrong: Color(0xFFBBB8AF),
     accentPrimary: Color(0xFF393B37),
     accentHover: Color(0xFF2D2F2B),
     accentPressed: Color(0xFF20211F),
     accentSoft: Color(0xFFE4E3DE),
-    selectionBackground: Color(0xFFE4E3DE),
-    focusRing: Color(0xFF5E605A),
-    danger: Color(0xFFA23F38),
-    warning: Color(0xFF8A6428),
-    success: Color(0xFF4F7058),
-    readerPageShadow: Color(0x24000000),
+    selectionBackground: Color(0xFFD8D7CF),
+    focusRing: Color(0xFF50594E),
+    danger: Color(0xFF9C4943),
+    warning: Color(0xFF85652F),
+    success: Color(0xFF4E7058),
+    readerPageShadow: Color(0x2E000000),
+    readerBackground: Color(0xFFE7E4DC),
+    libraryBackground: Color(0xFFEDEBE5),
+    settingsBackground: Color(0xFFF1EFE9),
+    surfaceFloating: Color(0xFFFBF9F3),
+    surfaceActive: Color(0xFFDCDAD3),
+    surfaceHover: Color(0xFFE4E2DB),
+    surfacePressed: Color(0xFFD3D1CA),
+    textTertiary: Color(0xFF777B72),
+    textDisabled: Color(0xFF9B9E97),
+    iconNormal: Color(0xFF62665E),
+    iconActive: Color(0xFF20221E),
+    iconDisabled: Color(0xFFA4A79F),
+    separatorExceptional: Color(0xFFBBB8AF),
+    paperWhite: Color(0xFFF8F7F2),
+    ivory: Color(0xFFEDE7D8),
+    nightBackground: Color(0xFF0B0D0B),
+    bookSpineChannel: Color(0xFFBDB8AD),
+    ambientShadow: Color(0x1F000000),
+    pageShadow: Color(0x2E000000),
   );
 
   static const dark = AppColorTokens(
-    appBackground: Color(0xFF111210),
-    surfacePrimary: Color(0xFF181916),
-    surfaceSecondary: Color(0xFF1D1E1B),
-    surfaceElevated: Color(0xFF23241F),
+    appBackground: Color(0xFF111310),
+    surfacePrimary: Color(0xFF181B17),
+    surfaceSecondary: Color(0xFF151815),
+    surfaceElevated: Color(0xFF1C1F1B),
     surfaceSunken: Color(0xFF0B0C0A),
-    textPrimary: Color(0xFFE8E8E3),
-    textSecondary: Color(0xFF999B94),
+    textPrimary: Color(0xFFF0F1EB),
+    textSecondary: Color(0xFFB7BBB1),
     textMuted: Color(0xFF777A72),
-    borderSubtle: Color(0xFF2A2C27),
-    borderStrong: Color(0xFF3D4038),
+    borderSubtle: Color(0xFF2B2F29),
+    borderStrong: Color(0xFF3B4038),
     accentPrimary: Color(0xFFD0D1CA),
     accentHover: Color(0xFFE0E1DA),
     accentPressed: Color(0xFFF1F1EA),
     accentSoft: Color(0xFF2B2D28),
     selectionBackground: Color(0xFF2B2D28),
-    focusRing: Color(0xFFBDC0B5),
-    danger: Color(0xFFDF8077),
-    warning: Color(0xFFD4AA69),
-    success: Color(0xFF8BB293),
-    readerPageShadow: Color(0x52000000),
+    focusRing: Color(0xFFD8DED3),
+    danger: Color(0xFFD9847C),
+    warning: Color(0xFFD0AD70),
+    success: Color(0xFF8EB397),
+    readerPageShadow: Color(0x85000000),
+    readerBackground: Color(0xFF141613),
+    libraryBackground: Color(0xFF10120F),
+    settingsBackground: Color(0xFF151714),
+    surfaceFloating: Color(0xFF232620),
+    surfaceActive: Color(0xFF30342D),
+    surfaceHover: Color(0xFF242720),
+    surfacePressed: Color(0xFF34382F),
+    textTertiary: Color(0xFF8F948A),
+    textDisabled: Color(0xFF666B62),
+    iconNormal: Color(0xFFA9ADA4),
+    iconActive: Color(0xFFF3F4EE),
+    iconDisabled: Color(0xFF5E635A),
+    separatorExceptional: Color(0xFF3B4038),
+    paperWhite: Color(0xFFF8F7F2),
+    ivory: Color(0xFFEDE7D8),
+    nightBackground: Color(0xFF0B0D0B),
+    bookSpineChannel: Color(0xFF080A08),
+    ambientShadow: Color(0x66000000),
+    pageShadow: Color(0x85000000),
   );
 
   @override
@@ -235,6 +337,25 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     Color? warning,
     Color? success,
     Color? readerPageShadow,
+    Color? readerBackground,
+    Color? libraryBackground,
+    Color? settingsBackground,
+    Color? surfaceFloating,
+    Color? surfaceActive,
+    Color? surfaceHover,
+    Color? surfacePressed,
+    Color? textTertiary,
+    Color? textDisabled,
+    Color? iconNormal,
+    Color? iconActive,
+    Color? iconDisabled,
+    Color? separatorExceptional,
+    Color? paperWhite,
+    Color? ivory,
+    Color? nightBackground,
+    Color? bookSpineChannel,
+    Color? ambientShadow,
+    Color? pageShadow,
   }) => AppColorTokens(
     appBackground: appBackground ?? this.appBackground,
     surfacePrimary: surfacePrimary ?? this.surfacePrimary,
@@ -256,6 +377,25 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     warning: warning ?? this.warning,
     success: success ?? this.success,
     readerPageShadow: readerPageShadow ?? this.readerPageShadow,
+    readerBackground: readerBackground ?? this.readerBackground,
+    libraryBackground: libraryBackground ?? this.libraryBackground,
+    settingsBackground: settingsBackground ?? this.settingsBackground,
+    surfaceFloating: surfaceFloating ?? this.surfaceFloating,
+    surfaceActive: surfaceActive ?? this.surfaceActive,
+    surfaceHover: surfaceHover ?? this.surfaceHover,
+    surfacePressed: surfacePressed ?? this.surfacePressed,
+    textTertiary: textTertiary ?? this.textTertiary,
+    textDisabled: textDisabled ?? this.textDisabled,
+    iconNormal: iconNormal ?? this.iconNormal,
+    iconActive: iconActive ?? this.iconActive,
+    iconDisabled: iconDisabled ?? this.iconDisabled,
+    separatorExceptional: separatorExceptional ?? this.separatorExceptional,
+    paperWhite: paperWhite ?? this.paperWhite,
+    ivory: ivory ?? this.ivory,
+    nightBackground: nightBackground ?? this.nightBackground,
+    bookSpineChannel: bookSpineChannel ?? this.bookSpineChannel,
+    ambientShadow: ambientShadow ?? this.ambientShadow,
+    pageShadow: pageShadow ?? this.pageShadow,
   );
 
   @override
@@ -294,6 +434,45 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
         other.readerPageShadow,
         t,
       )!,
+      readerBackground: Color.lerp(
+        readerBackground,
+        other.readerBackground,
+        t,
+      )!,
+      libraryBackground: Color.lerp(
+        libraryBackground,
+        other.libraryBackground,
+        t,
+      )!,
+      settingsBackground: Color.lerp(
+        settingsBackground,
+        other.settingsBackground,
+        t,
+      )!,
+      surfaceFloating: Color.lerp(surfaceFloating, other.surfaceFloating, t)!,
+      surfaceActive: Color.lerp(surfaceActive, other.surfaceActive, t)!,
+      surfaceHover: Color.lerp(surfaceHover, other.surfaceHover, t)!,
+      surfacePressed: Color.lerp(surfacePressed, other.surfacePressed, t)!,
+      textTertiary: Color.lerp(textTertiary, other.textTertiary, t)!,
+      textDisabled: Color.lerp(textDisabled, other.textDisabled, t)!,
+      iconNormal: Color.lerp(iconNormal, other.iconNormal, t)!,
+      iconActive: Color.lerp(iconActive, other.iconActive, t)!,
+      iconDisabled: Color.lerp(iconDisabled, other.iconDisabled, t)!,
+      separatorExceptional: Color.lerp(
+        separatorExceptional,
+        other.separatorExceptional,
+        t,
+      )!,
+      paperWhite: Color.lerp(paperWhite, other.paperWhite, t)!,
+      ivory: Color.lerp(ivory, other.ivory, t)!,
+      nightBackground: Color.lerp(nightBackground, other.nightBackground, t)!,
+      bookSpineChannel: Color.lerp(
+        bookSpineChannel,
+        other.bookSpineChannel,
+        t,
+      )!,
+      ambientShadow: Color.lerp(ambientShadow, other.ambientShadow, t)!,
+      pageShadow: Color.lerp(pageShadow, other.pageShadow, t)!,
     );
   }
 }

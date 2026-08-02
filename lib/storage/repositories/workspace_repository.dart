@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
+import '../../app/theme/app_tokens.dart';
 import '../../features/workspaces/domain/workspace_models.dart';
 import '../database/app_database.dart';
 import 'document_repository.dart';
@@ -112,7 +113,7 @@ final class WorkspaceRepository {
           isDefault ? 1 : 0,
           activeTabId,
           panelSection,
-          panelWidth.clamp(280, 480),
+          panelWidth.clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth),
           jsonEncode(_encodeSplit(split)),
           collectionId,
           now.toIso8601String(),

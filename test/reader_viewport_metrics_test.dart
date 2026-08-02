@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yamantaka/features/reader/domain/reader_models.dart';
 import 'package:yamantaka/pdf_engine/presentation/reader_viewport_metrics.dart';
 
 void main() {
@@ -69,6 +70,49 @@ void main() {
         rightToLeft: true,
       );
       expect(rtl.pageRects[2].left, lessThan(rtl.pageRects[1].left));
+    });
+
+    test('keeps the physical gap separate from the visual book channel', () {
+      final layout = ReaderViewportMetrics.facingSpreadLayout(
+        pageSizes: const [
+          Size(600, 800),
+          Size(600, 800),
+          Size(600, 800),
+        ],
+        outerMargin: 24,
+        rightToLeft: false,
+        physicalPageGap: 0,
+      );
+
+      expect(layout.pageRects[2].left - layout.pageRects[1].right, 0);
+      expect(
+        layout.spreadRectFor(1).width,
+        closeTo(layout.pageRects[1].width + layout.pageRects[2].width, 0.001),
+      );
+    });
+
+    test('places the first no-cover page on the configured side', () {
+      final right = ReaderViewportMetrics.facingSpreadLayout(
+        pageSizes: const [Size(600, 800), Size(600, 800), Size(600, 800)],
+        outerMargin: 24,
+        rightToLeft: false,
+        coverPolicy: ReaderCoverPolicy.noCover,
+        initialSide: ReaderInitialSide.right,
+      );
+      expect(
+        right.pageRects[0].right,
+        closeTo(right.documentSize.width / 2 - 24, 0.001),
+      );
+
+      final left = ReaderViewportMetrics.facingSpreadLayout(
+        pageSizes: const [Size(600, 800), Size(600, 800), Size(600, 800)],
+        outerMargin: 24,
+        rightToLeft: false,
+        coverPolicy: ReaderCoverPolicy.noCover,
+        initialSide: ReaderInitialSide.left,
+      );
+      expect(left.pageRects[0].left, closeTo(24, 0.001));
+      expect(left.pageRects[1].right, greaterThan(left.pageRects[0].right));
     });
   });
 

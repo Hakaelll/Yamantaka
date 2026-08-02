@@ -26,6 +26,10 @@ final class ReaderSidePanel extends StatefulWidget {
     required this.width,
     required this.onClose,
     required this.onWidthChanged,
+    this.pinned = false,
+    this.allowPin = false,
+    this.onPinnedChanged,
+    this.flatChrome = false,
     this.onExportAnnotations,
   });
 
@@ -35,6 +39,10 @@ final class ReaderSidePanel extends StatefulWidget {
   final double width;
   final VoidCallback onClose;
   final ValueChanged<double> onWidthChanged;
+  final bool pinned;
+  final bool allowPin;
+  final ValueChanged<bool>? onPinnedChanged;
+  final bool flatChrome;
   final Future<void> Function()? onExportAnnotations;
 
   @override
@@ -64,7 +72,7 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
       child: FocusTraversalGroup(
         child: Material(
           key: const Key('reader-side-panel'),
-          color: context.appColors.surfacePrimary,
+          color: context.appColors.surfaceElevated,
           elevation: 0,
           child: Container(
             width: widget.width,
@@ -72,13 +80,15 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
               border: Border(
                 left: BorderSide(color: context.appColors.borderStrong),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: AppShadow.readerPanelBlur,
-                  offset: const Offset(-2, 0),
-                ),
-              ],
+              boxShadow: widget.flatChrome
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: context.appColors.ambientShadow,
+                        blurRadius: AppShadow.readerPanelBlur,
+                        offset: const Offset(-2, 0),
+                      ),
+                    ],
             ),
             child: Stack(
               children: [
@@ -95,6 +105,20 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                           ),
+                          if (widget.allowPin)
+                            IconButton(
+                              tooltip: widget.pinned
+                                  ? 'Desanclar panel'
+                                  : 'Anclar panel',
+                              onPressed: widget.onPinnedChanged == null
+                                  ? null
+                                  : () => widget.onPinnedChanged!(!widget.pinned),
+                              icon: Icon(
+                                widget.pinned
+                                    ? Icons.push_pin_rounded
+                                    : Icons.push_pin_outlined,
+                              ),
+                            ),
                           IconButton(
                             autofocus:
                                 widget.section != ReaderPanelSection.search,

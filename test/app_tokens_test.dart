@@ -89,10 +89,10 @@ void main() {
     final light = AppTheme.light().extension<AppColorTokens>()!;
     final dark = AppTheme.dark().extension<AppColorTokens>()!;
 
-    expect(light.appBackground, const Color(0xFFF1F0EC));
+    expect(light.appBackground, const Color(0xFFECEAE4));
     expect(light.accentPrimary, const Color(0xFF393B37));
-    expect(dark.appBackground, const Color(0xFF111210));
-    expect(dark.textPrimary, const Color(0xFFE8E8E3));
+    expect(dark.appBackground, const Color(0xFF111310));
+    expect(dark.textPrimary, const Color(0xFFF0F1EB));
   });
 
   test(

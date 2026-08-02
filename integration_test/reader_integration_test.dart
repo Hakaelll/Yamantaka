@@ -197,11 +197,13 @@ void main() {
     await _bounded(reader.fitPage(), 'restore fit-page zoom');
     await tester.pump();
 
-    await _bounded(reader.toggleFullScreen(), 'enter immersive fullscreen');
+    await _bounded(reader.toggleFullScreen(), 'enter fullscreen');
     await tester.pump();
-    expect(find.byKey(const Key('reader-top-bar')), findsNothing);
-    expect(find.byKey(const Key('reader-bottom-controls')), findsNothing);
-    expect(find.byKey(const Key('reader-progress')), findsNothing);
+    // Fullscreen controls the window; immersive mode controls the chrome.
+    // They are intentionally orthogonal so F11 never hides the reader UI.
+    expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+    expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
+    expect(find.byKey(const Key('reader-progress')), findsOneWidget);
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 500)),
     );

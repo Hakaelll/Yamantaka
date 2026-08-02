@@ -45,20 +45,26 @@ abstract final class LibraryArtifactLayout {
     }
 
     return ArtifactJitter(
-      offsetX: signed(0, 0xff) * 3,
-      offsetY: signed(8, 0xff) * 4,
-      rotationDegrees: signed(16, 0xff) * 0.65,
-      scale: 1 + signed(24, 0x7f) * 0.006,
+      // Editorial imperfection is deliberately almost imperceptible. It
+      // gives small collections rhythm without looking like accidental
+      // misalignment, and can be disabled for HC/reduced-motion surfaces.
+      offsetX: signed(0, 0xff) * 1.5,
+      offsetY: signed(8, 0xff) * 2,
+      rotationDegrees: signed(16, 0xff) * 0.25,
+      scale: 1 + signed(24, 0x7f) * 0.0025,
     );
   }
 
   static ArtifactGridMetrics metricsFor({
     required double viewportWidth,
     required int documentCount,
+    bool compact = false,
   }) {
     final usableWidth = math.max(1.0, viewportWidth);
     if (documentCount <= 1) {
-      final width = math.min(210.0, usableWidth * 0.66);
+      final width = compact || usableWidth < 520
+          ? (usableWidth * 0.66).clamp(136.0, 190.0).toDouble()
+          : (usableWidth * 0.18).clamp(220.0, 300.0).toDouble();
       return ArtifactGridMetrics(
         columns: 1,
         artifactWidth: width,

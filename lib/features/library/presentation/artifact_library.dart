@@ -113,7 +113,8 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.highContrastOf(context);
     final result = evaluateLibraryDocuments(
       widget.documents,
       query: widget.controller.query,
@@ -197,7 +198,8 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                               widget.controller.selectedDocumentId,
                           selectedDocumentIds: _selection.ids.toSet(),
                           selectionMode: _selectionMode,
-                          reserveInfoSpace: describedDocument != null,
+                          reserveInfoSpace: describedDocument != null &&
+                              result.documents.length != 1,
                           reduceMotion: reduceMotion,
                           onSelect: _select,
                           onOpen: _open,
@@ -993,7 +995,43 @@ final class _ArtifactCanvas extends StatelessWidget {
         final metrics = LibraryArtifactLayout.metricsFor(
           viewportWidth: constraints.maxWidth - horizontalPadding * 2,
           documentCount: documents.length,
+          compact: AppBreakpoints.classify(constraints.maxWidth) ==
+              AppWindowClass.compact,
         );
+        if (documents.length == 1) {
+          final document = documents.single;
+          return SingleChildScrollView(
+            controller: controller,
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              AppSpacing.space24,
+              horizontalPadding,
+              AppSpacing.space48,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: math.max(360, constraints.maxHeight - 48),
+              ),
+              child: Center(
+                child: _SingleArtifactHero(
+                  document: document,
+                  width: metrics.artifactWidth,
+                  selected: selectionMode
+                      ? selectedDocumentIds.contains(document.id)
+                      : selectedDocumentId == document.id,
+                  selectionMode: selectionMode,
+                  reduceMotion: reduceMotion,
+                  onSelect: () => onSelect(document),
+                  onOpen: () => onOpen(document),
+                  onHover: (hovered) =>
+                      onHover(hovered ? document.id : null),
+                  onMenu: (position) => onMenu(document, position),
+                  onVisible: () => onDocumentVisible?.call(document),
+                ),
+              ),
+            ),
+          );
+        }
         if (documents.length <= 6) {
           final bottomPadding = reserveInfoSpace ? 116.0 : AppSpacing.space24;
           return SingleChildScrollView(
@@ -1107,6 +1145,148 @@ final class _ArtifactCanvas extends StatelessWidget {
   }
 }
 
+final class _SingleArtifactHero extends StatelessWidget {
+  const _SingleArtifactHero({
+    required this.document,
+    required this.width,
+    required this.selected,
+    required this.selectionMode,
+    required this.reduceMotion,
+    required this.onSelect,
+    required this.onOpen,
+    required this.onHover,
+    required this.onMenu,
+    required this.onVisible,
+  });
+
+  final LibraryDocument document;
+  final double width;
+  final bool selected;
+  final bool selectionMode;
+  final bool reduceMotion;
+  final VoidCallback onSelect;
+  final VoidCallback onOpen;
+  final ValueChanged<bool> onHover;
+  final ValueChanged<Offset> onMenu;
+  final VoidCallback onVisible;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final cover = ArtifactDocument(
+      key: ValueKey('artifact-${document.id}'),
+      document: document,
+      width: width,
+      selected: selected,
+      selectionMode: selectionMode,
+      reduceMotion: reduceMotion,
+      onSelect: onSelect,
+      onOpen: onOpen,
+      onHover: onHover,
+      onMenu: onMenu,
+      onVisible: onVisible,
+    );
+    final details = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 320),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Tu espacio de lectura',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          const SizedBox(height: AppSpacing.space8),
+          Text(
+            document.effectiveTitle,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          if (document.effectiveAuthor case final author?) ...[
+            const SizedBox(height: AppSpacing.space4),
+            Text(author, style: Theme.of(context).textTheme.bodyMedium),
+          ],
+          const SizedBox(height: AppSpacing.space12),
+          Text(
+            document.readingProgress >= 1
+                ? 'Terminado · ${document.pageCount} páginas'
+                : document.readingProgress > 0
+                ? '${(document.readingProgress * 100).round()} % leído'
+                : '${document.pageCount} páginas · Sin empezar',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.space16),
+          Wrap(
+            spacing: AppSpacing.space8,
+            runSpacing: AppSpacing.space8,
+            children: [
+              FilledButton.icon(
+                onPressed: document.isMissing ? null : onOpen,
+                icon: Icon(
+                  document.readingProgress > 0
+                      ? Icons.play_arrow_rounded
+                      : Icons.menu_book_outlined,
+                  size: 18,
+                ),
+                label: Text(
+                  document.readingProgress > 0
+                      ? 'Continuar leyendo'
+                      : 'Abrir documento',
+                ),
+              ),
+              if (document.isMissing)
+                OutlinedButton(
+                  onPressed: onOpen,
+                  child: const Text('Localizar archivo'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 760.0;
+        final content = availableWidth < 640
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(child: cover),
+                  const SizedBox(height: AppSpacing.space24),
+                  details,
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  cover,
+                  const SizedBox(width: AppSpacing.space32),
+                  details,
+                ],
+              );
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surfaceElevated.withValues(alpha: 0.42),
+              border: Border.all(color: colors.borderSubtle),
+              borderRadius: BorderRadius.circular(AppRadii.floating),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.space24),
+              child: content,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 final class ArtifactDocument extends StatefulWidget {
   const ArtifactDocument({
     super.key,
@@ -1153,17 +1333,22 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
   Widget build(BuildContext context) {
     final jitter = LibraryArtifactLayout.jitterFor(widget.document.id);
     final emphasized = widget.selected || _hovered || _focused;
+    final highContrast = MediaQuery.highContrastOf(context);
+    final applyJitter = !widget.reduceMotion &&
+        !highContrast &&
+        !widget.selectionMode &&
+        !widget.selected;
     final scale = widget.reduceMotion
         ? 1.0
         : widget.selected
-        ? 1.055
+        ? 1.025
         : _hovered
         ? 1.02
         : jitter.scale;
     final elevation = widget.selected
         ? 8.0
         : _hovered
-        ? 3.0
+        ? 2.0
         : 0.0;
     final aspectRatio =
         widget.document.coverMetadata?.pageAspectRatio.clamp(0.25, 3.2) ??
@@ -1215,12 +1400,14 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
               onDoubleTap: widget.onOpen,
               onSecondaryTapDown: (details) =>
                   widget.onMenu(details.globalPosition),
-              child: Transform.translate(
-                offset: Offset(jitter.offsetX, jitter.offsetY),
-                child: Transform.rotate(
-                  angle: widget.reduceMotion
-                      ? 0
-                      : jitter.rotationDegrees * math.pi / 180,
+               child: Transform.translate(
+                 offset: applyJitter
+                     ? Offset(jitter.offsetX, jitter.offsetY)
+                     : Offset.zero,
+                 child: Transform.rotate(
+                   angle: applyJitter
+                       ? jitter.rotationDegrees * math.pi / 180
+                       : 0,
                   child: AnimatedScale(
                     duration: duration,
                     curve: Curves.easeOutCubic,
@@ -1246,24 +1433,26 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                               ? 1.5
                               : 1,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: context.appColors.readerPageShadow
-                                .withValues(
-                                  alpha: widget.selected ? 0.72 : 0.38,
+                        boxShadow: widget.reduceMotion || highContrast
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: context.appColors.readerPageShadow
+                                      .withValues(
+                                        alpha: widget.selected ? 0.72 : 0.38,
+                                      ),
+                                  blurRadius: widget.selected
+                                      ? AppShadow.artifactSelectedBlur
+                                      : AppShadow.artifactRestBlur,
+                                  spreadRadius: widget.selected ? 1 : 0,
+                                  offset: Offset(
+                                    0,
+                                    widget.selected
+                                        ? AppShadow.artifactSelectedOffset
+                                        : AppShadow.artifactRestOffset,
+                                  ),
                                 ),
-                            blurRadius: widget.selected
-                                ? AppShadow.artifactSelectedBlur
-                                : AppShadow.artifactRestBlur,
-                            spreadRadius: widget.selected ? 1 : 0,
-                            offset: Offset(
-                              0,
-                              widget.selected
-                                  ? AppShadow.artifactSelectedOffset
-                                  : AppShadow.artifactRestOffset,
-                            ),
-                          ),
-                        ],
+                              ],
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Stack(

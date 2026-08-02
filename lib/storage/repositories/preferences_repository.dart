@@ -41,6 +41,16 @@ final class DocumentPreferencesRepository {
         row['page_layout'] as String,
         PageLayoutMode.continuous,
       ),
+      coverPolicy: _enumByName(
+        ReaderCoverPolicy.values,
+        row['cover_policy'] as String? ?? ReaderCoverPolicy.firstPageIsCover.name,
+        ReaderCoverPolicy.firstPageIsCover,
+      ),
+      initialSide: _enumByName(
+        ReaderInitialSide.values,
+        row['initial_side'] as String? ?? ReaderInitialSide.right.name,
+        ReaderInitialSide.right,
+      ),
       pageRotation: row['page_rotation'] as int,
       horizontalMargin: row['horizontal_margin'] as double,
       verticalMargin: row['vertical_margin'] as double,
@@ -56,15 +66,18 @@ final class DocumentPreferencesRepository {
       '''
       INSERT INTO document_preferences (
         document_id, view_mode, reading_theme, zoom_mode, zoom_level,
-        page_layout, page_rotation, horizontal_margin, vertical_margin,
-        controls_auto_hide, scroll_offset, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        page_layout, cover_policy, initial_side, page_rotation,
+        horizontal_margin, vertical_margin, controls_auto_hide, scroll_offset,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(document_id) DO UPDATE SET
         view_mode = excluded.view_mode,
         reading_theme = excluded.reading_theme,
         zoom_mode = excluded.zoom_mode,
         zoom_level = excluded.zoom_level,
         page_layout = excluded.page_layout,
+        cover_policy = excluded.cover_policy,
+        initial_side = excluded.initial_side,
         page_rotation = excluded.page_rotation,
         horizontal_margin = excluded.horizontal_margin,
         vertical_margin = excluded.vertical_margin,
@@ -79,6 +92,8 @@ final class DocumentPreferencesRepository {
         preferences.zoomMode.name,
         preferences.zoomLevel,
         preferences.pageLayout.name,
+        preferences.coverPolicy.name,
+        preferences.initialSide.name,
         preferences.pageRotation,
         preferences.horizontalMargin,
         preferences.verticalMargin,

@@ -8,6 +8,7 @@ import '../../../app/shortcuts/app_commands.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_density.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../app/ui/yama_components.dart';
 import '../../../core/privacy/storage_catalog.dart';
 import '../../../core/privacy/local_storage_service.dart';
 import '../../../storage/repositories/app_settings_repository.dart';
@@ -39,6 +40,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context, _) {
         final settings = widget.services.settings.settings;
         return Scaffold(
+          backgroundColor: context.appColors.settingsBackground,
           appBar: AppBar(
             leading: IconButton(
               tooltip: 'Volver',
@@ -49,9 +51,8 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           ),
           body: LayoutBuilder(
             builder: (context, constraints) {
-              final windowClass = AppBreakpoints.classify(constraints.maxWidth);
               final sections = _buildSections(settings);
-              if (windowClass == AppWindowClass.compact) {
+              if (constraints.maxWidth < 840) {
                 return _CompactSettings(sections: sections);
               }
               return _DesktopSettings(
@@ -130,19 +131,27 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) =>
                 _update(settings.copyWith(showProgress: value)),
           ),
-          _SwitchSetting(
-            label: 'Reducir animaciones',
-            description: 'Acorta las transiciones sin eliminarlas.',
-            value: settings.reduceMotion,
-            onChanged: (value) =>
-                _update(settings.copyWith(reduceMotion: value)),
-          ),
-          _SwitchSetting(
-            label: 'Desactivar animaciones',
-            description: 'Elimina transiciones y movimiento decorativo.',
-            value: settings.disableAnimations,
-            onChanged: (value) =>
-                _update(settings.copyWith(disableAnimations: value)),
+          _DropdownSetting(
+            label: 'Movimiento',
+            description:
+                'Completo, reducido o sin animaciones. Se respeta la opción '
+                'más restrictiva del sistema.',
+            value: settings.resolvedMotionPreference.name,
+            values: const {
+              'full': 'Completo',
+              'reduced': 'Reducido',
+              'none': 'Sin animaciones',
+            },
+            onChanged: (value) {
+              final preference = AppMotionPreference.values.byName(value);
+              _update(
+                settings.copyWith(
+                  motionPreference: preference,
+                  reduceMotion: preference != AppMotionPreference.full,
+                  disableAnimations: preference == AppMotionPreference.none,
+                ),
+              );
+            },
           ),
           _DropdownSetting(
             label: 'Perfil visual',
@@ -166,6 +175,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                       profile == ReaderVisualProfile.electronicInk
                       ? true
                       : settings.disableAnimations,
+                  motionPreference:
+                      profile == ReaderVisualProfile.electronicInk
+                      ? AppMotionPreference.none
+                      : settings.motionPreference,
                   defaultReaderTheme:
                       profile == ReaderVisualProfile.electronicInk
                       ? 'light'
@@ -437,9 +450,9 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-      _SettingsSectionData(
-        id: _SettingsSectionId.backup,
-        description: 'Copia local versionada, validada y sin archivos PDF.',
+          _SettingsSectionData(
+        id: _SettingsSectionId.dataPrivacy,
+        description: 'Datos locales, copias versionadas y privacidad.',
         children: [
           _StorageSummary(
             service: widget.services.storage,
@@ -479,6 +492,26 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             actionLabel: 'Importar',
             onPressed: () => _importBackup(context),
           ),
+          _ActionSetting(
+            label: 'Abrir ubicación de datos',
+            description: widget.services.paths.dataDirectory.path,
+            actionLabel: 'Abrir',
+            onPressed: widget.services.openDataLocation,
+          ),
+          _ActionSetting(
+            label: 'Eliminar todos los datos locales',
+            description: 'No elimina los archivos PDF originales.',
+            actionLabel: 'Eliminar',
+            destructive: true,
+            onPressed: () => _confirmAndRun(
+              context,
+              title: '¿Eliminar todos los datos?',
+              body:
+                  'Se borrarán biblioteca, progreso, marcadores, sesiones, '
+                  'ajustes y caché. Los PDF originales no se modificarán.',
+              action: widget.services.deleteAllLocalData,
+            ),
+          ),
         ],
       ),
       _SettingsSectionData(
@@ -503,32 +536,6 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 'Resumen local de búsqueda, anotaciones, espacios y atajos.',
             actionLabel: 'Ver ayuda',
             onPressed: () => _showContextualHelp(context),
-          ),
-        ],
-      ),
-      _SettingsSectionData(
-        id: _SettingsSectionId.privacy,
-        description: 'Datos locales y sesiones de lectura.',
-        children: [
-          _ActionSetting(
-            label: 'Abrir ubicación de datos',
-            description: widget.services.paths.dataDirectory.path,
-            actionLabel: 'Abrir',
-            onPressed: widget.services.openDataLocation,
-          ),
-          _ActionSetting(
-            label: 'Eliminar todos los datos locales',
-            description: 'No elimina los archivos PDF originales.',
-            actionLabel: 'Eliminar',
-            destructive: true,
-            onPressed: () => _confirmAndRun(
-              context,
-              title: '¿Eliminar todos los datos?',
-              body:
-                  'Se borrarán biblioteca, progreso, marcadores, sesiones, '
-                  'ajustes y caché. Los PDF originales no se modificarán.',
-              action: widget.services.deleteAllLocalData,
-            ),
           ),
         ],
       ),
@@ -792,8 +799,38 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     return confirmed ?? false;
   }
 
-  Future<void> _update(AppSettings settings) =>
-      widget.services.settings.update(settings);
+  Future<void> _update(AppSettings settings) async {
+    try {
+      await widget.services.settings.updateStrict(settings);
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Ajuste actualizado'),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Deshacer',
+            onPressed: () async {
+              await widget.services.settings.undoLastUpdate();
+              if (mounted) setState(() {});
+            },
+          ),
+        ),
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo guardar el ajuste: $error'),
+          action: SnackBarAction(
+            label: 'Reintentar',
+            onPressed: () => unawaited(_update(settings)),
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> _setCoverGeneration(AppSettings settings, bool enabled) async {
     await _update(settings.copyWith(generateCovers: enabled));
@@ -927,13 +964,12 @@ final class _StorageSummary extends StatelessWidget {
 enum _SettingsSectionId {
   appearance('Apariencia', Icons.contrast_rounded),
   reading('Lectura', Icons.menu_book_outlined),
-  readerBar('Barra del lector', Icons.space_dashboard_outlined),
+  readerBar('Controles del lector', Icons.space_dashboard_outlined),
   shortcuts('Atajos', Icons.keyboard_outlined),
   library('Biblioteca', Icons.library_books_outlined),
   history('Historial', Icons.history_rounded),
-  backup('Copias locales', Icons.inventory_2_outlined),
-  advanced('Avanzado', Icons.health_and_safety_outlined),
-  privacy('Privacidad', Icons.shield_outlined);
+  dataPrivacy('Datos y privacidad', Icons.shield_outlined),
+  advanced('Avanzado', Icons.health_and_safety_outlined);
 
   const _SettingsSectionId(this.label, this.icon);
 
@@ -972,7 +1008,7 @@ final class _DesktopSettings extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 220,
+          width: AppSizes.settingsNavigationWidth,
           decoration: BoxDecoration(
             color: context.appColors.surfaceSecondary,
             border: Border(
@@ -1030,7 +1066,49 @@ final class _CompactSettings extends StatelessWidget {
   final List<_SettingsSectionData> sections;
 
   @override
+  Widget build(BuildContext context) =>
+      _CompactSettingsNavigator(sections: sections);
+}
+
+final class _CompactSettingsNavigator extends StatefulWidget {
+  const _CompactSettingsNavigator({required this.sections});
+
+  final List<_SettingsSectionData> sections;
+
+  @override
+  State<_CompactSettingsNavigator> createState() =>
+      _CompactSettingsNavigatorState();
+}
+
+final class _CompactSettingsNavigatorState
+    extends State<_CompactSettingsNavigator> {
+  _SettingsSectionId? _selected;
+
+  @override
   Widget build(BuildContext context) {
+    final selected = _selected;
+    if (selected != null) {
+      final section = widget.sections.firstWhere((item) => item.id == selected);
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.space20,
+          AppSpacing.space12,
+          AppSpacing.space20,
+          AppSpacing.space48,
+        ),
+        children: [
+          TextButton.icon(
+            onPressed: () => setState(() => _selected = null),
+            icon: const Icon(Icons.arrow_back_rounded, size: 18),
+            label: const Text('Todas las categorías'),
+            style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+          ),
+          const SizedBox(height: AppSpacing.space12),
+          _SettingsSectionContent(section: section),
+        ],
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.space20,
@@ -1043,12 +1121,16 @@ final class _CompactSettings extends StatelessWidget {
           title: 'Preferencias locales',
           description: 'Los cambios reversibles se guardan al instante.',
         ),
-        const SizedBox(height: AppSpacing.space32),
-        for (var index = 0; index < sections.length; index++) ...[
-          _SettingsSectionContent(section: sections[index]),
-          if (index + 1 < sections.length)
-            SizedBox(height: context.appDensity.sectionSpacing),
-        ],
+        const SizedBox(height: AppSpacing.space20),
+        for (final section in widget.sections)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.space8),
+            child: _SettingsNavItem(
+              section: section.id,
+              selected: false,
+              onPressed: () => setState(() => _selected = section.id),
+            ),
+          ),
       ],
     );
   }
@@ -1065,7 +1147,9 @@ final class _SettingsSectionView extends StatelessWidget {
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 840),
+        constraints: const BoxConstraints(
+          maxWidth: AppSizes.settingsContentMaxWidth,
+        ),
         child: ListView(
           padding: padding,
           children: [_SettingsSectionContent(section: section)],
@@ -1085,17 +1169,37 @@ final class _SettingsSectionContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppSectionHeader(
-          title: section.id.label,
-          description: section.description,
+        Semantics(
+          header: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                section.id.label,
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
+              const SizedBox(height: AppSpacing.space4),
+              Text(
+                section.description,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.space20),
-        Divider(color: context.appColors.borderStrong),
-        for (var index = 0; index < section.children.length; index++) ...[
-          section.children[index],
-          if (index + 1 < section.children.length)
-            Divider(color: context.appColors.borderSubtle),
-        ],
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: context.appColors.surfaceElevated,
+            border: Border.all(color: context.appColors.borderSubtle),
+            borderRadius: BorderRadius.circular(AppRadii.floating),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
+            child: Column(
+              children: [for (final child in section.children) child],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1242,42 +1346,10 @@ final class _SettingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final stacked = constraints.maxWidth < 560;
-        final labelBlock = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.bodyLarge),
-            if (description case final value?) ...[
-              const SizedBox(height: AppSpacing.space4),
-              Text(value, style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ],
-        );
-        return Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: context.appDensity.settingsRowVerticalPadding,
-          ),
-          child: stacked
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    labelBlock,
-                    const SizedBox(height: AppSpacing.space12),
-                    Align(alignment: Alignment.centerLeft, child: control),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(child: labelBlock),
-                    const SizedBox(width: AppSpacing.space24),
-                    control,
-                  ],
-                ),
-        );
-      },
+    return YamaSettingRow(
+      label: label,
+      description: description,
+      control: control,
     );
   }
 }

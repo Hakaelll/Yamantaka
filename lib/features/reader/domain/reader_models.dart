@@ -1,5 +1,9 @@
 enum ReaderMode { document, book }
 
+enum ReaderCoverPolicy { firstPageIsCover, noCover, automatic }
+
+enum ReaderInitialSide { right, left }
+
 enum ReaderTheme {
   light(0xFFF3F3F1, 'Claro'),
   ivory(0xFFEAE5D8, 'Marfil'),
@@ -12,6 +16,11 @@ enum ReaderTheme {
 
   final int colorValue;
   final String label;
+
+  /// The plan uses semantic canvas roles rather than allowing arbitrary
+  /// reader widgets to choose colours.  Legacy enum values remain available
+  /// for persisted documents and backups.
+  bool get isLegacyPurePreset => this == ReaderTheme.light || this == ReaderTheme.black;
 }
 
 enum PageLayoutMode { single, facing, continuous }
@@ -30,6 +39,8 @@ final class DocumentPreferences {
     this.zoomMode = ZoomMode.fitPage,
     this.zoomLevel = 1,
     this.pageLayout = PageLayoutMode.single,
+    this.coverPolicy = ReaderCoverPolicy.firstPageIsCover,
+    this.initialSide = ReaderInitialSide.right,
     this.pageRotation = 0,
     this.horizontalMargin = 32,
     this.verticalMargin = 24,
@@ -44,6 +55,8 @@ final class DocumentPreferences {
   final ZoomMode zoomMode;
   final double zoomLevel;
   final PageLayoutMode pageLayout;
+  final ReaderCoverPolicy coverPolicy;
+  final ReaderInitialSide initialSide;
   final int pageRotation;
   final double horizontalMargin;
   final double verticalMargin;
@@ -57,6 +70,8 @@ final class DocumentPreferences {
     ZoomMode? zoomMode,
     double? zoomLevel,
     PageLayoutMode? pageLayout,
+    ReaderCoverPolicy? coverPolicy,
+    ReaderInitialSide? initialSide,
     int? pageRotation,
     double? horizontalMargin,
     double? verticalMargin,
@@ -70,6 +85,8 @@ final class DocumentPreferences {
     zoomMode: zoomMode ?? this.zoomMode,
     zoomLevel: zoomLevel ?? this.zoomLevel,
     pageLayout: pageLayout ?? this.pageLayout,
+    coverPolicy: coverPolicy ?? this.coverPolicy,
+    initialSide: initialSide ?? this.initialSide,
     pageRotation: pageRotation ?? this.pageRotation,
     horizontalMargin: horizontalMargin ?? this.horizontalMargin,
     verticalMargin: verticalMargin ?? this.verticalMargin,
@@ -108,19 +125,38 @@ final class FacingPageSpread {
     int pageIndex,
     int pageCount, {
     ReadingDirection direction = ReadingDirection.leftToRight,
+    bool firstPageIsCover = true,
+    ReaderInitialSide? initialSide,
   }) {
     if (pageCount <= 0) return const FacingPageSpread();
-    final index = pageIndex.clamp(0, pageCount - 1);
-    if (index == 0) {
-      return direction == ReadingDirection.leftToRight
-          ? const FacingPageSpread(rightPageIndex: 0)
-          : const FacingPageSpread(leftPageIndex: 0);
+    final index = pageIndex.clamp(0, pageCount - 1).toInt();
+    final cover = firstPageIsCover;
+    final resolvedInitialSide = initialSide ??
+        (direction == ReadingDirection.leftToRight
+            ? ReaderInitialSide.right
+            : ReaderInitialSide.left);
+    final firstPageIsSolo = cover ||
+        (!cover && resolvedInitialSide == ReaderInitialSide.right);
+    if (firstPageIsSolo && index == 0) {
+      if (cover) {
+        return direction == ReadingDirection.leftToRight
+            ? const FacingPageSpread(rightPageIndex: 0)
+            : const FacingPageSpread(leftPageIndex: 0);
+      }
+      return resolvedInitialSide == ReaderInitialSide.left
+          ? const FacingPageSpread(leftPageIndex: 0)
+          : const FacingPageSpread(rightPageIndex: 0);
     }
-    final first = index.isOdd ? index : index - 1;
-    final second = first + 1 < pageCount ? first + 1 : null;
+    final first = cover
+        ? (index.isOdd ? index : index - 1)
+        : firstPageIsSolo
+        ? (index.isOdd ? index : index - 1)
+        : (index.isEven ? index : index - 1);
+    final normalizedFirst = first.clamp(0, pageCount - 1).toInt();
+    final second = normalizedFirst + 1 < pageCount ? normalizedFirst + 1 : null;
     return direction == ReadingDirection.leftToRight
-        ? FacingPageSpread(leftPageIndex: first, rightPageIndex: second)
-        : FacingPageSpread(leftPageIndex: second, rightPageIndex: first);
+        ? FacingPageSpread(leftPageIndex: normalizedFirst, rightPageIndex: second)
+        : FacingPageSpread(leftPageIndex: second, rightPageIndex: normalizedFirst);
   }
 }
 
@@ -131,26 +167,43 @@ abstract final class ReadingUnitNavigation {
     required int pageIndex,
     required int pageCount,
     required ReaderMode mode,
+    bool firstPageIsCover = true,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
   }) {
     if (pageCount <= 0) return 0;
-    final index = pageIndex.clamp(0, pageCount - 1);
-    if (!isFacing(mode) || index == 0) return index;
-    return index.isOdd ? index : index - 1;
+    final index = pageIndex.clamp(0, pageCount - 1).toInt();
+    if (!isFacing(mode) ||
+        (firstPageIsCover && index == 0) ||
+        (!firstPageIsCover && initialSide == ReaderInitialSide.right && index == 0)) {
+      return index;
+    }
+    if (firstPageIsCover || initialSide == ReaderInitialSide.right) {
+      return index.isOdd ? index : index - 1;
+    }
+    return index.isEven ? index : index - 1;
   }
 
   static int previousTarget({
     required int pageIndex,
     required int pageCount,
     required ReaderMode mode,
+    bool firstPageIsCover = true,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
   }) {
     if (pageCount <= 0) return 0;
     final current = canonicalPage(
       pageIndex: pageIndex,
       pageCount: pageCount,
       mode: mode,
+      firstPageIsCover: firstPageIsCover,
+      initialSide: initialSide,
     );
     if (!isFacing(mode)) return (current - 1).clamp(0, pageCount - 1);
-    if (current <= 1) return 0;
+    if (current == 0 ||
+        (firstPageIsCover && current == 1) ||
+        (!firstPageIsCover && initialSide == ReaderInitialSide.right && current == 1)) {
+      return 0;
+    }
     return (current - 2).clamp(0, pageCount - 1);
   }
 
@@ -158,25 +211,41 @@ abstract final class ReadingUnitNavigation {
     required int pageIndex,
     required int pageCount,
     required ReaderMode mode,
+    bool firstPageIsCover = true,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
   }) {
     if (pageCount <= 0) return 0;
     final current = canonicalPage(
       pageIndex: pageIndex,
       pageCount: pageCount,
       mode: mode,
+      firstPageIsCover: firstPageIsCover,
+      initialSide: initialSide,
     );
     if (!isFacing(mode)) return (current + 1).clamp(0, pageCount - 1);
-    if (current == 0) return pageCount > 1 ? 1 : 0;
+    if (current == 0) {
+      if (firstPageIsCover || initialSide == ReaderInitialSide.right) {
+        return pageCount > 1 ? 1 : 0;
+      }
+      return pageCount > 2 ? 2 : 0;
+    }
     final target = current + 2;
     return target < pageCount ? target : current;
   }
 
-  static int lastTarget({required int pageCount, required ReaderMode mode}) {
+  static int lastTarget({
+    required int pageCount,
+    required ReaderMode mode,
+    bool firstPageIsCover = true,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
+  }) {
     if (pageCount <= 0) return 0;
     return canonicalPage(
       pageIndex: pageCount - 1,
       pageCount: pageCount,
       mode: mode,
+      firstPageIsCover: firstPageIsCover,
+      initialSide: initialSide,
     );
   }
 
@@ -185,6 +254,8 @@ abstract final class ReadingUnitNavigation {
     required int pageCount,
     required ReaderMode mode,
     ReadingDirection direction = ReadingDirection.leftToRight,
+    bool firstPageIsCover = true,
+    ReaderInitialSide? initialSide,
   }) {
     if (pageCount <= 0) return '0 / 0';
     if (!isFacing(mode)) {
@@ -194,6 +265,8 @@ abstract final class ReadingUnitNavigation {
       pageIndex,
       pageCount,
       direction: direction,
+      firstPageIsCover: firstPageIsCover,
+      initialSide: initialSide,
     );
     final first = spread.firstPageIndex;
     final last = spread.lastPageIndex;

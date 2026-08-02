@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import '../../features/reader/domain/reader_models.dart';
+
 final class ReaderPageLayoutGeometry {
   const ReaderPageLayoutGeometry({
     required this.pageRects,
@@ -9,6 +11,30 @@ final class ReaderPageLayoutGeometry {
 
   final List<Rect> pageRects;
   final Size documentSize;
+
+  Rect get contentRect => pageRects.isEmpty
+      ? Rect.zero
+      : pageRects.skip(1).fold(pageRects.first, (rect, page) =>
+          rect.expandToInclude(page));
+
+  Rect spreadRectFor(
+    int pageIndex, {
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
+  }) {
+    if (pageRects.isEmpty) return Rect.zero;
+    final index = pageIndex.clamp(0, pageRects.length - 1).toInt();
+    final firstPageIsSolo = coverPolicy != ReaderCoverPolicy.noCover ||
+        initialSide == ReaderInitialSide.right;
+    if (firstPageIsSolo && index == 0) return pageRects[0];
+    final start = firstPageIsSolo
+        ? (index.isOdd ? index : index - 1)
+        : (index.isEven ? index : index - 1);
+    if (start + 1 < pageRects.length) {
+      return pageRects[start].expandToInclude(pageRects[start + 1]);
+    }
+    return pageRects[start];
+  }
 }
 
 /// Single source of truth for reader page geometry and viewport constraints.
@@ -43,6 +69,9 @@ abstract final class ReaderViewportMetrics {
     required double outerMargin,
     required double spineGap,
     required bool rightToLeft,
+    double? physicalPageGap,
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
   }) {
     if (pageSizes.isEmpty) {
       return const ReaderPageLayoutGeometry(
@@ -51,14 +80,22 @@ abstract final class ReaderViewportMetrics {
       );
     }
 
-    var widestUnit = pageSizes.first.width;
-    var tallestPage = pageSizes.first.height;
-    for (var index = 1; index < pageSizes.length; index += 2) {
+    final gap = physicalPageGap == null
+        ? spineGap
+        : physicalPageGap.clamp(0.0, 2.0).toDouble();
+    final hasCover = coverPolicy != ReaderCoverPolicy.noCover;
+    final noCoverStartsWithRight =
+        !hasCover && initialSide == ReaderInitialSide.right;
+    final hasSoloFirst = hasCover || noCoverStartsWithRight;
+    var widestUnit = hasSoloFirst ? pageSizes.first.width : 0.0;
+    var tallestPage = hasSoloFirst ? pageSizes.first.height : 0.0;
+    final firstPairIndex = hasSoloFirst ? 1 : 0;
+    for (var index = firstPairIndex; index < pageSizes.length; index += 2) {
       final first = pageSizes[index];
       final second = index + 1 < pageSizes.length ? pageSizes[index + 1] : null;
       widestUnit = math.max(
         widestUnit,
-        first.width + (second == null ? 0 : spineGap + second.width),
+        first.width + (second == null ? 0 : gap + second.width),
       );
       tallestPage = math.max(tallestPage, first.height);
       if (second != null) {
@@ -71,21 +108,35 @@ abstract final class ReaderViewportMetrics {
     final rects = List<Rect>.filled(pageSizes.length, Rect.zero);
     var slotLeft = 0.0;
 
-    final cover = pageSizes.first;
-    rects[0] = Rect.fromLTWH(
-      slotLeft + (slotWidth - cover.width) / 2,
-      (documentHeight - cover.height) / 2,
-      cover.width,
-      cover.height,
-    );
-    slotLeft += slotWidth;
+    if (hasSoloFirst) {
+      final firstPage = pageSizes.first;
+      final firstPageLeft = hasCover
+          ? slotLeft + (slotWidth - firstPage.width) / 2
+          : slotLeft + slotWidth - outerMargin - firstPage.width;
+      rects[0] = Rect.fromLTWH(
+        firstPageLeft,
+        (documentHeight - firstPage.height) / 2,
+        firstPage.width,
+        firstPage.height,
+      );
+      slotLeft += slotWidth;
+    }
 
-    for (var index = 1; index < pageSizes.length; index += 2) {
+    final firstPageOnLeft = hasCover || noCoverStartsWithRight
+        ? !rightToLeft
+        : rightToLeft
+        ? initialSide == ReaderInitialSide.right
+        : initialSide == ReaderInitialSide.left;
+
+    for (var index = firstPairIndex; index < pageSizes.length; index += 2) {
       final first = pageSizes[index];
       final second = index + 1 < pageSizes.length ? pageSizes[index + 1] : null;
       if (second == null) {
+        final pageLeft = firstPageOnLeft
+            ? slotLeft + outerMargin
+            : slotLeft + slotWidth - outerMargin - first.width;
         rects[index] = Rect.fromLTWH(
-          slotLeft + (slotWidth - first.width) / 2,
+          pageLeft,
           (documentHeight - first.height) / 2,
           first.width,
           first.height,
@@ -94,14 +145,14 @@ abstract final class ReaderViewportMetrics {
         continue;
       }
 
-      final left = rightToLeft ? second : first;
-      final right = rightToLeft ? first : second;
-      final pairWidth = left.width + spineGap + right.width;
+      final left = firstPageOnLeft ? first : second;
+      final right = firstPageOnLeft ? second : first;
+      final pairWidth = left.width + gap + right.width;
       final pairTop =
           (documentHeight - math.max(left.height, right.height)) / 2;
       final pairLeft = slotLeft + (slotWidth - pairWidth) / 2;
-      final leftIndex = rightToLeft ? index + 1 : index;
-      final rightIndex = rightToLeft ? index : index + 1;
+      final leftIndex = firstPageOnLeft ? index : index + 1;
+      final rightIndex = firstPageOnLeft ? index + 1 : index;
       rects[leftIndex] = Rect.fromLTWH(
         pairLeft,
         pairTop,
@@ -109,7 +160,7 @@ abstract final class ReaderViewportMetrics {
         left.height,
       );
       rects[rightIndex] = Rect.fromLTWH(
-        pairLeft + left.width + spineGap,
+        pairLeft + left.width + gap,
         pairTop,
         right.width,
         right.height,
@@ -122,6 +173,26 @@ abstract final class ReaderViewportMetrics {
       documentSize: Size(slotLeft, documentHeight),
     );
   }
+
+  /// Layout for a single visible reading unit.  It is intentionally separate
+  /// from the legacy all-pages layout so the adapter can keep a 0–2 px
+  /// physical page gap while the Reader paints a 12–16 px editorial channel.
+  static ReaderPageLayoutGeometry facingSpreadLayout({
+    required List<Size> pageSizes,
+    required double outerMargin,
+    required bool rightToLeft,
+    double physicalPageGap = 0,
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
+  }) => facingPageLayout(
+    pageSizes: pageSizes,
+    outerMargin: outerMargin,
+    spineGap: physicalPageGap,
+    physicalPageGap: physicalPageGap,
+    rightToLeft: rightToLeft,
+    coverPolicy: coverPolicy,
+    initialSide: initialSide,
+  );
 
   static ReaderPageLayoutGeometry singlePageLayout({
     required List<Size> pageSizes,
@@ -166,11 +237,24 @@ abstract final class ReaderViewportMetrics {
     required List<Rect> pageRects,
     required int pageIndex,
     required bool facing,
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
   }) {
     if (pageRects.isEmpty) return Rect.zero;
-    final index = pageIndex.clamp(0, pageRects.length - 1);
-    if (!facing || index == 0) return pageRects[index];
-    final start = index.isOdd ? index : index - 1;
+    final index = pageIndex.clamp(0, pageRects.length - 1).toInt();
+    final noCoverStartsWithRight =
+        coverPolicy == ReaderCoverPolicy.noCover &&
+        initialSide == ReaderInitialSide.right;
+    if (!facing ||
+        (index == 0 &&
+            (coverPolicy != ReaderCoverPolicy.noCover ||
+                noCoverStartsWithRight))) {
+      return pageRects[index];
+    }
+    final start = coverPolicy != ReaderCoverPolicy.noCover ||
+            noCoverStartsWithRight
+        ? (index.isOdd ? index : index - 1)
+        : (index.isEven ? index : index - 1);
     var result = pageRects[start];
     if (start + 1 < pageRects.length) {
       result = result.expandToInclude(pageRects[start + 1]);
@@ -182,6 +266,8 @@ abstract final class ReaderViewportMetrics {
     required List<Rect> pageRects,
     required Offset proposedCenter,
     required bool facing,
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.right,
   }) {
     if (pageRects.isEmpty) return Rect.zero;
     if (!facing) {
@@ -194,8 +280,15 @@ abstract final class ReaderViewportMetrics {
       );
     }
 
-    final units = <Rect>[pageRects.first];
-    for (var index = 1; index < pageRects.length; index += 2) {
+    final units = <Rect>[];
+    final noCoverStartsWithRight =
+        coverPolicy == ReaderCoverPolicy.noCover &&
+        initialSide == ReaderInitialSide.right;
+    final firstPairIndex = coverPolicy == ReaderCoverPolicy.noCover
+        ? (noCoverStartsWithRight ? 1 : 0)
+        : 1;
+    if (firstPairIndex == 1) units.add(pageRects.first);
+    for (var index = firstPairIndex; index < pageRects.length; index += 2) {
       var unit = pageRects[index];
       if (index + 1 < pageRects.length) {
         unit = unit.expandToInclude(pageRects[index + 1]);

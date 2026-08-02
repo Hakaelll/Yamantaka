@@ -129,6 +129,8 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
                   pageRects: layout.pageLayouts,
                   proposedCenter: proposedCenter,
                   facing: widget.configuration.flow == PdfViewFlow.facing,
+                  coverPolicy: widget.configuration.coverPolicy,
+                  initialSide: widget.configuration.initialSide,
                 );
                 final normalizedCenter = ReaderViewportMetrics.normalizeCenter(
                   proposedCenter: proposedCenter,
@@ -214,6 +216,12 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
             fitPage: () => _fitPage(
               controller,
               pageNumber: controller.pageNumber ?? 1,
+              duration: _motionDuration,
+            ),
+            actualSize: () => _setCustomZoom(
+              controller,
+              pageNumber: controller.pageNumber ?? 1,
+              zoom: 1,
               duration: _motionDuration,
             ),
             restorePosition: (zoom, scrollOffset) => _restorePosition(
@@ -513,14 +521,16 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     );
   }
 
-  Rect _readingUnitRect(pdfrx.PdfViewerController controller, int pageNumber) {
-    final layouts = controller.layout.pageLayouts;
-    return ReaderViewportMetrics.readingUnitRect(
-      pageRects: layouts,
-      pageIndex: pageNumber - 1,
-      facing: widget.configuration.flow == PdfViewFlow.facing,
-    );
-  }
+    Rect _readingUnitRect(pdfrx.PdfViewerController controller, int pageNumber) {
+      final layouts = controller.layout.pageLayouts;
+      return ReaderViewportMetrics.readingUnitRect(
+        pageRects: layouts,
+        pageIndex: pageNumber - 1,
+        facing: widget.configuration.flow == PdfViewFlow.facing,
+        coverPolicy: widget.configuration.coverPolicy,
+        initialSide: widget.configuration.initialSide,
+      );
+    }
 
   void _handleLink(pdfrx.PdfLink link) {
     if (link.dest != null) {
@@ -585,6 +595,9 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
           .toList(growable: false),
       outerMargin: params.margin,
       spineGap: widget.configuration.spineGap,
+      physicalPageGap: widget.configuration.physicalPageGap,
+      coverPolicy: widget.configuration.coverPolicy,
+      initialSide: widget.configuration.initialSide,
       rightToLeft:
           widget.configuration.readingDirection ==
           PdfViewReadingDirection.rightToLeft,

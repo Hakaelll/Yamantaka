@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/shortcuts/app_commands.dart';
+import '../../../app/ui/yama_components.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
@@ -29,7 +30,10 @@ final class ReaderTopBar extends StatelessWidget
     required this.onDocumentInfo,
     required this.onToggleFullScreen,
     required this.onToggleChrome,
+    required this.onToggleImmersive,
     required this.onOpenSettings,
+    this.canvasColor,
+    this.flatChrome = false,
     this.shortcutOverrides = '{}',
   });
 
@@ -52,7 +56,10 @@ final class ReaderTopBar extends StatelessWidget
   final VoidCallback onDocumentInfo;
   final VoidCallback onToggleFullScreen;
   final VoidCallback onToggleChrome;
+  final VoidCallback onToggleImmersive;
   final VoidCallback onOpenSettings;
+  final Color? canvasColor;
+  final bool flatChrome;
   final String shortcutOverrides;
 
   @override
@@ -65,49 +72,73 @@ final class ReaderTopBar extends StatelessWidget
     if (preferences == null || document == null) {
       return const SizedBox(height: AppSizes.topBarHeight);
     }
-    return Material(
-      color: context.appColors.surfacePrimary,
-      child: Container(
-        height: AppSizes.topBarHeight,
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: context.appColors.borderSubtle),
-          ),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: AppSpacing.space4),
-            IconButton(
-              tooltip: 'Volver a la biblioteca',
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_back_rounded),
+    final colors = context.appColors;
+    final veilColor = canvasColor ?? colors.readerBackground;
+    final flat = flatChrome || MediaQuery.highContrastOf(context);
+    return DecoratedBox(
+      decoration: flat
+          ? BoxDecoration(color: veilColor)
+          : BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  veilColor.withValues(alpha: 0.88),
+                  veilColor.withValues(alpha: 0.34),
+                  Colors.transparent,
+                ],
+                stops: const [0, 0.58, 1],
+              ),
             ),
-            const SizedBox(width: AppSpacing.space4),
-            Expanded(
+      child: SizedBox(
+        height: AppSizes.topVeilDepth,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact
+                ? AppSpacing.space12
+                : expanded
+                ? AppSpacing.space24
+                : AppSpacing.space20,
+          ),
+          child: Row(
+          children: [
+            YamaIconButton(
+              semanticLabel: 'Volver a la biblioteca',
+              tooltip: 'Volver a la biblioteca',
+              icon: Icons.arrow_back_rounded,
+              onPressed: onBack,
+            ),
+            const SizedBox(width: AppSpacing.space8),
+            Flexible(
               child: Tooltip(
                 message: document.fileName,
                 child: Text(
                   document.effectiveTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
             if (!compact && controller.navigationHistory != null) ...[
-              IconButton(
+              YamaIconButton(
+                semanticLabel: 'Volver a la ubicación anterior',
                 tooltip: 'Volver a la ubicación anterior (Alt+←)',
+                icon: Icons.undo_rounded,
                 onPressed: controller.navigationHistory!.canGoBack
                     ? controller.historyBack
                     : null,
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 17),
               ),
-              IconButton(
+              YamaIconButton(
+                semanticLabel: 'Avanzar en el historial',
                 tooltip: 'Avanzar en el historial (Alt+→)',
+                icon: Icons.redo_rounded,
                 onPressed: controller.navigationHistory!.canGoForward
                     ? controller.historyForward
                     : null,
-                icon: const Icon(Icons.arrow_forward_ios_rounded, size: 17),
               ),
             ],
             if (!compact && showModeControls) ...[
@@ -118,50 +149,79 @@ final class ReaderTopBar extends StatelessWidget
               ),
               const SizedBox(width: AppSpacing.space8),
             ],
-            IconButton(
+            YamaIconButton(
+              semanticLabel: 'Buscar en el documento',
               tooltip:
                   'Buscar (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides)})',
+              icon: Icons.search_rounded,
               onPressed: onSearch,
-              icon: Icon(
-                Icons.search_rounded,
-                color: activePanel == ReaderPanelSection.search
-                    ? context.appColors.accentPrimary
-                    : null,
-              ),
+              selected: activePanel == ReaderPanelSection.search,
             ),
-            if (expanded && showPanelControls) ...[
-              _PanelIconButton(
+            if (expanded && showPanelControls)
+              YamaIconButton(
+                semanticLabel: 'Abrir miniaturas',
                 tooltip:
                     'Miniaturas (${AppCommandRegistry.shortcutLabel(AppCommandId.togglePanel, shortcutOverrides)})',
                 icon: Icons.grid_view_outlined,
                 selected: activePanel == ReaderPanelSection.thumbnails,
                 onPressed: onShowThumbnails,
               ),
-              _PanelIconButton(
-                tooltip: 'Índice',
-                icon: Icons.format_list_bulleted_rounded,
-                selected: activePanel == ReaderPanelSection.outline,
-                onPressed: onShowOutline,
+            if (showPanelControls)
+              PopupMenuButton<_ReaderToolsAction>(
+                tooltip: 'Herramientas',
+                onSelected: _runToolsAction,
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: _ReaderToolsAction.thumbnails,
+                    child: _ReaderMenuItem(
+                      icon: Icons.grid_view_outlined,
+                      label: 'Miniaturas',
+                      shortcut: AppCommandRegistry.shortcutLabel(
+                        AppCommandId.togglePanel,
+                        shortcutOverrides,
+                      ),
+                      selected: activePanel == ReaderPanelSection.thumbnails,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ReaderToolsAction.outline,
+                    child: _ReaderMenuItem(
+                      icon: Icons.format_list_bulleted_rounded,
+                      label: 'Índice',
+                      selected: activePanel == ReaderPanelSection.outline,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ReaderToolsAction.bookmarks,
+                    child: _ReaderMenuItem(
+                      icon: Icons.bookmarks_outlined,
+                      label: 'Marcadores',
+                      selected: activePanel == ReaderPanelSection.bookmarks,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _ReaderToolsAction.annotations,
+                    child: _ReaderMenuItem(
+                      icon: Icons.rate_review_outlined,
+                      label: 'Anotaciones',
+                      selected: activePanel == ReaderPanelSection.annotations,
+                    ),
+                  ),
+                ],
+                icon: Icon(
+                  Icons.build_outlined,
+                  color: activePanel == null
+                      ? colors.iconNormal
+                      : colors.iconActive,
+                ),
               ),
-              _PanelIconButton(
-                tooltip: 'Marcadores',
-                icon: Icons.bookmarks_outlined,
-                selected: activePanel == ReaderPanelSection.bookmarks,
-                onPressed: onShowBookmarks,
-              ),
-              _PanelIconButton(
-                tooltip: 'Anotaciones',
-                icon: Icons.rate_review_outlined,
-                selected: activePanel == ReaderPanelSection.annotations,
-                onPressed: onShowAnnotations,
-              ),
-            ],
-            if (!compact)
-              IconButton(
+            if (!compact && expanded)
+              YamaIconButton(
+                semanticLabel: 'Abrir paleta de comandos',
                 tooltip:
                     'Paleta de comandos (${AppCommandRegistry.shortcutLabel(AppCommandId.commandPalette, shortcutOverrides)})',
+                icon: Icons.keyboard_command_key_rounded,
                 onPressed: onCommandPalette,
-                icon: const Icon(Icons.keyboard_command_key_rounded),
               ),
             PopupMenuButton<_ReaderMenuAction>(
               tooltip: 'Más opciones',
@@ -292,6 +352,18 @@ final class ReaderTopBar extends StatelessWidget
                     ),
                   ),
                 ),
+                PopupMenuItem(
+                  value: _ReaderMenuAction.toggleImmersive,
+                  height: 40,
+                  child: _ReaderMenuItem(
+                    icon: Icons.center_focus_strong_rounded,
+                    label: 'Lectura inmersiva',
+                    shortcut: AppCommandRegistry.shortcutLabel(
+                      AppCommandId.toggleImmersive,
+                      shortcutOverrides,
+                    ),
+                  ),
+                ),
                 const PopupMenuDivider(height: 9),
                 const PopupMenuItem(
                   value: _ReaderMenuAction.documentInfo,
@@ -313,9 +385,23 @@ final class ReaderTopBar extends StatelessWidget
             ),
             const SizedBox(width: AppSpacing.space4),
           ],
+          ),
         ),
       ),
     );
+  }
+
+  void _runToolsAction(_ReaderToolsAction action) {
+    switch (action) {
+      case _ReaderToolsAction.thumbnails:
+        onShowThumbnails();
+      case _ReaderToolsAction.outline:
+        onShowOutline();
+      case _ReaderToolsAction.bookmarks:
+        onShowBookmarks();
+      case _ReaderToolsAction.annotations:
+        onShowAnnotations();
+    }
   }
 
   void _runAction(_ReaderMenuAction action) {
@@ -344,6 +430,8 @@ final class ReaderTopBar extends StatelessWidget
         onToggleFullScreen();
       case _ReaderMenuAction.toggleChrome:
         onToggleChrome();
+      case _ReaderMenuAction.toggleImmersive:
+        onToggleImmersive();
       case _ReaderMenuAction.documentInfo:
         onDocumentInfo();
       case _ReaderMenuAction.settings:
@@ -363,14 +451,9 @@ final class _ReaderModeSelector extends StatelessWidget {
     return Semantics(
       label: 'Modo de visualización',
       explicitChildNodes: true,
-      child: Material(
+      child: Container(
         key: const Key('reader-mode-selector'),
-        color: context.appColors.surfaceSecondary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.field),
-          side: BorderSide(color: context.appColors.borderSubtle),
-        ),
-        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -493,41 +576,12 @@ enum _ReaderMenuAction {
   margins,
   fullscreen,
   toggleChrome,
+  toggleImmersive,
   documentInfo,
   settings,
 }
 
-final class _PanelIconButton extends StatelessWidget {
-  const _PanelIconButton({
-    required this.tooltip,
-    required this.icon,
-    required this.selected,
-    required this.onPressed,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      selected: selected,
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        style: selected
-            ? IconButton.styleFrom(
-                backgroundColor: context.appColors.selectionBackground,
-                foregroundColor: context.appColors.accentPrimary,
-              )
-            : null,
-        icon: Icon(icon),
-      ),
-    );
-  }
-}
+enum _ReaderToolsAction { thumbnails, outline, bookmarks, annotations }
 
 final class _ReaderMenuItem extends StatelessWidget {
   const _ReaderMenuItem({

@@ -11,6 +11,9 @@ final class AppDensityTokens extends ThemeExtension<AppDensityTokens> {
     required this.sectionSpacing,
     required this.recentCoverWidth,
     required this.recentCoverHeight,
+    this.targetExtent = 40,
+    this.settingRowMinHeight = 56,
+    this.compactMenuRowHeight = 34,
   });
 
   static const comfortable = AppDensityTokens(
@@ -20,6 +23,9 @@ final class AppDensityTokens extends ThemeExtension<AppDensityTokens> {
     sectionSpacing: 40,
     recentCoverWidth: 44,
     recentCoverHeight: 60,
+    targetExtent: 40,
+    settingRowMinHeight: 56,
+    compactMenuRowHeight: 34,
   );
 
   static const compact = AppDensityTokens(
@@ -29,6 +35,9 @@ final class AppDensityTokens extends ThemeExtension<AppDensityTokens> {
     sectionSpacing: 28,
     recentCoverWidth: 38,
     recentCoverHeight: 52,
+    targetExtent: 40,
+    settingRowMinHeight: 48,
+    compactMenuRowHeight: 34,
   );
 
   final AppInterfaceDensity interfaceDensity;
@@ -37,6 +46,9 @@ final class AppDensityTokens extends ThemeExtension<AppDensityTokens> {
   final double sectionSpacing;
   final double recentCoverWidth;
   final double recentCoverHeight;
+  final double targetExtent;
+  final double settingRowMinHeight;
+  final double compactMenuRowHeight;
 
   @override
   AppDensityTokens copyWith({
@@ -46,6 +58,9 @@ final class AppDensityTokens extends ThemeExtension<AppDensityTokens> {
     double? sectionSpacing,
     double? recentCoverWidth,
     double? recentCoverHeight,
+    double? targetExtent,
+    double? settingRowMinHeight,
+    double? compactMenuRowHeight,
   }) => AppDensityTokens(
     interfaceDensity: interfaceDensity ?? this.interfaceDensity,
     listRowVerticalPadding:
@@ -55,6 +70,10 @@ final class AppDensityTokens extends ThemeExtension<AppDensityTokens> {
     sectionSpacing: sectionSpacing ?? this.sectionSpacing,
     recentCoverWidth: recentCoverWidth ?? this.recentCoverWidth,
     recentCoverHeight: recentCoverHeight ?? this.recentCoverHeight,
+    targetExtent: targetExtent ?? this.targetExtent,
+    settingRowMinHeight: settingRowMinHeight ?? this.settingRowMinHeight,
+    compactMenuRowHeight:
+        compactMenuRowHeight ?? this.compactMenuRowHeight,
   );
 
   @override

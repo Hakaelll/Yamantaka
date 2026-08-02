@@ -329,24 +329,35 @@ final class ReaderController extends ChangeNotifier {
     pageIndex: currentPageIndex,
     pageCount: pageCount,
     mode: readerMode,
+    firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
+    initialSide: preferences?.initialSide ?? ReaderInitialSide.right,
   );
 
   int _previousReadingUnitTarget() => ReadingUnitNavigation.previousTarget(
     pageIndex: currentPageIndex,
     pageCount: pageCount,
     mode: readerMode,
+    firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
+    initialSide: preferences?.initialSide ?? ReaderInitialSide.right,
   );
 
   int _nextReadingUnitTarget() => ReadingUnitNavigation.nextTarget(
     pageIndex: currentPageIndex,
     pageCount: pageCount,
     mode: readerMode,
+    firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
+    initialSide: preferences?.initialSide ?? ReaderInitialSide.right,
   );
 
   Future<void> goToFirstReadingUnit() => viewController.goToPage(0);
 
   Future<void> goToLastReadingUnit() => viewController.goToPage(
-    ReadingUnitNavigation.lastTarget(pageCount: pageCount, mode: readerMode),
+    ReadingUnitNavigation.lastTarget(
+      pageCount: pageCount,
+      mode: readerMode,
+      firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
+      initialSide: preferences?.initialSide ?? ReaderInitialSide.right,
+    ),
   );
 
   String readingUnitIndicator({
@@ -356,6 +367,8 @@ final class ReaderController extends ChangeNotifier {
     pageCount: pageCount,
     mode: readerMode,
     direction: direction,
+    firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
+    initialSide: preferences?.initialSide,
   );
 
   Future<void> goToPage(int oneBasedPage) {
@@ -467,6 +480,8 @@ final class ReaderController extends ChangeNotifier {
       pageIndex: currentPageIndex,
       pageCount: pageCount,
       mode: mode,
+      firstPageIsCover: current.coverPolicy != ReaderCoverPolicy.noCover,
+      initialSide: current.initialSide,
     );
     currentPageIndex = canonicalPage;
     preferences = current.copyWith(
@@ -497,6 +512,8 @@ final class ReaderController extends ChangeNotifier {
       pageIndex: currentPageIndex,
       pageCount: pageCount,
       mode: mode,
+      firstPageIsCover: current.coverPolicy != ReaderCoverPolicy.noCover,
+      initialSide: current.initialSide,
     );
     preferences = current.copyWith(pageLayout: layout, viewMode: mode);
     _scheduleSave();

@@ -229,7 +229,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
             safeMode: widget.services.safeMode,
           ),
           themeAnimationDuration:
-              settings.reduceMotion || settings.disableAnimations
+              settings.resolvedMotionPreference != AppMotionPreference.full
               ? AppMotion.instant
               : AppMotion.standard,
           home: CallbackShortcuts(
@@ -242,8 +242,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
               child: Builder(
                 builder: (context) {
                   final reduceMotion =
-                      settings.reduceMotion ||
-                      settings.disableAnimations ||
+                      settings.resolvedMotionPreference !=
+                          AppMotionPreference.full ||
                       MediaQuery.disableAnimationsOf(context);
                   return AnimatedSwitcher(
                     duration: reduceMotion
@@ -334,8 +334,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
     onOpenDocument: _pickAndOpen,
     onOpenSettings: () => setState(() => _page = _AppPage.settings),
     reduceMotion:
-        widget.services.settings.settings.reduceMotion ||
-        widget.services.settings.settings.disableAnimations,
+        widget.services.settings.settings.resolvedMotionPreference !=
+            AppMotionPreference.full,
     showProgress: widget.services.settings.settings.showProgress,
     controlsAutoHide: widget.services.settings.settings.autoHideControls,
     readingDirection: widget.services.settings.settings.readingDirection,

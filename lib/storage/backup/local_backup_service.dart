@@ -8,6 +8,7 @@ import 'package:crypto/crypto.dart';
 import '../../app/app_config.dart';
 import '../../core/backup/backup_manifest.dart';
 import '../../app/theme/app_density.dart';
+import '../../app/theme/app_tokens.dart';
 import '../../features/reader/domain/reader_models.dart';
 import '../../features/settings/application/settings_controller.dart';
 import '../database/app_database.dart';
@@ -42,7 +43,7 @@ final class LocalBackupService {
        _settings = settings;
 
   static const format = 'yamantaka-local-backup';
-  static const version = 5;
+  static const version = 6;
   static const maxBackupBytes = 128 * 1024 * 1024;
 
   final AppDatabase _database;
@@ -354,7 +355,11 @@ final class LocalBackupService {
           ? _v3DocumentColumns
           : _legacyDocumentColumns,
     );
-    _validateTable(tables, 'document_preferences', _preferenceColumns);
+    _validateTable(
+      tables,
+      'document_preferences',
+      backupVersion >= 6 ? _preferenceColumns : _legacyPreferenceColumns,
+    );
     _validateTable(tables, 'document_notes', _noteColumns);
     _validateTable(tables, 'bookmarks', _bookmarkColumns);
     _validateTable(tables, 'reading_sessions', _sessionColumns);
@@ -458,7 +463,15 @@ final class LocalBackupService {
       _database.database.execute(sql, [
         for (final column in columns)
           row[column] ??
-              (table == 'documents' && column == 'is_favorite' ? 0 : null),
+              (table == 'documents' && column == 'is_favorite'
+                  ? 0
+                  : table == 'document_preferences' &&
+                        column == 'cover_policy'
+                  ? ReaderCoverPolicy.firstPageIsCover.name
+                  : table == 'document_preferences' &&
+                        column == 'initial_side'
+                  ? ReaderInitialSide.right.name
+                  : null),
       ]);
     }
   }
@@ -470,6 +483,7 @@ final class LocalBackupService {
     'showProgress': value.showProgress,
     'reduceMotion': value.reduceMotion,
     'disableAnimations': value.disableAnimations,
+    'motionPreference': value.resolvedMotionPreference.name,
     'interfaceDensity': value.interfaceDensity.name,
     'defaultViewMode': value.defaultViewMode,
     'defaultPageLayout': value.defaultPageLayout,
@@ -523,6 +537,15 @@ final class LocalBackupService {
       showProgress: boolean('showProgress', true),
       reduceMotion: boolean('reduceMotion', false),
       disableAnimations: boolean('disableAnimations', false),
+      motionPreference: enumValue(
+        AppMotionPreference.values,
+        map['motionPreference'],
+        boolean('disableAnimations', false)
+            ? AppMotionPreference.none
+            : boolean('reduceMotion', false)
+            ? AppMotionPreference.reduced
+            : AppMotionPreference.full,
+      ),
       interfaceDensity: enumValue(
         AppInterfaceDensity.values,
         map['interfaceDensity'],
@@ -549,7 +572,10 @@ final class LocalBackupService {
       recordReadingSessions: boolean('recordReadingSessions', true),
       readingHistoryLimit: integer('readingHistoryLimit', 250).clamp(25, 1000),
       libraryReadingFilter: string('libraryReadingFilter', 'all'),
-      readerPanelWidth: number('readerPanelWidth', 320).clamp(280, 480),
+        readerPanelWidth: number(
+          'readerPanelWidth',
+          AppSizes.readerPanelDefault,
+        ).clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth),
       readerPanelSection: string('readerPanelSection', ''),
       readerPanelOpen: boolean('readerPanelOpen', false),
       readerChromeVisible: boolean('readerChromeVisible', true),
@@ -643,6 +669,23 @@ const _legacyDocumentColumns = <String>[
 ];
 
 const _preferenceColumns = <String>[
+  'document_id',
+  'view_mode',
+  'reading_theme',
+  'zoom_mode',
+  'zoom_level',
+  'page_layout',
+  'cover_policy',
+  'initial_side',
+  'page_rotation',
+  'horizontal_margin',
+  'vertical_margin',
+  'controls_auto_hide',
+  'scroll_offset',
+  'updated_at',
+];
+
+const _legacyPreferenceColumns = <String>[
   'document_id',
   'view_mode',
   'reading_theme',

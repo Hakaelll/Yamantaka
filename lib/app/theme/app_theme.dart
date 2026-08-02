@@ -32,13 +32,33 @@ abstract final class AppTheme {
   }) {
     final isDark = brightness == Brightness.dark;
     if (highContrast) {
+      final flatSurface = isDark ? Colors.black : Colors.white;
       tokens = tokens.copyWith(
+        appBackground: flatSurface,
+        surfacePrimary: flatSurface,
+        surfaceSecondary: flatSurface,
+        surfaceElevated: flatSurface,
+        surfaceSunken: flatSurface,
         textPrimary: isDark ? Colors.white : Colors.black,
         textSecondary: isDark ? Colors.white : const Color(0xFF202020),
         textMuted: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF303030),
         borderSubtle: isDark ? Colors.white : Colors.black,
         borderStrong: isDark ? Colors.white : Colors.black,
         focusRing: isDark ? const Color(0xFFFFFF00) : const Color(0xFF0000A0),
+        readerBackground: flatSurface,
+        libraryBackground: flatSurface,
+        settingsBackground: flatSurface,
+        surfaceFloating: flatSurface,
+        surfaceActive: flatSurface,
+        surfaceHover: flatSurface,
+        surfacePressed: flatSurface,
+        iconNormal: isDark ? Colors.white : Colors.black,
+        iconActive: isDark ? Colors.white : Colors.black,
+        iconDisabled: isDark ? const Color(0xFFB0B0B0) : const Color(0xFF606060),
+        separatorExceptional: isDark ? Colors.white : Colors.black,
+        bookSpineChannel: flatSurface,
+        ambientShadow: Colors.transparent,
+        pageShadow: Colors.transparent,
       );
     }
     final densityTokens = switch (density) {

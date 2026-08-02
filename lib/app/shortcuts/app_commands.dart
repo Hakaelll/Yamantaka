@@ -13,8 +13,10 @@ enum AppCommandId {
   zoomIn,
   zoomOut,
   resetZoom,
+  actualSize,
   fullScreen,
   toggleChrome,
+  toggleImmersive,
   escape,
   nextPage,
   previousPage,
@@ -88,8 +90,11 @@ abstract final class AppCommandRegistry {
     AppCommandId.previousPage,
     AppCommandId.zoomIn,
     AppCommandId.zoomOut,
+    AppCommandId.actualSize,
+    AppCommandId.fitWidth,
     AppCommandId.fullScreen,
     AppCommandId.toggleChrome,
+    AppCommandId.toggleImmersive,
   };
 
   /// These activators remain available to structural reader navigation.
@@ -147,6 +152,30 @@ abstract final class AppCommandRegistry {
       token: 'ctrl-g',
       label: 'Ctrl+G',
       activator: SingleActivator(LogicalKeyboardKey.keyG, control: true),
+    ),
+    AppShortcutChoice(
+      token: 'ctrl-0',
+      label: 'Ctrl+0',
+      activator: SingleActivator(LogicalKeyboardKey.digit0, control: true),
+    ),
+    AppShortcutChoice(
+      token: 'ctrl-1',
+      label: 'Ctrl+1',
+      activator: SingleActivator(LogicalKeyboardKey.digit1, control: true),
+    ),
+    AppShortcutChoice(
+      token: 'ctrl-2',
+      label: 'Ctrl+2',
+      activator: SingleActivator(LogicalKeyboardKey.digit2, control: true),
+    ),
+    AppShortcutChoice(
+      token: 'ctrl-shift-i',
+      label: 'Ctrl+Mayús+I',
+      activator: SingleActivator(
+        LogicalKeyboardKey.keyI,
+        control: true,
+        shift: true,
+      ),
     ),
     AppShortcutChoice(
       token: 'ctrl-j',
@@ -260,15 +289,18 @@ abstract final class AppCommandRegistry {
     AppCommandId.openDocument: 'ctrl-o',
     AppCommandId.search: 'ctrl-f',
     AppCommandId.commandPalette: 'ctrl-k',
-    AppCommandId.goToPage: 'ctrl-l',
+    AppCommandId.goToPage: 'ctrl-g',
     AppCommandId.togglePanel: 'ctrl-j',
     AppCommandId.toggleBookmark: 'ctrl-b',
     AppCommandId.nextPage: 'arrow-right',
     AppCommandId.previousPage: 'arrow-left',
     AppCommandId.zoomIn: 'ctrl-plus',
     AppCommandId.zoomOut: 'ctrl-minus',
+    AppCommandId.actualSize: 'ctrl-1',
+    AppCommandId.fitWidth: 'ctrl-2',
     AppCommandId.fullScreen: 'f11',
     AppCommandId.toggleChrome: 'ctrl-h',
+    AppCommandId.toggleImmersive: 'ctrl-shift-i',
   };
 
   static const definitions = <AppCommandDefinition>[
@@ -292,7 +324,7 @@ abstract final class AppCommandRegistry {
     AppCommandDefinition(
       id: AppCommandId.goToPage,
       label: 'Ir a una página',
-      shortcutLabel: 'Ctrl+L',
+      shortcutLabel: 'Ctrl+G',
     ),
     AppCommandDefinition(
       id: AppCommandId.nextPage,
@@ -330,6 +362,11 @@ abstract final class AppCommandRegistry {
       shortcutLabel: 'Ctrl+0',
     ),
     AppCommandDefinition(
+      id: AppCommandId.actualSize,
+      label: 'Tamaño real (100 %)',
+      shortcutLabel: 'Ctrl+1',
+    ),
+    AppCommandDefinition(
       id: AppCommandId.bookMode,
       label: 'Activar modo libro',
     ),
@@ -356,7 +393,11 @@ abstract final class AppCommandRegistry {
       label: 'Avanzar en el historial',
       shortcutLabel: 'Alt+→',
     ),
-    AppCommandDefinition(id: AppCommandId.fitWidth, label: 'Ajustar al ancho'),
+    AppCommandDefinition(
+      id: AppCommandId.fitWidth,
+      label: 'Ajustar al ancho',
+      shortcutLabel: 'Ctrl+2',
+    ),
     AppCommandDefinition(
       id: AppCommandId.fitPage,
       label: 'Ajustar a la página',
@@ -379,6 +420,11 @@ abstract final class AppCommandRegistry {
       id: AppCommandId.toggleChrome,
       label: 'Mostrar u ocultar interfaz',
       shortcutLabel: 'Ctrl+H',
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.toggleImmersive,
+      label: 'Alternar lectura inmersiva',
+      shortcutLabel: 'Ctrl+Mayús+I',
     ),
     AppCommandDefinition(
       id: AppCommandId.settings,
@@ -487,6 +533,17 @@ abstract final class AppCommandRegistry {
       const SingleActivator(LogicalKeyboardKey.digit0, control: true): action(
         AppCommandId.resetZoom,
       ),
+      const SingleActivator(LogicalKeyboardKey.digit1, control: true): action(
+        AppCommandId.actualSize,
+      ),
+      const SingleActivator(LogicalKeyboardKey.digit2, control: true): action(
+        AppCommandId.fitWidth,
+      ),
+      const SingleActivator(
+        LogicalKeyboardKey.keyI,
+        control: true,
+        shift: true,
+      ): action(AppCommandId.toggleImmersive),
       const SingleActivator(LogicalKeyboardKey.escape): action(
         AppCommandId.escape,
       ),
@@ -521,6 +578,13 @@ abstract final class AppCommandRegistry {
           .where((item) => item.token == entry.value)
           .firstOrNull;
       if (choice != null) bindings[choice.activator] = action(entry.key);
+    }
+    // Keep the old go-to-page chord as a compatibility alias while Ctrl+G is
+    // the documented binding.  Do not steal it when the user assigned it to
+    // another configurable command.
+    if (!tokens.values.contains('ctrl-l')) {
+      bindings[const SingleActivator(LogicalKeyboardKey.keyL, control: true)] =
+          action(AppCommandId.goToPage);
     }
     return bindings;
   }

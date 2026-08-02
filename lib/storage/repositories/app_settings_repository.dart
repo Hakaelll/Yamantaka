@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/theme/app_density.dart';
+import '../../app/theme/app_tokens.dart';
 import '../../features/reader/domain/reader_models.dart';
 
 abstract interface class AppPreferencesStore {
@@ -60,6 +61,7 @@ final class AppSettings {
     this.showProgress = true,
     this.reduceMotion = false,
     this.disableAnimations = false,
+    this.motionPreference,
     this.interfaceDensity = AppInterfaceDensity.comfortable,
     this.defaultViewMode = 'document',
     this.defaultPageLayout = 'single',
@@ -74,7 +76,7 @@ final class AppSettings {
     this.recordReadingSessions = true,
     this.readingHistoryLimit = 250,
     this.libraryReadingFilter = 'all',
-    this.readerPanelWidth = 320,
+      this.readerPanelWidth = AppSizes.readerPanelDefault,
     this.readerPanelSection = '',
     this.readerPanelOpen = false,
     this.readerChromeVisible = true,
@@ -98,6 +100,17 @@ final class AppSettings {
   final bool showProgress;
   final bool reduceMotion;
   final bool disableAnimations;
+  /// New semantic setting. Null means the value is derived from the legacy
+  /// booleans, which keeps old backups and preference stores compatible.
+  final AppMotionPreference? motionPreference;
+
+  AppMotionPreference get resolvedMotionPreference =>
+      motionPreference ??
+      (disableAnimations
+          ? AppMotionPreference.none
+          : reduceMotion
+          ? AppMotionPreference.reduced
+          : AppMotionPreference.full);
   final AppInterfaceDensity interfaceDensity;
   final String defaultViewMode;
   final String defaultPageLayout;
@@ -136,6 +149,7 @@ final class AppSettings {
     bool? showProgress,
     bool? reduceMotion,
     bool? disableAnimations,
+    AppMotionPreference? motionPreference,
     AppInterfaceDensity? interfaceDensity,
     String? defaultViewMode,
     String? defaultPageLayout,
@@ -173,6 +187,7 @@ final class AppSettings {
     showProgress: showProgress ?? this.showProgress,
     reduceMotion: reduceMotion ?? this.reduceMotion,
     disableAnimations: disableAnimations ?? this.disableAnimations,
+    motionPreference: motionPreference ?? this.motionPreference,
     interfaceDensity: interfaceDensity ?? this.interfaceDensity,
     defaultViewMode: defaultViewMode ?? this.defaultViewMode,
     defaultPageLayout: defaultPageLayout ?? this.defaultPageLayout,
@@ -222,6 +237,12 @@ final class AppSettingsRepository {
     showProgress: await _preferences.getBool('showProgress') ?? true,
     reduceMotion: await _preferences.getBool('reduceMotion') ?? false,
     disableAnimations: await _preferences.getBool('disableAnimations') ?? false,
+    motionPreference: _motionPreferenceFromStorage(
+      await _preferences.getString('motionPreference'),
+      reduceMotion: await _preferences.getBool('reduceMotion') ?? false,
+      disableAnimations:
+          await _preferences.getBool('disableAnimations') ?? false,
+    ),
     interfaceDensity: _enumByName(
       AppInterfaceDensity.values,
       await _preferences.getString('interfaceDensity'),
@@ -258,8 +279,10 @@ final class AppSettingsRepository {
         ),
     libraryReadingFilter:
         await _preferences.getString('libraryReadingFilter') ?? 'all',
-    readerPanelWidth: (await _preferences.getDouble('readerPanelWidth') ?? 320)
-        .clamp(280, 480),
+      readerPanelWidth:
+          (await _preferences.getDouble('readerPanelWidth') ??
+                  AppSizes.readerPanelDefault)
+          .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth),
     readerPanelSection:
         await _preferences.getString('readerPanelSection') ?? '',
     readerPanelOpen: await _preferences.getBool('readerPanelOpen') ?? false,
@@ -291,6 +314,10 @@ final class AppSettingsRepository {
       _preferences.setBool('showProgress', settings.showProgress),
       _preferences.setBool('reduceMotion', settings.reduceMotion),
       _preferences.setBool('disableAnimations', settings.disableAnimations),
+      _preferences.setString(
+        'motionPreference',
+        settings.resolvedMotionPreference.name,
+      ),
       _preferences.setString(
         'interfaceDensity',
         settings.interfaceDensity.name,
@@ -355,5 +382,18 @@ final class AppSettingsRepository {
       if (value.name == storedName) return value;
     }
     return fallback;
+  }
+
+  static AppMotionPreference? _motionPreferenceFromStorage(
+    String? value, {
+    required bool reduceMotion,
+    required bool disableAnimations,
+  }) {
+    for (final preference in AppMotionPreference.values) {
+      if (preference.name == value) return preference;
+    }
+    if (disableAnimations) return AppMotionPreference.none;
+    if (reduceMotion) return AppMotionPreference.reduced;
+    return null;
   }
 }

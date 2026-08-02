@@ -17,8 +17,10 @@ import '../../library/domain/library_document.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
 import 'reader_bottom_controls.dart';
+import 'reader_book_spine.dart';
 import 'reader_side_panel.dart';
 import 'reader_top_bar.dart';
+import 'reader_ui_state.dart';
 
 final class ReaderScreen extends StatefulWidget {
   const ReaderScreen({
@@ -37,6 +39,7 @@ final class ReaderScreen extends StatefulWidget {
     this.initialPanelWidth = AppSizes.sidePanelWidth,
     this.initialPanelSection = '',
     this.initialPanelOpen = false,
+    this.initialPanelPinned = false,
     this.initialChromeVisible = true,
     this.showModeControls = true,
     this.showPanelControls = true,
@@ -67,6 +70,7 @@ final class ReaderScreen extends StatefulWidget {
   final double initialPanelWidth;
   final String initialPanelSection;
   final bool initialPanelOpen;
+  final bool initialPanelPinned;
   final bool initialChromeVisible;
   final bool showModeControls;
   final bool showPanelControls;
@@ -89,12 +93,18 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   late double _panelWidthValue;
   Timer? _controlsTimer;
   Timer? _panelSaveTimer;
+  Timer? _cursorTimer;
   final FocusNode _readerFocusNode = FocusNode(debugLabel: 'PDF reader');
   final GlobalKey _viewerRegionKey = GlobalKey(debugLabel: 'PDF viewer region');
   FocusNode? _focusBeforePanel;
   String? _focusedDocumentId;
   Object? _viewerCacheKey;
   Widget? _viewerCache;
+  late final ReaderChromeCoordinator _chromeCoordinator;
+  bool _immersive = false;
+  bool _cursorHidden = false;
+  bool _panelPinned = false;
+  Offset? _lastPointerPosition;
 
   bool get _isBookMode =>
       widget.controller.preferences?.viewMode == ReaderMode.book;
@@ -102,21 +112,40 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   bool get _isElectronicInk =>
       widget.visualProfile == ReaderVisualProfile.electronicInk;
 
-  Duration get _controlMotion =>
-      AppMotion.whenAllowed(widget.reduceMotion, AppMotion.fast);
+  Duration _chromeTransition(BuildContext context, bool visible) =>
+      AppMotion.whenAllowed(
+        widget.reduceMotion ||
+            _isElectronicInk ||
+            MediaQuery.disableAnimationsOf(context),
+        visible ? AppMotion.chromeReveal : AppMotion.chromeHide,
+      );
 
   @override
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleHardwareNavigation);
+    _chromeCoordinator = ReaderChromeCoordinator(
+      autoHide: widget.controlsAutoHide ?? true,
+      reduceMotion: widget.reduceMotion,
+    );
     _controlsVisible = widget.initialChromeVisible;
+    _panelPinned = widget.initialPanelPinned;
     _panelWidthValue = widget.initialPanelWidth
         .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth)
         .toDouble();
+    _chromeCoordinator.setPanelWidth(_panelWidthValue);
     if (widget.initialPanelOpen) {
       _panel = ReaderPanelSection.values
           .where((section) => section.name == widget.initialPanelSection)
           .firstOrNull;
+      if (_panel case final section?) {
+        _chromeCoordinator.openPanel(
+          section,
+          presentation: _panelPinned
+              ? ReaderPanelPresentation.pinned
+              : ReaderPanelPresentation.overlay,
+        );
+      }
     }
     if (_controlsVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _revealControls());
@@ -128,6 +157,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     HardwareKeyboard.instance.removeHandler(_handleHardwareNavigation);
     _controlsTimer?.cancel();
     _panelSaveTimer?.cancel();
+    _cursorTimer?.cancel();
+    _chromeCoordinator.dispose();
     _readerFocusNode.dispose();
     super.dispose();
   }
@@ -135,8 +166,15 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void didUpdateWidget(covariant ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controlsAutoHide == widget.controlsAutoHide) return;
+    if (oldWidget.controlsAutoHide == widget.controlsAutoHide &&
+        oldWidget.reduceMotion == widget.reduceMotion) {
+      return;
+    }
     _controlsTimer?.cancel();
+    _chromeCoordinator.configure(
+      autoHide: widget.controlsAutoHide,
+      reduceMotion: widget.reduceMotion,
+    );
     if (widget.controlsAutoHide == false) {
       if (!_controlsVisible) {
         setState(() => _controlsVisible = true);
@@ -188,10 +226,41 @@ final class _ReaderScreenState extends State<ReaderScreen> {
               return KeyEventResult.ignored;
             },
             child: MouseRegion(
-              onHover: (_) => _revealControls(),
+              cursor: _cursorHidden
+                  ? SystemMouseCursors.none
+                  : SystemMouseCursors.basic,
+              onHover: (event) {
+                final previous = _lastPointerPosition;
+                _lastPointerPosition = event.position;
+                _showCursor();
+                _scheduleCursorHide();
+                final height = MediaQuery.sizeOf(context).height;
+                final atRevealEdge =
+                    event.localPosition.dy <= AppSizes.topRevealZone ||
+                    event.localPosition.dy >= height - AppSpacing.space12;
+                final inTopChrome =
+                    event.localPosition.dy <= AppSizes.topVeilDepth;
+                final inBottomChrome =
+                    event.localPosition.dy >=
+                    height - AppSizes.bottomControlHeight - AppSpacing.space24;
+                _chromeCoordinator.setPointerRegion(
+                  inTopChrome
+                      ? ReaderPointerRegion.topEdge
+                      : inBottomChrome
+                      ? ReaderPointerRegion.bottomEdge
+                      : ReaderPointerRegion.canvas,
+                );
+                if (atRevealEdge &&
+                    (previous == null ||
+                        (event.position - previous).distance > 2)) {
+                  _revealControls();
+                }
+              },
               child: Listener(
                 onPointerDown: (_) {
                   widget.controller.registerActivity();
+                  _showCursor();
+                  _scheduleCursorHide();
                   _revealControls();
                 },
                 child: Scaffold(
@@ -212,11 +281,12 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     final controller = widget.controller;
     final opened = controller.openedDocument!;
     final preferences = controller.preferences!;
-    final readerBackground = _isElectronicInk
-        ? const Color(0xFFFFFFFF)
-        : Color(preferences.readingTheme.colorValue);
+    final readerBackground = _readerCanvasColor(
+      context,
+      preferences.readingTheme,
+    );
     final panelWidth = _panelWidth(constraints.maxWidth);
-    final immersive = controller.isFullScreen;
+    final immersive = _immersive;
     final requestedFlow = _isElectronicInk
         ? PdfViewFlow.single
         : _isBookMode
@@ -225,31 +295,24 @@ final class _ReaderScreenState extends State<ReaderScreen> {
         ? PdfViewFlow.continuous
         : PdfViewFlow.single;
     final controlsShown = _controlsVisible && !immersive;
-    final outerWindowClass = AppBreakpoints.classify(constraints.maxWidth);
+    // Panels are overlays by default. Their visibility must not alter PDF
+    // constraints, which is the core continuity invariant of the redesign.
+    final windowClass = AppBreakpoints.classify(constraints.maxWidth);
     final panelDocked =
-        !immersive &&
         _panel != null &&
-        outerWindowClass == AppWindowClass.expanded;
-    final reservedPanelWidth = panelDocked ? panelWidth : 0.0;
-    final windowClass = AppBreakpoints.classify(
-      constraints.maxWidth - reservedPanelWidth,
-    );
-    final viewerSize = Size(
-      constraints.maxWidth - reservedPanelWidth,
-      constraints.maxHeight,
-    );
+        _panelPinned &&
+        windowClass == AppWindowClass.expanded;
+    final viewerSize = Size(constraints.maxWidth, constraints.maxHeight);
     final readerMargin = ReaderViewportMetrics.adaptiveMargin(
       viewport: viewerSize,
       preferred:
           (preferences.horizontalMargin + preferences.verticalMargin) / 2,
     );
     final spineGap = ReaderViewportMetrics.adaptiveSpineGap(viewerSize.width);
-    final viewportMargin = immersive
-        ? readerMargin
-        : math.max(
-            readerMargin,
-            AppSizes.bottomControlHeight + AppSpacing.space16,
-          );
+    // The PDF layout already contains the editorial outer margin.  Keeping
+    // this separate viewport margin at zero is what makes chrome genuinely
+    // overlay-only instead of reserving a hidden toolbar strip.
+    const viewportMargin = 0.0;
     _ensureReaderFocus(opened.documentId);
 
     return ColoredBox(
@@ -259,7 +322,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
           Positioned(
             left: 0,
             top: 0,
-            right: reservedPanelWidth,
+            right: panelDocked ? panelWidth : 0,
             bottom: 0,
             child: Semantics(
               label:
@@ -272,7 +335,9 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 child: TweenAnimationBuilder<double>(
                   key: ValueKey((opened.documentId, requestedFlow)),
                   duration: AppMotion.whenAllowed(
-                    widget.reduceMotion || _isElectronicInk,
+                    widget.reduceMotion ||
+                        _isElectronicInk ||
+                        MediaQuery.disableAnimationsOf(context),
                     AppMotion.standard,
                   ),
                   curve: Curves.easeOutCubic,
@@ -287,6 +352,12 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                       margin: readerMargin,
                       viewportMargin: viewportMargin,
                       spineGap: spineGap,
+                      physicalPageGap: 0,
+                      spineVisualWidth: _isBookMode
+                          ? (windowClass == AppWindowClass.expanded ? 16 : 12)
+                          : 0,
+                      coverPolicy: preferences.coverPolicy,
+                      initialSide: preferences.initialSide,
                       flow: requestedFlow,
                       rotation: preferences.pageRotation,
                       reduceMotion: widget.reduceMotion || _isElectronicInk,
@@ -324,29 +395,46 @@ final class _ReaderScreenState extends State<ReaderScreen> {
               ),
             ),
           ),
+          if (_isBookMode &&
+              !immersive &&
+              !_isElectronicInk &&
+              !MediaQuery.highContrastOf(context))
+            Positioned(
+              left: 0,
+              top: 0,
+              right: panelDocked ? panelWidth : 0,
+              bottom: 0,
+              child: ReaderBookSpine(
+                width: windowClass == AppWindowClass.expanded ? 16 : 12,
+              ),
+            ),
           if (_isBookMode && !immersive)
             ..._pageTurnZones(
               controller: controller,
-              panelWidth: immersive ? 0 : panelWidth,
-              panelVisible: !immersive && _panel != null,
+              panelWidth: panelWidth,
+              panelVisible: panelDocked,
             ),
           if (!immersive)
             Positioned(
               left: 0,
               top: 0,
-              right: reservedPanelWidth,
+              right: panelDocked ? panelWidth : 0,
               child: AnimatedSlide(
-                duration: _controlMotion,
+                duration: _chromeTransition(context, controlsShown),
                 curve: Curves.easeOutCubic,
                 offset: controlsShown ? Offset.zero : const Offset(0, -1),
                 child: AnimatedOpacity(
-                  duration: _controlMotion,
+                  duration: _chromeTransition(context, controlsShown),
                   opacity: controlsShown ? 1 : 0,
                   child: IgnorePointer(
                     ignoring: !controlsShown,
                     child: ReaderTopBar(
                       key: const Key('reader-top-bar'),
                       controller: controller,
+                      canvasColor: readerBackground,
+                      flatChrome:
+                          _isElectronicInk ||
+                          MediaQuery.highContrastOf(context),
                       compact: windowClass == AppWindowClass.compact,
                       expanded: windowClass == AppWindowClass.expanded,
                       activePanel: _panel,
@@ -372,6 +460,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                           () => _showDocumentInfo(context),
                       onToggleFullScreen: _toggleFullScreen,
                       onToggleChrome: _toggleChrome,
+                      onToggleImmersive: _toggleImmersive,
                       onOpenSettings: widget.onOpenSettings,
                     ),
                   ),
@@ -381,14 +470,16 @@ final class _ReaderScreenState extends State<ReaderScreen> {
           if (!immersive)
             Positioned(
               left: AppSpacing.space12,
-              right: AppSpacing.space12 + reservedPanelWidth,
+              right: panelDocked
+                  ? panelWidth + AppSpacing.space12
+                  : AppSpacing.space12,
               bottom: AppSpacing.space12,
               child: AnimatedSlide(
-                duration: _controlMotion,
+                duration: _chromeTransition(context, controlsShown),
                 curve: Curves.easeOutCubic,
                 offset: controlsShown ? Offset.zero : const Offset(0, 1.3),
                 child: AnimatedOpacity(
-                  duration: _controlMotion,
+                  duration: _chromeTransition(context, controlsShown),
                   opacity: controlsShown ? 1 : 0,
                   child: IgnorePointer(
                     ignoring: !controlsShown,
@@ -399,19 +490,32 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                       onGoToPage: () => _showGoToPage(context),
                       onChooseTheme: () => _showThemeChooser(context),
                       readingDirection: widget.readingDirection,
+                      flatChrome:
+                          _isElectronicInk ||
+                          MediaQuery.highContrastOf(context),
                       shortcutOverrides: widget.shortcutOverrides,
                     ),
                   ),
                 ),
               ),
             ),
-          if (!immersive && _panel != null && !panelDocked)
+          if (!immersive &&
+              _panel != null &&
+              !panelDocked &&
+              !_isElectronicInk &&
+              !MediaQuery.highContrastOf(context))
             Positioned.fill(
               child: GestureDetector(
                 key: const Key('reader-panel-scrim'),
                 behavior: HitTestBehavior.opaque,
                 onTap: _closePanel,
-                child: ColoredBox(color: Colors.black.withValues(alpha: 0.18)),
+                child: ColoredBox(
+                  color: Colors.black.withValues(
+                    alpha: Theme.of(context).brightness == Brightness.dark
+                        ? 0.12
+                        : 0.08,
+                  ),
+                ),
               ),
             ),
           if (!immersive && _panel != null)
@@ -437,16 +541,23 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                   controller: controller,
                   engine: widget.engine,
                   width: panelWidth,
+                  pinned: _panelPinned,
+                  allowPin: windowClass == AppWindowClass.expanded,
+                  onPinnedChanged: _togglePanelPinned,
+                  flatChrome:
+                      _isElectronicInk || MediaQuery.highContrastOf(context),
                   onClose: _closePanel,
                   onWidthChanged: _resizePanel,
                   onExportAnnotations: widget.onExportAnnotations,
                 ),
               ),
             ),
-          if (!immersive && widget.showProgress)
+          if (!immersive &&
+              widget.showProgress &&
+              (!controller.isFullScreen || _controlsVisible))
             Positioned(
               left: 0,
-              right: reservedPanelWidth,
+              right: panelDocked ? panelWidth : 0,
               bottom: 0,
               child: LinearProgressIndicator(
                 key: const Key('reader-progress'),
@@ -538,25 +649,47 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     ];
   }
 
+  Color _readerCanvasColor(BuildContext context, ReaderTheme theme) {
+    if (_isElectronicInk || MediaQuery.highContrastOf(context)) {
+      return Colors.white;
+    }
+    final colors = context.appColors;
+    return switch (theme) {
+      ReaderTheme.light => colors.paperWhite,
+      ReaderTheme.ivory => colors.ivory,
+      ReaderTheme.sepia => const Color(0xFFE2D5BE),
+      ReaderTheme.gray => const Color(0xFFB8BAB5),
+      ReaderTheme.dark => const Color(0xFF242722),
+      // Pure black remains readable for old persisted documents, but the
+      // normal preset is the semantic charcoal token from the redesign.
+      ReaderTheme.black => colors.nightBackground,
+    };
+  }
+
   BoxShadow? _pageShadow(BuildContext context, ReaderTheme theme) {
     if (_isElectronicInk ||
+        MediaQuery.highContrastOf(context) ||
         theme == ReaderTheme.dark ||
         theme == ReaderTheme.black) {
       return null;
     }
     return BoxShadow(
-      color: context.appColors.readerPageShadow,
+      color: context.appColors.pageShadow,
       blurRadius: theme == ReaderTheme.gray
           ? AppShadow.readerGrayPageBlur
           : AppShadow.readerPageBlur,
       spreadRadius: 0,
-      offset: const Offset(0, 1),
+      offset: const Offset(0, 2),
     );
   }
 
   double _panelWidth(double viewportWidth) {
     if (AppBreakpoints.classify(viewportWidth) == AppWindowClass.compact) {
-      return math.min(_panelWidthValue, viewportWidth * 0.86);
+      final availableWidth = math.max(0.0, viewportWidth - AppSpacing.space24);
+      return math.min(
+        _panelWidthValue,
+        math.min(availableWidth, viewportWidth * 0.88),
+      );
     }
     return _panelWidthValue;
   }
@@ -575,6 +708,10 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       configuration.margin,
       configuration.viewportMargin,
       configuration.spineGap,
+      configuration.physicalPageGap,
+      configuration.spineVisualWidth,
+      configuration.coverPolicy,
+      configuration.initialSide,
       configuration.flow,
       configuration.rotation,
       configuration.reduceMotion,
@@ -704,6 +841,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
         .toDouble();
     if ((next - _panelWidthValue).abs() < 0.5) return;
     setState(() => _panelWidthValue = next);
+    _chromeCoordinator.setPanelWidth(next);
     _panelSaveTimer?.cancel();
     _panelSaveTimer = Timer(const Duration(milliseconds: 240), () {
       widget.onPanelWidthChanged?.call(_panelWidthValue);
@@ -722,8 +860,11 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     AppCommandId.zoomIn: () => unawaited(widget.controller.zoomBy(1.18)),
     AppCommandId.zoomOut: () => unawaited(widget.controller.zoomBy(0.85)),
     AppCommandId.resetZoom: () => unawaited(widget.controller.fitPage()),
+    AppCommandId.actualSize: () =>
+        unawaited(widget.controller.viewController.actualSize()),
     AppCommandId.fullScreen: _toggleFullScreen,
     AppCommandId.toggleChrome: _toggleChrome,
+    AppCommandId.toggleImmersive: _toggleImmersive,
     AppCommandId.escape: _escape,
     AppCommandId.nextPage: () =>
         _runReaderNavigation(widget.controller.goToNextReadingUnit),
@@ -762,6 +903,12 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       _panel = section;
       _controlsVisible = true;
     });
+    _chromeCoordinator.openPanel(
+      section,
+      presentation: _panelPinned
+          ? ReaderPanelPresentation.pinned
+          : ReaderPanelPresentation.overlay,
+    );
     widget.onPanelChanged?.call(section);
     widget.onChromeVisibilityChanged?.call(true);
   }
@@ -769,6 +916,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   void _closePanel() {
     if (_panel == null) return;
     setState(() => _panel = null);
+    _chromeCoordinator.closePanel();
     widget.onPanelChanged?.call(null);
     final previousFocus = _focusBeforePanel;
     _focusBeforePanel = null;
@@ -779,11 +927,28 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     });
   }
 
+  void _togglePanelPinned(bool pinned) {
+    if (_panel == null ||
+        AppBreakpoints.classify(MediaQuery.sizeOf(context).width) !=
+            AppWindowClass.expanded) {
+      return;
+    }
+    setState(() => _panelPinned = pinned);
+    _chromeCoordinator.openPanel(
+      _panel!,
+      presentation: pinned
+          ? ReaderPanelPresentation.pinned
+          : ReaderPanelPresentation.overlay,
+    );
+  }
+
   void _escape() {
-    if (widget.controller.isFullScreen) {
-      unawaited(_leaveFullScreen());
-    } else if (_panel != null) {
+    if (_panel != null) {
       _closePanel();
+    } else if (_immersive) {
+      _setImmersive(false);
+    } else if (widget.controller.isFullScreen) {
+      unawaited(_leaveFullScreen());
     }
   }
 
@@ -791,37 +956,147 @@ final class _ReaderScreenState extends State<ReaderScreen> {
 
   Future<void> _toggleFullScreenNow() async {
     _controlsTimer?.cancel();
-    await widget.controller.toggleFullScreen();
-    if (!widget.controller.isFullScreen) _revealControls();
+    final controlsWereVisible = _controlsVisible;
+    try {
+      await widget.controller.toggleFullScreen();
+    } on Object {
+      // Window services can fail during monitor/DPI transitions. Keep the
+      // reader usable and reconcile the presentation state with the window.
+      _chromeCoordinator.setFullscreen(widget.controller.isFullScreen);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo activar pantalla completa'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        _revealControls();
+      }
+      return;
+    }
+    _chromeCoordinator.setFullscreen(widget.controller.isFullScreen);
+    if (widget.controller.isFullScreen) {
+      // Fullscreen is orthogonal to immersive mode: preserve the user's
+      // chrome choice and only change the window bounds.
+      if (mounted) setState(() {});
+      if (controlsWereVisible) _revealControls();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pantalla completa · F11 para salir'),
+            duration: Duration(milliseconds: 1200),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } else {
+      if (mounted) setState(() {});
+      _revealControls();
+    }
   }
 
   Future<void> _leaveFullScreen() async {
-    await widget.controller.leaveFullScreen();
+    try {
+      await widget.controller.leaveFullScreen();
+    } on Object {
+      _chromeCoordinator.setFullscreen(widget.controller.isFullScreen);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo salir de pantalla completa'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+    _chromeCoordinator.setFullscreen(false);
+    if (mounted) setState(() {});
     _revealControls();
   }
 
   void _toggleChrome() {
-    if (widget.controller.isFullScreen) return;
-    setState(() => _controlsVisible = !_controlsVisible);
-    widget.onChromeVisibilityChanged?.call(_controlsVisible);
+    final show = !_controlsVisible;
+    setState(() {
+      _controlsVisible = show;
+    });
+    if (show) {
+      _chromeCoordinator.reveal();
+    } else {
+      _chromeCoordinator.toggleUserChrome();
+    }
+    widget.onChromeVisibilityChanged?.call(show);
+  }
+
+  void _toggleImmersive() => _setImmersive(!_immersive);
+
+  void _setImmersive(bool value) {
+    _controlsTimer?.cancel();
+    _cursorTimer?.cancel();
+    if (value && _panel != null) {
+      // Do not leave an interactive panel mounted behind an immersive canvas.
+      setState(() => _panel = null);
+      _chromeCoordinator.closePanel();
+      widget.onPanelChanged?.call(null);
+    }
+    setState(() {
+      _immersive = value;
+      if (value) _controlsVisible = false;
+      if (!value) _controlsVisible = true;
+    });
+    if (!value) {
+      _showCursor();
+    } else {
+      _scheduleCursorHide();
+    }
+    _chromeCoordinator.setImmersive(value);
+    widget.onChromeVisibilityChanged?.call(!value);
+    if (!value) _revealControls();
+  }
+
+  void _showCursor() {
+    if (!_cursorHidden) return;
+    if (mounted) setState(() => _cursorHidden = false);
+  }
+
+  void _scheduleCursorHide() {
+    _cursorTimer?.cancel();
+    if (!_immersive || _chromeCoordinator.state.controlsHaveFocus) return;
+    _cursorTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted &&
+          _immersive &&
+          !_chromeCoordinator.state.controlsHaveFocus) {
+        setState(() => _cursorHidden = true);
+      }
+    });
   }
 
   void _revealControls() {
-    if (!mounted || widget.controller.isFullScreen) return;
+    if (!mounted || _immersive) return;
     if (!_controlsVisible) {
       setState(() => _controlsVisible = true);
       widget.onChromeVisibilityChanged?.call(true);
     }
+    _chromeCoordinator.reveal();
     _controlsTimer?.cancel();
     final preferences = widget.controller.preferences;
-    if (_isBookMode &&
-        (widget.controlsAutoHide ?? preferences?.controlsAutoHide ?? true)) {
-      _controlsTimer = Timer(AppMotion.controlsAutoHide, () {
-        if (mounted && _panel == null) {
-          setState(() => _controlsVisible = false);
-          widget.onChromeVisibilityChanged?.call(false);
-        }
-      });
+    if (widget.controlsAutoHide ?? preferences?.controlsAutoHide ?? true) {
+      _controlsTimer = Timer(
+        widget.controller.isFullScreen
+            ? const Duration(milliseconds: 2500)
+            : AppMotion.controlsAutoHide,
+        () {
+          final region = _chromeCoordinator.state.pointerRegion;
+          final pointerOverChrome =
+              region == ReaderPointerRegion.topEdge ||
+              region == ReaderPointerRegion.bottomEdge;
+          if (mounted && _panel == null && !pointerOverChrome) {
+            setState(() => _controlsVisible = false);
+            _chromeCoordinator.hideAutomatically();
+            widget.onChromeVisibilityChanged?.call(false);
+          }
+        },
+      );
     }
   }
 

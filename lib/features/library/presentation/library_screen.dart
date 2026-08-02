@@ -126,7 +126,12 @@ final class _LibraryScreenState extends State<LibraryScreen> {
             }
           },
           child: Scaffold(
+            backgroundColor: context.appColors.libraryBackground,
             appBar: AppBar(
+              backgroundColor: context.appColors.libraryBackground,
+              surfaceTintColor: Colors.transparent,
+              shape: const Border(),
+              toolbarHeight: AppSizes.libraryHeaderHeight,
               title: const Text('Biblioteca'),
               actions: [
                 if (widget.safeMode)
