@@ -4,11 +4,13 @@ param(
     [string]$FixturePdf = 'build/verification/corpus/normal.pdf',
     [int]$Cycles = 30,
     [int]$SecondsPerCycle = 3,
-    [string]$OutputPath = 'build/verification/soak-report.json'
+    [string]$OutputPath = 'build/verification/soak-report.json',
+    [switch]$RequireSignature
 )
 
 $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+. (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
 $executable = [System.IO.Path]::GetFullPath((Join-Path $root $ExecutablePath))
 $fixture = [System.IO.Path]::GetFullPath((Join-Path $root $FixturePdf))
 $reportPath = [System.IO.Path]::GetFullPath((Join-Path $root $OutputPath))
@@ -16,6 +18,10 @@ if (-not (Test-Path $executable)) { throw "Executable not found: $executable" }
 if (-not (Test-Path $fixture)) { throw "Fixture not found: $fixture" }
 if ($Cycles -lt 1 -or $Cycles -gt 1000) { throw 'Cycles must be between 1 and 1000.' }
 if ($SecondsPerCycle -lt 1 -or $SecondsPerCycle -gt 3600) { throw 'SecondsPerCycle must be between 1 and 3600.' }
+[void](Assert-YamantakaWindowsBundleRunnable `
+        -BundlePath (Split-Path -Parent $executable) `
+        -RepositoryRoot $root `
+        -RequireSignature:$RequireSignature)
 
 $samples = [System.Collections.Generic.List[object]]::new()
 for ($cycle = 1; $cycle -le $Cycles; $cycle++) {
@@ -54,6 +60,7 @@ $report = [ordered]@{
     format = 'yamantaka-windows-soak'
     version = 1
     generatedAt = [DateTime]::UtcNow.ToString('o')
+    requireSignature = [bool]$RequireSignature
     cycles = $Cycles
     samples = @($samples)
     peakRssBytes = ($rss | Measure-Object -Maximum).Maximum

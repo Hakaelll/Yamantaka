@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.0-dev — 2026-08-02 (lector editorial y fullscreen real)
+
+- Sustituye el fullscreen de Windows por una transición Win32 sin frame que
+  conserva y restaura estilo, monitor y geometría normal.
+- Rehace Libro para abrir con 1–2 enfrentadas, avanzar por pliegos completos y
+  mantener un lomo ligado a las páginas durante zoom y paneo.
+- Elimina el velo superior transparente, centra selector y navegación respecto
+  a toda la ventana y ordena las acciones de vista en un grupo independiente.
+- Normaliza defaults y preferencias antiguas en dominio, SQLite y backups; el
+  cierre del lector restaura fullscreen antes de liberar el documento.
+- Mejora el menú contextual de biblioteca por teclado, el tratamiento de
+  archivos ausentes y la resolución de portada seleccionada.
+- Añade una referencia visual mantenida por prueba, corrige el gate y la matriz
+  de capturas, y retira 57 imágenes y documentos generacionales obsoletos.
+- Separa ejecución local y distribución: rechaza bundles incompletos,
+  descargados o externos al árbol de build, y reserva `-RequireSignature` para
+  validar todos los ejecutables y DLL con Authenticode; compilar o firmar no
+  publica la app.
+- Aprueba análisis, 204 pruebas y build Release de Windows. El arranque local se
+  revalidó el 8 de agosto: la ventana permaneció receptiva y cerró normalmente;
+  los nueve binarios siguen sin firma y no se presentan como release distribuible.
+
 ## 0.1.0-dev — 2026-08-01 (gates, ownership y almacenamiento local)
 
 - Añade un coordinador único de trabajos con generaciones, prioridades,

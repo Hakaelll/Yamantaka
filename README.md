@@ -1,243 +1,186 @@
 # Yamantaka
 
-Yamantaka es un lector PDF local y ligero para documentos y sesiones largas de
-lectura. No copia ni sube los PDF, no requiere cuenta y conserva biblioteca,
-progreso, preferencias, sesiones y marcadores en el dispositivo.
-
-El nombre visible está centralizado en `lib/app/app_config.dart`.
+Yamantaka es un lector PDF local para Windows orientado a documentos y
+sesiones largas de lectura. No requiere cuenta, no sube archivos y conserva
+biblioteca, progreso, preferencias, sesiones, marcadores, anotaciones y
+metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base funcional Flutter 0.1.0 para Windows, Android e iOS, con una línea base
-validada entre el 28 y el 29 de julio de 2026:
+Base Flutter 0.1.0 revisada el 2 de agosto de 2026, con arranque local
+revalidado el 8 de agosto de 2026:
 
-- `flutter analyze`: aprobado, sin incidencias.
-- `flutter test`: 102 pruebas aprobadas.
-- PDFium: apertura, bitmap nativo, extracción y búsqueda verificadas con un PDF
-  legal generado durante la prueba.
-- SQLite: esquema v6, migraciones y repositorios verificados en memoria.
-- Integración Windows: aprobada sobre el lector completo con `ui.Image`,
-  lectura de píxeles, pintura nativa, chrome real, búsqueda, paleta, zoom,
-  avance/retroceso, marcador, anotación de página, cierre y restauración.
-- `flutter build windows --release`: aprobado; el ejecutable se abrió con un
-  PDF real mediante argumento, mostró una ventana receptiva y no abrió
-  conexiones TCP durante el smoke.
-- Perfil Windows/Profile: cinco pasadas con 40 PDF, 100 páginas y carga
-  vectorial pesada; cero frames fuera de presupuesto en el escenario medido.
+- flutter analyze --no-pub: aprobado sin incidencias;
+- flutter test --no-pub: 204 pruebas aprobadas;
+- flutter build windows --release --no-pub: aprobado, incluido el runner C++;
+- PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
+- el bundle Release local abre una ventana receptiva y acepta un cierre normal;
+  no se registró un fallo de Yamantaka durante la comprobación;
+- sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
+  no convierte el bundle en un artefacto apto para distribución.
 
-La reconstrucción local del 1 de agosto añade migración de esquema v6, backup
-v5, cola persistente y metadatos locales. Su suite completa debe repetirse en
-un host con la caché de Pub y el toolchain nativo disponibles; esos resultados
-históricos no certifican por sí solos este árbol de trabajo.
+La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
+vigente de pruebas en [TESTING.md](TESTING.md).
 
-El estado criterio por criterio está en [NEXT_TODOS.md](NEXT_TODOS.md).
+## Lector
 
-## Funciones disponibles
+- Documento muestra una página; Libro muestra un pliego completo.
+- Libro abre con 1–2 enfrentadas y navega por 3–4, 5–6, sin portada aislada por
+  defecto.
+- Las páginas del pliego son contiguas y comparten un canal central ligado a
+  sus bordes, por lo que el lomo acompaña zoom y paneo.
+- El lienzo de Libro es carbón estable; Documento conserva los seis fondos de
+  lectura.
+- La barra superior es opaca y superpuesta: no reserva altura ni transparenta
+  el contenido.
+- El selector Documento/Libro y la navegación inferior están centrados respecto
+  a toda la ventana; vista y zoom permanecen agrupados a la derecha.
+- Los laterales ofrecen zonas claras de paso de página, con estado deshabilitado
+  y soporte semántico.
+- Flechas, Page Up/Down, Home/End, espacio, F11 y Escape comparten la misma
+  navegación canónica.
+- F11 usa una transición Win32 sin frame, conserva la geometría anterior y no
+  guarda como normales las dimensiones fullscreen.
+- Movimiento reducido, alto contraste y perfil de tinta electrónica tienen
+  rutas específicas.
 
-- Selector nativo, arrastrar y soltar y apertura mediante argumento.
-- Biblioteca de artefactos con portadas como objetos espaciales, posición
-  determinista, selección/foco/hover, navegación por teclado y virtualización.
-- Búsqueda temporal `Ctrl+F`, filtros compactos combinables por estado y
-  favorito, cuatro órdenes y menú contextual completo.
-- Detección local de portada entre las primeras seis páginas, dos resoluciones
-  de caché y selector manual que nunca es reemplazado por el algoritmo.
-- Visor continuo, de página única o de páginas enfrentadas; modo libro con
-  portada individual y pliegos 2–3/4–5 compactos, LTR/RTL, lomo discreto,
-  zoom/paneo centrados, ajuste de página/ancho, teclado completo y pantalla
-  completa realmente inmersiva.
-- Recuperación opt-in de documento, página, zoom, posición, disposición,
-  márgenes, panel, sección, ancho y visibilidad del chrome, con guarda contra
-  rutas ausentes/corruptas.
-- Modo libro y seis fondos no destructivos: claro, marfil, sepia, gris, oscuro
-  y negro.
-- Búsqueda cancelable, índice, miniaturas y un único panel lateral perezoso,
-  redimensionable entre 280 y 480 px con ratón o teclado.
-- Marcadores locales con etiqueta opcional.
-- Paleta `Ctrl+K` con comandos y hasta ocho documentos recientes; registro
-  central y personalización segura de atajos importantes.
-- Ficha local del documento desde biblioteca/lector con copiar/mostrar,
-  localizar, continuar, reiniciar o retirar sin borrar el PDF.
-- Editor de metadatos locales para título, autor y nota de biblioteca; los
-  overrides se conservan fuera del PDF y se incluyen de forma explícita en el
-  índice y en el backup.
-- Historial local acotado y opcional; copia de seguridad JSON versionada con
-  vista previa, validación, prebackup e importación transaccional, nunca PDF
-  (formato actual v5, compatible con v1–v4).
-- Anotaciones locales por página con nota, tipos/colores acotados, etiquetas,
-  filtros, undo, estado de revisión y exportación Markdown/JSON; nunca escribe
-  el PDF.
-- Contextos de documentos acotados y suspendibles para restaurar espacios de
-  trabajo, sin una franja de pestañas visible sobre el lector.
-- Búsqueda global FTS5 opt-in sobre metadatos, páginas y anotaciones, cancelable
-  y borrable, sin OCR ni consultas persistidas.
-- Colecciones manuales, etiquetas y vistas inteligentes; importación de carpeta
-  con preview, cola recuperable y recuperación conservadora por huella; la
-  observación de carpetas solo se activa con confirmación explícita y convierte
-  eventos en revalidaciones.
-- Selección múltiple accesible en biblioteca con Ctrl/Shift, acciones locales de
-  favoritos, etiquetas, colecciones, archivo, portadas y retirada confirmada;
-  cada lote conserva el resultado individual y nunca modifica el PDF.
-- Historial de navegación atrás/adelante, scrubber para documentos largos, seis
-  perfiles base, diagnóstico redaccionado y safe mode tras tres cierres no
-  limpios.
-- Ajustes de apariencia, lectura, barra, atajos, biblioteca, historial, copias y
-  privacidad; perfil inicial para tinta electrónica y previsualización ligera.
-- Sistema visual editorial monocromático con tokens semánticos,
-  tipografía Segoe UI Variable, tema claro/oscuro y breakpoints únicos en
-  680/1100 px.
-- Densidad cómoda/compacta persistente, miniaturas de alta densidad ajustadas al
-  tamaño físico/DPR y movimiento reducido coherente, sin dependencias nuevas.
-- Navegación primaria con `←`/`→`, tema oscuro disponible incluso en modo seguro
-  e iconos de plataforma derivados exactamente de la imagen original.
-- Favicon e iconos web/PWA derivados de la misma imagen original, listos para
-  el contenedor web de Flutter.
-- Restauración del tamaño y posición de la ventana de escritorio.
-- Confirmación antes de abrir enlaces externos y bloqueo de esquemas no seguros.
+## Otras funciones
 
-## Capturas
+- Apertura mediante selector nativo, arrastrar y soltar o argumento.
+- Biblioteca local con portadas, filtros, estados, favoritos, colecciones,
+  etiquetas, vistas inteligentes, selección múltiple y operaciones por lote.
+- Búsqueda PDF cancelable, índice, miniaturas y panel lateral redimensionable.
+- Marcadores, notas por página, historial local opcional y navegación
+  atrás/adelante.
+- Paleta de comandos y atajos personalizables con detección de conflictos.
+- Recuperación opt-in de documento, página, zoom, disposición, panel, chrome y
+  geometría de ventana.
+- Copia de seguridad JSON versionada, validada y transaccional; nunca incluye
+  los PDF.
+- Búsqueda global FTS5 opt-in, diagnósticos redactados y safe mode conservador.
+- Confirmación de enlaces externos y bloqueo de esquemas no seguros.
+- Sistema visual monocromático con Segoe UI Variable, temas claro/oscuro,
+  densidad cómoda/compacta y breakpoints en 680/1100 px.
 
-![Biblioteca de artefactos centrada en Windows](docs/screenshots/windows-library-artifacts.png)
+## Referencia visual vigente
 
-![Lector centrado con miniaturas de alta densidad](docs/screenshots/windows-reader-redesign-thumbnails.png)
+![Modo Libro fullscreen mantenido por prueba](docs/screenshots/windows-reader-book-fullscreen.png)
 
-![Menú compacto del lector sin barra de pestañas](docs/screenshots/windows-reader-redesign-menu.png)
-
-Son capturas reproducibles de la aplicación Release y de la integración
-Windows con PDFium; no son mockups. Búsqueda, paleta, variantes compactas y
-tema oscuro están también en [`docs/screenshots`](docs/screenshots).
+Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
+suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
 
 ## Requisitos
 
 - Windows 10/11 de 64 bits.
 - Flutter estable 3.44.8 o compatible y Dart 3.12.
-- Visual Studio 2022 con `Desktop development with C++` y sus componentes
-  predeterminados.
-- Modo de desarrollador de Windows activado para los enlaces simbólicos que
-  necesitan los plugins.
+- Visual Studio 2022 con Desktop development with C++.
+- Modo de desarrollador de Windows para los enlaces simbólicos de plugins.
 
-Consulta la [configuración oficial de Flutter para
-Windows](https://docs.flutter.dev/platform-integration/windows/setup).
-El SDK `.flutter-sdk` usado durante esta iteración es local, está ignorado por
-Git y no forma parte del producto.
+El SDK local .flutter-sdk está ignorado por Git y no forma parte del producto.
 
-## Instalación y ejecución
+## Preparación y compilación local
 
-```powershell
-flutter doctor -v
-flutter pub get
-flutter run -d windows
-```
+    flutter doctor -v
+    flutter pub get
+    flutter build windows --release --no-pub
 
-También se puede pasar un PDF al ejecutable:
+Este comando solo escribe artefactos bajo `build/`, que está ignorado por Git:
+no publica Yamantaka en pub.dev, Microsoft Store ni ningún otro canal.
 
-```powershell
-flutter run -d windows -- "C:\libros\ejemplo.pdf"
-```
+El ejecutable de Flutter no es autónomo: debe permanecer junto a `data/`,
+`flutter_windows.dll` y las DLL de plugins. Si se usa el ZIP, hay que extraer el
+bundle completo antes de abrirlo; copiar o ejecutar solo `yamantaka.exe` puede
+fallar por dependencias ausentes.
+
+Para iniciar la build local con preflight de estructura, ruta y
+Mark-of-the-Web:
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/run_windows.ps1
+
+También puede abrir un PDF directamente:
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/run_windows.ps1 -PdfPath "C:\libros\ejemplo.pdf"
+
+Las builds Flutter de Windows no incluyen por defecto una firma Authenticode.
+El launcher acepta una build local completa situada bajo `build/`, pero nunca la
+presenta como artefacto firmado. Smart App Control puede bloquear binarios
+descargados o desconocidos; no se recomienda desactivar protecciones de Windows
+para evitarlo.
+
+Cuando exista un certificado RSA de firma de código de un proveedor confiable,
+se firma el bundle completo —ejecutable y DLL— así:
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/sign_windows_bundle.ps1 -BundlePath build/windows/x64/runner/Release -CertificateThumbprint <THUMBPRINT>
+
+Una build firmada o la build local comprobada puede abrirse también como proceso
+normal:
+
+    & build/windows/x64/runner/Release/yamantaka.exe "C:\libros\ejemplo.pdf"
+
+Firmar no publica la aplicación. El certificado y su clave se administran fuera
+del repositorio. No se recomienda desactivar Smart App Control como solución de
+desarrollo.
 
 ## Compilación y pruebas
 
-```powershell
-dart format --output=none --set-exit-if-changed `
-  lib test integration_test tool test_driver
-flutter analyze
-flutter test
-flutter test integration_test/reader_integration_test.dart -d windows
-flutter build windows --release
-```
+    dart format --output=none --set-exit-if-changed lib test integration_test tool test_driver
+    flutter analyze --no-pub
+    flutter test --no-pub
+    flutter build windows --release --no-pub
 
-Para ejecutar el gate reproducible completo en Windows:
+Gate reproducible:
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File tool/verify_windows.ps1
-```
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/verify_windows.ps1
 
-El gate conserva los informes bajo `build/verification` y falla si el checkout
-está sucio, falta una dependencia offline, no pasa el análisis, falla el
-corpus, el benchmark, el build o la regresión visual. Para una iteración local
-intencionada puede usarse `-AllowDirty`; no descarga dependencias sin permiso.
-La matriz nativa de DPI requiere además `-DpiScaleConfirmed` después de que el
-host confirme realmente cada escala; `-SkipDpiMatrix` solo sirve para aislar
-otras fases y nunca convierte la evidencia visual en aprobada.
-La trazabilidad de la hoja de ruta está en
-[`docs/verification/todo-traceability.md`](docs/verification/todo-traceability.md).
+Los informes quedan bajo build/verification. El gate local puede ejecutar el
+bundle que acaba de compilar cuando está completo, permanece bajo `build/` y no
+tiene Mark-of-the-Web. La firma sigue siendo obligatoria para un gate de
+distribución; con un certificado disponible:
 
-El ejecutable Release se genera en
-`build\windows\x64\runner\Release\yamantaka.exe`.
-Para crear el PDF legal y reproducible usado en el smoke test:
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/verify_windows.ps1 -CertificateThumbprint <THUMBPRINT> -RequireSignature
 
-```powershell
-dart run tool/create_test_pdf.dart build/manual/yamantaka-smoke.pdf
-```
+Sin certificado, `-RequireSignature` omite las fases que abrirían el bundle y
+explica qué binarios carecen de firma. No desactiva ni modifica Smart App
+Control.
 
-Los fixtures y el perfil de interfaz se regeneran con:
+PDF sintético para smoke:
 
-```powershell
-dart run tool/create_performance_fixtures.dart build/performance/fixtures
-flutter drive --driver=test_driver/performance_driver.dart `
-  --target=integration_test/performance_profile_test.dart `
-  -d windows --profile
-```
+    dart run tool/create_test_pdf.dart build/verification/corpus/normal.pdf
 
-Las capturas de una ventana Release se pueden repetir con:
+Matriz visual nativa sobre una escala real del host; use `-RequireSignature`
+para evidencia de distribución:
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-  -File tool/capture_windows_window.ps1 `
-  -TargetProcessId <PID> `
-  -OutputPath docs/screenshots/windows-library-wide.png `
-  -Width 1200 -Height 800
-```
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/run_visual_matrix.ps1 -HostScalePercent 125 -ScaleConfirmed
+
+Captura de una ventana ya abierta, conservando sus bounds y enviando F11:
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/capture_windows_window.ps1 -TargetProcessId <PID> -OutputPath build/verification/book-fullscreen.png -PreserveWindowBounds -SendKeys "{F11}"
 
 ## Estructura
 
-- `lib/app`: arranque, composición, tema, comandos y atajos.
-- `lib/core`: errores, resultados, plataforma y logging privado.
-- `lib/features`: biblioteca, lector, búsqueda, marcadores y ajustes.
-- `lib/pdf_engine`: contrato del motor, modelos, visor adaptado y caché.
-- `lib/storage`: SQLite, rutas, repositorios y copia de seguridad local.
-- `test`: pruebas unitarias, de widgets, SQLite y PDFium.
-- `integration_test`: flujo nativo con un PDF generado durante la prueba.
-- `tool`: utilidades reproducibles de desarrollo y validación.
-- `third_party/pdfrx`: parche local, aislado y licenciado de pdfrx 2.4.7.
+- lib/app: arranque, composición, tema, comandos y atajos.
+- lib/core: errores, plataforma y logging privado.
+- lib/features: biblioteca, lector, búsqueda, marcadores y ajustes.
+- lib/pdf_engine: contrato del motor, modelos, visor y caché.
+- lib/storage: SQLite, rutas, repositorios y backup local.
+- test: dominio, widgets, SQLite, PDFium y referencia visual.
+- integration_test: flujos nativos con PDF generado.
+- tool: utilidades reproducibles de desarrollo y validación.
+- third_party/pdfrx: parche local, aislado y licenciado de pdfrx 2.4.7.
 
-## Limitaciones actuales
+## Limitaciones
 
-- El desplazamiento se restaura como fracción aproximada de la página, no como
-  coordenada tipográfica exacta.
-- El visor usa páginas completas virtualizadas; el contrato admite regiones,
-  pero todavía no hay teselas.
-- No hay OCR: un escaneo sin texto muestra el estado correspondiente.
-- La selección automática de portada usa texto extraíble y análisis visual
-  ligero; no pretende reconocer semántica editorial ni sustituye la corrección
-  manual.
-- La selección geométrica nativa para highlight/subrayado/tachado está
-  bloqueada por el adaptador actual; hoy se crean notas ligadas a página.
-- Split/comparación tienen dominio y política serializables, pero no se anuncian
-  como disponibles: falta ownership y perfil de dos visores reales.
-- La UI avanzada de merge/reorder de etiquetas, perfiles personalizados, modo
-  estudio de tres zonas y keep-awake de presentación sigue pendiente.
-- Android/iOS están inicializados, pero sus toolchains y UX nativa no se han
-  validado.
-- Existe un perfil reproducible de 40 documentos, 100 páginas y carga vectorial
-  en un equipo; aún faltan 1000 páginas, páginas raster extremas y otras GPU.
-- Falta completar la matriz extensa de PDFs patológicos, DPI 100/150/200 %,
-  tabulación completa y lector de pantalla descrita en `TESTING.md`; en esta
-  iteración se verificó Windows a 125 %.
-- pdfrx 2.4.7 lleva un parche local de ciclo de vida del codec; debe retirarse
-  cuando una versión upstream corregida supere la misma captura nativa.
-- El build de desarrollo no está firmado ni empaquetado para distribución.
-- La cola de importación y la observación de carpetas autorizadas persisten y
-  revalidan trabajo local, pero ningún evento de carpeta importa, mueve o
-  elimina un PDF automáticamente.
+- No hay OCR ni edición o firma del PDF.
+- La selección geométrica para highlight, subrayado y tachado depende aún del
+  adaptador nativo; hoy las notas se ligan a página.
+- Split/comparación conservan modelos internos, pero no se anuncian sin dos
+  visores reales y medidos.
+- Android e iOS están inicializados, pero esta iteración solo valida Windows.
+- El build local actual no está firmado. Puede usarse para desarrollo desde el
+  bundle completo bajo `build/`, pero distribuirlo sin advertencias requiere un
+  certificado RSA confiable o un canal que firme el artefacto.
+- La validación manual de Narrador, varios monitores y cada DPI físico no se
+  sustituye por pruebas de widget.
 
-No se incluyen edición/firma del PDF, anotación geométrica sin selección nativa,
-nube, cuentas, telemetría,
-IA, EPUB ni formatos distintos de PDF.
-
-## Próximo paso
-
-Repetir `tool/verify_windows.ps1` en un checkout limpio con la caché de Pub y
-el toolchain nativo disponibles; después cerrar la evidencia de selección
-geométrica, split real, Narrador y DPI nativo. El orden y los criterios
-completos permanecen en [NEXT_TODOS.md](NEXT_TODOS.md).
+No se incluyen nube, cuentas, telemetría, IA, EPUB ni formatos distintos de
+PDF.

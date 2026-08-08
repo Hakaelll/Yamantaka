@@ -421,11 +421,11 @@ final class AppDatabase {
         database
           ..execute(
             "ALTER TABLE document_preferences ADD COLUMN cover_policy TEXT "
-            "NOT NULL DEFAULT 'firstPageIsCover'",
+            "NOT NULL DEFAULT 'noCover'",
           )
           ..execute(
             "ALTER TABLE document_preferences ADD COLUMN initial_side TEXT "
-            "NOT NULL DEFAULT 'right'",
+            "NOT NULL DEFAULT 'left'",
           )
           ..execute('PRAGMA user_version = 7');
       });

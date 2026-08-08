@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../app/shortcuts/app_commands.dart';
 import '../../../app/theme/app_components.dart';
+import '../../../app/theme/app_theme.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/errors/failure_presentation.dart';
 import '../../../pdf_engine/models/pdf_models.dart';
@@ -17,7 +18,6 @@ import '../../library/domain/library_document.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
 import 'reader_bottom_controls.dart';
-import 'reader_book_spine.dart';
 import 'reader_side_panel.dart';
 import 'reader_top_bar.dart';
 import 'reader_ui_state.dart';
@@ -239,7 +239,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                     event.localPosition.dy <= AppSizes.topRevealZone ||
                     event.localPosition.dy >= height - AppSpacing.space12;
                 final inTopChrome =
-                    event.localPosition.dy <= AppSizes.topVeilDepth;
+                    event.localPosition.dy <=
+                    AppSizes.topBarHeight + AppSpacing.space8;
                 final inBottomChrome =
                     event.localPosition.dy >=
                     height - AppSizes.bottomControlHeight - AppSpacing.space24;
@@ -285,6 +286,9 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       context,
       preferences.readingTheme,
     );
+    final chromeTheme = _isBookMode && !_isElectronicInk
+        ? AppTheme.dark(highContrast: MediaQuery.highContrastOf(context))
+        : Theme.of(context);
     final panelWidth = _panelWidth(constraints.maxWidth);
     final immersive = _immersive;
     final requestedFlow = _isElectronicInk
@@ -308,7 +312,6 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       preferred:
           (preferences.horizontalMargin + preferences.verticalMargin) / 2,
     );
-    final spineGap = ReaderViewportMetrics.adaptiveSpineGap(viewerSize.width);
     // The PDF layout already contains the editorial outer margin.  Keeping
     // this separate viewport margin at zero is what makes chrome genuinely
     // overlay-only instead of reserving a hidden toolbar strip.
@@ -351,11 +354,6 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                       backgroundColor: readerBackground,
                       margin: readerMargin,
                       viewportMargin: viewportMargin,
-                      spineGap: spineGap,
-                      physicalPageGap: 0,
-                      spineVisualWidth: _isBookMode
-                          ? (windowClass == AppWindowClass.expanded ? 16 : 12)
-                          : 0,
                       coverPolicy: preferences.coverPolicy,
                       initialSide: preferences.initialSide,
                       flow: requestedFlow,
@@ -395,19 +393,6 @@ final class _ReaderScreenState extends State<ReaderScreen> {
               ),
             ),
           ),
-          if (_isBookMode &&
-              !immersive &&
-              !_isElectronicInk &&
-              !MediaQuery.highContrastOf(context))
-            Positioned(
-              left: 0,
-              top: 0,
-              right: panelDocked ? panelWidth : 0,
-              bottom: 0,
-              child: ReaderBookSpine(
-                width: windowClass == AppWindowClass.expanded ? 16 : 12,
-              ),
-            ),
           if (_isBookMode && !immersive)
             ..._pageTurnZones(
               controller: controller,
@@ -428,40 +413,44 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                   opacity: controlsShown ? 1 : 0,
                   child: IgnorePointer(
                     ignoring: !controlsShown,
-                    child: ReaderTopBar(
-                      key: const Key('reader-top-bar'),
-                      controller: controller,
-                      canvasColor: readerBackground,
-                      flatChrome:
-                          _isElectronicInk ||
-                          MediaQuery.highContrastOf(context),
-                      compact: windowClass == AppWindowClass.compact,
-                      expanded: windowClass == AppWindowClass.expanded,
-                      activePanel: _panel,
-                      showModeControls: widget.showModeControls,
-                      showPanelControls: widget.showPanelControls,
-                      shortcutOverrides: widget.shortcutOverrides,
-                      onBack: widget.onBack,
-                      onOpenDocument: () => unawaited(widget.onOpenDocument()),
-                      onSearch: () => _showPanel(ReaderPanelSection.search),
-                      onCommandPalette: () => _showCommandPalette(context),
-                      onShowThumbnails: () =>
-                          _showPanel(ReaderPanelSection.thumbnails),
-                      onShowOutline: () =>
-                          _showPanel(ReaderPanelSection.outline),
-                      onShowBookmarks: () =>
-                          _showPanel(ReaderPanelSection.bookmarks),
-                      onShowAnnotations: () =>
-                          _showPanel(ReaderPanelSection.annotations),
-                      onAdjustMargins: () => _showMarginChooser(context),
-                      onModeChanged: _setReaderMode,
-                      onDocumentInfo:
-                          widget.onDocumentInfo ??
-                          () => _showDocumentInfo(context),
-                      onToggleFullScreen: _toggleFullScreen,
-                      onToggleChrome: _toggleChrome,
-                      onToggleImmersive: _toggleImmersive,
-                      onOpenSettings: widget.onOpenSettings,
+                    child: Theme(
+                      data: chromeTheme,
+                      child: ReaderTopBar(
+                        key: const Key('reader-top-bar'),
+                        controller: controller,
+                        canvasColor: readerBackground,
+                        flatChrome:
+                            _isElectronicInk ||
+                            MediaQuery.highContrastOf(context),
+                        compact: windowClass == AppWindowClass.compact,
+                        expanded: windowClass == AppWindowClass.expanded,
+                        activePanel: _panel,
+                        showModeControls: widget.showModeControls,
+                        showPanelControls: widget.showPanelControls,
+                        shortcutOverrides: widget.shortcutOverrides,
+                        onBack: widget.onBack,
+                        onOpenDocument: () =>
+                            unawaited(widget.onOpenDocument()),
+                        onSearch: () => _showPanel(ReaderPanelSection.search),
+                        onCommandPalette: () => _showCommandPalette(context),
+                        onShowThumbnails: () =>
+                            _showPanel(ReaderPanelSection.thumbnails),
+                        onShowOutline: () =>
+                            _showPanel(ReaderPanelSection.outline),
+                        onShowBookmarks: () =>
+                            _showPanel(ReaderPanelSection.bookmarks),
+                        onShowAnnotations: () =>
+                            _showPanel(ReaderPanelSection.annotations),
+                        onAdjustMargins: () => _showMarginChooser(context),
+                        onModeChanged: _setReaderMode,
+                        onDocumentInfo:
+                            widget.onDocumentInfo ??
+                            () => _showDocumentInfo(context),
+                        onToggleFullScreen: _toggleFullScreen,
+                        onToggleChrome: _toggleChrome,
+                        onToggleImmersive: _toggleImmersive,
+                        onOpenSettings: widget.onOpenSettings,
+                      ),
                     ),
                   ),
                 ),
@@ -483,17 +472,20 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                   opacity: controlsShown ? 1 : 0,
                   child: IgnorePointer(
                     ignoring: !controlsShown,
-                    child: ReaderBottomControls(
-                      key: const Key('reader-bottom-controls'),
-                      controller: controller,
-                      compact: windowClass == AppWindowClass.compact,
-                      onGoToPage: () => _showGoToPage(context),
-                      onChooseTheme: () => _showThemeChooser(context),
-                      readingDirection: widget.readingDirection,
-                      flatChrome:
-                          _isElectronicInk ||
-                          MediaQuery.highContrastOf(context),
-                      shortcutOverrides: widget.shortcutOverrides,
+                    child: Theme(
+                      data: chromeTheme,
+                      child: ReaderBottomControls(
+                        key: const Key('reader-bottom-controls'),
+                        controller: controller,
+                        compact: windowClass == AppWindowClass.compact,
+                        onGoToPage: () => _showGoToPage(context),
+                        onChooseTheme: () => _showThemeChooser(context),
+                        readingDirection: widget.readingDirection,
+                        flatChrome:
+                            _isElectronicInk ||
+                            MediaQuery.highContrastOf(context),
+                        shortcutOverrides: widget.shortcutOverrides,
+                      ),
                     ),
                   ),
                 ),
@@ -613,7 +605,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     Widget zone({
       required bool left,
       required String label,
-      required VoidCallback action,
+      required VoidCallback? action,
     }) => Positioned(
       left: left ? 0 : null,
       right: left ? null : (panelVisible ? panelWidth : 0),
@@ -622,12 +614,46 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       width: AppSizes.readerEdgeNavigation,
       child: Semantics(
         button: true,
+        enabled: action != null,
         label: label,
-        child: InkWell(
-          key: Key(left ? 'reader-left-zone' : 'reader-right-zone'),
-          onTap: action,
-          hoverColor: Colors.white.withValues(alpha: 0.06),
-          focusColor: Colors.white.withValues(alpha: 0.10),
+        child: Tooltip(
+          message: label,
+          child: InkWell(
+            key: Key(left ? 'reader-left-zone' : 'reader-right-zone'),
+            onTap: action,
+            hoverColor: Colors.white.withValues(alpha: 0.035),
+            focusColor: Colors.white.withValues(alpha: 0.06),
+            child: Center(
+              child: AnimatedOpacity(
+                duration: _chromeTransition(context, true),
+                opacity: action == null ? 0.32 : 1,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xE6222522),
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                    border: Border.all(color: const Color(0x2EFFFFFF)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x52000000),
+                        blurRadius: 12,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: SizedBox.square(
+                    dimension: 40,
+                    child: Icon(
+                      left
+                          ? Icons.chevron_left_rounded
+                          : Icons.chevron_right_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -636,15 +662,23 @@ final class _ReaderScreenState extends State<ReaderScreen> {
         left: true,
         label: rtl ? 'Página siguiente' : 'Página anterior',
         action: rtl
-            ? controller.goToNextReadingUnit
-            : controller.goToPreviousReadingUnit,
+            ? controller.canGoToNextReadingUnit
+                  ? controller.goToNextReadingUnit
+                  : null
+            : controller.canGoToPreviousReadingUnit
+            ? controller.goToPreviousReadingUnit
+            : null,
       ),
       zone(
         left: false,
         label: rtl ? 'Página anterior' : 'Página siguiente',
         action: rtl
-            ? controller.goToPreviousReadingUnit
-            : controller.goToNextReadingUnit,
+            ? controller.canGoToPreviousReadingUnit
+                  ? controller.goToPreviousReadingUnit
+                  : null
+            : controller.canGoToNextReadingUnit
+            ? controller.goToNextReadingUnit
+            : null,
       ),
     ];
   }
@@ -652,6 +686,9 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   Color _readerCanvasColor(BuildContext context, ReaderTheme theme) {
     if (_isElectronicInk || MediaQuery.highContrastOf(context)) {
       return Colors.white;
+    }
+    if (_isBookMode) {
+      return AppColorTokens.dark.readerBackground;
     }
     final colors = context.appColors;
     return switch (theme) {
@@ -707,9 +744,6 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       configuration.backgroundColor,
       configuration.margin,
       configuration.viewportMargin,
-      configuration.spineGap,
-      configuration.physicalPageGap,
-      configuration.spineVisualWidth,
       configuration.coverPolicy,
       configuration.initialSide,
       configuration.flow,

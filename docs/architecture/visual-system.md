@@ -13,7 +13,7 @@ equivalente.
 | Elevación y sombras | `AppElevation`, `AppShadow` | Superficies planas por defecto; sombras solo para overlays, páginas y portadas. |
 | Movimiento | `AppMotion` | Pasar siempre por `whenAllowed`; reduced motion produce duración cero. |
 | Densidad | `AppDensityTokens` | La densidad compacta reduce ritmo, no objetivos de interacción. |
-| Layout | `AppBreakpoints`, `ReaderLayoutPolicy` | Clasificar por espacio lógico disponible, no por resolución física aislada. |
+| Layout | `AppBreakpoints`, `AppWindowClass` | Clasificar por espacio lógico disponible, no por resolución física aislada. |
 | Tipografía | `AppTheme` | Segoe UI Variable/Segoe UI con fallback; los estilos tienen función semántica. |
 
 ## Excepciones permitidas

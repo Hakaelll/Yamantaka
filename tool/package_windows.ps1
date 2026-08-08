@@ -5,12 +5,17 @@ param(
     [string]$BuildNumber = '1',
     [string]$FlutterExecutable,
     [string]$CertificateThumbprint,
+    [string]$SignToolPath,
+    [string]$TimestampUrl = 'http://timestamp.digicert.com',
+    [switch]$SkipTimestamp,
+    [switch]$MachineCertificateStore,
     [switch]$RequireSignature,
     [switch]$Portable
 )
 
 $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+. (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
 $outputRoot = [System.IO.Path]::GetFullPath((Join-Path $root $OutputDirectory))
 $bundle = Join-Path $outputRoot 'yamantaka'
 $failurePath = Join-Path $outputRoot 'release-failure.json'
@@ -108,19 +113,36 @@ try {
     if (Test-Path $bundle) { Remove-Item -LiteralPath $bundle -Recurse -Force }
     Copy-Item -LiteralPath $releaseRoot -Destination $bundle -Recurse
     Copy-Item -LiteralPath (Join-Path $root 'third_party/pdfrx/LICENSE') -Destination (Join-Path $bundle 'THIRD_PARTY_PDfrx_LICENSE.txt')
+    Copy-Item -LiteralPath (Join-Path $root 'docs/release/WINDOWS-BUNDLE.txt') -Destination (Join-Path $bundle 'LEEME.txt')
     if ($Portable) {
         New-Item -ItemType File -Force -Path (Join-Path $bundle '.yamantaka-portable') | Out-Null
     }
-    $signed = $false
-    $executable = Get-ChildItem -LiteralPath $bundle -Filter '*.exe' -Recurse | Select-Object -First 1
     if ($CertificateThumbprint) {
-        $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
-        if (-not $signtool) { throw 'Certificate thumbprint was provided but signtool.exe was not found.' }
-        & $signtool.Source sign /sha1 $CertificateThumbprint /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $executable.FullName
-        if ($LASTEXITCODE -ne 0) { throw "signtool failed with exit code $LASTEXITCODE." }
-        $signed = $true
+        $signingArguments = @{
+            BundlePath = $bundle
+            CertificateThumbprint = $CertificateThumbprint
+            TimestampUrl = $TimestampUrl
+        }
+        if ($SignToolPath) { $signingArguments.SignToolPath = $SignToolPath }
+        if ($SkipTimestamp) { $signingArguments.SkipTimestamp = $true }
+        if ($MachineCertificateStore) {
+            $signingArguments.MachineCertificateStore = $true
+        }
+        & (Join-Path $PSScriptRoot 'sign_windows_bundle.ps1') @signingArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "Windows bundle signing failed with exit code $LASTEXITCODE."
+        }
     }
-    if ($RequireSignature -and -not $signed) { throw 'A signed package was required but no certificate was supplied.' }
+    $signatureState = Get-YamantakaWindowsBundleSignatureState -BundlePath $bundle
+    $signed = $signatureState.readyForNativeExecution
+    if ($RequireSignature -and -not $signed) {
+        $invalid = @(
+            $signatureState.binaries |
+                Where-Object { -not $_.valid } |
+                ForEach-Object { "$($_.relativePath) [$($_.status)]" }
+        ) -join ', '
+        throw "A fully signed package was required, but these native binaries are not valid: $invalid"
+    }
     $commit = (git rev-parse HEAD).Trim()
     $dirty = @((git status --porcelain)).Count -gt 0
     $files = Get-ChildItem -LiteralPath $bundle -File -Recurse | ForEach-Object {
@@ -139,6 +161,13 @@ try {
         dirty = $dirty
         generatedAt = [DateTime]::UtcNow.ToString('o')
         signed = $signed
+        nativeBinaryCount = $signatureState.binaryCount
+        validSignatureCount = $signatureState.validSignatureCount
+        signatureSubjects = @(
+            $signatureState.binaries.subject |
+                Where-Object { $_ } |
+                Sort-Object -Unique
+        )
         distribution = if ($Portable) { 'portable' } else { 'installed-bundle' }
         dataIsExternal = $true
         containsPdfFiles = $false

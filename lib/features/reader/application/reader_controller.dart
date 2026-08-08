@@ -29,6 +29,19 @@ enum ReaderStatus { idle, loading, ready, failure }
 
 int _defaultHistoryLimit() => 250;
 
+@visibleForTesting
+DocumentPreferences normalizeOpeningReaderPreferences(
+  DocumentPreferences restored,
+) => restored.viewMode == ReaderMode.book
+    ? restored.copyWith(
+        pageLayout: PageLayoutMode.facing,
+        coverPolicy: ReaderCoverPolicy.noCover,
+        initialSide: ReaderInitialSide.left,
+        zoomMode: ZoomMode.fitPage,
+        scrollOffset: 0,
+      )
+    : restored;
+
 final class ReaderController extends ChangeNotifier {
   ReaderController({
     required DocumentService documentService,
@@ -150,9 +163,10 @@ final class ReaderController extends ChangeNotifier {
       document = libraryDocument;
       openedDocument = newlyOpened;
       newlyOpened = null;
-      preferences = _preferences.exists(libraryDocument.id)
+      final restoredPreferences = _preferences.exists(libraryDocument.id)
           ? _preferences.load(libraryDocument.id)
           : _defaultPreferences(libraryDocument.id);
+      preferences = normalizeOpeningReaderPreferences(restoredPreferences);
       currentPageIndex = _shouldRestorePosition()
           ? libraryDocument.lastPageIndex.clamp(0, pageCount - 1)
           : 0;
@@ -276,6 +290,16 @@ final class ReaderController extends ChangeNotifier {
   }
 
   Future<void> closeDocument() async {
+    try {
+      await leaveFullScreen();
+    } on Object catch (exception) {
+      // Closing the PDF must remain recoverable even if Windows rejects a
+      // monitor transition. Do not strand handles or persisted state.
+      _logger.warning(
+        'Fullscreen restore failed while closing the reader.',
+        exception,
+      );
+    }
     _openGeneration++;
     openProgress = ProgressiveOpenPolicy.cancel(openProgress);
     await _closeCurrent();
@@ -330,7 +354,7 @@ final class ReaderController extends ChangeNotifier {
     pageCount: pageCount,
     mode: readerMode,
     firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
-    initialSide: preferences?.initialSide ?? ReaderInitialSide.right,
+    initialSide: preferences?.initialSide ?? ReaderInitialSide.left,
   );
 
   int _previousReadingUnitTarget() => ReadingUnitNavigation.previousTarget(
@@ -338,7 +362,7 @@ final class ReaderController extends ChangeNotifier {
     pageCount: pageCount,
     mode: readerMode,
     firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
-    initialSide: preferences?.initialSide ?? ReaderInitialSide.right,
+    initialSide: preferences?.initialSide ?? ReaderInitialSide.left,
   );
 
   int _nextReadingUnitTarget() => ReadingUnitNavigation.nextTarget(
@@ -346,7 +370,7 @@ final class ReaderController extends ChangeNotifier {
     pageCount: pageCount,
     mode: readerMode,
     firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
-    initialSide: preferences?.initialSide ?? ReaderInitialSide.right,
+    initialSide: preferences?.initialSide ?? ReaderInitialSide.left,
   );
 
   Future<void> goToFirstReadingUnit() => viewController.goToPage(0);
@@ -356,7 +380,7 @@ final class ReaderController extends ChangeNotifier {
       pageCount: pageCount,
       mode: readerMode,
       firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
-      initialSide: preferences?.initialSide ?? ReaderInitialSide.right,
+      initialSide: preferences?.initialSide ?? ReaderInitialSide.left,
     ),
   );
 
@@ -368,7 +392,7 @@ final class ReaderController extends ChangeNotifier {
     mode: readerMode,
     direction: direction,
     firstPageIsCover: preferences?.coverPolicy != ReaderCoverPolicy.noCover,
-    initialSide: preferences?.initialSide,
+    initialSide: preferences?.initialSide ?? ReaderInitialSide.left,
   );
 
   Future<void> goToPage(int oneBasedPage) {
@@ -475,13 +499,18 @@ final class ReaderController extends ChangeNotifier {
 
   void setReaderMode(ReaderMode mode) {
     final current = preferences;
-    if (current == null) return;
+    if (current == null || current.viewMode == mode) return;
+    final bookMode = mode == ReaderMode.book;
+    final coverPolicy = bookMode
+        ? ReaderCoverPolicy.noCover
+        : current.coverPolicy;
+    final initialSide = bookMode ? ReaderInitialSide.left : current.initialSide;
     final canonicalPage = ReadingUnitNavigation.canonicalPage(
       pageIndex: currentPageIndex,
       pageCount: pageCount,
       mode: mode,
-      firstPageIsCover: current.coverPolicy != ReaderCoverPolicy.noCover,
-      initialSide: current.initialSide,
+      firstPageIsCover: coverPolicy != ReaderCoverPolicy.noCover,
+      initialSide: initialSide,
     );
     currentPageIndex = canonicalPage;
     preferences = current.copyWith(
@@ -489,6 +518,13 @@ final class ReaderController extends ChangeNotifier {
       pageLayout: mode == ReaderMode.book
           ? PageLayoutMode.facing
           : PageLayoutMode.single,
+      coverPolicy: coverPolicy,
+      initialSide: initialSide,
+      // Document and Book use different geometric units. Start the new unit
+      // with a deterministic fit so a custom one-page zoom cannot leave half
+      // of a spread outside the viewport.
+      zoomMode: ZoomMode.fitPage,
+      scrollOffset: 0,
     );
     _scheduleSave();
     notifyListeners();
@@ -508,14 +544,27 @@ final class ReaderController extends ChangeNotifier {
     final mode = layout == PageLayoutMode.facing
         ? ReaderMode.book
         : ReaderMode.document;
+    final coverPolicy = mode == ReaderMode.book
+        ? ReaderCoverPolicy.noCover
+        : current.coverPolicy;
+    final initialSide = mode == ReaderMode.book
+        ? ReaderInitialSide.left
+        : current.initialSide;
     currentPageIndex = ReadingUnitNavigation.canonicalPage(
       pageIndex: currentPageIndex,
       pageCount: pageCount,
       mode: mode,
-      firstPageIsCover: current.coverPolicy != ReaderCoverPolicy.noCover,
-      initialSide: current.initialSide,
+      firstPageIsCover: coverPolicy != ReaderCoverPolicy.noCover,
+      initialSide: initialSide,
     );
-    preferences = current.copyWith(pageLayout: layout, viewMode: mode);
+    preferences = current.copyWith(
+      pageLayout: layout,
+      viewMode: mode,
+      coverPolicy: coverPolicy,
+      initialSide: initialSide,
+      zoomMode: ZoomMode.fitPage,
+      scrollOffset: 0,
+    );
     _scheduleSave();
     notifyListeners();
   }
@@ -548,10 +597,11 @@ final class ReaderController extends ChangeNotifier {
   }
 
   Future<void> leaveFullScreen() async {
-    if (!await _windowService.isFullScreen()) return;
-    await _windowService.setFullScreen(false);
+    final serviceIsFullScreen = await _windowService.isFullScreen();
+    if (serviceIsFullScreen) await _windowService.setFullScreen(false);
+    final changed = isFullScreen;
     isFullScreen = false;
-    notifyListeners();
+    if (changed) notifyListeners();
   }
 
   void toggleBookmark({String? label}) {

@@ -29,6 +29,39 @@ import 'support/stub_pdf_engine.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUpAll(() async {
+    final windowsRoot = Platform.environment['WINDIR'] ?? r'C:\Windows';
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+    await _loadTestFont('Segoe UI Variable', [
+      '$windowsRoot/Fonts/segoeui.ttf',
+      '$windowsRoot/Fonts/SegoeUIVF.ttf',
+    ]);
+    await _loadTestFont('MaterialIcons', [
+      r'.flutter-sdk\bin\cache\artifacts\material_fonts\MaterialIcons-Regular.otf',
+      if (flutterRoot != null)
+        '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+    ]);
+  });
+
+  test('opening a saved book starts from a complete fitted unit', () {
+    const restored = DocumentPreferences(
+      documentId: 'book',
+      viewMode: ReaderMode.book,
+      pageLayout: PageLayoutMode.facing,
+      zoomMode: ZoomMode.custom,
+      zoomLevel: 1.56,
+      scrollOffset: 0.4,
+    );
+
+    final normalized = normalizeOpeningReaderPreferences(restored);
+
+    expect(normalized.zoomMode, ZoomMode.fitPage);
+    expect(normalized.scrollOffset, 0);
+    expect(normalized.zoomLevel, 1.56);
+    expect(normalized.coverPolicy, ReaderCoverPolicy.noCover);
+    expect(normalized.initialSide, ReaderInitialSide.left);
+  });
+
   testWidgets('reader presents a recoverable error state', (tester) async {
     final harness = await _ReaderHarness.create(ready: false);
     harness.controller
@@ -68,6 +101,13 @@ void main() {
     expect(find.byKey(const Key('test-pdf-viewer')), findsOneWidget);
     expect(find.byKey(const Key('reader-progress')), findsOneWidget);
     expect(find.text('1 / 3'), findsOneWidget);
+    final topSurface = tester.widget<DecoratedBox>(
+      find.byKey(const Key('reader-top-surface')),
+    );
+    final topDecoration = topSurface.decoration as BoxDecoration;
+    expect(topDecoration.color, isNotNull);
+    expect(topDecoration.color!.a, 1);
+    expect(topDecoration.gradient, isNull);
 
     await tester.tap(find.byTooltip('Más opciones'));
     await tester.pump();
@@ -137,44 +177,51 @@ void main() {
     },
   );
 
-  testWidgets(
-    'fullscreen keeps chrome orthogonal to immersive mode',
-    (tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final harness = await _ReaderHarness.create(ready: true);
+  testWidgets('fullscreen keeps chrome orthogonal to immersive mode', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true);
 
-      await tester.pumpWidget(_app(harness));
-      await tester.pump();
-      expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
-      expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
+    await tester.pumpWidget(_app(harness));
+    await tester.pump();
+    expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+    expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.f11);
-      await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+    await tester.pump();
 
-      expect(harness.windowService.fullScreen, isTrue);
-      expect(harness.controller.isFullScreen, isTrue);
-      expect(find.byKey(const Key('test-pdf-viewer')), findsOneWidget);
-      expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
-      expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
-      expect(find.byKey(const Key('reader-progress')), findsOneWidget);
+    expect(harness.windowService.fullScreen, isTrue);
+    expect(harness.controller.isFullScreen, isTrue);
+    expect(find.byKey(const Key('test-pdf-viewer')), findsOneWidget);
+    expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+    expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
+    expect(find.byKey(const Key('reader-progress')), findsOneWidget);
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
 
-      expect(harness.windowService.fullScreen, isFalse);
-      expect(harness.controller.isFullScreen, isFalse);
-      expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
-      expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
+    expect(harness.windowService.fullScreen, isFalse);
+    expect(harness.controller.isFullScreen, isFalse);
+    expect(find.byKey(const Key('reader-top-bar')), findsOneWidget);
+    expect(find.byKey(const Key('reader-bottom-controls')), findsOneWidget);
 
-      await tester.pumpWidget(const SizedBox.shrink());
-      await harness.dispose();
-    },
-  );
+    await tester.sendKeyEvent(LogicalKeyboardKey.f11);
+    await tester.pump();
+    expect(harness.windowService.fullScreen, isTrue);
 
-  testWidgets('book mode pairs cover, spreads and arrow-key navigation', (
+    await harness.controller.closeDocument();
+    expect(harness.windowService.fullScreen, isFalse);
+    expect(harness.controller.isFullScreen, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('book mode pairs page one immediately and navigates by spreads', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1280, 800);
@@ -191,19 +238,55 @@ void main() {
     expect(harness.controller.preferences!.pageLayout, PageLayoutMode.facing);
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
     expect(find.byTooltip('Apertura siguiente (→)'), findsOneWidget);
-    expect(find.text('1 / 6'), findsOneWidget);
+    expect(adapter.configuration?.coverPolicy, ReaderCoverPolicy.noCover);
+    expect(adapter.configuration?.initialSide, ReaderInitialSide.left);
+    expect(find.text('1–2 / 6'), findsOneWidget);
+    expect(
+      tester.getCenter(find.byKey(const Key('reader-mode-selector'))).dx,
+      closeTo(640, 1),
+    );
+    expect(
+      tester.getCenter(find.byKey(const Key('reader-navigation-group'))).dx,
+      closeTo(640, 1),
+    );
 
-    for (final expectedPage in const [1, 3, 5, 5]) {
+    for (final expectedPage in const [2, 4, 4, 4]) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
       expect(harness.controller.currentPageIndex, expectedPage);
     }
-    expect(find.text('6 / 6'), findsOneWidget);
-    for (final expectedPage in const [3, 1, 0]) {
+    expect(find.text('5–6 / 6'), findsOneWidget);
+    for (final expectedPage in const [2, 0]) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pump();
       expect(harness.controller.currentPageIndex, expectedPage);
     }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('book reader matches the maintained fullscreen baseline', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true, pageCount: 6);
+    harness.controller.setReaderMode(ReaderMode.book);
+
+    await tester.pumpWidget(
+      _app(harness, viewerAdapter: const _BookPreviewViewerAdapter()),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await expectLater(
+      find.byType(ReaderScreen),
+      matchesGoldenFile(
+        '../docs/screenshots/windows-reader-book-fullscreen.png',
+      ),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
@@ -218,6 +301,8 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final harness = await _ReaderHarness.create(ready: true, pageCount: 6);
     final adapter = _RecordingViewerAdapter();
+    await harness.controller.zoomBy(1.56);
+    expect(harness.controller.preferences!.zoomMode, ZoomMode.custom);
 
     await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
     await tester.pump();
@@ -233,7 +318,14 @@ void main() {
     await tester.pump();
     expect(harness.controller.preferences!.viewMode, ReaderMode.book);
     expect(harness.controller.preferences!.pageLayout, PageLayoutMode.facing);
+    expect(harness.controller.preferences!.zoomMode, ZoomMode.fitPage);
+    expect(
+      harness.controller.preferences!.coverPolicy,
+      ReaderCoverPolicy.noCover,
+    );
+    expect(harness.controller.preferences!.initialSide, ReaderInitialSide.left);
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
+    expect(adapter.configuration?.initialZoomMode, PdfViewZoomMode.fitPage);
 
     await tester.tap(find.byTooltip('Documento: mostrar una página'));
     await tester.pump();
@@ -260,8 +352,8 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
     await tester.pump();
-    expect(harness.controller.currentPageIndex, 1);
-    expect(find.text('2–3 / 6'), findsOneWidget);
+    expect(harness.controller.currentPageIndex, 2);
+    expect(find.text('3–4 / 6'), findsOneWidget);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
     await tester.pump();
@@ -269,7 +361,7 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
     await tester.pump();
-    expect(harness.controller.currentPageIndex, 1);
+    expect(harness.controller.currentPageIndex, 2);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
@@ -278,7 +370,7 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.end);
     await tester.pump();
-    expect(harness.controller.currentPageIndex, 5);
+    expect(harness.controller.currentPageIndex, 4);
     await tester.sendKeyEvent(LogicalKeyboardKey.home);
     await tester.pump();
     expect(harness.controller.currentPageIndex, 0);
@@ -369,12 +461,14 @@ void main() {
     await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
     await tester.pump();
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
-    expect(adapter.configuration?.spineGap, 10);
+    expect(adapter.configuration?.coverPolicy, ReaderCoverPolicy.noCover);
+    expect(adapter.configuration?.initialSide, ReaderInitialSide.left);
 
     tester.view.physicalSize = const Size(1200, 800);
     await tester.pump();
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
-    expect(adapter.configuration?.spineGap, 14);
+    expect(find.byKey(const Key('reader-left-zone')), findsOneWidget);
+    expect(find.byKey(const Key('reader-right-zone')), findsOneWidget);
 
     tester.view.physicalSize = const Size(1200, 460);
     await tester.pump();
@@ -500,7 +594,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
 
-    expect(harness.controller.currentPageIndex, 1);
+    expect(harness.controller.currentPageIndex, 2);
     expect(find.byTooltip('Buscar (Ctrl+F)').hitTestable(), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
@@ -521,6 +615,21 @@ void main() {
       expect(harness.controller.preferences!.verticalMargin, 52);
     },
   );
+}
+
+Future<void> _loadTestFont(String family, List<String> candidates) async {
+  File? fontFile;
+  for (final candidate in candidates) {
+    final file = File(candidate);
+    if (file.existsSync()) {
+      fontFile = file;
+      break;
+    }
+  }
+  if (fontFile == null) return;
+  final bytes = await fontFile.readAsBytes();
+  final data = ByteData.sublistView(bytes);
+  await (FontLoader(family)..addFont(Future.value(data))).load();
 }
 
 Widget _app(
@@ -699,6 +808,118 @@ final class _RecordingViewerAdapter implements PdfViewerAdapter {
   }) {
     this.configuration = configuration;
     return const ColoredBox(key: Key('test-pdf-viewer'), color: Colors.white);
+  }
+}
+
+final class _BookPreviewViewerAdapter implements PdfViewerAdapter {
+  const _BookPreviewViewerAdapter();
+
+  @override
+  Widget buildViewer({
+    required OpenedPdfDocument document,
+    required PdfViewController controller,
+    required PdfViewConfiguration configuration,
+    required int initialPageIndex,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<Object> onError,
+  }) => ColoredBox(
+    key: const Key('test-pdf-viewer'),
+    color: configuration.backgroundColor,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final pageHeight = (constraints.maxHeight - 190).clamp(360.0, 640.0);
+        final pageWidth = pageHeight * 0.72;
+        return Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _PreviewPage(
+                pageNumber: initialPageIndex + 1,
+                width: pageWidth,
+                height: pageHeight,
+                innerEdge: Alignment.centerRight,
+              ),
+              _PreviewPage(
+                pageNumber: initialPageIndex + 2,
+                width: pageWidth,
+                height: pageHeight,
+                innerEdge: Alignment.centerLeft,
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+final class _PreviewPage extends StatelessWidget {
+  const _PreviewPage({
+    required this.pageNumber,
+    required this.width,
+    required this.height,
+    required this.innerEdge,
+  });
+
+  final int pageNumber;
+  final double width;
+  final double height;
+  final Alignment innerEdge;
+
+  @override
+  Widget build(BuildContext context) {
+    final innerEdgeOnRight = innerEdge == Alignment.centerRight;
+    return Container(
+      width: width,
+      height: height,
+      decoration: const BoxDecoration(
+        color: Color(0xFFFDFDFC),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x52000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Text(
+              'Yamantaka · página $pageNumber',
+              style: const TextStyle(
+                color: Color(0xFF20231F),
+                fontFamily: 'Segoe UI Variable',
+                fontSize: 24,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: innerEdgeOnRight ? null : 0,
+            right: innerEdgeOnRight ? 0 : null,
+            width: 22,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: innerEdgeOnRight
+                      ? Alignment.centerLeft
+                      : Alignment.centerRight,
+                  end: innerEdge,
+                  colors: const [
+                    Colors.transparent,
+                    Color(0x16000000),
+                    Color(0x40000000),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

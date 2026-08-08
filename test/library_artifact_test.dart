@@ -6,6 +6,7 @@ import 'package:yamantaka/features/library/application/library_controller.dart';
 import 'package:yamantaka/features/library/domain/document_cover.dart';
 import 'package:yamantaka/features/library/domain/library_artifact_layout.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
+import 'package:yamantaka/features/library/presentation/artifact_library.dart';
 import 'package:yamantaka/pdf_engine/cache/thumbnail_service.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
@@ -17,6 +18,39 @@ void main() {
       expect(ThumbnailService.smallCoverScale, greaterThanOrEqualTo(0.45));
       expect(ThumbnailService.largeCoverScale, greaterThanOrEqualTo(1));
       expect(CoverSelectionPolicy.algorithmVersion, 3);
+    });
+
+    test('artifact books promote the selected real cover resolution', () {
+      final base = _document();
+      final document = base.copyWith(
+        thumbnailPath: 'legacy-cover.png',
+        coverMetadata: DocumentCoverMetadata(
+          documentId: base.id,
+          sourcePageIndex: 0,
+          smallThumbnailPath: 'small-cover.png',
+          largeThumbnailPath: 'large-cover.png',
+          generatedAt: DateTime.utc(2026, 7, 29, 12),
+          sourceModifiedAt: base.fileModifiedAt,
+          confidence: 1,
+          selectionMode: CoverSelectionMode.automatic,
+          algorithmVersion: CoverSelectionPolicy.algorithmVersion,
+          cropMode: CoverCropMode.contain,
+          pageAspectRatio: 0.704,
+        ),
+      );
+
+      expect(
+        artifactCoverPathFor(document, selected: false),
+        'small-cover.png',
+      );
+      expect(artifactCoverPathFor(document, selected: true), 'large-cover.png');
+      expect(
+        artifactCoverPathFor(
+          base.copyWith(thumbnailPath: 'legacy.png'),
+          selected: true,
+        ),
+        'legacy.png',
+      );
     });
 
     test('keeps a reasonable preference for the first page', () {

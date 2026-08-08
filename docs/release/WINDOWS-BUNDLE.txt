@@ -1,0 +1,13 @@
+YAMANTAKA PARA WINDOWS
+=====================
+
+1. Extrae todo el contenido del ZIP a una carpeta local.
+2. Conserva yamantaka.exe, las DLL y la carpeta data en el mismo directorio.
+3. Abre yamantaka.exe desde la carpeta extraida.
+
+yamantaka.exe no es un ejecutable autonomo. Abrirlo dentro del ZIP o copiarlo
+sin sus archivos vecinos puede impedir el arranque.
+
+Este archivo no acredita una firma digital. Si Windows bloquea un paquete
+descargado, no desactives sus protecciones: usa una distribucion firmada y
+verifica siempre el origen del bundle.

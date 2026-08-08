@@ -12,6 +12,12 @@ param(
     [switch]$SkipAnalysis,
     [string]$FlutterExecutable,
     [string]$DartExecutable,
+    [string]$CertificateThumbprint,
+    [string]$SignToolPath,
+    [string]$TimestampUrl = 'http://timestamp.digicert.com',
+    [switch]$SkipTimestamp,
+    [switch]$MachineCertificateStore,
+    [switch]$RequireSignature,
     [switch]$SkipDpiMatrix,
     [switch]$DpiScaleConfirmed,
     [ValidateRange(1, 3600)]
@@ -21,10 +27,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+. (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
 $outputRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDirectory))
 $failures = [System.Collections.Generic.List[string]]::new()
 $phaseResults = [System.Collections.Generic.List[object]]::new()
 $startedAt = [DateTime]::UtcNow
+$nativeExecutionReady = $false
+$nativeExecutionReason = 'Windows release build has not been evaluated.'
+$nativeSignatureState = $null
+$nativeExecutionState = $null
 
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $toolStateRoot = Join-Path $outputRoot 'tool-state'
@@ -243,6 +254,7 @@ try {
 
     Invoke-Gate 'pure contract self-checks' {
         Invoke-External $DartExecutable @('--enable-asserts', 'run', 'tool/self_check.dart') 'self-check.log'
+        & (Join-Path $PSScriptRoot 'test_windows_binary_trust.ps1')
     }
 
     if (-not $SkipFormat) {
@@ -309,16 +321,87 @@ try {
             Invoke-External $FlutterExecutable @('build', 'windows', '--release', '--no-pub') 'flutter-build-windows.log'
         }
 
-        if (-not $SkipCorpus) {
+        $releaseBuildPassed = @(
+            $phaseResults |
+                Where-Object { $_.name -eq 'Windows release build' } |
+                Select-Object -Last 1
+        ).status -eq 'passed'
+        if ($releaseBuildPassed -and $CertificateThumbprint) {
+            Invoke-Gate 'Windows bundle signing' {
+                $signingArguments = @{
+                    BundlePath = 'build/windows/x64/runner/Release'
+                    CertificateThumbprint = $CertificateThumbprint
+                    TimestampUrl = $TimestampUrl
+                }
+                if ($SignToolPath) {
+                    $signingArguments.SignToolPath = $SignToolPath
+                }
+                if ($SkipTimestamp) {
+                    $signingArguments.SkipTimestamp = $true
+                }
+                if ($MachineCertificateStore) {
+                    $signingArguments.MachineCertificateStore = $true
+                }
+                & (Join-Path $PSScriptRoot 'sign_windows_bundle.ps1') @signingArguments
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Windows bundle signing returned exit code $LASTEXITCODE."
+                }
+            }
+        }
+
+        $signingPassed = -not $CertificateThumbprint -or @(
+            $phaseResults |
+                Where-Object { $_.name -eq 'Windows bundle signing' } |
+                Select-Object -Last 1
+        ).status -eq 'passed'
+        if ($releaseBuildPassed -and $signingPassed) {
+            try {
+                $nativeExecutionState = Get-YamantakaWindowsBundleExecutionState `
+                    -BundlePath (Join-Path $repositoryRoot 'build/windows/x64/runner/Release') `
+                    -RepositoryRoot $repositoryRoot
+                $nativeSignatureState = $nativeExecutionState.signatureState
+                if ($RequireSignature) {
+                    $nativeExecutionReady = $nativeSignatureState.readyForNativeExecution
+                    if ($nativeExecutionReady) {
+                        $nativeExecutionReason = 'Every native binary has a locally valid Authenticode signature.'
+                    }
+                    else {
+                        $nativeExecutionReason = "Automatic launch suppressed because -RequireSignature was set: $($nativeSignatureState.invalidOrUnsignedCount) of $($nativeSignatureState.binaryCount) native binaries are unsigned or invalid."
+                    }
+                }
+                else {
+                    $nativeExecutionReady = $nativeExecutionState.readyForLocalExecution
+                    $nativeExecutionReason = $nativeExecutionState.reason
+                }
+            }
+            catch {
+                $nativeExecutionReason = "Automatic launch suppressed: $($_.Exception.Message)"
+            }
+        }
+        elseif (-not $releaseBuildPassed) {
+            $nativeExecutionReason = 'Automatic launch suppressed because the Windows release build failed.'
+        }
+        else {
+            $nativeExecutionReason = 'Automatic launch suppressed because Windows bundle signing failed.'
+        }
+
+        if (-not $SkipCorpus -and $nativeExecutionReady) {
             Invoke-Gate 'zero-network smoke' {
                 & (Join-Path $PSScriptRoot 'verify_no_network.ps1') `
                     -ExecutablePath 'build/windows/x64/runner/Release/yamantaka.exe' `
                     -FixturePath (Join-Path $outputRoot 'corpus/normal.pdf') `
-                    -OutputPath (Join-Path $OutputDirectory 'no-network.json')
+                    -OutputPath (Join-Path $OutputDirectory 'no-network.json') `
+                    -RequireSignature:$RequireSignature
                 if ($LASTEXITCODE -ne 0) {
                     throw "Zero-network smoke returned exit code $LASTEXITCODE."
                 }
             }
+        }
+        elseif (-not $SkipCorpus) {
+            Add-SkippedGate 'zero-network smoke' $nativeExecutionReason
+        }
+        else {
+            Add-SkippedGate 'zero-network smoke' 'SkipCorpus'
         }
     }
     else {
@@ -327,18 +410,21 @@ try {
     }
 
     if (-not $SkipVisual) {
-        Invoke-Gate 'visual regression and DPI matrix' {
-            & (Join-Path $PSScriptRoot 'verify_visual_regression.ps1') -ManifestPath (Join-Path $repositoryRoot 'docs/verification/visual-manifest.json') -OutputDirectory (Join-Path $outputRoot 'visual')
-            if ($LASTEXITCODE -ne 0) {
-                throw "Visual gate returned exit code $LASTEXITCODE."
-            }
+        Invoke-Gate 'maintained reader visual baseline' {
+            Invoke-External $FlutterExecutable @(
+                'test',
+                '--no-pub',
+                'test/reader_widgets_test.dart',
+                '--plain-name',
+                'book reader matches the maintained fullscreen baseline'
+            ) 'reader-visual-baseline.log'
         }
     }
     else {
-        Add-SkippedGate 'visual regression and DPI matrix' 'SkipVisual'
+        Add-SkippedGate 'maintained reader visual baseline' 'SkipVisual'
     }
 
-    if (-not $SkipDpiMatrix -and -not $SkipNative) {
+    if (-not $SkipDpiMatrix -and -not $SkipNative -and $nativeExecutionReady) {
         Invoke-Gate 'native resolution and DPI matrix' {
             $matrixScript = Join-Path $PSScriptRoot 'run_visual_matrix.ps1'
             $matrixArguments = @(
@@ -347,6 +433,7 @@ try {
                 '-OutputDirectory', (Join-Path $OutputDirectory 'dpi-matrix')
             )
             if ($DpiScaleConfirmed) { $matrixArguments += '-ScaleConfirmed' }
+            if ($RequireSignature) { $matrixArguments += '-RequireSignature' }
             & $matrixScript @matrixArguments
             if ($LASTEXITCODE -ne 0) {
                 throw "DPI matrix returned exit code $LASTEXITCODE."
@@ -354,7 +441,16 @@ try {
         }
     }
     else {
-        Add-SkippedGate 'native resolution and DPI matrix' $(if ($SkipDpiMatrix) { 'SkipDpiMatrix' } else { 'SkipNative' })
+        $dpiSkipReason = if ($SkipDpiMatrix) {
+            'SkipDpiMatrix'
+        }
+        elseif ($SkipNative) {
+            'SkipNative'
+        }
+        else {
+            $nativeExecutionReason
+        }
+        Add-SkippedGate 'native resolution and DPI matrix' $dpiSkipReason
     }
 
     $skippedCount = @($phaseResults | Where-Object { $_.status -eq 'skipped' }).Count
@@ -378,6 +474,12 @@ try {
         skipAnalysis = [bool]$SkipAnalysis
         skipDpiMatrix = [bool]$SkipDpiMatrix
         dpiScaleConfirmed = [bool]$DpiScaleConfirmed
+        certificateThumbprintProvided = -not [string]::IsNullOrWhiteSpace($CertificateThumbprint)
+        requireSignature = [bool]$RequireSignature
+        nativeExecutionReady = $nativeExecutionReady
+        nativeExecutionReason = $nativeExecutionReason
+        nativeExecutionState = $nativeExecutionState
+        nativeSignatureState = $nativeSignatureState
         externalTimeoutSeconds = $ExternalTimeoutSeconds
         flutterExecutable = $FlutterExecutable
         dartExecutable = $DartExecutable

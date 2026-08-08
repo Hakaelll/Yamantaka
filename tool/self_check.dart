@@ -97,7 +97,7 @@ Future<void> main() async {
           pageIndex: 2,
           kind: UnifiedNavigationKind.page,
         ).canonical(pageCount: 5, mode: ReaderMode.book).pageIndex ==
-        1,
+        2,
   );
   assert(
     SplitSynchronizer.propagate(

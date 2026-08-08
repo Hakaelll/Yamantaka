@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 enum AppWindowClass { compact, medium, expanded }
@@ -56,19 +54,11 @@ abstract final class AppSizes {
   static const double touchControlExtent = 48;
   static const double dialogMaxWidth = 600;
   static const double commandPaletteMaxHeight = 520;
-  static const double contentMaxWidth = 1000;
-  static const double readerMinimumPageWidth = 340;
-  static const double readerMaximumPageWidth = 920;
   static const double readerEdgeNavigation = 64;
-  static const double readerSpreadGutter = 12;
   static const double topRevealZone = 24;
-  static const double topVeilDepth = 72;
-  static const double controlGroupGap = 16;
   static const double readerPanelDefault = 336;
   static const double settingsNavigationWidth = 220;
   static const double settingsContentMaxWidth = 760;
-  static const double libraryHeroCoverMinWidth = 220;
-  static const double libraryHeroCoverMaxWidth = 300;
 }
 
 abstract final class AppRadii {
@@ -100,16 +90,12 @@ abstract final class AppShadow {
 
 abstract final class AppMotion {
   static const Duration instant = Duration.zero;
-  static const Duration feedback = Duration(milliseconds: 80);
   static const Duration fast = Duration(milliseconds: 120);
   static const Duration standard = Duration(milliseconds: 160);
   static const Duration panel = Duration(milliseconds: 200);
   static const Duration controlsAutoHide = Duration(seconds: 3);
   static const Duration chromeReveal = Duration(milliseconds: 120);
   static const Duration chromeHide = Duration(milliseconds: 100);
-  static const Duration spread = Duration(milliseconds: 140);
-  static const Duration category = Duration(milliseconds: 120);
-  static const Duration hover = Duration(milliseconds: 100);
 
   static bool isDisabled(AppMotionPreference preference) =>
       preference == AppMotionPreference.none;
@@ -119,32 +105,6 @@ abstract final class AppMotion {
 
   static Duration whenAllowed(bool reduceMotion, Duration duration) =>
       reduceMotion ? instant : duration;
-}
-
-abstract final class ReaderLayoutPolicy {
-  static bool shouldUseFacing({
-    required double viewportWidth,
-    required double viewportHeight,
-    required double pageAspectRatio,
-    double occupiedPanelWidth = 0,
-    double visualMargin = AppSpacing.space32,
-  }) {
-    if (AppBreakpoints.classify(viewportWidth) != AppWindowClass.expanded) {
-      return false;
-    }
-    final usableWidth = math.max(
-      0,
-      viewportWidth -
-          occupiedPanelWidth -
-          visualMargin * 2 -
-          AppSizes.readerSpreadGutter,
-    );
-    final widthPerPage = usableWidth / 2;
-    final usableHeight = math.max(0, viewportHeight - visualMargin * 2);
-    final widthWhenFitToHeight = usableHeight * pageAspectRatio.clamp(0.2, 5.0);
-    final legibleWidth = math.min(widthPerPage, widthWhenFitToHeight);
-    return legibleWidth >= AppSizes.readerMinimumPageWidth;
-  }
 }
 
 @immutable
@@ -186,7 +146,6 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     this.paperWhite = const Color(0xFFF8F7F2),
     this.ivory = const Color(0xFFEDE7D8),
     this.nightBackground = const Color(0xFF0B0D0B),
-    this.bookSpineChannel = const Color(0xFFBDB8AD),
     this.ambientShadow = const Color(0x1F000000),
     this.pageShadow = const Color(0x2E000000),
   });
@@ -227,7 +186,6 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
   final Color paperWhite;
   final Color ivory;
   final Color nightBackground;
-  final Color bookSpineChannel;
   final Color ambientShadow;
   final Color pageShadow;
 
@@ -268,7 +226,6 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     paperWhite: Color(0xFFF8F7F2),
     ivory: Color(0xFFEDE7D8),
     nightBackground: Color(0xFF0B0D0B),
-    bookSpineChannel: Color(0xFFBDB8AD),
     ambientShadow: Color(0x1F000000),
     pageShadow: Color(0x2E000000),
   );
@@ -310,7 +267,6 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     paperWhite: Color(0xFFF8F7F2),
     ivory: Color(0xFFEDE7D8),
     nightBackground: Color(0xFF0B0D0B),
-    bookSpineChannel: Color(0xFF080A08),
     ambientShadow: Color(0x66000000),
     pageShadow: Color(0x85000000),
   );
@@ -353,7 +309,6 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     Color? paperWhite,
     Color? ivory,
     Color? nightBackground,
-    Color? bookSpineChannel,
     Color? ambientShadow,
     Color? pageShadow,
   }) => AppColorTokens(
@@ -393,7 +348,6 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     paperWhite: paperWhite ?? this.paperWhite,
     ivory: ivory ?? this.ivory,
     nightBackground: nightBackground ?? this.nightBackground,
-    bookSpineChannel: bookSpineChannel ?? this.bookSpineChannel,
     ambientShadow: ambientShadow ?? this.ambientShadow,
     pageShadow: pageShadow ?? this.pageShadow,
   );
@@ -466,11 +420,6 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
       paperWhite: Color.lerp(paperWhite, other.paperWhite, t)!,
       ivory: Color.lerp(ivory, other.ivory, t)!,
       nightBackground: Color.lerp(nightBackground, other.nightBackground, t)!,
-      bookSpineChannel: Color.lerp(
-        bookSpineChannel,
-        other.bookSpineChannel,
-        t,
-      )!,
       ambientShadow: Color.lerp(ambientShadow, other.ambientShadow, t)!,
       pageShadow: Color.lerp(pageShadow, other.pageShadow, t)!,
     );

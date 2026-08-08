@@ -113,7 +113,8 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.disableAnimationsOf(context) ||
+    final reduceMotion =
+        MediaQuery.disableAnimationsOf(context) ||
         MediaQuery.highContrastOf(context);
     final result = evaluateLibraryDocuments(
       widget.documents,
@@ -141,6 +142,10 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         const SingleActivator(LogicalKeyboardKey.escape): _handleEscape,
         const SingleActivator(LogicalKeyboardKey.enter): () =>
             _openSelected(result.documents),
+        const SingleActivator(LogicalKeyboardKey.f10, shift: true): () =>
+            _showSelectedDocumentMenu(result.documents),
+        const SingleActivator(LogicalKeyboardKey.contextMenu): () =>
+            _showSelectedDocumentMenu(result.documents),
         const SingleActivator(LogicalKeyboardKey.delete): () =>
             _deleteSelected(result.documents),
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
@@ -198,8 +203,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                               widget.controller.selectedDocumentId,
                           selectedDocumentIds: _selection.ids.toSet(),
                           selectionMode: _selectionMode,
-                          reserveInfoSpace: describedDocument != null &&
-                              result.documents.length != 1,
+                          reserveInfoSpace: describedDocument != null,
                           reduceMotion: reduceMotion,
                           onSelect: _select,
                           onOpen: _open,
@@ -342,6 +346,19 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     _libraryFocusNode.requestFocus();
   }
 
+  void _selectForContextMenu(LibraryDocument document) {
+    if (_selectionMode && !_selection.contains(document.id)) {
+      setState(() {
+        _selection
+          ..clear()
+          ..toggle(document.id, selected: true);
+        _selectionAnchorId = document.id;
+      });
+    }
+    widget.controller.selectDocument(document.id);
+    _libraryFocusNode.requestFocus();
+  }
+
   void _open(LibraryDocument document) {
     _select(document);
     if (document.isMissing) {
@@ -357,6 +374,19 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       widget.controller.selectedDocumentId,
     );
     if (selected != null) _open(selected);
+  }
+
+  void _showSelectedDocumentMenu(List<LibraryDocument> documents) {
+    final selected = _documentById(
+      documents,
+      widget.controller.selectedDocumentId,
+    );
+    if (selected == null) return;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final position = overlay.localToGlobal(
+      Offset(overlay.size.width / 2, overlay.size.height / 2),
+    );
+    unawaited(_showDocumentMenu(selected, position));
   }
 
   void _deleteSelected(List<LibraryDocument> documents) {
@@ -613,7 +643,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     LibraryDocument document,
     Offset position,
   ) async {
-    _select(document);
+    _selectForContextMenu(document);
     final overlay =
         Overlay.of(context).context.findRenderObject()! as RenderBox;
     final action = await showMenu<_ArtifactMenuAction>(
@@ -626,7 +656,11 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         PopupMenuItem(
           value: _ArtifactMenuAction.open,
           child: Text(
-            document.readingProgress > 0 ? 'Continuar leyendo' : 'Abrir',
+            document.isMissing
+                ? 'Localizar archivo'
+                : document.readingProgress > 0
+                ? 'Continuar leyendo'
+                : 'Abrir',
           ),
         ),
         PopupMenuItem(
@@ -637,10 +671,11 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                 : 'Marcar como favorito',
           ),
         ),
-        const PopupMenuItem(
-          value: _ArtifactMenuAction.cover,
-          child: Text('Cambiar portada'),
-        ),
+        if (!document.isMissing)
+          const PopupMenuItem(
+            value: _ArtifactMenuAction.cover,
+            child: Text('Cambiar portada'),
+          ),
         const PopupMenuItem(
           value: _ArtifactMenuAction.info,
           child: Text('Mostrar información'),
@@ -653,7 +688,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         const PopupMenuDivider(),
         const PopupMenuItem(
           value: _ArtifactMenuAction.remove,
-          child: Text('Eliminar de la biblioteca'),
+          child: Text('Retirar de la biblioteca'),
         ),
       ],
     );
@@ -995,43 +1030,10 @@ final class _ArtifactCanvas extends StatelessWidget {
         final metrics = LibraryArtifactLayout.metricsFor(
           viewportWidth: constraints.maxWidth - horizontalPadding * 2,
           documentCount: documents.length,
-          compact: AppBreakpoints.classify(constraints.maxWidth) ==
+          compact:
+              AppBreakpoints.classify(constraints.maxWidth) ==
               AppWindowClass.compact,
         );
-        if (documents.length == 1) {
-          final document = documents.single;
-          return SingleChildScrollView(
-            controller: controller,
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              AppSpacing.space24,
-              horizontalPadding,
-              AppSpacing.space48,
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: math.max(360, constraints.maxHeight - 48),
-              ),
-              child: Center(
-                child: _SingleArtifactHero(
-                  document: document,
-                  width: metrics.artifactWidth,
-                  selected: selectionMode
-                      ? selectedDocumentIds.contains(document.id)
-                      : selectedDocumentId == document.id,
-                  selectionMode: selectionMode,
-                  reduceMotion: reduceMotion,
-                  onSelect: () => onSelect(document),
-                  onOpen: () => onOpen(document),
-                  onHover: (hovered) =>
-                      onHover(hovered ? document.id : null),
-                  onMenu: (position) => onMenu(document, position),
-                  onVisible: () => onDocumentVisible?.call(document),
-                ),
-              ),
-            ),
-          );
-        }
         if (documents.length <= 6) {
           final bottomPadding = reserveInfoSpace ? 116.0 : AppSpacing.space24;
           return SingleChildScrollView(
@@ -1145,148 +1147,6 @@ final class _ArtifactCanvas extends StatelessWidget {
   }
 }
 
-final class _SingleArtifactHero extends StatelessWidget {
-  const _SingleArtifactHero({
-    required this.document,
-    required this.width,
-    required this.selected,
-    required this.selectionMode,
-    required this.reduceMotion,
-    required this.onSelect,
-    required this.onOpen,
-    required this.onHover,
-    required this.onMenu,
-    required this.onVisible,
-  });
-
-  final LibraryDocument document;
-  final double width;
-  final bool selected;
-  final bool selectionMode;
-  final bool reduceMotion;
-  final VoidCallback onSelect;
-  final VoidCallback onOpen;
-  final ValueChanged<bool> onHover;
-  final ValueChanged<Offset> onMenu;
-  final VoidCallback onVisible;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final cover = ArtifactDocument(
-      key: ValueKey('artifact-${document.id}'),
-      document: document,
-      width: width,
-      selected: selected,
-      selectionMode: selectionMode,
-      reduceMotion: reduceMotion,
-      onSelect: onSelect,
-      onOpen: onOpen,
-      onHover: onHover,
-      onMenu: onMenu,
-      onVisible: onVisible,
-    );
-    final details = ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 320),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Tu espacio de lectura',
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
-          const SizedBox(height: AppSpacing.space8),
-          Text(
-            document.effectiveTitle,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          if (document.effectiveAuthor case final author?) ...[
-            const SizedBox(height: AppSpacing.space4),
-            Text(author, style: Theme.of(context).textTheme.bodyMedium),
-          ],
-          const SizedBox(height: AppSpacing.space12),
-          Text(
-            document.readingProgress >= 1
-                ? 'Terminado · ${document.pageCount} páginas'
-                : document.readingProgress > 0
-                ? '${(document.readingProgress * 100).round()} % leído'
-                : '${document.pageCount} páginas · Sin empezar',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.space16),
-          Wrap(
-            spacing: AppSpacing.space8,
-            runSpacing: AppSpacing.space8,
-            children: [
-              FilledButton.icon(
-                onPressed: document.isMissing ? null : onOpen,
-                icon: Icon(
-                  document.readingProgress > 0
-                      ? Icons.play_arrow_rounded
-                      : Icons.menu_book_outlined,
-                  size: 18,
-                ),
-                label: Text(
-                  document.readingProgress > 0
-                      ? 'Continuar leyendo'
-                      : 'Abrir documento',
-                ),
-              ),
-              if (document.isMissing)
-                OutlinedButton(
-                  onPressed: onOpen,
-                  child: const Text('Localizar archivo'),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : 760.0;
-        final content = availableWidth < 640
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(child: cover),
-                  const SizedBox(height: AppSpacing.space24),
-                  details,
-                ],
-              )
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  cover,
-                  const SizedBox(width: AppSpacing.space32),
-                  details,
-                ],
-              );
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surfaceElevated.withValues(alpha: 0.42),
-              border: Border.all(color: colors.borderSubtle),
-              borderRadius: BorderRadius.circular(AppRadii.floating),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.space24),
-              child: content,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 final class ArtifactDocument extends StatefulWidget {
   const ArtifactDocument({
     super.key,
@@ -1334,7 +1194,8 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
     final jitter = LibraryArtifactLayout.jitterFor(widget.document.id);
     final emphasized = widget.selected || _hovered || _focused;
     final highContrast = MediaQuery.highContrastOf(context);
-    final applyJitter = !widget.reduceMotion &&
+    final applyJitter =
+        !widget.reduceMotion &&
         !highContrast &&
         !widget.selectionMode &&
         !widget.selected;
@@ -1357,11 +1218,10 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
     final maxHeight = widget.width * 1.62;
     final fittedHeight = math.min(height, maxHeight);
     final duration = widget.reduceMotion ? Duration.zero : AppMotion.standard;
-    final coverPath = widget.selected
-        ? widget.document.coverMetadata?.largeThumbnailPath ??
-              widget.document.thumbnailPath
-        : widget.document.coverMetadata?.smallThumbnailPath ??
-              widget.document.thumbnailPath;
+    final coverPath = artifactCoverPathFor(
+      widget.document,
+      selected: widget.selected,
+    );
 
     return Semantics(
       button: true,
@@ -1400,14 +1260,14 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
               onDoubleTap: widget.onOpen,
               onSecondaryTapDown: (details) =>
                   widget.onMenu(details.globalPosition),
-               child: Transform.translate(
-                 offset: applyJitter
-                     ? Offset(jitter.offsetX, jitter.offsetY)
-                     : Offset.zero,
-                 child: Transform.rotate(
-                   angle: applyJitter
-                       ? jitter.rotationDegrees * math.pi / 180
-                       : 0,
+              child: Transform.translate(
+                offset: applyJitter
+                    ? Offset(jitter.offsetX, jitter.offsetY)
+                    : Offset.zero,
+                child: Transform.rotate(
+                  angle: applyJitter
+                      ? jitter.rotationDegrees * math.pi / 180
+                      : 0,
                   child: AnimatedScale(
                     duration: duration,
                     curve: Curves.easeOutCubic,
@@ -1793,6 +1653,14 @@ final class _NoArtifactResults extends StatelessWidget {
 }
 
 enum _ArtifactMenuAction { open, favorite, cover, info, reveal, remove }
+
+@visibleForTesting
+String? artifactCoverPathFor(
+  LibraryDocument document, {
+  required bool selected,
+}) => selected
+    ? document.coverMetadata?.largeThumbnailPath ?? document.thumbnailPath
+    : document.coverMetadata?.smallThumbnailPath ?? document.thumbnailPath;
 
 enum _FilterCommand {
   all,

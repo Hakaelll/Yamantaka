@@ -24,67 +24,6 @@ void main() {
     });
   });
 
-  group('facing-page policy', () {
-    test('rejects widths below expanded even near the boundary', () {
-      expect(
-        ReaderLayoutPolicy.shouldUseFacing(
-          viewportWidth: 1099,
-          viewportHeight: 800,
-          pageAspectRatio: 0.75,
-        ),
-        isFalse,
-      );
-    });
-
-    test('accepts a readable spread at expanded desktop size', () {
-      expect(
-        ReaderLayoutPolicy.shouldUseFacing(
-          viewportWidth: 1100,
-          viewportHeight: 800,
-          pageAspectRatio: 0.75,
-        ),
-        isTrue,
-      );
-    });
-
-    test('accounts for an open panel and a short viewport', () {
-      expect(
-        ReaderLayoutPolicy.shouldUseFacing(
-          viewportWidth: 1100,
-          viewportHeight: 800,
-          pageAspectRatio: 0.75,
-          occupiedPanelWidth: AppSizes.sidePanelWidth,
-        ),
-        isTrue,
-      );
-      expect(
-        ReaderLayoutPolicy.shouldUseFacing(
-          viewportWidth: 1100,
-          viewportHeight: 460,
-          pageAspectRatio: 0.75,
-        ),
-        isFalse,
-      );
-    });
-
-    test('accepts the common 16:9, 16:10 and 2K desktop viewports', () {
-      for (final viewport in [
-        const Size(1920, 1080),
-        const Size(1920, 1200),
-        const Size(2560, 1440),
-      ]) {
-        expect(
-          ReaderLayoutPolicy.shouldUseFacing(
-            viewportWidth: viewport.width,
-            viewportHeight: viewport.height,
-            pageAspectRatio: 0.704,
-          ),
-          isTrue,
-        );
-      }
-    });
-  });
-
   test('light and dark themes expose semantic color tokens', () {
     final light = AppTheme.light().extension<AppColorTokens>()!;
     final dark = AppTheme.dark().extension<AppColorTokens>()!;

@@ -43,13 +43,13 @@ final class DocumentPreferencesRepository {
       ),
       coverPolicy: _enumByName(
         ReaderCoverPolicy.values,
-        row['cover_policy'] as String? ?? ReaderCoverPolicy.firstPageIsCover.name,
-        ReaderCoverPolicy.firstPageIsCover,
+        row['cover_policy'] as String? ?? ReaderCoverPolicy.noCover.name,
+        ReaderCoverPolicy.noCover,
       ),
       initialSide: _enumByName(
         ReaderInitialSide.values,
-        row['initial_side'] as String? ?? ReaderInitialSide.right.name,
-        ReaderInitialSide.right,
+        row['initial_side'] as String? ?? ReaderInitialSide.left.name,
+        ReaderInitialSide.left,
       ),
       pageRotation: row['page_rotation'] as int,
       horizontalMargin: row['horizontal_margin'] as double,

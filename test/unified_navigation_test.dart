@@ -11,7 +11,7 @@ void main() {
       label: 'Página',
     );
     final canonical = target.canonical(pageCount: 8, mode: ReaderMode.book);
-    expect(canonical.pageIndex, 3);
+    expect(canonical.pageIndex, 4);
     expect(canonical.offset, 0.3);
   });
 

@@ -3,11 +3,13 @@ param(
     [Parameter(Mandatory = $true)][string]$ExecutablePath,
     [Parameter(Mandatory = $true)][string]$FixturePath,
     [int]$DurationSeconds = 8,
-    [string]$OutputPath = 'build/verification/no-network.json'
+    [string]$OutputPath = 'build/verification/no-network.json',
+    [switch]$RequireSignature
 )
 
 $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+. (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
 $executable = [System.IO.Path]::GetFullPath((Join-Path $root $ExecutablePath))
 $fixture = [System.IO.Path]::GetFullPath((Join-Path $root $FixturePath))
 $reportPath = [System.IO.Path]::GetFullPath((Join-Path $root $OutputPath))
@@ -22,6 +24,10 @@ if (-not (Get-Command Get-NetUDPEndpoint -ErrorAction SilentlyContinue)) {
 if ($DurationSeconds -lt 1 -or $DurationSeconds -gt 300) {
     throw 'DurationSeconds must be between 1 and 300.'
 }
+[void](Assert-YamantakaWindowsBundleRunnable `
+        -BundlePath (Split-Path -Parent $executable) `
+        -RepositoryRoot $root `
+        -RequireSignature:$RequireSignature)
 
 $process = Start-Process -FilePath $executable -ArgumentList @($fixture) -PassThru `
     -WorkingDirectory (Split-Path $executable -Parent)
@@ -57,7 +63,7 @@ try {
 finally {
     if (-not $process.HasExited) {
         Stop-Process -Id $process.Id -Force
-        $process.WaitForExit(5000)
+        [void]$process.WaitForExit(5000)
     }
 }
 
@@ -65,6 +71,7 @@ $report = [ordered]@{
     format = 'yamantaka-zero-network-smoke'
     version = 1
     generatedAt = [DateTime]::UtcNow.ToString('o')
+    requireSignature = [bool]$RequireSignature
     durationSeconds = $DurationSeconds
     processExited = $process.HasExited
     connections = @($connections | Sort-Object protocol, state, localAddress, localPort, remoteAddress, remotePort -Unique)

@@ -54,9 +54,10 @@ abstract final class AppTheme {
         surfacePressed: flatSurface,
         iconNormal: isDark ? Colors.white : Colors.black,
         iconActive: isDark ? Colors.white : Colors.black,
-        iconDisabled: isDark ? const Color(0xFFB0B0B0) : const Color(0xFF606060),
+        iconDisabled: isDark
+            ? const Color(0xFFB0B0B0)
+            : const Color(0xFF606060),
         separatorExceptional: isDark ? Colors.white : Colors.black,
-        bookSpineChannel: flatSurface,
         ambientShadow: Colors.transparent,
         pageShadow: Colors.transparent,
       );

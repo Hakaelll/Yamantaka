@@ -16,25 +16,40 @@ void main() {
   });
 
   group('FacingPageSpread', () {
-    test('keeps cover alone and then pairs odd-even page indexes', () {
-      expect(FacingPageSpread.forPage(0, 8).rightPageIndex, 0);
+    test('pairs the first two pages and supports an explicit cover', () {
+      final openingSpread = FacingPageSpread.forPage(0, 8);
+      expect(openingSpread.leftPageIndex, 0);
+      expect(openingSpread.rightPageIndex, 1);
+
       final spread = FacingPageSpread.forPage(2, 8);
-      expect(spread.leftPageIndex, 1);
-      expect(spread.rightPageIndex, 2);
+      expect(spread.leftPageIndex, 2);
+      expect(spread.rightPageIndex, 3);
+
+      final cover = FacingPageSpread.forPage(0, 8, firstPageIsCover: true);
+      expect(cover.leftPageIndex, isNull);
+      expect(cover.rightPageIndex, 0);
+
+      final spreadAfterCover = FacingPageSpread.forPage(
+        2,
+        8,
+        firstPageIsCover: true,
+      );
+      expect(spreadAfterCover.leftPageIndex, 1);
+      expect(spreadAfterCover.rightPageIndex, 2);
     });
 
     test('supports a final unpaired page and RTL direction', () {
       final finalSpread = FacingPageSpread.forPage(4, 5);
-      expect(finalSpread.leftPageIndex, 3);
-      expect(finalSpread.rightPageIndex, 4);
+      expect(finalSpread.leftPageIndex, 4);
+      expect(finalSpread.rightPageIndex, isNull);
 
       final rtl = FacingPageSpread.forPage(
         1,
         5,
         direction: ReadingDirection.rightToLeft,
       );
-      expect(rtl.leftPageIndex, 2);
-      expect(rtl.rightPageIndex, 1);
+      expect(rtl.leftPageIndex, 1);
+      expect(rtl.rightPageIndex, 0);
     });
 
     test('supports configurable parity without a cover', () {
@@ -82,7 +97,7 @@ void main() {
           pageCount: 2,
           mode: ReaderMode.book,
         ),
-        1,
+        0,
       );
       expect(
         ReadingUnitNavigation.previousTarget(
@@ -94,15 +109,15 @@ void main() {
       );
     });
 
-    test('walks cover and spreads for even and odd page counts', () {
+    test('walks paired spreads for even and odd page counts', () {
       int walk(int page, int count) => ReadingUnitNavigation.nextTarget(
         pageIndex: page,
         pageCount: count,
         mode: ReaderMode.book,
       );
 
-      expect([0, walk(0, 6), walk(1, 6), walk(3, 6)], [0, 1, 3, 5]);
-      expect([0, walk(0, 5), walk(1, 5), walk(3, 5)], [0, 1, 3, 3]);
+      expect([0, walk(0, 6), walk(2, 6), walk(4, 6)], [0, 2, 4, 4]);
+      expect([0, walk(0, 5), walk(2, 5), walk(4, 5)], [0, 2, 4, 4]);
       expect(
         ReadingUnitNavigation.previousTarget(
           pageIndex: 2,
@@ -120,7 +135,7 @@ void main() {
           pageCount: 24,
           mode: ReaderMode.book,
         ),
-        '1 / 24',
+        '1–2 / 24',
       );
       expect(
         ReadingUnitNavigation.indicator(
@@ -128,7 +143,7 @@ void main() {
           pageCount: 24,
           mode: ReaderMode.book,
         ),
-        '2–3 / 24',
+        '3–4 / 24',
       );
       expect(
         ReadingUnitNavigation.indicator(
@@ -136,7 +151,7 @@ void main() {
           pageCount: 24,
           mode: ReaderMode.book,
         ),
-        '24 / 24',
+        '23–24 / 24',
       );
       expect(
         ReadingUnitNavigation.indicator(

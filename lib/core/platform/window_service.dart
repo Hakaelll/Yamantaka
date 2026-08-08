@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 abstract interface class WindowService {
@@ -9,33 +10,34 @@ abstract interface class WindowService {
 }
 
 final class DesktopWindowService implements WindowService {
-  bool _restoreMaximizedOnExit = false;
+  static const _windowsChannel = MethodChannel('yamantaka/window');
 
   bool get _supported =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
   @override
-  Future<bool> isFullScreen() async =>
-      _supported ? windowManager.isFullScreen() : false;
+  Future<bool> isFullScreen() async {
+    if (!_supported) return false;
+    if (Platform.isWindows) {
+      return await _windowsChannel.invokeMethod<bool>('isFullScreen') ?? false;
+    }
+    return windowManager.isFullScreen();
+  }
 
   @override
   Future<void> setFullScreen(bool value) async {
-    if (!_supported || await windowManager.isFullScreen() == value) return;
-    if (Platform.isWindows && value) {
-      // window_manager 0.5.2 keeps the native title bar when fullscreen is
-      // requested from a maximized window. Enter from a restored state so the
-      // plugin snapshots/removes the complete frame, then restore maximized
-      // state after leaving fullscreen.
-      _restoreMaximizedOnExit = await windowManager.isMaximized();
-      if (_restoreMaximizedOnExit) await windowManager.unmaximize();
-      await windowManager.setFullScreen(true);
+    if (!_supported || await isFullScreen() == value) return;
+    if (Platform.isWindows) {
+      final applied = await _windowsChannel.invokeMethod<bool>(
+        'setFullScreen',
+        {'value': value},
+      );
+      if (applied != value) {
+        throw StateError('Windows rejected the fullscreen transition.');
+      }
       return;
     }
     await windowManager.setFullScreen(value);
-    if (Platform.isWindows && !value && _restoreMaximizedOnExit) {
-      _restoreMaximizedOnExit = false;
-      await windowManager.maximize();
-    }
   }
 
   @override

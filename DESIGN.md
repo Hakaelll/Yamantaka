@@ -637,7 +637,7 @@ Antes de cerrar una tarea visual:
 - Split no se muestra hasta que existan dos lectores reales y medidos; el
   breakpoint técnico por sí solo no constituye una función visual.
 
-Las capturas `windows-reader-third-generation-*` y
-`windows-library-third-generation-*` demuestran estados ejecutados a
-1200×800 y 640×760: anotaciones, colecciones, filtro, modo compacto y oscuro.
-La matriz Narrador y DPI nativo 100/150/200 % continúa en revisión.
+La referencia vigente `windows-reader-book-fullscreen.png` se genera desde una
+prueba de widgets a 1600×900 y fija la composición del lector Libro. Las
+capturas generacionales se retiraron porque ya no representaban el producto.
+Narrador, varios monitores y DPI físico siguen requiriendo validación nativa.

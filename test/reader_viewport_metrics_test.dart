@@ -16,26 +16,25 @@ void main() {
           Size(590, 810),
         ],
         outerMargin: 32,
-        spineGap: 14,
+        pageGap: 0,
         rightToLeft: false,
       );
 
-      final left = layout.pageRects[1];
-      final right = layout.pageRects[2];
-      expect(right.left - left.right, 14);
+      final left = layout.pageRects[0];
+      final right = layout.pageRects[1];
+      expect(right.left - left.right, 0);
       expect(left.top, right.top);
 
       final slotWidth = layout.documentSize.width / 3;
       final spread = left.expandToInclude(right);
-      expect(spread.center.dx, closeTo(slotWidth * 1.5, 0.001));
-      expect(layout.pageRects.first.center.dx, closeTo(slotWidth / 2, 0.001));
+      expect(spread.center.dx, closeTo(slotWidth / 2, 0.001));
     });
 
     test('supports one page, an unpaired final page and RTL ordering', () {
       final onePage = ReaderViewportMetrics.facingPageLayout(
         pageSizes: const [Size(600, 800)],
         outerMargin: 24,
-        spineGap: 12,
+        pageGap: 0,
         rightToLeft: false,
       );
       expect(onePage.pageRects, hasLength(1));
@@ -50,49 +49,76 @@ void main() {
           Size(600, 800),
           Size(600, 800),
           Size(600, 800),
+          Size(600, 800),
         ],
         outerMargin: 24,
-        spineGap: 12,
+        pageGap: 0,
         rightToLeft: false,
       );
-      expect(ltr.pageRects[1].left, lessThan(ltr.pageRects[2].left));
+      expect(ltr.pageRects[0].left, lessThan(ltr.pageRects[1].left));
       final finalUnit = ReaderViewportMetrics.readingUnitRect(
         pageRects: ltr.pageRects,
-        pageIndex: 3,
+        pageIndex: 4,
         facing: true,
       );
-      expect(finalUnit, ltr.pageRects[3]);
+      expect(finalUnit, ltr.pageRects[4]);
 
       final rtl = ReaderViewportMetrics.facingPageLayout(
         pageSizes: const [Size(600, 800), Size(600, 800), Size(600, 800)],
         outerMargin: 24,
-        spineGap: 12,
+        pageGap: 0,
         rightToLeft: true,
       );
-      expect(rtl.pageRects[2].left, lessThan(rtl.pageRects[1].left));
+      expect(rtl.pageRects[1].left, lessThan(rtl.pageRects[0].left));
     });
 
     test('keeps the physical gap separate from the visual book channel', () {
-      final layout = ReaderViewportMetrics.facingSpreadLayout(
+      final layout = ReaderViewportMetrics.facingPageLayout(
+        pageSizes: const [Size(600, 800), Size(600, 800), Size(600, 800)],
+        outerMargin: 24,
+        rightToLeft: false,
+        pageGap: 0,
+      );
+
+      expect(layout.pageRects[1].left - layout.pageRects[0].right, 0);
+      expect(
+        layout.spreadRectFor(0).width,
+        closeTo(layout.pageRects[0].width + layout.pageRects[1].width, 0.001),
+      );
+    });
+
+    test('isolates a fitted spread from the following spread', () {
+      final layout = ReaderViewportMetrics.facingPageLayout(
         pageSizes: const [
           Size(600, 800),
           Size(600, 800),
           Size(600, 800),
+          Size(600, 800),
         ],
-        outerMargin: 24,
+        outerMargin: 40,
         rightToLeft: false,
-        physicalPageGap: 0,
+      );
+      final firstSpread = layout.pageRects[0].expandToInclude(
+        layout.pageRects[1],
+      );
+      final zoom = ReaderViewportMetrics.fitPageZoom(
+        viewport: const Size(1920, 1080),
+        contentRect: firstSpread,
+        margin: 0,
+        minimum: 0.1,
+        maximum: 8,
+      );
+      final visible = Rect.fromCenter(
+        center: firstSpread.center,
+        width: 1920 / zoom,
+        height: 1080 / zoom,
       );
 
-      expect(layout.pageRects[2].left - layout.pageRects[1].right, 0);
-      expect(
-        layout.spreadRectFor(1).width,
-        closeTo(layout.pageRects[1].width + layout.pageRects[2].width, 0.001),
-      );
+      expect(visible.overlaps(layout.pageRects[2]), isFalse);
     });
 
     test('places the first no-cover page on the configured side', () {
-      final right = ReaderViewportMetrics.facingSpreadLayout(
+      final right = ReaderViewportMetrics.facingPageLayout(
         pageSizes: const [Size(600, 800), Size(600, 800), Size(600, 800)],
         outerMargin: 24,
         rightToLeft: false,
@@ -104,15 +130,19 @@ void main() {
         closeTo(right.documentSize.width / 2 - 24, 0.001),
       );
 
-      final left = ReaderViewportMetrics.facingSpreadLayout(
+      final left = ReaderViewportMetrics.facingPageLayout(
         pageSizes: const [Size(600, 800), Size(600, 800), Size(600, 800)],
         outerMargin: 24,
         rightToLeft: false,
         coverPolicy: ReaderCoverPolicy.noCover,
         initialSide: ReaderInitialSide.left,
       );
-      expect(left.pageRects[0].left, closeTo(24, 0.001));
-      expect(left.pageRects[1].right, greaterThan(left.pageRects[0].right));
+      final firstSpread = left.pageRects[0].expandToInclude(left.pageRects[1]);
+      expect(left.pageRects[0].left, lessThan(left.pageRects[1].left));
+      expect(
+        firstSpread.center.dx,
+        closeTo(left.documentSize.width / 4, 0.001),
+      );
     });
   });
 
@@ -177,7 +207,7 @@ void main() {
     });
   });
 
-  test('margins and spine adapt in bounded discrete steps', () {
+  test('margins adapt in bounded discrete steps', () {
     expect(
       ReaderViewportMetrics.adaptiveMargin(
         viewport: const Size(640, 460),
@@ -192,8 +222,5 @@ void main() {
       ),
       40,
     );
-    expect(ReaderViewportMetrics.adaptiveSpineGap(640), 10);
-    expect(ReaderViewportMetrics.adaptiveSpineGap(1200), 14);
-    expect(ReaderViewportMetrics.adaptiveSpineGap(1920), 16);
   });
 }

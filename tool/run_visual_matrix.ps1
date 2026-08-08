@@ -3,102 +3,166 @@ param(
     [string]$ExecutablePath = 'build/windows/x64/runner/Release/yamantaka.exe',
     [string]$OutputDirectory = 'build/verification/visual',
     [string]$FixturePdf = 'build/verification/corpus/normal.pdf',
+    [ValidateSet(100, 125, 150, 175, 200)]
+    [int]$HostScalePercent = 100,
     [switch]$SkipLaunch,
-    [switch]$ScaleConfirmed
+    [switch]$ScaleConfirmed,
+    [switch]$RequireSignature
 )
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$executable = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $ExecutablePath))
-$outputRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDirectory))
+. (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
+$executable = [System.IO.Path]::GetFullPath(
+    (Join-Path $repositoryRoot $ExecutablePath)
+)
+$fixture = [System.IO.Path]::GetFullPath(
+    (Join-Path $repositoryRoot $FixturePdf)
+)
+$outputRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $repositoryRoot $OutputDirectory)
+)
 $candidateRoot = Join-Path $outputRoot 'candidates'
 New-Item -ItemType Directory -Force -Path $candidateRoot | Out-Null
 
-$layouts = @(
-    [pscustomobject]@{ name = 'library-wide-light'; width = 1600; height = 900; args = @() },
-    [pscustomobject]@{ name = 'library-compact-dark'; width = 1366; height = 768; args = @('--yamantaka-visual-dark') },
-    [pscustomobject]@{ name = 'reader-fullhd'; width = 1920; height = 1080; args = @($FixturePdf) },
-    [pscustomobject]@{ name = 'reader-book-2k'; width = 2560; height = 1440; args = @($FixturePdf, '--yamantaka-visual-book') },
-    [pscustomobject]@{ name = 'settings-16x10'; width = 1920; height = 1200; args = @('--yamantaka-visual-settings') },
-    [pscustomobject]@{ name = 'reader-4k'; width = 3840; height = 2160; args = @($FixturePdf) }
-)
-$matrix = foreach ($layout in $layouts) {
-    foreach ($scale in @(100, 125, 150, 175, 200)) {
-        [pscustomobject]@{
-            name = "$($layout.name)-$scale"
-            width = $layout.width
-            height = $layout.height
-            scale = $scale
-            args = $layout.args
-        }
+if (-not $SkipLaunch) {
+    if (-not (Test-Path -LiteralPath $executable)) {
+        throw "Release executable not found: $executable"
     }
+    if (-not (Test-Path -LiteralPath $fixture)) {
+        throw "Fixture PDF not found: $fixture"
+    }
+    [void](Assert-YamantakaWindowsBundleRunnable `
+            -BundlePath (Split-Path -Parent $executable) `
+            -RepositoryRoot $repositoryRoot `
+            -RequireSignature:$RequireSignature)
 }
 
-if (-not $SkipLaunch -and -not (Test-Path $executable)) {
-    throw "Release executable not found: $executable"
-}
+# Every case below uses a supported public entry point. Book mode is selected
+# through the visible centered control; no private or ignored visual flags are
+# passed to the application.
+$cases = @(
+    [pscustomobject]@{
+        name = 'library-wide'
+        width = 1600
+        height = 900
+        openFixture = $false
+        selectBook = $false
+        fullscreen = $false
+    },
+    [pscustomobject]@{
+        name = 'reader-document'
+        width = 1600
+        height = 900
+        openFixture = $true
+        selectBook = $false
+        fullscreen = $false
+    },
+    [pscustomobject]@{
+        name = 'reader-book'
+        width = 1600
+        height = 900
+        openFixture = $true
+        selectBook = $true
+        fullscreen = $false
+    },
+    [pscustomobject]@{
+        name = 'reader-book-fullscreen'
+        width = 1600
+        height = 900
+        openFixture = $true
+        selectBook = $true
+        fullscreen = $true
+    }
+)
 
 $evidence = [System.Collections.Generic.List[object]]::new()
-foreach ($case in $matrix) {
+foreach ($case in $cases) {
     $outputPath = Join-Path $candidateRoot "$($case.name).png"
     $process = $null
     try {
         if (-not $SkipLaunch) {
-            $process = Start-Process -FilePath $executable -ArgumentList $case.args -PassThru -WorkingDirectory (Split-Path $executable -Parent)
-            & (Join-Path $PSScriptRoot 'capture_windows_window.ps1') `
-                -TargetProcessId $process.Id `
-                -OutputPath $outputPath `
-                -Width $case.width `
-                -Height $case.height `
-                -X 80 `
-                -Y 80
+            $launch = @{
+                FilePath = $executable
+                PassThru = $true
+                WorkingDirectory = (Split-Path -Parent $executable)
+            }
+            if ($case.openFixture) {
+                $launch.ArgumentList = '"' + $fixture + '"'
+            }
+            $process = Start-Process @launch
+            $capture = @{
+                TargetProcessId = $process.Id
+                OutputPath = $outputPath
+                Width = $case.width
+                Height = $case.height
+                X = 80
+                Y = 80
+            }
+            if ($case.selectBook) {
+                $capture.ClickX = [int]($case.width / 2 + 52)
+                $capture.ClickY = 55
+            }
+            if ($case.fullscreen) {
+                $capture.SendKeys = '{F11}'
+            }
+            & (Join-Path $PSScriptRoot 'capture_windows_window.ps1') @capture
             if ($LASTEXITCODE -ne 0) {
                 throw "Capture failed with exit code $LASTEXITCODE."
             }
         }
-        elseif (-not (Test-Path $outputPath)) {
+        elseif (-not (Test-Path -LiteralPath $outputPath)) {
             throw "-SkipLaunch was specified but the candidate is missing: $outputPath"
+        }
+
+        Add-Type -AssemblyName System.Drawing
+        $bitmap = [System.Drawing.Bitmap]::new($outputPath)
+        try {
+            $actualWidth = $bitmap.Width
+            $actualHeight = $bitmap.Height
+        }
+        finally {
+            $bitmap.Dispose()
         }
         $evidence.Add([ordered]@{
             name = $case.name
-            requestedPhysicalWidth = $case.width
-            requestedPhysicalHeight = $case.height
-            requestedScalePercent = $case.scale
+            requestedWindowWidth = $case.width
+            requestedWindowHeight = $case.height
+            actualCaptureWidth = $actualWidth
+            actualCaptureHeight = $actualHeight
+            hostScalePercent = $HostScalePercent
             candidate = $outputPath
-            dpr = $case.scale / 100
-            theme = if ($case.name -like '*dark*') { 'dark' } else { 'light' }
-            density = if ($case.width -le 1366) { 'compact' } else { 'comfortable' }
+            mode = if ($case.selectBook) { 'book' } elseif ($case.openFixture) { 'document' } else { 'library' }
+            fullscreen = [bool]$case.fullscreen
             nativeCapture = -not $SkipLaunch
             scaleConfirmed = [bool]$ScaleConfirmed
-            validation = if ($ScaleConfirmed) { 'captured-and-scale-confirmed' } else { 'capture-only-scale-unverified' }
             capturedAt = [DateTime]::UtcNow.ToString('o')
         })
     }
     finally {
         if ($process -and -not $process.HasExited) {
             Stop-Process -Id $process.Id -Force
-            $process.WaitForExit(5000)
+            [void]$process.WaitForExit(5000)
         }
     }
 }
 
 $report = [ordered]@{
     format = 'yamantaka-visual-matrix'
-    version = 1
+    version = 2
     generatedAt = [DateTime]::UtcNow.ToString('o')
     executable = $executable
-    cases = @($evidence)
-    physicalSizesAreRequested = $true
-    scales = @(100, 125, 150, 175, 200)
-    scaleConfirmationRequired = $true
+    hostScalePercent = $HostScalePercent
     scaleConfirmed = [bool]$ScaleConfirmed
+    requireSignature = [bool]$RequireSignature
+    cases = @($evidence)
     complete = (-not $SkipLaunch -and $ScaleConfirmed)
-    note = 'Windows scaling must be applied by the test host. Pass -ScaleConfirmed only after the host reports the requested DPI; capture dimensions alone do not prove Windows scaling.'
+    note = 'Run the matrix once for each real Windows scale. The script records one host scale and never fabricates unobserved DPI variants.'
 }
 $reportPath = Join-Path $outputRoot 'matrix-report.json'
 $report | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 $reportPath
 Write-Host "Visual matrix evidence: $reportPath"
 if (-not $ScaleConfirmed) {
-    Write-Warning 'Matrix captured, but Windows DPI was not confirmed by the host. The evidence is intentionally not a passing gate.'
+    Write-Warning 'The host DPI was not confirmed. Capture evidence is intentionally incomplete.'
     exit 2
 }

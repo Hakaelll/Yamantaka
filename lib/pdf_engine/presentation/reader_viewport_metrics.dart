@@ -14,17 +14,19 @@ final class ReaderPageLayoutGeometry {
 
   Rect get contentRect => pageRects.isEmpty
       ? Rect.zero
-      : pageRects.skip(1).fold(pageRects.first, (rect, page) =>
-          rect.expandToInclude(page));
+      : pageRects
+            .skip(1)
+            .fold(pageRects.first, (rect, page) => rect.expandToInclude(page));
 
   Rect spreadRectFor(
     int pageIndex, {
-    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
-    ReaderInitialSide initialSide = ReaderInitialSide.right,
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.noCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.left,
   }) {
     if (pageRects.isEmpty) return Rect.zero;
     final index = pageIndex.clamp(0, pageRects.length - 1).toInt();
-    final firstPageIsSolo = coverPolicy != ReaderCoverPolicy.noCover ||
+    final firstPageIsSolo =
+        coverPolicy != ReaderCoverPolicy.noCover ||
         initialSide == ReaderInitialSide.right;
     if (firstPageIsSolo && index == 0) return pageRects[0];
     final start = firstPageIsSolo
@@ -57,21 +59,13 @@ abstract final class ReaderViewportMetrics {
     return preferred.clamp(12.0, maximum).toDouble();
   }
 
-  static double adaptiveSpineGap(double viewportWidth) =>
-      switch (viewportWidth) {
-        < 800 => 10.0,
-        < 1400 => 14.0,
-        _ => 16.0,
-      };
-
   static ReaderPageLayoutGeometry facingPageLayout({
     required List<Size> pageSizes,
     required double outerMargin,
-    required double spineGap,
     required bool rightToLeft,
-    double? physicalPageGap,
-    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
-    ReaderInitialSide initialSide = ReaderInitialSide.right,
+    double pageGap = 0,
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.noCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.left,
   }) {
     if (pageSizes.isEmpty) {
       return const ReaderPageLayoutGeometry(
@@ -80,9 +74,7 @@ abstract final class ReaderViewportMetrics {
       );
     }
 
-    final gap = physicalPageGap == null
-        ? spineGap
-        : physicalPageGap.clamp(0.0, 2.0).toDouble();
+    final gap = pageGap.clamp(0.0, 2.0).toDouble();
     final hasCover = coverPolicy != ReaderCoverPolicy.noCover;
     final noCoverStartsWithRight =
         !hasCover && initialSide == ReaderInitialSide.right;
@@ -103,9 +95,30 @@ abstract final class ReaderViewportMetrics {
       }
     }
 
-    final slotWidth = widestUnit + outerMargin * 2;
+    final widestPage = pageSizes.fold<double>(
+      0,
+      (width, page) => math.max(width, page.width),
+    );
+    // A reading unit owns a complete horizontal slot. The additional page
+    // width keeps the next cover/spread outside the viewport when the active
+    // unit is fitted by height on a wide desktop window. Without this neutral
+    // isolation area, a solo cover can reveal the following page beside it.
+    final slotWidth = widestUnit + widestPage * 2 + outerMargin * 2;
     final documentHeight = tallestPage + outerMargin * 2;
     final rects = List<Rect>.filled(pageSizes.length, Rect.zero);
+    if (pageSizes.length == 1) {
+      final page = pageSizes.single;
+      rects[0] = Rect.fromLTWH(
+        (slotWidth - page.width) / 2,
+        (documentHeight - page.height) / 2,
+        page.width,
+        page.height,
+      );
+      return ReaderPageLayoutGeometry(
+        pageRects: rects,
+        documentSize: Size(slotWidth, documentHeight),
+      );
+    }
     var slotLeft = 0.0;
 
     if (hasSoloFirst) {
@@ -174,26 +187,8 @@ abstract final class ReaderViewportMetrics {
     );
   }
 
-  /// Layout for a single visible reading unit.  It is intentionally separate
-  /// from the legacy all-pages layout so the adapter can keep a 0–2 px
-  /// physical page gap while the Reader paints a 12–16 px editorial channel.
-  static ReaderPageLayoutGeometry facingSpreadLayout({
-    required List<Size> pageSizes,
-    required double outerMargin,
-    required bool rightToLeft,
-    double physicalPageGap = 0,
-    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
-    ReaderInitialSide initialSide = ReaderInitialSide.right,
-  }) => facingPageLayout(
-    pageSizes: pageSizes,
-    outerMargin: outerMargin,
-    spineGap: physicalPageGap,
-    physicalPageGap: physicalPageGap,
-    rightToLeft: rightToLeft,
-    coverPolicy: coverPolicy,
-    initialSide: initialSide,
-  );
-
+  /// Horizontal one-page layout with enough neutral space to keep adjacent
+  /// pages outside a fitted viewport.
   static ReaderPageLayoutGeometry singlePageLayout({
     required List<Size> pageSizes,
     required double outerMargin,
@@ -237,8 +232,8 @@ abstract final class ReaderViewportMetrics {
     required List<Rect> pageRects,
     required int pageIndex,
     required bool facing,
-    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
-    ReaderInitialSide initialSide = ReaderInitialSide.right,
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.noCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.left,
   }) {
     if (pageRects.isEmpty) return Rect.zero;
     final index = pageIndex.clamp(0, pageRects.length - 1).toInt();
@@ -251,8 +246,8 @@ abstract final class ReaderViewportMetrics {
                 noCoverStartsWithRight))) {
       return pageRects[index];
     }
-    final start = coverPolicy != ReaderCoverPolicy.noCover ||
-            noCoverStartsWithRight
+    final start =
+        coverPolicy != ReaderCoverPolicy.noCover || noCoverStartsWithRight
         ? (index.isOdd ? index : index - 1)
         : (index.isEven ? index : index - 1);
     var result = pageRects[start];
@@ -266,8 +261,8 @@ abstract final class ReaderViewportMetrics {
     required List<Rect> pageRects,
     required Offset proposedCenter,
     required bool facing,
-    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.firstPageIsCover,
-    ReaderInitialSide initialSide = ReaderInitialSide.right,
+    ReaderCoverPolicy coverPolicy = ReaderCoverPolicy.noCover,
+    ReaderInitialSide initialSide = ReaderInitialSide.left,
   }) {
     if (pageRects.isEmpty) return Rect.zero;
     if (!facing) {

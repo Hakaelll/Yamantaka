@@ -10,7 +10,9 @@ param(
     [int]$X = 80,
     [int]$Y = 80,
     [int]$ClickX = -1,
-    [int]$ClickY = -1
+    [int]$ClickY = -1,
+    [switch]$PreserveWindowBounds,
+    [string]$SendKeys = ''
 )
 
 Add-Type -AssemblyName System.Drawing
@@ -87,15 +89,17 @@ if ($handle -eq [IntPtr]::Zero) {
     throw "The process did not expose a main window."
 }
 
-[void][YamantakaWindowCapture]::ShowWindow($handle, 9)
-[void][YamantakaWindowCapture]::MoveWindow(
-    $handle,
-    $X,
-    $Y,
-    $Width,
-    $Height,
-    $true
-)
+if (-not $PreserveWindowBounds) {
+    [void][YamantakaWindowCapture]::ShowWindow($handle, 9)
+    [void][YamantakaWindowCapture]::MoveWindow(
+        $handle,
+        $X,
+        $Y,
+        $Width,
+        $Height,
+        $true
+    )
+}
 [void][YamantakaWindowCapture]::SetForegroundWindow($handle)
 Start-Sleep -Milliseconds 800
 
@@ -111,6 +115,12 @@ if ($ClickX -ge 0 -and $ClickY -ge 0) {
     [YamantakaWindowCapture]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
     [YamantakaWindowCapture]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
     Start-Sleep -Milliseconds 800
+}
+
+if ($SendKeys) {
+    Add-Type -AssemblyName System.Windows.Forms
+    [System.Windows.Forms.SendKeys]::SendWait($SendKeys)
+    Start-Sleep -Milliseconds 1200
 }
 
 $windowRect = New-Object YamantakaWindowCapture+Rect

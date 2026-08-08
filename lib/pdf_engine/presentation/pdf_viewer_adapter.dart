@@ -14,7 +14,6 @@ final class PdfViewConfiguration {
     required this.backgroundColor,
     required this.margin,
     required this.viewportMargin,
-    required this.spineGap,
     required this.flow,
     required this.rotation,
     required this.reduceMotion,
@@ -23,16 +22,13 @@ final class PdfViewConfiguration {
     this.initialScrollOffset = 0,
     this.readingDirection = PdfViewReadingDirection.leftToRight,
     this.pageShadow,
-    this.physicalPageGap = 0,
-    this.spineVisualWidth = 14,
-    this.coverPolicy = ReaderCoverPolicy.firstPageIsCover,
-    this.initialSide = ReaderInitialSide.right,
+    this.coverPolicy = ReaderCoverPolicy.noCover,
+    this.initialSide = ReaderInitialSide.left,
   });
 
   final Color backgroundColor;
   final double margin;
   final double viewportMargin;
-  final double spineGap;
   final PdfViewFlow flow;
   final int rotation;
   final bool reduceMotion;
@@ -41,10 +37,6 @@ final class PdfViewConfiguration {
   final double initialScrollOffset;
   final PdfViewReadingDirection readingDirection;
   final BoxShadow? pageShadow;
-  /// Gap used by the PDF layout. The visible book channel is painted by the
-  /// presentation layer and must not inflate the spread fit rectangle.
-  final double physicalPageGap;
-  final double spineVisualWidth;
   final ReaderCoverPolicy coverPolicy;
   final ReaderInitialSide initialSide;
 }

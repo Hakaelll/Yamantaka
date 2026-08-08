@@ -32,7 +32,10 @@ final class ReaderBottomControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([controller.viewController, controller.bookmarks]),
+      listenable: Listenable.merge([
+        controller.viewController,
+        controller.bookmarks,
+      ]),
       builder: (context, _) => _buildControls(context),
     );
   }
@@ -45,6 +48,7 @@ final class ReaderBottomControls extends StatelessWidget {
     final nextLabel = facing ? 'Apertura siguiente' : 'Página siguiente';
     final flat = flatChrome || MediaQuery.highContrastOf(context);
     final navigation = YamaToolbarGroup(
+      key: const Key('reader-navigation-group'),
       label: 'Navegación de lectura',
       flat: flat,
       children: [
@@ -78,6 +82,7 @@ final class ReaderBottomControls extends StatelessWidget {
       ],
     );
     final zoom = YamaToolbarGroup(
+      key: const Key('reader-view-group'),
       label: 'Vista y zoom',
       flat: flat,
       children: [
@@ -136,27 +141,7 @@ final class ReaderBottomControls extends StatelessWidget {
             ),
           ],
         ),
-        if (!compact) ...[
-          PopupMenuButton<PageLayoutMode>(
-            tooltip: 'Disposición de páginas',
-            initialValue: preferences.pageLayout,
-            icon: const Icon(Icons.view_carousel_outlined, size: 18),
-            onSelected: controller.setPageLayout,
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: PageLayoutMode.single,
-                child: Text('Una página'),
-              ),
-              PopupMenuItem(
-                value: PageLayoutMode.facing,
-                child: Text('Dos páginas enfrentadas'),
-              ),
-              PopupMenuItem(
-                value: PageLayoutMode.continuous,
-                child: Text('Vista continua'),
-              ),
-            ],
-          ),
+        if (!compact && !facing) ...[
           YamaIconButton(
             semanticLabel: 'Tema de lectura',
             tooltip: 'Tema de lectura',
@@ -192,39 +177,63 @@ final class ReaderBottomControls extends StatelessWidget {
                 checked: preferences.pageLayout == PageLayoutMode.continuous,
                 child: const Text('Vista continua'),
               ),
-              const PopupMenuItem(
-                value: _CompactReaderAction.theme,
-                child: Text('Tema de lectura'),
-              ),
+              if (!facing)
+                const PopupMenuItem(
+                  value: _CompactReaderAction.theme,
+                  child: Text('Tema de lectura'),
+                ),
             ],
           ),
         YamaIconButton(
-          semanticLabel: controller.bookmarks.containsPage(controller.currentPageIndex)
+          semanticLabel:
+              controller.bookmarks.containsPage(controller.currentPageIndex)
               ? 'Retirar marcador'
               : 'Añadir marcador',
-          tooltip: controller.bookmarks.containsPage(controller.currentPageIndex)
-              ? _shortcutTooltip('Retirar marcador', AppCommandId.toggleBookmark)
-              : _shortcutTooltip('Añadir marcador', AppCommandId.toggleBookmark),
+          tooltip:
+              controller.bookmarks.containsPage(controller.currentPageIndex)
+              ? _shortcutTooltip(
+                  'Retirar marcador',
+                  AppCommandId.toggleBookmark,
+                )
+              : _shortcutTooltip(
+                  'Añadir marcador',
+                  AppCommandId.toggleBookmark,
+                ),
           icon: controller.bookmarks.containsPage(controller.currentPageIndex)
               ? Icons.bookmark_rounded
               : Icons.bookmark_border_rounded,
-          selected: controller.bookmarks.containsPage(controller.currentPageIndex),
+          selected: controller.bookmarks.containsPage(
+            controller.currentPageIndex,
+          ),
           onPressed: controller.toggleBookmark,
         ),
       ],
     );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Align(alignment: Alignment.bottomCenter, child: navigation),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (compact || constraints.maxWidth < 900) {
+          return Align(
+            alignment: Alignment.bottomCenter,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              runAlignment: WrapAlignment.center,
+              spacing: AppSpacing.space12,
+              runSpacing: AppSpacing.space8,
+              children: [navigation, zoom],
+            ),
+          );
+        }
+        return SizedBox(
+          height: AppSizes.bottomControlHeight + AppSpacing.space8,
+          child: Stack(
+            children: [
+              Align(alignment: Alignment.bottomCenter, child: navigation),
+              Align(alignment: Alignment.bottomRight, child: zoom),
+            ],
           ),
-          if (!compact) const SizedBox(width: AppSizes.controlGroupGap),
-          Align(alignment: Alignment.bottomRight, child: zoom),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -262,16 +271,20 @@ final class ReaderBottomControls extends StatelessWidget {
           controller: value,
           autofocus: true,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(suffixText: '%', labelText: 'Escala'),
-          onSubmitted: (text) => Navigator.pop(
-            context,
-            double.tryParse(text),
+          decoration: const InputDecoration(
+            suffixText: '%',
+            labelText: 'Escala',
           ),
+          onSubmitted: (text) => Navigator.pop(context, double.tryParse(text)),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, double.tryParse(value.text)),
+            onPressed: () =>
+                Navigator.pop(context, double.tryParse(value.text)),
             child: const Text('Aplicar'),
           ),
         ],
@@ -288,4 +301,11 @@ final class ReaderBottomControls extends StatelessWidget {
 
 enum _ZoomAction { actualSize, fitWidth, fitPage }
 
-enum _CompactReaderAction { actualSize, fitWidth, fitPage, single, continuous, theme }
+enum _CompactReaderAction {
+  actualSize,
+  fitWidth,
+  fitPage,
+  single,
+  continuous,
+  theme,
+}

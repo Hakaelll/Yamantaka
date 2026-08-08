@@ -335,7 +335,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
     onOpenSettings: () => setState(() => _page = _AppPage.settings),
     reduceMotion:
         widget.services.settings.settings.resolvedMotionPreference !=
-            AppMotionPreference.full,
+        AppMotionPreference.full,
     showProgress: widget.services.settings.settings.showProgress,
     controlsAutoHide: widget.services.settings.settings.autoHideControls,
     readingDirection: widget.services.settings.settings.readingDirection,
@@ -1145,6 +1145,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
 
   Future<void> _saveWindowBounds() async {
     if (!_isDesktop ||
+        widget.services.reader.isFullScreen ||
         await windowManager.isFullScreen() ||
         await windowManager.isMaximized()) {
       return;

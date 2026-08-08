@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/app_config.dart';
 import '../../core/security/local_input_policy.dart';
+import '../../features/reader/domain/reader_models.dart';
 import '../models/pdf_models.dart';
 import '../presentation/pdf_viewer_adapter.dart';
 import '../presentation/reader_viewport_metrics.dart';
@@ -111,6 +112,9 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
         backgroundColor: widget.configuration.backgroundColor,
         margin: widget.configuration.margin,
         pageDropShadow: widget.configuration.pageShadow,
+        pageOverlaysBuilder: widget.configuration.flow == PdfViewFlow.facing
+            ? _buildBookPageOverlays
+            : null,
         normalizeMatrix: widget.configuration.flow == PdfViewFlow.continuous
             ? null
             : (matrix, viewSize, layout, controller) {
@@ -430,10 +434,14 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   }) {
     final rect = _readingUnitRect(controller, pageNumber);
     if (rect.isEmpty) return Future<void>.value();
+    final fitMargin =
+        widget.configuration.margin > widget.configuration.viewportMargin
+        ? widget.configuration.margin
+        : widget.configuration.viewportMargin;
     final zoom = ReaderViewportMetrics.fitPageZoom(
       viewport: controller.viewSize,
       contentRect: rect,
-      margin: widget.configuration.viewportMargin,
+      margin: fitMargin,
       minimum: controller.minScale,
       maximum: controller.maxScale,
     );
@@ -450,24 +458,28 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   }) async {
     final rect = _readingUnitRect(controller, pageNumber);
     if (rect.isEmpty) return;
+    final fitMargin =
+        widget.configuration.margin > widget.configuration.viewportMargin
+        ? widget.configuration.margin
+        : widget.configuration.viewportMargin;
     final zoom = ReaderViewportMetrics.fitWidthZoom(
       viewport: controller.viewSize,
       contentRect: rect,
-      margin: widget.configuration.viewportMargin,
+      margin: fitMargin,
       minimum: controller.minScale,
       maximum: controller.maxScale,
     );
     final visibleHeight = controller.viewSize.height / zoom;
     final topAlignedCenter = Offset(
       rect.center.dx,
-      rect.top - widget.configuration.viewportMargin / zoom + visibleHeight / 2,
+      rect.top - fitMargin / zoom + visibleHeight / 2,
     );
     final normalizedCenter = ReaderViewportMetrics.normalizeCenter(
       proposedCenter: topAlignedCenter,
       viewport: controller.viewSize,
       contentRect: rect,
       zoom: zoom,
-      margin: widget.configuration.viewportMargin / zoom,
+      margin: fitMargin / zoom,
       centerVerticallyWhenFits: false,
     );
     await controller.goTo(
@@ -521,16 +533,71 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     );
   }
 
-    Rect _readingUnitRect(pdfrx.PdfViewerController controller, int pageNumber) {
-      final layouts = controller.layout.pageLayouts;
-      return ReaderViewportMetrics.readingUnitRect(
-        pageRects: layouts,
-        pageIndex: pageNumber - 1,
-        facing: widget.configuration.flow == PdfViewFlow.facing,
-        coverPolicy: widget.configuration.coverPolicy,
-        initialSide: widget.configuration.initialSide,
-      );
+  Rect _readingUnitRect(pdfrx.PdfViewerController controller, int pageNumber) {
+    final layouts = controller.layout.pageLayouts;
+    return ReaderViewportMetrics.readingUnitRect(
+      pageRects: layouts,
+      pageIndex: pageNumber - 1,
+      facing: widget.configuration.flow == PdfViewFlow.facing,
+      coverPolicy: widget.configuration.coverPolicy,
+      initialSide: widget.configuration.initialSide,
+    );
+  }
+
+  List<Widget> _buildBookPageOverlays(
+    BuildContext _,
+    Rect pageRect,
+    pdfrx.PdfPage page,
+  ) {
+    final pageIndex = page.pageNumber - 1;
+    final direction =
+        widget.configuration.readingDirection ==
+            PdfViewReadingDirection.rightToLeft
+        ? ReadingDirection.rightToLeft
+        : ReadingDirection.leftToRight;
+    final spread = FacingPageSpread.forPage(
+      pageIndex,
+      widget.document.pageCount,
+      direction: direction,
+      firstPageIsCover:
+          widget.configuration.coverPolicy != ReaderCoverPolicy.noCover,
+      initialSide: widget.configuration.initialSide,
+    );
+    if (spread.leftPageIndex == null || spread.rightPageIndex == null) {
+      return const [];
     }
+
+    final pageIsLeft = spread.leftPageIndex == pageIndex;
+    final channelWidth = (pageRect.width * 0.035).clamp(10.0, 24.0);
+    return [
+      Positioned(
+        top: 0,
+        bottom: 0,
+        left: pageIsLeft ? null : 0,
+        right: pageIsLeft ? 0 : null,
+        width: channelWidth,
+        child: IgnorePointer(
+          child: DecoratedBox(
+            key: ValueKey('book-inner-edge-$pageIndex'),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: pageIsLeft
+                    ? Alignment.centerLeft
+                    : Alignment.centerRight,
+                end: pageIsLeft ? Alignment.centerRight : Alignment.centerLeft,
+                colors: const [
+                  Colors.transparent,
+                  Color(0x12000000),
+                  Color(0x38000000),
+                ],
+                stops: const [0, 0.58, 1],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
 
   void _handleLink(pdfrx.PdfLink link) {
     if (link.dest != null) {
@@ -594,8 +661,7 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
           .map((page) => Size(page.width, page.height))
           .toList(growable: false),
       outerMargin: params.margin,
-      spineGap: widget.configuration.spineGap,
-      physicalPageGap: widget.configuration.physicalPageGap,
+      pageGap: 0,
       coverPolicy: widget.configuration.coverPolicy,
       initialSide: widget.configuration.initialSide,
       rightToLeft:

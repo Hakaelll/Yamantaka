@@ -31,6 +31,41 @@ bool FlutterWindow::OnCreate() {
       flutter::MethodChannel<flutter::EncodableValue>>(
       flutter_controller_->engine()->messenger(),
       "yamantaka/activation", &flutter::StandardMethodCodec::GetInstance());
+  window_channel_ = std::make_unique<
+      flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "yamantaka/window",
+      &flutter::StandardMethodCodec::GetInstance());
+  window_channel_->SetMethodCallHandler(
+      [this](const auto& call, auto result) {
+        if (call.method_name() == "isFullScreen") {
+          result->Success(flutter::EncodableValue(is_fullscreen_));
+          return;
+        }
+        if (call.method_name() == "setFullScreen") {
+          const auto* arguments = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (arguments == nullptr) {
+            result->Error("invalid_arguments",
+                          "setFullScreen requires an argument map.");
+            return;
+          }
+          const auto value = arguments->find(flutter::EncodableValue("value"));
+          if (value == arguments->end() ||
+              !std::holds_alternative<bool>(value->second)) {
+            result->Error("invalid_arguments",
+                          "setFullScreen requires a boolean value.");
+            return;
+          }
+          if (!SetFullScreen(std::get<bool>(value->second))) {
+            result->Error("fullscreen_failed",
+                          "Windows could not apply the fullscreen state.");
+            return;
+          }
+          result->Success(flutter::EncodableValue(is_fullscreen_));
+          return;
+        }
+        result->NotImplemented();
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -47,11 +82,77 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
+    window_channel_.reset();
     activation_channel_.reset();
     flutter_controller_ = nullptr;
   }
 
   Win32Window::OnDestroy();
+}
+
+bool FlutterWindow::SetFullScreen(bool value) {
+  if (value == is_fullscreen_) {
+    return true;
+  }
+
+  const HWND window = GetHandle();
+  if (window == nullptr) {
+    return false;
+  }
+
+  if (value) {
+    placement_before_fullscreen_.length = sizeof(WINDOWPLACEMENT);
+    if (!::GetWindowPlacement(window, &placement_before_fullscreen_)) {
+      return false;
+    }
+    style_before_fullscreen_ = ::GetWindowLongPtr(window, GWL_STYLE);
+    extended_style_before_fullscreen_ =
+        ::GetWindowLongPtr(window, GWL_EXSTYLE);
+
+    MONITORINFO monitor_info{};
+    monitor_info.cbSize = sizeof(MONITORINFO);
+    const HMONITOR monitor =
+        ::MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+    if (!::GetMonitorInfo(monitor, &monitor_info)) {
+      return false;
+    }
+
+    const LONG_PTR fullscreen_style =
+        (style_before_fullscreen_ & ~WS_OVERLAPPEDWINDOW) | WS_POPUP;
+    const LONG_PTR fullscreen_extended_style =
+        extended_style_before_fullscreen_ &
+        ~(WS_EX_DLGMODALFRAME | WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE |
+          WS_EX_STATICEDGE);
+    ::SetWindowLongPtr(window, GWL_STYLE, fullscreen_style);
+    ::SetWindowLongPtr(window, GWL_EXSTYLE, fullscreen_extended_style);
+
+    const RECT bounds = monitor_info.rcMonitor;
+    is_fullscreen_ = true;
+    if (!::SetWindowPos(window, HWND_TOP, bounds.left, bounds.top,
+                        bounds.right - bounds.left,
+                        bounds.bottom - bounds.top,
+                        SWP_NOOWNERZORDER | SWP_FRAMECHANGED)) {
+      is_fullscreen_ = false;
+      ::SetWindowLongPtr(window, GWL_STYLE, style_before_fullscreen_);
+      ::SetWindowLongPtr(window, GWL_EXSTYLE,
+                         extended_style_before_fullscreen_);
+      return false;
+    }
+    ::SetForegroundWindow(window);
+    return true;
+  }
+
+  ::SetWindowLongPtr(window, GWL_STYLE, style_before_fullscreen_);
+  ::SetWindowLongPtr(window, GWL_EXSTYLE, extended_style_before_fullscreen_);
+  is_fullscreen_ = false;
+  if (!::SetWindowPlacement(window, &placement_before_fullscreen_)) {
+    is_fullscreen_ = true;
+    return false;
+  }
+  ::SetWindowPos(window, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER |
+                     SWP_FRAMECHANGED);
+  return true;
 }
 
 LRESULT

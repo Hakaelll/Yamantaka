@@ -465,12 +465,10 @@ final class LocalBackupService {
           row[column] ??
               (table == 'documents' && column == 'is_favorite'
                   ? 0
-                  : table == 'document_preferences' &&
-                        column == 'cover_policy'
-                  ? ReaderCoverPolicy.firstPageIsCover.name
-                  : table == 'document_preferences' &&
-                        column == 'initial_side'
-                  ? ReaderInitialSide.right.name
+                  : table == 'document_preferences' && column == 'cover_policy'
+                  ? ReaderCoverPolicy.noCover.name
+                  : table == 'document_preferences' && column == 'initial_side'
+                  ? ReaderInitialSide.left.name
                   : null),
       ]);
     }
@@ -572,10 +570,10 @@ final class LocalBackupService {
       recordReadingSessions: boolean('recordReadingSessions', true),
       readingHistoryLimit: integer('readingHistoryLimit', 250).clamp(25, 1000),
       libraryReadingFilter: string('libraryReadingFilter', 'all'),
-        readerPanelWidth: number(
-          'readerPanelWidth',
-          AppSizes.readerPanelDefault,
-        ).clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth),
+      readerPanelWidth: number(
+        'readerPanelWidth',
+        AppSizes.readerPanelDefault,
+      ).clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth),
       readerPanelSection: string('readerPanelSection', ''),
       readerPanelOpen: boolean('readerPanelOpen', false),
       readerChromeVisible: boolean('readerChromeVisible', true),

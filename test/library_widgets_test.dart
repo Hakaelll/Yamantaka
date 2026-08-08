@@ -449,6 +449,117 @@ void main() {
     expect(find.text('2 seleccionados'), findsNothing);
   });
 
+  testWidgets(
+    'artifact context actions stay keyboard reachable and adapt to missing PDFs',
+    (tester) async {
+      final database = AppDatabase.inMemory(
+        AppLogger(minimumLevel: LogLevel.error),
+      );
+      addTearDown(database.close);
+      final repository = DocumentRepository(database);
+      final document = _document(
+        id: 'actions',
+        fileName: 'actions.pdf',
+        openedAt: DateTime.utc(2026, 7, 29),
+        progress: 0.4,
+      );
+      repository.save(document);
+      final controller = LibraryController(
+        repository,
+        AppLogger(minimumLevel: LogLevel.error),
+      );
+      await controller.load();
+      controller.documents = [document];
+      var coverChanged = false;
+      var relocated = false;
+      tester.view.physicalSize = const Size(1100, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      Widget app() => MaterialApp(
+        theme: AppTheme.light(),
+        home: LibraryScreen(
+          controller: controller,
+          onOpenPath: (_) async {},
+          onPickDocument: () async {},
+          onOpenSettings: () {},
+          showRecents: true,
+          onRelocateDocument: (_) async => relocated = true,
+          onChangeCover: (_) async => coverChanged = true,
+          onDocumentInfo: (_) async {},
+          onToggleFavorite: (_) async {},
+          onRevealDocument: (_) async {},
+          onRemoveDocument: (_) async {},
+        ),
+      );
+
+      await tester.pumpWidget(app());
+      await tester.pump();
+      expect(find.byKey(const ValueKey('artifact-actions')), findsOneWidget);
+      expect(find.text('Tu espacio de lectura'), findsNothing);
+      expect(find.text('Abrir documento'), findsNothing);
+      expect(
+        tester.getCenter(find.byKey(const ValueKey('artifact-actions'))).dx,
+        closeTo(550, 2),
+      );
+      await tester.tap(find.byKey(const ValueKey('artifact-actions')));
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.f10);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final visibleLabels = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((text) => text.data)
+          .whereType<String>()
+          .toSet();
+      expect(
+        visibleLabels,
+        containsAll(const {
+          'Continuar leyendo',
+          'Cambiar portada',
+          'Mostrar información',
+          'Mostrar en el explorador',
+          'Retirar de la biblioteca',
+        }),
+      );
+      expect(find.text('1 seleccionados'), findsNothing);
+      await tester.tap(
+        find.ancestor(
+          of: find.text('Cambiar portada'),
+          matching: find.byWidgetPredicate((widget) => widget is PopupMenuItem),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(coverChanged, isTrue);
+
+      controller.documents = [document.copyWith(isMissing: true)];
+      await tester.pumpWidget(app());
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('artifact-actions')));
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.contextMenu);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final locateAction = find.ancestor(
+        of: find.text('Localizar archivo'),
+        matching: find.byWidgetPredicate((widget) => widget is PopupMenuItem),
+      );
+      expect(locateAction, findsOneWidget);
+      expect(find.text('Cambiar portada'), findsNothing);
+      expect(find.text('Mostrar en el explorador'), findsNothing);
+      await tester.tap(locateAction);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(relocated, isTrue);
+    },
+  );
+
   testWidgets('thumbnail decoding is bounded by its physical display size', (
     tester,
   ) async {
