@@ -13,15 +13,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
-$executable = [System.IO.Path]::GetFullPath(
-    (Join-Path $repositoryRoot $ExecutablePath)
-)
-$fixture = [System.IO.Path]::GetFullPath(
-    (Join-Path $repositoryRoot $FixturePdf)
-)
-$outputRoot = [System.IO.Path]::GetFullPath(
-    (Join-Path $repositoryRoot $OutputDirectory)
-)
+
+function Resolve-RepositoryPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if ([System.IO.Path]::IsPathFullyQualified($Path)) {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+    return [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $Path))
+}
+
+$executable = Resolve-RepositoryPath $ExecutablePath
+$fixture = Resolve-RepositoryPath $FixturePdf
+$outputRoot = Resolve-RepositoryPath $OutputDirectory
 $candidateRoot = Join-Path $outputRoot 'candidates'
 New-Item -ItemType Directory -Force -Path $candidateRoot | Out-Null
 
@@ -79,6 +82,9 @@ $cases = @(
 $evidence = [System.Collections.Generic.List[object]]::new()
 foreach ($case in $cases) {
     $outputPath = Join-Path $candidateRoot "$($case.name).png"
+    if (Test-Path -LiteralPath $outputPath) {
+        Remove-Item -LiteralPath $outputPath -Force
+    }
     $process = $null
     try {
         if (-not $SkipLaunch) {
@@ -99,16 +105,23 @@ foreach ($case in $cases) {
                 X = 80
                 Y = 80
             }
-            if ($case.selectBook) {
-                $capture.ClickX = [int]($case.width / 2 + 52)
-                $capture.ClickY = 55
+            if ($case.openFixture) {
+                # Select the requested public mode after pointer movement has
+                # revealed the centered reader toolbar.
+                $capture.ClickX = if ($case.selectBook) {
+                    [int]($case.width / 2 + 75)
+                }
+                else {
+                    [int]($case.width / 2 - 50)
+                }
+                $capture.ClickY = 78
             }
             if ($case.fullscreen) {
                 $capture.SendKeys = '{F11}'
             }
             & (Join-Path $PSScriptRoot 'capture_windows_window.ps1') @capture
-            if ($LASTEXITCODE -ne 0) {
-                throw "Capture failed with exit code $LASTEXITCODE."
+            if (-not (Test-Path -LiteralPath $outputPath)) {
+                throw "Capture did not produce its candidate: $outputPath"
             }
         }
         elseif (-not (Test-Path -LiteralPath $outputPath)) {
@@ -141,8 +154,11 @@ foreach ($case in $cases) {
     }
     finally {
         if ($process -and -not $process.HasExited) {
-            Stop-Process -Id $process.Id -Force
-            [void]$process.WaitForExit(5000)
+            [void]$process.CloseMainWindow()
+            if (-not $process.WaitForExit(5000)) {
+                Stop-Process -Id $process.Id -Force
+                [void]$process.WaitForExit(5000)
+            }
         }
     }
 }
@@ -166,3 +182,4 @@ if (-not $ScaleConfirmed) {
     Write-Warning 'The host DPI was not confirmed. Capture evidence is intentionally incomplete.'
     exit 2
 }
+exit 0

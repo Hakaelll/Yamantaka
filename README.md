@@ -7,11 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.1.0 revisada el 2 de agosto de 2026, con arranque local
-revalidado el 8 de agosto de 2026:
+Base Flutter 0.2.1 revisada el 23 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 204 pruebas aprobadas;
+- flutter test --no-pub: suite completa aprobada;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local abre una ventana receptiva y acepta un cierre normal;
@@ -25,14 +24,14 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 ## Lector
 
 - Documento muestra una página; Libro muestra un pliego completo.
-- Libro abre con 1–2 enfrentadas y navega por 3–4, 5–6, sin portada aislada por
-  defecto.
+- Libro navega por pliegos completos, conserva portada individual y lado
+  inicial cuando están configurados y respeta LTR/RTL.
 - Las páginas del pliego son contiguas y comparten un canal central ligado a
   sus bordes, por lo que el lomo acompaña zoom y paneo.
-- El lienzo de Libro es carbón estable; Documento conserva los seis fondos de
-  lectura.
-- La barra superior es opaca y superpuesta: no reserva altura ni transparenta
-  el contenido.
+- Documento y Libro comparten los seis entornos de lectura; el tema se aplica
+  al canvas y al chrome sin alterar los píxeles del PDF.
+- La barra superior se divide en grupos flotantes superpuestos para documento,
+  modo y herramientas, sin reservar una franja en el visor.
 - El selector Documento/Libro y la navegación inferior están centrados respecto
   a toda la ventana; vista y zoom permanecen agrupados a la derecha.
 - Los laterales ofrecen zonas claras de paso de página, con estado deshabilitado
@@ -49,6 +48,9 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Apertura mediante selector nativo, arrastrar y soltar o argumento.
 - Biblioteca local con portadas, filtros, estados, favoritos, colecciones,
   etiquetas, vistas inteligentes, selección múltiple y operaciones por lote.
+- Biblioteca siempre oscura y espacial, con una paleta monocromática,
+  selección violeta, foco blanco independiente del color y controles
+  superiores en cápsulas discretas.
 - Búsqueda PDF cancelable, índice, miniaturas y panel lateral redimensionable.
 - Marcadores, notas por página, historial local opcional y navegación
   atrás/adelante.

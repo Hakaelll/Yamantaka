@@ -77,14 +77,7 @@ final class ReaderTopBar extends StatelessWidget
     return DecoratedBox(
       key: const Key('reader-top-surface'),
       decoration: BoxDecoration(
-        color: veilColor,
-        border: Border(
-          bottom: BorderSide(
-            color: flatChrome || MediaQuery.highContrastOf(context)
-                ? colors.borderStrong
-                : colors.borderSubtle.withValues(alpha: 0.7),
-          ),
-        ),
+        color: veilColor.withValues(alpha: flatChrome ? 1 : 0.92),
       ),
       child: SizedBox(
         height: AppSizes.topBarHeight,
@@ -99,49 +92,61 @@ final class ReaderTopBar extends StatelessWidget
           child: Row(
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    YamaIconButton(
-                      semanticLabel: 'Volver a la biblioteca',
-                      tooltip: 'Volver a la biblioteca',
-                      icon: Icons.arrow_back_rounded,
-                      onPressed: onBack,
-                    ),
-                    const SizedBox(width: AppSpacing.space8),
-                    Flexible(
-                      child: Tooltip(
-                        message: document.fileName,
-                        child: Text(
-                          document.effectiveTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: colors.textSecondary,
-                                fontWeight: FontWeight.w500,
-                              ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: YamaToolbarGroup(
+                    label: 'Documento actual',
+                    flat: flatChrome,
+                    children: [
+                      YamaIconButton(
+                        semanticLabel: 'Volver a la biblioteca',
+                        tooltip: 'Volver a la biblioteca',
+                        icon: Icons.arrow_back_rounded,
+                        onPressed: onBack,
+                      ),
+                      const SizedBox(width: AppSpacing.space8),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: compact
+                              ? 112
+                              : expanded
+                              ? 280
+                              : 180,
+                        ),
+                        child: Tooltip(
+                          message: document.fileName,
+                          child: Text(
+                            document.effectiveTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: colors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                          ),
                         ),
                       ),
-                    ),
-                    if (!compact && controller.navigationHistory != null) ...[
-                      YamaIconButton(
-                        semanticLabel: 'Volver a la ubicación anterior',
-                        tooltip: 'Volver a la ubicación anterior (Alt+←)',
-                        icon: Icons.undo_rounded,
-                        onPressed: controller.navigationHistory!.canGoBack
-                            ? controller.historyBack
-                            : null,
-                      ),
-                      YamaIconButton(
-                        semanticLabel: 'Avanzar en el historial',
-                        tooltip: 'Avanzar en el historial (Alt+→)',
-                        icon: Icons.redo_rounded,
-                        onPressed: controller.navigationHistory!.canGoForward
-                            ? controller.historyForward
-                            : null,
-                      ),
+                      if (!compact && controller.navigationHistory != null) ...[
+                        YamaIconButton(
+                          semanticLabel: 'Volver a la ubicación anterior',
+                          tooltip: 'Volver a la ubicación anterior (Alt+←)',
+                          icon: Icons.undo_rounded,
+                          onPressed: controller.navigationHistory!.canGoBack
+                              ? controller.historyBack
+                              : null,
+                        ),
+                        YamaIconButton(
+                          semanticLabel: 'Avanzar en el historial',
+                          tooltip: 'Avanzar en el historial (Alt+→)',
+                          icon: Icons.redo_rounded,
+                          onPressed: controller.navigationHistory!.canGoForward
+                              ? controller.historyForward
+                              : null,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               if (!compact && showModeControls) ...[
@@ -151,261 +156,271 @@ final class ReaderTopBar extends StatelessWidget
                 ),
               ],
               Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    YamaIconButton(
-                      semanticLabel: 'Buscar en el documento',
-                      tooltip:
-                          'Buscar (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides)})',
-                      icon: Icons.search_rounded,
-                      onPressed: onSearch,
-                      selected: activePanel == ReaderPanelSection.search,
-                    ),
-                    if (expanded && showPanelControls)
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: YamaToolbarGroup(
+                    label: 'Herramientas del lector',
+                    flat: flatChrome,
+                    children: [
                       YamaIconButton(
-                        semanticLabel: 'Abrir miniaturas',
+                        semanticLabel: 'Buscar en el documento',
                         tooltip:
-                            'Miniaturas (${AppCommandRegistry.shortcutLabel(AppCommandId.togglePanel, shortcutOverrides)})',
-                        icon: Icons.grid_view_outlined,
-                        selected: activePanel == ReaderPanelSection.thumbnails,
-                        onPressed: onShowThumbnails,
+                            'Buscar (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides)})',
+                        icon: Icons.search_rounded,
+                        onPressed: onSearch,
+                        selected: activePanel == ReaderPanelSection.search,
                       ),
-                    if (showPanelControls)
-                      PopupMenuButton<_ReaderToolsAction>(
-                        tooltip: 'Herramientas',
-                        onSelected: _runToolsAction,
+                      if (expanded && showPanelControls)
+                        YamaIconButton(
+                          semanticLabel: 'Abrir miniaturas',
+                          tooltip:
+                              'Miniaturas (${AppCommandRegistry.shortcutLabel(AppCommandId.togglePanel, shortcutOverrides)})',
+                          icon: Icons.grid_view_outlined,
+                          selected:
+                              activePanel == ReaderPanelSection.thumbnails,
+                          onPressed: onShowThumbnails,
+                        ),
+                      if (showPanelControls)
+                        PopupMenuButton<_ReaderToolsAction>(
+                          tooltip: 'Herramientas',
+                          onSelected: _runToolsAction,
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: _ReaderToolsAction.thumbnails,
+                              child: _ReaderMenuItem(
+                                icon: Icons.grid_view_outlined,
+                                label: 'Miniaturas',
+                                shortcut: AppCommandRegistry.shortcutLabel(
+                                  AppCommandId.togglePanel,
+                                  shortcutOverrides,
+                                ),
+                                selected:
+                                    activePanel ==
+                                    ReaderPanelSection.thumbnails,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: _ReaderToolsAction.outline,
+                              child: _ReaderMenuItem(
+                                icon: Icons.format_list_bulleted_rounded,
+                                label: 'Índice',
+                                selected:
+                                    activePanel == ReaderPanelSection.outline,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: _ReaderToolsAction.bookmarks,
+                              child: _ReaderMenuItem(
+                                icon: Icons.bookmarks_outlined,
+                                label: 'Marcadores',
+                                selected:
+                                    activePanel == ReaderPanelSection.bookmarks,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: _ReaderToolsAction.annotations,
+                              child: _ReaderMenuItem(
+                                icon: Icons.rate_review_outlined,
+                                label: 'Anotaciones',
+                                selected:
+                                    activePanel ==
+                                    ReaderPanelSection.annotations,
+                              ),
+                            ),
+                          ],
+                          icon: Icon(
+                            Icons.build_outlined,
+                            color: activePanel == null
+                                ? colors.iconNormal
+                                : colors.iconActive,
+                          ),
+                        ),
+                      if (!compact && expanded)
+                        YamaIconButton(
+                          semanticLabel: 'Abrir paleta de comandos',
+                          tooltip:
+                              'Paleta de comandos (${AppCommandRegistry.shortcutLabel(AppCommandId.commandPalette, shortcutOverrides)})',
+                          icon: Icons.keyboard_command_key_rounded,
+                          onPressed: onCommandPalette,
+                        ),
+                      PopupMenuButton<_ReaderMenuAction>(
+                        tooltip: 'Más opciones',
+                        onSelected: _runAction,
+                        constraints: const BoxConstraints(
+                          minWidth: 252,
+                          maxWidth: 292,
+                        ),
                         itemBuilder: (context) => [
                           PopupMenuItem(
-                            value: _ReaderToolsAction.thumbnails,
+                            value: _ReaderMenuAction.openDocument,
+                            height: 40,
                             child: _ReaderMenuItem(
-                              icon: Icons.grid_view_outlined,
-                              label: 'Miniaturas',
+                              icon: Icons.file_open_outlined,
+                              label: 'Abrir otro PDF…',
                               shortcut: AppCommandRegistry.shortcutLabel(
-                                AppCommandId.togglePanel,
+                                AppCommandId.openDocument,
                                 shortcutOverrides,
                               ),
-                              selected:
-                                  activePanel == ReaderPanelSection.thumbnails,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderToolsAction.outline,
-                            child: _ReaderMenuItem(
-                              icon: Icons.format_list_bulleted_rounded,
-                              label: 'Índice',
-                              selected:
-                                  activePanel == ReaderPanelSection.outline,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderToolsAction.bookmarks,
-                            child: _ReaderMenuItem(
-                              icon: Icons.bookmarks_outlined,
-                              label: 'Marcadores',
-                              selected:
-                                  activePanel == ReaderPanelSection.bookmarks,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderToolsAction.annotations,
-                            child: _ReaderMenuItem(
-                              icon: Icons.rate_review_outlined,
-                              label: 'Anotaciones',
-                              selected:
-                                  activePanel == ReaderPanelSection.annotations,
-                            ),
-                          ),
-                        ],
-                        icon: Icon(
-                          Icons.build_outlined,
-                          color: activePanel == null
-                              ? colors.iconNormal
-                              : colors.iconActive,
-                        ),
-                      ),
-                    if (!compact && expanded)
-                      YamaIconButton(
-                        semanticLabel: 'Abrir paleta de comandos',
-                        tooltip:
-                            'Paleta de comandos (${AppCommandRegistry.shortcutLabel(AppCommandId.commandPalette, shortcutOverrides)})',
-                        icon: Icons.keyboard_command_key_rounded,
-                        onPressed: onCommandPalette,
-                      ),
-                    PopupMenuButton<_ReaderMenuAction>(
-                      tooltip: 'Más opciones',
-                      onSelected: _runAction,
-                      constraints: const BoxConstraints(
-                        minWidth: 252,
-                        maxWidth: 292,
-                      ),
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: _ReaderMenuAction.openDocument,
-                          height: 40,
-                          child: _ReaderMenuItem(
-                            icon: Icons.file_open_outlined,
-                            label: 'Abrir otro PDF…',
-                            shortcut: AppCommandRegistry.shortcutLabel(
-                              AppCommandId.openDocument,
-                              shortcutOverrides,
-                            ),
-                          ),
-                        ),
-                        const PopupMenuDivider(height: 9),
-                        if (compact || !showModeControls) ...[
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.documentMode,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.description_outlined,
-                              label: 'Modo documento',
-                              selected:
-                                  preferences.viewMode == ReaderMode.document,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.bookMode,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.menu_book_outlined,
-                              label: 'Modo libro',
-                              selected: preferences.viewMode == ReaderMode.book,
                             ),
                           ),
                           const PopupMenuDivider(height: 9),
-                        ],
-                        if (compact) ...[
+                          if (compact || !showModeControls) ...[
+                            PopupMenuItem(
+                              value: _ReaderMenuAction.documentMode,
+                              height: 40,
+                              child: _ReaderMenuItem(
+                                icon: Icons.description_outlined,
+                                label: 'Modo documento',
+                                selected:
+                                    preferences.viewMode == ReaderMode.document,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: _ReaderMenuAction.bookMode,
+                              height: 40,
+                              child: _ReaderMenuItem(
+                                icon: Icons.menu_book_outlined,
+                                label: 'Modo libro',
+                                selected:
+                                    preferences.viewMode == ReaderMode.book,
+                              ),
+                            ),
+                            const PopupMenuDivider(height: 9),
+                          ],
+                          if (compact) ...[
+                            const PopupMenuItem(
+                              value: _ReaderMenuAction.commandPalette,
+                              height: 40,
+                              child: _ReaderMenuItem(
+                                icon: Icons.keyboard_command_key_rounded,
+                                label: 'Paleta de comandos',
+                              ),
+                            ),
+                            const PopupMenuDivider(height: 9),
+                          ],
+                          if (!expanded || !showPanelControls) ...[
+                            PopupMenuItem(
+                              value: _ReaderMenuAction.thumbnails,
+                              height: 40,
+                              child: _ReaderMenuItem(
+                                icon: Icons.grid_view_outlined,
+                                label: 'Miniaturas',
+                                selected:
+                                    activePanel ==
+                                    ReaderPanelSection.thumbnails,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: _ReaderMenuAction.outline,
+                              height: 40,
+                              child: _ReaderMenuItem(
+                                icon: Icons.format_list_bulleted_rounded,
+                                label: 'Índice',
+                                selected:
+                                    activePanel == ReaderPanelSection.outline,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: _ReaderMenuAction.bookmarks,
+                              height: 40,
+                              child: _ReaderMenuItem(
+                                icon: Icons.bookmarks_outlined,
+                                label: 'Marcadores',
+                                selected:
+                                    activePanel == ReaderPanelSection.bookmarks,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: _ReaderMenuAction.annotations,
+                              height: 40,
+                              child: _ReaderMenuItem(
+                                icon: Icons.rate_review_outlined,
+                                label: 'Anotaciones',
+                                selected:
+                                    activePanel ==
+                                    ReaderPanelSection.annotations,
+                              ),
+                            ),
+                            const PopupMenuDivider(height: 9),
+                          ],
                           const PopupMenuItem(
-                            value: _ReaderMenuAction.commandPalette,
+                            value: _ReaderMenuAction.rotate,
                             height: 40,
                             child: _ReaderMenuItem(
-                              icon: Icons.keyboard_command_key_rounded,
-                              label: 'Paleta de comandos',
+                              icon: Icons.rotate_right_rounded,
+                              label: 'Girar página',
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: _ReaderMenuAction.margins,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.width_normal_rounded,
+                              label: 'Márgenes de lectura',
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.fullscreen,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: controller.isFullScreen
+                                  ? Icons.fullscreen_exit_rounded
+                                  : Icons.fullscreen_rounded,
+                              label: controller.isFullScreen
+                                  ? 'Salir de pantalla completa'
+                                  : 'Pantalla completa',
+                              shortcut: AppCommandRegistry.shortcutLabel(
+                                AppCommandId.fullScreen,
+                                shortcutOverrides,
+                              ),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.toggleChrome,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.visibility_off_outlined,
+                              label: 'Ocultar interfaz',
+                              shortcut: AppCommandRegistry.shortcutLabel(
+                                AppCommandId.toggleChrome,
+                                shortcutOverrides,
+                              ),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.toggleImmersive,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.center_focus_strong_rounded,
+                              label: 'Lectura inmersiva',
+                              shortcut: AppCommandRegistry.shortcutLabel(
+                                AppCommandId.toggleImmersive,
+                                shortcutOverrides,
+                              ),
                             ),
                           ),
                           const PopupMenuDivider(height: 9),
+                          const PopupMenuItem(
+                            value: _ReaderMenuAction.documentInfo,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.info_outline_rounded,
+                              label: 'Información del documento',
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: _ReaderMenuAction.settings,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.settings_outlined,
+                              label: 'Ajustes',
+                            ),
+                          ),
                         ],
-                        if (!expanded || !showPanelControls) ...[
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.thumbnails,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.grid_view_outlined,
-                              label: 'Miniaturas',
-                              selected:
-                                  activePanel == ReaderPanelSection.thumbnails,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.outline,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.format_list_bulleted_rounded,
-                              label: 'Índice',
-                              selected:
-                                  activePanel == ReaderPanelSection.outline,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.bookmarks,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.bookmarks_outlined,
-                              label: 'Marcadores',
-                              selected:
-                                  activePanel == ReaderPanelSection.bookmarks,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.annotations,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.rate_review_outlined,
-                              label: 'Anotaciones',
-                              selected:
-                                  activePanel == ReaderPanelSection.annotations,
-                            ),
-                          ),
-                          const PopupMenuDivider(height: 9),
-                        ],
-                        const PopupMenuItem(
-                          value: _ReaderMenuAction.rotate,
-                          height: 40,
-                          child: _ReaderMenuItem(
-                            icon: Icons.rotate_right_rounded,
-                            label: 'Girar página',
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: _ReaderMenuAction.margins,
-                          height: 40,
-                          child: _ReaderMenuItem(
-                            icon: Icons.width_normal_rounded,
-                            label: 'Márgenes de lectura',
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: _ReaderMenuAction.fullscreen,
-                          height: 40,
-                          child: _ReaderMenuItem(
-                            icon: controller.isFullScreen
-                                ? Icons.fullscreen_exit_rounded
-                                : Icons.fullscreen_rounded,
-                            label: controller.isFullScreen
-                                ? 'Salir de pantalla completa'
-                                : 'Pantalla completa',
-                            shortcut: AppCommandRegistry.shortcutLabel(
-                              AppCommandId.fullScreen,
-                              shortcutOverrides,
-                            ),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: _ReaderMenuAction.toggleChrome,
-                          height: 40,
-                          child: _ReaderMenuItem(
-                            icon: Icons.visibility_off_outlined,
-                            label: 'Ocultar interfaz',
-                            shortcut: AppCommandRegistry.shortcutLabel(
-                              AppCommandId.toggleChrome,
-                              shortcutOverrides,
-                            ),
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: _ReaderMenuAction.toggleImmersive,
-                          height: 40,
-                          child: _ReaderMenuItem(
-                            icon: Icons.center_focus_strong_rounded,
-                            label: 'Lectura inmersiva',
-                            shortcut: AppCommandRegistry.shortcutLabel(
-                              AppCommandId.toggleImmersive,
-                              shortcutOverrides,
-                            ),
-                          ),
-                        ),
-                        const PopupMenuDivider(height: 9),
-                        const PopupMenuItem(
-                          value: _ReaderMenuAction.documentInfo,
-                          height: 40,
-                          child: _ReaderMenuItem(
-                            icon: Icons.info_outline_rounded,
-                            label: 'Información del documento',
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: _ReaderMenuAction.settings,
-                          height: 40,
-                          child: _ReaderMenuItem(
-                            icon: Icons.settings_outlined,
-                            label: 'Ajustes',
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: AppSpacing.space4),
-                  ],
+                      ),
+                      const SizedBox(width: AppSpacing.space4),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -472,117 +487,25 @@ final class _ReaderModeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Modo de visualización',
-      explicitChildNodes: true,
-      child: Container(
-        key: const Key('reader-mode-selector'),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ReaderModeSegment(
-              mode: ReaderMode.document,
-              label: 'Documento',
-              tooltip: 'Documento: mostrar una página',
-              icon: Icons.description_outlined,
-              selected: selected == ReaderMode.document,
-              onTap: onSelected,
-            ),
-            _ReaderModeSegment(
-              mode: ReaderMode.book,
-              label: 'Libro',
-              tooltip: 'Libro: mostrar páginas enfrentadas',
-              icon: Icons.menu_book_outlined,
-              selected: selected == ReaderMode.book,
-              onTap: onSelected,
-            ),
-          ],
+    return YamaSegmentedControl<ReaderMode>(
+      key: const Key('reader-mode-selector'),
+      value: selected,
+      semanticLabel: 'Modo de visualización',
+      segments: const [
+        YamaSegment(
+          value: ReaderMode.document,
+          label: 'Documento',
+          tooltip: 'Documento: mostrar una página',
+          icon: Icons.description_outlined,
         ),
-      ),
-    );
-  }
-}
-
-final class _ReaderModeSegment extends StatelessWidget {
-  const _ReaderModeSegment({
-    required this.mode,
-    required this.label,
-    required this.tooltip,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final ReaderMode mode;
-  final String label;
-  final String tooltip;
-  final IconData icon;
-  final bool selected;
-  final ValueChanged<ReaderMode> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final motion = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : AppMotion.fast;
-    final foreground = selected ? colors.textPrimary : colors.textSecondary;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: () => onTap(mode),
-          hoverColor: colors.accentHover.withValues(alpha: 0.08),
-          focusColor: colors.focusRing.withValues(alpha: 0.12),
-          child: AnimatedContainer(
-            duration: motion,
-            curve: Curves.easeOutCubic,
-            constraints: const BoxConstraints(minHeight: 32),
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.space12,
-              vertical: AppSpacing.space6,
-            ),
-            decoration: BoxDecoration(
-              color: selected ? colors.surfaceElevated : Colors.transparent,
-              border: Border(
-                bottom: BorderSide(
-                  color: selected ? colors.textPrimary : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16, color: foreground),
-                const SizedBox(width: AppSpacing.space6),
-                AnimatedDefaultTextStyle(
-                  duration: motion,
-                  curve: Curves.easeOutCubic,
-                  style:
-                      Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: foreground,
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                      ) ??
-                      TextStyle(
-                        color: foreground,
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
-                      ),
-                  child: Text(label),
-                ),
-              ],
-            ),
-          ),
+        YamaSegment(
+          value: ReaderMode.book,
+          label: 'Libro',
+          tooltip: 'Libro: mostrar páginas enfrentadas',
+          icon: Icons.menu_book_outlined,
         ),
-      ),
+      ],
+      onChanged: onSelected,
     );
   }
 }

@@ -36,6 +36,13 @@ $nativeExecutionReady = $false
 $nativeExecutionReason = 'Windows release build has not been evaluated.'
 $nativeSignatureState = $null
 $nativeExecutionState = $null
+$resolvedPubCache = $env:PUB_CACHE
+if ([string]::IsNullOrWhiteSpace($resolvedPubCache)) {
+    $defaultPubCache = Join-Path $env:LOCALAPPDATA 'Pub\Cache'
+    if (Test-Path -LiteralPath $defaultPubCache) {
+        $resolvedPubCache = $defaultPubCache
+    }
+}
 
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $toolStateRoot = Join-Path $outputRoot 'tool-state'
@@ -44,6 +51,9 @@ Push-Location $repositoryRoot
 try {
     $env:APPDATA = $toolStateRoot
     $env:LOCALAPPDATA = $toolStateRoot
+    if (-not [string]::IsNullOrWhiteSpace($resolvedPubCache)) {
+        $env:PUB_CACHE = $resolvedPubCache
+    }
     $env:GIT_CONFIG_COUNT = '2'
     $env:GIT_CONFIG_KEY_0 = 'safe.directory'
     $env:GIT_CONFIG_VALUE_0 = $repositoryRoot.Replace('\', '/')
@@ -225,12 +235,9 @@ try {
         Invoke-Gate 'toolchain and native prerequisites' {
             if ($toolchainResolutionError) { throw $toolchainResolutionError }
             if (-not $SkipNative) {
-                if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
-                    throw 'cmake was not found on PATH.'
-                }
-                if (-not (Get-Command msbuild -ErrorAction SilentlyContinue)) {
-                    throw 'msbuild was not found on PATH.'
-                }
+                # Flutter resolves CMake and MSBuild from the selected Visual
+                # Studio installation even when neither executable is on PATH.
+                # The native release gate below is the authoritative check.
                 $free = (Get-PSDrive -Name (Get-Location).Drive.Name).Free
                 if ($free -lt 10GB) {
                     throw "Less than 10 GB is free on the workspace drive ($free bytes)."
@@ -427,13 +434,13 @@ try {
     if (-not $SkipDpiMatrix -and -not $SkipNative -and $nativeExecutionReady) {
         Invoke-Gate 'native resolution and DPI matrix' {
             $matrixScript = Join-Path $PSScriptRoot 'run_visual_matrix.ps1'
-            $matrixArguments = @(
-                '-ExecutablePath', 'build/windows/x64/runner/Release/yamantaka.exe',
-                '-FixturePdf', (Join-Path $OutputDirectory 'corpus/normal.pdf'),
-                '-OutputDirectory', (Join-Path $OutputDirectory 'dpi-matrix')
-            )
-            if ($DpiScaleConfirmed) { $matrixArguments += '-ScaleConfirmed' }
-            if ($RequireSignature) { $matrixArguments += '-RequireSignature' }
+            $matrixArguments = @{
+                ExecutablePath = 'build/windows/x64/runner/Release/yamantaka.exe'
+                FixturePdf = Join-Path $OutputDirectory 'corpus/normal.pdf'
+                OutputDirectory = Join-Path $OutputDirectory 'dpi-matrix'
+                ScaleConfirmed = [bool]$DpiScaleConfirmed
+                RequireSignature = [bool]$RequireSignature
+            }
             & $matrixScript @matrixArguments
             if ($LASTEXITCODE -ne 0) {
                 throw "DPI matrix returned exit code $LASTEXITCODE."

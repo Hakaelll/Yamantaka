@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.2.1 — 2026-08-23 (biblioteca monocromática)
+
+- Sustituye la paleta azul-negra de Biblioteca por negros, blancos y grises
+  neutros en fondos, superficies, texto, iconos, bordes y controles.
+- Reserva el violeta `#B58AFF` exclusivamente para el borde, progreso y halo
+  luminoso del archivo seleccionado; el resto de acciones conserva contraste
+  monocromático y un foco blanco independiente del color.
+
+## 0.2.0 — 2026-08-23 (revamp visual y paridad de Libro)
+
+- Consolida un sistema visual profesional con botones circulares, controles
+  segmentados en cápsula, grupos flotantes, paneles y diálogos de radios
+  jerárquicos, sin nuevas dependencias ni efectos de blur.
+- Preserva la biblioteca como una constelación oscura inspirada
+  conceptualmente en navegadores de partidas de consola: portadas protagonistas,
+  espacio negativo, barra superior limpia y selección con halo cian accesible.
+- Recompone el chrome del lector en tres grupos flotantes, convierte los
+  controles inferiores en una dock ligera y suaviza paneles, menús y estados.
+- Da paridad real a Documento y Libro: el selector de tema está disponible en
+  ambos modos y el lienzo, el pliego y el chrome respetan los seis entornos de
+  lectura en layouts compactos y expandidos.
+- Conserva portada individual, lado inicial y RTL al entrar o restaurar Libro;
+  añade un canal central estrecho, semántica de pliego y ajuste sobre la unidad
+  completa sin degradar silenciosamente a Documento.
+- Añade navegación interna al panel lateral sin reconstruir el visor, limpia
+  tarjetas redundantes de Ajustes y Ayuda y actualiza la referencia visual de
+  Libro junto con pruebas de paridad, accesibilidad y responsive.
+- Retira del bundle el emblema raster de 1254×1254 (2.089.291 bytes), que no
+  tenía ninguna referencia en código, tests ni integración.
+- Elimina el antiguo `ContinueReadingCard` y tres wrappers Yama sin consumidores
+  después de verificar referencias y sustituir sus responsabilidades por las
+  superficies activas del sistema.
+- Endurece el gate de Windows para conservar la caché Pub aislada, aceptar
+  rutas absolutas, cerrar capturas limpiamente y activar Documento/Libro por su
+  control visible; aprueba 206 pruebas, build Release, smoke sin red, benchmark
+  de 5.000 documentos y matriz nativa a escala real del 100 %.
+
 ## 0.1.0-dev — 2026-08-02 (lector editorial y fullscreen real)
 
 - Sustituye el fullscreen de Windows por una transición Win32 sin frame que

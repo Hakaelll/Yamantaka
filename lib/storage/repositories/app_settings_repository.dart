@@ -76,7 +76,7 @@ final class AppSettings {
     this.recordReadingSessions = true,
     this.readingHistoryLimit = 250,
     this.libraryReadingFilter = 'all',
-      this.readerPanelWidth = AppSizes.readerPanelDefault,
+    this.readerPanelWidth = AppSizes.readerPanelDefault,
     this.readerPanelSection = '',
     this.readerPanelOpen = false,
     this.readerChromeVisible = true,
@@ -100,6 +100,7 @@ final class AppSettings {
   final bool showProgress;
   final bool reduceMotion;
   final bool disableAnimations;
+
   /// New semantic setting. Null means the value is derived from the legacy
   /// booleans, which keeps old backups and preference stores compatible.
   final AppMotionPreference? motionPreference;
@@ -279,10 +280,10 @@ final class AppSettingsRepository {
         ),
     libraryReadingFilter:
         await _preferences.getString('libraryReadingFilter') ?? 'all',
-      readerPanelWidth:
-          (await _preferences.getDouble('readerPanelWidth') ??
-                  AppSizes.readerPanelDefault)
-          .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth),
+    readerPanelWidth:
+        (await _preferences.getDouble('readerPanelWidth') ??
+                AppSizes.readerPanelDefault)
+            .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth),
     readerPanelSection:
         await _preferences.getString('readerPanelSection') ?? '',
     readerPanelOpen: await _preferences.getBool('readerPanelOpen') ?? false,

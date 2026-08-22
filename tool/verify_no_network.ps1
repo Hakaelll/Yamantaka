@@ -10,9 +10,18 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
-$executable = [System.IO.Path]::GetFullPath((Join-Path $root $ExecutablePath))
-$fixture = [System.IO.Path]::GetFullPath((Join-Path $root $FixturePath))
-$reportPath = [System.IO.Path]::GetFullPath((Join-Path $root $OutputPath))
+
+function Resolve-RepositoryPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if ([System.IO.Path]::IsPathFullyQualified($Path)) {
+        return [System.IO.Path]::GetFullPath($Path)
+    }
+    return [System.IO.Path]::GetFullPath((Join-Path $root $Path))
+}
+
+$executable = Resolve-RepositoryPath $ExecutablePath
+$fixture = Resolve-RepositoryPath $FixturePath
+$reportPath = Resolve-RepositoryPath $OutputPath
 if (-not (Test-Path $executable)) { throw "Executable not found: $executable" }
 if (-not (Test-Path $fixture)) { throw "Fixture not found: $fixture" }
 if (-not (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue)) {

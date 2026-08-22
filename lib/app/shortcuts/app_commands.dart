@@ -543,7 +543,9 @@ abstract final class AppCommandRegistry {
         LogicalKeyboardKey.keyI,
         control: true,
         shift: true,
-      ): action(AppCommandId.toggleImmersive),
+      ): action(
+        AppCommandId.toggleImmersive,
+      ),
       const SingleActivator(LogicalKeyboardKey.escape): action(
         AppCommandId.escape,
       ),

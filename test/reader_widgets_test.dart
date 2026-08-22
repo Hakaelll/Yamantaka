@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yamantaka/app/theme/app_tokens.dart';
 import 'package:yamantaka/core/errors/app_failure.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/core/platform/window_service.dart';
@@ -48,6 +49,8 @@ void main() {
       documentId: 'book',
       viewMode: ReaderMode.book,
       pageLayout: PageLayoutMode.facing,
+      coverPolicy: ReaderCoverPolicy.firstPageIsCover,
+      initialSide: ReaderInitialSide.right,
       zoomMode: ZoomMode.custom,
       zoomLevel: 1.56,
       scrollOffset: 0.4,
@@ -58,8 +61,8 @@ void main() {
     expect(normalized.zoomMode, ZoomMode.fitPage);
     expect(normalized.scrollOffset, 0);
     expect(normalized.zoomLevel, 1.56);
-    expect(normalized.coverPolicy, ReaderCoverPolicy.noCover);
-    expect(normalized.initialSide, ReaderInitialSide.left);
+    expect(normalized.coverPolicy, ReaderCoverPolicy.firstPageIsCover);
+    expect(normalized.initialSide, ReaderInitialSide.right);
   });
 
   testWidgets('reader presents a recoverable error state', (tester) async {
@@ -106,7 +109,8 @@ void main() {
     );
     final topDecoration = topSurface.decoration as BoxDecoration;
     expect(topDecoration.color, isNotNull);
-    expect(topDecoration.color!.a, 1);
+    expect(topDecoration.color!.a, lessThan(1));
+    expect(topDecoration.border, isNull);
     expect(topDecoration.gradient, isNull);
 
     await tester.tap(find.byTooltip('Más opciones'));
@@ -237,7 +241,7 @@ void main() {
 
     expect(harness.controller.preferences!.pageLayout, PageLayoutMode.facing);
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
-    expect(find.byTooltip('Apertura siguiente (→)'), findsOneWidget);
+    expect(find.byTooltip('Pliego siguiente (→)'), findsOneWidget);
     expect(adapter.configuration?.coverPolicy, ReaderCoverPolicy.noCover);
     expect(adapter.configuration?.initialSide, ReaderInitialSide.left);
     expect(find.text('1–2 / 6'), findsOneWidget);
@@ -302,6 +306,10 @@ void main() {
     final harness = await _ReaderHarness.create(ready: true, pageCount: 6);
     final adapter = _RecordingViewerAdapter();
     await harness.controller.zoomBy(1.56);
+    harness.controller.preferences = harness.controller.preferences!.copyWith(
+      coverPolicy: ReaderCoverPolicy.firstPageIsCover,
+      initialSide: ReaderInitialSide.right,
+    );
     expect(harness.controller.preferences!.zoomMode, ZoomMode.custom);
 
     await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
@@ -321,9 +329,12 @@ void main() {
     expect(harness.controller.preferences!.zoomMode, ZoomMode.fitPage);
     expect(
       harness.controller.preferences!.coverPolicy,
-      ReaderCoverPolicy.noCover,
+      ReaderCoverPolicy.firstPageIsCover,
     );
-    expect(harness.controller.preferences!.initialSide, ReaderInitialSide.left);
+    expect(
+      harness.controller.preferences!.initialSide,
+      ReaderInitialSide.right,
+    );
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
     expect(adapter.configuration?.initialZoomMode, PdfViewZoomMode.fitPage);
 
@@ -447,6 +458,110 @@ void main() {
     await harness.dispose();
   });
 
+  testWidgets(
+    'document and book expose the same common actions in compact and expanded layouts',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final size in const [Size(640, 760), Size(1280, 800)]) {
+        final compact = size.width < AppBreakpoints.medium;
+        for (final mode in ReaderMode.values) {
+          final harness = await _ReaderHarness.create(
+            ready: true,
+            pageCount: 6,
+          );
+          if (mode == ReaderMode.book) {
+            harness.controller.setReaderMode(ReaderMode.book);
+          }
+          tester.view.physicalSize = size;
+          await tester.pumpWidget(_app(harness));
+          await tester.pump();
+
+          expect(find.byTooltip('Volver a la biblioteca'), findsOneWidget);
+          expect(find.byTooltip('Buscar (Ctrl+F)'), findsOneWidget);
+          expect(find.byTooltip('Ajuste de zoom'), findsOneWidget);
+          expect(
+            find.byTooltip(
+              mode == ReaderMode.book
+                  ? 'Pliego siguiente (→)'
+                  : 'Página siguiente (→)',
+            ),
+            findsOneWidget,
+          );
+
+          await tester.tap(find.byTooltip('Más opciones'));
+          await tester.pump();
+          for (final label in const [
+            'Abrir otro PDF…',
+            'Girar página',
+            'Márgenes de lectura',
+            'Pantalla completa',
+            'Ocultar interfaz',
+            'Lectura inmersiva',
+            'Información del documento',
+            'Ajustes',
+          ]) {
+            expect(
+              find.text(label),
+              findsOneWidget,
+              reason: '$mode · $size · $label',
+            );
+          }
+          if (compact) {
+            for (final label in const [
+              'Paleta de comandos',
+              'Miniaturas',
+              'Índice',
+              'Marcadores',
+              'Anotaciones',
+            ]) {
+              expect(
+                find.text(label),
+                findsOneWidget,
+                reason: '$mode · $size · $label',
+              );
+            }
+          }
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pump();
+
+          if (compact) {
+            await tester.tap(find.byTooltip('Más controles de lectura'));
+            await tester.pump();
+            expect(find.text('Tema de lectura'), findsOneWidget);
+            expect(find.textContaining('Tamaño real'), findsOneWidget);
+            expect(find.textContaining('Ajustar al'), findsWidgets);
+            await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+            await tester.pump();
+          } else {
+            expect(find.byTooltip('Tema de lectura'), findsOneWidget);
+            expect(
+              find.byTooltip('Paleta de comandos (Ctrl+K)'),
+              findsOneWidget,
+            );
+            await tester.tap(find.byTooltip('Herramientas'));
+            await tester.pump();
+            for (final label in const [
+              'Miniaturas',
+              'Índice',
+              'Marcadores',
+              'Anotaciones',
+            ]) {
+              expect(find.text(label), findsOneWidget);
+            }
+            await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+            await tester.pump();
+          }
+
+          await tester.pumpWidget(const SizedBox.shrink());
+          await harness.dispose();
+        }
+      }
+    },
+  );
+
   testWidgets('book flow remains a compact spread at every reader width', (
     tester,
   ) async {
@@ -542,11 +657,16 @@ void main() {
       final draggedWidth = tester
           .getSize(find.byKey(const Key('reader-side-panel')))
           .width;
-      expect(draggedWidth, inInclusiveRange(380, 416));
+      expect(draggedWidth, inInclusiveRange(400, 440));
       expect(adapter.buildCount, 1);
       expect(persistedWidth, isNull);
       await tester.pump(const Duration(milliseconds: 260));
       expect(persistedWidth, closeTo(draggedWidth, 1));
+
+      await tester.tap(find.byTooltip('Miniaturas'));
+      await tester.pump();
+      expect(find.byKey(const Key('pdf-search-field')), findsNothing);
+      expect(adapter.buildCount, 1);
 
       await tester.tap(handle);
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);

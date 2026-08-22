@@ -52,7 +52,8 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           body: LayoutBuilder(
             builder: (context, constraints) {
               final sections = _buildSections(settings);
-              if (constraints.maxWidth < 840) {
+              if (AppBreakpoints.classify(constraints.maxWidth) !=
+                  AppWindowClass.expanded) {
                 return _CompactSettings(sections: sections);
               }
               return _DesktopSettings(
@@ -87,7 +88,9 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _SwitchSetting(
             label: 'Tema oscuro de la aplicación',
-            description: 'Afecta a la biblioteca, el lector y los ajustes.',
+            description:
+                'Afecta al lector y a los ajustes. La biblioteca conserva su '
+                'entorno oscuro y espacial.',
             value: settings.darkMode,
             onChanged: (value) => _update(settings.copyWith(darkMode: value)),
           ),
@@ -175,8 +178,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                       profile == ReaderVisualProfile.electronicInk
                       ? true
                       : settings.disableAnimations,
-                  motionPreference:
-                      profile == ReaderVisualProfile.electronicInk
+                  motionPreference: profile == ReaderVisualProfile.electronicInk
                       ? AppMotionPreference.none
                       : settings.motionPreference,
                   defaultReaderTheme:
@@ -450,7 +452,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-          _SettingsSectionData(
+      _SettingsSectionData(
         id: _SettingsSectionId.dataPrivacy,
         description: 'Datos locales, copias versionadas y privacidad.',
         children: [
@@ -913,47 +915,45 @@ final class _StorageSummary extends StatelessWidget {
             subtitle: Text('Calculando tamaños…'),
           );
         }
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.space12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Almacenamiento local',
-                  style: Theme.of(context).textTheme.titleSmall,
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.space12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Almacenamiento local',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: AppSpacing.space8),
+              for (final entry in entries)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(entry.category.name),
+                  subtitle: Text(entry.description),
+                  trailing: Text(_formatStorageBytes(entry.bytes)),
                 ),
-                const SizedBox(height: AppSpacing.space8),
-                for (final entry in entries)
-                  ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(entry.category.name),
-                    subtitle: Text(entry.description),
-                    trailing: Text(_formatStorageBytes(entry.bytes)),
+              const SizedBox(height: AppSpacing.space4),
+              Text(
+                'Los archivos PDF originales no se borran desde estas acciones.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.space8),
+              Wrap(
+                spacing: AppSpacing.space8,
+                runSpacing: AppSpacing.space8,
+                children: [
+                  OutlinedButton(
+                    onPressed: onClearRebuildable,
+                    child: const Text('Limpiar recreables'),
                   ),
-                const SizedBox(height: AppSpacing.space4),
-                Text(
-                  'Los archivos PDF originales no se borran desde estas acciones.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: AppSpacing.space8),
-                Wrap(
-                  spacing: AppSpacing.space8,
-                  runSpacing: AppSpacing.space8,
-                  children: [
-                    OutlinedButton(
-                      onPressed: onClearRebuildable,
-                      child: const Text('Limpiar recreables'),
-                    ),
-                    OutlinedButton(
-                      onPressed: onClearBackups,
-                      child: const Text('Eliminar copias'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  OutlinedButton(
+                    onPressed: onClearBackups,
+                    child: const Text('Eliminar copias'),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -1187,17 +1187,10 @@ final class _SettingsSectionContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.space20),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceElevated,
-            border: Border.all(color: context.appColors.borderSubtle),
-            borderRadius: BorderRadius.circular(AppRadii.floating),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
-            child: Column(
-              children: [for (final child in section.children) child],
-            ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space4),
+          child: Column(
+            children: [for (final child in section.children) child],
           ),
         ),
       ],
@@ -1228,27 +1221,32 @@ final class _SettingsNavItem extends StatelessWidget {
           color: selected
               ? context.appColors.selectionBackground
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadii.control),
+          borderRadius: BorderRadius.circular(AppRadii.capsule),
           child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.control),
+            borderRadius: BorderRadius.circular(AppRadii.capsule),
             onTap: onPressed,
             child: Container(
               height: AppSizes.desktopControlExtent,
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: selected
-                        ? context.appColors.accentPrimary
-                        : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-              ),
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.space12,
               ),
               child: Row(
                 children: [
+                  AnimatedContainer(
+                    duration: AppMotion.whenAllowed(
+                      MediaQuery.disableAnimationsOf(context),
+                      AppMotion.fast,
+                    ),
+                    width: 3,
+                    height: selected ? 18 : 3,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? context.appColors.accentPrimary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppRadii.indicator),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.space8),
                   Icon(section.icon, size: 18),
                   const SizedBox(width: AppSpacing.space12),
                   Expanded(child: Text(section.label)),

@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme/app_tokens.dart';
+import '../../../app/ui/yama_components.dart';
 import '../application/library_controller.dart';
 import '../application/library_filter.dart';
 import '../domain/library_artifact_layout.dart';
@@ -793,12 +794,11 @@ final class _LibraryCommandBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(
-            query.isEmpty && !activeFilter
-                ? '$totalCount ${totalCount == 1 ? 'documento' : 'documentos'}'
-                : '$resultCount de $totalCount',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          if (query.isNotEmpty || activeFilter)
+            Text(
+              '$resultCount de $totalCount',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           const Spacer(),
           if (selectedCount > 0)
             Semantics(
@@ -814,90 +814,102 @@ final class _LibraryCommandBar extends StatelessWidget {
                 ),
               ),
             ),
-          IconButton(
-            key: const Key('library-selection-mode-button'),
-            tooltip: selectionMode
-                ? 'Salir del modo de selección'
-                : 'Seleccionar varios documentos',
-            onPressed: onToggleSelectionMode,
-            icon: Badge(
-              isLabelVisible: selectedCount > 0,
-              label: Text('$selectedCount'),
-              child: Icon(
-                selectionMode
+          YamaToolbarGroup(
+            label: 'Buscar, seleccionar, filtrar y ordenar',
+            flat: MediaQuery.highContrastOf(context),
+            children: [
+              YamaIconButton(
+                key: const Key('library-selection-mode-button'),
+                semanticLabel: selectionMode
+                    ? 'Salir del modo de selección'
+                    : 'Seleccionar varios documentos',
+                tooltip: selectionMode
+                    ? 'Salir del modo de selección'
+                    : 'Seleccionar varios documentos',
+                selected: selectionMode,
+                onPressed: onToggleSelectionMode,
+                icon: selectionMode
                     ? Icons.check_box_outlined
                     : Icons.checklist_rounded,
+                badge: selectedCount > 0
+                    ? Badge(label: Text('$selectedCount'))
+                    : null,
               ),
-            ),
-          ),
-          IconButton(
-            key: const Key('library-search-button'),
-            tooltip: 'Buscar en la biblioteca (Ctrl+F)',
-            onPressed: onSearch,
-            icon: const Icon(Icons.search_rounded),
-          ),
-          PopupMenuButton<_FilterCommand>(
-            key: const Key('library-filter-button'),
-            tooltip: 'Filtrar y ordenar',
-            onSelected: onFilter,
-            icon: Badge(
-              isLabelVisible: activeFilter,
-              smallSize: 6,
-              backgroundColor: context.appColors.textSecondary,
-              child: const Icon(Icons.tune_rounded),
-            ),
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                enabled: false,
-                height: 32,
-                child: Text('Estado'),
+              YamaIconButton(
+                key: const Key('library-search-button'),
+                semanticLabel: 'Buscar en la biblioteca',
+                tooltip: 'Buscar en la biblioteca (Ctrl+F)',
+                onPressed: onSearch,
+                icon: Icons.search_rounded,
               ),
-              for (final state in LibraryReadingState.values)
-                CheckedPopupMenuItem(
-                  value: switch (state) {
-                    LibraryReadingState.all => _FilterCommand.all,
-                    LibraryReadingState.inProgress => _FilterCommand.inProgress,
-                    LibraryReadingState.notStarted => _FilterCommand.notStarted,
-                    LibraryReadingState.completed => _FilterCommand.completed,
-                  },
-                  checked: readingState == state,
-                  child: Text('${state.label} · ${counts[state] ?? 0}'),
+              PopupMenuButton<_FilterCommand>(
+                key: const Key('library-filter-button'),
+                tooltip: 'Filtrar y ordenar',
+                onSelected: onFilter,
+                icon: Badge(
+                  isLabelVisible: activeFilter,
+                  smallSize: 6,
+                  backgroundColor: context.appColors.textSecondary,
+                  child: const Icon(Icons.tune_rounded),
                 ),
-              const PopupMenuDivider(),
-              CheckedPopupMenuItem(
-                value: _FilterCommand.favorites,
-                checked: favoritesOnly,
-                child: const Text('Solo favoritos'),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    enabled: false,
+                    height: 32,
+                    child: Text('Estado'),
+                  ),
+                  for (final state in LibraryReadingState.values)
+                    CheckedPopupMenuItem(
+                      value: switch (state) {
+                        LibraryReadingState.all => _FilterCommand.all,
+                        LibraryReadingState.inProgress =>
+                          _FilterCommand.inProgress,
+                        LibraryReadingState.notStarted =>
+                          _FilterCommand.notStarted,
+                        LibraryReadingState.completed =>
+                          _FilterCommand.completed,
+                      },
+                      checked: readingState == state,
+                      child: Text('${state.label} · ${counts[state] ?? 0}'),
+                    ),
+                  const PopupMenuDivider(),
+                  CheckedPopupMenuItem(
+                    value: _FilterCommand.favorites,
+                    checked: favoritesOnly,
+                    child: const Text('Solo favoritos'),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    enabled: false,
+                    height: 32,
+                    child: Text('Orden'),
+                  ),
+                  for (final order in LibrarySortOrder.values)
+                    CheckedPopupMenuItem(
+                      value: switch (order) {
+                        LibrarySortOrder.lastOpened =>
+                          _FilterCommand.lastOpened,
+                        LibrarySortOrder.dateAdded => _FilterCommand.dateAdded,
+                        LibrarySortOrder.title => _FilterCommand.title,
+                        LibrarySortOrder.progress => _FilterCommand.progress,
+                      },
+                      checked: sortOrder == order,
+                      child: Text(switch (order) {
+                        LibrarySortOrder.lastOpened => 'Última apertura',
+                        LibrarySortOrder.dateAdded => 'Fecha de incorporación',
+                        LibrarySortOrder.title => 'Título',
+                        LibrarySortOrder.progress => 'Progreso',
+                      }),
+                    ),
+                  if (activeFilter) ...[
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: _FilterCommand.reset,
+                      child: Text('Restablecer filtros'),
+                    ),
+                  ],
+                ],
               ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                enabled: false,
-                height: 32,
-                child: Text('Orden'),
-              ),
-              for (final order in LibrarySortOrder.values)
-                CheckedPopupMenuItem(
-                  value: switch (order) {
-                    LibrarySortOrder.lastOpened => _FilterCommand.lastOpened,
-                    LibrarySortOrder.dateAdded => _FilterCommand.dateAdded,
-                    LibrarySortOrder.title => _FilterCommand.title,
-                    LibrarySortOrder.progress => _FilterCommand.progress,
-                  },
-                  checked: sortOrder == order,
-                  child: Text(switch (order) {
-                    LibrarySortOrder.lastOpened => 'Última apertura',
-                    LibrarySortOrder.dateAdded => 'Fecha de incorporación',
-                    LibrarySortOrder.title => 'Título',
-                    LibrarySortOrder.progress => 'Progreso',
-                  }),
-                ),
-              if (activeFilter) ...[
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: _FilterCommand.reset,
-                  child: Text('Restablecer filtros'),
-                ),
-              ],
             ],
           ),
         ],
@@ -1202,7 +1214,7 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
     final scale = widget.reduceMotion
         ? 1.0
         : widget.selected
-        ? 1.025
+        ? 1.055
         : _hovered
         ? 1.02
         : jitter.scale;
@@ -1280,12 +1292,12 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                       height: fittedHeight,
                       decoration: BoxDecoration(
                         color: context.appColors.surfaceSunken,
-                        borderRadius: BorderRadius.circular(AppRadii.indicator),
+                        borderRadius: BorderRadius.circular(AppRadii.page),
                         border: Border.all(
                           color: _focused
                               ? context.appColors.focusRing
                               : widget.selected
-                              ? context.appColors.accentPrimary
+                              ? context.appColors.librarySelectionAccent
                               : context.appColors.borderSubtle,
                           width: _focused
                               ? 2
@@ -1296,6 +1308,16 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                         boxShadow: widget.reduceMotion || highContrast
                             ? null
                             : [
+                                if (widget.selected)
+                                  BoxShadow(
+                                    color: context
+                                        .appColors
+                                        .librarySelectionAccent
+                                        .withValues(alpha: 0.44),
+                                    blurRadius: AppShadow.artifactGlowBlur,
+                                    spreadRadius: AppShadow.artifactGlowSpread,
+                                    offset: const Offset(0, 12),
+                                  ),
                                 BoxShadow(
                                   color: context.appColors.readerPageShadow
                                       .withValues(
@@ -1324,7 +1346,7 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                 ? 0.48
                                 : emphasized
                                 ? 1
-                                : 0.84,
+                                : 0.72,
                             child: coverPath == null
                                 ? _ArtifactPlaceholder(
                                     document: widget.document,
@@ -1365,7 +1387,9 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                               child: FractionallySizedBox(
                                 widthFactor: widget.document.readingProgress,
                                 child: ColoredBox(
-                                  color: context.appColors.textPrimary,
+                                  color: widget.selected
+                                      ? context.appColors.librarySelectionAccent
+                                      : context.appColors.textSecondary,
                                   child: const SizedBox(height: 2),
                                 ),
                               ),
@@ -1410,7 +1434,9 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                   color: context.appColors.surfacePrimary,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: context.appColors.accentPrimary,
+                                    color: context
+                                        .appColors
+                                        .librarySelectionAccent,
                                   ),
                                 ),
                                 child: Padding(
@@ -1418,7 +1444,9 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                   child: Icon(
                                     Icons.check_rounded,
                                     size: 16,
-                                    color: context.appColors.accentPrimary,
+                                    color: context
+                                        .appColors
+                                        .librarySelectionAccent,
                                   ),
                                 ),
                               ),

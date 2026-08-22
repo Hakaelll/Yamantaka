@@ -35,8 +35,6 @@ DocumentPreferences normalizeOpeningReaderPreferences(
 ) => restored.viewMode == ReaderMode.book
     ? restored.copyWith(
         pageLayout: PageLayoutMode.facing,
-        coverPolicy: ReaderCoverPolicy.noCover,
-        initialSide: ReaderInitialSide.left,
         zoomMode: ZoomMode.fitPage,
         scrollOffset: 0,
       )
@@ -500,11 +498,8 @@ final class ReaderController extends ChangeNotifier {
   void setReaderMode(ReaderMode mode) {
     final current = preferences;
     if (current == null || current.viewMode == mode) return;
-    final bookMode = mode == ReaderMode.book;
-    final coverPolicy = bookMode
-        ? ReaderCoverPolicy.noCover
-        : current.coverPolicy;
-    final initialSide = bookMode ? ReaderInitialSide.left : current.initialSide;
+    final coverPolicy = current.coverPolicy;
+    final initialSide = current.initialSide;
     final canonicalPage = ReadingUnitNavigation.canonicalPage(
       pageIndex: currentPageIndex,
       pageCount: pageCount,
@@ -544,12 +539,8 @@ final class ReaderController extends ChangeNotifier {
     final mode = layout == PageLayoutMode.facing
         ? ReaderMode.book
         : ReaderMode.document;
-    final coverPolicy = mode == ReaderMode.book
-        ? ReaderCoverPolicy.noCover
-        : current.coverPolicy;
-    final initialSide = mode == ReaderMode.book
-        ? ReaderInitialSide.left
-        : current.initialSide;
+    final coverPolicy = current.coverPolicy;
+    final initialSide = current.initialSide;
     currentPageIndex = ReadingUnitNavigation.canonicalPage(
       pageIndex: currentPageIndex,
       pageCount: pageCount,

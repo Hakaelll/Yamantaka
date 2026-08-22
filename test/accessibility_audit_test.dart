@@ -7,7 +7,11 @@ import 'package:yamantaka/app/theme/app_tokens.dart';
 
 void main() {
   test('semantic text token pairs meet WCAG AA contrast', () {
-    for (final tokens in [AppColorTokens.light, AppColorTokens.dark]) {
+    for (final tokens in [
+      AppColorTokens.light,
+      AppColorTokens.dark,
+      AppColorTokens.library,
+    ]) {
       expect(
         _contrast(tokens.textPrimary, tokens.appBackground),
         greaterThanOrEqualTo(4.5),

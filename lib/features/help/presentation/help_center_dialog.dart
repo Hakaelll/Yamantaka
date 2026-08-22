@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_tokens.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../domain/help_content.dart';
 
@@ -53,7 +54,7 @@ final class _HelpCenterDialogState extends State<HelpCenterDialog> {
               ),
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.space12),
             Expanded(
               child: articles.isEmpty
                   ? Center(child: Text(strings.get('help.noResults')))
@@ -62,31 +63,34 @@ final class _HelpCenterDialogState extends State<HelpCenterDialog> {
                       itemBuilder: (context, index) {
                         final article = articles[index];
                         final expanded = _expanded == article.topic;
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: Semantics(
-                            expanded: expanded,
-                            child: ExpansionTile(
-                              initiallyExpanded: expanded,
-                              onExpansionChanged: (value) => setState(
-                                () => _expanded = value ? article.topic : null,
-                              ),
-                              title: Text(article.title),
-                              subtitle: Text(article.summary),
-                              childrenPadding: const EdgeInsets.fromLTRB(
-                                16,
-                                0,
-                                16,
-                                16,
-                              ),
-                              children: [
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(article.body),
+                        return Column(
+                          children: [
+                            Semantics(
+                              expanded: expanded,
+                              child: ExpansionTile(
+                                initiallyExpanded: expanded,
+                                onExpansionChanged: (value) => setState(
+                                  () =>
+                                      _expanded = value ? article.topic : null,
                                 ),
-                              ],
+                                title: Text(article.title),
+                                subtitle: Text(article.summary),
+                                childrenPadding: const EdgeInsets.fromLTRB(
+                                  AppSpacing.space16,
+                                  0,
+                                  AppSpacing.space16,
+                                  AppSpacing.space16,
+                                ),
+                                children: [
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(article.body),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                            const Divider(height: 1),
+                          ],
                         );
                       },
                     ),

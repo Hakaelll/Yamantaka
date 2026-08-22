@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../app/shortcuts/app_commands.dart';
 import '../../../app/theme/app_components.dart';
+import '../../../app/theme/app_density.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/errors/failure_presentation.dart';
@@ -286,9 +287,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       context,
       preferences.readingTheme,
     );
-    final chromeTheme = _isBookMode && !_isElectronicInk
-        ? AppTheme.dark(highContrast: MediaQuery.highContrastOf(context))
-        : Theme.of(context);
+    final chromeTheme = _readerChromeTheme(context, preferences.readingTheme);
     final panelWidth = _panelWidth(constraints.maxWidth);
     final immersive = _immersive;
     final requestedFlow = _isElectronicInk
@@ -528,19 +527,23 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                   offset: Offset(panelWidth * offset, 0),
                   child: child,
                 ),
-                child: ReaderSidePanel(
-                  section: _panel!,
-                  controller: controller,
-                  engine: widget.engine,
-                  width: panelWidth,
-                  pinned: _panelPinned,
-                  allowPin: windowClass == AppWindowClass.expanded,
-                  onPinnedChanged: _togglePanelPinned,
-                  flatChrome:
-                      _isElectronicInk || MediaQuery.highContrastOf(context),
-                  onClose: _closePanel,
-                  onWidthChanged: _resizePanel,
-                  onExportAnnotations: widget.onExportAnnotations,
+                child: Theme(
+                  data: chromeTheme,
+                  child: ReaderSidePanel(
+                    section: _panel!,
+                    controller: controller,
+                    engine: widget.engine,
+                    width: panelWidth,
+                    pinned: _panelPinned,
+                    allowPin: windowClass == AppWindowClass.expanded,
+                    onPinnedChanged: _togglePanelPinned,
+                    onSectionChanged: _showPanel,
+                    flatChrome:
+                        _isElectronicInk || MediaQuery.highContrastOf(context),
+                    onClose: _closePanel,
+                    onWidthChanged: _resizePanel,
+                    onExportAnnotations: widget.onExportAnnotations,
+                  ),
                 ),
               ),
             ),
@@ -581,7 +584,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                     color: context.appColors.surfacePrimary.withValues(
                       alpha: 0.92,
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(AppRadii.capsule),
                     border: Border.all(color: context.appColors.borderStrong),
                   ),
                   child: const Padding(
@@ -602,6 +605,11 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     required bool panelVisible,
   }) {
     final rtl = widget.readingDirection == ReadingDirection.rightToLeft;
+    final readingTheme = widget.controller.preferences?.readingTheme;
+    final chromeColors = _readerChromeTheme(
+      context,
+      readingTheme ?? ReaderTheme.ivory,
+    ).extension<AppColorTokens>()!;
     Widget zone({
       required bool left,
       required String label,
@@ -621,22 +629,22 @@ final class _ReaderScreenState extends State<ReaderScreen> {
           child: InkWell(
             key: Key(left ? 'reader-left-zone' : 'reader-right-zone'),
             onTap: action,
-            hoverColor: Colors.white.withValues(alpha: 0.035),
-            focusColor: Colors.white.withValues(alpha: 0.06),
+            hoverColor: chromeColors.surfaceHover.withValues(alpha: 0.45),
+            focusColor: chromeColors.focusRing.withValues(alpha: 0.18),
             child: Center(
               child: AnimatedOpacity(
                 duration: _chromeTransition(context, true),
                 opacity: action == null ? 0.32 : 1,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: const Color(0xE6222522),
-                    borderRadius: BorderRadius.circular(AppRadii.control),
-                    border: Border.all(color: const Color(0x2EFFFFFF)),
-                    boxShadow: const [
+                    color: chromeColors.surfaceFloating,
+                    borderRadius: BorderRadius.circular(AppRadii.capsule),
+                    border: Border.all(color: chromeColors.borderSubtle),
+                    boxShadow: [
                       BoxShadow(
-                        color: Color(0x52000000),
+                        color: chromeColors.ambientShadow,
                         blurRadius: 12,
-                        offset: Offset(0, 3),
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -646,7 +654,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                       left
                           ? Icons.chevron_left_rounded
                           : Icons.chevron_right_rounded,
-                      color: Colors.white,
+                      color: chromeColors.iconActive,
                       size: 22,
                     ),
                   ),
@@ -660,7 +668,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     return [
       zone(
         left: true,
-        label: rtl ? 'Página siguiente' : 'Página anterior',
+        label: rtl ? 'Pliego siguiente' : 'Pliego anterior',
         action: rtl
             ? controller.canGoToNextReadingUnit
                   ? controller.goToNextReadingUnit
@@ -671,7 +679,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       ),
       zone(
         left: false,
-        label: rtl ? 'Página anterior' : 'Página siguiente',
+        label: rtl ? 'Pliego anterior' : 'Pliego siguiente',
         action: rtl
             ? controller.canGoToPreviousReadingUnit
                   ? controller.goToPreviousReadingUnit
@@ -687,19 +695,23 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     if (_isElectronicInk || MediaQuery.highContrastOf(context)) {
       return Colors.white;
     }
-    if (_isBookMode) {
-      return AppColorTokens.dark.readerBackground;
+    return Color(theme.colorValue);
+  }
+
+  ThemeData _readerChromeTheme(BuildContext context, ReaderTheme theme) {
+    final density =
+        Theme.of(context).extension<AppDensityTokens>()?.interfaceDensity ??
+        AppInterfaceDensity.comfortable;
+    final highContrast = MediaQuery.highContrastOf(context);
+    if (_isElectronicInk) {
+      return AppTheme.light(density: density, highContrast: highContrast);
     }
-    final colors = context.appColors;
     return switch (theme) {
-      ReaderTheme.light => colors.paperWhite,
-      ReaderTheme.ivory => colors.ivory,
-      ReaderTheme.sepia => const Color(0xFFE2D5BE),
-      ReaderTheme.gray => const Color(0xFFB8BAB5),
-      ReaderTheme.dark => const Color(0xFF242722),
-      // Pure black remains readable for old persisted documents, but the
-      // normal preset is the semantic charcoal token from the redesign.
-      ReaderTheme.black => colors.nightBackground,
+      ReaderTheme.dark || ReaderTheme.black => AppTheme.dark(
+        density: density,
+        highContrast: highContrast,
+      ),
+      _ => AppTheme.light(density: density, highContrast: highContrast),
     };
   }
 
@@ -1256,36 +1268,28 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _showThemeChooser(BuildContext context) async {
     final selected = await showDialog<ReaderTheme>(
       context: context,
-      builder: (context) => SimpleDialog(
+      builder: (context) => AlertDialog(
         title: const Text('Entorno de lectura'),
-        children: [
-          RadioGroup<ReaderTheme>(
-            groupValue: widget.controller.preferences?.readingTheme,
-            onChanged: (value) => Navigator.pop(context, value),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: ReaderTheme.values
-                  .map(
-                    (theme) => RadioListTile<ReaderTheme>(
-                      value: theme,
-                      title: Text(theme.label),
-                      secondary: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Color(theme.colorValue),
-                          border: Border.all(
-                            color: context.appColors.borderStrong,
-                          ),
-                          borderRadius: BorderRadius.circular(
-                            AppRadii.indicator,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-            ),
+        content: SizedBox(
+          width: 400,
+          child: Wrap(
+            spacing: AppSpacing.space8,
+            runSpacing: AppSpacing.space8,
+            children: [
+              for (final theme in ReaderTheme.values)
+                _ReaderThemeChoice(
+                  theme: theme,
+                  selected:
+                      widget.controller.preferences?.readingTheme == theme,
+                  onSelected: () => Navigator.pop(context, theme),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
           ),
         ],
       ),
@@ -1406,6 +1410,75 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       ),
     );
     if (selected != null) widget.controller.setMargins(selected);
+  }
+}
+
+final class _ReaderThemeChoice extends StatelessWidget {
+  const _ReaderThemeChoice({
+    required this.theme,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final ReaderTheme theme;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Entorno ${theme.label}',
+      child: InkWell(
+        key: ValueKey('reader-theme-${theme.name}'),
+        onTap: onSelected,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        child: AnimatedContainer(
+          duration: AppMotion.whenAllowed(
+            MediaQuery.disableAnimationsOf(context),
+            AppMotion.fast,
+          ),
+          constraints: const BoxConstraints(
+            minWidth: 124,
+            minHeight: AppSizes.touchControlExtent,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.space12,
+            vertical: AppSpacing.space8,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? colors.surfaceActive : Colors.transparent,
+            border: Border.all(
+              color: selected ? colors.focusRing : colors.borderSubtle,
+              width: selected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Color(theme.colorValue),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.borderStrong),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.space8),
+              Text(theme.label),
+              if (selected) ...[
+                const SizedBox(width: AppSpacing.space6),
+                Icon(Icons.check_rounded, size: 16, color: colors.iconActive),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

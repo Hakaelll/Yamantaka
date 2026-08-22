@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../app/app_config.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../app/ui/yama_components.dart';
 import '../../../core/errors/failure_presentation.dart';
 import '../../../pdf_engine/models/pdf_models.dart';
 import '../../../pdf_engine/pdf_document_engine.dart';
@@ -26,6 +27,7 @@ final class ReaderSidePanel extends StatefulWidget {
     required this.width,
     required this.onClose,
     required this.onWidthChanged,
+    required this.onSectionChanged,
     this.pinned = false,
     this.allowPin = false,
     this.onPinnedChanged,
@@ -39,6 +41,7 @@ final class ReaderSidePanel extends StatefulWidget {
   final double width;
   final VoidCallback onClose;
   final ValueChanged<double> onWidthChanged;
+  final ValueChanged<ReaderPanelSection> onSectionChanged;
   final bool pinned;
   final bool allowPin;
   final ValueChanged<bool>? onPinnedChanged;
@@ -74,6 +77,10 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
           key: const Key('reader-side-panel'),
           color: context.appColors.surfaceElevated,
           elevation: 0,
+          borderRadius: BorderRadius.horizontal(
+            left: Radius.circular(widget.pinned ? 0 : AppRadii.panel),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: Container(
             width: widget.width,
             decoration: BoxDecoration(
@@ -112,7 +119,8 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                                   : 'Anclar panel',
                               onPressed: widget.onPinnedChanged == null
                                   ? null
-                                  : () => widget.onPinnedChanged!(!widget.pinned),
+                                  : () =>
+                                        widget.onPinnedChanged!(!widget.pinned),
                               icon: Icon(
                                 widget.pinned
                                     ? Icons.push_pin_rounded
@@ -129,6 +137,11 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                           const SizedBox(width: AppSpacing.space4),
                         ],
                       ),
+                    ),
+                    const Divider(height: 1),
+                    _PanelSectionBar(
+                      selected: widget.section,
+                      onSelected: widget.onSectionChanged,
                     ),
                     const Divider(height: 1),
                     Expanded(child: _content()),
@@ -177,6 +190,53 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
       controller: widget.controller,
       textController: _searchTextController,
     ),
+  };
+}
+
+final class _PanelSectionBar extends StatelessWidget {
+  const _PanelSectionBar({required this.selected, required this.onSelected});
+
+  final ReaderPanelSection selected;
+  final ValueChanged<ReaderPanelSection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: 'Secciones del panel',
+      child: SizedBox(
+        height: AppSizes.bottomControlHeight,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            for (final section in ReaderPanelSection.values)
+              YamaIconButton(
+                semanticLabel: _label(section),
+                tooltip: _label(section),
+                icon: _icon(section),
+                selected: selected == section,
+                onPressed: () => onSelected(section),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _label(ReaderPanelSection section) => switch (section) {
+    ReaderPanelSection.thumbnails => 'Miniaturas',
+    ReaderPanelSection.outline => 'Índice',
+    ReaderPanelSection.bookmarks => 'Marcadores',
+    ReaderPanelSection.annotations => 'Anotaciones',
+    ReaderPanelSection.search => 'Buscar',
+  };
+
+  IconData _icon(ReaderPanelSection section) => switch (section) {
+    ReaderPanelSection.thumbnails => Icons.grid_view_outlined,
+    ReaderPanelSection.outline => Icons.format_list_bulleted_rounded,
+    ReaderPanelSection.bookmarks => Icons.bookmarks_outlined,
+    ReaderPanelSection.annotations => Icons.rate_review_outlined,
+    ReaderPanelSection.search => Icons.search_rounded,
   };
 }
 
@@ -1050,7 +1110,7 @@ final class _AnnotationColorMarker extends StatelessWidget {
       height: 28,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         border: Border.all(color: context.appColors.borderStrong),
       ),
       child: Icon(

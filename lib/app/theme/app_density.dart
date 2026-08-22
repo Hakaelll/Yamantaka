@@ -72,8 +72,7 @@ final class AppDensityTokens extends ThemeExtension<AppDensityTokens> {
     recentCoverHeight: recentCoverHeight ?? this.recentCoverHeight,
     targetExtent: targetExtent ?? this.targetExtent,
     settingRowMinHeight: settingRowMinHeight ?? this.settingRowMinHeight,
-    compactMenuRowHeight:
-        compactMenuRowHeight ?? this.compactMenuRowHeight,
+    compactMenuRowHeight: compactMenuRowHeight ?? this.compactMenuRowHeight,
   );
 
   @override

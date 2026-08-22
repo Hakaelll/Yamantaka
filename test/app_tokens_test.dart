@@ -34,6 +34,15 @@ void main() {
     expect(dark.textPrimary, const Color(0xFFF0F1EB));
   });
 
+  test('library theme keeps its spatial identity across app theme modes', () {
+    final library = AppTheme.library().extension<AppColorTokens>()!;
+
+    expect(library.libraryBackground, const Color(0xFF080808));
+    expect(library.accentPrimary, const Color(0xFFF5F5F5));
+    expect(library.librarySelectionAccent, const Color(0xFFB58AFF));
+    expect(AppTheme.library().brightness, Brightness.dark);
+  });
+
   test(
     'dark mode remains active even while safe mode is protecting startup',
     () {

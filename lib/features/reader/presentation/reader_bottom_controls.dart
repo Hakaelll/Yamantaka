@@ -44,8 +44,14 @@ final class ReaderBottomControls extends StatelessWidget {
     final preferences = controller.preferences;
     if (preferences == null) return const SizedBox.shrink();
     final facing = preferences.viewMode == ReaderMode.book;
-    final previousLabel = facing ? 'Apertura anterior' : 'Página anterior';
-    final nextLabel = facing ? 'Apertura siguiente' : 'Página siguiente';
+    final previousLabel = facing ? 'Pliego anterior' : 'Página anterior';
+    final nextLabel = facing ? 'Pliego siguiente' : 'Página siguiente';
+    final fitWidthLabel = facing
+        ? 'Ajustar al ancho del pliego'
+        : 'Ajustar al ancho';
+    final fitPageLabel = facing
+        ? 'Ajustar al pliego completo'
+        : 'Ajustar a la página';
     final flat = flatChrome || MediaQuery.highContrastOf(context);
     final navigation = YamaToolbarGroup(
       key: const Key('reader-navigation-group'),
@@ -126,22 +132,22 @@ final class ReaderBottomControls extends StatelessWidget {
                 controller.fitPage();
             }
           },
-          itemBuilder: (_) => const [
-            PopupMenuItem(
+          itemBuilder: (_) => [
+            const PopupMenuItem(
               value: _ZoomAction.actualSize,
               child: Text('Tamaño real · Ctrl+1'),
             ),
             PopupMenuItem(
               value: _ZoomAction.fitWidth,
-              child: Text('Ajustar al ancho · Ctrl+2'),
+              child: Text('$fitWidthLabel · Ctrl+2'),
             ),
             PopupMenuItem(
               value: _ZoomAction.fitPage,
-              child: Text('Ajustar a la página · Ctrl+0'),
+              child: Text('$fitPageLabel · Ctrl+0'),
             ),
           ],
         ),
-        if (!compact && !facing) ...[
+        if (!compact) ...[
           YamaIconButton(
             semanticLabel: 'Tema de lectura',
             tooltip: 'Tema de lectura',
@@ -158,30 +164,31 @@ final class ReaderBottomControls extends StatelessWidget {
                 value: _CompactReaderAction.actualSize,
                 child: Text('Tamaño real · Ctrl+1'),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _CompactReaderAction.fitWidth,
-                child: Text('Ajustar al ancho · Ctrl+2'),
+                child: Text('$fitWidthLabel · Ctrl+2'),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: _CompactReaderAction.fitPage,
-                child: Text('Ajustar a la página · Ctrl+0'),
+                child: Text('$fitPageLabel · Ctrl+0'),
               ),
               const PopupMenuDivider(),
-              CheckedPopupMenuItem(
-                value: _CompactReaderAction.single,
-                checked: preferences.pageLayout == PageLayoutMode.single,
-                child: const Text('Una página'),
-              ),
-              CheckedPopupMenuItem(
-                value: _CompactReaderAction.continuous,
-                checked: preferences.pageLayout == PageLayoutMode.continuous,
-                child: const Text('Vista continua'),
-              ),
-              if (!facing)
-                const PopupMenuItem(
-                  value: _CompactReaderAction.theme,
-                  child: Text('Tema de lectura'),
+              if (!facing) ...[
+                CheckedPopupMenuItem(
+                  value: _CompactReaderAction.single,
+                  checked: preferences.pageLayout == PageLayoutMode.single,
+                  child: const Text('Una página'),
                 ),
+                CheckedPopupMenuItem(
+                  value: _CompactReaderAction.continuous,
+                  checked: preferences.pageLayout == PageLayoutMode.continuous,
+                  child: const Text('Vista continua'),
+                ),
+              ],
+              const PopupMenuItem(
+                value: _CompactReaderAction.theme,
+                child: Text('Tema de lectura'),
+              ),
             ],
           ),
         YamaIconButton(

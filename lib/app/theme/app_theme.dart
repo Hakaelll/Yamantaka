@@ -24,6 +24,16 @@ abstract final class AppTheme {
     highContrast: highContrast,
   );
 
+  static ThemeData library({
+    AppInterfaceDensity density = AppInterfaceDensity.comfortable,
+    bool highContrast = false,
+  }) => _build(
+    brightness: Brightness.dark,
+    tokens: AppColorTokens.library,
+    density: density,
+    highContrast: highContrast,
+  );
+
   static ThemeData _build({
     required Brightness brightness,
     required AppColorTokens tokens,
@@ -180,11 +190,12 @@ abstract final class AppTheme {
       }
       return null;
     });
-    final compactShape = WidgetStatePropertyAll(
+    final controlShape = WidgetStatePropertyAll(
       RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
     );
+    const iconShape = WidgetStatePropertyAll(CircleBorder());
 
     return base.copyWith(
       textTheme: textTheme,
@@ -284,7 +295,7 @@ abstract final class AppTheme {
           }),
           overlayColor: overlay,
           side: focusSide,
-          shape: compactShape,
+          shape: iconShape,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -294,7 +305,11 @@ abstract final class AppTheme {
           ),
           foregroundColor: WidgetStatePropertyAll(tokens.accentPrimary),
           overlayColor: overlay,
-          shape: compactShape,
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.capsule),
+            ),
+          ),
           side: focusSide,
           textStyle: WidgetStatePropertyAll(textTheme.labelLarge),
         ),
@@ -317,7 +332,7 @@ abstract final class AppTheme {
           foregroundColor: WidgetStatePropertyAll(
             isDark ? tokens.appBackground : Colors.white,
           ),
-          shape: compactShape,
+          shape: controlShape,
           side: focusSide,
           textStyle: WidgetStatePropertyAll(textTheme.labelLarge),
         ),
@@ -335,7 +350,7 @@ abstract final class AppTheme {
             }
             return BorderSide(color: tokens.borderStrong);
           }),
-          shape: compactShape,
+          shape: controlShape,
           textStyle: WidgetStatePropertyAll(textTheme.labelLarge),
         ),
       ),
@@ -526,7 +541,11 @@ abstract final class AppTheme {
                 : tokens.textSecondary,
           ),
           side: WidgetStatePropertyAll(BorderSide(color: tokens.borderSubtle)),
-          shape: compactShape,
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.capsule),
+            ),
+          ),
         ),
       ),
     );

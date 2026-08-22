@@ -43,10 +43,10 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppSizes {
-  static const double topBarHeight = 48;
-  static const double libraryHeaderHeight = 56;
-  static const double bottomControlHeight = 40;
-  static const double sidePanelWidth = 336;
+  static const double topBarHeight = 64;
+  static const double libraryHeaderHeight = 72;
+  static const double bottomControlHeight = 48;
+  static const double sidePanelWidth = 344;
   static const double sidePanelMinWidth = 288;
   static const double sidePanelMaxWidth = 480;
   static const double compactSidePanelWidth = 360;
@@ -55,6 +55,7 @@ abstract final class AppSizes {
   static const double dialogMaxWidth = 600;
   static const double commandPaletteMaxHeight = 520;
   static const double readerEdgeNavigation = 64;
+  static const double readerSpreadGutter = 2;
   static const double topRevealZone = 24;
   static const double readerPanelDefault = 336;
   static const double settingsNavigationWidth = 220;
@@ -63,11 +64,14 @@ abstract final class AppSizes {
 
 abstract final class AppRadii {
   static const double indicator = 2;
-  static const double control = 6;
-  static const double field = 6;
-  static const double dialog = 10;
-  static const double touchSurface = 10;
-  static const double floating = 8;
+  static const double page = 3;
+  static const double control = 10;
+  static const double field = 12;
+  static const double floating = 16;
+  static const double panel = 18;
+  static const double dialog = 20;
+  static const double touchSurface = 14;
+  static const double capsule = 999;
 }
 
 abstract final class AppElevation {
@@ -86,10 +90,13 @@ abstract final class AppShadow {
   static const double artifactSelectedBlur = 18;
   static const double artifactRestOffset = 4;
   static const double artifactSelectedOffset = 9;
+  static const double artifactGlowBlur = 32;
+  static const double artifactGlowSpread = 3;
 }
 
 abstract final class AppMotion {
   static const Duration instant = Duration.zero;
+  static const Duration feedback = Duration(milliseconds: 80);
   static const Duration fast = Duration(milliseconds: 120);
   static const Duration standard = Duration(milliseconds: 160);
   static const Duration panel = Duration(milliseconds: 200);
@@ -130,6 +137,7 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     required this.warning,
     required this.success,
     required this.readerPageShadow,
+    required this.librarySelectionAccent,
     this.readerBackground = const Color(0xFFE7E4DC),
     this.libraryBackground = const Color(0xFFEDEBE5),
     this.settingsBackground = const Color(0xFFF1EFE9),
@@ -170,6 +178,7 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
   final Color warning;
   final Color success;
   final Color readerPageShadow;
+  final Color librarySelectionAccent;
   final Color readerBackground;
   final Color libraryBackground;
   final Color settingsBackground;
@@ -210,6 +219,7 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     warning: Color(0xFF85652F),
     success: Color(0xFF4E7058),
     readerPageShadow: Color(0x2E000000),
+    librarySelectionAccent: Color(0xFF7652BC),
     readerBackground: Color(0xFFE7E4DC),
     libraryBackground: Color(0xFFEDEBE5),
     settingsBackground: Color(0xFFF1EFE9),
@@ -251,6 +261,7 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     warning: Color(0xFFD0AD70),
     success: Color(0xFF8EB397),
     readerPageShadow: Color(0x85000000),
+    librarySelectionAccent: Color(0xFFB58AFF),
     readerBackground: Color(0xFF141613),
     libraryBackground: Color(0xFF10120F),
     settingsBackground: Color(0xFF151714),
@@ -269,6 +280,51 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     nightBackground: Color(0xFF0B0D0B),
     ambientShadow: Color(0x66000000),
     pageShadow: Color(0x85000000),
+  );
+
+  /// Monochrome palette reserved for Home/Library. Violet is deliberately
+  /// isolated in [librarySelectionAccent] and only identifies selected files.
+  /// Reader and Settings continue to use [light] and [dark].
+  static const library = AppColorTokens(
+    appBackground: Color(0xFF080808),
+    surfacePrimary: Color(0xFF0E0E0F),
+    surfaceSecondary: Color(0xFF131314),
+    surfaceElevated: Color(0xFF19191A),
+    surfaceSunken: Color(0xFF050505),
+    textPrimary: Color(0xFFF5F5F5),
+    textSecondary: Color(0xFFBDBDC1),
+    textMuted: Color(0xFF7B7B80),
+    borderSubtle: Color(0xFF262628),
+    borderStrong: Color(0xFF404043),
+    accentPrimary: Color(0xFFF5F5F5),
+    accentHover: Color(0xFFFFFFFF),
+    accentPressed: Color(0xFFD7D7DA),
+    accentSoft: Color(0xFF202022),
+    selectionBackground: Color(0xFF29292C),
+    focusRing: Color(0xFFFFFFFF),
+    danger: Color(0xFFE4E4E6),
+    warning: Color(0xFFBEBEC2),
+    success: Color(0xFFF5F5F5),
+    readerPageShadow: Color(0xB8000000),
+    librarySelectionAccent: Color(0xFFB58AFF),
+    readerBackground: Color(0xFF0E0E0F),
+    libraryBackground: Color(0xFF080808),
+    settingsBackground: Color(0xFF0E0E0F),
+    surfaceFloating: Color(0xF2141415),
+    surfaceActive: Color(0xFF2A2A2D),
+    surfaceHover: Color(0xFF1D1D1F),
+    surfacePressed: Color(0xFF323235),
+    textTertiary: Color(0xFF98989D),
+    textDisabled: Color(0xFF606065),
+    iconNormal: Color(0xFFBDBDC1),
+    iconActive: Color(0xFFF5F5F5),
+    iconDisabled: Color(0xFF5A5A5F),
+    separatorExceptional: Color(0xFF404043),
+    paperWhite: Color(0xFFF8F7F2),
+    ivory: Color(0xFFEDE7D8),
+    nightBackground: Color(0xFF020202),
+    ambientShadow: Color(0x8A000000),
+    pageShadow: Color(0xA8000000),
   );
 
   @override
@@ -293,6 +349,7 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     Color? warning,
     Color? success,
     Color? readerPageShadow,
+    Color? librarySelectionAccent,
     Color? readerBackground,
     Color? libraryBackground,
     Color? settingsBackground,
@@ -332,6 +389,8 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     warning: warning ?? this.warning,
     success: success ?? this.success,
     readerPageShadow: readerPageShadow ?? this.readerPageShadow,
+    librarySelectionAccent:
+        librarySelectionAccent ?? this.librarySelectionAccent,
     readerBackground: readerBackground ?? this.readerBackground,
     libraryBackground: libraryBackground ?? this.libraryBackground,
     settingsBackground: settingsBackground ?? this.settingsBackground,
@@ -386,6 +445,11 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
       readerPageShadow: Color.lerp(
         readerPageShadow,
         other.readerPageShadow,
+        t,
+      )!,
+      librarySelectionAccent: Color.lerp(
+        librarySelectionAccent,
+        other.librarySelectionAccent,
         t,
       )!,
       readerBackground: Color.lerp(

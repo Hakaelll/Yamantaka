@@ -28,6 +28,8 @@ aplicación ni sustituye la firma exigida para distribución.
 La suite automatizada comprueba:
 
 - Documento, Libro y restauración de preferencias;
+- matriz de paridad de acciones comunes entre Documento y Libro en 640 y
+  1280 px;
 - pliegos 1–2, 3–4 y final impar, además de paridad explícita y RTL;
 - ajuste de pliego, aislamiento de unidades, centrado y límites de paneo;
 - navegación por botones, flechas, Page Up/Down, Home/End y espacio;

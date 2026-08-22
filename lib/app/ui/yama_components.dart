@@ -39,9 +39,8 @@ final class YamaIconButton extends StatelessWidget {
           padding: EdgeInsets.zero,
           backgroundColor: selected ? colors.surfaceActive : null,
           foregroundColor: selected ? colors.iconActive : colors.iconNormal,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.control),
-          ),
+          side: selected ? BorderSide(color: colors.borderStrong) : null,
+          shape: const CircleBorder(),
         ),
         icon: Icon(icon, size: 18),
       ),
@@ -81,7 +80,7 @@ final class YamaToolbarGroup extends StatelessWidget {
             ? colors.surfaceFloating
             : colors.surfaceFloating.withValues(alpha: 0.96),
         border: Border.all(color: colors.borderSubtle),
-        borderRadius: BorderRadius.circular(AppRadii.floating),
+        borderRadius: BorderRadius.circular(AppRadii.capsule),
         boxShadow: flatSurface
             ? null
             : [
@@ -103,11 +102,17 @@ final class YamaToolbarGroup extends StatelessWidget {
 }
 
 final class YamaSegment<T> {
-  const YamaSegment({required this.value, required this.label, this.icon});
+  const YamaSegment({
+    required this.value,
+    required this.label,
+    this.icon,
+    this.tooltip,
+  });
 
   final T value;
   final String label;
   final IconData? icon;
+  final String? tooltip;
 }
 
 final class YamaSegmentedControl<T> extends StatelessWidget {
@@ -127,25 +132,36 @@ final class YamaSegmentedControl<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Semantics(
+    final control = Semantics(
       container: true,
       label: semanticLabel,
       explicitChildNodes: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var index = 0; index < segments.length; index++) ...[
-            if (index > 0) const SizedBox(width: AppSpacing.space16),
-            _YamaSegmentButton<T>(
-              segment: segments[index],
-              selected: segments[index].value == value,
-              colors: colors,
-              onPressed: () => onChanged(segments[index].value),
-            ),
-          ],
-        ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceSecondary,
+          border: Border.all(color: colors.borderSubtle),
+          borderRadius: BorderRadius.circular(AppRadii.capsule),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.space4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var index = 0; index < segments.length; index++) ...[
+                if (index > 0) const SizedBox(width: AppSpacing.space2),
+                _YamaSegmentButton<T>(
+                  segment: segments[index],
+                  selected: segments[index].value == value,
+                  colors: colors,
+                  onPressed: () => onChanged(segments[index].value),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
+    return control;
   }
 }
 
@@ -165,22 +181,30 @@ final class _YamaSegmentButton<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = selected ? colors.textPrimary : colors.textSecondary;
-    return Semantics(
+    final duration = AppMotion.whenAllowed(
+      MediaQuery.disableAnimationsOf(context),
+      AppMotion.fast,
+    );
+    final control = Semantics(
       button: true,
       selected: selected,
       label: segment.label,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(AppRadii.control),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 40),
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 2),
+        borderRadius: BorderRadius.circular(AppRadii.capsule),
+        child: AnimatedContainer(
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(minHeight: 34),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.space12,
+            vertical: AppSpacing.space6,
+          ),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: selected ? colors.textPrimary : Colors.transparent,
-                width: 2,
-              ),
+            color: selected ? colors.surfaceActive : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadii.capsule),
+            border: Border.all(
+              color: selected ? colors.borderStrong : Colors.transparent,
             ),
           ),
           child: Row(
@@ -202,6 +226,10 @@ final class _YamaSegmentButton<T> extends StatelessWidget {
         ),
       ),
     );
+    final tooltip = segment.tooltip;
+    return tooltip == null
+        ? control
+        : Tooltip(message: tooltip, child: control);
   }
 }
 
@@ -260,146 +288,44 @@ final class YamaSettingRow extends StatelessWidget {
                 padding: const EdgeInsets.only(left: AppSpacing.space8),
                 child: Tooltip(
                   message: 'Distinto del valor predeterminado',
-                  child: Icon(Icons.circle, size: 7, color: colors.accentPrimary),
+                  child: Icon(
+                    Icons.circle,
+                    size: 7,
+                    color: colors.accentPrimary,
+                  ),
                 ),
               ),
           ],
         );
-        return ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 56),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
-            child: stacked
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      labelWidget,
-                      const SizedBox(height: AppSpacing.space8),
-                      Align(alignment: Alignment.centerLeft, child: control),
-                    ],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(child: labelWidget),
-                      const SizedBox(width: AppSpacing.space24),
-                      control,
-                    ],
-                  ),
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: colors.borderSubtle)),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 60),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.space12),
+              child: stacked
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        labelWidget,
+                        const SizedBox(height: AppSpacing.space8),
+                        Align(alignment: Alignment.centerLeft, child: control),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(child: labelWidget),
+                        const SizedBox(width: AppSpacing.space24),
+                        control,
+                      ],
+                    ),
+            ),
           ),
         );
       },
-    );
-  }
-}
-
-final class YamaSection extends StatelessWidget {
-  const YamaSection({
-    super.key,
-    required this.title,
-    this.description,
-    required this.child,
-  });
-
-  final String title;
-  final String? description;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-        if (description != null) ...[
-          const SizedBox(height: AppSpacing.space4),
-          Text(description!, style: Theme.of(context).textTheme.bodySmall),
-        ],
-        const SizedBox(height: AppSpacing.space12),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceElevated,
-            border: Border.all(color: colors.borderSubtle),
-            borderRadius: BorderRadius.circular(AppRadii.floating),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
-            child: child,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-final class YamaPanelSurface extends StatelessWidget {
-  const YamaPanelSurface({super.key, required this.child, this.label});
-
-  final Widget child;
-  final String? label;
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = DecoratedBox(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceElevated,
-        border: Border(left: BorderSide(color: context.appColors.borderStrong)),
-        boxShadow: [
-          BoxShadow(
-            color: context.appColors.ambientShadow,
-            blurRadius: 14,
-            offset: const Offset(-2, 0),
-          ),
-        ],
-      ),
-      child: child,
-    );
-    return label == null
-        ? surface
-        : Semantics(container: true, label: label, child: surface);
-  }
-}
-
-final class YamaStatusSurface extends StatelessWidget {
-  const YamaStatusSurface({
-    super.key,
-    required this.title,
-    required this.message,
-    this.icon = Icons.info_outline_rounded,
-    this.action,
-    this.actionLabel,
-  });
-
-  final String title;
-  final String message;
-  final IconData icon;
-  final VoidCallback? action;
-  final String? actionLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.space24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 24, color: context.appColors.iconNormal),
-              const SizedBox(height: AppSpacing.space12),
-              Text(title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: AppSpacing.space8),
-              Text(message, textAlign: TextAlign.center),
-              if (action != null && actionLabel != null) ...[
-                const SizedBox(height: AppSpacing.space16),
-                FilledButton(onPressed: action, child: Text(actionLabel!)),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

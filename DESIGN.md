@@ -141,10 +141,11 @@ space64 = 64
 ### Tamaños
 
 ```text
-topBarHeight            = 46
-bottomControlHeight      = 44
-sidePanelWidth           = 320
-compactSidePanelWidth    = 304
+topBarHeight            = 64
+libraryHeaderHeight      = 72
+bottomControlHeight      = 48
+sidePanelWidth           = 344
+compactSidePanelWidth    = 360
 desktopControlExtent     = 40
 touchControlExtent       = 48
 dialogMaxWidth           = 600
@@ -153,7 +154,7 @@ contentMaxWidth          = 1000
 readerMinimumPageWidth   = 340
 readerMaximumPageWidth   = 920
 readerEdgeNavigation     = 64
-readerSpreadGutter       = 16
+readerSpreadGutter       = 2
 ```
 
 ### Movimiento
@@ -223,6 +224,14 @@ Con movimiento reducido, las transiciones espaciales usan `motionInstant`.
 
 El acento nunca ocupa grandes superficies. El negro puro se reserva para el
 entorno de lectura Negro.
+
+### Biblioteca espacial
+
+Inicio y Biblioteca usan una paleta oscura estable e independiente del tema
+editorial: fondo `#080808`, superficies negras y grises, texto `#F5F5F5` y
+controles monocromáticos. El violeta `#B58AFF` se reserva para borde, progreso
+y halo del archivo seleccionado; el foco permanece blanco e independiente del
+color. El concepto evoca profundidad sin texturas ni animación continua.
 
 ### Entornos de lectura
 
@@ -294,10 +303,13 @@ densidad modifica chrome y ritmo, nunca escala tipografía ni zoom del PDF.
 Radios:
 
 - 2 px: selección o indicador;
-- 4 px: controles compactos;
-- 6 px: campos, menús y superficies pequeñas;
-- 8 px: diálogo y paleta;
-- 10 px: superficie táctil grande.
+- 3 px: página PDF o portada;
+- 10 px: control discreto;
+- 12 px: campo;
+- 16 px: superficie flotante;
+- 18 px: panel;
+- 20 px: diálogo;
+- cápsula: selector segmentado, dock y grupo de herramientas.
 
 Los bordes son de 1 px y bajo contraste; selección y foco aumentan contraste.
 No hay bordes dobles. Solo menús, paleta y diálogos emplean elevación, en dos
@@ -343,7 +355,7 @@ Progreso discreto
 Capas temporales
 ```
 
-No todas las superficies aparecen a la vez. La barra mide 46 px y puede
+No todas las superficies aparecen a la vez. La barra mide 64 px y puede
 ocultarse/revelarse en cualquier modo mediante el mismo comando persistido.
 
 ## 13. Biblioteca
@@ -351,17 +363,18 @@ ocultarse/revelarse en cualquier modo mediante el mismo comando persistido.
 Jerarquía:
 
 ```text
-Barra discreta: Biblioteca | Más | Abrir PDF | Ajustes
-Comando local: contador | Buscar | Filtrar/ordenar
+Barra discreta: Biblioteca + contador | Más | Abrir PDF | Ajustes
+Comando local flotante: Buscar | Selección | Filtrar/ordenar
 Espacio de artefactos virtualizado
 Información tipográfica de selección/hover/foco
 ```
 
 La portada es el objeto. No existe una tarjeta con título permanente: la página
 respeta su proporción, usa radio mínimo, sombra difusa y un jitter estable de
-posición/giro. Selección eleva 8 px y escala 5,5 %; hover eleva 3 px. Los no
-seleccionados reducen saturación/opacidad sin desaparecer. Progreso es una
-línea de 2 px; terminado usa un anillo y favorito un marcador monocromático.
+posición/giro. Selección eleva 8 px, escala 5,5 % y proyecta un halo violeta
+suave; hover eleva 3 px. Los no seleccionados reducen saturación/opacidad sin
+desaparecer. Progreso es una línea de 2 px; terminado usa un anillo y favorito
+un marcador.
 
 Uno a seis documentos forman una constelación centrada con espacio negativo.
 Desde siete se usa una cuadrícula invisible con variaciones controladas y
@@ -401,7 +414,8 @@ El canvas y las páginas permanecen estables cuando aparecen controles, paneles
 o resultados. La página se centra con márgenes proporcionales y un fondo plano,
 sin texturas.
 
-La barra superior prioriza por clase de ventana:
+La barra superior superpuesta se reparte en tres grupos flotantes y prioriza
+por clase de ventana:
 
 ```text
 Volver | Título flexible | Modo opcional | Buscar | Panel opcional | Paleta | Más
@@ -428,24 +442,27 @@ actual.
 Prioriza página, márgenes, ritmo, progreso y continuidad. La barra y controles
 se ocultan sin cambiar el layout.
 
-Una página se centra y adapta por anchura o altura. Dos páginas respetan:
+Una página se centra y adapta por anchura o altura. Dos páginas permanecen en
+Libro incluso con una ventana estrecha, reduciendo margen y escala de forma
+determinista. El pliego respeta:
 
 - portada individual;
 - pares e impares;
 - LTR/RTL;
-- separación central de 12–24 px;
-- cambio automático a una página si cada hoja tendría menos de 340 px.
+- canal central de 2 px y sombras interiores simétricas;
+- páginas de distinto tamaño, última hoja sin pareja y portada individual.
 
 Las zonas laterales miden 64 px, son visualmente transparentes, ofrecen
 feedback discreto, no invaden el centro y respetan RTL.
 
 ## 17. Panel lateral
 
-Ancho inicial: 320 px; límites: 280–480 px. En compacto se acota además al 86 %
+Ancho inicial: 344 px; límites: 288–480 px. En compacto se acota además al 88 %
 del viewport.
 
-Muestra una sola sección: miniaturas, índice, marcadores o búsqueda. Tiene
-encabezado de 46 px, cierre visible, contenido desplazable y selección clara.
+Muestra una sola sección: miniaturas, índice, marcadores, anotaciones o
+búsqueda. Tiene encabezado compacto, selector interno de sección, cierre
+visible, contenido desplazable y selección clara.
 En compacto/medio aparece como superposición con scrim; en expandido se alinea
 al borde sin mover bruscamente la página. Un divisor de 10 px admite ratón,
 flechas y semántica de valor. El ancho se guarda con debounce; solo se monta la
@@ -469,7 +486,8 @@ En escritorio, una navegación lateral pequeña cambia entre Apariencia,
 Lectura, Barra del lector, Atajos, Biblioteca, Historial, Copias locales y
 Privacidad. En compacto, las secciones se apilan.
 
-Cada ajuste es una fila sencilla con etiqueta, descripción corta y control.
+Cada ajuste es una fila sencilla con etiqueta, descripción corta, separador y
+control; la sección no se encierra en una tarjeta.
 Los cambios reversibles se aplican inmediatamente. Las acciones destructivas
 exigen confirmación proporcional. Apariencia incluye una previsualización
 pequeña de tema, densidad, canvas y perfil e-ink. No se encierra cada sección
@@ -638,6 +656,7 @@ Antes de cerrar una tarea visual:
   breakpoint técnico por sí solo no constituye una función visual.
 
 La referencia vigente `windows-reader-book-fullscreen.png` se genera desde una
-prueba de widgets a 1600×900 y fija la composición del lector Libro. Las
+prueba de widgets a 1600×900 y fija Libro con tema Marfil, grupos flotantes,
+selector segmentado y dock inferior. Las
 capturas generacionales se retiraron porque ya no representaban el producto.
 Narrador, varios monitores y DPI físico siguen requiriendo validación nativa.

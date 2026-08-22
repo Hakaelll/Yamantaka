@@ -5,6 +5,7 @@ import 'package:pdfrx/pdfrx.dart' as pdfrx;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/app_config.dart';
+import '../../app/theme/app_tokens.dart';
 import '../../core/security/local_input_policy.dart';
 import '../../features/reader/domain/reader_models.dart';
 import '../models/pdf_models.dart';
@@ -661,7 +662,7 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
           .map((page) => Size(page.width, page.height))
           .toList(growable: false),
       outerMargin: params.margin,
-      pageGap: 0,
+      pageGap: AppSizes.readerSpreadGutter,
       coverPolicy: widget.configuration.coverPolicy,
       initialSide: widget.configuration.initialSide,
       rightToLeft:

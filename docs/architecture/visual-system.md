@@ -16,6 +16,41 @@ equivalente.
 | Layout | `AppBreakpoints`, `AppWindowClass` | Clasificar por espacio lógico disponible, no por resolución física aislada. |
 | Tipografía | `AppTheme` | Segoe UI Variable/Segoe UI con fallback; los estilos tienen función semántica. |
 
+## Jerarquía de forma
+
+- `page` (3 px) identifica papel PDF y portadas, nunca chrome.
+- `control` (10 px) se reserva para controles editoriales discretos.
+- `field` (12 px) unifica entradas y menús.
+- `floating`/`panel`/`dialog` (16/18/20 px) escalan con la superficie.
+- `capsule` solo agrupa acciones, selector Documento/Libro y dock; no se aplica
+  a filas de contenido ni páginas.
+
+Los iconos globales usan objetivos circulares de 40 px. Selección, hover,
+presión y foco combinan superficie, borde y semántica; el color no actúa solo.
+
+## Identidad de Biblioteca
+
+`AppTheme.library` utiliza `AppColorTokens.library` para mantener el fondo
+negro `#080808` y superficies en escala de grises tanto si la aplicación
+general está clara como oscura. `librarySelectionAccent` reserva el violeta
+`#B58AFF` para el archivo seleccionado; Lector y Ajustes conservan las paletas
+editoriales.
+
+No hay texturas, blur, vídeo ni movimiento ambiental. La profundidad procede
+de espacio negativo, escala breve, sombra acotada y un halo estático bajo la
+portada seleccionada.
+
+## Chrome del lector y Libro
+
+La barra superior y la dock inferior son overlays: mostrarlas, ocultarlas o
+abrir/cambiar el panel no modifica las restricciones del visor. El visor se
+mantiene en un `RepaintBoundary` cacheado por configuración de documento.
+
+Los seis `ReaderTheme` resuelven el canvas y una paleta clara/oscura para el
+chrome en Documento y Libro. Libro conserva `coverPolicy`, `initialSide` y RTL;
+el ajuste calcula página o ancho sobre el pliego completo y nunca cambia de
+modo por un breakpoint.
+
 ## Excepciones permitidas
 
 - El fondo y la sombra de la página PDF pueden variar con el tema para mantener

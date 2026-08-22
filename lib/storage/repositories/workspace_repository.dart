@@ -113,7 +113,10 @@ final class WorkspaceRepository {
           isDefault ? 1 : 0,
           activeTabId,
           panelSection,
-          panelWidth.clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth),
+          panelWidth.clamp(
+            AppSizes.sidePanelMinWidth,
+            AppSizes.sidePanelMaxWidth,
+          ),
           jsonEncode(_encodeSplit(split)),
           collectionId,
           now.toIso8601String(),

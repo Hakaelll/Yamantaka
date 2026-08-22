@@ -101,7 +101,9 @@ if (-not $PreserveWindowBounds) {
     )
 }
 [void][YamantakaWindowCapture]::SetForegroundWindow($handle)
-Start-Sleep -Milliseconds 800
+# Native startup includes database hydration and optional command-line opening.
+# Wait for the routed screen, not merely for the Win32 handle to exist.
+Start-Sleep -Milliseconds 2500
 
 if ($ClickX -ge 0 -and $ClickY -ge 0) {
     $rect = New-Object YamantakaWindowCapture+Rect
@@ -112,15 +114,23 @@ if ($ClickX -ge 0 -and $ClickY -ge 0) {
         $rect.Left + $ClickX,
         $rect.Top + $ClickY
     )
+    # Reader chrome may be hidden until pointer movement. Give Flutter one
+    # frame window to reveal and lay it out before pressing the control.
+    Start-Sleep -Milliseconds 1200
     [YamantakaWindowCapture]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
     [YamantakaWindowCapture]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
-    Start-Sleep -Milliseconds 800
+    Start-Sleep -Milliseconds 1200
 }
 
 if ($SendKeys) {
     Add-Type -AssemblyName System.Windows.Forms
     [System.Windows.Forms.SendKeys]::SendWait($SendKeys)
     Start-Sleep -Milliseconds 1200
+}
+
+$process.Refresh()
+if ($process.HasExited) {
+    throw "The application exited before its window could be captured (exit code $($process.ExitCode))."
 }
 
 $windowRect = New-Object YamantakaWindowCapture+Rect
