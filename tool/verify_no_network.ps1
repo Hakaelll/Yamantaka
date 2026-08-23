@@ -13,7 +13,7 @@ $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 
 function Resolve-RepositoryPath {
     param([Parameter(Mandatory = $true)][string]$Path)
-    if ([System.IO.Path]::IsPathFullyQualified($Path)) {
+    if ([System.IO.Path]::IsPathRooted($Path)) {
         return [System.IO.Path]::GetFullPath($Path)
     }
     return [System.IO.Path]::GetFullPath((Join-Path $root $Path))

@@ -23,6 +23,36 @@ final class OpenedPdfDocument {
   final bool isEncrypted;
 }
 
+final class PdfDocumentMetadata {
+  const PdfDocumentMetadata({this.title, this.author});
+
+  final String? title;
+  final String? author;
+}
+
+final class PdfStructuredTextBlock {
+  const PdfStructuredTextBlock({
+    required this.text,
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.height,
+    required this.pageWidth,
+    required this.pageHeight,
+  });
+
+  final String text;
+  final double left;
+  final double top;
+  final double width;
+  final double height;
+  final double pageWidth;
+  final double pageHeight;
+
+  double get relativeHeight => pageHeight <= 0 ? 0 : height / pageHeight;
+  double get relativeTop => pageHeight <= 0 ? 0 : top / pageHeight;
+}
+
 final class PdfRenderRegion {
   const PdfRenderRegion({
     required this.left,

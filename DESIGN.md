@@ -373,8 +373,9 @@ La portada es el objeto. No existe una tarjeta con título permanente: la págin
 respeta su proporción, usa radio mínimo, sombra difusa y un jitter estable de
 posición/giro. Selección eleva 8 px, escala 5,5 % y proyecta un halo violeta
 suave; hover eleva 3 px. Los no seleccionados reducen saturación/opacidad sin
-desaparecer. Progreso es una línea de 2 px; terminado usa un anillo y favorito
-un marcador.
+desaparecer. Progreso es una línea de 4 px con pista gris tenue; el relleno es
+blanco/gris salvo en la selección, donde pasa a violeta. Terminado usa un
+anillo y favorito un marcador.
 
 Uno a seis documentos forman una constelación centrada con espacio negativo.
 Desde siete se usa una cuadrícula invisible con variaciones controladas y
@@ -389,9 +390,10 @@ cierra overlay o selección. El foco tiene contorno propio y no depende de
 sombra/color.
 
 `Ctrl+F` abre un campo flotante con foco y contador; Escape lo cierra y restaura
-la colección. Estado, favorito y orden viven en un popover compacto con
-recuentos y reset. Colecciones, workspaces, importación, recuperación y búsqueda
-global están bajo “Más”; no se eliminan para simplificar la barra.
+la colección. Estado, favorito y orden viven en un popover compacto; autores y
+temas forman facetas combinables con recuentos completos. Agrupar por autor crea
+secciones dinámicas y coloca Autor desconocido al final. Colecciones,
+workspaces, importación, recuperación y búsqueda global están bajo “Más”.
 
 Cada portada solicita una decodificación ajustada a caja física/DPR, usa la
 miniatura pequeña a distancia y la grande al seleccionar. El placeholder es una
@@ -418,10 +420,12 @@ La barra superior superpuesta se reparte en tres grupos flotantes y prioriza
 por clase de ventana:
 
 ```text
-Volver | Título flexible | Modo opcional | Buscar | Panel opcional | Paleta | Más
+Volver | Título flexible | Buscar | Panel opcional | Paleta | Más
 ```
 
 La navegación y zoom viven en un control inferior contextual, atajos y paleta.
+Una página, Dos páginas y Continua viven en la paleta `Ctrl+K`, no como selector
+permanente de la barra.
 El progreso es una línea de 2 px. En compacto se ocultan acciones menos
 frecuentes dentro de un único “Más”, sin eliminarlas. Los grupos de modo y
 panel pueden ocultarse como unidades; su elección es local y persistente. Un

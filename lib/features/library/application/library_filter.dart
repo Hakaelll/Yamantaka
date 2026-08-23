@@ -1,4 +1,5 @@
 import '../domain/library_document.dart';
+import '../domain/document_enrichment.dart';
 
 enum LibrarySortOrder { lastOpened, dateAdded, title, progress }
 
@@ -26,6 +27,8 @@ LibraryFilterResult evaluateLibraryDocuments(
   LibrarySortOrder sortOrder = LibrarySortOrder.lastOpened,
   LibraryReadingState readingState = LibraryReadingState.all,
   bool favoritesOnly = false,
+  Set<String> authors = const {},
+  Set<LibraryTopic> topics = const {},
 }) {
   final normalizedQuery = query.trim().toLowerCase();
   final visible = <LibraryDocument>[];
@@ -33,14 +36,32 @@ LibraryFilterResult evaluateLibraryDocuments(
     for (final state in LibraryReadingState.values) state: 0,
   };
   for (final document in documents) {
+    final normalizedAuthor = document.effectiveAuthor?.trim().toLowerCase();
+    final matchesAuthor =
+        authors.isEmpty ||
+        (normalizedAuthor != null && authors.contains(normalizedAuthor));
+    final documentTopics = document.topics
+        .map((assignment) => assignment.topic)
+        .toSet();
+    final matchesTopic =
+        topics.isEmpty || documentTopics.intersection(topics).isNotEmpty;
     final matchesText =
         normalizedQuery.isEmpty ||
         document.effectiveTitle.toLowerCase().contains(normalizedQuery) ||
         document.effectiveAuthor?.toLowerCase().contains(normalizedQuery) ==
             true ||
         document.fileName.toLowerCase().contains(normalizedQuery) ||
-        document.libraryNote?.toLowerCase().contains(normalizedQuery) == true;
-    if (!matchesText || (favoritesOnly && !document.isFavorite)) continue;
+        document.libraryNote?.toLowerCase().contains(normalizedQuery) == true ||
+        document.topics.any(
+          (assignment) =>
+              assignment.topic.label.toLowerCase().contains(normalizedQuery),
+        );
+    if (!matchesText ||
+        !matchesAuthor ||
+        !matchesTopic ||
+        (favoritesOnly && !document.isFavorite)) {
+      continue;
+    }
     final documentState = readingStateOf(document);
     counts[LibraryReadingState.all] = counts[LibraryReadingState.all]! + 1;
     counts[documentState] = counts[documentState]! + 1;
@@ -74,13 +95,44 @@ List<LibraryDocument> filterAndSortLibraryDocuments(
   LibrarySortOrder sortOrder = LibrarySortOrder.lastOpened,
   LibraryReadingState readingState = LibraryReadingState.all,
   bool favoritesOnly = false,
+  Set<String> authors = const {},
+  Set<LibraryTopic> topics = const {},
 }) => evaluateLibraryDocuments(
   documents,
   query: query,
   sortOrder: sortOrder,
   readingState: readingState,
   favoritesOnly: favoritesOnly,
+  authors: authors,
+  topics: topics,
 ).documents;
+
+Map<String, List<LibraryDocument>> groupLibraryDocumentsByAuthor(
+  Iterable<LibraryDocument> documents,
+) {
+  final groups = <String, ({String label, List<LibraryDocument> documents})>{};
+  for (final document in documents) {
+    final author = document.effectiveAuthor
+        ?.replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final label = author == null || author.isEmpty
+        ? 'Autor desconocido'
+        : author;
+    final key = label == 'Autor desconocido' ? '' : label.toLowerCase();
+    final group = groups.putIfAbsent(
+      key,
+      () => (label: label, documents: <LibraryDocument>[]),
+    );
+    group.documents.add(document);
+  }
+  final entries = groups.values.toList()
+    ..sort((left, right) {
+      if (left.label == 'Autor desconocido') return 1;
+      if (right.label == 'Autor desconocido') return -1;
+      return left.label.toLowerCase().compareTo(right.label.toLowerCase());
+    });
+  return {for (final entry in entries) entry.label: entry.documents};
+}
 
 LibraryReadingState readingStateOf(LibraryDocument document) {
   if (document.readingProgress >= 1) return LibraryReadingState.completed;

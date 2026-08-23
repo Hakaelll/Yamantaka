@@ -16,7 +16,7 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 
 function Resolve-RepositoryPath {
     param([Parameter(Mandatory = $true)][string]$Path)
-    if ([System.IO.Path]::IsPathFullyQualified($Path)) {
+    if ([System.IO.Path]::IsPathRooted($Path)) {
         return [System.IO.Path]::GetFullPath($Path)
     }
     return [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $Path))
@@ -41,9 +41,8 @@ if (-not $SkipLaunch) {
             -RequireSignature:$RequireSignature)
 }
 
-# Every case below uses a supported public entry point. Book mode is selected
-# through the visible centered control; no private or ignored visual flags are
-# passed to the application.
+# Every case below uses a supported public entry point. Page layout is selected
+# through the Ctrl+K command palette; no private visual flags are passed.
 $cases = @(
     [pscustomobject]@{
         name = 'library-wide'
@@ -106,15 +105,12 @@ foreach ($case in $cases) {
                 Y = 80
             }
             if ($case.openFixture) {
-                # Select the requested public mode after pointer movement has
-                # revealed the centered reader toolbar.
-                $capture.ClickX = if ($case.selectBook) {
-                    [int]($case.width / 2 + 75)
+                $capture.LayoutCommand = if ($case.selectBook) {
+                    'facing'
                 }
                 else {
-                    [int]($case.width / 2 - 50)
+                    'single'
                 }
-                $capture.ClickY = 78
             }
             if ($case.fullscreen) {
                 $capture.SendKeys = '{F11}'

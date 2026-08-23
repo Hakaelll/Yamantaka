@@ -12,6 +12,7 @@ import '../../../core/errors/failure_presentation.dart';
 import '../../organization/application/organization_controller.dart';
 import '../../organization/domain/organization_models.dart';
 import '../application/library_controller.dart';
+import '../application/document_enrichment_controller.dart';
 import '../application/library_filter.dart';
 import '../domain/library_document.dart';
 import '../domain/library_selection.dart';
@@ -44,6 +45,7 @@ final class LibraryScreen extends StatefulWidget {
     this.onImportFolder,
     this.onRecoverFolder,
     this.safeMode = false,
+    this.enrichment,
   });
 
   final LibraryController controller;
@@ -68,6 +70,7 @@ final class LibraryScreen extends StatefulWidget {
   final VoidCallback? onImportFolder;
   final VoidCallback? onRecoverFolder;
   final bool safeMode;
+  final DocumentEnrichmentController? enrichment;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -141,7 +144,10 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                   shape: const Border(),
                   toolbarHeight: AppSizes.libraryHeaderHeight,
                   title: ListenableBuilder(
-                    listenable: widget.controller,
+                    listenable: Listenable.merge([
+                      widget.controller,
+                      if (widget.enrichment != null) widget.enrichment!,
+                    ]),
                     builder: (context, _) => Semantics(
                       header: true,
                       child: Column(
@@ -154,8 +160,12 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                           ),
                           const SizedBox(height: AppSpacing.space2),
                           Text(
-                            '${widget.controller.totalDocuments} '
-                            '${widget.controller.totalDocuments == 1 ? 'documento local' : 'documentos locales'}',
+                            widget.enrichment?.progress.isRunning == true
+                                ? 'Analizando '
+                                      '${widget.enrichment!.progress.completed + 1} '
+                                      'de ${widget.enrichment!.progress.total}…'
+                                : '${widget.controller.totalDocuments} '
+                                      '${widget.controller.totalDocuments == 1 ? 'documento local' : 'documentos locales'}',
                             style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ],
@@ -163,6 +173,12 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                     ),
                   ),
                   actions: [
+                    if (widget.enrichment?.progress.isRunning == true)
+                      IconButton(
+                        tooltip: 'Cancelar análisis local',
+                        onPressed: widget.enrichment!.cancel,
+                        icon: const Icon(Icons.stop_circle_outlined),
+                      ),
                     if (widget.safeMode)
                       const Tooltip(
                         message:
@@ -186,6 +202,8 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                             widget.onRecoverFolder?.call();
                           case _LibraryAppMenuAction.globalSearch:
                             widget.onGlobalSearch?.call();
+                          case _LibraryAppMenuAction.enrich:
+                            widget.enrichment?.analyzePending();
                         }
                       },
                       itemBuilder: (context) => [
@@ -216,6 +234,11 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                           const PopupMenuItem(
                             value: _LibraryAppMenuAction.globalSearch,
                             child: Text('Búsqueda global'),
+                          ),
+                        if (widget.enrichment != null)
+                          const PopupMenuItem(
+                            value: _LibraryAppMenuAction.enrich,
+                            child: Text('Analizar metadatos y temas'),
                           ),
                       ],
                       icon: const Icon(Icons.more_horiz_rounded),
@@ -751,4 +774,5 @@ enum _LibraryAppMenuAction {
   importFolder,
   recover,
   globalSearch,
+  enrich,
 }

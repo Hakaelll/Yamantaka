@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
+import 'package:yamantaka/features/library/domain/document_enrichment.dart';
+import 'package:yamantaka/features/reader/domain/reader_models.dart';
 import 'package:yamantaka/features/settings/application/settings_controller.dart';
 import 'package:yamantaka/storage/backup/local_backup_service.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
@@ -11,6 +14,7 @@ import 'package:yamantaka/storage/repositories/app_settings_repository.dart';
 import 'package:yamantaka/storage/repositories/bookmark_repository.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
 import 'package:yamantaka/storage/repositories/reading_session_repository.dart';
+import 'package:yamantaka/storage/repositories/preferences_repository.dart';
 
 void main() {
   test(
@@ -26,6 +30,7 @@ void main() {
       final documents = DocumentRepository(database);
       final bookmarks = BookmarkRepository(database);
       final sessions = ReadingSessionRepository(database);
+      final preferences = DocumentPreferencesRepository(database);
       final settings = SettingsController(
         AppSettingsRepository(_MemoryPreferencesStore()),
         logger,
@@ -60,6 +65,19 @@ void main() {
         ),
       );
       bookmarks.add('doc-1', 4, label: 'Capítulo');
+      documents.setManualTopics('doc-1', {
+        LibraryTopic.history,
+        LibraryTopic.politics,
+      }, analyzerVersion: 1);
+      preferences.save(
+        const DocumentPreferences(
+          documentId: 'doc-1',
+          viewMode: ReaderMode.book,
+          pageLayout: PageLayoutMode.facing,
+          coverPolicy: ReaderCoverPolicy.firstPageIsCover,
+          initialSide: ReaderInitialSide.right,
+        ),
+      );
       final session = sessions.start('doc-1', 1);
       sessions.finish(id: session.id, endPage: 4, activeSeconds: 90);
       await settings.update(
@@ -73,6 +91,7 @@ void main() {
       final backup = File('${directory.path}/backup.json');
       await service.exportTo(backup.path);
       final exported = await backup.readAsString();
+      expect((jsonDecode(exported) as Map<String, dynamic>)['version'], 7);
       expect(exported, contains('"containsPdfFiles": false'));
       expect(exported, isNot(contains('%PDF-')));
       final preview = await service.preview(backup.path);
@@ -87,7 +106,17 @@ void main() {
       expect(File(safetyPath).existsSync(), isTrue);
       expect(documents.byId('doc-1')?.readingProgress, 0.5);
       expect(documents.byId('doc-1')?.libraryNote, 'Restore this note');
+      expect(
+        documents.byId('doc-1')?.topics.map((topic) => topic.topic).toSet(),
+        {LibraryTopic.history, LibraryTopic.politics},
+      );
+      expect(documents.byId('doc-1')?.enrichment?.topicsManual, isTrue);
       expect(bookmarks.forDocument('doc-1').single.label, 'Capítulo');
+      expect(
+        preferences.load('doc-1').coverPolicy,
+        ReaderCoverPolicy.firstPageIsCover,
+      );
+      expect(preferences.load('doc-1').initialSide, ReaderInitialSide.right);
       expect(sessions.history(), hasLength(1));
       expect(settings.settings.darkMode, isTrue);
       expect(settings.settings.readerPanelWidth, 416);

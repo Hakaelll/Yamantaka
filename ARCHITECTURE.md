@@ -47,12 +47,13 @@ se guarda después de 240 ms sin cambios. `PdfrxDocumentEngine.diagnostics`
 expone únicamente contadores locales de solicitudes, caché, deduplicación,
 cancelación y recursos abiertos para pruebas/Profile; no persiste ni transmite.
 
-`ReadingUnitNavigation` define la unidad que se lee: una página en Documento y
-portada/pliego en Libro. Barra inferior, zonas laterales, flechas, `PageUp`,
+`ReadingUnitNavigation` define la unidad que se lee: una página, una secuencia
+continua o un pliego. Barra inferior, zonas laterales, flechas, `PageUp`,
 `PageDown`, `Home`, `End` y espacio llaman a las mismas operaciones de
 `ReaderController`; ningún widget calcula índices por su cuenta. Cambiar de modo
-normaliza la página activa y hace que Documento posea la disposición de una
-página y Libro la enfrentada.
+normaliza la página activa. `PageLayoutMode` expone directamente una página,
+dos páginas y continua; `coverPolicy` e `initialSide` corrigen la paridad del
+pliego por documento sin reordenar ni modificar el PDF.
 
 `ReaderViewportMetrics` es la única geometría de los modos paginados. Calcula
 slots, márgenes discretos, lomo de 10–16 px, rectángulo de página/pliego, escala
@@ -71,8 +72,9 @@ almacén adicional.
 
 ## Persistencia
 
-SQLite v3 guarda documentos, preferencias, marcadores, sesiones, anotaciones,
-etiquetas, colecciones, workspaces, perfiles e índice FTS reconstruible. Las
+SQLite v8 guarda documentos, preferencias, marcadores, sesiones, anotaciones,
+etiquetas, colecciones, workspaces, perfiles, enriquecimiento, relaciones de
+temas e índice FTS reconstruible. Las
 migraciones son incrementales, crean una copia pre-migración y se ejecutan en
 transacción; `PRAGMA integrity_check` cierra el gate. Los PDF permanecen en su
 ubicación original.
@@ -91,6 +93,14 @@ seleccionado, atajos, panel, sección, ancho, chrome y política de recuperació
 viven como preferencias globales validadas.
 
 ## Portadas y biblioteca de artefactos
+
+`DocumentEnrichmentController` recorre secuencialmente los documentos nuevos o
+con huella/versión obsoleta y se pausa durante lectura activa. El motor expone
+metadatos PDFium y bloques estructurados; el caso de uso limita la muestra a 12
+páginas/64 KiB y no la persiste. `document_enrichment` conserva estado,
+sugerencias, confianza, huella y versión; `document_topics` separa procedencia
+automática/manual. Las consultas SQL calculan facetas y recuentos sobre toda la
+biblioteca aunque la presentación esté paginada.
 
 `ThumbnailService` es el único caso de uso que renderiza y persiste portadas.
 Puntúa como máximo seis páginas a escala baja combinando prioridad de posición,
@@ -115,9 +125,10 @@ acciones; persistencia, PDFium y SQL quedan fuera del widget.
 ## Copias, historial y recuperación
 
 `LocalBackupService` es el único límite de exportación/importación. Serializa
-un contenedor JSON `yamantaka-local-backup` versión 2 con ajustes y tablas
+un contenedor JSON `yamantaka-local-backup` versión 7 con ajustes y tablas
 privadas permitidas, pero nunca bytes PDF ni FTS reconstruible. También importa
-v1 con las tablas nuevas vacías. La vista previa valida formato, versión,
+los formatos 1–6 con las tablas posteriores vacías y defaults seguros. La vista
+previa valida formato, versión,
 columnas, tipos y recuentos antes de mutar. La importación crea primero otra
 copia local y reemplaza las filas en una transacción, respetando el orden de
 claves foráneas.

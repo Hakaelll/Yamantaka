@@ -15,7 +15,6 @@ final class ReaderTopBar extends StatelessWidget
     required this.compact,
     required this.expanded,
     required this.activePanel,
-    required this.showModeControls,
     required this.showPanelControls,
     required this.onBack,
     required this.onOpenDocument,
@@ -26,7 +25,6 @@ final class ReaderTopBar extends StatelessWidget
     required this.onShowBookmarks,
     required this.onShowAnnotations,
     required this.onAdjustMargins,
-    required this.onModeChanged,
     required this.onDocumentInfo,
     required this.onToggleFullScreen,
     required this.onToggleChrome,
@@ -41,7 +39,6 @@ final class ReaderTopBar extends StatelessWidget
   final bool compact;
   final bool expanded;
   final ReaderPanelSection? activePanel;
-  final bool showModeControls;
   final bool showPanelControls;
   final VoidCallback onBack;
   final VoidCallback onOpenDocument;
@@ -52,7 +49,6 @@ final class ReaderTopBar extends StatelessWidget
   final VoidCallback onShowBookmarks;
   final VoidCallback onShowAnnotations;
   final VoidCallback onAdjustMargins;
-  final ValueChanged<ReaderMode> onModeChanged;
   final VoidCallback onDocumentInfo;
   final VoidCallback onToggleFullScreen;
   final VoidCallback onToggleChrome;
@@ -149,12 +145,6 @@ final class ReaderTopBar extends StatelessWidget
                   ),
                 ),
               ),
-              if (!compact && showModeControls) ...[
-                _ReaderModeSelector(
-                  selected: preferences.viewMode,
-                  onSelected: onModeChanged,
-                ),
-              ],
               Expanded(
                 child: Align(
                   alignment: Alignment.centerRight,
@@ -264,26 +254,25 @@ final class ReaderTopBar extends StatelessWidget
                             ),
                           ),
                           const PopupMenuDivider(height: 9),
-                          if (compact || !showModeControls) ...[
-                            PopupMenuItem(
-                              value: _ReaderMenuAction.documentMode,
-                              height: 40,
-                              child: _ReaderMenuItem(
-                                icon: Icons.description_outlined,
-                                label: 'Modo documento',
-                                selected:
-                                    preferences.viewMode == ReaderMode.document,
-                              ),
+                          if (preferences.pageLayout ==
+                              PageLayoutMode.facing) ...[
+                            CheckedPopupMenuItem(
+                              value: _ReaderMenuAction.coverAlone,
+                              checked:
+                                  preferences.coverPolicy ==
+                                  ReaderCoverPolicy.firstPageIsCover,
+                              child: const Text('Portada sola'),
                             ),
-                            PopupMenuItem(
-                              value: _ReaderMenuAction.bookMode,
-                              height: 40,
-                              child: _ReaderMenuItem(
-                                icon: Icons.menu_book_outlined,
-                                label: 'Modo libro',
-                                selected:
-                                    preferences.viewMode == ReaderMode.book,
-                              ),
+                            CheckedPopupMenuItem(
+                              value: _ReaderMenuAction.firstPageRight,
+                              checked:
+                                  preferences.initialSide ==
+                                  ReaderInitialSide.right,
+                              child: const Text('Primera página a la derecha'),
+                            ),
+                            const PopupMenuItem(
+                              value: _ReaderMenuAction.resetPairing,
+                              child: Text('Restablecer emparejado'),
                             ),
                             const PopupMenuDivider(height: 9),
                           ],
@@ -447,10 +436,21 @@ final class ReaderTopBar extends StatelessWidget
     switch (action) {
       case _ReaderMenuAction.openDocument:
         onOpenDocument();
-      case _ReaderMenuAction.documentMode:
-        onModeChanged(ReaderMode.document);
-      case _ReaderMenuAction.bookMode:
-        onModeChanged(ReaderMode.book);
+      case _ReaderMenuAction.coverAlone:
+        controller.setCoverPolicy(
+          controller.preferences?.coverPolicy ==
+                  ReaderCoverPolicy.firstPageIsCover
+              ? ReaderCoverPolicy.noCover
+              : ReaderCoverPolicy.firstPageIsCover,
+        );
+      case _ReaderMenuAction.firstPageRight:
+        controller.setInitialSide(
+          controller.preferences?.initialSide == ReaderInitialSide.right
+              ? ReaderInitialSide.left
+              : ReaderInitialSide.right,
+        );
+      case _ReaderMenuAction.resetPairing:
+        controller.resetBookPairing();
       case _ReaderMenuAction.commandPalette:
         onCommandPalette();
       case _ReaderMenuAction.thumbnails:
@@ -479,41 +479,11 @@ final class ReaderTopBar extends StatelessWidget
   }
 }
 
-final class _ReaderModeSelector extends StatelessWidget {
-  const _ReaderModeSelector({required this.selected, required this.onSelected});
-
-  final ReaderMode selected;
-  final ValueChanged<ReaderMode> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return YamaSegmentedControl<ReaderMode>(
-      key: const Key('reader-mode-selector'),
-      value: selected,
-      semanticLabel: 'Modo de visualización',
-      segments: const [
-        YamaSegment(
-          value: ReaderMode.document,
-          label: 'Documento',
-          tooltip: 'Documento: mostrar una página',
-          icon: Icons.description_outlined,
-        ),
-        YamaSegment(
-          value: ReaderMode.book,
-          label: 'Libro',
-          tooltip: 'Libro: mostrar páginas enfrentadas',
-          icon: Icons.menu_book_outlined,
-        ),
-      ],
-      onChanged: onSelected,
-    );
-  }
-}
-
 enum _ReaderMenuAction {
   openDocument,
-  documentMode,
-  bookMode,
+  coverAlone,
+  firstPageRight,
+  resetPairing,
   commandPalette,
   thumbnails,
   outline,

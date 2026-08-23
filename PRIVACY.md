@@ -4,7 +4,8 @@ Yamantaka es local-first:
 
 - Los documentos no se suben a Internet ni se copian a la biblioteca interna.
 - No se requiere cuenta.
-- Biblioteca, marcadores, progreso, sesiones y preferencias son locales.
+- Biblioteca, metadatos enriquecidos, temas, marcadores, progreso, sesiones y
+  preferencias son locales.
 - No existe telemetría por defecto, publicidad ni venta o intercambio de datos.
 - Los logs no incluyen texto, selección, consultas, títulos, nombres, rutas
   locales, marcadores, contraseñas ni contenido PDF.
@@ -31,7 +32,7 @@ entre procesos.
 
 La exportación JSON es manual, versionada y no usa red. Incluye, cuando existen:
 
-- rutas y metadatos de biblioteca;
+- rutas, metadatos, temas y sugerencias de biblioteca;
 - progreso y preferencias;
 - marcadores e historial;
 - ajustes internos.
@@ -60,7 +61,7 @@ decisión explícita; no forma parte de las copias locales actuales.
 Anotaciones, etiquetas, colecciones, workspaces y perfiles se guardan solo en
 SQLite local. Pueden revelar hábitos, proyectos y fragmentos del documento:
 limpiar “historial” no los elimina; “borrar todos los datos” sí. El backup JSON
-v2 y las exportaciones manuales de anotaciones contienen datos sensibles y
+v7 y las exportaciones manuales de anotaciones contienen datos sensibles y
 deben protegerse como el PDF, aunque nunca contienen sus bytes.
 
 El índice FTS es opcional y reconstruible. Solo se activa desde la búsqueda
@@ -85,6 +86,19 @@ documento; el PDF original nunca se modifica.
 La página elegida manualmente se guarda como preferencia local. La puntuación y
 confianza automáticas no se muestran ni se registran en logs. La búsqueda de
 biblioteca permanece solo en memoria.
+
+## Enriquecimiento local de biblioteca
+
+Yamantaka puede leer `Title`/`Author`, bloques de texto de la portada elegida y
+una muestra limitada de las primeras páginas. Procesa un PDF cada vez, como
+máximo 12 páginas y 64 KiB de texto, y descarta la muestra después de obtener el
+resultado. No usa OCR, IA, API, cuenta, subida ni conexión de red.
+
+Las reglas locales asignan como máximo tres temas entre un vocabulario cerrado
+en español e inglés. Una confianza alta se aplica automáticamente, una
+confianza intermedia se presenta como sugerencia y una baja se ignora. Las
+ediciones manuales de título, autor o temas nunca se sustituyen. Un PDF escaneado
+sin texto no se clasifica y conserva el nombre de archivo.
 
 ## Diagnóstico y modo seguro
 

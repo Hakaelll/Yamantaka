@@ -1,4 +1,5 @@
 import 'library_document.dart';
+import 'document_enrichment.dart';
 
 final class LibraryQuery {
   const LibraryQuery({
@@ -8,6 +9,9 @@ final class LibraryQuery {
     this.sort = LibraryQuerySort.lastOpened,
     this.favoritesOnly = false,
     this.includeMissing = true,
+    this.readingState = LibraryQueryReadingState.all,
+    this.authors = const {},
+    this.topics = const {},
   });
 
   final int offset;
@@ -16,6 +20,9 @@ final class LibraryQuery {
   final LibraryQuerySort sort;
   final bool favoritesOnly;
   final bool includeMissing;
+  final LibraryQueryReadingState readingState;
+  final Set<String> authors;
+  final Set<LibraryTopic> topics;
 
   LibraryQuery copyWith({
     int? offset,
@@ -24,6 +31,9 @@ final class LibraryQuery {
     LibraryQuerySort? sort,
     bool? favoritesOnly,
     bool? includeMissing,
+    LibraryQueryReadingState? readingState,
+    Set<String>? authors,
+    Set<LibraryTopic>? topics,
   }) => LibraryQuery(
     offset: offset ?? this.offset,
     limit: limit ?? this.limit,
@@ -31,6 +41,9 @@ final class LibraryQuery {
     sort: sort ?? this.sort,
     favoritesOnly: favoritesOnly ?? this.favoritesOnly,
     includeMissing: includeMissing ?? this.includeMissing,
+    readingState: readingState ?? this.readingState,
+    authors: authors ?? this.authors,
+    topics: topics ?? this.topics,
   );
 
   LibraryQuery normalized() => LibraryQuery(
@@ -40,10 +53,18 @@ final class LibraryQuery {
     sort: sort,
     favoritesOnly: favoritesOnly,
     includeMissing: includeMissing,
+    readingState: readingState,
+    authors: {
+      for (final author in authors)
+        if (author.trim().isNotEmpty) author.trim().toLowerCase(),
+    },
+    topics: Set<LibraryTopic>.unmodifiable(topics),
   );
 }
 
 enum LibraryQuerySort { lastOpened, added, title, progress }
+
+enum LibraryQueryReadingState { all, inProgress, notStarted, completed }
 
 final class LibraryPage {
   const LibraryPage({

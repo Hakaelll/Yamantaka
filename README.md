@@ -7,10 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.2.1 revisada el 23 de agosto de 2026:
+Base Flutter 0.3.0+4 revisada el 23 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: suite completa aprobada;
+- flutter test --no-pub: 214 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local abre una ventana receptiva y acepta un cierre normal;
@@ -23,17 +23,20 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 
 ## Lector
 
-- Documento muestra una página; Libro muestra un pliego completo.
-- Libro navega por pliegos completos, conserva portada individual y lado
-  inicial cuando están configurados y respeta LTR/RTL.
+- `Ctrl+K` permite elegir Una página, Dos páginas y Continua desde la paleta de
+  comandos, sin ocupar permanentemente la barra; conserva la página activa y
+  la disposición por PDF.
+- Dos páginas navega por pliegos completos y permite ajustar por documento si
+  la portada queda sola y si la primera página comienza a izquierda o derecha;
+  el emparejado respeta LTR/RTL, páginas pares/impares y la última sin pareja.
 - Las páginas del pliego son contiguas y comparten un canal central ligado a
   sus bordes, por lo que el lomo acompaña zoom y paneo.
-- Documento y Libro comparten los seis entornos de lectura; el tema se aplica
+- Los tres modos comparten los seis entornos de lectura; el tema se aplica
   al canvas y al chrome sin alterar los píxeles del PDF.
 - La barra superior se divide en grupos flotantes superpuestos para documento,
   modo y herramientas, sin reservar una franja en el visor.
-- El selector Documento/Libro y la navegación inferior están centrados respecto
-  a toda la ventana; vista y zoom permanecen agrupados a la derecha.
+- La navegación inferior está centrada respecto a toda la ventana; vista y
+  zoom permanecen agrupados a la derecha.
 - Los laterales ofrecen zonas claras de paso de página, con estado deshabilitado
   y soporte semántico.
 - Flechas, Page Up/Down, Home/End, espacio, F11 y Escape comparten la misma
@@ -46,8 +49,12 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 ## Otras funciones
 
 - Apertura mediante selector nativo, arrastrar y soltar o argumento.
-- Biblioteca local con portadas, filtros, estados, favoritos, colecciones,
-  etiquetas, vistas inteligentes, selección múltiple y operaciones por lote.
+- Biblioteca local con portadas, filtros combinables por autor, tema, estado y
+  favorito, agrupación por autor, colecciones, etiquetas, vistas inteligentes,
+  selección múltiple y operaciones por lote.
+- Título, autor y hasta tres temas se proponen mediante metadatos y texto PDF
+  procesados localmente; los resultados dudosos se revisan y las ediciones
+  manuales prevalecen siempre.
 - Biblioteca siempre oscura y espacial, con una paleta monocromática,
   selección violeta, foco blanco independiente del color y controles
   superiores en cápsulas discretas.
@@ -63,6 +70,7 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Confirmación de enlaces externos y bloqueo de esquemas no seguros.
 - Sistema visual monocromático con Segoe UI Variable, temas claro/oscuro,
   densidad cómoda/compacta y breakpoints en 680/1100 px.
+- La ventana se abre maximizada y conserva su geometría normal para restaurarla.
 
 ## Referencia visual vigente
 
@@ -172,7 +180,9 @@ Captura de una ventana ya abierta, conservando sus bounds y enviando F11:
 
 ## Limitaciones
 
-- No hay OCR ni edición o firma del PDF.
+- No hay OCR, IA, clasificación remota ni edición o firma del PDF. Los PDF
+  escaneados sin capa de texto conservan el nombre de archivo hasta una edición
+  manual.
 - La selección geométrica para highlight, subrayado y tachado depende aún del
   adaptador nativo; hoy las notas se ligan a página.
 - Split/comparación conservan modelos internos, pero no se anuncian sin dos

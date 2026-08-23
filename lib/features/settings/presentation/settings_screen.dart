@@ -284,14 +284,6 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         description: 'Jerarquía y espacio de las herramientas del lector.',
         children: [
           _SwitchSetting(
-            label: 'Mostrar selector Documento / Libro',
-            description:
-                'La acción seguirá disponible en Más opciones y en la paleta.',
-            value: settings.showReaderModeControls,
-            onChanged: (value) =>
-                _update(settings.copyWith(showReaderModeControls: value)),
-          ),
-          _SwitchSetting(
             label: 'Mostrar accesos al panel',
             description:
                 'Miniaturas, índice y marcadores seguirán en Más opciones.',

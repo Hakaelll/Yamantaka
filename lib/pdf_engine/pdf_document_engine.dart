@@ -24,6 +24,14 @@ abstract interface class PdfDocumentEngine {
     PdfOperationToken? cancellationToken,
   });
 
+  Future<PdfDocumentMetadata> readDocumentMetadata(String documentId);
+
+  Future<List<PdfStructuredTextBlock>> extractStructuredPageText({
+    required String documentId,
+    required int pageIndex,
+    PdfOperationToken? cancellationToken,
+  });
+
   Future<List<PdfSearchMatch>> searchText({
     required String documentId,
     required String query,

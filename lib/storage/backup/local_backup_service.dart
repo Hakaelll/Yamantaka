@@ -43,7 +43,7 @@ final class LocalBackupService {
        _settings = settings;
 
   static const format = 'yamantaka-local-backup';
-  static const version = 6;
+  static const version = 7;
   static const maxBackupBytes = 128 * 1024 * 1024;
 
   final AppDatabase _database;
@@ -144,6 +144,8 @@ final class LocalBackupService {
       ..execute('DELETE FROM workspaces')
       ..execute('DELETE FROM collection_documents')
       ..execute('DELETE FROM collections')
+      ..execute('DELETE FROM document_topics')
+      ..execute('DELETE FROM document_enrichment')
       ..execute('DELETE FROM document_tags')
       ..execute('DELETE FROM annotation_tags')
       ..execute('DELETE FROM tags')
@@ -158,6 +160,16 @@ final class LocalBackupService {
       ..execute('DELETE FROM documents')
       ..execute('DELETE FROM app_metadata');
     _restoreTable('documents', _documentColumns, tables['documents']! as List);
+    _restoreTable(
+      'document_enrichment',
+      _enrichmentColumns,
+      tables['document_enrichment']! as List,
+    );
+    _restoreTable(
+      'document_topics',
+      _topicColumns,
+      tables['document_topics']! as List,
+    );
     _restoreTable(
       'document_preferences',
       _preferenceColumns,
@@ -244,6 +256,8 @@ final class LocalBackupService {
   Map<String, dynamic> _snapshot() {
     final tables = <String, List<Map<String, Object?>>>{
       'documents': _tableRows('documents'),
+      'document_enrichment': _tableRows('document_enrichment'),
+      'document_topics': _tableRows('document_topics'),
       'document_preferences': _tableRows('document_preferences'),
       'document_notes': _tableRows('document_notes'),
       'bookmarks': _tableRows('bookmarks'),
@@ -345,6 +359,8 @@ final class LocalBackupService {
     // Notes were introduced after the v1-v4 backup formats. Treat an absent
     // table as an empty table so older backups remain importable.
     tables.putIfAbsent('document_notes', () => <Object?>[]);
+    tables.putIfAbsent('document_enrichment', () => <Object?>[]);
+    tables.putIfAbsent('document_topics', () => <Object?>[]);
     final backupVersion = decoded['version'] as int;
     _validateTable(
       tables,
@@ -360,6 +376,8 @@ final class LocalBackupService {
       'document_preferences',
       backupVersion >= 6 ? _preferenceColumns : _legacyPreferenceColumns,
     );
+    _validateTable(tables, 'document_enrichment', _enrichmentColumns);
+    _validateTable(tables, 'document_topics', _topicColumns);
     _validateTable(tables, 'document_notes', _noteColumns);
     _validateTable(tables, 'bookmarks', _bookmarkColumns);
     _validateTable(tables, 'reading_sessions', _sessionColumns);
@@ -664,6 +682,30 @@ const _legacyDocumentColumns = <String>[
   'is_missing',
   'fingerprint',
   'thumbnail_path',
+];
+
+const _enrichmentColumns = <String>[
+  'document_id',
+  'fingerprint',
+  'analyzer_version',
+  'status',
+  'suggested_title',
+  'suggested_author',
+  'title_confidence',
+  'author_confidence',
+  'topics_manual',
+  'analyzed_at',
+  'error_code',
+];
+
+const _topicColumns = <String>[
+  'document_id',
+  'topic_key',
+  'confidence',
+  'origin',
+  'analyzer_version',
+  'fingerprint',
+  'updated_at',
 ];
 
 const _preferenceColumns = <String>[

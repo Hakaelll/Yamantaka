@@ -19,6 +19,17 @@ base class StubPdfDocumentEngine implements PdfDocumentEngine {
   }) async => '';
 
   @override
+  Future<PdfDocumentMetadata> readDocumentMetadata(String documentId) async =>
+      const PdfDocumentMetadata();
+
+  @override
+  Future<List<PdfStructuredTextBlock>> extractStructuredPageText({
+    required String documentId,
+    required int pageIndex,
+    PdfOperationToken? cancellationToken,
+  }) async => const [];
+
+  @override
   Future<List<PdfOutlineItem>> getOutline(String documentId) async => const [];
 
   @override

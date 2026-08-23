@@ -1,5 +1,6 @@
 import '../../reader/domain/reader_models.dart';
 import 'document_cover.dart';
+import 'document_enrichment.dart';
 
 final class LibraryDocument {
   const LibraryDocument({
@@ -29,6 +30,8 @@ final class LibraryDocument {
     this.thumbnailPath,
     this.coverMetadata,
     this.isFavorite = false,
+    this.topics = const [],
+    this.enrichment,
   });
 
   final String id;
@@ -61,6 +64,8 @@ final class LibraryDocument {
   final String? thumbnailPath;
   final DocumentCoverMetadata? coverMetadata;
   final bool isFavorite;
+  final List<DocumentTopicAssignment> topics;
+  final DocumentEnrichment? enrichment;
 
   String get effectiveTitle => titleOverride ?? title ?? fileName;
   String? get effectiveAuthor => authorOverride ?? author;
@@ -95,6 +100,8 @@ final class LibraryDocument {
     String? thumbnailPath,
     DocumentCoverMetadata? coverMetadata,
     bool? isFavorite,
+    List<DocumentTopicAssignment>? topics,
+    DocumentEnrichment? enrichment,
   }) => LibraryDocument(
     id: id ?? this.id,
     path: path ?? this.path,
@@ -124,6 +131,8 @@ final class LibraryDocument {
     thumbnailPath: thumbnailPath ?? this.thumbnailPath,
     coverMetadata: coverMetadata ?? this.coverMetadata,
     isFavorite: isFavorite ?? this.isFavorite,
+    topics: topics ?? this.topics,
+    enrichment: enrichment ?? this.enrichment,
   );
 
   LibraryDocument withMetadataOverrides({
@@ -169,6 +178,8 @@ final class LibraryDocument {
       thumbnailPath: thumbnailPath,
       coverMetadata: coverMetadata,
       isFavorite: isFavorite,
+      topics: topics,
+      enrichment: enrichment,
     );
   }
 

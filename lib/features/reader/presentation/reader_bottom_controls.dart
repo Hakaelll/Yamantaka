@@ -172,19 +172,6 @@ final class ReaderBottomControls extends StatelessWidget {
                 value: _CompactReaderAction.fitPage,
                 child: Text('$fitPageLabel · Ctrl+0'),
               ),
-              const PopupMenuDivider(),
-              if (!facing) ...[
-                CheckedPopupMenuItem(
-                  value: _CompactReaderAction.single,
-                  checked: preferences.pageLayout == PageLayoutMode.single,
-                  child: const Text('Una página'),
-                ),
-                CheckedPopupMenuItem(
-                  value: _CompactReaderAction.continuous,
-                  checked: preferences.pageLayout == PageLayoutMode.continuous,
-                  child: const Text('Vista continua'),
-                ),
-              ],
               const PopupMenuItem(
                 value: _CompactReaderAction.theme,
                 child: Text('Tema de lectura'),
@@ -257,10 +244,6 @@ final class ReaderBottomControls extends StatelessWidget {
         controller.fitWidth();
       case _CompactReaderAction.fitPage:
         controller.fitPage();
-      case _CompactReaderAction.single:
-        controller.setPageLayout(PageLayoutMode.single);
-      case _CompactReaderAction.continuous:
-        controller.setPageLayout(PageLayoutMode.continuous);
       case _CompactReaderAction.theme:
         onChooseTheme();
     }
@@ -308,11 +291,4 @@ final class ReaderBottomControls extends StatelessWidget {
 
 enum _ZoomAction { actualSize, fitWidth, fitPage }
 
-enum _CompactReaderAction {
-  actualSize,
-  fitWidth,
-  fitPage,
-  single,
-  continuous,
-  theme,
-}
+enum _CompactReaderAction { actualSize, fitWidth, fitPage, theme }

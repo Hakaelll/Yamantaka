@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +14,7 @@ import '../core/i18n/app_localizations.dart';
 import '../core/performance/startup_timeline.dart';
 import '../core/platform/activation_channel.dart';
 import '../features/library/domain/library_document.dart';
+import '../features/library/domain/document_enrichment.dart';
 import '../features/library/domain/library_selection.dart';
 import '../features/library/domain/metadata_editor.dart';
 import '../features/library/presentation/library_screen.dart';
@@ -314,6 +316,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
       onImportFolder: _importFolder,
       onRecoverFolder: _recoverMissingFromFolder,
       safeMode: widget.services.safeMode,
+      enrichment: widget.services.enrichment,
     ),
     _AppPage.reader => _buildReaderPage(),
     _AppPage.settings => SettingsScreen(
@@ -344,7 +347,6 @@ final class _YamantakaAppState extends State<YamantakaApp>
     initialPanelSection: widget.services.settings.settings.readerPanelSection,
     initialPanelOpen: widget.services.settings.settings.readerPanelOpen,
     initialChromeVisible: widget.services.settings.settings.readerChromeVisible,
-    showModeControls: widget.services.settings.settings.showReaderModeControls,
     showPanelControls:
         widget.services.settings.settings.showReaderPanelControls,
     shortcutOverrides: widget.services.settings.settings.shortcutOverrides,
@@ -796,6 +798,17 @@ final class _YamantakaAppState extends State<YamantakaApp>
                 _DocumentMetadataLine(label: 'Estado', value: readingState),
                 if (document.libraryNote case final note?)
                   _DocumentMetadataLine(label: 'Nota', value: note),
+                if (document.topics.isNotEmpty)
+                  _DocumentMetadataLine(
+                    label: 'Temas',
+                    value: document.topics
+                        .map((assignment) => assignment.topic.label)
+                        .join(', '),
+                  ),
+                if (document.enrichment?.suggestedTitle case final title?)
+                  _DocumentMetadataLine(label: 'Título sugerido', value: title),
+                if (document.enrichment?.suggestedAuthor case final author?)
+                  _DocumentMetadataLine(label: 'Autor sugerido', value: author),
                 _DocumentMetadataLine(
                   label: 'Modificado',
                   value: _formatLocalDate(document.fileModifiedAt),
@@ -813,6 +826,18 @@ final class _YamantakaAppState extends State<YamantakaApp>
           ),
         ),
         actions: [
+          if (document.enrichment?.needsReview == true) ...[
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(context, _DocumentInfoAction.dismissSuggestion),
+              child: const Text('Descartar propuesta'),
+            ),
+            FilledButton.tonal(
+              onPressed: () =>
+                  Navigator.pop(context, _DocumentInfoAction.acceptSuggestion),
+              child: const Text('Aceptar propuesta'),
+            ),
+          ],
           TextButton.icon(
             onPressed: () =>
                 Navigator.pop(context, _DocumentInfoAction.editMetadata),
@@ -822,6 +847,12 @@ final class _YamantakaAppState extends State<YamantakaApp>
           TextButton(
             onPressed: () => Navigator.pop(context, _DocumentInfoAction.remove),
             child: const Text('Retirar'),
+          ),
+          IconButton(
+            tooltip: 'Volver a analizar metadatos y temas',
+            onPressed: () =>
+                Navigator.pop(context, _DocumentInfoAction.reanalyze),
+            icon: const Icon(Icons.refresh_rounded),
           ),
           TextButton(
             onPressed: () =>
@@ -871,6 +902,18 @@ final class _YamantakaAppState extends State<YamantakaApp>
         _showNotice('Ruta copiada.');
       case _DocumentInfoAction.editMetadata:
         await _editDocumentMetadata(document);
+      case _DocumentInfoAction.acceptSuggestion:
+        widget.services.enrichment.acceptSuggestions(document.id);
+        await widget.services.library.reload();
+        _showNotice('Metadatos detectados aplicados.');
+      case _DocumentInfoAction.dismissSuggestion:
+        widget.services.enrichment.dismissSuggestions(document.id);
+        await widget.services.library.reload();
+        _showNotice('Propuesta descartada.');
+      case _DocumentInfoAction.reanalyze:
+        await widget.services.enrichment.analyzeDocument(document);
+        await widget.services.library.reload();
+        _showNotice('Análisis local actualizado.');
       case _DocumentInfoAction.reveal:
         await widget.services.revealDocument(document.path);
       case _DocumentInfoAction.resetProgress:
@@ -906,64 +949,93 @@ final class _YamantakaAppState extends State<YamantakaApp>
     final title = TextEditingController(text: document.titleOverride ?? '');
     final author = TextEditingController(text: document.authorOverride ?? '');
     final note = TextEditingController(text: document.libraryNote ?? '');
-    final edited = await showDialog<MetadataEditState>(
+    final initialTopics = document.topics
+        .map((assignment) => assignment.topic)
+        .toSet();
+    var selectedTopics = Set<LibraryTopic>.from(initialTopics);
+    final edited = await showDialog<_MetadataEditResult>(
       context: _navigatorKey.currentContext!,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.edit_note_rounded),
-        title: const Text('Editar metadata local'),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: title,
-                  autofocus: true,
-                  maxLength: 512,
-                  decoration: const InputDecoration(
-                    labelText: 'Título',
-                    helperText: 'Vacío restaura el título original.',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          icon: const Icon(Icons.edit_note_rounded),
+          title: const Text('Editar metadata local'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 660),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: title,
+                    autofocus: true,
+                    maxLength: 512,
+                    decoration: const InputDecoration(
+                      labelText: 'Título',
+                      helperText: 'Vacío restaura el título detectado.',
+                    ),
                   ),
-                ),
-                TextField(
-                  controller: author,
-                  maxLength: 512,
-                  decoration: const InputDecoration(labelText: 'Autor'),
-                ),
-                TextField(
-                  controller: note,
-                  maxLength: 4000,
-                  minLines: 3,
-                  maxLines: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Nota de biblioteca',
-                    helperText: 'Se guarda fuera del PDF.',
+                  TextField(
+                    controller: author,
+                    maxLength: 512,
+                    decoration: const InputDecoration(labelText: 'Autor'),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(
-              context,
-              MetadataEditState(
-                sourceTitle: document.sourceTitle ?? document.title,
-                sourceAuthor: document.sourceAuthor ?? document.author,
-                titleOverride: title.text,
-                authorOverride: author.text,
-                libraryNote: note.text,
+                  TextField(
+                    controller: note,
+                    maxLength: 4000,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Nota de biblioteca',
+                      helperText: 'Se guarda fuera del PDF.',
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.space8),
+                  Text('Temas', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: AppSpacing.space8),
+                  Wrap(
+                    spacing: AppSpacing.space8,
+                    runSpacing: AppSpacing.space8,
+                    children: [
+                      for (final topic in LibraryTopic.values)
+                        FilterChip(
+                          label: Text(topic.label),
+                          selected: selectedTopics.contains(topic),
+                          onSelected: (selected) => setDialogState(() {
+                            selected
+                                ? selectedTopics.add(topic)
+                                : selectedTopics.remove(topic);
+                          }),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            child: const Text('Guardar'),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                context,
+                _MetadataEditResult(
+                  metadata: MetadataEditState(
+                    sourceTitle: document.sourceTitle ?? document.title,
+                    sourceAuthor: document.sourceAuthor ?? document.author,
+                    titleOverride: title.text,
+                    authorOverride: author.text,
+                    libraryNote: note.text,
+                  ),
+                  topics: Set.unmodifiable(selectedTopics),
+                ),
+              ),
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
       ),
     );
     title.dispose();
@@ -971,13 +1043,16 @@ final class _YamantakaAppState extends State<YamantakaApp>
     note.dispose();
     if (!mounted || edited == null) return;
     try {
-      final value = edited.normalized();
+      final value = edited.metadata.normalized();
       widget.services.documents.updateLocalMetadata(
         document.id,
         title: value.titleOverride,
         author: value.authorOverride,
         note: value.libraryNote,
       );
+      if (!setEquals(initialTopics, edited.topics)) {
+        widget.services.enrichment.setManualTopics(document.id, edited.topics);
+      }
       widget.services.libraryIndex.refreshMetadata(document.id);
       await widget.services.library.reload();
       _showNotice('Metadata local guardada.');
@@ -1165,12 +1240,22 @@ enum _AppPage { library, reader, settings }
 
 enum _DocumentInfoAction {
   editMetadata,
+  acceptSuggestion,
+  dismissSuggestion,
+  reanalyze,
   copyPath,
   reveal,
   resetProgress,
   remove,
   relocate,
   open,
+}
+
+final class _MetadataEditResult {
+  const _MetadataEditResult({required this.metadata, required this.topics});
+
+  final MetadataEditState metadata;
+  final Set<LibraryTopic> topics;
 }
 
 enum _AnnotationExportFormat { markdown, json }

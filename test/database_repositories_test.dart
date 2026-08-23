@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart';
 import 'package:yamantaka/app/app_config.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/application/document_service.dart';
 import 'package:yamantaka/features/library/application/duplicate_resolution_service.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
+import 'package:yamantaka/features/library/domain/document_enrichment.dart';
 import 'package:yamantaka/features/library/domain/import_queue.dart';
 import 'package:yamantaka/features/library/domain/library_query.dart';
 import 'package:yamantaka/features/reader/domain/reader_models.dart';
@@ -51,7 +55,122 @@ void main() {
         'workspaces',
         'library_search',
         'document_covers',
+        'document_enrichment',
+        'document_topics',
       }),
+    );
+  });
+
+  test('author, topic and reading filters use complete-library counts', () {
+    final first = _document().copyWith(
+      id: 'first',
+      normalizedPath: 'first.pdf',
+      path: 'first.pdf',
+      fileName: 'first.pdf',
+      author: 'Octavia Butler',
+      readingProgress: 0.4,
+      fingerprint: 'first',
+    );
+    final second = _document().copyWith(
+      id: 'second',
+      normalizedPath: 'second.pdf',
+      path: 'second.pdf',
+      fileName: 'second.pdf',
+      author: 'Octavia Butler',
+      readingProgress: 1,
+      fingerprint: 'second',
+    );
+    final third = _document().copyWith(
+      id: 'third',
+      normalizedPath: 'third.pdf',
+      path: 'third.pdf',
+      fileName: 'third.pdf',
+      author: null,
+      readingProgress: 0,
+      fingerprint: 'third',
+    );
+    for (final document in [first, second, third]) {
+      documents.save(document);
+    }
+    documents.setManualTopics(first.id, {
+      LibraryTopic.literature,
+      LibraryTopic.society,
+    }, analyzerVersion: 1);
+    documents.setManualTopics(second.id, {
+      LibraryTopic.literature,
+    }, analyzerVersion: 1);
+
+    final query = LibraryQuery(
+      limit: 1,
+      authors: const {'octavia butler'},
+      topics: const {LibraryTopic.literature, LibraryTopic.politics},
+    );
+    final page = documents.page(query);
+    final counts = documents.readingStateCounts(query);
+
+    expect(page.documents, hasLength(1));
+    expect(page.total, 2);
+    expect(page.hasMore, isTrue);
+    expect(counts[LibraryQueryReadingState.all], 2);
+    expect(counts[LibraryQueryReadingState.inProgress], 1);
+    expect(counts[LibraryQueryReadingState.completed], 1);
+    expect(
+      documents
+          .page(
+            query.copyWith(readingState: LibraryQueryReadingState.completed),
+          )
+          .total,
+      1,
+    );
+    expect(
+      documents.authorFacets(),
+      contains(
+        isA<LibraryFacet>()
+            .having((facet) => facet.value, 'value', 'Octavia Butler')
+            .having((facet) => facet.count, 'count', 2),
+      ),
+    );
+    expect(documents.topicFacets()[LibraryTopic.literature], 2);
+  });
+
+  test('migration 7 to 8 creates enrichment tables transactionally', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'yamantaka-schema-7-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final path = '${directory.path}${Platform.pathSeparator}state.sqlite3';
+    final seeded = AppDatabase.open(
+      path,
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    seeded.close();
+    final raw = sqlite3.open(path)
+      ..execute('DROP TABLE document_topics')
+      ..execute('DROP TABLE document_enrichment')
+      ..execute('PRAGMA user_version = 7');
+    raw.close();
+
+    final migrated = AppDatabase.open(
+      path,
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    addTearDown(migrated.close);
+    final tables = migrated.database
+        .select("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .map((row) => row['name'])
+        .toSet();
+
+    expect(
+      migrated.database.select('PRAGMA user_version').first.columnAt(0),
+      8,
+    );
+    expect(tables, containsAll({'document_enrichment', 'document_topics'}));
+    expect(migrated.integrityCheck(), 'ok');
+    expect(
+      directory.listSync().where(
+        (entry) => entry.path.contains('pre-migration-v7'),
+      ),
+      isNotEmpty,
     );
   });
 

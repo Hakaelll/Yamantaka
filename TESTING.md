@@ -1,6 +1,6 @@
 # Pruebas
 
-Estado actualizado: 2026-08-02.
+Estado actualizado: 2026-08-23.
 
 Este documento describe únicamente evidencia reproducible del árbol actual. Se
 han retirado las tablas y capturas históricas que correspondían a lectores
@@ -27,8 +27,8 @@ aplicación ni sustituye la firma exigida para distribución.
 
 La suite automatizada comprueba:
 
-- Documento, Libro y restauración de preferencias;
-- matriz de paridad de acciones comunes entre Documento y Libro en 640 y
+- Una página, Dos páginas, Continua y restauración de preferencias;
+- matriz de paridad de acciones comunes entre disposiciones en 640 y
   1280 px;
 - pliegos 1–2, 3–4 y final impar, además de paridad explícita y RTL;
 - ajuste de pliego, aislamiento de unidades, centrado y límites de paneo;
@@ -36,10 +36,15 @@ La suite automatizada comprueba:
 - exclusión de atajos mientras un campo de texto tiene foco;
 - F11, Escape y separación entre fullscreen, chrome e inmersivo;
 - superficie superior opaca y ausencia de degradado transparente;
-- selector de modo y navegación inferior centrados respecto a la ventana;
+- disposiciones accesibles desde `Ctrl+K`, sin selector permanente, y
+  navegación inferior centrada respecto a la ventana;
 - composición compacta, media y expandida sin overflow;
 - alto contraste, movimiento reducido y perfil de tinta electrónica;
 - panel lateral, búsqueda, marcadores, temas de Documento y persistencia.
+
+La biblioteca cubre metadatos PDF, portada estructurada, autor explícito o
+dudoso, ausencia de texto, temas ES/EN, límite de muestra, preservación manual,
+facetas completas, migración 7→8 y backup v7 con ajustes de pliego.
 
 ## Referencia visual mantenida
 

@@ -12,6 +12,8 @@ param(
     [int]$ClickX = -1,
     [int]$ClickY = -1,
     [switch]$PreserveWindowBounds,
+    [ValidateSet('', 'single', 'facing', 'continuous')]
+    [string]$LayoutCommand = '',
     [string]$SendKeys = ''
 )
 
@@ -54,6 +56,14 @@ public static class YamantakaWindowCapture {
 
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr handle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool PostMessage(
+        IntPtr handle,
+        uint message,
+        IntPtr wParam,
+        IntPtr lParam
+    );
 
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr handle, int command);
@@ -122,9 +132,89 @@ if ($ClickX -ge 0 -and $ClickY -ge 0) {
     Start-Sleep -Milliseconds 1200
 }
 
+if ($LayoutCommand) {
+    # Open Ctrl+K through window messages so the validation remains usable in
+    # non-interactive Windows PowerShell hosts where SendKeys can be denied.
+    [void][YamantakaWindowCapture]::PostMessage(
+        $handle,
+        0x0100,
+        [IntPtr]0x11,
+        [IntPtr]::Zero
+    )
+    [void][YamantakaWindowCapture]::PostMessage(
+        $handle,
+        0x0100,
+        [IntPtr]0x4B,
+        [IntPtr]::Zero
+    )
+    [void][YamantakaWindowCapture]::PostMessage(
+        $handle,
+        0x0101,
+        [IntPtr]0x4B,
+        [IntPtr]::Zero
+    )
+    [void][YamantakaWindowCapture]::PostMessage(
+        $handle,
+        0x0101,
+        [IntPtr]0x11,
+        [IntPtr]::Zero
+    )
+    Start-Sleep -Milliseconds 800
+    $query = switch ($LayoutCommand) {
+        'single' { 'una' }
+        'facing' { 'dos' }
+        'continuous' { 'continua' }
+    }
+    foreach ($character in $query.ToCharArray()) {
+        if (-not [YamantakaWindowCapture]::PostMessage(
+                $handle,
+                0x0102,
+                [IntPtr][int]$character,
+                [IntPtr]::Zero
+            )) {
+            throw "Could not write the layout query to the command palette."
+        }
+    }
+    Start-Sleep -Milliseconds 400
+    [void][YamantakaWindowCapture]::PostMessage(
+        $handle,
+        0x0100,
+        [IntPtr]0x0D,
+        [IntPtr]::Zero
+    )
+    [void][YamantakaWindowCapture]::PostMessage(
+        $handle,
+        0x0101,
+        [IntPtr]0x0D,
+        [IntPtr]::Zero
+    )
+    Start-Sleep -Milliseconds 1200
+}
+
 if ($SendKeys) {
-    Add-Type -AssemblyName System.Windows.Forms
-    [System.Windows.Forms.SendKeys]::SendWait($SendKeys)
+    if ($SendKeys -eq '{F11}') {
+        $virtualKeyF11 = [IntPtr]0x7A
+        if (-not [YamantakaWindowCapture]::PostMessage(
+                $handle,
+                0x0100,
+                $virtualKeyF11,
+                [IntPtr]::Zero
+            )) {
+            throw "Could not post the F11 key-down message."
+        }
+        if (-not [YamantakaWindowCapture]::PostMessage(
+                $handle,
+                0x0101,
+                $virtualKeyF11,
+                [IntPtr]::Zero
+            )) {
+            throw "Could not post the F11 key-up message."
+        }
+    }
+    else {
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.SendKeys]::SendWait($SendKeys)
+    }
     Start-Sleep -Milliseconds 1200
 }
 

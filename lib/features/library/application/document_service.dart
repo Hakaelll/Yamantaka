@@ -141,6 +141,8 @@ final class DocumentService {
           ? existing?.coverMetadata
           : null,
       isFavorite: existing?.isFavorite ?? false,
+      topics: existing?.topics ?? const [],
+      enrichment: existing?.enrichment,
     );
     if (existing != null &&
         existing.fingerprint != file.fingerprint &&

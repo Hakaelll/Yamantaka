@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 — 2026-08-23 (biblioteca inteligente y lectura flexible)
+
+- Enriquece cada PDF localmente con título y autor desde metadatos o portada y
+  hasta tres temas reproducibles en español e inglés, con límites de 12 páginas
+  y 64 KiB, cancelación, reintento y revisión de resultados dudosos.
+- Añade filtros combinables y recuentos completos por autor, tema, estado y
+  favorito, además de agrupación alfabética por autor y edición manual de temas.
+- Eleva SQLite a esquema 8 y el backup local a formato 7, conservando sugerencias,
+  procedencia/confianza, huella, versión de analizador y ajustes de pliego.
+- Amplía la barra de progreso a 4 px: gris/blanca en documentos normales y
+  violeta únicamente en el documento seleccionado.
+- Sustituye Documento/Libro por los comandos Una página, Dos páginas y Continua
+  dentro de la paleta `Ctrl+K`, sin un selector permanente y con persistencia
+  por PDF.
+- Incorpora Ajustar pliego para portada sola/emparejada, primera página a
+  izquierda/derecha y restablecimiento de la recomendación.
+- Abre la ventana maximizada sin perder la geometría normal almacenada y
+  mantiene F11 como fullscreen real independiente.
+- Actualiza pruebas, documentación y referencia visual de Windows; no añade
+  OCR, IA, cuentas, red ni firma de binarios.
+
 ## 0.2.1 — 2026-08-23 (biblioteca monocromática)
 
 - Sustituye la paleta azul-negra de Biblioteca por negros, blancos y grises

@@ -39,23 +39,19 @@ Future<void> bootstrap(List<String> arguments) async {
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
     final stored = settings.settings;
-    final hasPosition = stored.windowX != null && stored.windowY != null;
+    final presentation = resolveInitialWindowPresentation(stored);
     final options = WindowOptions(
-      size: Size(
-        stored.windowWidth.clamp(640, 2400),
-        stored.windowHeight.clamp(480, 1600),
-      ),
+      size: presentation.normalSize,
       minimumSize: Size(640, 480),
-      center: !hasPosition,
+      center: presentation.normalPosition == null,
       title: AppConfig.productName,
       backgroundColor: const Color(0xFFF4F3EF),
     );
     await windowManager.waitUntilReadyToShow(options, () async {
-      if (hasPosition) {
-        await windowManager.setPosition(
-          Offset(stored.windowX!, stored.windowY!),
-        );
+      if (presentation.normalPosition != null) {
+        await windowManager.setPosition(presentation.normalPosition!);
       }
+      if (presentation.maximized) await windowManager.maximize();
       await windowManager.show();
       await windowManager.focus();
     });
@@ -76,6 +72,32 @@ Future<void> bootstrap(List<String> arguments) async {
   startup.start(StartupPhase.firstFrame);
   runApp(YamantakaApp(services: services, initialPaths: initialPaths));
 }
+
+@immutable
+final class InitialWindowPresentation {
+  const InitialWindowPresentation({
+    required this.normalSize,
+    required this.normalPosition,
+    required this.maximized,
+  });
+
+  final Size normalSize;
+  final Offset? normalPosition;
+  final bool maximized;
+}
+
+InitialWindowPresentation resolveInitialWindowPresentation(
+  AppSettings settings,
+) => InitialWindowPresentation(
+  normalSize: Size(
+    settings.windowWidth.clamp(640, 2400),
+    settings.windowHeight.clamp(480, 1600),
+  ),
+  normalPosition: settings.windowX == null || settings.windowY == null
+      ? null
+      : Offset(settings.windowX!, settings.windowY!),
+  maximized: true,
+);
 
 String? initialPdfPath(List<String> arguments) {
   final paths = SingleInstanceProtocol.fromArguments(arguments).pdfPaths;

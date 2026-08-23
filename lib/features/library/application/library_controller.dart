@@ -7,6 +7,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../storage/repositories/document_repository.dart';
 import '../domain/library_document.dart';
 import '../domain/library_query.dart';
+import '../domain/document_enrichment.dart';
 
 final class LibraryController extends ChangeNotifier {
   LibraryController(this._repository, this._logger);
@@ -26,6 +27,12 @@ final class LibraryController extends ChangeNotifier {
   String sortOrder = 'lastOpened';
   String readingState = 'all';
   bool favoritesOnly = false;
+  Set<String> selectedAuthors = const {};
+  Set<LibraryTopic> selectedTopics = const {};
+  bool groupByAuthor = false;
+  List<LibraryFacet> authorFacets = const [];
+  Map<LibraryTopic, int> topicFacets = const {};
+  Map<LibraryQueryReadingState, int> readingStateCounts = const {};
   LibraryQuery? _activeQuery;
   int _loadGeneration = 0;
 
@@ -60,6 +67,9 @@ final class LibraryController extends ChangeNotifier {
           : page.documents;
       totalDocuments = page.total;
       hasMore = page.hasMore;
+      authorFacets = _repository.authorFacets(requested);
+      topicFacets = _repository.topicFacets(requested);
+      readingStateCounts = _repository.readingStateCounts(requested);
       if (selectedDocumentId != null &&
           _repository.byId(selectedDocumentId!) == null) {
         selectedDocumentId = null;
@@ -101,9 +111,30 @@ final class LibraryController extends ChangeNotifier {
     unawaited(reload());
   }
 
+  Future<void> setFacets({
+    required Set<String> authors,
+    required Set<LibraryTopic> topics,
+    required bool groupAuthors,
+  }) {
+    selectedAuthors = {
+      for (final author in authors) author.trim().toLowerCase(),
+    };
+    selectedTopics = Set.unmodifiable(topics);
+    groupByAuthor = groupAuthors;
+    return reload();
+  }
+
   LibraryQuery _queryFromState() => LibraryQuery(
     text: query,
     favoritesOnly: favoritesOnly,
+    authors: selectedAuthors,
+    topics: selectedTopics,
+    readingState: switch (readingState) {
+      'inProgress' => LibraryQueryReadingState.inProgress,
+      'notStarted' => LibraryQueryReadingState.notStarted,
+      'completed' => LibraryQueryReadingState.completed,
+      _ => LibraryQueryReadingState.all,
+    },
     sort: switch (sortOrder) {
       'added' => LibraryQuerySort.added,
       'title' => LibraryQuerySort.title,

@@ -4,6 +4,7 @@ import 'package:sqlite3/common.dart' show Row;
 
 import '../../features/library/domain/library_document.dart';
 import '../../features/library/domain/document_cover.dart';
+import '../../features/library/domain/document_enrichment.dart';
 import '../../features/library/domain/library_query.dart';
 import '../../features/reader/domain/reader_models.dart';
 import '../database/app_database.dart';
@@ -26,6 +27,93 @@ final class DocumentRepository {
       '$_documentSelect ORDER BY d.last_opened_at DESC',
     );
     return rows.map(_fromRow).toList(growable: false);
+  }
+
+  List<LibraryDocument> needingEnrichment(int analyzerVersion) {
+    final rows = _database.database.select(
+      '$_documentSelect WHERE d.is_missing = 0 AND '
+      '(e.document_id IS NULL OR e.fingerprint <> d.fingerprint OR '
+      'e.analyzer_version < ? OR e.status IN (?, ?)) '
+      'ORDER BY d.last_opened_at DESC',
+      [
+        analyzerVersion,
+        EnrichmentStatus.pending.name,
+        EnrichmentStatus.analyzing.name,
+      ],
+    );
+    return rows.map(_fromRow).toList(growable: false);
+  }
+
+  List<LibraryFacet> authorFacets([LibraryQuery query = const LibraryQuery()]) {
+    final base = query.copyWith(authors: const {}).normalized();
+    final where = _whereClause(base);
+    final rows = _database.database.select('''
+      SELECT trim(coalesce(d.author_override, d.author, '')) AS value,
+        COUNT(*) AS item_count
+      FROM documents d
+      LEFT JOIN document_notes n ON n.document_id = d.id
+      WHERE ${where.sql}
+      GROUP BY lower(trim(coalesce(d.author_override, d.author, '')))
+      HAVING value <> ''
+      ORDER BY value COLLATE NOCASE
+      ''', where.parameters);
+    return rows
+        .map(
+          (row) => LibraryFacet(
+            value: row['value'] as String,
+            count: row['item_count'] as int,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Map<LibraryTopic, int> topicFacets([
+    LibraryQuery query = const LibraryQuery(),
+  ]) {
+    final base = query.copyWith(topics: const {}).normalized();
+    final where = _whereClause(base);
+    final rows = _database.database.select('''
+      SELECT dt.topic_key, COUNT(DISTINCT dt.document_id) AS item_count
+      FROM document_topics dt
+      JOIN documents d ON d.id = dt.document_id
+      LEFT JOIN document_notes n ON n.document_id = d.id
+      WHERE ${where.sql}
+      GROUP BY dt.topic_key
+      ''', where.parameters);
+    final facets = <LibraryTopic, int>{};
+    for (final row in rows) {
+      final topic = _topicByName(row['topic_key'] as String);
+      if (topic != null) facets[topic] = row['item_count'] as int;
+    }
+    return facets;
+  }
+
+  Map<LibraryQueryReadingState, int> readingStateCounts([
+    LibraryQuery query = const LibraryQuery(),
+  ]) {
+    final base = query
+        .copyWith(readingState: LibraryQueryReadingState.all)
+        .normalized();
+    final where = _whereClause(base);
+    final row = _database.database.select('''
+      SELECT COUNT(*) AS all_count,
+        SUM(CASE WHEN d.reading_progress > 0 AND d.reading_progress < 1
+          THEN 1 ELSE 0 END) AS progress_count,
+        SUM(CASE WHEN d.reading_progress <= 0 THEN 1 ELSE 0 END)
+          AS not_started_count,
+        SUM(CASE WHEN d.reading_progress >= 1 THEN 1 ELSE 0 END)
+          AS completed_count
+      FROM documents d
+      LEFT JOIN document_notes n ON n.document_id = d.id
+      WHERE ${where.sql}
+      ''', where.parameters).first;
+    int count(String key) => (row[key] as int?) ?? 0;
+    return {
+      LibraryQueryReadingState.all: count('all_count'),
+      LibraryQueryReadingState.inProgress: count('progress_count'),
+      LibraryQueryReadingState.notStarted: count('not_started_count'),
+      LibraryQueryReadingState.completed: count('completed_count'),
+    };
   }
 
   LibraryPage page([LibraryQuery query = const LibraryQuery()]) {
@@ -232,6 +320,240 @@ final class DocumentRepository {
     );
   }
 
+  void beginEnrichment(LibraryDocument document, int analyzerVersion) {
+    _database.database.execute(
+      '''
+      INSERT INTO document_enrichment(
+        document_id, fingerprint, analyzer_version, status, topics_manual
+      ) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(document_id) DO UPDATE SET
+        fingerprint = excluded.fingerprint,
+        analyzer_version = excluded.analyzer_version,
+        status = excluded.status,
+        error_code = NULL
+      ''',
+      [
+        document.id,
+        document.fingerprint,
+        analyzerVersion,
+        EnrichmentStatus.analyzing.name,
+        document.enrichment?.topicsManual == true ? 1 : 0,
+      ],
+    );
+  }
+
+  void saveEnrichment({
+    required LibraryDocument document,
+    required int analyzerVersion,
+    required EnrichmentStatus status,
+    String? detectedTitle,
+    String? detectedAuthor,
+    String? suggestedTitle,
+    String? suggestedAuthor,
+    double? titleConfidence,
+    double? authorConfidence,
+    List<DocumentTopicAssignment> automaticTopics = const [],
+    String? errorCode,
+  }) {
+    final db = _database.database;
+    final now = _date(DateTime.now());
+    db.execute('BEGIN IMMEDIATE');
+    try {
+      if (detectedTitle != null || detectedAuthor != null) {
+        db.execute(
+          '''
+          UPDATE documents SET
+            title = coalesce(?, title),
+            source_title = coalesce(?, source_title),
+            author = coalesce(?, author),
+            source_author = coalesce(?, source_author)
+          WHERE id = ?
+          ''',
+          [
+            _cleanMetadata(detectedTitle),
+            _cleanMetadata(detectedTitle),
+            _cleanMetadata(detectedAuthor),
+            _cleanMetadata(detectedAuthor),
+            document.id,
+          ],
+        );
+      }
+      final topicsManual =
+          db.select(
+            'SELECT topics_manual FROM document_enrichment '
+            'WHERE document_id = ?',
+            [document.id],
+          ).firstOrNull?['topics_manual'] ==
+          1;
+      if (!topicsManual) {
+        db.execute(
+          "DELETE FROM document_topics WHERE document_id = ? AND origin = 'automatic'",
+          [document.id],
+        );
+        for (final assignment in automaticTopics.take(3)) {
+          db.execute(
+            '''
+            INSERT INTO document_topics(
+              document_id, topic_key, confidence, origin, analyzer_version,
+              fingerprint, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(document_id, topic_key) DO NOTHING
+            ''',
+            [
+              document.id,
+              assignment.topic.name,
+              assignment.confidence.clamp(0, 1),
+              EnrichmentOrigin.automatic.name,
+              analyzerVersion,
+              document.fingerprint,
+              now,
+            ],
+          );
+        }
+      }
+      db.execute(
+        '''
+        INSERT INTO document_enrichment(
+          document_id, fingerprint, analyzer_version, status,
+          suggested_title, suggested_author, title_confidence,
+          author_confidence, topics_manual, analyzed_at, error_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(document_id) DO UPDATE SET
+          fingerprint = excluded.fingerprint,
+          analyzer_version = excluded.analyzer_version,
+          status = excluded.status,
+          suggested_title = excluded.suggested_title,
+          suggested_author = excluded.suggested_author,
+          title_confidence = excluded.title_confidence,
+          author_confidence = excluded.author_confidence,
+          analyzed_at = excluded.analyzed_at,
+          error_code = excluded.error_code
+        ''',
+        [
+          document.id,
+          document.fingerprint,
+          analyzerVersion,
+          status.name,
+          _cleanMetadata(suggestedTitle),
+          _cleanMetadata(suggestedAuthor),
+          titleConfidence,
+          authorConfidence,
+          topicsManual ? 1 : 0,
+          now,
+          errorCode,
+        ],
+      );
+      db.execute('COMMIT');
+    } catch (_) {
+      db.execute('ROLLBACK');
+      rethrow;
+    }
+  }
+
+  LibraryDocument? acceptEnrichmentSuggestions(String documentId) {
+    final current = byId(documentId);
+    final enrichment = current?.enrichment;
+    if (current == null || enrichment == null) return current;
+    final db = _database.database;
+    db.execute('BEGIN IMMEDIATE');
+    try {
+      db.execute(
+        '''
+        UPDATE documents SET
+          title = coalesce(?, title), source_title = coalesce(?, source_title),
+          author = coalesce(?, author), source_author = coalesce(?, source_author)
+        WHERE id = ?
+        ''',
+        [
+          enrichment.suggestedTitle,
+          enrichment.suggestedTitle,
+          enrichment.suggestedAuthor,
+          enrichment.suggestedAuthor,
+          documentId,
+        ],
+      );
+      db.execute(
+        '''
+        UPDATE document_enrichment SET status = ?, suggested_title = NULL,
+          suggested_author = NULL, analyzed_at = ? WHERE document_id = ?
+        ''',
+        [EnrichmentStatus.completed.name, _date(DateTime.now()), documentId],
+      );
+      db.execute('COMMIT');
+    } catch (_) {
+      db.execute('ROLLBACK');
+      rethrow;
+    }
+    return byId(documentId);
+  }
+
+  LibraryDocument? dismissEnrichmentSuggestions(String documentId) {
+    _database.database.execute(
+      '''
+      UPDATE document_enrichment SET status = ?, suggested_title = NULL,
+        suggested_author = NULL, analyzed_at = ? WHERE document_id = ?
+      ''',
+      [EnrichmentStatus.completed.name, _date(DateTime.now()), documentId],
+    );
+    return byId(documentId);
+  }
+
+  LibraryDocument? setManualTopics(
+    String documentId,
+    Set<LibraryTopic> topics, {
+    required int analyzerVersion,
+  }) {
+    final document = byId(documentId);
+    if (document == null) return null;
+    final db = _database.database;
+    final now = _date(DateTime.now());
+    db.execute('BEGIN IMMEDIATE');
+    try {
+      db.execute('DELETE FROM document_topics WHERE document_id = ?', [
+        documentId,
+      ]);
+      for (final topic in topics) {
+        db.execute(
+          '''
+          INSERT INTO document_topics(
+            document_id, topic_key, confidence, origin, analyzer_version,
+            fingerprint, updated_at
+          ) VALUES (?, ?, 1, ?, ?, ?, ?)
+          ''',
+          [
+            documentId,
+            topic.name,
+            EnrichmentOrigin.manual.name,
+            analyzerVersion,
+            document.fingerprint,
+            now,
+          ],
+        );
+      }
+      db.execute(
+        '''
+        INSERT INTO document_enrichment(
+          document_id, fingerprint, analyzer_version, status, topics_manual,
+          analyzed_at
+        ) VALUES (?, ?, ?, ?, 1, ?)
+        ON CONFLICT(document_id) DO UPDATE SET topics_manual = 1
+        ''',
+        [
+          documentId,
+          document.fingerprint,
+          analyzerVersion,
+          EnrichmentStatus.completed.name,
+          now,
+        ],
+      );
+      db.execute('COMMIT');
+    } catch (_) {
+      db.execute('ROLLBACK');
+      rethrow;
+    }
+    return byId(documentId);
+  }
+
   void updateProgress({
     required String documentId,
     required int pageIndex,
@@ -432,6 +754,52 @@ final class DocumentRepository {
             ),
             pageAspectRatio: row['cover_page_aspect_ratio'] as double,
           );
+    final topics = <DocumentTopicAssignment>[];
+    final topicData = row['topic_data'] as String?;
+    if (topicData != null && topicData.isNotEmpty) {
+      for (final encoded in topicData.split(';;')) {
+        final parts = encoded.split('|');
+        if (parts.length != 3) continue;
+        final topic = _topicByName(parts[0]);
+        final confidence = double.tryParse(parts[1]);
+        final origin = _enumByName(
+          EnrichmentOrigin.values,
+          parts[2],
+          EnrichmentOrigin.automatic,
+        );
+        if (topic != null && confidence != null) {
+          topics.add(
+            DocumentTopicAssignment(
+              topic: topic,
+              confidence: confidence,
+              origin: origin,
+            ),
+          );
+        }
+      }
+    }
+    final enrichmentDocumentId = row['enrichment_document_id'] as String?;
+    final enrichment = enrichmentDocumentId == null
+        ? null
+        : DocumentEnrichment(
+            documentId: enrichmentDocumentId,
+            fingerprint: row['enrichment_fingerprint'] as String,
+            analyzerVersion: row['enrichment_analyzer_version'] as int,
+            status: _enumByName(
+              EnrichmentStatus.values,
+              row['enrichment_status'] as String,
+              EnrichmentStatus.pending,
+            ),
+            suggestedTitle: row['suggested_title'] as String?,
+            suggestedAuthor: row['suggested_author'] as String?,
+            titleConfidence: row['title_confidence'] as double?,
+            authorConfidence: row['author_confidence'] as double?,
+            topicsManual: (row['topics_manual'] as int) == 1,
+            analyzedAt: row['enrichment_analyzed_at'] == null
+                ? null
+                : DateTime.parse(row['enrichment_analyzed_at'] as String),
+            errorCode: row['enrichment_error_code'] as String?,
+          );
     return LibraryDocument(
       id: row['id'] as String,
       path: path,
@@ -468,6 +836,8 @@ final class DocumentRepository {
           cover?.smallThumbnailPath ?? row['thumbnail_path'] as String?,
       coverMetadata: cover,
       isFavorite: (row['is_favorite'] as int) == 1,
+      topics: List.unmodifiable(topics),
+      enrichment: enrichment,
     );
   }
 
@@ -485,9 +855,28 @@ final class DocumentRepository {
       c.crop_mode AS cover_crop_mode
       , c.page_aspect_ratio AS cover_page_aspect_ratio
       , n.note AS library_note
+      , e.document_id AS enrichment_document_id
+      , e.fingerprint AS enrichment_fingerprint
+      , e.analyzer_version AS enrichment_analyzer_version
+      , e.status AS enrichment_status
+      , e.suggested_title AS suggested_title
+      , e.suggested_author AS suggested_author
+      , e.title_confidence AS title_confidence
+      , e.author_confidence AS author_confidence
+      , e.topics_manual AS topics_manual
+      , e.analyzed_at AS enrichment_analyzed_at
+      , e.error_code AS enrichment_error_code
+      , (
+        SELECT group_concat(
+          dt.topic_key || '|' || dt.confidence || '|' || dt.origin,
+          ';;'
+        )
+        FROM document_topics dt WHERE dt.document_id = d.id
+      ) AS topic_data
     FROM documents d
     LEFT JOIN document_covers c ON c.document_id = d.id
     LEFT JOIN document_notes n ON n.document_id = d.id
+    LEFT JOIN document_enrichment e ON e.document_id = d.id
   ''';
 
   static String _date(DateTime value) => value.toUtc().toIso8601String();
@@ -497,6 +886,33 @@ final class DocumentRepository {
     final parameters = <Object?>[];
     if (!query.includeMissing) conditions.add('d.is_missing = 0');
     if (query.favoritesOnly) conditions.add('d.is_favorite = 1');
+    switch (query.readingState) {
+      case LibraryQueryReadingState.all:
+        break;
+      case LibraryQueryReadingState.inProgress:
+        conditions.add('d.reading_progress > 0 AND d.reading_progress < 1');
+      case LibraryQueryReadingState.notStarted:
+        conditions.add('d.reading_progress <= 0');
+      case LibraryQueryReadingState.completed:
+        conditions.add('d.reading_progress >= 1');
+    }
+    if (query.authors.isNotEmpty) {
+      final placeholders = List.filled(query.authors.length, '?').join(', ');
+      conditions.add(
+        'lower(trim(coalesce(d.author_override, d.author, \'\'))) '
+        'IN ($placeholders)',
+      );
+      parameters.addAll(query.authors);
+    }
+    if (query.topics.isNotEmpty) {
+      final placeholders = List.filled(query.topics.length, '?').join(', ');
+      conditions.add(
+        'EXISTS (SELECT 1 FROM document_topics filter_topics '
+        'WHERE filter_topics.document_id = d.id '
+        'AND filter_topics.topic_key IN ($placeholders))',
+      );
+      parameters.addAll(query.topics.map((topic) => topic.name));
+    }
     final text = query.text.toLowerCase();
     if (text.isNotEmpty) {
       conditions.add(
@@ -524,6 +940,9 @@ final class DocumentRepository {
     String name,
     T fallback,
   ) => values.where((value) => value.name == name).firstOrNull ?? fallback;
+
+  static LibraryTopic? _topicByName(String name) =>
+      LibraryTopic.values.where((topic) => topic.name == name).firstOrNull;
 
   static String? _cleanMetadata(String? value) {
     final clean = value?.trim();

@@ -560,6 +560,48 @@ final class ReaderController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setCoverPolicy(ReaderCoverPolicy policy) {
+    final current = preferences;
+    if (current == null || current.coverPolicy == policy) return;
+    _setBookPairing(policy, current.initialSide);
+  }
+
+  void setInitialSide(ReaderInitialSide side) {
+    final current = preferences;
+    if (current == null || current.initialSide == side) return;
+    _setBookPairing(current.coverPolicy, side);
+  }
+
+  void resetBookPairing() {
+    _setBookPairing(
+      ReaderCoverPolicy.firstPageIsCover,
+      ReaderInitialSide.right,
+    );
+  }
+
+  void _setBookPairing(
+    ReaderCoverPolicy coverPolicy,
+    ReaderInitialSide initialSide,
+  ) {
+    final current = preferences;
+    if (current == null) return;
+    currentPageIndex = ReadingUnitNavigation.canonicalPage(
+      pageIndex: currentPageIndex,
+      pageCount: pageCount,
+      mode: current.viewMode,
+      firstPageIsCover: coverPolicy != ReaderCoverPolicy.noCover,
+      initialSide: initialSide,
+    );
+    preferences = current.copyWith(
+      coverPolicy: coverPolicy,
+      initialSide: initialSide,
+      zoomMode: ZoomMode.fitPage,
+      scrollOffset: 0,
+    );
+    _scheduleSave();
+    notifyListeners();
+  }
+
   void rotateClockwise() {
     final current = preferences;
     if (current == null) return;

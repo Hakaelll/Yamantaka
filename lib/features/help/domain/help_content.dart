@@ -53,7 +53,9 @@ abstract final class HelpContent {
       summary: 'Abre un PDF local y vuelve siempre a tu posición.',
       body:
           'Usa Abrir para elegir un PDF. La biblioteca conserva el progreso y '
-          'la última posición sin copiar ni modificar el archivo original.',
+          'la última posición sin copiar ni modificar el archivo original. '
+          'También puede proponer título, autor y temas mediante metadatos y '
+          'texto local; los escaneos sin texto conservan el nombre de archivo.',
       keywords: ['biblioteca', 'abrir', 'PDF'],
     ),
     HelpArticle(
@@ -112,7 +114,9 @@ abstract final class HelpContent {
       summary: 'Usa el teclado para las acciones principales.',
       body:
           'Ctrl+O abre, Ctrl+F busca, Ctrl+K muestra la paleta, F11 alterna '
-          'pantalla completa y Escape cierra la capa temporal superior.',
+          'pantalla completa y Escape cierra la capa temporal superior. En el '
+          'lector puedes elegir Una página, Dos páginas o Continua desde '
+          'Ctrl+K y ajustar el emparejado del pliego desde Más opciones.',
       keywords: ['teclado', 'atajos', 'Ctrl'],
     ),
   ];
@@ -124,7 +128,9 @@ abstract final class HelpContent {
       summary: 'Open a local PDF and return to your reading position.',
       body:
           'Use Open to choose a PDF. The library keeps progress and the last '
-          'position without copying or modifying the original file.',
+          'position without copying or modifying the original file. It can '
+          'also suggest title, author, and topics from local metadata and text; '
+          'scans without text keep the file name.',
       keywords: ['library', 'open', 'PDF'],
     ),
     HelpArticle(
@@ -180,7 +186,9 @@ abstract final class HelpContent {
       summary: 'Use the keyboard for primary actions.',
       body:
           'Ctrl+O opens, Ctrl+F searches, Ctrl+K opens the command palette, '
-          'F11 toggles fullscreen, and Escape closes the top temporary layer.',
+          'F11 toggles fullscreen, and Escape closes the top temporary layer. '
+          'Ctrl+K exposes One page, Two pages, and Continuous; More options '
+          'contains spread pairing adjustments.',
       keywords: ['keyboard', 'shortcuts', 'Ctrl'],
     ),
   ];

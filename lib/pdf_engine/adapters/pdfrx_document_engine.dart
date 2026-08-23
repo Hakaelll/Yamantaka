@@ -1,11 +1,14 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
+import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:ffi/ffi.dart';
 import 'package:pdfrx/pdfrx.dart' as pdfrx;
+import 'package:pdfium_dart/pdfium_dart.dart' as pdfium;
 
 import '../../app/app_config.dart';
 import '../../core/errors/app_failure.dart';
@@ -73,6 +76,8 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
   final MemoryGovernor? _memory;
   final Map<String, pdfrx.PdfDocument> _documents = {};
   final Map<String, Map<int, String>> _textCache = {};
+  final Map<String, Map<int, List<PdfStructuredTextBlock>>>
+  _structuredTextCache = {};
   final Map<_RenderKey, Future<RenderedPdfPage>> _pendingRenders = {};
   final Map<_RenderKey, pdfrx.PdfPageRenderCancellationToken>
   _activeRenderTokens = {};
@@ -88,6 +93,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
   int _renderCacheMisses = 0;
   int _renderRequests = 0;
   int _deduplicatedRenders = 0;
+  static final pdfium.PDFium _pdfiumBindings = pdfium.getPdfium();
   int _cancelledRenders = 0;
 
   void _onCacheEntryEvicted(_RenderKey key, ui.Image image) {
@@ -156,6 +162,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
       final lease = _lifecycle?.acquire(ResourceKind.document);
       if (lease != null) _documentLeases[documentId] = lease;
       _textCache[documentId] = {};
+      _structuredTextCache[documentId] = {};
       final opened = OpenedPdfDocument(
         documentId: documentId,
         path: path,
@@ -224,6 +231,7 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
     _renderCache.removeWhere((key) => key.documentId == documentId);
     _disposeUncachedImages(documentId);
     _textCache.remove(documentId);
+    _structuredTextCache.remove(documentId);
     final document = _documents.remove(documentId);
     _documentLeases.remove(documentId)?.release();
     await document?.dispose();
@@ -447,6 +455,59 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
   }
 
   @override
+  Future<PdfDocumentMetadata> readDocumentMetadata(String documentId) async {
+    final document = documentFor(documentId);
+    return document.useNativeDocumentHandle((address) {
+      final handle = pdfium.FPDF_DOCUMENT.fromAddress(address);
+      return PdfDocumentMetadata(
+        title: _readMetadataTag(handle, 'Title'),
+        author: _readMetadataTag(handle, 'Author'),
+      );
+    });
+  }
+
+  @override
+  Future<List<PdfStructuredTextBlock>> extractStructuredPageText({
+    required String documentId,
+    required int pageIndex,
+    PdfOperationToken? cancellationToken,
+  }) async {
+    if (cancellationToken?.isCancelled ?? false) {
+      throw const AppFailure(
+        FailureKind.cancelled,
+        'Extracción de texto cancelada.',
+      );
+    }
+    final document = documentFor(documentId);
+    _validatePageIndex(document, pageIndex);
+    final cached = _structuredTextCache[documentId]?[pageIndex];
+    if (cached != null) return cached;
+    final page = await document.pages[pageIndex].ensureLoaded();
+    final text = await page.loadStructuredText();
+    if (cancellationToken?.isCancelled ?? false) {
+      throw const AppFailure(
+        FailureKind.cancelled,
+        'Extracción de texto cancelada.',
+      );
+    }
+    final value = List<PdfStructuredTextBlock>.unmodifiable([
+      for (final fragment in text.fragments)
+        if (fragment.text.trim().isNotEmpty && fragment.bounds.isNotEmpty)
+          PdfStructuredTextBlock(
+            text: fragment.text.trim(),
+            left: fragment.bounds.left,
+            top: fragment.bounds.top,
+            width: fragment.bounds.width,
+            height: fragment.bounds.height,
+            pageWidth: page.width,
+            pageHeight: page.height,
+          ),
+    ]);
+    _structuredTextCache[documentId]?[pageIndex] = value;
+    return value;
+  }
+
+  @override
   Future<List<PdfSearchMatch>> searchText({
     required String documentId,
     required String query,
@@ -627,6 +688,36 @@ final class PdfrxDocumentEngine implements PdfDocumentEngine {
         document.pages.length - 1,
         'pageIndex',
       );
+    }
+  }
+
+  static String? _readMetadataTag(pdfium.FPDF_DOCUMENT document, String tag) {
+    final nativeTag = tag.toNativeUtf8();
+    try {
+      final length = _pdfiumBindings.FPDF_GetMetaText(
+        document,
+        nativeTag.cast<ffi.Char>(),
+        ffi.nullptr,
+        0,
+      );
+      if (length <= 2 || length > 4096) return null;
+      final buffer = calloc<ffi.Uint8>(length);
+      try {
+        final written = _pdfiumBindings.FPDF_GetMetaText(
+          document,
+          nativeTag.cast<ffi.Char>(),
+          buffer.cast(),
+          length,
+        );
+        if (written <= 2) return null;
+        final units = buffer.cast<ffi.Uint16>().asTypedList((written ~/ 2) - 1);
+        final value = String.fromCharCodes(units).trim();
+        return value.isEmpty ? null : value;
+      } finally {
+        calloc.free(buffer);
+      }
+    } finally {
+      malloc.free(nativeTag);
     }
   }
 

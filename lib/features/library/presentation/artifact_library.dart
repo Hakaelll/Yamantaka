@@ -10,8 +10,10 @@ import '../../../app/theme/app_tokens.dart';
 import '../../../app/ui/yama_components.dart';
 import '../application/library_controller.dart';
 import '../application/library_filter.dart';
+import '../domain/document_enrichment.dart';
 import '../domain/library_artifact_layout.dart';
 import '../domain/library_document.dart';
+import '../domain/library_query.dart';
 import '../domain/library_selection.dart';
 import '../../organization/domain/organization_models.dart';
 
@@ -123,7 +125,26 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       sortOrder: _sortOrder,
       readingState: _readingState,
       favoritesOnly: _favoritesOnly,
+      authors: widget.controller.selectedAuthors,
+      topics: widget.controller.selectedTopics,
     );
+    final fullCounts = <LibraryReadingState, int>{
+      LibraryReadingState.all:
+          widget.controller.readingStateCounts[LibraryQueryReadingState.all] ??
+          result.counts[LibraryReadingState.all]!,
+      LibraryReadingState.inProgress:
+          widget.controller.readingStateCounts[LibraryQueryReadingState
+              .inProgress] ??
+          result.counts[LibraryReadingState.inProgress]!,
+      LibraryReadingState.notStarted:
+          widget.controller.readingStateCounts[LibraryQueryReadingState
+              .notStarted] ??
+          result.counts[LibraryReadingState.notStarted]!,
+      LibraryReadingState.completed:
+          widget.controller.readingStateCounts[LibraryQueryReadingState
+              .completed] ??
+          result.counts[LibraryReadingState.completed]!,
+    };
     final selected = _documentById(
       result.documents,
       widget.controller.selectedDocumentId,
@@ -134,7 +155,10 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     final activeFilter =
         _readingState != LibraryReadingState.all ||
         _sortOrder != LibrarySortOrder.lastOpened ||
-        _favoritesOnly;
+        _favoritesOnly ||
+        widget.controller.selectedAuthors.isNotEmpty ||
+        widget.controller.selectedTopics.isNotEmpty ||
+        widget.controller.groupByAuthor;
 
     return CallbackShortcuts(
       bindings: {
@@ -173,7 +197,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                   resultCount: result.documents.length,
                   totalCount: widget.controller.totalDocuments,
                   query: widget.controller.query,
-                  counts: result.counts,
+                  counts: fullCounts,
                   readingState: _readingState,
                   sortOrder: _sortOrder,
                   favoritesOnly: _favoritesOnly,
@@ -182,6 +206,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                   selectedCount: _selection.length,
                   onSearch: _openSearch,
                   onFilter: _applyFilterCommand,
+                  onFacets: _showFacetFilters,
                   onToggleSelectionMode: _toggleSelectionMode,
                 ),
                 if (_selectionMode && _selection.isNotEmpty)
@@ -206,6 +231,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                           selectionMode: _selectionMode,
                           reserveInfoSpace: describedDocument != null,
                           reduceMotion: reduceMotion,
+                          groupByAuthor: widget.controller.groupByAuthor,
                           onSelect: _select,
                           onOpen: _open,
                           onHover: (documentId) =>
@@ -736,6 +762,9 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
           _readingState = LibraryReadingState.all;
           _sortOrder = LibrarySortOrder.lastOpened;
           _favoritesOnly = false;
+          widget.controller.selectedAuthors = const {};
+          widget.controller.selectedTopics = const {};
+          widget.controller.groupByAuthor = false;
       }
       widget.controller.readingState = _readingState.name;
       widget.controller.sortOrder = _sortOrder.name;
@@ -743,6 +772,112 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     });
     widget.onReadingStateChanged(_readingState);
     unawaited(widget.controller.reload());
+  }
+
+  Future<void> _showFacetFilters() async {
+    var authors = Set<String>.from(widget.controller.selectedAuthors);
+    var topics = Set<LibraryTopic>.from(widget.controller.selectedTopics);
+    var groupAuthors = widget.controller.groupByAuthor;
+    final applied = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          icon: const Icon(Icons.account_tree_outlined),
+          title: const Text('Autores y temas'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620, maxHeight: 560),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Agrupar por autor'),
+                    subtitle: const Text(
+                      'Crea secciones dinámicas sin modificar colecciones.',
+                    ),
+                    value: groupAuthors,
+                    onChanged: (value) =>
+                        setDialogState(() => groupAuthors = value),
+                  ),
+                  const SizedBox(height: AppSpacing.space12),
+                  Text(
+                    'Autores',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: AppSpacing.space8),
+                  if (widget.controller.authorFacets.isEmpty)
+                    const Text('Todavía no hay autores detectados.')
+                  else
+                    Wrap(
+                      spacing: AppSpacing.space8,
+                      runSpacing: AppSpacing.space8,
+                      children: [
+                        for (final facet in widget.controller.authorFacets)
+                          FilterChip(
+                            label: Text('${facet.value} · ${facet.count}'),
+                            selected: authors.contains(
+                              facet.value.trim().toLowerCase(),
+                            ),
+                            onSelected: (selected) => setDialogState(() {
+                              final key = facet.value.trim().toLowerCase();
+                              selected ? authors.add(key) : authors.remove(key);
+                            }),
+                          ),
+                      ],
+                    ),
+                  const SizedBox(height: AppSpacing.space20),
+                  Text('Temas', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: AppSpacing.space8),
+                  Wrap(
+                    spacing: AppSpacing.space8,
+                    runSpacing: AppSpacing.space8,
+                    children: [
+                      for (final topic in LibraryTopic.values)
+                        FilterChip(
+                          label: Text(
+                            '${topic.label} · '
+                            '${widget.controller.topicFacets[topic] ?? 0}',
+                          ),
+                          selected: topics.contains(topic),
+                          onSelected: (selected) => setDialogState(() {
+                            selected ? topics.add(topic) : topics.remove(topic);
+                          }),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => setDialogState(() {
+                authors.clear();
+                topics.clear();
+                groupAuthors = false;
+              }),
+              child: const Text('Restablecer'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Aplicar'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (applied != true || !mounted) return;
+    await widget.controller.setFacets(
+      authors: authors,
+      topics: topics,
+      groupAuthors: groupAuthors,
+    );
+    if (mounted) setState(() {});
   }
 
   void _resetFilters() {
@@ -766,6 +901,7 @@ final class _LibraryCommandBar extends StatelessWidget {
     required this.selectedCount,
     required this.onSearch,
     required this.onFilter,
+    required this.onFacets,
     required this.onToggleSelectionMode,
   });
 
@@ -781,6 +917,7 @@ final class _LibraryCommandBar extends StatelessWidget {
   final int selectedCount;
   final VoidCallback onSearch;
   final ValueChanged<_FilterCommand> onFilter;
+  final VoidCallback onFacets;
   final VoidCallback onToggleSelectionMode;
 
   @override
@@ -841,6 +978,14 @@ final class _LibraryCommandBar extends StatelessWidget {
                 tooltip: 'Buscar en la biblioteca (Ctrl+F)',
                 onPressed: onSearch,
                 icon: Icons.search_rounded,
+              ),
+              YamaIconButton(
+                key: const Key('library-facet-button'),
+                semanticLabel: 'Filtrar por autores y temas',
+                tooltip: 'Autores, temas y agrupación',
+                onPressed: onFacets,
+                selected: activeFilter,
+                icon: Icons.account_tree_outlined,
               ),
               PopupMenuButton<_FilterCommand>(
                 key: const Key('library-filter-button'),
@@ -1014,6 +1159,7 @@ final class _ArtifactCanvas extends StatelessWidget {
     required this.selectionMode,
     required this.reserveInfoSpace,
     required this.reduceMotion,
+    required this.groupByAuthor,
     required this.onSelect,
     required this.onOpen,
     required this.onHover,
@@ -1028,6 +1174,7 @@ final class _ArtifactCanvas extends StatelessWidget {
   final bool selectionMode;
   final bool reserveInfoSpace;
   final bool reduceMotion;
+  final bool groupByAuthor;
   final ValueChanged<LibraryDocument> onSelect;
   final ValueChanged<LibraryDocument> onOpen;
   final ValueChanged<String?> onHover;
@@ -1046,6 +1193,83 @@ final class _ArtifactCanvas extends StatelessWidget {
               AppBreakpoints.classify(constraints.maxWidth) ==
               AppWindowClass.compact,
         );
+        if (groupByAuthor) {
+          final groups = groupLibraryDocumentsByAuthor(documents);
+          return CustomScrollView(
+            controller: controller,
+            slivers: [
+              const SliverToBoxAdapter(
+                child: SizedBox(height: AppSpacing.space16),
+              ),
+              for (final entry in groups.entries) ...[
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    AppSpacing.space8,
+                    horizontalPadding,
+                    AppSpacing.space8,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: Row(
+                      children: [
+                        Text(
+                          entry.key,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(width: AppSpacing.space8),
+                        Text(
+                          '${entry.value.length}',
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    0,
+                    horizontalPadding,
+                    AppSpacing.space24,
+                  ),
+                  sliver: SliverGrid.builder(
+                    itemCount: entry.value.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: metrics.columns,
+                      mainAxisExtent: metrics.cellExtent,
+                      mainAxisSpacing: AppSpacing.space16,
+                      crossAxisSpacing: AppSpacing.space16,
+                    ),
+                    itemBuilder: (context, index) {
+                      final document = entry.value[index];
+                      return Center(
+                        child: ArtifactDocument(
+                          key: ValueKey('artifact-${document.id}'),
+                          document: document,
+                          width: metrics.artifactWidth,
+                          selected: selectionMode
+                              ? selectedDocumentIds.contains(document.id)
+                              : selectedDocumentId == document.id,
+                          selectionMode: selectionMode,
+                          reduceMotion: reduceMotion,
+                          onSelect: () => onSelect(document),
+                          onOpen: () => onOpen(document),
+                          onHover: (hovered) =>
+                              onHover(hovered ? document.id : null),
+                          onMenu: (position) => onMenu(document, position),
+                          onVisible: () => onDocumentVisible?.call(document),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+              SliverToBoxAdapter(
+                child: SizedBox(height: reserveInfoSpace ? 156 : 48),
+              ),
+            ],
+          );
+        }
         if (documents.length <= 6) {
           final bottomPadding = reserveInfoSpace ? 116.0 : AppSpacing.space24;
           return SingleChildScrollView(
@@ -1383,6 +1607,20 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                           if (widget.document.readingProgress > 0 &&
                               widget.document.readingProgress < 1)
                             Align(
+                              alignment: Alignment.bottomCenter,
+                              child: ColoredBox(
+                                color: context.appColors.textMuted.withValues(
+                                  alpha: 0.28,
+                                ),
+                                child: const SizedBox(
+                                  width: double.infinity,
+                                  height: 4,
+                                ),
+                              ),
+                            ),
+                          if (widget.document.readingProgress > 0 &&
+                              widget.document.readingProgress < 1)
+                            Align(
                               alignment: Alignment.bottomLeft,
                               child: FractionallySizedBox(
                                 widthFactor: widget.document.readingProgress,
@@ -1390,7 +1628,7 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                   color: widget.selected
                                       ? context.appColors.librarySelectionAccent
                                       : context.appColors.textSecondary,
-                                  child: const SizedBox(height: 2),
+                                  child: const SizedBox(height: 4),
                                 ),
                               ),
                             ),
@@ -1557,6 +1795,22 @@ final class DocumentInfoOverlay extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if (document.topics.isNotEmpty)
+                Text(
+                  document.topics
+                      .map((assignment) => assignment.topic.label)
+                      .join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              if (document.enrichment?.needsReview == true)
+                Text(
+                  'Metadatos pendientes de revisión',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: context.appColors.textSecondary,
+                  ),
                 ),
               const SizedBox(height: AppSpacing.space4),
               Text(

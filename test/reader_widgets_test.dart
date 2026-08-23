@@ -245,10 +245,7 @@ void main() {
     expect(adapter.configuration?.coverPolicy, ReaderCoverPolicy.noCover);
     expect(adapter.configuration?.initialSide, ReaderInitialSide.left);
     expect(find.text('1–2 / 6'), findsOneWidget);
-    expect(
-      tester.getCenter(find.byKey(const Key('reader-mode-selector'))).dx,
-      closeTo(640, 1),
-    );
+    expect(find.byKey(const Key('reader-mode-selector')), findsNothing);
     expect(
       tester.getCenter(find.byKey(const Key('reader-navigation-group'))).dx,
       closeTo(640, 1),
@@ -296,7 +293,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('mode selector is explicit and each mode owns its layout', (
+  testWidgets('Ctrl+K exposes all layouts without a persistent selector', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1280, 800);
@@ -314,15 +311,25 @@ void main() {
 
     await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
     await tester.pump();
-    expect(find.byKey(const Key('reader-mode-selector')), findsOneWidget);
-    expect(find.byTooltip('Documento: mostrar una página'), findsOneWidget);
-    expect(
-      find.byTooltip('Libro: mostrar páginas enfrentadas'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('reader-mode-selector')), findsNothing);
     expect(adapter.configuration?.flow, PdfViewFlow.single);
 
-    await tester.tap(find.byTooltip('Libro: mostrar páginas enfrentadas'));
+    Future<void> openPalette(String query) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      final search = find.byKey(const Key('command-palette-search'));
+      expect(search, findsOneWidget);
+      await tester.enterText(search, query);
+      await tester.pump();
+    }
+
+    await openPalette('disposición');
+    expect(find.text('Disposición: Una página'), findsOneWidget);
+    expect(find.text('Disposición: Dos páginas'), findsOneWidget);
+    expect(find.text('Disposición: Continua'), findsOneWidget);
+    await tester.tap(find.text('Disposición: Dos páginas'));
     await tester.pump();
     expect(harness.controller.preferences!.viewMode, ReaderMode.book);
     expect(harness.controller.preferences!.pageLayout, PageLayoutMode.facing);
@@ -337,8 +344,26 @@ void main() {
     );
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
     expect(adapter.configuration?.initialZoomMode, PdfViewZoomMode.fitPage);
+    await tester.tap(find.byTooltip('Más opciones'));
+    await tester.pump();
+    expect(find.text('Portada sola'), findsOneWidget);
+    expect(find.text('Primera página a la derecha'), findsOneWidget);
+    expect(find.text('Restablecer emparejado'), findsOneWidget);
+    await tester.tapAt(Offset.zero);
+    await tester.pump();
 
-    await tester.tap(find.byTooltip('Documento: mostrar una página'));
+    await openPalette('continua');
+    await tester.tap(find.text('Disposición: Continua'));
+    await tester.pump();
+    expect(harness.controller.preferences!.viewMode, ReaderMode.document);
+    expect(
+      harness.controller.preferences!.pageLayout,
+      PageLayoutMode.continuous,
+    );
+    expect(adapter.configuration?.flow, PdfViewFlow.continuous);
+
+    await openPalette('una página');
+    await tester.tap(find.text('Disposición: Una página'));
     await tester.pump();
     expect(harness.controller.preferences!.viewMode, ReaderMode.document);
     expect(harness.controller.preferences!.pageLayout, PageLayoutMode.single);
@@ -448,10 +473,7 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull, reason: 'viewport $size');
       expect(find.byKey(const Key('test-pdf-viewer')), findsOneWidget);
-      expect(
-        find.byKey(const Key('reader-mode-selector')),
-        size.width < 680 ? findsNothing : findsOneWidget,
-      );
+      expect(find.byKey(const Key('reader-mode-selector')), findsNothing);
     }
 
     await tester.pumpWidget(const SizedBox.shrink());

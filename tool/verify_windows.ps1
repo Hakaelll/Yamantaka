@@ -238,7 +238,8 @@ try {
                 # Flutter resolves CMake and MSBuild from the selected Visual
                 # Studio installation even when neither executable is on PATH.
                 # The native release gate below is the authoritative check.
-                $free = (Get-PSDrive -Name (Get-Location).Drive.Name).Free
+                $driveRoot = [System.IO.Path]::GetPathRoot($repositoryRoot)
+                $free = ([System.IO.DriveInfo]::new($driveRoot)).AvailableFreeSpace
                 if ($free -lt 10GB) {
                     throw "Less than 10 GB is free on the workspace drive ($free bytes)."
                 }

@@ -42,7 +42,6 @@ final class ReaderScreen extends StatefulWidget {
     this.initialPanelOpen = false,
     this.initialPanelPinned = false,
     this.initialChromeVisible = true,
-    this.showModeControls = true,
     this.showPanelControls = true,
     this.shortcutOverrides = '{}',
     this.recentDocuments = const [],
@@ -73,7 +72,6 @@ final class ReaderScreen extends StatefulWidget {
   final bool initialPanelOpen;
   final bool initialPanelPinned;
   final bool initialChromeVisible;
-  final bool showModeControls;
   final bool showPanelControls;
   final String shortcutOverrides;
   final List<LibraryDocument> recentDocuments;
@@ -424,7 +422,6 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                         compact: windowClass == AppWindowClass.compact,
                         expanded: windowClass == AppWindowClass.expanded,
                         activePanel: _panel,
-                        showModeControls: widget.showModeControls,
                         showPanelControls: widget.showPanelControls,
                         shortcutOverrides: widget.shortcutOverrides,
                         onBack: widget.onBack,
@@ -441,7 +438,6 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                         onShowAnnotations: () =>
                             _showPanel(ReaderPanelSection.annotations),
                         onAdjustMargins: () => _showMarginChooser(context),
-                        onModeChanged: _setReaderMode,
                         onDocumentInfo:
                             widget.onDocumentInfo ??
                             () => _showDocumentInfo(context),
@@ -874,8 +870,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     unawaited(action());
   }
 
-  void _setReaderMode(ReaderMode mode) {
-    widget.controller.setReaderMode(mode);
+  void _setPageLayout(PageLayoutMode layout) {
+    widget.controller.setPageLayout(layout);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _requestReaderFocus();
     });
@@ -920,8 +916,10 @@ final class _ReaderScreenState extends State<ReaderScreen> {
         _runReaderNavigation(widget.controller.goToFirstReadingUnit),
     AppCommandId.lastPage: () =>
         _runReaderNavigation(widget.controller.goToLastReadingUnit),
-    AppCommandId.bookMode: () => _setReaderMode(ReaderMode.book),
-    AppCommandId.documentMode: () => _setReaderMode(ReaderMode.document),
+    AppCommandId.singlePageLayout: () => _setPageLayout(PageLayoutMode.single),
+    AppCommandId.facingPageLayout: () => _setPageLayout(PageLayoutMode.facing),
+    AppCommandId.continuousPageLayout: () =>
+        _setPageLayout(PageLayoutMode.continuous),
     AppCommandId.showThumbnails: () =>
         _showPanel(ReaderPanelSection.thumbnails),
     AppCommandId.showOutline: () => _showPanel(ReaderPanelSection.outline),

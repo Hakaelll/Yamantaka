@@ -14,6 +14,7 @@ import '../features/annotations/application/annotation_controller.dart';
 import '../features/annotations/application/annotation_export_service.dart';
 import '../features/bookmarks/application/bookmark_controller.dart';
 import '../features/library/application/document_service.dart';
+import '../features/library/application/document_enrichment_controller.dart';
 import '../features/library/application/duplicate_resolution_service.dart';
 import '../features/library/application/library_bulk_operation_service.dart';
 import '../features/library/application/library_controller.dart';
@@ -70,6 +71,7 @@ final class AppServices {
     required this.organization,
     required this.globalSearch,
     required this.libraryIndex,
+    required this.enrichment,
     required this.folderImport,
     required this.folderWatch,
     required this.documentRecovery,
@@ -107,6 +109,7 @@ final class AppServices {
   final OrganizationController organization;
   final GlobalLibrarySearchController globalSearch;
   final LibraryIndexController libraryIndex;
+  final DocumentEnrichmentController enrichment;
   final FolderImportController folderImport;
   final FolderWatchController folderWatch;
   final DocumentRecoveryService documentRecovery;
@@ -207,6 +210,7 @@ final class AppServices {
     final search = SearchController(engine, viewController, logger);
     final navigationHistory = NavigationHistoryController();
     final library = LibraryController(documents, logger);
+    final enrichment = DocumentEnrichmentController(documents, engine);
     thumbnails.onCoverUpdated = () => unawaited(library.load());
     final reader = ReaderController(
       documentService: documentService,
@@ -258,6 +262,16 @@ final class AppServices {
         );
       },
     );
+    reader.addListener(() {
+      final readerActive =
+          reader.status == ReaderStatus.loading ||
+          reader.status == ReaderStatus.ready;
+      enrichment.pause(readerActive);
+      if (reader.status == ReaderStatus.idle &&
+          !enrichment.progress.isRunning) {
+        unawaited(enrichment.analyzePending().whenComplete(library.reload));
+      }
+    });
     final tabs = DocumentTabsController();
     final workspaces = WorkspaceController(
       WorkspaceRepository(database, documents),
@@ -324,6 +338,7 @@ final class AppServices {
         if (!document.isMissing) thumbnails.enqueueCover(document);
       }
     }
+    unawaited(enrichment.analyzePending().whenComplete(library.reload));
     return AppServices._(
       paths: paths,
       database: database,
@@ -342,6 +357,7 @@ final class AppServices {
       organization: organization,
       globalSearch: globalSearch,
       libraryIndex: libraryIndex,
+      enrichment: enrichment,
       folderImport: folderImport,
       folderWatch: folderWatch,
       documentRecovery: documentRecovery,
@@ -372,6 +388,7 @@ final class AppServices {
   Future<void> deleteAllLocalData() async {
     await reader.closeDocument();
     libraryIndex.cancel();
+    enrichment.cancel();
     database.clearUserData();
     await settings.clear();
     await clearCache();
@@ -414,6 +431,7 @@ final class AppServices {
     organization.dispose();
     globalSearch.dispose();
     libraryIndex.dispose();
+    enrichment.dispose();
     folderImport.dispose();
     folderWatch.dispose();
     readingProfiles.dispose();
