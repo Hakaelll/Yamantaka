@@ -56,7 +56,7 @@ final class DiagnosticsService {
   Future<SafeDiagnosticsReport> collect() async {
     final databaseFile = File(paths.databasePath);
     return SafeDiagnosticsReport({
-      'yamantaka_version': '0.4.0+5',
+      'yamantaka_version': '0.5.0+6',
       'flutter_version': const String.fromEnvironment(
         'FLUTTER_VERSION',
         defaultValue: 'bundled',

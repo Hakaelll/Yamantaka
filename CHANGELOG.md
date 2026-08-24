@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.0 — 2026-08-24 (refinamiento editorial y panel adaptativo)
+
+- Consolida tamaños, sombras y duraciones semánticas para chrome, portadas,
+  ajustes, menús y paleta, respetando movimiento reducido y alto contraste.
+- Mantiene Biblioteca en `#080808`, convierte “Abrir PDF” en acción primaria,
+  expone un restablecimiento de filtros visible y suaviza escala, elevación,
+  halo y atenuación sin perder el violeta `#B58AFF` ni el foco blanco.
+- Hace que el panel del lector reste siempre su ancho y recentre el PDF en
+  ventanas expandidas; en compacto/medio continúa como overlay con scrim. El
+  resize, pin, cierre, persistencia, foco y montaje de una sola sección se
+  conservan sin reconstruir el visor.
+- Refina Ajustes con navegación de escritorio sobria, contenido legible y una
+  columna estable de controles; separa Comandos y Documentos recientes en la
+  paleta con filas de altura compartida.
+- Amplía contratos widget y matrices visuales desde 640×480 hasta 3440×1440,
+  añade escenarios de panel overlay/acoplado y eleva la suite a 244 pruebas.
+- Publica el paquete local de prueba `0.5.0+6`; los binarios nativos permanecen
+  sin firma y no constituyen una distribución pública.
+
 ## 0.4.0 — 2026-08-23 (renderizado PDF progresivo y estable)
 
 - Presenta cada página primero con una previsualización limitada a 110 DPI y

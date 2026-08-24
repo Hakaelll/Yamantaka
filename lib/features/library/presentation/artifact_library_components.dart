@@ -118,6 +118,14 @@ final class _LibraryCommandBar extends StatelessWidget {
                 selected: activeFilter,
                 icon: Icons.account_tree_outlined,
               ),
+              if (activeFilter)
+                YamaIconButton(
+                  key: const Key('library-reset-filters-button'),
+                  semanticLabel: strings.get('library.resetFilters'),
+                  tooltip: strings.get('library.resetFilters'),
+                  onPressed: () => onFilter(_FilterCommand.reset),
+                  icon: Icons.filter_alt_off_outlined,
+                ),
               PopupMenuButton<_FilterCommand>(
                 key: const Key('library-filter-button'),
                 tooltip: strings.get('library.filterSort'),
@@ -553,14 +561,14 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
     final scale = widget.reduceMotion
         ? 1.0
         : widget.selected
-        ? 1.055
+        ? AppSizes.artifactSelectedScale
         : _hovered
-        ? 1.02
+        ? AppSizes.artifactHoverScale
         : jitter.scale;
     final elevation = widget.selected
-        ? 8.0
+        ? AppSizes.artifactSelectedLift
         : _hovered
-        ? 2.0
+        ? AppSizes.artifactHoverLift
         : 0.0;
     final aspectRatio =
         widget.document.coverMetadata?.pageAspectRatio.clamp(0.25, 3.2) ??
@@ -623,189 +631,219 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                     duration: duration,
                     curve: Curves.easeOutCubic,
                     scale: scale,
-                    child: AnimatedContainer(
-                      duration: duration,
-                      curve: Curves.easeOutCubic,
-                      transform: Matrix4.translationValues(0, -elevation, 0),
-                      width: widget.width,
-                      height: fittedHeight,
-                      decoration: BoxDecoration(
-                        color: context.appColors.surfaceSunken,
-                        borderRadius: BorderRadius.circular(AppRadii.page),
-                        border: Border.all(
-                          color: _focused
-                              ? context.appColors.focusRing
-                              : widget.selected
-                              ? context.appColors.librarySelectionAccent
-                              : context.appColors.borderSubtle,
-                          width: _focused
-                              ? 2
-                              : widget.selected
-                              ? 1.5
-                              : 1,
-                        ),
-                        boxShadow: widget.reduceMotion || highContrast
-                            ? null
-                            : [
-                                if (widget.selected)
-                                  BoxShadow(
-                                    color: context
-                                        .appColors
-                                        .librarySelectionAccent
-                                        .withValues(alpha: 0.44),
-                                    blurRadius: AppShadow.artifactGlowBlur,
-                                    spreadRadius: AppShadow.artifactGlowSpread,
-                                    offset: const Offset(0, 12),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        if (_focused)
+                          Positioned.fill(
+                            left: -3,
+                            top: -3,
+                            right: -3,
+                            bottom: -3,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: context.appColors.focusRing,
+                                    width: 2,
                                   ),
-                                BoxShadow(
-                                  color: context.appColors.readerPageShadow
-                                      .withValues(
-                                        alpha: widget.selected ? 0.72 : 0.38,
-                                      ),
-                                  blurRadius: widget.selected
-                                      ? AppShadow.artifactSelectedBlur
-                                      : AppShadow.artifactRestBlur,
-                                  spreadRadius: widget.selected ? 1 : 0,
-                                  offset: Offset(
-                                    0,
-                                    widget.selected
-                                        ? AppShadow.artifactSelectedOffset
-                                        : AppShadow.artifactRestOffset,
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadii.page + 3,
                                   ),
                                 ),
-                              ],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          AnimatedOpacity(
-                            duration: duration,
-                            opacity: widget.document.isMissing
-                                ? 0.48
-                                : emphasized
-                                ? 1
-                                : 0.72,
-                            child: coverPath == null
-                                ? _ArtifactPlaceholder(
-                                    document: widget.document,
-                                  )
-                                : ColorFiltered(
-                                    colorFilter: ColorFilter.matrix(
-                                      _saturationMatrix(emphasized ? 1 : 0.42),
-                                    ),
-                                    child: Image.file(
-                                      File(coverPath),
-                                      fit: BoxFit.contain,
-                                      cacheWidth:
-                                          (widget.width *
-                                                  MediaQuery.devicePixelRatioOf(
-                                                    context,
-                                                  ))
-                                              .ceil(),
-                                      cacheHeight:
-                                          (fittedHeight *
-                                                  MediaQuery.devicePixelRatioOf(
-                                                    context,
-                                                  ))
-                                              .ceil(),
-                                      gaplessPlayback: true,
-                                      filterQuality: FilterQuality.low,
-                                      errorBuilder: (_, _, _) =>
-                                          _ArtifactPlaceholder(
-                                            document: widget.document,
-                                            failed: true,
-                                          ),
-                                    ),
-                                  ),
+                              ),
+                            ),
                           ),
-                          if (widget.document.readingProgress > 0 &&
-                              widget.document.readingProgress < 1)
-                            Align(
-                              alignment: Alignment.bottomCenter,
-                              child: ColoredBox(
-                                color: context.appColors.textMuted.withValues(
-                                  alpha: 0.28,
-                                ),
-                                child: const SizedBox(
-                                  width: double.infinity,
-                                  height: 4,
-                                ),
-                              ),
+                        AnimatedContainer(
+                          duration: duration,
+                          curve: Curves.easeOutCubic,
+                          transform: Matrix4.translationValues(
+                            0,
+                            -elevation,
+                            0,
+                          ),
+                          width: widget.width,
+                          height: fittedHeight,
+                          decoration: BoxDecoration(
+                            color: context.appColors.surfaceSunken,
+                            borderRadius: BorderRadius.circular(AppRadii.page),
+                            border: Border.all(
+                              color: widget.selected
+                                  ? context.appColors.librarySelectionAccent
+                                  : context.appColors.borderSubtle,
+                              width: widget.selected ? 1.5 : 1,
                             ),
-                          if (widget.document.readingProgress > 0 &&
-                              widget.document.readingProgress < 1)
-                            Align(
-                              alignment: Alignment.bottomLeft,
-                              child: FractionallySizedBox(
-                                widthFactor: widget.document.readingProgress,
-                                child: ColoredBox(
-                                  color: widget.selected
-                                      ? context.appColors.librarySelectionAccent
-                                      : context.appColors.textSecondary,
-                                  child: const SizedBox(height: 4),
-                                ),
+                            boxShadow: widget.reduceMotion || highContrast
+                                ? null
+                                : [
+                                    if (widget.selected)
+                                      BoxShadow(
+                                        color: context
+                                            .appColors
+                                            .librarySelectionAccent
+                                            .withValues(alpha: 0.24),
+                                        blurRadius: AppShadow.artifactGlowBlur,
+                                        spreadRadius:
+                                            AppShadow.artifactGlowSpread,
+                                        offset: const Offset(0, 12),
+                                      ),
+                                    BoxShadow(
+                                      color: context.appColors.readerPageShadow
+                                          .withValues(
+                                            alpha: widget.selected
+                                                ? 0.72
+                                                : 0.38,
+                                          ),
+                                      blurRadius: widget.selected
+                                          ? AppShadow.artifactSelectedBlur
+                                          : AppShadow.artifactRestBlur,
+                                      spreadRadius: widget.selected ? 1 : 0,
+                                      offset: Offset(
+                                        0,
+                                        widget.selected
+                                            ? AppShadow.artifactSelectedOffset
+                                            : AppShadow.artifactRestOffset,
+                                      ),
+                                    ),
+                                  ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              AnimatedOpacity(
+                                duration: duration,
+                                opacity: widget.document.isMissing
+                                    ? 0.56
+                                    : emphasized
+                                    ? 1
+                                    : 0.84,
+                                child: coverPath == null
+                                    ? _ArtifactPlaceholder(
+                                        document: widget.document,
+                                      )
+                                    : ColorFiltered(
+                                        colorFilter: ColorFilter.matrix(
+                                          _saturationMatrix(
+                                            emphasized ? 1 : 0.72,
+                                          ),
+                                        ),
+                                        child: Image.file(
+                                          File(coverPath),
+                                          fit: BoxFit.contain,
+                                          cacheWidth:
+                                              (widget.width *
+                                                      MediaQuery.devicePixelRatioOf(
+                                                        context,
+                                                      ))
+                                                  .ceil(),
+                                          cacheHeight:
+                                              (fittedHeight *
+                                                      MediaQuery.devicePixelRatioOf(
+                                                        context,
+                                                      ))
+                                                  .ceil(),
+                                          gaplessPlayback: true,
+                                          filterQuality: FilterQuality.low,
+                                          errorBuilder: (_, _, _) =>
+                                              _ArtifactPlaceholder(
+                                                document: widget.document,
+                                                failed: true,
+                                              ),
+                                        ),
+                                      ),
                               ),
-                            ),
-                          if (widget.document.readingProgress >= 1)
-                            Positioned(
-                              right: AppSpacing.space8,
-                              bottom: AppSpacing.space8,
-                              child: Tooltip(
-                                message: strings.get('library.finished'),
-                                child: Container(
-                                  width: 9,
-                                  height: 9,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
+                              if (widget.document.readingProgress > 0 &&
+                                  widget.document.readingProgress < 1)
+                                Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: ColoredBox(
+                                    color: context.appColors.textMuted
+                                        .withValues(alpha: 0.28),
+                                    child: const SizedBox(
+                                      width: double.infinity,
+                                      height: 4,
+                                    ),
+                                  ),
+                                ),
+                              if (widget.document.readingProgress > 0 &&
+                                  widget.document.readingProgress < 1)
+                                Align(
+                                  alignment: Alignment.bottomLeft,
+                                  child: FractionallySizedBox(
+                                    widthFactor:
+                                        widget.document.readingProgress,
+                                    child: ColoredBox(
+                                      color: widget.selected
+                                          ? context
+                                                .appColors
+                                                .librarySelectionAccent
+                                          : context.appColors.textSecondary,
+                                      child: const SizedBox(height: 4),
+                                    ),
+                                  ),
+                                ),
+                              if (widget.document.readingProgress >= 1)
+                                Positioned(
+                                  right: AppSpacing.space8,
+                                  bottom: AppSpacing.space8,
+                                  child: Tooltip(
+                                    message: strings.get('library.finished'),
+                                    child: Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: context.appColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              if (widget.document.isFavorite)
+                                Positioned(
+                                  right: AppSpacing.space6,
+                                  top: AppSpacing.space6,
+                                  child: Tooltip(
+                                    message: strings.get('library.favorite'),
+                                    child: Icon(
+                                      Icons.bookmark_rounded,
+                                      size: 17,
                                       color: context.appColors.textPrimary,
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          if (widget.document.isFavorite)
-                            Positioned(
-                              right: AppSpacing.space6,
-                              top: AppSpacing.space6,
-                              child: Tooltip(
-                                message: strings.get('library.favorite'),
-                                child: Icon(
-                                  Icons.bookmark_rounded,
-                                  size: 15,
-                                  color: context.appColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          if (widget.selectionMode && widget.selected)
-                            Positioned(
-                              left: AppSpacing.space8,
-                              top: AppSpacing.space8,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: context.appColors.surfacePrimary,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: context
-                                        .appColors
-                                        .librarySelectionAccent,
+                              if (widget.selectionMode && widget.selected)
+                                Positioned(
+                                  left: AppSpacing.space8,
+                                  top: AppSpacing.space8,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: context.appColors.surfacePrimary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: context
+                                            .appColors
+                                            .librarySelectionAccent,
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(2),
+                                      child: Icon(
+                                        Icons.check_rounded,
+                                        size: 16,
+                                        color: context
+                                            .appColors
+                                            .librarySelectionAccent,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(2),
-                                  child: Icon(
-                                    Icons.check_rounded,
-                                    size: 16,
-                                    color: context
-                                        .appColors
-                                        .librarySelectionAccent,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -892,10 +930,18 @@ final class DocumentInfoOverlay extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 560),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: context.appColors.appBackground.withValues(alpha: 0.94),
-          border: Border(
-            top: BorderSide(color: context.appColors.borderSubtle),
-          ),
+          color: context.appColors.surfaceFloating,
+          border: Border.all(color: context.appColors.borderSubtle),
+          borderRadius: BorderRadius.circular(AppRadii.floating),
+          boxShadow: MediaQuery.highContrastOf(context)
+              ? null
+              : [
+                  BoxShadow(
+                    color: context.appColors.ambientShadow,
+                    blurRadius: AppShadow.floatingControlBlur,
+                    offset: const Offset(0, AppShadow.floatingControlOffset),
+                  ),
+                ],
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(

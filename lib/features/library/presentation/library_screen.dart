@@ -282,14 +282,29 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                       icon: const Icon(Icons.more_horiz_rounded),
                     ),
                     if (compact)
-                      IconButton(
-                        key: const Key('library-open-button'),
-                        tooltip: '${strings.libraryOpenPdf} (Ctrl+O)',
-                        onPressed: widget.onPickDocument,
-                        icon: const Icon(Icons.file_open_outlined),
+                      Tooltip(
+                        message: '${strings.libraryOpenPdf} (Ctrl+O)',
+                        child: Semantics(
+                          button: true,
+                          label: strings.libraryOpenPdf,
+                          child: FilledButton(
+                            key: const Key('library-open-button'),
+                            onPressed: widget.onPickDocument,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.square(
+                                AppSizes.desktopControlExtent,
+                              ),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Icon(
+                              Icons.file_open_outlined,
+                              size: 18,
+                            ),
+                          ),
+                        ),
                       )
                     else
-                      TextButton.icon(
+                      FilledButton.icon(
                         key: const Key('library-open-button'),
                         onPressed: widget.onPickDocument,
                         icon: const Icon(Icons.file_open_outlined, size: 18),

@@ -57,9 +57,15 @@ abstract final class AppSizes {
   static const double readerEdgeNavigation = 64;
   static const double readerSpreadGutter = 2;
   static const double topRevealZone = 24;
-  static const double readerPanelDefault = 336;
+  static const double readerPanelDefault = sidePanelWidth;
   static const double settingsNavigationWidth = 220;
   static const double settingsContentMaxWidth = 760;
+  static const double settingsControlWidth = 240;
+  static const double commandPaletteRowHeight = 52;
+  static const double artifactSelectedScale = 1.035;
+  static const double artifactHoverScale = 1.015;
+  static const double artifactSelectedLift = 6;
+  static const double artifactHoverLift = 2;
 }
 
 abstract final class AppRadii {
@@ -85,13 +91,15 @@ abstract final class AppElevation {
 abstract final class AppShadow {
   static const double readerPageBlur = 10;
   static const double readerGrayPageBlur = 6;
-  static const double readerPanelBlur = 14;
+  static const double readerPanelBlur = 10;
+  static const double floatingControlBlur = 10;
+  static const double floatingControlOffset = 3;
   static const double artifactRestBlur = 8;
-  static const double artifactSelectedBlur = 18;
+  static const double artifactSelectedBlur = 14;
   static const double artifactRestOffset = 4;
-  static const double artifactSelectedOffset = 9;
-  static const double artifactGlowBlur = 32;
-  static const double artifactGlowSpread = 3;
+  static const double artifactSelectedOffset = 7;
+  static const double artifactGlowBlur = 18;
+  static const double artifactGlowSpread = 0;
 }
 
 abstract final class AppMotion {
@@ -103,6 +111,11 @@ abstract final class AppMotion {
   static const Duration controlsAutoHide = Duration(seconds: 3);
   static const Duration chromeReveal = Duration(milliseconds: 120);
   static const Duration chromeHide = Duration(milliseconds: 100);
+  static const Duration searchDebounce = standard;
+  static const Duration persistenceDebounce = panel;
+  static const Duration fullscreenControlsAutoHide = Duration(
+    milliseconds: 2500,
+  );
 
   static bool isDisabled(AppMotionPreference preference) =>
       preference == AppMotionPreference.none;

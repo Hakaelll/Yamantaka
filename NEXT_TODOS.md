@@ -1,6 +1,6 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-08-02.
+Actualizado: 2026-08-24.
 
 Este documento es el backlog vivo posterior a la reconstrucción del lector. No
 es una colección de ideas sueltas: ordena trabajo de producto, funcionamiento,
@@ -355,15 +355,15 @@ larga duración presenta crecimiento monótono de memoria o handles.
 Objetivo P2: construir una identidad sobria y consistente sin reducir densidad
 útil ni competir con el documento.
 
-- [ ] Consolidar tokens semánticos para lienzo, superficies, bordes, foco,
+- [x] Consolidar tokens semánticos para lienzo, superficies, bordes, foco,
   estados, elevación y texto; eliminar valores locales equivalentes.
 - [ ] Definir una escala tipográfica de escritorio con métricas estables para
   español e inglés.
 - [ ] Revisar iconografía para grosor, caja óptica, alineación y significado
   consistente.
-- [ ] Unificar radios, alturas, separación y sombras de menús, paneles, diálogos
+- [x] Unificar radios, alturas, separación y sombras de menús, paneles, diálogos
   y barras flotantes.
-- [ ] Mantener el PDF como superficie de mayor contraste y reducir chrome visual
+- [x] Mantener el PDF como superficie de mayor contraste y reducir chrome visual
   cuando no se usa.
 - [ ] Diseñar temas Documento claro, sepia, oscuro y alto contraste sin aplicar
   transformaciones que falseen color de ilustraciones.
@@ -371,9 +371,9 @@ Objetivo P2: construir una identidad sobria y consistente sin reducir densidad
   movimiento reducido.
 - [ ] Revisar empty states y errores para que tengan una acción principal, una
   secundaria como máximo y texto específico.
-- [ ] Añadir microinteracciones de 80–200 ms únicamente cuando expliquen causa y
+- [x] Añadir microinteracciones de 80–200 ms únicamente cuando expliquen causa y
   efecto.
-- [ ] Ajustar hit targets a un mínimo de 40 px y 48 px en perfiles táctiles.
+- [x] Ajustar hit targets a un mínimo de 40 px y 48 px en perfiles táctiles.
 - [ ] Crear una galería ejecutable de componentes y estados críticos para QA
   visual, sin convertirla en una segunda implementación.
 - [ ] Revisar la aplicación en pantallas OLED, LCD de bajo contraste y tinta

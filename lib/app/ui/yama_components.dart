@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_density.dart';
 import '../theme/app_tokens.dart';
 
 /// Small, deliberately boring building blocks for the desktop design system.
@@ -33,14 +34,39 @@ final class YamaIconButton extends StatelessWidget {
       child: IconButton(
         tooltip: tooltip ?? semanticLabel,
         onPressed: onPressed,
-        style: IconButton.styleFrom(
-          minimumSize: const Size.square(AppSizes.desktopControlExtent),
-          maximumSize: const Size.square(AppSizes.touchControlExtent),
-          padding: EdgeInsets.zero,
-          backgroundColor: selected ? colors.surfaceActive : null,
-          foregroundColor: selected ? colors.iconActive : colors.iconNormal,
-          side: selected ? BorderSide(color: colors.borderStrong) : null,
-          shape: const CircleBorder(),
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(
+            Size.square(AppSizes.desktopControlExtent),
+          ),
+          maximumSize: const WidgetStatePropertyAll(
+            Size.square(AppSizes.touchControlExtent),
+          ),
+          padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return colors.surfacePressed;
+            }
+            if (selected) return colors.surfaceActive;
+            if (states.contains(WidgetState.hovered)) {
+              return colors.surfaceHover;
+            }
+            return Colors.transparent;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return colors.iconDisabled;
+            }
+            return selected ? colors.iconActive : colors.iconNormal;
+          }),
+          side: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.focused)) {
+              return BorderSide(color: colors.focusRing, width: 2);
+            }
+            return BorderSide(
+              color: selected ? colors.borderStrong : Colors.transparent,
+            );
+          }),
+          shape: const WidgetStatePropertyAll(CircleBorder()),
         ),
         icon: Icon(icon, size: 18),
       ),
@@ -86,8 +112,8 @@ final class YamaToolbarGroup extends StatelessWidget {
             : [
                 BoxShadow(
                   color: colors.ambientShadow,
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
+                  blurRadius: AppShadow.floatingControlBlur,
+                  offset: const Offset(0, AppShadow.floatingControlOffset),
                 ),
               ],
       ),
@@ -297,14 +323,17 @@ final class YamaSettingRow extends StatelessWidget {
               ),
           ],
         );
+        final density = context.appDensity;
         return DecoratedBox(
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: colors.borderSubtle)),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 60),
+            constraints: BoxConstraints(minHeight: density.settingRowMinHeight),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.space12),
+              padding: EdgeInsets.symmetric(
+                vertical: density.settingsRowVerticalPadding,
+              ),
               child: stacked
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -319,7 +348,13 @@ final class YamaSettingRow extends StatelessWidget {
                       children: [
                         Expanded(child: labelWidget),
                         const SizedBox(width: AppSpacing.space24),
-                        control,
+                        SizedBox(
+                          width: AppSizes.settingsControlWidth,
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: control,
+                          ),
+                        ),
                       ],
                     ),
             ),

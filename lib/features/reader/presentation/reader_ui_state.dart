@@ -111,11 +111,11 @@ final class ReaderChromeCoordinator extends ChangeNotifier {
   Duration get revealDuration => _disableAnimations
       ? Duration.zero
       : _reduceMotion
-      ? const Duration(milliseconds: 80)
+      ? AppMotion.feedback
       : AppMotion.chromeReveal;
 
   Duration get _autoHideDuration => _state.fullscreen
-      ? const Duration(milliseconds: 2500)
+      ? AppMotion.fullscreenControlsAutoHide
       : AppMotion.controlsAutoHide;
 
   void configure({

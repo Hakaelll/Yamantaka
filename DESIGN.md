@@ -371,9 +371,10 @@ Información tipográfica de selección/hover/foco
 
 La portada es el objeto. No existe una tarjeta con título permanente: la página
 respeta su proporción, usa radio mínimo, sombra difusa y un jitter estable de
-posición/giro. Selección eleva 8 px, escala 5,5 % y proyecta un halo violeta
-suave; hover eleva 3 px. Los no seleccionados reducen saturación/opacidad sin
-desaparecer. Progreso es una línea de 4 px con pista gris tenue; el relleno es
+posición/giro. Selección eleva 6 px, escala 3,5 % y proyecta un halo violeta
+acotado; hover eleva 2 px y escala 1,5 %. Los no seleccionados reducen
+saturación/opacidad sin desaparecer. Progreso es una línea de 4 px con pista
+gris tenue; el relleno es
 blanco/gris salvo en la selección, donde pasa a violeta. Terminado usa un
 anillo y favorito un marcador.
 
@@ -412,9 +413,10 @@ error de portada mantiene geometría. El color nunca es el único indicador.
 
 ## 14. Lector
 
-El canvas y las páginas permanecen estables cuando aparecen controles, paneles
-o resultados. La página se centra con márgenes proporcionales y un fondo plano,
-sin texturas.
+El canvas y las páginas permanecen estables cuando aparecen controles o
+resultados. Abrir un panel no reconstruye el visor: en expandido recalcula su
+área útil y recentra la página; en compacto/medio el panel se superpone. La
+página usa márgenes proporcionales y un fondo plano, sin texturas.
 
 La barra superior superpuesta se reparte en tres grupos flotantes y prioriza
 por clase de ventana:
@@ -467,8 +469,10 @@ del viewport.
 Muestra una sola sección: miniaturas, índice, marcadores, anotaciones o
 búsqueda. Tiene encabezado compacto, selector interno de sección, cierre
 visible, contenido desplazable y selección clara.
-En compacto/medio aparece como superposición con scrim; en expandido se alinea
-al borde sin mover bruscamente la página. Un divisor de 10 px admite ratón,
+En compacto/medio aparece como superposición con scrim; en expandido ocupa una
+columna propia, resta siempre su ancho al visor y recentra la página. Fijar
+mantiene el estado persistente, pero no altera este contrato geométrico. Un
+divisor de 10 px admite ratón,
 flechas y semántica de valor. El ancho se guarda con debounce; solo se monta la
 sección activa y las miniaturas visibles reutilizan su futuro/scroll. Escape lo
 cierra y restaura el foco.
@@ -491,7 +495,9 @@ Lectura, Barra del lector, Atajos, Biblioteca, Historial, Copias locales y
 Privacidad. En compacto, las secciones se apilan.
 
 Cada ajuste es una fila sencilla con etiqueta, descripción corta, separador y
-control; la sección no se encierra en una tarjeta.
+control; la sección no se encierra en una tarjeta. El contenido usa un ancho
+máximo legible y, en escritorio, los controles se alinean en una columna de
+240 px; en compacto vuelven al flujo apilado.
 Los cambios reversibles se aplican inmediatamente. Las acciones destructivas
 exigen confirmación proporcional. Apariencia incluye una previsualización
 pequeña de tema, densidad, canvas y perfil e-ink. No se encierra cada sección
@@ -659,8 +665,8 @@ Antes de cerrar una tarea visual:
 - Split no se muestra hasta que existan dos lectores reales y medidos; el
   breakpoint técnico por sí solo no constituye una función visual.
 
-La referencia vigente `windows-reader-book-fullscreen.png` se genera desde una
+La referencia vigente `windows-reader-editorial-v05.png` se genera desde una
 prueba de widgets a 1600×900 y fija Libro con tema Marfil, grupos flotantes,
-selector segmentado y dock inferior. Las
+pliego enfrentado y dock inferior. Las
 capturas generacionales se retiraron porque ya no representaban el producto.
 Narrador, varios monitores y DPI físico siguen requiriendo validación nativa.

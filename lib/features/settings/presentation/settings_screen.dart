@@ -858,7 +858,7 @@ final class SettingsAppBar extends StatelessWidget
   final VoidCallback onBack;
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => const Size.fromHeight(AppSizes.topBarHeight);
 
   @override
   Widget build(BuildContext context) {

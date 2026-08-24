@@ -1,6 +1,6 @@
 # Pruebas
 
-Estado actualizado: 2026-08-23.
+Estado actualizado: 2026-08-24.
 
 Este documento describe únicamente evidencia reproducible del árbol actual. Se
 han retirado las tablas y capturas históricas que correspondían a lectores
@@ -40,7 +40,9 @@ La suite automatizada comprueba:
   navegación inferior centrada respecto a la ventana;
 - composición compacta, media y expandida sin overflow;
 - alto contraste, movimiento reducido y perfil de tinta electrónica;
-- panel lateral, búsqueda, marcadores, temas de Documento y persistencia.
+- panel lateral, búsqueda, marcadores, temas de Documento y persistencia;
+- panel overlay en 680–1099 px y panel restado del visor en ≥1100 px, también
+  durante resize y sin reconstruir el adaptador PDF.
 
 La biblioteca cubre metadatos PDF, cuatro páginas iniciales, título multilínea,
 autor/editor explícito o dudoso, fallback de nombre legible, ausencia de texto,
@@ -57,20 +59,25 @@ extremo; los resultados bajo `build/` no contienen rutas ni títulos.
 
 La única captura normativa es:
 
-    docs/screenshots/windows-reader-book-fullscreen.png
+    docs/screenshots/windows-reader-editorial-v05.png
 
 La genera y compara esta prueba:
 
-    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained fullscreen baseline"
+    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.5 baseline"
 
 Para aceptar deliberadamente un cambio visual:
 
-    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained fullscreen baseline"
+    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.5 baseline"
 
 Es una referencia de widgets ejecutados a 1600×900, no una captura nativa ni un
 mockup manual. Valida la composición fullscreen del contenido: barra opaca,
-pliego enfrentado, canal central, controles laterales, selector superior
-centrado, navegación inferior centrada y acciones de vista a la derecha.
+pliego enfrentado, canal central, controles laterales, navegación inferior
+centrada y acciones de vista a la derecha sin un selector permanente.
+
+Las matrices widget de Biblioteca, Lector y Ajustes cubren 640×480, 800×600,
+1280×720, 1600×900, 1920×1080, 1920×1200, 2560×1440 y 3440×1440, además de
+tema oscuro, alto contraste, movimiento reducido y panel abierto. La evidencia
+local se escribe en `build/visual-evidence/v0.5.0/` y no se versiona.
 
 ## Validación nativa de Windows
 
@@ -114,6 +121,10 @@ permaneció activo, presentó una ventana que aceptó cierre normal y no generó
 evento de error de Yamantaka. Por tanto, `NotSigned` no se usa como sinónimo de
 “no arrancable”. Los nueve binarios siguen sin firma y no constituyen evidencia
 de distribución; `-RequireSignature` conserva ese gate separado.
+
+El 24 de agosto de 2026 el bundle local `0.5.0+6` superó además un smoke de 5 s
+con un PDF sintético: permaneció activo hasta el cierre del harness y no abrió
+conexiones TCP/UDP. El informe está junto al paquete versionado bajo `build/`.
 
 ## Corpus y privacidad
 

@@ -274,7 +274,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('book reader matches the maintained fullscreen baseline', (
+  testWidgets('book reader matches the maintained editorial v0.5 baseline', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1600, 900);
@@ -291,9 +291,7 @@ void main() {
 
     await expectLater(
       find.byType(ReaderScreen),
-      matchesGoldenFile(
-        '../docs/screenshots/windows-reader-book-fullscreen.png',
-      ),
+      matchesGoldenFile('../docs/screenshots/windows-reader-editorial-v05.png'),
     );
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -682,6 +680,11 @@ void main() {
       expect(adapter.buildCount, 1);
       expect(find.byKey(const Key('pdf-search-field')), findsOneWidget);
       expect(find.bySemanticsLabel('Ancho del panel lateral'), findsOneWidget);
+      expect(find.byKey(const Key('reader-panel-scrim')), findsNothing);
+      expect(
+        tester.getSize(find.byKey(const ValueKey('reader-viewer-pdf-1'))).width,
+        closeTo(1440 - AppSizes.sidePanelWidth, 1),
+      );
 
       final handle = find.byKey(const Key('reader-panel-resize-handle'));
       await tester.drag(handle, const Offset(-96, 0));
@@ -690,6 +693,10 @@ void main() {
           .getSize(find.byKey(const Key('reader-side-panel')))
           .width;
       expect(draggedWidth, inInclusiveRange(400, 440));
+      expect(
+        tester.getSize(find.byKey(const ValueKey('reader-viewer-pdf-1'))).width,
+        closeTo(1440 - draggedWidth, 1),
+      );
       expect(adapter.buildCount, 1);
       expect(persistedWidth, isNull);
       await tester.pump(const Duration(milliseconds: 260));
@@ -725,6 +732,30 @@ void main() {
       await harness.dispose();
     },
   );
+
+  testWidgets('side panel overlays medium layouts without shrinking the PDF', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true);
+
+    await tester.pumpWidget(
+      _app(harness, initialPanelOpen: true, initialPanelSection: 'search'),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('reader-panel-scrim')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('reader-viewer-pdf-1'))).width,
+      closeTo(800, 1),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
 
   testWidgets('a relevant key reveals hidden book controls and navigates', (
     tester,
@@ -909,6 +940,7 @@ void main() {
       ThemeMode themeMode = ThemeMode.light,
       bool highContrast = false,
       bool reduceMotion = false,
+      bool panelOpen = false,
     }) async {
       tester.view.physicalSize = size;
       await tester.pumpWidget(
@@ -918,6 +950,8 @@ void main() {
           themeMode: themeMode,
           highContrast: highContrast,
           reduceMotion: reduceMotion,
+          scenarioKey: name,
+          panelOpen: panelOpen,
         ),
       );
       await tester.pump();
@@ -932,6 +966,7 @@ void main() {
         'theme': themeMode.name,
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
+        'panelOpen': panelOpen,
         'mode': harness.controller.preferences!.viewMode.name,
         'layout': harness.controller.preferences!.pageLayout.name,
         'source': 'flutter-widget-test',
@@ -948,6 +983,10 @@ void main() {
       ('800x600', Size(800, 600)),
       ('1280x720', Size(1280, 720)),
       ('1600x900', Size(1600, 900)),
+      ('1920x1080', Size(1920, 1080)),
+      ('1920x1200', Size(1920, 1200)),
+      ('2560x1440', Size(2560, 1440)),
+      ('3440x1440', Size(3440, 1440)),
     ]) {
       await capture(
         name: 'reader-document-${entry.$1}-light-widget',
@@ -983,6 +1022,16 @@ void main() {
       name: 'reader-document-1280x720-reduced-motion-widget',
       size: profileSize,
       reduceMotion: true,
+    );
+    await capture(
+      name: 'reader-document-800x600-panel-overlay-widget',
+      size: const Size(800, 600),
+      panelOpen: true,
+    );
+    await capture(
+      name: 'reader-document-1600x900-panel-docked-widget',
+      size: const Size(1600, 900),
+      panelOpen: true,
     );
     File(
       '${output.path}${Platform.pathSeparator}reader-matrix.json',
@@ -1053,6 +1102,8 @@ Widget _visualApp(
   required ThemeMode themeMode,
   required bool highContrast,
   required bool reduceMotion,
+  required String scenarioKey,
+  required bool panelOpen,
 }) => MaterialApp(
   debugShowCheckedModeBanner: false,
   locale: const Locale('es'),
@@ -1075,6 +1126,7 @@ Widget _visualApp(
   home: RepaintBoundary(
     key: captureKey,
     child: ReaderScreen(
+      key: ValueKey(scenarioKey),
       controller: harness.controller,
       engine: harness.engine,
       viewerAdapter: const _VisualViewerAdapter(),
@@ -1084,6 +1136,8 @@ Widget _visualApp(
       reduceMotion: reduceMotion,
       showProgress: true,
       readingDirection: ReadingDirection.leftToRight,
+      initialPanelOpen: panelOpen,
+      initialPanelSection: panelOpen ? 'search' : '',
     ),
   ),
 );

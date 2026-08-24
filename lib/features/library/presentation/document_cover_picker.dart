@@ -108,7 +108,10 @@ final class _DocumentCoverPickerDialogState
                           onTap: () => _select(preview.pageIndex),
                           borderRadius: BorderRadius.circular(AppRadii.control),
                           child: AnimatedContainer(
-                            duration: AppMotion.standard,
+                            duration: AppMotion.whenAllowed(
+                              MediaQuery.disableAnimationsOf(context),
+                              AppMotion.standard,
+                            ),
                             padding: const EdgeInsets.all(AppSpacing.space4),
                             decoration: BoxDecoration(
                               border: Border.all(

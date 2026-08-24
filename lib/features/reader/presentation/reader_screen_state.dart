@@ -212,13 +212,9 @@ final class _ReaderScreenState extends State<ReaderScreen> {
         ? PdfViewFlow.continuous
         : PdfViewFlow.single;
     final controlsShown = _controlsVisible && !immersive;
-    // Panels are overlays by default. Their visibility must not alter PDF
-    // constraints, which is the core continuity invariant of the redesign.
     final windowClass = AppBreakpoints.classify(constraints.maxWidth);
     final panelDocked =
-        _panel != null &&
-        _panelPinned &&
-        windowClass == AppWindowClass.expanded;
+        _panel != null && windowClass == AppWindowClass.expanded;
     final viewerSize = Size(constraints.maxWidth, constraints.maxHeight);
     final readerMargin = ReaderViewportMetrics.adaptiveMargin(
       viewport: viewerSize,
@@ -423,7 +419,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 behavior: HitTestBehavior.opaque,
                 onTap: _closePanel,
                 child: ColoredBox(
-                  color: Colors.black.withValues(
+                  color: context.appColors.nightBackground.withValues(
                     alpha: Theme.of(context).brightness == Brightness.dark
                         ? 0.12
                         : 0.08,
@@ -440,7 +436,9 @@ final class _ReaderScreenState extends State<ReaderScreen> {
               child: TweenAnimationBuilder<double>(
                 key: ValueKey(_panel),
                 duration: AppMotion.whenAllowed(
-                  widget.reduceMotion,
+                  widget.reduceMotion ||
+                      _isElectronicInk ||
+                      MediaQuery.disableAnimationsOf(context),
                   AppMotion.panel,
                 ),
                 curve: Curves.easeOutCubic,
@@ -457,6 +455,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                     engine: widget.engine,
                     width: panelWidth,
                     pinned: _panelPinned,
+                    docked: panelDocked,
                     allowPin: windowClass == AppWindowClass.expanded,
                     onPinnedChanged: _togglePanelPinned,
                     onSectionChanged: _showPanel,
@@ -572,14 +571,17 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 opacity: action == null ? 0.32 : 1,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: chromeColors.surfaceFloating,
-                    borderRadius: BorderRadius.circular(AppRadii.capsule),
+                    color: chromeColors.surfaceFloating.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(AppRadii.control),
                     border: Border.all(color: chromeColors.borderSubtle),
                     boxShadow: [
                       BoxShadow(
                         color: chromeColors.ambientShadow,
-                        blurRadius: 12,
-                        offset: const Offset(0, 3),
+                        blurRadius: AppShadow.floatingControlBlur,
+                        offset: const Offset(
+                          0,
+                          AppShadow.floatingControlOffset,
+                        ),
                       ),
                     ],
                   ),
@@ -824,7 +826,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     setState(() => _panelWidthValue = next);
     _chromeCoordinator.setPanelWidth(next);
     _panelSaveTimer?.cancel();
-    _panelSaveTimer = Timer(const Duration(milliseconds: 240), () {
+    _panelSaveTimer = Timer(AppMotion.persistenceDebounce, () {
       widget.onPanelWidthChanged?.call(_panelWidthValue);
     });
   }
@@ -1158,7 +1160,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     if (widget.controlsAutoHide ?? preferences?.controlsAutoHide ?? true) {
       _controlsTimer = Timer(
         widget.controller.isFullScreen
-            ? const Duration(milliseconds: 2500)
+            ? AppMotion.fullscreenControlsAutoHide
             : AppMotion.controlsAutoHide,
         () {
           final region = _chromeCoordinator.state.pointerRegion;

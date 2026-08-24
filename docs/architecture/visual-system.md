@@ -42,9 +42,16 @@ portada seleccionada.
 
 ## Chrome del lector y Libro
 
-La barra superior y la dock inferior son overlays: mostrarlas, ocultarlas o
-abrir/cambiar el panel no modifica las restricciones del visor. El visor se
-mantiene en un `RepaintBoundary` cacheado por configuración de documento.
+La barra superior y la dock inferior son overlays: mostrarlas u ocultarlas no
+modifica las restricciones del visor. En compacto/medio el panel también es
+overlay con scrim; en expandido resta siempre su ancho y el visor se recentra
+en el área restante. Abrir, cambiar o redimensionar el panel no reconstruye el
+`RepaintBoundary` cacheado por configuración de documento.
+
+Biblioteca limita selección a escala 1,035, elevación 6 px y halo sin spread;
+el foco blanco de 2 px es independiente del borde violeta. Ajustes alinea sus
+controles en 240 px dentro de contenido legible y la paleta usa filas de 52 px
+con grupos separados para comandos y documentos recientes.
 
 Los seis `ReaderTheme` resuelven el canvas y una paleta clara/oscura para el
 chrome en Documento y Libro. Libro conserva `coverPolicy`, `initialSide` y RTL;

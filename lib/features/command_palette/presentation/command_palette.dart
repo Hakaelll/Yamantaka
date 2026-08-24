@@ -91,112 +91,20 @@ final class _CommandPaletteState extends State<CommandPalette> {
                 ),
               ),
               const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.space16,
-                  AppSpacing.space12,
-                  AppSpacing.space16,
-                  AppSpacing.space6,
-                ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    strings.commandSection,
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ),
-              ),
               Flexible(
                 child: entries.isEmpty
                     ? _EmptyPalette(message: strings.commandEmpty)
-                    : ListView.builder(
+                    : ListView(
                         controller: _scrollController,
                         padding: const EdgeInsets.only(
                           bottom: AppSpacing.space8,
                         ),
                         shrinkWrap: true,
-                        itemCount: entries.length,
-                        itemExtent: 56,
-                        itemBuilder: (context, index) {
-                          final entry = entries[index];
-                          final selected = index == selectedIndex;
-                          return Semantics(
-                            selected: selected,
-                            button: true,
-                            child: MouseRegion(
-                              onEnter: (_) =>
-                                  setState(() => _selectedIndex = index),
-                              child: Material(
-                                color: selected
-                                    ? context.appColors.selectionBackground
-                                    : Colors.transparent,
-                                child: InkWell(
-                                  key: ValueKey(entry.key),
-                                  onTap: () => _execute(entry),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        left: BorderSide(
-                                          color: selected
-                                              ? context.appColors.accentPrimary
-                                              : Colors.transparent,
-                                          width: 3,
-                                        ),
-                                      ),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.space16,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          entry.icon,
-                                          size: 18,
-                                          color: context.appColors.textMuted,
-                                        ),
-                                        const SizedBox(
-                                          width: AppSpacing.space12,
-                                        ),
-                                        Expanded(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                entry.label,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: Theme.of(
-                                                  context,
-                                                ).textTheme.bodyMedium,
-                                              ),
-                                              if (entry.subtitle
-                                                  case final subtitle?)
-                                                Text(
-                                                  subtitle,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: Theme.of(
-                                                    context,
-                                                  ).textTheme.labelSmall,
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (entry.shortcutLabel
-                                            case final shortcut?)
-                                          AppShortcutHint(shortcut),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                        children: _entryWidgets(
+                          entries,
+                          selectedIndex,
+                          strings,
+                        ),
                       ),
               ),
               Container(
@@ -248,7 +156,7 @@ final class _CommandPaletteState extends State<CommandPalette> {
       entries.add(_PaletteEntry.command(definition, localizedLabel));
     }
     if (widget.onOpenRecent != null) {
-      for (final document in widget.recentDocuments) {
+      for (final document in widget.recentDocuments.take(8)) {
         final label = document.effectiveTitle;
         final searchable =
             '$label ${document.effectiveAuthor ?? ''} ${document.fileName} ${document.libraryNote ?? ''}'
@@ -299,10 +207,18 @@ final class _CommandPaletteState extends State<CommandPalette> {
     setState(() => _selectedIndex = index);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      final target = (index * 56.0)
-          .clamp(0, _scrollController.position.maxScrollExtent)
-          .toDouble();
-      if (widget.reduceMotion) {
+      final precedingSectionHeight =
+          AppSizes.commandPaletteRowHeight + AppSpacing.space12;
+      final hasRecentSectionBefore = _filteredEntries(
+        YamantakaLocalizations.of(context),
+      ).take(index + 1).any((entry) => entry.document != null);
+      final target =
+          (index * AppSizes.commandPaletteRowHeight +
+                  precedingSectionHeight +
+                  (hasRecentSectionBefore ? precedingSectionHeight : 0))
+              .clamp(0, _scrollController.position.maxScrollExtent)
+              .toDouble();
+      if (widget.reduceMotion || MediaQuery.disableAnimationsOf(context)) {
         _scrollController.jumpTo(target);
         return;
       }
@@ -321,6 +237,127 @@ final class _CommandPaletteState extends State<CommandPalette> {
     } else if (entry.document case final document?) {
       widget.onOpenRecent?.call(document);
     }
+  }
+
+  List<Widget> _entryWidgets(
+    List<_PaletteEntry> entries,
+    int selectedIndex,
+    YamantakaLocalizations strings,
+  ) {
+    final widgets = <Widget>[];
+    var currentGroup = '';
+    for (var index = 0; index < entries.length; index++) {
+      final entry = entries[index];
+      final group = entry.document == null
+          ? strings.commandSection
+          : strings.get('command.recentSection');
+      if (group != currentGroup) {
+        currentGroup = group;
+        widgets.add(_PaletteSectionLabel(group));
+      }
+      widgets.add(
+        _PaletteEntryTile(
+          entry: entry,
+          selected: index == selectedIndex,
+          onHover: () => setState(() => _selectedIndex = index),
+          onTap: () => _execute(entry),
+        ),
+      );
+    }
+    return widgets;
+  }
+}
+
+final class _PaletteSectionLabel extends StatelessWidget {
+  const _PaletteSectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.space16,
+      AppSpacing.space12,
+      AppSpacing.space16,
+      AppSpacing.space6,
+    ),
+    child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+  );
+}
+
+final class _PaletteEntryTile extends StatelessWidget {
+  const _PaletteEntryTile({
+    required this.entry,
+    required this.selected,
+    required this.onHover,
+    required this.onTap,
+  });
+
+  final _PaletteEntry entry;
+  final bool selected;
+  final VoidCallback onHover;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: MouseRegion(
+        onEnter: (_) => onHover(),
+        child: Material(
+          color: selected ? colors.selectionBackground : Colors.transparent,
+          child: InkWell(
+            key: ValueKey(entry.key),
+            onTap: onTap,
+            child: Container(
+              height: AppSizes.commandPaletteRowHeight,
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(
+                    color: selected ? colors.accentPrimary : Colors.transparent,
+                    width: 3,
+                  ),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.space16,
+              ),
+              child: Row(
+                children: [
+                  Icon(entry.icon, size: 18, color: colors.textMuted),
+                  const SizedBox(width: AppSpacing.space12),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        if (entry.subtitle case final subtitle?)
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (entry.shortcutLabel case final shortcut?)
+                    AppShortcutHint(shortcut),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -295,7 +295,7 @@ final class _SettingsSectionContent extends StatelessWidget {
             children: [
               Text(
                 section.id.label(YamantakaLocalizations.of(context)),
-                style: Theme.of(context).textTheme.displaySmall,
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: AppSpacing.space4),
               Text(
@@ -345,9 +345,9 @@ final class _SettingsNavItem extends StatelessWidget {
           color: selected
               ? context.appColors.selectionBackground
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadii.capsule),
+          borderRadius: BorderRadius.circular(AppRadii.control),
           child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.capsule),
+            borderRadius: BorderRadius.circular(AppRadii.control),
             onTap: onPressed,
             child: Container(
               height: AppSizes.desktopControlExtent,
@@ -419,17 +419,17 @@ final class _AppearancePreview extends StatelessWidget {
       ),
       child: Container(
         key: const Key('appearance-preview'),
-        padding: const EdgeInsets.all(AppSpacing.space16),
+        padding: const EdgeInsets.all(AppSpacing.space12),
         decoration: BoxDecoration(
           color: context.appColors.surfaceSecondary,
           border: Border.all(color: context.appColors.borderSubtle),
-          borderRadius: BorderRadius.circular(AppRadii.field),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         child: Row(
           children: [
             Container(
-              width: 52,
-              height: 68,
+              width: 44,
+              height: 56,
               decoration: BoxDecoration(
                 color: Color(
                   readerTheme?.colorValue ?? ReaderTheme.ivory.colorValue,

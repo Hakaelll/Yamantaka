@@ -325,7 +325,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     widget.controller.query = value;
     setState(() {});
     _queryDebounce?.cancel();
-    _queryDebounce = Timer(const Duration(milliseconds: 180), () {
+    _queryDebounce = Timer(AppMotion.searchDebounce, () {
       if (mounted) unawaited(widget.controller.reload());
     });
   }

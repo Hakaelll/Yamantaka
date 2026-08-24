@@ -32,6 +32,7 @@ final class ReaderSidePanel extends StatefulWidget {
     required this.onWidthChanged,
     required this.onSectionChanged,
     this.pinned = false,
+    this.docked = false,
     this.allowPin = false,
     this.onPinnedChanged,
     this.flatChrome = false,
@@ -46,6 +47,7 @@ final class ReaderSidePanel extends StatefulWidget {
   final ValueChanged<double> onWidthChanged;
   final ValueChanged<ReaderPanelSection> onSectionChanged;
   final bool pinned;
+  final bool docked;
   final bool allowPin;
   final ValueChanged<bool>? onPinnedChanged;
   final bool flatChrome;
@@ -83,7 +85,7 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
           color: context.appColors.surfaceElevated,
           elevation: 0,
           borderRadius: BorderRadius.horizontal(
-            left: Radius.circular(widget.pinned ? 0 : AppRadii.panel),
+            left: Radius.circular(widget.docked ? 0 : AppRadii.panel),
           ),
           clipBehavior: Clip.antiAlias,
           child: Container(

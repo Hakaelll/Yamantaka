@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$OutputDirectory = 'build/release',
-    [string]$Version = '0.4.0',
-    [string]$BuildNumber = '5',
+    [string]$Version = '0.5.0',
+    [string]$BuildNumber = '6',
     [string]$FlutterExecutable,
     [string]$CertificateThumbprint,
     [string]$SignToolPath,

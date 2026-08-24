@@ -293,6 +293,10 @@ void main() {
         );
         await tester.pump();
         expect(tester.takeException(), isNull, reason: 'viewport width $width');
+        expect(
+          tester.widget(find.byKey(const Key('library-open-button'))),
+          isA<FilledButton>(),
+        );
         expect(find.byKey(const Key('library-filter')), findsNothing);
         if (width == 1100) {
           final alpha = tester.getCenter(
@@ -414,10 +418,12 @@ void main() {
       expect(find.byKey(const ValueKey('artifact-active')), findsOneWidget);
       expect(find.byKey(const ValueKey('artifact-new')), findsNothing);
       expect(find.byKey(const ValueKey('artifact-done')), findsNothing);
+      expect(
+        find.byKey(const Key('library-reset-filters-button')),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.byKey(const Key('library-filter-button')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Todos · 3'), warnIfMissed: false);
+      await tester.tap(find.byKey(const Key('library-reset-filters-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('artifact-new')), findsOneWidget);
       expect(find.byKey(const ValueKey('artifact-done')), findsOneWidget);

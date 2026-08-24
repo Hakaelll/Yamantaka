@@ -239,6 +239,10 @@ void main() {
       ('800x600', Size(800, 600)),
       ('1280x720', Size(1280, 720)),
       ('1600x900', Size(1600, 900)),
+      ('1920x1080', Size(1920, 1080)),
+      ('1920x1200', Size(1920, 1200)),
+      ('2560x1440', Size(2560, 1440)),
+      ('3440x1440', Size(3440, 1440)),
     ];
     for (final size in sizes) {
       await capture(state: 'empty', sizeName: size.$1, size: size.$2);

@@ -53,8 +53,10 @@ modo de zoom y luego el desplazamiento aproximado.
 
 `ReaderScreen` conserva el widget del adaptador con una clave formada solo por
 documento y configuración de render. Panel, resize, chrome, progreso y
-marcadores no reconstruyen el visor. El panel monta una única sección; su ancho
-se guarda después de 240 ms sin cambios. `PdfrxDocumentEngine.diagnostics`
+marcadores no reconstruyen el visor. El panel monta una única sección; en
+compacto/medio es overlay con scrim y en expandido su ancho se resta de las
+restricciones del visor para recentrar la página. Su ancho se guarda después de
+la duración semántica de persistencia sin cambios. `PdfrxDocumentEngine.diagnostics`
 expone únicamente contadores locales de solicitudes, caché, deduplicación,
 cancelación y recursos abiertos para pruebas/Profile; no persiste ni transmite.
 

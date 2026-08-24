@@ -23,6 +23,8 @@ void main() {
       ),
     );
 
+    expect(find.text('Comandos'), findsOneWidget);
+
     await tester.enterText(
       find.byKey(const Key('command-palette-search')),
       'abrir',
@@ -107,14 +109,17 @@ void main() {
     expect(find.byKey(const Key('command-palette-search')), findsNothing);
   });
 
-  testWidgets('reduced motion uses immediate keyboard selection scrolling', (
+  testWidgets('system reduced motion uses immediate keyboard scrolling', (
     tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          child: child!,
+        ),
         home: Scaffold(
           body: CommandPalette(
-            reduceMotion: true,
             actions: {
               for (final definition in AppCommandRegistry.definitions)
                 definition.id: () {},
@@ -163,6 +168,9 @@ void main() {
         ),
       ),
     );
+
+    expect(find.text('Comandos'), findsOneWidget);
+    expect(find.text('Documentos recientes'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const Key('command-palette-search')),

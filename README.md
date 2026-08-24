@@ -7,14 +7,14 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.4.0+5 revisada el 23 de agosto de 2026:
+Base Flutter 0.5.0+6 revisada el 24 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 224 pruebas aprobadas;
+- flutter test --no-pub: 244 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
-- el bundle Release local abre una ventana receptiva y acepta un cierre normal;
-  no se registró un fallo de Yamantaka durante la comprobación;
+- el bundle Release local permanece receptivo durante un smoke de 5 s con un
+  PDF sintético y no abre conexiones TCP/UDP; el harness lo cierra al terminar;
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
@@ -35,6 +35,8 @@ vigente de pruebas en [TESTING.md](TESTING.md).
   al canvas y al chrome sin alterar los píxeles del PDF.
 - La barra superior se divide en grupos flotantes superpuestos para documento,
   modo y herramientas, sin reservar una franja en el visor.
+- En ventanas expandidas el panel lateral ocupa una columna propia y el visor
+  se recentra en el ancho restante; en compacto/medio es overlay con scrim.
 - La navegación inferior está centrada respecto a toda la ventana; vista y
   zoom permanecen agrupados a la derecha.
 - Los laterales ofrecen zonas claras de paso de página, con estado deshabilitado
@@ -63,6 +65,8 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Biblioteca siempre oscura y espacial, con una paleta monocromática,
   selección violeta, foco blanco independiente del color y controles
   superiores en cápsulas discretas.
+- “Abrir PDF” es la acción primaria y los filtros activos ofrecen un
+  restablecimiento visible sin volver a abrir el menú.
 - Búsqueda PDF cancelable, índice, miniaturas y panel lateral redimensionable.
 - Marcadores, notas por página, historial local opcional y navegación
   atrás/adelante.
@@ -79,7 +83,7 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 
 ## Referencia visual vigente
 
-![Modo Libro fullscreen mantenido por prueba](docs/screenshots/windows-reader-book-fullscreen.png)
+![Modo Libro editorial mantenido por prueba](docs/screenshots/windows-reader-editorial-v05.png)
 
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.

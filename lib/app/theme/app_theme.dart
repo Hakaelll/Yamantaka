@@ -79,11 +79,11 @@ abstract final class AppTheme {
     final scheme = ColorScheme(
       brightness: brightness,
       primary: tokens.accentPrimary,
-      onPrimary: isDark ? const Color(0xFF171816) : Colors.white,
+      onPrimary: isDark ? tokens.appBackground : tokens.paperWhite,
       secondary: tokens.accentPrimary,
-      onSecondary: isDark ? const Color(0xFF171816) : Colors.white,
+      onSecondary: isDark ? tokens.appBackground : tokens.paperWhite,
       error: tokens.danger,
-      onError: isDark ? const Color(0xFF171816) : Colors.white,
+      onError: isDark ? tokens.appBackground : tokens.paperWhite,
       surface: tokens.surfacePrimary,
       onSurface: tokens.textPrimary,
       surfaceContainerLowest: tokens.appBackground,
@@ -233,7 +233,7 @@ abstract final class AppTheme {
         backgroundColor: tokens.surfaceElevated,
         surfaceTintColor: Colors.transparent,
         elevation: AppElevation.popup,
-        shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.16),
+        shadowColor: tokens.ambientShadow,
         shape: RoundedRectangleBorder(
           side: BorderSide(color: tokens.borderStrong),
           borderRadius: BorderRadius.circular(AppRadii.dialog),
@@ -307,7 +307,7 @@ abstract final class AppTheme {
           overlayColor: overlay,
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.capsule),
+              borderRadius: BorderRadius.circular(AppRadii.control),
             ),
           ),
           side: focusSide,
@@ -330,7 +330,7 @@ abstract final class AppTheme {
             return tokens.accentPrimary;
           }),
           foregroundColor: WidgetStatePropertyAll(
-            isDark ? tokens.appBackground : Colors.white,
+            isDark ? tokens.appBackground : tokens.paperWhite,
           ),
           shape: controlShape,
           side: focusSide,
@@ -372,7 +372,7 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         elevation: AppElevation.overlay,
         menuPadding: const EdgeInsets.symmetric(vertical: AppSpacing.space6),
-        shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
+        shadowColor: tokens.ambientShadow,
         shape: RoundedRectangleBorder(
           side: BorderSide(color: tokens.borderSubtle),
           borderRadius: BorderRadius.circular(AppRadii.field),
@@ -384,9 +384,7 @@ abstract final class AppTheme {
           backgroundColor: WidgetStatePropertyAll(tokens.surfaceElevated),
           surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
           elevation: const WidgetStatePropertyAll(AppElevation.overlay),
-          shadowColor: WidgetStatePropertyAll(
-            Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
-          ),
+          shadowColor: WidgetStatePropertyAll(tokens.ambientShadow),
           side: WidgetStatePropertyAll(BorderSide(color: tokens.borderSubtle)),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
@@ -415,7 +413,7 @@ abstract final class AppTheme {
         backgroundColor: tokens.surfaceElevated,
         modalBackgroundColor: tokens.surfaceElevated,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
+        shadowColor: tokens.ambientShadow,
         elevation: AppElevation.popup,
         modalElevation: AppElevation.popup,
         shape: RoundedRectangleBorder(
@@ -465,7 +463,7 @@ abstract final class AppTheme {
           return Colors.transparent;
         }),
         checkColor: WidgetStatePropertyAll(
-          isDark ? tokens.appBackground : Colors.white,
+          isDark ? tokens.appBackground : tokens.paperWhite,
         ),
         side: BorderSide(color: tokens.borderStrong),
         shape: RoundedRectangleBorder(

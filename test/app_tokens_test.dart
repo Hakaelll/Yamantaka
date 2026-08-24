@@ -43,6 +43,17 @@ void main() {
     expect(AppTheme.library().brightness, Brightness.dark);
   });
 
+  test('editorial interaction tokens remain restrained and readable', () {
+    expect(AppSizes.artifactSelectedScale, lessThanOrEqualTo(1.04));
+    expect(
+      AppSizes.artifactHoverScale,
+      lessThan(AppSizes.artifactSelectedScale),
+    );
+    expect(AppShadow.artifactGlowSpread, 0);
+    expect(AppSizes.settingsControlWidth, 240);
+    expect(AppSizes.readerPanelDefault, AppSizes.sidePanelWidth);
+  });
+
   test(
     'dark mode remains active even while safe mode is protecting startup',
     () {

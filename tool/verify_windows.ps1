@@ -424,7 +424,7 @@ try {
                 '--no-pub',
                 'test/reader_widgets_test.dart',
                 '--plain-name',
-                'book reader matches the maintained fullscreen baseline'
+                'book reader matches the maintained editorial v0.5 baseline'
             ) 'reader-visual-baseline.log'
         }
     }
