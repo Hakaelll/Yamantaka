@@ -79,13 +79,15 @@ Fuentes: [file_selector](https://pub.dev/packages/file_selector),
 - Contexto: un límite por número de páginas no controla documentos con imágenes
   gigantes y una caché ilimitada degrada sesiones largas.
 - Opciones: caché del paquete, LRU por entradas, LRU por bytes o teselas.
-- Decisión: visor virtualizado de `pdfrx`, LRU propia de 96 MiB por bytes
-  estimados y portadas de baja resolución con máximo global configurable.
+- Decisión: visor virtualizado de `pdfrx`, LRU de 72 MiB para páginas, 24 MiB
+  para regiones, 8 MiB para texto y portadas de baja resolución con máximo
+  global configurable; todos los presupuestos responden a presión de memoria.
 - Motivo: límites simples y medibles sin renderizar todo el documento.
-- Consecuencias: hay dos presupuestos de memoria independientes; limpiar caché
-  vacía ambos recursos controlados por Yamantaka y los archivos de portada.
-- Riesgos: una única página extrema puede superar temporalmente el presupuesto;
-  teselas se decidirán con mediciones, no antes.
+- Consecuencias: ownership, claves y métricas quedan separados; limpiar caché
+  vacía recursos controlados por Yamantaka y archivos de portada. Escala,
+  dimensión y bytes se acotan antes de cada render.
+- Riesgos: PDFium y el asignador de Windows pueden conservar memoria fuera de
+  estas LRU; el soak y el RSS complementan, pero no sustituyen, el ownership.
 
 ## ADR-007 — Enlaces externos
 

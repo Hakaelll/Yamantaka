@@ -3,6 +3,7 @@ param(
     [string]$BaselinePath = 'docs/verification/performance-baseline.json',
     [string]$OutputPath = 'build/verification/performance/library-benchmark.json',
     [double]$Tolerance = 0.10,
+    [string]$PdfProfilePath = 'build/performance/performance-profile.json',
     [string]$DartExecutable
 )
 
@@ -49,3 +50,9 @@ $comparisonPath = [System.IO.Path]::ChangeExtension($output, '.comparison.json')
 $comparison | ConvertTo-Json -Depth 12 | Set-Content -Encoding UTF8 $comparisonPath
 Write-Host "Performance comparison: $comparisonPath"
 if ($comparison.status -eq 'fail') { exit 1 }
+
+$pdfProfile = [System.IO.Path]::GetFullPath((Join-Path $root $PdfProfilePath))
+if (Test-Path -LiteralPath $pdfProfile) {
+    & (Join-Path $PSScriptRoot 'compare_pdf_profile.ps1') -ProfilePath $PdfProfilePath
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}

@@ -27,6 +27,9 @@ final class LibraryIndexController extends ChangeNotifier {
   bool _cancelled = false;
   bool _paused = false;
   bool _backgroundPaused = false;
+  bool _interactionPaused = false;
+  bool get _effectivelyPaused =>
+      _paused || _backgroundPaused || _interactionPaused;
   int _generation = 0;
   LibraryIndexProgress progress = const LibraryIndexProgress(
     totalDocuments: 0,
@@ -102,13 +105,13 @@ final class LibraryIndexController extends ChangeNotifier {
         currentPage: 0,
         totalPages: 0,
         isRunning: true,
-        isPaused: _paused || _backgroundPaused,
+        isPaused: _effectivelyPaused,
       );
       notifyListeners();
       var completed = 0;
       for (final document in candidates) {
         if (_cancelled || operationToken.isCancelled) break;
-        while ((_paused || _backgroundPaused) &&
+        while (_effectivelyPaused &&
             !_cancelled &&
             !operationToken.isCancelled) {
           await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -121,7 +124,7 @@ final class LibraryIndexController extends ChangeNotifier {
           var hasText = false;
           for (var pageIndex = 0; pageIndex < opened.pageCount; pageIndex++) {
             if (_cancelled || operationToken.isCancelled) break;
-            while ((_paused || _backgroundPaused) &&
+            while (_effectivelyPaused &&
                 !_cancelled &&
                 !operationToken.isCancelled) {
               await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -145,7 +148,7 @@ final class LibraryIndexController extends ChangeNotifier {
               currentPage: pageIndex + 1,
               totalPages: opened.pageCount,
               isRunning: true,
-              isPaused: _paused,
+              isPaused: _effectivelyPaused,
             );
             notifyListeners();
             await Future<void>.delayed(Duration.zero);
@@ -175,7 +178,7 @@ final class LibraryIndexController extends ChangeNotifier {
           currentPage: 0,
           totalPages: 0,
           isRunning: true,
-          isPaused: _paused || _backgroundPaused,
+          isPaused: _effectivelyPaused,
         );
         notifyListeners();
       }
@@ -232,7 +235,24 @@ final class LibraryIndexController extends ChangeNotifier {
         currentPage: progress.currentPage,
         totalPages: progress.totalPages,
         isRunning: true,
-        isPaused: _paused || _backgroundPaused,
+        isPaused: _effectivelyPaused,
+      );
+      notifyListeners();
+    }
+  }
+
+  /// Pauses recreable indexing while the reader is zooming or scrolling.
+  void setInteractionPaused(bool value) {
+    if (_interactionPaused == value) return;
+    _interactionPaused = value;
+    if (progress.isRunning) {
+      progress = LibraryIndexProgress(
+        totalDocuments: progress.totalDocuments,
+        completedDocuments: progress.completedDocuments,
+        currentPage: progress.currentPage,
+        totalPages: progress.totalPages,
+        isRunning: true,
+        isPaused: _effectivelyPaused,
       );
       notifyListeners();
     }

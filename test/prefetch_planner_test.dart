@@ -23,6 +23,7 @@ void main() {
     expect(plan.pages, [4]);
     expect(plan.direction, 1);
     expect(plan.generation, 7);
+    expect(plan.velocityPagesPerSecond, greaterThan(8));
   });
 
   test(
@@ -56,4 +57,24 @@ void main() {
       );
     },
   );
+
+  test('fast navigation expands lookahead only in its current direction', () {
+    final plan = PrefetchPlanner.plan(
+      samples: [
+        ScrollSample(pageIndex: 2, offset: 0, at: now),
+        ScrollSample(
+          pageIndex: 8,
+          offset: 0,
+          at: now.add(const Duration(milliseconds: 100)),
+        ),
+      ],
+      currentPage: 8,
+      pageCount: 20,
+      mode: ReaderMode.document,
+      generation: 9,
+    );
+
+    expect(plan.pages, [9, 10, 11]);
+    expect(plan.velocityPagesPerSecond, 60);
+  });
 }

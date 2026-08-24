@@ -7,10 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.3.0+4 revisada el 23 de agosto de 2026:
+Base Flutter 0.4.0+5 revisada el 23 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 214 pruebas aprobadas;
+- flutter test --no-pub: 224 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local abre una ventana receptiva y acepta un cierre normal;
@@ -55,6 +55,11 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Título, autor y hasta tres temas se proponen mediante metadatos y texto PDF
   procesados localmente; los resultados dudosos se revisan y las ediciones
   manuales prevalecen siempre.
+- El menú de cada documento y el menú general permiten volver a analizar
+  metadatos y temas sin perder ninguna corrección manual.
+- El lector muestra una previsualización rápida y la sustituye por la región
+  nítida al estabilizar zoom/desplazamiento; en Continua solo agenda páginas
+  visibles o próximas, incluso en documentos de miles de páginas.
 - Biblioteca siempre oscura y espacial, con una paleta monocromática,
   selección violeta, foco blanco independiente del color y controles
   superiores en cápsulas discretas.

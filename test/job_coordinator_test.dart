@@ -105,6 +105,70 @@ void main() {
     await first.future;
   });
 
+  test(
+    'settled waits for native-style cleanup after consumer cancellation',
+    () async {
+      final coordinator = JobCoordinator(maxConcurrent: 1);
+      final release = Completer<void>();
+      final started = Completer<void>();
+      final handle = coordinator.submit<void>(
+        key: 'native-cleanup',
+        category: JobCategory.render,
+        priority: JobPriority.visible,
+        generation: 1,
+        task: (token) async {
+          started.complete();
+          token.addListener(() {});
+          await release.future;
+        },
+      );
+      await started.future;
+      handle.cancel();
+      await expectLater(handle.future, throwsA(isA<JobCancelled>()));
+      var settled = false;
+      handle.settled.then((_) => settled = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(settled, isFalse);
+      release.complete();
+      await handle.settled;
+      expect(settled, isTrue);
+      await coordinator.dispose();
+    },
+  );
+
+  test('a visible consumer promotes queued deduplicated work', () async {
+    final coordinator = JobCoordinator(maxConcurrent: 1);
+    addTearDown(coordinator.dispose);
+    final blocker = Completer<void>();
+    final first = coordinator.submit<void>(
+      key: 'blocker',
+      category: JobCategory.render,
+      priority: JobPriority.visible,
+      generation: 1,
+      task: (_) => blocker.future,
+    );
+    final background = coordinator.submit<int>(
+      key: 'promoted',
+      category: JobCategory.render,
+      priority: JobPriority.background,
+      generation: 1,
+      task: (_) async => 7,
+    );
+    final visible = coordinator.submit<int>(
+      key: 'promoted',
+      category: JobCategory.render,
+      priority: JobPriority.visible,
+      generation: 1,
+      task: (_) async => 99,
+    );
+
+    blocker.complete();
+    await first.future;
+    expect(await background.future, 7);
+    expect(await visible.future, 7);
+    expect(visible.descriptor.priority, JobPriority.visible);
+  });
+
   test('background work pauses while visible work remains eligible', () async {
     final coordinator = JobCoordinator(maxConcurrent: 1);
     addTearDown(coordinator.dispose);

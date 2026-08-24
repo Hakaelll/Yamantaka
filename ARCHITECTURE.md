@@ -12,8 +12,10 @@ dependencias durante el arranque; cada estado mutable vive en un controlador
 pequeño y observable.
 
 La copia mínima de pdfrx 2.4.7 en `third_party/pdfrx` corrige temporalmente el
-ciclo de vida del codec de imagen en Windows. Está aislada, conserva la licencia
-MIT y no cambia los contratos de Yamantaka; ADR-009 e YAM-014 definen su retirada.
+ciclo de vida del codec de imagen en Windows y contiene el render progresivo y
+la virtualización vertical instrumentada. Está aislada, conserva la licencia
+MIT y no cambia los contratos de Yamantaka; `PATCHES.md` inventaría cada cambio
+y ADR-009 e YAM-014 definen su retirada.
 
 ## Apertura
 
@@ -28,12 +30,21 @@ Los errores técnicos se convierten en `AppFailure` antes de llegar a la UI.
 
 ## Renderizado
 
-El adaptador conserva un mapa de documentos abiertos. Las solicitudes llevan
-documento, página, escala, rotación y región. Una caché LRU limita imágenes por
-peso estimado, deduplica solicitudes y libera recursos al cerrar. Los renders
-activos reciben un token de cancelación; el cierre los cancela y espera su
-finalización antes de disponer PDFium. El primer hito usa el visor virtualizado
-de `pdfrx`; el contrato de regiones queda listo para teselas futuras.
+El adaptador conserva un mapa de documentos abiertos. Cada solicitud se
+identifica por huella de contenido, página, rotación, escala física, DPI,
+región y generación. El coordinador deduplica trabajo nativo, pero entrega un
+handle por consumidor: cancelar una miniatura no cancela la página visible si
+ambas comparten render. Visible, próxima, prefetch y miniatura tienen prioridad
+decreciente. Subir de generación cancela trabajo anterior y un resultado
+obsoleto se descarta antes de publicarlo.
+
+Páginas completas (72 MiB), regiones/teselas (24 MiB), texto estructurado/plano
+(8 MiB) y miniaturas en disco tienen ownership y presupuestos separados. Un
+bitmap se limita a 16.384 px por eje y 192 MiB antes de llegar a PDFium. El
+`MemoryGovernor` reduce las LRU bajo presión; desalojar, cerrar o limpiar libera
+la `ui.Image` una sola vez. El cierre cancela y espera jobs/tokens nativos antes
+de disponer el documento. Los invariantes completos están en
+`docs/architecture/pdf-rendering-0.4.md`.
 
 El widget concreto queda detrás de `PdfViewerAdapter`. Informa página, zoom y
 fracción visible de la página a `PdfViewController`; `ReaderController` aplica
@@ -64,11 +75,13 @@ ajuste de página/ancho y resize. Cada instancia nativa adjunta el
 `PdfViewController` con un propietario para que la destrucción tardía de una
 vista anterior no desconecte la nueva durante un cambio de modo.
 
-El layout reserva de antemano el tamaño de todas las páginas. `pdfrx` mantiene
-el bitmap anterior durante el render progresivo y se configura con caché
-horizontal de una unidad adyacente, precarga vertical para continuo y límite
-global de memoria; la caché LRU/cancelación del motor sigue siendo el único
-almacén adicional.
+El layout reserva únicamente geometría liviana para todas las páginas. En modo
+Continuo una búsqueda binaria encuentra el rango que cruza viewport y anillo de
+precarga, por lo que el trabajo de pintura no crece linealmente con 5.000
+páginas. `pdfrx` agenda visibles antes que próximas, cancela el exterior y
+mantiene el preview anterior hasta refinar la región tras 75 ms de reposo. La
+previsualización se limita a 110 DPI y el fundido final dura 90 ms o cero con
+movimiento reducido.
 
 ## Persistencia
 
@@ -95,9 +108,11 @@ viven como preferencias globales validadas.
 ## Portadas y biblioteca de artefactos
 
 `DocumentEnrichmentController` recorre secuencialmente los documentos nuevos o
-con huella/versión obsoleta y se pausa durante lectura activa. El motor expone
-metadatos PDFium y bloques estructurados; el caso de uso limita la muestra a 12
-páginas/64 KiB y no la persiste. `document_enrichment` conserva estado,
+con huella/versión obsoleta y se pausa durante interacción/lectura activa. El
+usuario puede reanalizar una selección o toda la biblioteca sin tocar campos
+manuales. El motor expone metadatos PDFium y bloques estructurados de hasta
+cuatro páginas iniciales; el caso de uso limita la muestra a 12 páginas/64 KiB
+y no la persiste. `document_enrichment` conserva estado,
 sugerencias, confianza, huella y versión; `document_topics` separa procedencia
 automática/manual. Las consultas SQL calculan facetas y recuentos sobre toda la
 biblioteca aunque la presentación esté paginada.

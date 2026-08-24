@@ -42,9 +42,16 @@ La suite automatizada comprueba:
 - alto contraste, movimiento reducido y perfil de tinta electrónica;
 - panel lateral, búsqueda, marcadores, temas de Documento y persistencia.
 
-La biblioteca cubre metadatos PDF, portada estructurada, autor explícito o
-dudoso, ausencia de texto, temas ES/EN, límite de muestra, preservación manual,
-facetas completas, migración 7→8 y backup v7 con ajustes de pliego.
+La biblioteca cubre metadatos PDF, cuatro páginas iniciales, título multilínea,
+autor/editor explícito o dudoso, fallback de nombre legible, ausencia de texto,
+temas ES/EN, límite de muestra, reanálisis y preservación manual, facetas
+completas, migración 7→8 y backup v7 con ajustes de pliego.
+
+El motor cubre PDFium real, contraseña, corrupción, cancelación previa,
+generaciones obsoletas, cierre sin pendientes, reducción dinámica de LRU y
+diagnóstico de rendimiento sin campos privados. El perfil Windows añade
+documentos sintéticos de 1, 50, 500 y 5.000 páginas, vector pesado y raster
+extremo; los resultados bajo `build/` no contienen rutas ni títulos.
 
 ## Referencia visual mantenida
 

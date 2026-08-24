@@ -14,6 +14,7 @@ final class OpenedPdfDocument {
     required this.pageCount,
     required this.pageSizes,
     required this.isEncrypted,
+    this.cacheIdentity = '',
   });
 
   final String documentId;
@@ -21,6 +22,11 @@ final class OpenedPdfDocument {
   final int pageCount;
   final List<PdfPageSize> pageSizes;
   final bool isEncrypted;
+
+  /// Opaque content identity used only for in-memory cache partitioning.
+  ///
+  /// It is never written to diagnostics and deliberately contains no path.
+  final String cacheIdentity;
 }
 
 final class PdfDocumentMetadata {
@@ -84,6 +90,8 @@ final class RenderedPdfPage {
 
   int get estimatedBytes => image.width * image.height * 4;
 }
+
+enum PdfRenderPriority { visible, nearby, prefetch, thumbnail }
 
 final class PdfSearchMatch {
   const PdfSearchMatch({

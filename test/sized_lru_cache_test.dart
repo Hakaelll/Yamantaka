@@ -20,4 +20,23 @@ void main() {
     expect(cache.get('c'), 'cc');
     expect(evicted, ['bb']);
   });
+
+  test('shrinks an existing cache immediately when pressure rises', () {
+    final evicted = <String>[];
+    final cache = SizedLruCache<String, String>(
+      maxBytes: 8,
+      sizeOf: (value) => value.length,
+      onEvict: evicted.add,
+    );
+    cache
+      ..put('oldest', 'aaaa')
+      ..put('newest', 'bbbb')
+      ..setMaxBytes(4);
+
+    expect(cache.maxBytes, 4);
+    expect(cache.currentBytes, 4);
+    expect(cache.containsKey('oldest'), isFalse);
+    expect(cache.get('newest'), 'bbbb');
+    expect(evicted, ['aaaa']);
+  });
 }

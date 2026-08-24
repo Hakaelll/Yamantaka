@@ -466,7 +466,7 @@ packages:
       path: "third_party/pdfrx"
       relative: true
     source: path
-    version: "2.4.7+yamantaka.1"
+    version: "2.4.7+yamantaka.2"
   pdfrx_engine:
     dependency: transitive
     description:

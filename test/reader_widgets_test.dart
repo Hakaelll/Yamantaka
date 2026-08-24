@@ -1115,6 +1115,9 @@ final class _FakePdfEngine extends StubPdfDocumentEngine {
     int rotation = 0,
     PdfRenderRegion? region,
     PdfOperationToken? cancellationToken,
+    double devicePixelRatio = 1,
+    int? generation,
+    PdfRenderPriority priority = PdfRenderPriority.visible,
   }) async {
     throw StateError('No bitmap in the widget harness.');
   }

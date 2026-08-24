@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0 — 2026-08-23 (renderizado PDF progresivo y estable)
+
+- Presenta cada página primero con una previsualización limitada a 110 DPI y
+  refina después de 75 ms de reposo, con transición corta desactivada cuando
+  el usuario reduce el movimiento y sin destellos blancos entre bitmaps.
+- Introduce generaciones de render, cancelación por consumidor y prioridades
+  visible/próxima/prefetch/miniatura; un resultado obsoleto nunca entra en
+  caché y cerrar un PDF espera los trabajos nativos antes de liberar PDFium.
+- Separa presupuestos LRU de páginas, regiones y texto, limita dimensiones y
+  bytes de cada bitmap, responde a presión de memoria y expone diagnóstico
+  local agregado de p50/p95, frames lentos, caché y renders progresivos.
+- Virtualiza la vista continua mediante búsqueda binaria del rango próximo,
+  prioriza páginas visibles, cancela trabajo fuera del anillo y pausa índice y
+  enriquecimiento durante la interacción activa con el lector.
+- Mejora la detección local de título, autor y hasta tres temas usando
+  metadatos, cuatro páginas iniciales, títulos multilínea, autorías/editorías
+  explícitas, nombres de archivo legibles y vocabularios ES/EN más específicos.
+- Añade “Volver a analizar” para un documento o toda la biblioteca; conserva
+  siempre los overrides manuales y excluye archivos ausentes.
+- Amplía fixtures, pruebas de caché/cancelación/privacidad/enriquecimiento,
+  documentación, benchmark y empaquetado reproducible de Windows.
+
 ## 0.3.0 — 2026-08-23 (biblioteca inteligente y lectura flexible)
 
 - Enriquece cada PDF localmente con título y autor desde metadatos o portada y

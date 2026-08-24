@@ -92,6 +92,20 @@ Future<void> main(List<String> arguments) async {
       'close': 'zero-live-document',
     },
   );
+  cases['transparency-heavy'] =
+      _write(root, 'transparency-heavy.pdf', _transparencyPdf(), {
+        'open': 'success',
+        'render': 'bounded-alpha-composition',
+        'text': 'extractable',
+        'close': 'zero-live-document',
+      });
+  cases['font-substitution'] =
+      _write(root, 'font-substitution.pdf', _problemFontPdf(), {
+        'open': 'success-or-typed-font-error',
+        'render': 'substitute-or-typed-error-no-process-crash',
+        'text': 'best-effort',
+        'close': 'zero-live-document',
+      });
   cases['mixed-rotation'] =
       _write(root, 'mixed-rotation.pdf', _mixedRotationPdf(), {
         'open': 'success',
@@ -102,8 +116,8 @@ Future<void> main(List<String> arguments) async {
 
   final manifest = <String, Object?>{
     'format': 'yamantaka-pathological-pdf-corpus',
-    'schemaVersion': 1,
-    'generatorVersion': 1,
+    'schemaVersion': 2,
+    'generatorVersion': 2,
     'generatedAt': DateTime.now().toUtc().toIso8601String(),
     'containsPersonalData': false,
     'containsCopyrightedContent': false,
@@ -217,6 +231,47 @@ Uint8List _mixedRotationPdf() {
       }(),
   ];
   return _serializePdf(objects);
+}
+
+Uint8List _transparencyPdf() {
+  final content = Uint8List.fromList(
+    utf8.encode(
+      'q /GS1 gs 1 0 0 rg 40 80 440 620 re f '
+      '0 0 1 rg 100 160 440 520 re f Q '
+      'BT /F1 18 Tf 60 720 Td (transparent vectors) Tj ET',
+    ),
+  );
+  return _serializePdf([
+    _PdfObject('<< /Type /Catalog /Pages 2 0 R >>'),
+    _PdfObject('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+    _PdfObject(
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+      '/Resources << /ExtGState << /GS1 4 0 R >> '
+      '/Font << /F1 5 0 R >> >> /Contents 6 0 R >>',
+    ),
+    _PdfObject('<< /Type /ExtGState /ca 0.35 /CA 0.35 >>'),
+    _PdfObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'),
+    _PdfObject('<< /Length ${content.length} >>', stream: content),
+  ]);
+}
+
+Uint8List _problemFontPdf() {
+  final content = Uint8List.fromList(
+    utf8.encode('BT /F1 20 Tf 48 700 Td (font fallback fixture) Tj ET'),
+  );
+  return _serializePdf([
+    _PdfObject('<< /Type /Catalog /Pages 2 0 R >>'),
+    _PdfObject('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+    _PdfObject(
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
+      '/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    ),
+    _PdfObject(
+      '<< /Type /Font /Subtype /Type1 '
+      '/BaseFont /YamantakaDefinitelyUnavailable /Encoding /WinAnsiEncoding >>',
+    ),
+    _PdfObject('<< /Length ${content.length} >>', stream: content),
+  ]);
 }
 
 Uint8List _serializePdf(List<_PdfObject> objects) {

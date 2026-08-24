@@ -50,7 +50,13 @@ base class StubPdfDocumentEngine implements PdfDocumentEngine {
     int rotation = 0,
     PdfRenderRegion? region,
     PdfOperationToken? cancellationToken,
+    double devicePixelRatio = 1,
+    int? generation,
+    PdfRenderPriority priority = PdfRenderPriority.visible,
   }) => throw UnimplementedError();
+
+  @override
+  void beginRenderGeneration(String documentId, int generation) {}
 
   @override
   Future<List<PdfSearchMatch>> searchText({

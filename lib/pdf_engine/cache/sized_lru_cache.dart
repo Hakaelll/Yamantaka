@@ -2,13 +2,15 @@ import 'dart:collection';
 
 final class SizedLruCache<K, V extends Object> {
   SizedLruCache({
-    required this.maxBytes,
+    required int maxBytes,
     required this.sizeOf,
     this.onEvict,
     this.onEvictEntry,
-  }) : assert(maxBytes >= 0);
+  }) : assert(maxBytes >= 0),
+       _maxBytes = maxBytes;
 
-  final int maxBytes;
+  int _maxBytes;
+  int get maxBytes => _maxBytes;
   final int Function(V value) sizeOf;
   final void Function(V value)? onEvict;
   final void Function(K key, V value)? onEvictEntry;
@@ -17,6 +19,15 @@ final class SizedLruCache<K, V extends Object> {
 
   int get currentBytes => _currentBytes;
   int get length => _entries.length;
+  Iterable<K> get keys => _entries.keys;
+
+  bool containsKey(K key) => _entries.containsKey(key);
+
+  void setMaxBytes(int value) {
+    if (value < 0) throw ArgumentError.value(value, 'value');
+    _maxBytes = value;
+    _trim();
+  }
 
   V? get(K key) {
     final value = _entries.remove(key);

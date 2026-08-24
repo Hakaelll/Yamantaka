@@ -24,6 +24,7 @@ final class PdfViewConfiguration {
     this.pageShadow,
     this.coverPolicy = ReaderCoverPolicy.noCover,
     this.initialSide = ReaderInitialSide.left,
+    this.onInteractionChanged,
   });
 
   final Color backgroundColor;
@@ -39,6 +40,7 @@ final class PdfViewConfiguration {
   final BoxShadow? pageShadow;
   final ReaderCoverPolicy coverPolicy;
   final ReaderInitialSide initialSide;
+  final ValueChanged<bool>? onInteractionChanged;
 }
 
 final class PdfViewController extends ChangeNotifier {

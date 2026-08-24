@@ -1,0 +1,30 @@
+{
+  "format": "yamantaka-pdf-profile-baseline",
+  "version": 1,
+  "release": "0.3.0+4",
+  "recordedAt": "2026-07-29",
+  "hardware": "Windows 11 10.0.26200, Intel Core i7-1165G7, Flutter 3.44.8",
+  "containsPersonalData": false,
+  "metrics": [
+    {
+      "path": "pdf_engine_microseconds.heavy_open_p95",
+      "value": 15718,
+      "tolerance": 0.20
+    },
+    {
+      "path": "pdf_engine_microseconds.heavy_render_p95",
+      "value": 6986,
+      "tolerance": 0.20
+    },
+    {
+      "path": "frame_build_microseconds.reader_p95",
+      "value": 5570,
+      "tolerance": 0.35
+    },
+    {
+      "path": "interaction_microseconds.reader_p95",
+      "value": 87589,
+      "tolerance": 0.20
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -204,6 +205,8 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                             widget.onGlobalSearch?.call();
                           case _LibraryAppMenuAction.enrich:
                             widget.enrichment?.analyzePending();
+                          case _LibraryAppMenuAction.reanalyze:
+                            unawaited(_reanalyzeLibrary());
                         }
                       },
                       itemBuilder: (context) => [
@@ -239,6 +242,11 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                           const PopupMenuItem(
                             value: _LibraryAppMenuAction.enrich,
                             child: Text('Analizar metadatos y temas'),
+                          ),
+                        if (widget.enrichment != null)
+                          const PopupMenuItem(
+                            value: _LibraryAppMenuAction.reanalyze,
+                            child: Text('Volver a analizar la biblioteca'),
                           ),
                       ],
                       icon: const Icon(Icons.more_horiz_rounded),
@@ -290,6 +298,14 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                         onChangeCover: widget.onChangeCover,
                         onRevealDocument: widget.onRevealDocument,
                         onRemoveDocument: widget.onRemoveDocument,
+                        onReanalyzeDocument: widget.enrichment == null
+                            ? null
+                            : (document) async {
+                                await widget.enrichment!.reanalyzeDocuments([
+                                  document,
+                                ]);
+                                await widget.controller.reload();
+                              },
                         onDocumentVisible: widget.onDocumentVisible,
                         documentPredicate: widget.organization?.includes,
                         collections:
@@ -320,6 +336,34 @@ final class _LibraryScreenState extends State<LibraryScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _reanalyzeLibrary() async {
+    final enrichment = widget.enrichment;
+    if (enrichment == null || enrichment.progress.isRunning) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Volver a analizar la biblioteca'),
+        content: const Text(
+          'Se volverán a detectar localmente títulos, autores y temas. '
+          'Los títulos, autores y temas editados manualmente se conservarán.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Analizar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await enrichment.reanalyzeAll();
+    await widget.controller.reload();
   }
 
   Future<void> _showCollections() async {
@@ -431,6 +475,7 @@ final class _LibraryBody extends StatelessWidget {
     required this.onChangeCover,
     required this.onRevealDocument,
     required this.onRemoveDocument,
+    this.onReanalyzeDocument,
     this.onDocumentVisible,
     this.documentPredicate,
     this.collections = const [],
@@ -450,6 +495,7 @@ final class _LibraryBody extends StatelessWidget {
   final Future<void> Function(LibraryDocument document)? onChangeCover;
   final Future<void> Function(LibraryDocument document)? onRevealDocument;
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
+  final Future<void> Function(LibraryDocument document)? onReanalyzeDocument;
   final ValueChanged<LibraryDocument>? onDocumentVisible;
   final bool Function(String documentId)? documentPredicate;
   final List<DocumentCollection> collections;
@@ -507,6 +553,7 @@ final class _LibraryBody extends StatelessWidget {
       onChangeCover: onChangeCover,
       onRevealDocument: onRevealDocument,
       onRemoveDocument: onRemoveDocument,
+      onReanalyzeDocument: onReanalyzeDocument,
       onDocumentVisible: onDocumentVisible,
     );
   }
@@ -775,4 +822,5 @@ enum _LibraryAppMenuAction {
   recover,
   globalSearch,
   enrich,
+  reanalyze,
 }

@@ -22,13 +22,20 @@ void main(List<String> arguments) {
   }
   final longDocument = File('${root.path}/long-100-pages.pdf');
   longDocument.writeAsBytesSync(createPdfWithPageCount(100), flush: true);
+  const scalePageCounts = [1, 50, 500, 5000];
+  for (final pageCount in scalePageCounts) {
+    File(
+      '${root.path}/scale-$pageCount-pages.pdf',
+    ).writeAsBytesSync(createPdfWithPageCount(pageCount), flush: true);
+  }
   final heavyDocument = File('${root.path}/heavy-vector-8-pages.pdf');
   heavyDocument.writeAsBytesSync(createHeavyVectorPdf(), flush: true);
   File('${root.path}/manifest.json').writeAsStringSync(
     const JsonEncoder.withIndent('  ').convert({
-      'schemaVersion': 1,
+      'schemaVersion': 2,
       'libraryDocuments': 40,
       'longDocumentPages': 100,
+      'scaleDocumentPages': scalePageCounts,
       'heavyVectorPages': 8,
       'heavyVectorShapesPerPage': 1200,
       'containsPersonalData': false,

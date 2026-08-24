@@ -14,5 +14,12 @@ abstract final class AppConfig {
   static const int maxSearchResults = 100;
   static const int maxAnnotationNoteLength = 4000;
   static const int maxRenderCacheBytes = 96 * 1024 * 1024;
+  static const int maxPageCacheBytes = 72 * 1024 * 1024;
+  static const int maxTileCacheBytes = 24 * 1024 * 1024;
+  static const int maxTextCacheBytes = 8 * 1024 * 1024;
+  static const int maxPdfiumDimension = 16384;
+  static const int maxSingleRenderBytes = 192 * 1024 * 1024;
+  static const double previewRenderDpi = 110;
+  static const Duration settledRenderDelay = Duration(milliseconds: 75);
   static const Duration positionSaveDebounce = Duration(milliseconds: 450);
 }

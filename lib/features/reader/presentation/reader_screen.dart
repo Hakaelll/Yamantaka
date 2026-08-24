@@ -51,6 +51,7 @@ final class ReaderScreen extends StatefulWidget {
     this.onChromeVisibilityChanged,
     this.onDocumentInfo,
     this.onExportAnnotations,
+    this.onViewportInteractionChanged,
   });
 
   final ReaderController controller;
@@ -81,6 +82,7 @@ final class ReaderScreen extends StatefulWidget {
   final ValueChanged<bool>? onChromeVisibilityChanged;
   final VoidCallback? onDocumentInfo;
   final Future<void> Function()? onExportAnnotations;
+  final ValueChanged<bool>? onViewportInteractionChanged;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -372,6 +374,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                         context,
                         preferences.readingTheme,
                       ),
+                      onInteractionChanged: widget.onViewportInteractionChanged,
                     ),
                     initialPageIndex: controller.currentPageIndex,
                     onPageChanged: controller.onPageChanged,

@@ -35,7 +35,7 @@ import '../test/support/pdf_fixture.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('profiles the repeatable 40-cover and 100-page workflow', (
+  testWidgets('profiles the repeatable library and 5000-page workflow', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1440, 900);
@@ -54,6 +54,8 @@ void main() {
     );
     final longPdf = File('${root.path}/long.pdf');
     await longPdf.writeAsBytes(createPdfWithPageCount(100));
+    final hugePdf = File('${root.path}/huge.pdf');
+    await hugePdf.writeAsBytes(createPdfWithPageCount(5000));
     final heavyPdf = File('${root.path}/heavy-vector.pdf');
     await heavyPdf.writeAsBytes(createHeavyVectorPdf());
     final logger = AppLogger(
@@ -154,17 +156,17 @@ void main() {
     for (var run = 0; run < 5; run++) {
       await binding.watchPerformance(() async {
         final stopwatch = Stopwatch()..start();
+        if (find.byKey(const Key('library-filter')).evaluate().isEmpty) {
+          await tester.tap(find.byKey(const Key('library-search-button')));
+          await tester.pump();
+        }
         await tester.enterText(
           find.byKey(const Key('library-filter')),
           'Fixture 3',
         );
         await tester.pump();
-        await tester.tap(find.textContaining('En curso').hitTestable().first);
-        await tester.pump();
-        await tester.enterText(find.byKey(const Key('library-filter')), '');
-        await tester.pump();
-        await tester.tap(find.textContaining('Todos').hitTestable().first);
-        await tester.pump();
+        await tester.tap(find.byKey(const Key('library-filter-clear')));
+        await tester.pumpAndSettle();
         await tester.pumpWidget(
           libraryApp(
             run.isEven
@@ -180,8 +182,17 @@ void main() {
 
     final openDurations = <int>[];
     final heavyRenderDurations = <int>[];
+    final heavyCloseRss = <int>[];
+    final warmup = await engine.openDocument(heavyPdf.path);
+    await engine.renderPage(
+      documentId: warmup.documentId,
+      pageIndex: 0,
+      scale: 1,
+    );
+    await engine.closeDocument(warmup.documentId);
+    engine.clearCaches();
     var peakRss = ProcessInfo.currentRss;
-    for (var run = 0; run < 5; run++) {
+    for (var run = 0; run < 15; run++) {
       final openWatch = Stopwatch()..start();
       final openedHeavy = await engine.openDocument(heavyPdf.path);
       openWatch.stop();
@@ -210,8 +221,15 @@ void main() {
           ? peakRss
           : ProcessInfo.currentRss;
       await engine.closeDocument(openedHeavy.documentId);
+      heavyCloseRss.add(ProcessInfo.currentRss);
     }
+    expect(engine.diagnostics.openDocuments, 0);
+    expect(engine.diagnostics.pendingRenders, 0);
+    expect(engine.diagnostics.cachedBytes, 0);
+    final heavyCloseGrowth = heavyCloseRss.last - heavyCloseRss.first;
+    expect(heavyCloseGrowth, lessThan(16 * 1024 * 1024));
 
+    final firstPage100Watch = Stopwatch()..start();
     expect(await reader.openPath(longPdf.path), isTrue);
     await tester.pumpWidget(
       MaterialApp(
@@ -230,6 +248,7 @@ void main() {
       ),
     );
     await _pumpUntil(tester, () => viewController.isReady);
+    firstPage100Watch.stop();
     peakRss = peakRss > ProcessInfo.currentRss
         ? peakRss
         : ProcessInfo.currentRss;
@@ -248,7 +267,7 @@ void main() {
         await tester.pump();
         await viewController.zoomBy(run.isEven ? 1.04 : 1 / 1.04);
         await tester.pump();
-        await tester.tap(find.byTooltip('Página siguiente (Av Pág)'));
+        await reader.goToNextReadingUnit();
         await tester.pump();
         stopwatch.stop();
         readerDurations.add(stopwatch.elapsedMicroseconds);
@@ -257,8 +276,63 @@ void main() {
           ? peakRss
           : ProcessInfo.currentRss;
     }
+
+    await reader.closeDocument();
+    final firstPage5000Watch = Stopwatch()..start();
+    expect(await reader.openPath(hugePdf.path), isTrue);
+    await tester.pump();
+    await _pumpUntil(tester, () => viewController.isReady);
+    firstPage5000Watch.stop();
+    peakRss = peakRss > ProcessInfo.currentRss
+        ? peakRss
+        : ProcessInfo.currentRss;
+
+    final layoutDurations = <int>[];
+    for (final layout in [
+      PageLayoutMode.continuous,
+      PageLayoutMode.facing,
+      PageLayoutMode.single,
+      PageLayoutMode.continuous,
+    ]) {
+      final stopwatch = Stopwatch()..start();
+      reader.setPageLayout(layout);
+      await tester.pump();
+      await _pumpUntil(tester, () => viewController.isReady);
+      stopwatch.stop();
+      layoutDurations.add(stopwatch.elapsedMicroseconds);
+    }
+
+    final continuousNavigationDurations = <int>[];
+    for (final target in [49, 499, 2499, 4999, 0]) {
+      final stopwatch = Stopwatch()..start();
+      await viewController.goToPage(target);
+      await tester.pump();
+      stopwatch.stop();
+      continuousNavigationDurations.add(stopwatch.elapsedMicroseconds);
+    }
+    final scrollWatch = Stopwatch()..start();
+    await tester.drag(find.byType(PdfViewer), const Offset(0, -640));
+    await tester.pump();
+    scrollWatch.stop();
+
+    final resizeDurations = <int>[];
+    for (final size in const [Size(1280, 800), Size(1600, 1000)]) {
+      final stopwatch = Stopwatch()..start();
+      tester.view.physicalSize = size;
+      await tester.pump();
+      stopwatch.stop();
+      resizeDurations.add(stopwatch.elapsedMicroseconds);
+    }
+    tester.view.physicalSize = const Size(1440, 900);
+    await tester.pump();
+    peakRss = peakRss > ProcessInfo.currentRss
+        ? peakRss
+        : ProcessInfo.currentRss;
     await reader.closeDocument();
     final engineDiagnostics = engine.diagnostics.toJson();
+    expect(engineDiagnostics['open_documents'], 0);
+    expect(engineDiagnostics['pending_renders'], 0);
+    expect(engineDiagnostics['cached_bytes'], 0);
     engine.clearCaches();
     await tester.pumpWidget(libraryApp(AppInterfaceDensity.comfortable));
     await tester.pumpAndSettle();
@@ -268,7 +342,9 @@ void main() {
         () => Future<void>.delayed(const Duration(milliseconds: 500)),
       );
       await tester.pump();
-      afterReturnSamples.add(ProcessInfo.currentRss);
+      final sample = ProcessInfo.currentRss;
+      afterReturnSamples.add(sample);
+      peakRss = peakRss > sample ? peakRss : sample;
     }
     final afterReturnRss = afterReturnSamples.reduce(
       (left, right) => left < right ? left : right,
@@ -280,12 +356,28 @@ void main() {
       'after_return_minimum': afterReturnRss,
       'after_return_samples': afterReturnSamples,
       'released_after_return': peakRss - afterReturnRss,
+      'heavy_close_samples': heavyCloseRss,
+      'heavy_close_growth': heavyCloseGrowth,
     };
     binding.reportData!['interaction_microseconds'] = {
       'library_median': _percentile(libraryDurations, 0.50),
       'library_p95': _percentile(libraryDurations, 0.95),
       'reader_median': _percentile(readerDurations, 0.50),
       'reader_p95': _percentile(readerDurations, 0.95),
+      'first_page_visible_100_pages': firstPage100Watch.elapsedMicroseconds,
+      'first_page_visible_5000_pages': firstPage5000Watch.elapsedMicroseconds,
+      'layout_change_median': _percentile(layoutDurations, 0.50),
+      'layout_change_p95': _percentile(layoutDurations, 0.95),
+      'continuous_navigation_median': _percentile(
+        continuousNavigationDurations,
+        0.50,
+      ),
+      'continuous_navigation_p95': _percentile(
+        continuousNavigationDurations,
+        0.95,
+      ),
+      'continuous_scroll': scrollWatch.elapsedMicroseconds,
+      'resize_p95': _percentile(resizeDurations, 0.95),
     };
     binding.reportData!['pdf_engine_microseconds'] = {
       'heavy_open_median': _percentile(openDurations, 0.50),
@@ -309,6 +401,10 @@ void main() {
       'library_p95': _percentile(libraryFrames, 0.95),
       'reader_median': _percentile(readerFrames, 0.50),
       'reader_p95': _percentile(readerFrames, 0.95),
+      'slow_over_16_7ms': [
+        ...libraryFrames,
+        ...readerFrames,
+      ].where((duration) => duration > 16667).length,
     };
     binding.reportData!['environment'] = {
       'build_mode': 'profile',
@@ -317,10 +413,12 @@ void main() {
       'physical_size': '1440x900',
       'logical_size': '1152x720',
       'library_documents': 40,
-      'long_document_pages': 100,
+      'comparison_document_pages': 100,
+      'huge_document_pages': 5000,
       'heavy_document_pages': 8,
       'heavy_shapes_per_page': 1200,
-      'runs': 5,
+      'interaction_runs': 5,
+      'engine_runs': 15,
       'contains_paths_or_titles': false,
     };
   });

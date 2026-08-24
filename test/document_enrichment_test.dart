@@ -13,6 +13,30 @@ import 'package:yamantaka/storage/repositories/document_repository.dart';
 import 'support/stub_pdf_engine.dart';
 
 void main() {
+  test('enrichment pause reasons remain independent', () {
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    addTearDown(database.close);
+    final controller = DocumentEnrichmentController(
+      DocumentRepository(database),
+      StubPdfDocumentEngine(),
+    );
+    addTearDown(controller.dispose);
+
+    controller.setReaderPaused(true);
+    controller.setInteractionPaused(true);
+    controller.setInteractionPaused(false);
+    expect(controller.isPaused, isTrue);
+
+    controller.setReaderPaused(false);
+    expect(controller.isPaused, isFalse);
+    controller.pause(true);
+    controller.setInteractionPaused(true);
+    controller.pause(false);
+    expect(controller.isPaused, isTrue);
+  });
+
   group('local enrichment rules', () {
     test('PDF metadata wins with automatic confidence', () {
       final result = LocalDocumentEnrichment.analyze(
@@ -130,6 +154,105 @@ void main() {
         ]),
       );
     });
+
+    test('combines multiline titles across front matter and finds editors', () {
+      final result = LocalDocumentEnrichment.analyze(
+        metadata: const PdfDocumentMetadata(),
+        coverBlocks: const [],
+        sampledText: 'democracia estado elecciones parlamento',
+        fileName: 'scan_20260823.pdf',
+        frontMatterPages: const [
+          [],
+          [
+            PdfStructuredTextBlock(
+              text: 'Historia de la democracia',
+              left: 40,
+              top: 90,
+              width: 420,
+              height: 54,
+              pageWidth: 500,
+              pageHeight: 800,
+            ),
+            PdfStructuredTextBlock(
+              text: 'en la Europa contemporánea',
+              left: 45,
+              top: 150,
+              width: 410,
+              height: 48,
+              pageWidth: 500,
+              pageHeight: 800,
+            ),
+            PdfStructuredTextBlock(
+              text: 'Editado por María Zambrano',
+              left: 90,
+              top: 260,
+              width: 320,
+              height: 21,
+              pageWidth: 500,
+              pageHeight: 800,
+            ),
+          ],
+        ],
+      );
+
+      expect(
+        result.title?.value,
+        'Historia de la democracia en la Europa contemporánea',
+      );
+      expect(result.title?.confidence, greaterThanOrEqualTo(0.8));
+      expect(result.author?.value, 'María Zambrano');
+      expect(
+        result.topics.map((topic) => topic.topic),
+        contains(LibraryTopic.politics),
+      );
+    });
+
+    test('uses a human-readable filename only as a reviewable fallback', () {
+      final result = LocalDocumentEnrichment.analyze(
+        metadata: const PdfDocumentMetadata(),
+        coverBlocks: const [],
+        sampledText: '',
+        fileName: 'El_jardín_de_los_senderos-que-se-bifurcan.pdf',
+      );
+
+      expect(result.title?.value, 'El jardín de los senderos que se bifurcan');
+      expect(result.title?.confidence, inInclusiveRange(0.55, 0.79));
+    });
+
+    test('recognizes Spanish surname particles in explicit authorship', () {
+      final result = LocalDocumentEnrichment.analyze(
+        metadata: const PdfDocumentMetadata(),
+        coverBlocks: const [
+          PdfStructuredTextBlock(
+            text: 'Novelas ejemplares',
+            left: 40,
+            top: 90,
+            width: 420,
+            height: 54,
+            pageWidth: 500,
+            pageHeight: 800,
+          ),
+          PdfStructuredTextBlock(
+            text: 'De Miguel de Cervantes',
+            left: 90,
+            top: 250,
+            width: 320,
+            height: 21,
+            pageWidth: 500,
+            pageHeight: 800,
+          ),
+        ],
+        sampledText: 'novela literatura narrativa ficción',
+        fileName: 'scan_314159.pdf',
+      );
+
+      expect(result.author?.value, 'Miguel de Cervantes');
+      expect(result.author?.confidence, greaterThanOrEqualTo(0.8));
+      expect(
+        result.topics.map((topic) => topic.topic),
+        contains(LibraryTopic.literature),
+      );
+    });
   });
 
   test('controller bounds sampling and preserves manual fields', () async {
@@ -194,6 +317,15 @@ void main() {
           .documents,
       hasLength(1),
     );
+
+    final opensBeforeReanalysis = engine.openedDocuments;
+    await controller.reanalyzeAll();
+    final reanalyzed = repository.byId('book')!;
+    expect(engine.openedDocuments, opensBeforeReanalysis + 1);
+    expect(reanalyzed.effectiveTitle, 'Mi título manual');
+    expect(reanalyzed.effectiveAuthor, 'Mi autor manual');
+    expect(reanalyzed.enrichment?.topicsManual, isTrue);
+    expect(reanalyzed.topics.map((topic) => topic.topic), [LibraryTopic.art]);
   });
 }
 
@@ -203,12 +335,14 @@ final class _EnrichmentEngine extends StubPdfDocumentEngine {
   final int pageCount;
   final List<int> extractedPages = [];
   int closedDocuments = 0;
+  int openedDocuments = 0;
 
   @override
   Future<OpenedPdfDocument> openDocument(
     String path, {
     String? password,
   }) async {
+    openedDocuments++;
     return OpenedPdfDocument(
       documentId: 'opened',
       path: path,

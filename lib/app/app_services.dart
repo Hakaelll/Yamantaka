@@ -8,6 +8,7 @@ import '../core/lifecycle/lifecycle_tracker.dart';
 import '../core/logging/app_logger.dart';
 import '../core/memory/memory_governor.dart';
 import '../core/performance/startup_timeline.dart';
+import '../core/performance/local_performance_monitor.dart';
 import '../core/privacy/local_storage_service.dart';
 import '../core/platform/window_service.dart';
 import '../features/annotations/application/annotation_controller.dart';
@@ -86,6 +87,7 @@ final class AppServices {
     required this.memory,
     required this.lifecycle,
     required this.startup,
+    required this.performance,
     required this.storage,
     required void Function() memorySettingsListener,
     required PdfrxDocumentEngine engine,
@@ -124,6 +126,7 @@ final class AppServices {
   final MemoryGovernor memory;
   final LifecycleTracker lifecycle;
   final StartupTimeline startup;
+  final LocalPerformanceMonitor performance;
   final LocalStorageService storage;
   final PdfrxDocumentEngine _engine;
   final void Function() _memorySettingsListener;
@@ -172,6 +175,7 @@ final class AppServices {
       limitBytes: settings.settings.maxCacheMegabytes * 1024 * 1024,
       minimumVisibleBytes: 32 * 1024 * 1024,
     );
+    final performance = LocalPerformanceMonitor()..startFrameMonitoring();
     void syncMemoryLimit() {
       memory.setLimit(settings.settings.maxCacheMegabytes * 1024 * 1024);
     }
@@ -181,6 +185,8 @@ final class AppServices {
       logger,
       lifecycle: lifecycle,
       memory: memory,
+      jobs: jobs,
+      performance: performance,
     );
     final thumbnails = ThumbnailService(
       engine: engine,
@@ -266,7 +272,7 @@ final class AppServices {
       final readerActive =
           reader.status == ReaderStatus.loading ||
           reader.status == ReaderStatus.ready;
-      enrichment.pause(readerActive);
+      enrichment.setReaderPaused(readerActive);
       if (reader.status == ReaderStatus.idle &&
           !enrichment.progress.isRunning) {
         unawaited(enrichment.analyzePending().whenComplete(library.reload));
@@ -308,6 +314,7 @@ final class AppServices {
       memory: memory,
       lifecycle: lifecycle,
       startup: startup,
+      performance: performance,
     );
     final readingProfiles = ReadingProfilesController(reader);
     final backups = LocalBackupService(
@@ -372,6 +379,7 @@ final class AppServices {
       memory: memory,
       lifecycle: lifecycle,
       startup: startup,
+      performance: performance,
       storage: storage,
       memorySettingsListener: syncMemoryLimit,
       engine: engine,
@@ -440,6 +448,7 @@ final class AppServices {
     settings.dispose();
     await jobs.dispose();
     await _engine.dispose();
+    performance.stopFrameMonitoring();
     lifecycle.dispose();
     database.markCleanShutdown();
     database.close();

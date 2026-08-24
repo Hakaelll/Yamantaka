@@ -46,8 +46,8 @@ Uint8List createTestPdf({bool includeThirdPage = false}) {
 }
 
 Uint8List createPdfWithPageCount(int pageCount) {
-  if (pageCount < 1 || pageCount > 1000) {
-    throw RangeError.range(pageCount, 1, 1000, 'pageCount');
+  if (pageCount < 1 || pageCount > 5000) {
+    throw RangeError.range(pageCount, 1, 5000, 'pageCount');
   }
   final pageObjects = [
     for (var index = 0; index < pageCount; index++) 4 + index * 2,
@@ -73,26 +73,24 @@ Uint8List createPdfWithPageCount(int pageCount) {
         ),
       );
   }
-  final buffer = StringBuffer('%PDF-1.4\n');
+  final bytes = BytesBuilder(copy: false)..add(utf8.encode('%PDF-1.4\n'));
   final offsets = <int>[0];
   for (var index = 0; index < objects.length; index++) {
-    offsets.add(utf8.encode(buffer.toString()).length);
-    buffer
-      ..write('${index + 1} 0 obj\n')
-      ..write(objects[index])
-      ..write('\nendobj\n');
+    offsets.add(bytes.length);
+    bytes.add(utf8.encode('${index + 1} 0 obj\n${objects[index]}\nendobj\n'));
   }
-  final xrefOffset = utf8.encode(buffer.toString()).length;
-  buffer
+  final xrefOffset = bytes.length;
+  final trailer = StringBuffer()
     ..write('xref\n0 ${objects.length + 1}\n')
     ..write('0000000000 65535 f \n');
   for (final offset in offsets.skip(1)) {
-    buffer.write('${offset.toString().padLeft(10, '0')} 00000 n \n');
+    trailer.write('${offset.toString().padLeft(10, '0')} 00000 n \n');
   }
-  buffer
+  trailer
     ..write('trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n')
     ..write('startxref\n$xrefOffset\n%%EOF\n');
-  return Uint8List.fromList(utf8.encode(buffer.toString()));
+  bytes.add(utf8.encode(trailer.toString()));
+  return bytes.takeBytes();
 }
 
 Uint8List createHeavyVectorPdf({int pageCount = 8, int shapesPerPage = 1200}) {

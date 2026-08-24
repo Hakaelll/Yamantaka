@@ -35,6 +35,7 @@ final class ArtifactLibraryView extends StatefulWidget {
     this.onChangeCover,
     this.onRevealDocument,
     this.onRemoveDocument,
+    this.onReanalyzeDocument,
     this.onDocumentVisible,
   });
 
@@ -53,6 +54,7 @@ final class ArtifactLibraryView extends StatefulWidget {
   final Future<void> Function(LibraryDocument document)? onChangeCover;
   final Future<void> Function(LibraryDocument document)? onRevealDocument;
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
+  final Future<void> Function(LibraryDocument document)? onReanalyzeDocument;
   final ValueChanged<LibraryDocument>? onDocumentVisible;
 
   @override
@@ -703,6 +705,11 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
             value: _ArtifactMenuAction.cover,
             child: Text('Cambiar portada'),
           ),
+        if (!document.isMissing && widget.onReanalyzeDocument != null)
+          const PopupMenuItem(
+            value: _ArtifactMenuAction.reanalyze,
+            child: Text('Volver a analizar metadatos y temas'),
+          ),
         const PopupMenuItem(
           value: _ArtifactMenuAction.info,
           child: Text('Mostrar información'),
@@ -727,6 +734,8 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         await widget.onToggleFavorite?.call(document);
       case _ArtifactMenuAction.cover:
         await widget.onChangeCover?.call(document);
+      case _ArtifactMenuAction.reanalyze:
+        await widget.onReanalyzeDocument?.call(document);
       case _ArtifactMenuAction.info:
         await widget.onDocumentInfo?.call(document);
       case _ArtifactMenuAction.reveal:
@@ -1934,7 +1943,15 @@ final class _NoArtifactResults extends StatelessWidget {
   }
 }
 
-enum _ArtifactMenuAction { open, favorite, cover, info, reveal, remove }
+enum _ArtifactMenuAction {
+  open,
+  favorite,
+  cover,
+  reanalyze,
+  info,
+  reveal,
+  remove,
+}
 
 @visibleForTesting
 String? artifactCoverPathFor(

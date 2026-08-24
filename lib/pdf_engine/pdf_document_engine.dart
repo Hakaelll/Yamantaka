@@ -16,7 +16,13 @@ abstract interface class PdfDocumentEngine {
     int rotation = 0,
     PdfRenderRegion? region,
     PdfOperationToken? cancellationToken,
+    double devicePixelRatio = 1,
+    int? generation,
+    PdfRenderPriority priority = PdfRenderPriority.visible,
   });
+
+  /// Starts a new visible render generation and cancels obsolete work.
+  void beginRenderGeneration(String documentId, int generation);
 
   Future<String> extractPageText({
     required String documentId,

@@ -27,6 +27,7 @@ final class DiagnosticsRedactor {
     'memory',
     'lifecycle',
     'startup',
+    'performance',
   };
 
   static const excludedFields = <String>{

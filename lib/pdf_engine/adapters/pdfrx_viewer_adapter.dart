@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart' as pdfrx;
@@ -72,6 +73,9 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   late final pdfrx.PdfDocumentRefDirect _documentRef;
   Size? _viewportSize;
   bool _recenterScheduled = false;
+  bool _firstPageReported = false;
+  final Stopwatch _firstPageStopwatch = Stopwatch()..start();
+  Timer? _interactionIdleTimer;
   final Object _attachmentOwner = Object();
 
   Duration get _motionDuration => widget.configuration.reduceMotion
@@ -91,6 +95,8 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
 
   @override
   void dispose() {
+    _interactionIdleTimer?.cancel();
+    widget.configuration.onInteractionChanged?.call(false);
     _controller.removeListener(_onTransformChanged);
     widget.bridgeController.detach(owner: _attachmentOwner);
     super.dispose();
@@ -155,18 +161,47 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
           PdfViewFlow.single => _singlePageLayout,
           PdfViewFlow.facing => _facingPageLayout,
         },
-        maxImageBytesCachedOnMemory: 112 * 1024 * 1024,
+        maxImageBytesCachedOnMemory: widget.engine.viewerCacheBudgetBytes,
+        getPageRenderingScale: _safeRenderingScale,
+        onePassRenderingSizeThreshold: AppConfig.maxPdfiumDimension.toDouble(),
+        onRenderEvent: _onRenderEvent,
+        onInteractionStart: (_) {
+          _interactionIdleTimer?.cancel();
+          widget.configuration.onInteractionChanged?.call(true);
+        },
+        onInteractionEnd: (_) {
+          _interactionIdleTimer?.cancel();
+          _interactionIdleTimer = Timer(const Duration(milliseconds: 350), () {
+            widget.configuration.onInteractionChanged?.call(false);
+          });
+        },
+        behaviorControlParams: pdfrx.PdfViewerBehaviorControlParams(
+          trailingPageLoadingDelay: const Duration(milliseconds: 160),
+          enableLowResolutionPagePreview: true,
+          pageImageCachingDelay: AppConfig.settledRenderDelay,
+          partialImageLoadingDelay: AppConfig.settledRenderDelay,
+          progressiveFadeDuration: widget.configuration.reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 90),
+        ),
         horizontalCacheExtent:
             widget.configuration.flow == PdfViewFlow.continuous ? 0.5 : 1.1,
-        verticalCacheExtent: widget.configuration.flow == PdfViewFlow.continuous
-            ? 1.25
+        verticalCacheExtent: widget.engine.underMemoryPressure
+            ? 0.2
+            : widget.configuration.flow == PdfViewFlow.continuous
+            ? 0.9
             : 0.5,
+        enableVerticalPageVirtualization:
+            widget.configuration.flow == PdfViewFlow.continuous,
+        pageVirtualizationRadius:
+            widget.configuration.flow == PdfViewFlow.continuous ? 0 : 6,
         enableKeyboardNavigation: false,
         // A small range below native fit-page leaves room for the persistent
         // chrome-safe margin. The custom normalizer still constrains the
         // active page/spread, so adjacent horizontal slots cannot take focus.
         sizeDelegateProvider: const pdfrx.PdfViewerSizeDelegateProviderSmart(
           maxPagesVisible: 1.25,
+          onePassRenderingScaleThreshold: AppConfig.previewRenderDpi / 72,
         ),
         linkHandlerParams: pdfrx.PdfLinkHandlerParams(
           enableAutoLinkDetection: false,
@@ -240,11 +275,9 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
           unawaited(_restoreInitialView(controller));
         },
         loadingBannerBuilder: (context, bytesDownloaded, totalBytes) =>
-            const Center(
-              child: SizedBox.square(
-                dimension: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
+            Semantics(
+              label: 'Preparando páginas',
+              child: ColoredBox(color: widget.configuration.backgroundColor),
             ),
         errorBannerBuilder: (context, error, stackTrace, documentRef) {
           WidgetsBinding.instance.addPostFrameCallback(
@@ -261,6 +294,36 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     );
     final turns = (widget.configuration.rotation ~/ 90) % 4;
     return turns == 0 ? viewer : RotatedBox(quarterTurns: turns, child: viewer);
+  }
+
+  double _safeRenderingScale(
+    BuildContext context,
+    pdfrx.PdfPage page,
+    pdfrx.PdfViewerController controller,
+    double estimatedScale,
+  ) {
+    final dimensionScale = math.min(
+      AppConfig.maxPdfiumDimension / math.max(1, page.width),
+      AppConfig.maxPdfiumDimension / math.max(1, page.height),
+    );
+    final byteScale = math.sqrt(
+      AppConfig.maxSingleRenderBytes /
+          (math.max(1, page.width) * math.max(1, page.height) * 4),
+    );
+    return estimatedScale
+        .clamp(0.01, math.max(0.01, math.min(dimensionScale, byteScale)))
+        .toDouble();
+  }
+
+  void _onRenderEvent(pdfrx.PdfViewerRenderEvent event) {
+    widget.engine.recordViewerRenderEvent(event);
+    if (!_firstPageReported &&
+        (event.type == pdfrx.PdfViewerRenderEventType.previewCompleted ||
+            event.type == pdfrx.PdfViewerRenderEventType.refinementCompleted)) {
+      _firstPageReported = true;
+      _firstPageStopwatch.stop();
+      widget.engine.recordFirstPageVisible(_firstPageStopwatch.elapsed);
+    }
   }
 
   void _handleViewportSize(Size nextSize) {

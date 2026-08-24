@@ -18,12 +18,14 @@ final class PrefetchPlan {
     required this.direction,
     required this.generation,
     required this.paused,
+    required this.velocityPagesPerSecond,
   });
 
   final List<int> pages;
   final int direction;
   final int generation;
   final bool paused;
+  final double velocityPagesPerSecond;
 }
 
 /// Chooses only the next reading unit. Prefetch has no user-visible progress
@@ -48,6 +50,7 @@ abstract final class PrefetchPlanner {
         direction: 0,
         generation: generation,
         paused: true,
+        velocityPagesPerSecond: 0,
       );
     }
     final direction = _direction(samples);
@@ -57,11 +60,18 @@ abstract final class PrefetchPlanner {
         direction: 0,
         generation: generation,
         paused: false,
+        velocityPagesPerSecond: 0,
       );
     }
+    final velocity = _velocityPagesPerSecond(samples);
     final units = mode == ReaderMode.book ? 2 : 1;
+    final lookahead = velocity >= 8
+        ? 3
+        : velocity >= 3
+        ? 2
+        : 1;
     final pages = <int>[];
-    for (var step = 1; step <= units; step++) {
+    for (var step = 1; step <= units * lookahead; step++) {
       final target = currentPage + direction * step;
       if (target < 0 || target >= pageCount) continue;
       if (!pages.contains(target)) pages.add(target);
@@ -71,6 +81,7 @@ abstract final class PrefetchPlanner {
       direction: direction,
       generation: generation,
       paused: false,
+      velocityPagesPerSecond: velocity,
     );
   }
 
@@ -83,5 +94,19 @@ abstract final class PrefetchPlanner {
     final offsetDelta = current.offset - previous.offset;
     if (offsetDelta.abs() < 1) return 0;
     return offsetDelta.sign.toInt();
+  }
+
+  static double _velocityPagesPerSecond(List<ScrollSample> samples) {
+    if (samples.length < 2) return 0;
+    final first = samples.first;
+    final last = samples.last;
+    final elapsedMicros = last.at.difference(first.at).inMicroseconds;
+    if (elapsedMicros <= 0) return 0;
+    final elapsedSeconds = elapsedMicros / Duration.microsecondsPerSecond;
+    final pageDistance = (last.pageIndex - first.pageIndex).abs().toDouble();
+    if (pageDistance > 0) return pageDistance / elapsedSeconds;
+    // A typical viewport is used only as a stable normalization unit. Actual
+    // rendering remains bounded by the cache ring and memory pressure.
+    return (last.offset - first.offset).abs() / 800 / elapsedSeconds;
   }
 }

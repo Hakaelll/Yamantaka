@@ -124,6 +124,7 @@ final class JobHandle<T> {
   final JobDescriptor descriptor;
   final _JobConsumer _consumer;
   final Future<T> future;
+  Future<void> get settled => _consumer.shared.settled.future;
 
   bool get isCancelled => _consumer.cancelled;
 
@@ -189,8 +190,15 @@ final class JobCoordinator {
       );
       _jobs[mapKey] = shared;
       _queue.add(shared);
+    } else if (!shared.started &&
+        priority.weight > shared.descriptor.priority.weight) {
+      shared.descriptor = JobDescriptor(
+        category: category,
+        priority: priority,
+        generation: generation,
+      );
     }
-    final consumer = _JobConsumer(shared);
+    final consumer = _JobConsumer(shared, _pump);
     shared.consumers.add(consumer);
     _pump();
     return JobHandle<T>._(shared.descriptor, consumer);
@@ -242,10 +250,12 @@ final class JobCoordinator {
         consumer.completeError(const JobCancelled());
       }
     }
+    for (final job in jobs.where((item) => !item.started)) {
+      if (!job.settled.isCompleted) job.settled.complete();
+    }
     _jobs.clear();
     _queue.clear();
-    // Running jobs are intentionally not awaited: their task owns its native
-    // cancellation token and will finish independently.
+    await Future.wait(jobs.map((job) => job.settled.future));
   }
 
   void _pump() {
@@ -275,6 +285,7 @@ final class JobCoordinator {
         } on Object {
           // Cleanup is isolated from scheduler accounting.
         }
+        if (!job.settled.isCompleted) job.settled.complete();
       }
     }
   }
@@ -367,6 +378,7 @@ final class JobCoordinator {
         // Cleanup is isolated from scheduler accounting.
       }
       jobLease?.release();
+      if (!job.settled.isCompleted) job.settled.complete();
       _pump();
     }
   }
@@ -384,11 +396,12 @@ final class _SharedJob {
   });
 
   final String mapKey;
-  final JobDescriptor descriptor;
+  JobDescriptor descriptor;
   final Future<Object?> Function(JobCancellationToken token) task;
   final void Function()? onCleanup;
   final JobCancellationToken token = JobCancellationToken();
   final Set<_JobConsumer> consumers = <_JobConsumer>{};
+  final Completer<void> settled = Completer<void>();
   bool started = false;
 
   void cancelUnderlying() {
@@ -400,9 +413,10 @@ final class _SharedJob {
 }
 
 final class _JobConsumer {
-  _JobConsumer(this.shared);
+  _JobConsumer(this.shared, this._onCancelled);
 
   final _SharedJob shared;
+  final void Function() _onCancelled;
   final Completer<Object?> completer = Completer<Object?>();
   bool cancelled = false;
 
@@ -412,6 +426,7 @@ final class _JobConsumer {
     shared.consumers.remove(this);
     completeError(const JobCancelled());
     if (shared.consumers.isEmpty) shared.cancelUnderlying();
+    _onCancelled();
   }
 
   void complete(Object? value) {

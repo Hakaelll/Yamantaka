@@ -143,6 +143,35 @@ void main() {
     },
   );
 
+  test('obsolete render generations are rejected before PDFium work', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'yamantaka-stale-render-',
+    );
+    await pdfrxInitialize(tmpPath: directory.path);
+    final file = File('${directory.path}${Platform.pathSeparator}fixture.pdf');
+    await file.writeAsBytes(createTestPdf());
+    final engine = PdfrxDocumentEngine(AppLogger(minimumLevel: LogLevel.error));
+    addTearDown(() async {
+      await engine.dispose();
+      await directory.delete(recursive: true);
+    });
+    final document = await engine.openDocument(file.path);
+    engine.beginRenderGeneration(document.documentId, 4);
+
+    await expectLater(
+      engine.renderPage(
+        documentId: document.documentId,
+        pageIndex: 0,
+        scale: 1,
+        generation: 3,
+      ),
+      throwsA(_failure(FailureKind.cancelled)),
+    );
+    expect(engine.diagnostics.staleResultsDiscarded, 1);
+    expect(engine.diagnostics.pendingRenders, 0);
+    await engine.closeDocument(document.documentId);
+  });
+
   test('PDFium requires, rejects and accepts a real PDF password', () async {
     final directory = await Directory.systemTemp.createTemp(
       'yamantaka-encrypted-pdf-',

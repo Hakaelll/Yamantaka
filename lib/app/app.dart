@@ -376,6 +376,10 @@ final class _YamantakaAppState extends State<YamantakaApp>
     ),
     onDocumentInfo: _showCurrentDocumentInfo,
     onExportAnnotations: _exportAnnotations,
+    onViewportInteractionChanged: (isActive) {
+      widget.services.libraryIndex.setInteractionPaused(isActive);
+      widget.services.enrichment.setInteractionPaused(isActive);
+    },
   );
 
   Future<void> _pickAndOpen() async {

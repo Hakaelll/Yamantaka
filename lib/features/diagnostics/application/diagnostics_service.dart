@@ -6,6 +6,7 @@ import '../../../core/async/job_coordinator.dart';
 import '../../../core/lifecycle/lifecycle_tracker.dart';
 import '../../../core/memory/memory_governor.dart';
 import '../../../core/performance/startup_timeline.dart';
+import '../../../core/performance/local_performance_monitor.dart';
 import '../../../core/privacy/diagnostics_redactor.dart';
 import '../../../pdf_engine/adapters/pdfrx_document_engine.dart';
 import '../../../storage/database/app_database.dart';
@@ -39,6 +40,7 @@ final class DiagnosticsService {
     this.memory,
     this.lifecycle,
     this.startup,
+    this.performance,
   });
 
   final AppDatabase database;
@@ -49,11 +51,12 @@ final class DiagnosticsService {
   final MemoryGovernor? memory;
   final LifecycleTracker? lifecycle;
   final StartupTimeline? startup;
+  final LocalPerformanceMonitor? performance;
 
   Future<SafeDiagnosticsReport> collect() async {
     final databaseFile = File(paths.databasePath);
     return SafeDiagnosticsReport({
-      'yamantaka_version': '0.1.0+1',
+      'yamantaka_version': '0.4.0+5',
       'flutter_version': const String.fromEnvironment(
         'FLUTTER_VERSION',
         defaultValue: 'bundled',
@@ -88,6 +91,7 @@ final class DiagnosticsService {
       'memory': memory?.snapshot.toJson() ?? const <String, Object>{},
       'lifecycle': lifecycle?.snapshot.toJson() ?? const <String, int>{},
       'startup': startup?.toJson() ?? const <String, Object>{},
+      'performance': performance?.toJson() ?? const <String, Object>{},
       'contains_paths_titles_or_queries': false,
     });
   }

@@ -33,6 +33,7 @@ migrate_working_dir/
 /build/
 /coverage/
 /.flutter-sdk/
+/LocalLow/
 
 # Symbolication related
 app.*.symbols
