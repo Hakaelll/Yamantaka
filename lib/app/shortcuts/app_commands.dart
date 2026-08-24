@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../core/i18n/app_localizations.dart';
+
 enum AppCommandId {
   openDocument,
   search,
@@ -30,6 +32,13 @@ enum AppCommandId {
   showAnnotations,
   navigationBack,
   navigationForward,
+  savePositionA,
+  savePositionB,
+  goToPositionA,
+  goToPositionB,
+  swapPositions,
+  undoAnnotation,
+  redoAnnotation,
   fitWidth,
   fitPage,
   changeReaderTheme,
@@ -402,6 +411,41 @@ abstract final class AppCommandRegistry {
       shortcutLabel: 'Alt+→',
     ),
     AppCommandDefinition(
+      id: AppCommandId.savePositionA,
+      label: 'Guardar posición temporal A',
+      keywords: ['posición', 'temporal', 'volver'],
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.savePositionB,
+      label: 'Guardar posición temporal B',
+      keywords: ['posición', 'temporal', 'volver'],
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.goToPositionA,
+      label: 'Ir a la posición temporal A',
+      keywords: ['posición', 'temporal', 'volver'],
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.goToPositionB,
+      label: 'Ir a la posición temporal B',
+      keywords: ['posición', 'temporal', 'volver'],
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.swapPositions,
+      label: 'Intercambiar posiciones A y B',
+      keywords: ['posición', 'temporal', 'intercambiar'],
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.undoAnnotation,
+      label: 'Deshacer cambio de anotación',
+      keywords: ['anotación', 'deshacer', 'historial'],
+    ),
+    AppCommandDefinition(
+      id: AppCommandId.redoAnnotation,
+      label: 'Rehacer cambio de anotación',
+      keywords: ['anotación', 'rehacer', 'historial'],
+    ),
+    AppCommandDefinition(
       id: AppCommandId.fitWidth,
       label: 'Ajustar al ancho',
       shortcutLabel: 'Ctrl+2',
@@ -496,37 +540,67 @@ abstract final class AppCommandRegistry {
   static String? assignmentError(
     AppCommandId id,
     String token,
-    Map<AppCommandId, String> current,
-  ) {
-    if (!configurableIds.contains(id)) return 'Esta acción está reservada.';
+    Map<AppCommandId, String> current, {
+    String Function(String key)? localize,
+  }) {
+    String text(String key, String fallback) => localize?.call(key) ?? fallback;
+    if (!configurableIds.contains(id)) {
+      return text('shortcut.actionReserved', 'Esta acción está reservada.');
+    }
     if (reservedShortcutTokens.contains(token)) {
-      return 'Esta combinación está reservada para la navegación.';
+      return text(
+        'shortcut.navigationReserved',
+        'Esta combinación está reservada para la navegación.',
+      );
     }
     if (!shortcutChoices.any((choice) => choice.token == token)) {
-      return 'La combinación no está permitida.';
+      return text('shortcut.notAllowed', 'La combinación no está permitida.');
     }
     for (final entry in current.entries) {
       if (entry.key != id && entry.value == token) {
-        return 'La combinación ya está asignada a otra acción.';
+        return text(
+          'shortcut.alreadyAssigned',
+          'La combinación ya está asignada a otra acción.',
+        );
       }
     }
     return null;
   }
 
-  static String shortcutLabel(AppCommandId id, String encoded) {
+  static String shortcutLabel(
+    AppCommandId id,
+    String encoded, {
+    YamantakaLocalizations? strings,
+  }) {
     final token = resolvedTokens(encoded)[id] ?? defaultTokens[id];
-    return shortcutChoices
-            .where((choice) => choice.token == token)
-            .firstOrNull
-            ?.label ??
-        '';
+    final choice = shortcutChoices
+        .where((choice) => choice.token == token)
+        .firstOrNull;
+    return choice == null ? '' : shortcutChoiceLabel(choice, strings: strings);
   }
 
-  static List<AppCommandDefinition> definitionsFor(String encoded) {
+  static String shortcutChoiceLabel(
+    AppShortcutChoice choice, {
+    YamantakaLocalizations? strings,
+  }) {
+    if (strings == null) return choice.label;
+    return switch (choice.token) {
+      'page-down' => strings.get('shortcut.pageDown'),
+      'page-up' => strings.get('shortcut.pageUp'),
+      _ => choice.label.replaceAll('Mayús', strings.get('shortcut.shift')),
+    };
+  }
+
+  static List<AppCommandDefinition> definitionsFor(
+    String encoded, {
+    YamantakaLocalizations? strings,
+  }) {
     return definitions
         .map(
           (definition) => configurableIds.contains(definition.id)
-              ? definition.withShortcut(shortcutLabel(definition.id, encoded))
+              ? definition.withShortcut(
+                  shortcutLabel(definition.id, encoded, strings: strings),
+                )
               : definition,
         )
         .toList(growable: false);

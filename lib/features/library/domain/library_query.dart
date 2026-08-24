@@ -1,5 +1,8 @@
 import 'library_document.dart';
 import 'document_enrichment.dart';
+import '../../organization/domain/organization_models.dart';
+
+const Object _keepLibraryQueryValue = Object();
 
 final class LibraryQuery {
   const LibraryQuery({
@@ -12,6 +15,8 @@ final class LibraryQuery {
     this.readingState = LibraryQueryReadingState.all,
     this.authors = const {},
     this.topics = const {},
+    this.collectionId,
+    this.smartCollection,
   });
 
   final int offset;
@@ -23,6 +28,8 @@ final class LibraryQuery {
   final LibraryQueryReadingState readingState;
   final Set<String> authors;
   final Set<LibraryTopic> topics;
+  final String? collectionId;
+  final SmartCollection? smartCollection;
 
   LibraryQuery copyWith({
     int? offset,
@@ -34,6 +41,8 @@ final class LibraryQuery {
     LibraryQueryReadingState? readingState,
     Set<String>? authors,
     Set<LibraryTopic>? topics,
+    Object? collectionId = _keepLibraryQueryValue,
+    Object? smartCollection = _keepLibraryQueryValue,
   }) => LibraryQuery(
     offset: offset ?? this.offset,
     limit: limit ?? this.limit,
@@ -44,6 +53,12 @@ final class LibraryQuery {
     readingState: readingState ?? this.readingState,
     authors: authors ?? this.authors,
     topics: topics ?? this.topics,
+    collectionId: identical(collectionId, _keepLibraryQueryValue)
+        ? this.collectionId
+        : collectionId as String?,
+    smartCollection: identical(smartCollection, _keepLibraryQueryValue)
+        ? this.smartCollection
+        : smartCollection as SmartCollection?,
   );
 
   LibraryQuery normalized() => LibraryQuery(
@@ -59,6 +74,10 @@ final class LibraryQuery {
         if (author.trim().isNotEmpty) author.trim().toLowerCase(),
     },
     topics: Set<LibraryTopic>.unmodifiable(topics),
+    collectionId: collectionId?.trim().isEmpty == true
+        ? null
+        : collectionId?.trim(),
+    smartCollection: smartCollection,
   );
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/shortcuts/app_commands.dart';
 import '../../../app/ui/yama_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
 import 'reader_side_panel.dart';
@@ -63,6 +64,16 @@ final class ReaderTopBar extends StatelessWidget
 
   @override
   Widget build(BuildContext context) {
+    final history = controller.navigationHistory;
+    if (history == null) return _buildBar(context);
+    return ListenableBuilder(
+      listenable: history,
+      builder: (context, _) => _buildBar(context),
+    );
+  }
+
+  Widget _buildBar(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     final preferences = controller.preferences;
     final document = controller.document;
     if (preferences == null || document == null) {
@@ -91,12 +102,12 @@ final class ReaderTopBar extends StatelessWidget
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: YamaToolbarGroup(
-                    label: 'Documento actual',
+                    label: strings.get('reader.currentDocument'),
                     flat: flatChrome,
                     children: [
                       YamaIconButton(
-                        semanticLabel: 'Volver a la biblioteca',
-                        tooltip: 'Volver a la biblioteca',
+                        semanticLabel: strings.get('reader.backToLibrary'),
+                        tooltip: strings.get('reader.backToLibrary'),
                         icon: Icons.arrow_back_rounded,
                         onPressed: onBack,
                       ),
@@ -125,16 +136,20 @@ final class ReaderTopBar extends StatelessWidget
                       ),
                       if (!compact && controller.navigationHistory != null) ...[
                         YamaIconButton(
-                          semanticLabel: 'Volver a la ubicación anterior',
-                          tooltip: 'Volver a la ubicación anterior (Alt+←)',
+                          semanticLabel: strings.get('command.navigationBack'),
+                          tooltip:
+                              '${strings.get('command.navigationBack')} (Alt+←)',
                           icon: Icons.undo_rounded,
                           onPressed: controller.navigationHistory!.canGoBack
                               ? controller.historyBack
                               : null,
                         ),
                         YamaIconButton(
-                          semanticLabel: 'Avanzar en el historial',
-                          tooltip: 'Avanzar en el historial (Alt+→)',
+                          semanticLabel: strings.get(
+                            'command.navigationForward',
+                          ),
+                          tooltip:
+                              '${strings.get('command.navigationForward')} (Alt+→)',
                           icon: Icons.redo_rounded,
                           onPressed: controller.navigationHistory!.canGoForward
                               ? controller.historyForward
@@ -149,22 +164,22 @@ final class ReaderTopBar extends StatelessWidget
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: YamaToolbarGroup(
-                    label: 'Herramientas del lector',
+                    label: strings.get('reader.tools'),
                     flat: flatChrome,
                     children: [
                       YamaIconButton(
-                        semanticLabel: 'Buscar en el documento',
+                        semanticLabel: strings.get('command.search'),
                         tooltip:
-                            'Buscar (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides)})',
+                            '${strings.get('command.search')} (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides, strings: strings)})',
                         icon: Icons.search_rounded,
                         onPressed: onSearch,
                         selected: activePanel == ReaderPanelSection.search,
                       ),
                       if (expanded && showPanelControls)
                         YamaIconButton(
-                          semanticLabel: 'Abrir miniaturas',
+                          semanticLabel: strings.get('reader.openThumbnails'),
                           tooltip:
-                              'Miniaturas (${AppCommandRegistry.shortcutLabel(AppCommandId.togglePanel, shortcutOverrides)})',
+                              '${strings.get('reader.thumbnails')} (${AppCommandRegistry.shortcutLabel(AppCommandId.togglePanel, shortcutOverrides, strings: strings)})',
                           icon: Icons.grid_view_outlined,
                           selected:
                               activePanel == ReaderPanelSection.thumbnails,
@@ -172,17 +187,18 @@ final class ReaderTopBar extends StatelessWidget
                         ),
                       if (showPanelControls)
                         PopupMenuButton<_ReaderToolsAction>(
-                          tooltip: 'Herramientas',
+                          tooltip: strings.get('reader.tools'),
                           onSelected: _runToolsAction,
                           itemBuilder: (context) => [
                             PopupMenuItem(
                               value: _ReaderToolsAction.thumbnails,
                               child: _ReaderMenuItem(
                                 icon: Icons.grid_view_outlined,
-                                label: 'Miniaturas',
+                                label: strings.get('reader.thumbnails'),
                                 shortcut: AppCommandRegistry.shortcutLabel(
                                   AppCommandId.togglePanel,
                                   shortcutOverrides,
+                                  strings: strings,
                                 ),
                                 selected:
                                     activePanel ==
@@ -193,7 +209,7 @@ final class ReaderTopBar extends StatelessWidget
                               value: _ReaderToolsAction.outline,
                               child: _ReaderMenuItem(
                                 icon: Icons.format_list_bulleted_rounded,
-                                label: 'Índice',
+                                label: strings.get('reader.outline'),
                                 selected:
                                     activePanel == ReaderPanelSection.outline,
                               ),
@@ -202,7 +218,7 @@ final class ReaderTopBar extends StatelessWidget
                               value: _ReaderToolsAction.bookmarks,
                               child: _ReaderMenuItem(
                                 icon: Icons.bookmarks_outlined,
-                                label: 'Marcadores',
+                                label: strings.get('reader.bookmarks'),
                                 selected:
                                     activePanel == ReaderPanelSection.bookmarks,
                               ),
@@ -211,7 +227,7 @@ final class ReaderTopBar extends StatelessWidget
                               value: _ReaderToolsAction.annotations,
                               child: _ReaderMenuItem(
                                 icon: Icons.rate_review_outlined,
-                                label: 'Anotaciones',
+                                label: strings.get('reader.annotations'),
                                 selected:
                                     activePanel ==
                                     ReaderPanelSection.annotations,
@@ -227,14 +243,14 @@ final class ReaderTopBar extends StatelessWidget
                         ),
                       if (!compact && expanded)
                         YamaIconButton(
-                          semanticLabel: 'Abrir paleta de comandos',
+                          semanticLabel: strings.get('command.commandPalette'),
                           tooltip:
-                              'Paleta de comandos (${AppCommandRegistry.shortcutLabel(AppCommandId.commandPalette, shortcutOverrides)})',
+                              '${strings.get('command.commandPalette')} (${AppCommandRegistry.shortcutLabel(AppCommandId.commandPalette, shortcutOverrides, strings: strings)})',
                           icon: Icons.keyboard_command_key_rounded,
                           onPressed: onCommandPalette,
                         ),
                       PopupMenuButton<_ReaderMenuAction>(
-                        tooltip: 'Más opciones',
+                        tooltip: strings.get('reader.moreOptions'),
                         onSelected: _runAction,
                         constraints: const BoxConstraints(
                           minWidth: 252,
@@ -246,10 +262,11 @@ final class ReaderTopBar extends StatelessWidget
                             height: 40,
                             child: _ReaderMenuItem(
                               icon: Icons.file_open_outlined,
-                              label: 'Abrir otro PDF…',
+                              label: strings.get('reader.openAnotherPdf'),
                               shortcut: AppCommandRegistry.shortcutLabel(
                                 AppCommandId.openDocument,
                                 shortcutOverrides,
+                                strings: strings,
                               ),
                             ),
                           ),
@@ -261,28 +278,28 @@ final class ReaderTopBar extends StatelessWidget
                               checked:
                                   preferences.coverPolicy ==
                                   ReaderCoverPolicy.firstPageIsCover,
-                              child: const Text('Portada sola'),
+                              child: Text(strings.get('reader.coverAlone')),
                             ),
                             CheckedPopupMenuItem(
                               value: _ReaderMenuAction.firstPageRight,
                               checked:
                                   preferences.initialSide ==
                                   ReaderInitialSide.right,
-                              child: const Text('Primera página a la derecha'),
+                              child: Text(strings.get('reader.firstPageRight')),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: _ReaderMenuAction.resetPairing,
-                              child: Text('Restablecer emparejado'),
+                              child: Text(strings.get('reader.resetPairing')),
                             ),
                             const PopupMenuDivider(height: 9),
                           ],
                           if (compact) ...[
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: _ReaderMenuAction.commandPalette,
                               height: 40,
                               child: _ReaderMenuItem(
                                 icon: Icons.keyboard_command_key_rounded,
-                                label: 'Paleta de comandos',
+                                label: strings.get('command.commandPalette'),
                               ),
                             ),
                             const PopupMenuDivider(height: 9),
@@ -293,7 +310,7 @@ final class ReaderTopBar extends StatelessWidget
                               height: 40,
                               child: _ReaderMenuItem(
                                 icon: Icons.grid_view_outlined,
-                                label: 'Miniaturas',
+                                label: strings.get('reader.thumbnails'),
                                 selected:
                                     activePanel ==
                                     ReaderPanelSection.thumbnails,
@@ -304,7 +321,7 @@ final class ReaderTopBar extends StatelessWidget
                               height: 40,
                               child: _ReaderMenuItem(
                                 icon: Icons.format_list_bulleted_rounded,
-                                label: 'Índice',
+                                label: strings.get('reader.outline'),
                                 selected:
                                     activePanel == ReaderPanelSection.outline,
                               ),
@@ -314,7 +331,7 @@ final class ReaderTopBar extends StatelessWidget
                               height: 40,
                               child: _ReaderMenuItem(
                                 icon: Icons.bookmarks_outlined,
-                                label: 'Marcadores',
+                                label: strings.get('reader.bookmarks'),
                                 selected:
                                     activePanel == ReaderPanelSection.bookmarks,
                               ),
@@ -324,7 +341,7 @@ final class ReaderTopBar extends StatelessWidget
                               height: 40,
                               child: _ReaderMenuItem(
                                 icon: Icons.rate_review_outlined,
-                                label: 'Anotaciones',
+                                label: strings.get('reader.annotations'),
                                 selected:
                                     activePanel ==
                                     ReaderPanelSection.annotations,
@@ -332,20 +349,20 @@ final class ReaderTopBar extends StatelessWidget
                             ),
                             const PopupMenuDivider(height: 9),
                           ],
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _ReaderMenuAction.rotate,
                             height: 40,
                             child: _ReaderMenuItem(
                               icon: Icons.rotate_right_rounded,
-                              label: 'Girar página',
+                              label: strings.get('reader.rotatePage'),
                             ),
                           ),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _ReaderMenuAction.margins,
                             height: 40,
                             child: _ReaderMenuItem(
                               icon: Icons.width_normal_rounded,
-                              label: 'Márgenes de lectura',
+                              label: strings.get('reader.readingMargins'),
                             ),
                           ),
                           PopupMenuItem(
@@ -356,11 +373,12 @@ final class ReaderTopBar extends StatelessWidget
                                   ? Icons.fullscreen_exit_rounded
                                   : Icons.fullscreen_rounded,
                               label: controller.isFullScreen
-                                  ? 'Salir de pantalla completa'
-                                  : 'Pantalla completa',
+                                  ? strings.get('reader.exitFullScreen')
+                                  : strings.get('command.fullScreen'),
                               shortcut: AppCommandRegistry.shortcutLabel(
                                 AppCommandId.fullScreen,
                                 shortcutOverrides,
+                                strings: strings,
                               ),
                             ),
                           ),
@@ -369,10 +387,11 @@ final class ReaderTopBar extends StatelessWidget
                             height: 40,
                             child: _ReaderMenuItem(
                               icon: Icons.visibility_off_outlined,
-                              label: 'Ocultar interfaz',
+                              label: strings.get('reader.hideInterface'),
                               shortcut: AppCommandRegistry.shortcutLabel(
                                 AppCommandId.toggleChrome,
                                 shortcutOverrides,
+                                strings: strings,
                               ),
                             ),
                           ),
@@ -381,28 +400,29 @@ final class ReaderTopBar extends StatelessWidget
                             height: 40,
                             child: _ReaderMenuItem(
                               icon: Icons.center_focus_strong_rounded,
-                              label: 'Lectura inmersiva',
+                              label: strings.get('reader.immersiveReading'),
                               shortcut: AppCommandRegistry.shortcutLabel(
                                 AppCommandId.toggleImmersive,
                                 shortcutOverrides,
+                                strings: strings,
                               ),
                             ),
                           ),
                           const PopupMenuDivider(height: 9),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _ReaderMenuAction.documentInfo,
                             height: 40,
                             child: _ReaderMenuItem(
                               icon: Icons.info_outline_rounded,
-                              label: 'Información del documento',
+                              label: strings.get('command.documentInfo'),
                             ),
                           ),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _ReaderMenuAction.settings,
                             height: 40,
                             child: _ReaderMenuItem(
                               icon: Icons.settings_outlined,
-                              label: 'Ajustes',
+                              label: strings.settingsTitle,
                             ),
                           ),
                         ],

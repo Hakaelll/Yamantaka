@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../app/shortcuts/app_commands.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../../library/domain/library_document.dart';
 
 final class CommandPalette extends StatefulWidget {
@@ -39,7 +40,8 @@ final class _CommandPaletteState extends State<CommandPalette> {
 
   @override
   Widget build(BuildContext context) {
-    final entries = _filteredEntries();
+    final strings = YamantakaLocalizations.of(context);
+    final entries = _filteredEntries(strings);
     final selectedIndex = entries.isEmpty
         ? 0
         : _selectedIndex.clamp(0, entries.length - 1);
@@ -73,9 +75,9 @@ final class _CommandPaletteState extends State<CommandPalette> {
                       child: TextField(
                         key: const Key('command-palette-search'),
                         autofocus: true,
-                        decoration: const InputDecoration(
-                          hintText: 'Buscar una acción',
-                          prefixIcon: Icon(Icons.search_rounded),
+                        decoration: InputDecoration(
+                          hintText: strings.commandSearch,
+                          prefixIcon: const Icon(Icons.search_rounded),
                         ),
                         onChanged: (value) => setState(() {
                           _query = value;
@@ -99,14 +101,14 @@ final class _CommandPaletteState extends State<CommandPalette> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'ACCIONES Y DOCUMENTOS RECIENTES',
+                    strings.commandSection,
                     style: Theme.of(context).textTheme.labelSmall,
                   ),
                 ),
               ),
               Flexible(
                 child: entries.isEmpty
-                    ? const _EmptyPalette()
+                    ? _EmptyPalette(message: strings.commandEmpty)
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.only(
@@ -208,15 +210,15 @@ final class _CommandPaletteState extends State<CommandPalette> {
                     top: BorderSide(color: context.appColors.borderSubtle),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    AppShortcutHint('↑↓'),
-                    SizedBox(width: AppSpacing.space6),
-                    Text('Mover'),
-                    SizedBox(width: AppSpacing.space16),
-                    AppShortcutHint('Enter'),
-                    SizedBox(width: AppSpacing.space6),
-                    Text('Ejecutar'),
+                    const AppShortcutHint('↑↓'),
+                    const SizedBox(width: AppSpacing.space6),
+                    Text(strings.commandMove),
+                    const SizedBox(width: AppSpacing.space16),
+                    const AppShortcutHint('Enter'),
+                    const SizedBox(width: AppSpacing.space6),
+                    Text(strings.commandRun),
                   ],
                 ),
               ),
@@ -227,21 +229,23 @@ final class _CommandPaletteState extends State<CommandPalette> {
     );
   }
 
-  List<_PaletteEntry> _filteredEntries() {
+  List<_PaletteEntry> _filteredEntries(YamantakaLocalizations strings) {
     final normalized = _query.trim().toLowerCase();
     final entries = <_PaletteEntry>[];
     for (final definition in AppCommandRegistry.definitionsFor(
       widget.shortcutOverrides,
+      strings: strings,
     )) {
       if (!widget.actions.containsKey(definition.id)) continue;
+      final localizedLabel = strings.get('command.${definition.id.name}');
       if (normalized.isNotEmpty &&
-          !definition.label.toLowerCase().contains(normalized) &&
+          !localizedLabel.toLowerCase().contains(normalized) &&
           !definition.keywords.any(
             (keyword) => keyword.toLowerCase().contains(normalized),
           )) {
         continue;
       }
-      entries.add(_PaletteEntry.command(definition));
+      entries.add(_PaletteEntry.command(definition, localizedLabel));
     }
     if (widget.onOpenRecent != null) {
       for (final document in widget.recentDocuments) {
@@ -250,7 +254,12 @@ final class _CommandPaletteState extends State<CommandPalette> {
             '$label ${document.effectiveAuthor ?? ''} ${document.fileName} ${document.libraryNote ?? ''}'
                 .toLowerCase();
         if (normalized.isEmpty || searchable.contains(normalized)) {
-          entries.add(_PaletteEntry.document(document));
+          entries.add(
+            _PaletteEntry.document(
+              document,
+              strings.get('command.recentDocument'),
+            ),
+          );
         }
       }
     }
@@ -326,20 +335,25 @@ final class _PaletteEntry {
     this.document,
   });
 
-  factory _PaletteEntry.command(AppCommandDefinition command) =>
-      _PaletteEntry._(
-        key: 'command-${command.id.name}',
-        label: command.label,
-        icon: Icons.bolt_rounded,
-        shortcutLabel: command.shortcutLabel,
-        command: command,
-      );
+  factory _PaletteEntry.command(
+    AppCommandDefinition command,
+    String localizedLabel,
+  ) => _PaletteEntry._(
+    key: 'command-${command.id.name}',
+    label: localizedLabel,
+    icon: Icons.bolt_rounded,
+    shortcutLabel: command.shortcutLabel,
+    command: command,
+  );
 
-  factory _PaletteEntry.document(LibraryDocument document) => _PaletteEntry._(
+  factory _PaletteEntry.document(
+    LibraryDocument document,
+    String recentDocumentLabel,
+  ) => _PaletteEntry._(
     key: 'recent-${document.id}',
     label: document.effectiveTitle,
     icon: Icons.history_rounded,
-    subtitle: document.effectiveAuthor ?? 'Documento reciente',
+    subtitle: document.effectiveAuthor ?? recentDocumentLabel,
     document: document,
   );
 
@@ -353,7 +367,9 @@ final class _PaletteEntry {
 }
 
 final class _EmptyPalette extends StatelessWidget {
-  const _EmptyPalette();
+  const _EmptyPalette({required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -364,7 +380,7 @@ final class _EmptyPalette extends StatelessWidget {
         children: [
           Icon(Icons.search_off_rounded, color: context.appColors.textMuted),
           const SizedBox(height: AppSpacing.space8),
-          const Text('No hay acciones que coincidan.'),
+          Text(message),
         ],
       ),
     );

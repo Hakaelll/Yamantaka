@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../application/folder_import_controller.dart';
 
 final class FolderImportDialog extends StatefulWidget {
@@ -25,6 +26,7 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680, maxHeight: 700),
@@ -55,12 +57,12 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Importar carpeta',
+                          strings.get('folderImport.title'),
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Cerrar',
+                        tooltip: strings.get('action.close'),
                         onPressed: widget.controller.isImporting
                             ? null
                             : () => Navigator.pop(context),
@@ -103,13 +105,25 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                     runSpacing: AppSpacing.space8,
                     children: [
                       _CountChip(
-                        label: 'Encontrados',
+                        label: strings.get('folderImport.found'),
                         value: widget.controller.candidates.length,
                       ),
-                      _CountChip(label: 'Nuevos', value: newCount),
-                      _CountChip(label: 'Duplicados', value: duplicates),
-                      _CountChip(label: 'Inaccesibles', value: inaccessible),
-                      _CountChip(label: 'No válidos', value: invalid),
+                      _CountChip(
+                        label: strings.get('folderImport.new'),
+                        value: newCount,
+                      ),
+                      _CountChip(
+                        label: strings.get('folderImport.duplicates'),
+                        value: duplicates,
+                      ),
+                      _CountChip(
+                        label: strings.get('folderImport.inaccessible'),
+                        value: inaccessible,
+                      ),
+                      _CountChip(
+                        label: strings.get('folderImport.invalid'),
+                        value: invalid,
+                      ),
                     ],
                   ),
                 ),
@@ -119,10 +133,9 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                       ? AppStatusView(
                           icon: Icons.folder_off_outlined,
                           title: widget.controller.isScanning
-                              ? 'Buscando PDF'
-                              : 'No se encontraron PDF',
-                          message:
-                              'Ningún archivo se añadirá sin confirmación.',
+                              ? strings.get('folderImport.scanning')
+                              : strings.get('folderImport.noneFound'),
+                          message: strings.get('folderImport.confirmationBody'),
                           loading: widget.controller.isScanning,
                         )
                       : ListView.builder(
@@ -137,7 +150,11 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              subtitle: Text(_label(candidate.status)),
+                              subtitle: Text(
+                                strings.get(
+                                  'folderImport.status.${candidate.status.name}',
+                                ),
+                              ),
                             );
                           },
                         ),
@@ -148,12 +165,8 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                   onChanged: widget.controller.isImporting
                       ? null
                       : (value) => setState(() => _watchRoot = value ?? false),
-                  title: const Text(
-                    'Observar esta carpeta después de importar',
-                  ),
-                  subtitle: const Text(
-                    'Solo revalidará cambios. No importará, moverá ni borrará PDF automáticamente.',
-                  ),
+                  title: Text(strings.get('folderImport.watch')),
+                  subtitle: Text(strings.get('folderImport.watchBody')),
                   controlAffinity: ListTileControlAffinity.leading,
                   dense: true,
                 ),
@@ -167,12 +180,14 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                           widget.controller.isImporting)
                         TextButton(
                           onPressed: widget.controller.cancel,
-                          child: const Text('Cancelar proceso'),
+                          child: Text(
+                            strings.get('folderImport.cancelProcess'),
+                          ),
                         )
                       else
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Cerrar'),
+                          child: Text(strings.get('action.close')),
                         ),
                       const SizedBox(width: AppSpacing.space8),
                       FilledButton.icon(
@@ -183,7 +198,12 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                             ? null
                             : () => widget.onImport(_watchRoot),
                         icon: const Icon(Icons.library_add_outlined, size: 18),
-                        label: Text('Añadir $newCount'),
+                        label: Text(
+                          strings.get(
+                            'folderImport.add',
+                            parameters: {'count': newCount},
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -201,13 +221,6 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
     FolderCandidateStatus.duplicate => Icons.content_copy_rounded,
     FolderCandidateStatus.inaccessible => Icons.lock_outline_rounded,
     FolderCandidateStatus.invalid => Icons.error_outline_rounded,
-  };
-
-  static String _label(FolderCandidateStatus status) => switch (status) {
-    FolderCandidateStatus.newDocument => 'Nuevo',
-    FolderCandidateStatus.duplicate => 'Ya está en la biblioteca',
-    FolderCandidateStatus.inaccessible => 'Sin permiso de lectura',
-    FolderCandidateStatus.invalid => 'PDF no válido',
   };
 }
 

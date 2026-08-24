@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$ExecutablePath,
-    [Parameter(Mandatory = $true)][string]$FixturePath,
+    [string]$ExecutablePath = 'build/windows/x64/runner/Release/yamantaka.exe',
+    [string]$FixturePath = 'build/verification/corpus/normal.pdf',
     [int]$DurationSeconds = 8,
     [string]$OutputPath = 'build/verification/no-network.json',
     [switch]$RequireSignature
@@ -22,6 +22,10 @@ function Resolve-RepositoryPath {
 $executable = Resolve-RepositoryPath $ExecutablePath
 $fixture = Resolve-RepositoryPath $FixturePath
 $reportPath = Resolve-RepositoryPath $OutputPath
+$toolStateRoot = Join-Path $root 'build/verification/tool-state/no-network'
+New-Item -ItemType Directory -Force -Path $toolStateRoot | Out-Null
+$env:APPDATA = $toolStateRoot
+$env:LOCALAPPDATA = $toolStateRoot
 if (-not (Test-Path $executable)) { throw "Executable not found: $executable" }
 if (-not (Test-Path $fixture)) { throw "Fixture not found: $fixture" }
 if (-not (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue)) {

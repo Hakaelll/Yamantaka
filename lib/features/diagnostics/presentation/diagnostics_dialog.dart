@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../app/app_services.dart';
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../application/diagnostics_service.dart';
 
 final class DiagnosticsDialog extends StatefulWidget {
@@ -30,6 +31,7 @@ final class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720, maxHeight: 700),
@@ -45,17 +47,17 @@ final class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Diagnóstico local',
+                          strings.get('diagnostics.title'),
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Actualizar',
+                        tooltip: strings.get('action.refresh'),
                         onPressed: _refresh,
                         icon: const Icon(Icons.refresh_rounded),
                       ),
                       IconButton(
-                        tooltip: 'Cerrar',
+                        tooltip: strings.get('action.close'),
                         onPressed: () => Navigator.pop(context),
                         icon: const Icon(Icons.close_rounded),
                       ),
@@ -67,29 +69,35 @@ final class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
                   child: snapshot.connectionState != ConnectionState.done
                       ? const Center(child: CircularProgressIndicator())
                       : report == null
-                      ? const AppStatusView(
+                      ? AppStatusView(
                           icon: Icons.error_outline_rounded,
-                          title: 'No se pudo generar el diagnóstico',
-                          message: 'Los datos locales no se han modificado.',
+                          title: strings.get('diagnostics.failedTitle'),
+                          message: strings.get('diagnostics.failedBody'),
                           tone: AppStatusTone.error,
                         )
                       : ListView(
                           padding: const EdgeInsets.all(AppSpacing.space16),
                           children: [
                             if (widget.services.safeMode)
-                              const MaterialBanner(
+                              MaterialBanner(
                                 content: Text(
-                                  'Modo seguro activo: no se restauró la '
-                                  'sesión ni se inició el índice.',
+                                  strings.get('diagnostics.safeMode'),
                                 ),
-                                leading: Icon(Icons.health_and_safety_outlined),
-                                actions: [SizedBox.shrink()],
+                                leading: const Icon(
+                                  Icons.health_and_safety_outlined,
+                                ),
+                                actions: const [SizedBox.shrink()],
                               ),
                             for (final entry in report.values.entries)
                               _DiagnosticLine(
                                 label: entry.key.replaceAll('_', ' '),
                                 value: entry.value is Map
-                                    ? '${(entry.value as Map).length} métricas'
+                                    ? strings.get(
+                                        'diagnostics.metrics',
+                                        parameters: {
+                                          'count': (entry.value as Map).length,
+                                        },
+                                      )
                                     : '${entry.value}',
                               ),
                           ],
@@ -106,44 +114,52 @@ final class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
                       OutlinedButton.icon(
                         onPressed: report == null ? null : () => _copy(report),
                         icon: const Icon(Icons.copy_rounded, size: 18),
-                        label: const Text('Copiar informe seguro'),
+                        label: Text(strings.get('diagnostics.copySafe')),
                       ),
                       OutlinedButton.icon(
                         onPressed: report == null
                             ? null
                             : () => _export(report),
                         icon: const Icon(Icons.save_alt_rounded, size: 18),
-                        label: const Text('Exportar'),
+                        label: Text(strings.get('action.export')),
                       ),
                       PopupMenuButton<_MaintenanceAction>(
-                        tooltip: 'Mantenimiento local',
+                        tooltip: strings.get('diagnostics.maintenanceLocal'),
                         onSelected: _runMaintenance,
-                        itemBuilder: (context) => const [
+                        itemBuilder: (context) => [
                           PopupMenuItem(
                             value: _MaintenanceAction.verify,
-                            child: Text('Verificar base de datos'),
+                            child: Text(
+                              strings.get('diagnostics.verifyDatabase'),
+                            ),
                           ),
                           PopupMenuItem(
                             value: _MaintenanceAction.optimize,
-                            child: Text('Optimizar base de datos'),
+                            child: Text(
+                              strings.get('diagnostics.optimizeDatabase'),
+                            ),
                           ),
                           PopupMenuItem(
                             value: _MaintenanceAction.clearCache,
-                            child: Text('Limpiar cachés'),
+                            child: Text(strings.get('diagnostics.clearCaches')),
                           ),
                           PopupMenuItem(
                             value: _MaintenanceAction.rebuildIndex,
-                            child: Text('Reconstruir índice'),
+                            child: Text(
+                              strings.get('diagnostics.rebuildIndex'),
+                            ),
                           ),
                           PopupMenuItem(
                             value: _MaintenanceAction.openData,
-                            child: Text('Abrir carpeta de datos'),
+                            child: Text(
+                              strings.get('diagnostics.openDataFolder'),
+                            ),
                           ),
                         ],
                         child: FilledButton.tonalIcon(
                           onPressed: null,
                           icon: Icon(Icons.build_outlined, size: 18),
-                          label: Text('Mantenimiento'),
+                          label: Text(strings.get('diagnostics.maintenance')),
                         ),
                       ),
                     ],
@@ -160,9 +176,13 @@ final class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
   Future<void> _copy(SafeDiagnosticsReport report) async {
     await Clipboard.setData(ClipboardData(text: report.toJson()));
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Diagnóstico copiado.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            YamantakaLocalizations.of(context).get('diagnostics.copied'),
+          ),
+        ),
+      );
     }
   }
 
@@ -177,40 +197,59 @@ final class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
     try {
       await widget.services.diagnostics.exportTo(report, location.path);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Diagnóstico exportado.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              YamantakaLocalizations.of(context).get('diagnostics.exported'),
+            ),
+          ),
+        );
       }
     } on FileSystemException {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo escribir el informe.')),
+          SnackBar(
+            content: Text(
+              YamantakaLocalizations.of(context).get('diagnostics.writeFailed'),
+            ),
+          ),
         );
       }
     }
   }
 
   Future<void> _runMaintenance(_MaintenanceAction action) async {
+    final strings = YamantakaLocalizations.of(context);
     switch (action) {
       case _MaintenanceAction.verify:
         final result = widget.services.diagnostics.verifyDatabase();
-        _notice(result == 'ok' ? 'Integridad correcta.' : 'Resultado: $result');
+        _notice(
+          result == 'ok'
+              ? strings.get('diagnostics.integrityOk')
+              : strings.get(
+                  'diagnostics.result',
+                  parameters: {'result': result},
+                ),
+        );
       case _MaintenanceAction.optimize:
         widget.services.diagnostics.optimizeDatabase();
-        _notice('Base de datos optimizada.');
+        _notice(strings.get('diagnostics.optimized'));
       case _MaintenanceAction.clearCache:
-        if (await _confirm('Limpiar cachés', 'Los PDF no se modificarán.')) {
+        if (await _confirm(
+          strings.get('diagnostics.clearCaches'),
+          strings.get('diagnostics.clearCachesBody'),
+        )) {
           await widget.services.clearCache();
-          _notice('Cachés eliminadas.');
+          _notice(strings.get('diagnostics.cachesCleared'));
         }
       case _MaintenanceAction.rebuildIndex:
         if (await _confirm(
-          'Reconstruir índice',
-          'Se eliminará y recreará solo el índice local.',
+          strings.get('diagnostics.rebuildIndex'),
+          strings.get('diagnostics.rebuildIndexBody'),
         )) {
           widget.services.libraryIndex.setEnabled(true);
           await widget.services.libraryIndex.rebuild();
-          _notice('Índice reconstruido.');
+          _notice(strings.get('diagnostics.indexRebuilt'));
         }
       case _MaintenanceAction.openData:
         await widget.services.openDataLocation();
@@ -221,20 +260,23 @@ final class _DiagnosticsDialogState extends State<DiagnosticsDialog> {
   Future<bool> _confirm(String title, String body) async =>
       await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text(title),
-          content: Text(body),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Continuar'),
-            ),
-          ],
-        ),
+        builder: (context) {
+          final strings = YamantakaLocalizations.of(context);
+          return AlertDialog(
+            title: Text(title),
+            content: Text(body),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(strings.get('action.cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(strings.get('action.continue')),
+              ),
+            ],
+          );
+        },
       ) ??
       false;
 

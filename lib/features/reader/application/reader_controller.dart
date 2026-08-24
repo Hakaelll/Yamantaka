@@ -102,12 +102,14 @@ final class ReaderController extends ChangeNotifier {
   AppFailure? error;
   String? pendingPath;
   List<PdfOutlineItem> outline = const [];
-  int currentPageIndex = 0;
+  final ValueNotifier<int> pageIndexListenable = ValueNotifier<int>(0);
   bool isFullScreen = false;
   ProgressiveOpenState openProgress = const ProgressiveOpenState(
     phase: ProgressiveOpenPhase.idle,
     generation: 0,
   );
+  ReaderTemporaryPosition? temporaryPositionA;
+  ReaderTemporaryPosition? temporaryPositionB;
 
   Timer? _saveTimer;
   Timer? _activityTimer;
@@ -119,6 +121,8 @@ final class ReaderController extends ChangeNotifier {
   int _openGeneration = 0;
 
   int get pageCount => openedDocument?.pageCount ?? 0;
+  int get currentPageIndex => pageIndexListenable.value;
+  set currentPageIndex(int value) => pageIndexListenable.value = value;
   bool get canGoBack => currentPageIndex > 0;
   bool get canGoForward => currentPageIndex + 1 < pageCount;
   ReaderMode get readerMode => preferences?.viewMode ?? ReaderMode.document;
@@ -317,6 +321,8 @@ final class ReaderController extends ChangeNotifier {
     annotations?.clear();
     bookmarks.clear();
     navigationHistory?.clear();
+    temporaryPositionA = null;
+    temporaryPositionB = null;
     final opened = openedDocument;
     document = null;
     openedDocument = null;
@@ -329,10 +335,11 @@ final class ReaderController extends ChangeNotifier {
 
   void onPageChanged(int pageIndex) {
     if (pageCount == 0) return;
-    currentPageIndex = pageIndex.clamp(0, pageCount - 1);
+    final next = pageIndex.clamp(0, pageCount - 1);
+    if (next == currentPageIndex) return;
+    currentPageIndex = next;
     registerActivity();
     _scheduleSave();
-    notifyListeners();
   }
 
   Future<void> goToPreviousReadingUnit() async {
@@ -441,6 +448,67 @@ final class ReaderController extends ChangeNotifier {
         scrollOffset: location.offset,
       );
     }
+  }
+
+  ReaderTemporaryPosition? temporaryPosition(
+    ReaderTemporaryPositionSlot slot,
+  ) => switch (slot) {
+    ReaderTemporaryPositionSlot.a => temporaryPositionA,
+    ReaderTemporaryPositionSlot.b => temporaryPositionB,
+  };
+
+  ReaderTemporaryPosition? saveTemporaryPosition(
+    ReaderTemporaryPositionSlot slot,
+  ) {
+    final current = preferences;
+    if (current == null || openedDocument == null) return null;
+    final position = ReaderTemporaryPosition(
+      pageIndex: currentPageIndex,
+      zoom: viewController.zoom,
+      scrollOffset: viewController.scrollOffset,
+      viewMode: current.viewMode,
+      pageLayout: current.pageLayout,
+      rotation: current.pageRotation,
+    );
+    switch (slot) {
+      case ReaderTemporaryPositionSlot.a:
+        temporaryPositionA = position;
+      case ReaderTemporaryPositionSlot.b:
+        temporaryPositionB = position;
+    }
+    return position;
+  }
+
+  Future<bool> goToTemporaryPosition(ReaderTemporaryPositionSlot slot) async {
+    final position = temporaryPosition(slot);
+    final current = preferences;
+    if (position == null || current == null || pageCount == 0) return false;
+    final target = position.pageIndex.clamp(0, pageCount - 1);
+    preferences = current.copyWith(
+      viewMode: position.viewMode,
+      pageLayout: position.pageLayout,
+      pageRotation: position.rotation,
+      zoomMode: ZoomMode.custom,
+      zoomLevel: position.zoom,
+      scrollOffset: position.scrollOffset,
+    );
+    currentPageIndex = target;
+    notifyListeners();
+    await viewController.goToPage(target);
+    await viewController.restorePosition(
+      zoom: position.zoom,
+      scrollOffset: position.scrollOffset,
+    );
+    _scheduleSave();
+    return true;
+  }
+
+  bool swapTemporaryPositions() {
+    if (temporaryPositionA == null && temporaryPositionB == null) return false;
+    final previousA = temporaryPositionA;
+    temporaryPositionA = temporaryPositionB;
+    temporaryPositionB = previousA;
+    return true;
   }
 
   Future<void> resetProgress() async {
@@ -713,6 +781,7 @@ final class ReaderController extends ChangeNotifier {
     _activityTimer?.cancel();
     _savePositionNow();
     _finishSession();
+    pageIndexListenable.dispose();
     unawaited(_closeEngineDocument());
     super.dispose();
   }

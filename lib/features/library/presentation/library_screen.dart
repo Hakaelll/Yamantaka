@@ -10,9 +10,11 @@ import '../../../app/theme/app_density.dart';
 import '../../../app/theme/app_theme.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/errors/failure_presentation.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../../organization/application/organization_controller.dart';
 import '../../organization/domain/organization_models.dart';
 import '../application/library_controller.dart';
+import '../application/library_file_validation_controller.dart';
 import '../application/document_enrichment_controller.dart';
 import '../application/library_filter.dart';
 import '../domain/library_document.dart';
@@ -47,6 +49,7 @@ final class LibraryScreen extends StatefulWidget {
     this.onRecoverFolder,
     this.safeMode = false,
     this.enrichment,
+    this.fileValidation,
   });
 
   final LibraryController controller;
@@ -72,6 +75,7 @@ final class LibraryScreen extends StatefulWidget {
   final VoidCallback? onRecoverFolder;
   final bool safeMode;
   final DocumentEnrichmentController? enrichment;
+  final LibraryFileValidationController? fileValidation;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -101,6 +105,7 @@ final class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     final compact = context.windowClass == AppWindowClass.compact;
     final libraryTheme = AppTheme.library(
       density: context.appDensity.interfaceDensity,
@@ -148,6 +153,7 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                     listenable: Listenable.merge([
                       widget.controller,
                       if (widget.enrichment != null) widget.enrichment!,
+                      if (widget.fileValidation != null) widget.fileValidation!,
                     ]),
                     builder: (context, _) => Semantics(
                       header: true,
@@ -156,17 +162,29 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Biblioteca',
+                            strings.libraryTitle,
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           const SizedBox(height: AppSpacing.space2),
                           Text(
                             widget.enrichment?.progress.isRunning == true
-                                ? 'Analizando '
-                                      '${widget.enrichment!.progress.completed + 1} '
-                                      'de ${widget.enrichment!.progress.total}…'
-                                : '${widget.controller.totalDocuments} '
-                                      '${widget.controller.totalDocuments == 1 ? 'documento local' : 'documentos locales'}',
+                                ? strings.get(
+                                    'library.analyzing',
+                                    parameters: {
+                                      'current':
+                                          widget
+                                              .enrichment!
+                                              .progress
+                                              .completed +
+                                          1,
+                                      'total':
+                                          widget.enrichment!.progress.total,
+                                    },
+                                  )
+                                : strings.count(
+                                    'count.documents',
+                                    widget.controller.libraryDocumentCount,
+                                  ),
                             style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ],
@@ -176,21 +194,26 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                   actions: [
                     if (widget.enrichment?.progress.isRunning == true)
                       IconButton(
-                        tooltip: 'Cancelar análisis local',
+                        tooltip: strings.get('library.cancelAnalysis'),
                         onPressed: widget.enrichment!.cancel,
                         icon: const Icon(Icons.stop_circle_outlined),
                       ),
+                    if (widget.fileValidation?.progress.isRunning == true)
+                      IconButton(
+                        tooltip: strings.get('action.cancel'),
+                        onPressed: widget.fileValidation!.cancel,
+                        icon: const Icon(Icons.stop_circle_outlined),
+                      ),
                     if (widget.safeMode)
-                      const Tooltip(
-                        message:
-                            'Modo seguro: la sesión y el índice no se restauraron',
-                        child: Padding(
+                      Tooltip(
+                        message: strings.get('library.safeMode'),
+                        child: const Padding(
                           padding: EdgeInsets.all(AppSpacing.space12),
                           child: Icon(Icons.health_and_safety_outlined),
                         ),
                       ),
                     PopupMenuButton<_LibraryAppMenuAction>(
-                      tooltip: 'Organizar y más acciones',
+                      tooltip: strings.get('library.organizeMore'),
                       onSelected: (action) {
                         switch (action) {
                           case _LibraryAppMenuAction.collections:
@@ -207,46 +230,53 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                             widget.enrichment?.analyzePending();
                           case _LibraryAppMenuAction.reanalyze:
                             unawaited(_reanalyzeLibrary());
+                          case _LibraryAppMenuAction.checkFiles:
+                            unawaited(_checkFiles());
                         }
                       },
                       itemBuilder: (context) => [
                         if (widget.organization != null)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _LibraryAppMenuAction.collections,
-                            child: Text('Colecciones'),
+                            child: Text(strings.get('library.collections')),
                           ),
                         if (widget.onWorkspaces != null)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _LibraryAppMenuAction.workspaces,
-                            child: Text('Espacios de trabajo'),
+                            child: Text(strings.get('library.workspaces')),
                           ),
                         if (widget.onImportFolder != null)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _LibraryAppMenuAction.importFolder,
-                            child: Text('Importar carpeta'),
+                            child: Text(strings.get('library.importFolder')),
                           ),
                         if (widget.onRecoverFolder != null &&
                             widget.controller.documents.any(
                               (document) => document.isMissing,
                             ))
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _LibraryAppMenuAction.recover,
-                            child: Text('Recuperar documentos movidos'),
+                            child: Text(strings.get('library.recoverMoved')),
                           ),
                         if (widget.onGlobalSearch != null)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _LibraryAppMenuAction.globalSearch,
-                            child: Text('Búsqueda global'),
+                            child: Text(strings.get('library.globalSearch')),
                           ),
                         if (widget.enrichment != null)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _LibraryAppMenuAction.enrich,
-                            child: Text('Analizar metadatos y temas'),
+                            child: Text(strings.get('library.analyzeMetadata')),
                           ),
                         if (widget.enrichment != null)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: _LibraryAppMenuAction.reanalyze,
-                            child: Text('Volver a analizar la biblioteca'),
+                            child: Text(strings.get('library.reanalyze')),
+                          ),
+                        if (widget.fileValidation != null)
+                          PopupMenuItem(
+                            value: _LibraryAppMenuAction.checkFiles,
+                            child: Text(strings.libraryCheckFiles),
                           ),
                       ],
                       icon: const Icon(Icons.more_horiz_rounded),
@@ -254,7 +284,7 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                     if (compact)
                       IconButton(
                         key: const Key('library-open-button'),
-                        tooltip: 'Abrir PDF (Ctrl+O)',
+                        tooltip: '${strings.libraryOpenPdf} (Ctrl+O)',
                         onPressed: widget.onPickDocument,
                         icon: const Icon(Icons.file_open_outlined),
                       )
@@ -263,11 +293,11 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                         key: const Key('library-open-button'),
                         onPressed: widget.onPickDocument,
                         icon: const Icon(Icons.file_open_outlined, size: 18),
-                        label: const Text('Abrir PDF'),
+                        label: Text(strings.libraryOpenPdf),
                       ),
                     const SizedBox(width: AppSpacing.space4),
                     IconButton(
-                      tooltip: 'Ajustes',
+                      tooltip: strings.settingsTitle,
                       onPressed: widget.onOpenSettings,
                       icon: const Icon(Icons.tune_rounded),
                     ),
@@ -307,7 +337,6 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                                 await widget.controller.reload();
                               },
                         onDocumentVisible: widget.onDocumentVisible,
-                        documentPredicate: widget.organization?.includes,
                         collections:
                             widget.organization?.collections ?? const [],
                         tags: widget.organization?.tags ?? const [],
@@ -322,8 +351,10 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                           child: Center(
                             child: Semantics(
                               liveRegion: true,
-                              label: 'Suelta el PDF para abrirlo',
-                              child: const _DropMessage(),
+                              label: strings.get('library.dropPdf'),
+                              child: _DropMessage(
+                                message: strings.get('library.dropPdf'),
+                              ),
                             ),
                           ),
                         ),
@@ -339,24 +370,22 @@ final class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _reanalyzeLibrary() async {
+    final strings = YamantakaLocalizations.of(context);
     final enrichment = widget.enrichment;
     if (enrichment == null || enrichment.progress.isRunning) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Volver a analizar la biblioteca'),
-        content: const Text(
-          'Se volverán a detectar localmente títulos, autores y temas. '
-          'Los títulos, autores y temas editados manualmente se conservarán.',
-        ),
+        title: Text(strings.get('library.reanalyze')),
+        content: Text(strings.get('library.reanalyze.description')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+            child: Text(strings.get('action.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Analizar'),
+            child: Text(strings.get('library.analyze')),
           ),
         ],
       ),
@@ -366,9 +395,43 @@ final class _LibraryScreenState extends State<LibraryScreen> {
     await widget.controller.reload();
   }
 
+  Future<void> _checkFiles() async {
+    final validation = widget.fileValidation;
+    if (validation == null || validation.progress.isRunning) return;
+    final summary = await validation.checkAll();
+    if (!mounted) return;
+    final strings = YamantakaLocalizations.of(context);
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.fact_check_outlined),
+        title: Text(strings.libraryCheckTitle),
+        content: Semantics(
+          liveRegion: true,
+          child: Text(
+            strings.fileCheckSummary(
+              available: summary.available,
+              missing: summary.missing,
+              modified: summary.modified,
+              failed: summary.failed,
+              cancelled: summary.cancelled,
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(strings.get('action.close')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showCollections() async {
     final organization = widget.organization;
     if (organization == null) return;
+    final strings = YamantakaLocalizations.of(context);
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -378,22 +441,30 @@ final class _LibraryScreenState extends State<LibraryScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.library_books_outlined),
-              title: const Text('Toda la biblioteca'),
+              title: Text(strings.get('library.allLibrary')),
               selected:
                   organization.selectedCollectionId == null &&
                   organization.selectedSmartCollection == null,
               onTap: () {
                 organization.clearSelection();
+                unawaited(widget.controller.setOrganizationScope());
                 Navigator.pop(context);
               },
             ),
             for (final smart in SmartCollection.values)
               ListTile(
                 leading: const Icon(Icons.auto_awesome_outlined),
-                title: Text(smart.label),
+                title: Text(
+                  strings.get('library.smartCollection.${smart.name}'),
+                ),
                 selected: organization.selectedSmartCollection == smart,
                 onTap: () {
                   organization.selectSmartCollection(smart);
+                  unawaited(
+                    widget.controller.setOrganizationScope(
+                      smartCollection: smart,
+                    ),
+                  );
                   Navigator.pop(context);
                 },
               ),
@@ -410,12 +481,17 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                 selected: organization.selectedCollectionId == collection.id,
                 onTap: () {
                   organization.selectCollection(collection.id);
+                  unawaited(
+                    widget.controller.setOrganizationScope(
+                      collectionId: collection.id,
+                    ),
+                  );
                   Navigator.pop(context);
                 },
               ),
             ListTile(
               leading: const Icon(Icons.create_new_folder_outlined),
-              title: const Text('Nueva colección'),
+              title: Text(strings.get('library.newCollection')),
               onTap: () async {
                 Navigator.pop(context);
                 await _createCollection(organization);
@@ -428,26 +504,27 @@ final class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _createCollection(OrganizationController organization) async {
+    final strings = YamantakaLocalizations.of(context);
     final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Nueva colección'),
+        title: Text(strings.get('library.newCollection')),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLength: 60,
-          decoration: const InputDecoration(labelText: 'Nombre'),
+          decoration: InputDecoration(labelText: strings.get('library.name')),
           onSubmitted: (value) => Navigator.pop(context, value),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: Text(strings.get('action.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Crear'),
+            child: Text(strings.get('action.create')),
           ),
         ],
       ),
@@ -456,6 +533,7 @@ final class _LibraryScreenState extends State<LibraryScreen> {
     if (name != null && name.trim().isNotEmpty) {
       final created = organization.createCollection(name);
       organization.selectCollection(created.id);
+      await widget.controller.setOrganizationScope(collectionId: created.id);
     }
   }
 }
@@ -477,7 +555,6 @@ final class _LibraryBody extends StatelessWidget {
     required this.onRemoveDocument,
     this.onReanalyzeDocument,
     this.onDocumentVisible,
-    this.documentPredicate,
     this.collections = const [],
     this.tags = const [],
   });
@@ -497,43 +574,44 @@ final class _LibraryBody extends StatelessWidget {
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
   final Future<void> Function(LibraryDocument document)? onReanalyzeDocument;
   final ValueChanged<LibraryDocument>? onDocumentVisible;
-  final bool Function(String documentId)? documentPredicate;
   final List<DocumentCollection> collections;
   final List<DocumentTag> tags;
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     if (controller.isLoading && controller.documents.isEmpty) {
-      return const AppStatusView(
+      return AppStatusView(
         icon: Icons.library_books_outlined,
-        title: 'Preparando tu biblioteca',
-        message: 'Revisando documentos y portadas guardadas en este equipo.',
+        title: strings.get('library.preparing'),
+        message: strings.get('library.preparing.description'),
         loading: true,
       );
     }
     if (controller.error case final error?) {
-      final presentation = FailurePresentations.forFailure(error);
+      final presentation = FailurePresentations.forFailure(
+        error,
+        strings: strings,
+      );
       return AppStatusView(
         icon: Icons.error_outline_rounded,
         title: presentation.title,
         message: presentation.message,
         action: controller.load,
-        actionLabel: 'Reintentar',
+        actionLabel: strings.get('action.retry'),
         tone: AppStatusTone.error,
       );
     }
-    if (controller.documents.isEmpty) {
+    if (controller.libraryDocumentCount == 0) {
       return EmptyLibraryState(onOpen: onPickDocument);
     }
-    final documents = controller.documents
-        .where((document) => documentPredicate?.call(document.id) ?? true)
-        .toList(growable: false);
+    final documents = controller.documents;
     if (!showRecents) {
       return Center(
         child: OutlinedButton.icon(
           onPressed: onPickDocument,
           icon: const Icon(Icons.file_open_outlined, size: 18),
-          label: const Text('Abrir otro PDF'),
+          label: Text(strings.get('reader.openAnotherPdf')),
         ),
       );
     }
@@ -566,14 +644,13 @@ final class EmptyLibraryState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     return AppStatusView(
       icon: Icons.menu_book_outlined,
-      title: 'Una biblioteca tranquila',
-      message:
-          'Abre un PDF o arrástralo a esta ventana. El archivo permanece '
-          'en su carpeta original y tu progreso se guarda solo aquí.',
+      title: strings.libraryEmptyTitle,
+      message: strings.libraryEmptyBody,
       action: onOpen,
-      actionLabel: 'Abrir PDF',
+      actionLabel: strings.libraryOpenPdf,
       actionKey: const Key('open-pdf-button'),
     );
   }
@@ -593,12 +670,16 @@ final class RecentDocumentItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     return Semantics(
       button: true,
       label: document.isMissing
-          ? '${document.fileName}, archivo no encontrado, localizar'
+          ? strings.get(
+              'library.missingDocumentSemantics',
+              parameters: {'file': document.fileName},
+            )
           : '${document.fileName}, '
-                '${(document.readingProgress * 100).round()} por ciento',
+                '${strings.get('library.percent', parameters: {'value': (document.readingProgress * 100).round()})}',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -635,21 +716,21 @@ final class RecentDocumentItem extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.space6),
                           if (document.isMissing)
-                            const AppStatusLabel(
+                            AppStatusLabel(
                               icon: Icons.link_off_rounded,
-                              label: 'Archivo no encontrado',
+                              label: strings.get('library.fileNotFound'),
                               tone: AppStatusTone.error,
                             )
                           else if (document.hasFileChanged)
-                            const AppStatusLabel(
+                            AppStatusLabel(
                               icon: Icons.sync_problem_rounded,
-                              label: 'El archivo ha cambiado',
+                              label: strings.get('library.fileChanged'),
                               tone: AppStatusTone.warning,
                             )
                           else
                             Text(
-                              '${_readingStateDescription(document)}'
-                              '  ·  ${_relativeDate(document.lastOpenedAt)}',
+                              '${_readingStateDescription(document, strings)}'
+                              '  ·  ${_relativeDate(document.lastOpenedAt, strings)}',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                         ],
@@ -663,13 +744,16 @@ final class RecentDocumentItem extends StatelessWidget {
                           Icons.drive_file_move_outline,
                           size: 17,
                         ),
-                        label: const Text('Localizar'),
+                        label: Text(strings.get('library.locate')),
                       )
                     else if (!compact)
                       SizedBox(
                         width: 88,
                         child: Text(
-                          'Página ${document.lastPageIndex + 1}',
+                          strings.get(
+                            'reader.page',
+                            parameters: {'page': document.lastPageIndex + 1},
+                          ),
                           textAlign: TextAlign.right,
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
@@ -678,7 +762,7 @@ final class RecentDocumentItem extends StatelessWidget {
                     if (onInfo != null)
                       IconButton(
                         key: ValueKey('document-info-${document.id}'),
-                        tooltip: 'Información del documento',
+                        tooltip: strings.get('command.documentInfo'),
                         onPressed: onInfo,
                         icon: const Icon(Icons.info_outline_rounded, size: 20),
                       )
@@ -768,7 +852,9 @@ final class _DocumentCover extends StatelessWidget {
 }
 
 final class _DropMessage extends StatelessWidget {
-  const _DropMessage();
+  const _DropMessage({required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -778,17 +864,17 @@ final class _DropMessage extends StatelessWidget {
         border: Border.all(color: context.appColors.focusRing, width: 2),
         borderRadius: BorderRadius.circular(AppRadii.dialog),
       ),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.space32,
           vertical: AppSpacing.space24,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.file_download_outlined),
-            SizedBox(width: AppSpacing.space12),
-            Text('Suelta el PDF para abrirlo'),
+            const Icon(Icons.file_download_outlined),
+            const SizedBox(width: AppSpacing.space12),
+            Text(message),
           ],
         ),
       ),
@@ -796,23 +882,44 @@ final class _DropMessage extends StatelessWidget {
   }
 }
 
-String _relativeDate(DateTime value) {
+String _relativeDate(DateTime value, YamantakaLocalizations strings) {
   final difference = DateTime.now().difference(value.toLocal());
-  if (difference.inMinutes < 1) return 'ahora';
-  if (difference.inHours < 1) return 'hace ${difference.inMinutes} min';
-  if (difference.inDays < 1) return 'hace ${difference.inHours} h';
-  if (difference.inDays < 7) return 'hace ${difference.inDays} d';
+  if (difference.inMinutes < 1) return strings.get('time.now');
+  if (difference.inHours < 1) {
+    return strings.get(
+      'time.minutesAgo',
+      parameters: {'count': difference.inMinutes},
+    );
+  }
+  if (difference.inDays < 1) {
+    return strings.get(
+      'time.hoursAgo',
+      parameters: {'count': difference.inHours},
+    );
+  }
+  if (difference.inDays < 7) {
+    return strings.get(
+      'time.daysAgo',
+      parameters: {'count': difference.inDays},
+    );
+  }
   final local = value.toLocal();
   return '${local.day.toString().padLeft(2, '0')}/'
       '${local.month.toString().padLeft(2, '0')}/${local.year}';
 }
 
-String _readingStateDescription(LibraryDocument document) {
-  if (document.readingProgress >= 1) return 'Terminado';
+String _readingStateDescription(
+  LibraryDocument document,
+  YamantakaLocalizations strings,
+) {
+  if (document.readingProgress >= 1) return strings.get('library.finished');
   if (document.readingProgress > 0) {
-    return 'En curso · ${(document.readingProgress * 100).round()} %';
+    return strings.get(
+      'library.inProgress',
+      parameters: {'value': (document.readingProgress * 100).round()},
+    );
   }
-  return 'Sin empezar';
+  return strings.get('library.notStarted');
 }
 
 enum _LibraryAppMenuAction {
@@ -823,4 +930,5 @@ enum _LibraryAppMenuAction {
   globalSearch,
   enrich,
   reanalyze,
+  checkFiles,
 }

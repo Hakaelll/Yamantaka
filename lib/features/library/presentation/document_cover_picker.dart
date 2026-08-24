@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../domain/document_cover.dart';
 import '../domain/library_document.dart';
 
@@ -49,8 +50,9 @@ final class _DocumentCoverPickerDialogState
   @override
   Widget build(BuildContext context) {
     final metadata = widget.document.coverMetadata;
+    final strings = YamantakaLocalizations.of(context);
     return AlertDialog(
-      title: const Text('Cambiar portada'),
+      title: Text(strings.get('cover.title')),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680, maxHeight: 520),
         child: Column(
@@ -72,8 +74,8 @@ final class _DocumentCoverPickerDialogState
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snapshot.hasError) {
-                    return const Center(
-                      child: Text('No se pudieron preparar las páginas.'),
+                    return Center(
+                      child: Text(strings.get('cover.previewFailed')),
                     );
                   }
                   final previews = snapshot.data ?? const [];
@@ -93,9 +95,15 @@ final class _DocumentCoverPickerDialogState
                       return Semantics(
                         selected: selected,
                         button: true,
-                        label:
-                            'Página ${preview.pageIndex + 1}'
-                            '${selected ? ', seleccionada' : ''}',
+                        label: strings.get(
+                          'cover.pageSemantics',
+                          parameters: {
+                            'page': preview.pageIndex + 1,
+                            'selected': selected
+                                ? strings.get('cover.selectedSuffix')
+                                : '',
+                          },
+                        ),
                         child: InkWell(
                           onTap: () => _select(preview.pageIndex),
                           borderRadius: BorderRadius.circular(AppRadii.control),
@@ -161,7 +169,9 @@ final class _DocumentCoverPickerDialogState
                     enabled: !_saving,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(labelText: 'Página'),
+                    decoration: InputDecoration(
+                      labelText: strings.get('cover.page'),
+                    ),
                     onSubmitted: (_) => _selectTypedPage(),
                   ),
                 ),
@@ -169,10 +179,16 @@ final class _DocumentCoverPickerDialogState
                 Expanded(
                   child: Text(
                     metadata == null
-                        ? 'Todavía no hay una portada guardada'
+                        ? strings.get('cover.noneSaved')
                         : metadata.selectionMode == CoverSelectionMode.manual
-                        ? 'Página actual: ${metadata.sourcePageIndex + 1} · manual'
-                        : 'Página actual: ${metadata.sourcePageIndex + 1} · automática',
+                        ? strings.get(
+                            'cover.currentManual',
+                            parameters: {'page': metadata.sourcePageIndex + 1},
+                          )
+                        : strings.get(
+                            'cover.currentAutomatic',
+                            parameters: {'page': metadata.sourcePageIndex + 1},
+                          ),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -193,11 +209,11 @@ final class _DocumentCoverPickerDialogState
       actions: [
         TextButton(
           onPressed: _saving ? null : _restoreAutomatic,
-          child: const Text('Selección automática'),
+          child: Text(strings.get('cover.automaticSelection')),
         ),
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context),
-          child: const Text('Cancelar'),
+          child: Text(strings.get('action.cancel')),
         ),
         FilledButton(
           onPressed: _saving ? null : _save,
@@ -206,7 +222,7 @@ final class _DocumentCoverPickerDialogState
                   dimension: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Usar portada'),
+              : Text(strings.get('cover.use')),
         ),
       ],
     );
@@ -223,7 +239,11 @@ final class _DocumentCoverPickerDialogState
   void _selectTypedPage() {
     final page = int.tryParse(_pageController.text);
     if (page == null || page < 1 || page > widget.document.pageCount) {
-      setState(() => _error = 'Introduce una página válida.');
+      setState(
+        () => _error = YamantakaLocalizations.of(
+          context,
+        ).get('cover.invalidPage'),
+      );
       return;
     }
     _select(page - 1);
@@ -240,7 +260,7 @@ final class _DocumentCoverPickerDialogState
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = 'No se pudo guardar esa portada.';
+          _error = YamantakaLocalizations.of(context).get('cover.saveFailed');
         });
       }
     }
@@ -255,7 +275,9 @@ final class _DocumentCoverPickerDialogState
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = 'No se pudo restaurar la selección automática.';
+          _error = YamantakaLocalizations.of(
+            context,
+          ).get('cover.restoreFailed');
         });
       }
     }

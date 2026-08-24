@@ -1,11 +1,11 @@
-import 'dart:io';
-
 import 'package:sqlite3/common.dart' show Row;
 
 import '../../features/library/domain/library_document.dart';
 import '../../features/library/domain/document_cover.dart';
 import '../../features/library/domain/document_enrichment.dart';
+import '../../features/library/domain/file_validation.dart';
 import '../../features/library/domain/library_query.dart';
+import '../../features/organization/domain/organization_models.dart';
 import '../../features/reader/domain/reader_models.dart';
 import '../database/app_database.dart';
 
@@ -13,6 +13,13 @@ final class DocumentRepository {
   const DocumentRepository(this._database);
 
   final AppDatabase _database;
+
+  int get documentCount =>
+      _database.database
+              .select('SELECT COUNT(*) FROM documents')
+              .first
+              .columnAt(0)
+          as int;
 
   List<LibraryDocument> recent({int limit = 40}) {
     final rows = _database.database.select(
@@ -674,23 +681,74 @@ final class DocumentRepository {
     _database.database.execute('UPDATE documents SET thumbnail_path = NULL');
   }
 
-  int refreshMissingState() {
-    var changed = 0;
+  int get fileValidationCount => documentCount;
+
+  List<FileValidationCandidate> fileValidationBatch({
+    String? afterId,
+    int limit = 24,
+  }) {
+    final boundedLimit = limit.clamp(1, 100);
     final rows = _database.database.select(
-      'SELECT id, path, is_missing FROM documents',
+      'SELECT id, path, file_size, file_modified_at, is_missing, is_modified '
+      'FROM documents ${afterId == null ? '' : 'WHERE id > ? '} '
+      'ORDER BY id LIMIT ?',
+      [?afterId, boundedLimit],
     );
-    for (final row in rows) {
-      final missing = !File(row['path'] as String).existsSync();
-      final wasMissing = (row['is_missing'] as int) == 1;
-      if (missing != wasMissing) {
+    return rows
+        .map(
+          (row) => FileValidationCandidate(
+            id: row['id'] as String,
+            path: row['path'] as String,
+            fileSize: row['file_size'] as int,
+            fileModifiedAt: DateTime.parse(row['file_modified_at'] as String),
+            wasMissing: (row['is_missing'] as int) == 1,
+            wasModified: (row['is_modified'] as int) == 1,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  /// Persists a small validation batch and returns only documents whose
+  /// user-visible availability state actually changed.
+  Set<String> applyFileValidationBatch(
+    List<FileValidationResult> results, {
+    DateTime? validatedAt,
+  }) {
+    if (results.isEmpty) return const {};
+    final stamp = _date(validatedAt ?? DateTime.now());
+    final changed = <String>{};
+    _database.writeTransaction(() {
+      for (final result in results) {
+        if (result.status == FileValidationStatus.failed) continue;
+        final missing = result.status == FileValidationStatus.missing;
+        final modified = result.status == FileValidationStatus.modified;
         _database.database.execute(
-          'UPDATE documents SET is_missing = ? WHERE id = ?',
-          [missing ? 1 : 0, row['id']],
+          'UPDATE documents SET is_missing = ?, is_modified = ?, '
+          'last_validated_at = ? WHERE id = ? AND '
+          '(is_missing <> ? OR is_modified <> ?)',
+          [
+            missing ? 1 : 0,
+            modified ? 1 : 0,
+            stamp,
+            result.id,
+            missing ? 1 : 0,
+            modified ? 1 : 0,
+          ],
         );
-        changed++;
+        final changedRows =
+            _database.database.select('SELECT changes()').first.columnAt(0)
+                as int;
+        if (changedRows > 0) {
+          changed.add(result.id);
+        } else {
+          _database.database.execute(
+            'UPDATE documents SET last_validated_at = ? WHERE id = ?',
+            [stamp, result.id],
+          );
+        }
       }
-    }
-    return changed;
+    });
+    return Set.unmodifiable(changed);
   }
 
   void deleteHistory() {
@@ -718,16 +776,6 @@ final class DocumentRepository {
     final path = row['path'] as String;
     final storedSize = row['file_size'] as int;
     final storedModifiedAt = DateTime.parse(row['file_modified_at'] as String);
-    var hasFileChanged = false;
-    try {
-      final stat = File(path).statSync();
-      hasFileChanged =
-          stat.type != FileSystemEntityType.notFound &&
-          (stat.size != storedSize ||
-              stat.modified.toUtc() != storedModifiedAt.toUtc());
-    } on FileSystemException {
-      // Missing and inaccessible files are represented by is_missing instead.
-    }
     final coverDocumentId = row['cover_document_id'] as String?;
     final cover = coverDocumentId == null
         ? null
@@ -830,7 +878,7 @@ final class DocumentRepository {
         ReaderTheme.ivory,
       ),
       isMissing: (row['is_missing'] as int) == 1,
-      hasFileChanged: hasFileChanged,
+      hasFileChanged: (row['is_modified'] as int) == 1,
       fingerprint: row['fingerprint'] as String,
       thumbnailPath:
           cover?.smallThumbnailPath ?? row['thumbnail_path'] as String?,
@@ -913,26 +961,63 @@ final class DocumentRepository {
       );
       parameters.addAll(query.topics.map((topic) => topic.name));
     }
+    if (query.collectionId case final collectionId?) {
+      conditions.add(
+        'EXISTS (SELECT 1 FROM collection_documents scoped_collection '
+        'WHERE scoped_collection.document_id = d.id '
+        'AND scoped_collection.collection_id = ?)',
+      );
+      parameters.add(collectionId);
+    }
+    switch (query.smartCollection) {
+      case SmartCollection.inProgress:
+        conditions.add('d.reading_progress > 0 AND d.reading_progress < 0.995');
+      case SmartCollection.notStarted:
+        conditions.add('d.reading_progress <= 0');
+      case SmartCollection.finished:
+        conditions.add('d.reading_progress >= 0.995');
+      case SmartCollection.annotated:
+        conditions.add(
+          'EXISTS (SELECT 1 FROM annotations scoped_annotations '
+          'WHERE scoped_annotations.document_id = d.id)',
+        );
+      case SmartCollection.bookmarked:
+        conditions.add(
+          'EXISTS (SELECT 1 FROM bookmarks scoped_bookmarks '
+          'WHERE scoped_bookmarks.document_id = d.id)',
+        );
+      case SmartCollection.missing:
+        conditions.add('d.is_missing = 1');
+      case SmartCollection.recentlyOpened:
+        conditions.add("d.last_opened_at >= datetime('now', '-14 days')");
+      case SmartCollection.recentlyAdded:
+        conditions.add("d.added_at >= datetime('now', '-14 days')");
+      case null:
+        break;
+    }
     final text = query.text.toLowerCase();
     if (text.isNotEmpty) {
       conditions.add(
         '(lower(d.file_name) LIKE ? OR '
         'lower(coalesce(d.title_override, d.title, \'\')) LIKE ? OR '
         'lower(coalesce(d.author_override, d.author, \'\')) LIKE ? OR '
-        'lower(coalesce(n.note, \'\')) LIKE ?)',
+        'lower(coalesce(n.note, \'\')) LIKE ? OR '
+        'EXISTS (SELECT 1 FROM document_topics text_topics '
+        'WHERE text_topics.document_id = d.id '
+        'AND lower(text_topics.topic_key) LIKE ?))',
       );
       final pattern = '%$text%';
-      parameters.addAll([pattern, pattern, pattern, pattern]);
+      parameters.addAll([pattern, pattern, pattern, pattern, pattern]);
     }
     return (sql: conditions.join(' AND '), parameters: parameters);
   }
 
   static String _sortColumn(LibraryQuerySort sort) => switch (sort) {
-    LibraryQuerySort.lastOpened => 'd.last_opened_at DESC',
-    LibraryQuerySort.added => 'd.added_at DESC',
+    LibraryQuerySort.lastOpened => 'd.last_opened_at DESC, d.id ASC',
+    LibraryQuerySort.added => 'd.added_at DESC, d.id ASC',
     LibraryQuerySort.title =>
-      'lower(coalesce(d.title_override, d.title, d.file_name)) ASC',
-    LibraryQuerySort.progress => 'd.reading_progress DESC',
+      'lower(coalesce(d.title_override, d.title, d.file_name)) ASC, d.id ASC',
+    LibraryQuerySort.progress => 'd.reading_progress DESC, d.id ASC',
   };
 
   static T _enumByName<T extends Enum>(

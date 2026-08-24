@@ -162,7 +162,7 @@ void main() {
 
     expect(
       migrated.database.select('PRAGMA user_version').first.columnAt(0),
-      8,
+      AppConfig.databaseVersion,
     );
     expect(tables, containsAll({'document_enrichment', 'document_topics'}));
     expect(migrated.integrityCheck(), 'ok');

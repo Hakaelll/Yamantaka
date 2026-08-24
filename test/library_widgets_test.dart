@@ -1,7 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
+import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/application/library_controller.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
@@ -10,6 +12,34 @@ import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
 
 void main() {
+  testWidgets('empty library opens in Spanish and English', (tester) async {
+    for (final language in AppLanguage.values) {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: Locale(language.code),
+          supportedLocales: const [Locale('es'), Locale('en')],
+          localizationsDelegates: const [
+            YamantakaLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: EmptyLibraryState(onOpen: () {}),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.text(
+          language == AppLanguage.spanish
+              ? 'Una biblioteca tranquila'
+              : 'A quiet library',
+        ),
+        findsOneWidget,
+      );
+    }
+  });
+
   testWidgets('empty library presents one clear opening action', (
     tester,
   ) async {
@@ -291,6 +321,7 @@ void main() {
       expect(field.focusNode.hasFocus, isTrue);
 
       await tester.enterText(find.byKey(const Key('library-filter')), 'ana');
+      await tester.pump(const Duration(milliseconds: 220));
       await tester.pump();
       expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
       expect(find.byKey(const ValueKey('artifact-beta')), findsNothing);
@@ -299,9 +330,11 @@ void main() {
         find.byKey(const Key('library-filter')),
         'sin coincidencias',
       );
+      await tester.pump(const Duration(milliseconds: 220));
       await tester.pump();
       expect(find.textContaining('No hay documentos'), findsOneWidget);
       await tester.tap(find.text('Restablecer'));
+      await tester.pump();
       await tester.pump();
       expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
       expect(find.byKey(const ValueKey('artifact-beta')), findsOneWidget);

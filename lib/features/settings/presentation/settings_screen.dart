@@ -11,10 +11,14 @@ import '../../../app/theme/app_tokens.dart';
 import '../../../app/ui/yama_components.dart';
 import '../../../core/privacy/storage_catalog.dart';
 import '../../../core/privacy/local_storage_service.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../../../storage/repositories/app_settings_repository.dart';
 import '../../../storage/backup/local_backup_service.dart';
 import '../../reader/domain/reader_models.dart';
 import '../../diagnostics/presentation/diagnostics_dialog.dart';
+import '../../help/presentation/help_center_dialog.dart';
+
+part 'settings_screen_components.dart';
 
 final class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -38,20 +42,14 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     return ListenableBuilder(
       listenable: widget.services.settings,
       builder: (context, _) {
+        final strings = YamantakaLocalizations.of(context);
         final settings = widget.services.settings.settings;
         return Scaffold(
           backgroundColor: context.appColors.settingsBackground,
-          appBar: AppBar(
-            leading: IconButton(
-              tooltip: 'Volver',
-              onPressed: widget.onBack,
-              icon: const Icon(Icons.arrow_back_rounded),
-            ),
-            title: const Text('Ajustes'),
-          ),
+          appBar: SettingsAppBar(onBack: widget.onBack),
           body: LayoutBuilder(
             builder: (context, constraints) {
-              final sections = _buildSections(settings);
+              final sections = _buildSections(settings, strings);
               if (AppBreakpoints.classify(constraints.maxWidth) !=
                   AppWindowClass.expanded) {
                 return _CompactSettings(sections: sections);
@@ -70,36 +68,41 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  List<_SettingsSectionData> _buildSections(AppSettings settings) {
+  List<_SettingsSectionData> _buildSections(
+    AppSettings settings,
+    YamantakaLocalizations strings,
+  ) {
     return [
       _SettingsSectionData(
         id: _SettingsSectionId.appearance,
-        description: 'Tema, controles y perfil de pantalla.',
+        description: strings.get('settings.appearance.description'),
         children: [
           _AppearancePreview(settings: settings),
           _DropdownSetting(
-            label: 'Idioma',
-            description:
-                'Aplica el catálogo castellano o inglés sin reiniciar.',
+            label: strings.get('settings.language'),
+            description: strings.get('settings.language.description'),
             value: settings.languageCode,
-            values: const {'es': 'Castellano', 'en': 'English'},
+            values: {
+              'es': strings.get('settings.language.spanish'),
+              'en': strings.get('settings.language.english'),
+            },
             onChanged: (value) =>
                 _update(settings.copyWith(languageCode: value)),
           ),
           _SwitchSetting(
-            label: 'Tema oscuro de la aplicación',
-            description:
-                'Afecta al lector y a los ajustes. La biblioteca conserva su '
-                'entorno oscuro y espacial.',
+            label: strings.get('settings.darkMode'),
+            description: strings.get('settings.darkMode.description'),
             value: settings.darkMode,
             onChanged: (value) => _update(settings.copyWith(darkMode: value)),
           ),
           _DropdownSetting(
-            label: 'Densidad de la interfaz',
-            description:
-                'Compacta muestra más contenido sin cambiar el tamaño del PDF.',
+            label: strings.get('settings.density'),
+            description: strings.get('settings.density.description'),
             value: settings.interfaceDensity.name,
-            values: const {'comfortable': 'Cómoda', 'compact': 'Compacta'},
+            values: {
+              'comfortable': strings.get('settings.value.comfortable'),
+              'compact': strings.get('settings.value.compact'),
+            },
             onChanged: (value) => _update(
               settings.copyWith(
                 interfaceDensity: AppInterfaceDensity.values.byName(value),
@@ -107,43 +110,41 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           _DropdownSetting(
-            label: 'Tema de lectura predeterminado',
-            description: 'Color del lienzo al abrir un documento nuevo.',
+            label: strings.get('settings.defaultReaderTheme'),
+            description: strings.get('settings.defaultReaderTheme.description'),
             value: settings.defaultReaderTheme,
-            values: const {
-              'light': 'Claro',
-              'ivory': 'Marfil',
-              'sepia': 'Sepia',
-              'gray': 'Gris',
-              'dark': 'Oscuro',
-              'black': 'Negro',
+            values: {
+              'light': strings.get('settings.value.light'),
+              'ivory': strings.get('settings.value.ivory'),
+              'sepia': strings.get('settings.value.sepia'),
+              'gray': strings.get('settings.value.gray'),
+              'dark': strings.get('settings.value.dark'),
+              'black': strings.get('settings.value.black'),
             },
             onChanged: (value) =>
                 _update(settings.copyWith(defaultReaderTheme: value)),
           ),
           _SwitchSetting(
-            label: 'Ocultar controles automáticamente',
-            description: 'Mantiene el documento despejado durante la lectura.',
+            label: strings.get('settings.autoHideControls'),
+            description: strings.get('settings.autoHideControls.description'),
             value: settings.autoHideControls,
             onChanged: (value) =>
                 _update(settings.copyWith(autoHideControls: value)),
           ),
           _SwitchSetting(
-            label: 'Mostrar barra de progreso',
+            label: strings.get('settings.showProgress'),
             value: settings.showProgress,
             onChanged: (value) =>
                 _update(settings.copyWith(showProgress: value)),
           ),
           _DropdownSetting(
-            label: 'Movimiento',
-            description:
-                'Completo, reducido o sin animaciones. Se respeta la opción '
-                'más restrictiva del sistema.',
+            label: strings.get('settings.motion'),
+            description: strings.get('settings.motion.description'),
             value: settings.resolvedMotionPreference.name,
-            values: const {
-              'full': 'Completo',
-              'reduced': 'Reducido',
-              'none': 'Sin animaciones',
+            values: {
+              'full': strings.get('settings.value.motionFull'),
+              'reduced': strings.get('settings.value.motionReduced'),
+              'none': strings.get('settings.value.motionNone'),
             },
             onChanged: (value) {
               final preference = AppMotionPreference.values.byName(value);
@@ -157,14 +158,12 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           _DropdownSetting(
-            label: 'Perfil visual',
-            description:
-                'Tinta electrónica fuerza alto contraste, una página y cero '
-                'movimiento.',
+            label: strings.get('settings.visualProfile'),
+            description: strings.get('settings.visualProfile.description'),
             value: settings.visualProfile.name,
-            values: const {
-              'standard': 'Estándar',
-              'electronicInk': 'Tinta electrónica',
+            values: {
+              'standard': strings.get('settings.value.standard'),
+              'electronicInk': strings.get('settings.value.electronicInk'),
             },
             onChanged: (value) {
               final profile = ReaderVisualProfile.values.byName(value);
@@ -197,21 +196,21 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       ),
       _SettingsSectionData(
         id: _SettingsSectionId.reading,
-        description: 'Comportamiento inicial y navegación.',
+        description: strings.get('settings.reading.description'),
         children: [
           _DropdownSetting(
-            label: 'Perfil de lectura',
-            description:
-                'Aplica un conjunto coherente sin mezclar densidad de interfaz '
-                'y zoom del contenido.',
+            label: strings.get('settings.readingProfile'),
+            description: strings.get('settings.readingProfile.description'),
             value: widget.services.readingProfiles.defaultProfileId,
-            values: const {
-              'builtin-reading': 'Lectura',
-              'builtin-study': 'Estudio',
-              'builtin-presentation': 'Presentación',
-              'builtin-night': 'Noche',
-              'builtin-eink': 'Tinta electrónica',
-              'builtin-comparison': 'Comparación',
+            values: {
+              'builtin-reading': strings.get('settings.value.reading'),
+              'builtin-study': strings.get('settings.value.study'),
+              'builtin-presentation': strings.get(
+                'settings.value.presentation',
+              ),
+              'builtin-night': strings.get('settings.value.night'),
+              'builtin-eink': strings.get('settings.value.electronicInk'),
+              'builtin-comparison': strings.get('settings.value.comparison'),
             },
             onChanged: (value) {
               widget.services.readingProfiles
@@ -221,55 +220,56 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           _DropdownSetting(
-            label: 'Vista predeterminada',
+            label: strings.get('settings.defaultView'),
             value: settings.defaultViewMode,
-            values: const {'document': 'Documento', 'book': 'Libro'},
+            values: {
+              'document': strings.get('settings.value.document'),
+              'book': strings.get('settings.value.book'),
+            },
             onChanged: (value) =>
                 _update(settings.copyWith(defaultViewMode: value)),
           ),
           _DropdownSetting(
-            label: 'Disposición de páginas',
-            description:
-                'La vista enfrentada solo se activa si ambas páginas son '
-                'legibles.',
+            label: strings.get('settings.pageLayout'),
+            description: strings.get('settings.pageLayout.description'),
             value: settings.defaultPageLayout,
-            values: const {
-              'single': 'Una página',
-              'facing': 'Dos páginas',
-              'continuous': 'Continua',
+            values: {
+              'single': strings.get('settings.value.singlePage'),
+              'facing': strings.get('settings.value.facingPages'),
+              'continuous': strings.get('settings.value.continuous'),
             },
             onChanged: (value) =>
                 _update(settings.copyWith(defaultPageLayout: value)),
           ),
           _DropdownSetting(
-            label: 'Ajuste de zoom',
+            label: strings.get('settings.zoomMode'),
             value: settings.defaultZoomMode,
-            values: const {
-              'fitWidth': 'Ajustar al ancho',
-              'fitPage': 'Ajustar a la página',
+            values: {
+              'fitWidth': strings.get('settings.value.fitWidth'),
+              'fitPage': strings.get('settings.value.fitPage'),
             },
             onChanged: (value) =>
                 _update(settings.copyWith(defaultZoomMode: value)),
           ),
           _SliderSetting(
-            label: 'Márgenes',
-            description: 'Espacio alrededor del documento.',
+            label: strings.get('settings.margins'),
+            description: strings.get('settings.margins.description'),
             value: settings.defaultMargin,
             onChanged: (value) =>
                 _update(settings.copyWith(defaultMargin: value)),
           ),
           _SwitchSetting(
-            label: 'Restaurar la última posición',
+            label: strings.get('settings.restorePosition'),
             value: settings.restoreLastPosition,
             onChanged: (value) =>
                 _update(settings.copyWith(restoreLastPosition: value)),
           ),
           _DropdownSetting(
-            label: 'Dirección de lectura',
+            label: strings.get('settings.readingDirection'),
             value: settings.readingDirection.name,
-            values: const {
-              'leftToRight': 'Izquierda a derecha',
-              'rightToLeft': 'Derecha a izquierda',
+            values: {
+              'leftToRight': strings.get('settings.value.leftToRight'),
+              'rightToLeft': strings.get('settings.value.rightToLeft'),
             },
             onChanged: (value) => _update(
               settings.copyWith(
@@ -281,21 +281,18 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       ),
       _SettingsSectionData(
         id: _SettingsSectionId.readerBar,
-        description: 'Jerarquía y espacio de las herramientas del lector.',
+        description: strings.get('settings.readerBar.description'),
         children: [
           _SwitchSetting(
-            label: 'Mostrar accesos al panel',
-            description:
-                'Miniaturas, índice y marcadores seguirán en Más opciones.',
+            label: strings.get('settings.showPanelControls'),
+            description: strings.get('settings.showPanelControls.description'),
             value: settings.showReaderPanelControls,
             onChanged: (value) =>
                 _update(settings.copyWith(showReaderPanelControls: value)),
           ),
           _SliderSetting(
-            label: 'Ancho del panel lateral',
-            description:
-                'Se conserva entre sesiones y también puede ajustarse '
-                'arrastrando su borde.',
+            label: strings.get('settings.panelWidth'),
+            description: strings.get('settings.panelWidth.description'),
             value: settings.readerPanelWidth,
             min: AppSizes.sidePanelMinWidth,
             max: AppSizes.sidePanelMaxWidth,
@@ -304,17 +301,15 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 _update(settings.copyWith(readerPanelWidth: value)),
           ),
           _SwitchSetting(
-            label: 'Recuperar la sesión al iniciar',
-            description:
-                'Reabre de forma segura el último documento y su contexto.',
+            label: strings.get('settings.restoreSession'),
+            description: strings.get('settings.restoreSession.description'),
             value: settings.restoreLastSession,
             onChanged: (value) =>
                 _update(settings.copyWith(restoreLastSession: value)),
           ),
           _SwitchSetting(
-            label: 'Iniciar siempre en la biblioteca',
-            description:
-                'Tiene prioridad sobre la recuperación automática de sesión.',
+            label: strings.get('settings.startInLibrary'),
+            description: strings.get('settings.startInLibrary.description'),
             value: settings.startInLibrary,
             onChanged: (value) =>
                 _update(settings.copyWith(startInLibrary: value)),
@@ -323,7 +318,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       ),
       _SettingsSectionData(
         id: _SettingsSectionId.shortcuts,
-        description: 'Un conjunto limitado, seguro y restaurable.',
+        description: strings.get('settings.shortcuts.description'),
         children: [
           for (final id in AppCommandRegistry.configurableIds)
             _ShortcutSetting(
@@ -335,11 +330,9 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   _assignShortcut(context, settings, id, token),
             ),
           _ActionSetting(
-            label: 'Restaurar atajos',
-            description:
-                'Recupera las combinaciones predeterminadas. Escape, Inicio, '
-                'Fin y las flechas básicas permanecen reservadas.',
-            actionLabel: 'Restaurar',
+            label: strings.get('settings.restoreShortcuts'),
+            description: strings.get('settings.restoreShortcuts.description'),
+            actionLabel: strings.get('action.reset'),
             onPressed: () =>
                 _update(settings.copyWith(shortcutOverrides: '{}')),
           ),
@@ -347,25 +340,23 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       ),
       _SettingsSectionData(
         id: _SettingsSectionId.library,
-        description: 'Recientes, portadas y almacenamiento temporal.',
+        description: strings.get('settings.library.description'),
         children: [
           _SwitchSetting(
-            label: 'Mostrar documentos recientes',
+            label: strings.get('settings.showRecents'),
             value: settings.showRecents,
             onChanged: (value) =>
                 _update(settings.copyWith(showRecents: value)),
           ),
           _SwitchSetting(
-            label: 'Generar portadas',
-            description:
-                'Elige localmente la mejor de las seis primeras páginas y '
-                'guarda miniaturas nítidas.',
+            label: strings.get('settings.generateCovers'),
+            description: strings.get('settings.generateCovers.description'),
             value: settings.generateCovers,
             onChanged: (value) =>
                 unawaited(_setCoverGeneration(settings, value)),
           ),
           _DropdownSetting(
-            label: 'Tamaño máximo de caché',
+            label: strings.get('settings.maxCache'),
             value: '${settings.maxCacheMegabytes}',
             values: const {
               '64': '64 MB',
@@ -377,29 +368,24 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 _update(settings.copyWith(maxCacheMegabytes: int.parse(value))),
           ),
           _ActionSetting(
-            label: 'Limpiar caché',
-            description: 'Elimina portadas y renderizados temporales.',
-            actionLabel: 'Limpiar',
+            label: strings.get('settings.clearCache'),
+            description: strings.get('settings.clearCache.description'),
+            actionLabel: strings.get('action.clear'),
             onPressed: () => _runWithNotice(
               context,
               widget.services.clearCache,
-              'Caché eliminada.',
+              strings.get('settings.clearCache.done'),
             ),
           ),
           _ActionSetting(
-            label: 'Eliminar historial',
-            description:
-                'Reinicia progreso, preferencias por documento, marcadores y '
-                'sesiones. Conserva biblioteca, anotaciones y colecciones.',
-            actionLabel: 'Eliminar',
+            label: strings.get('settings.deleteHistory'),
+            description: strings.get('settings.deleteHistory.description'),
+            actionLabel: strings.get('action.delete'),
             destructive: true,
             onPressed: () => _confirmAndRun(
               context,
-              title: '¿Eliminar historial?',
-              body:
-                  'Se reiniciarán progreso, preferencias por documento, '
-                  'marcadores y sesiones. Se conservarán documentos, '
-                  'anotaciones, etiquetas y colecciones.',
+              title: strings.get('settings.deleteHistory.confirmTitle'),
+              body: strings.get('settings.deleteHistory.confirmBody'),
               action: widget.services.deleteHistory,
             ),
           ),
@@ -407,26 +393,22 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       ),
       _SettingsSectionData(
         id: _SettingsSectionId.history,
-        description: 'Actividad local agrupada por día y bajo tu control.',
+        description: strings.get('settings.history.description'),
         children: [
           _SwitchSetting(
-            label: 'Registrar sesiones de lectura',
-            description: 'Solo tiempo activo aproximado, guardado localmente.',
+            label: strings.get('settings.recordSessions'),
+            description: strings.get('settings.recordSessions.description'),
             value: settings.recordReadingSessions,
             onChanged: (value) =>
                 _update(settings.copyWith(recordReadingSessions: value)),
           ),
           _DropdownSetting(
-            label: 'Límite del historial',
-            description:
-                'Las sesiones más antiguas se descartan automáticamente.',
+            label: strings.get('settings.historyLimit'),
+            description: strings.get('settings.historyLimit.description'),
             value: '${settings.readingHistoryLimit}',
-            values: const {
-              '50': '50 sesiones',
-              '100': '100 sesiones',
-              '250': '250 sesiones',
-              '500': '500 sesiones',
-              '1000': '1000 sesiones',
+            values: {
+              for (final count in const [50, 100, 250, 500, 1000])
+                '$count': strings.count('count.sessions', count),
             },
             onChanged: (value) {
               final limit = int.parse(value);
@@ -435,18 +417,16 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           _ActionSetting(
-            label: 'Ver historial de lectura',
-            description:
-                'Consulta páginas, duración y fecha; elimina entradas '
-                'individuales o todas.',
-            actionLabel: 'Ver historial',
+            label: strings.get('settings.viewHistory'),
+            description: strings.get('settings.viewHistory.description'),
+            actionLabel: strings.get('settings.viewHistory.action'),
             onPressed: () => _showReadingHistory(context, settings),
           ),
         ],
       ),
       _SettingsSectionData(
         id: _SettingsSectionId.dataPrivacy,
-        description: 'Datos locales, copias versionadas y privacidad.',
+        description: strings.get('settings.dataPrivacy.description'),
         children: [
           _StorageSummary(
             service: widget.services.storage,
@@ -454,55 +434,47 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               await _runWithNotice(
                 context,
                 widget.services.clearCache,
-                'Cachés recreables eliminadas.',
+                strings.get('settings.rebuildableCleared'),
               );
               if (mounted) setState(() {});
             },
             onClearBackups: () async {
               await _confirmAndRun(
                 context,
-                title: '¿Eliminar copias locales?',
-                body:
-                    'Solo se eliminarán copias de seguridad ya exportadas. '
-                    'Los PDF y la biblioteca permanecerán intactos.',
+                title: strings.get('settings.deleteBackups.confirmTitle'),
+                body: strings.get('settings.deleteBackups.confirmBody'),
                 action: widget.services.storage.clearBackups,
               );
               if (mounted) setState(() {});
             },
           ),
           _ActionSetting(
-            label: 'Exportar copia local',
-            description:
-                'Incluye biblioteca, progreso, marcadores, historial y '
-                'ajustes; nunca incluye el contenido de los PDF.',
-            actionLabel: 'Exportar',
+            label: strings.get('settings.exportBackup'),
+            description: strings.get('settings.exportBackup.description'),
+            actionLabel: strings.get('action.export'),
             onPressed: () => _exportBackup(context),
           ),
           _ActionSetting(
-            label: 'Importar copia local',
-            description:
-                'Muestra un resumen y pide confirmación. Antes crea una copia '
-                'de seguridad automática del estado actual.',
-            actionLabel: 'Importar',
+            label: strings.get('settings.importBackup'),
+            description: strings.get('settings.importBackup.description'),
+            actionLabel: strings.get('action.import'),
             onPressed: () => _importBackup(context),
           ),
           _ActionSetting(
-            label: 'Abrir ubicación de datos',
+            label: strings.get('settings.openDataLocation'),
             description: widget.services.paths.dataDirectory.path,
-            actionLabel: 'Abrir',
+            actionLabel: strings.get('action.open'),
             onPressed: widget.services.openDataLocation,
           ),
           _ActionSetting(
-            label: 'Eliminar todos los datos locales',
-            description: 'No elimina los archivos PDF originales.',
-            actionLabel: 'Eliminar',
+            label: strings.get('settings.deleteAllData'),
+            description: strings.get('settings.deleteAllData.description'),
+            actionLabel: strings.get('action.delete'),
             destructive: true,
             onPressed: () => _confirmAndRun(
               context,
-              title: '¿Eliminar todos los datos?',
-              body:
-                  'Se borrarán biblioteca, progreso, marcadores, sesiones, '
-                  'ajustes y caché. Los PDF originales no se modificarán.',
+              title: strings.get('settings.deleteAllData.confirmTitle'),
+              body: strings.get('settings.deleteAllData.confirmBody'),
               action: widget.services.deleteAllLocalData,
             ),
           ),
@@ -510,14 +482,12 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       ),
       _SettingsSectionData(
         id: _SettingsSectionId.advanced,
-        description: 'Diagnóstico, integridad y recuperación local.',
+        description: strings.get('settings.advanced.description'),
         children: [
           _ActionSetting(
-            label: 'Centro de diagnóstico',
-            description:
-                'Versiones, esquema, tamaños, recursos e integridad sin rutas, '
-                'títulos, consultas ni contenido.',
-            actionLabel: 'Abrir',
+            label: strings.get('settings.diagnostics'),
+            description: strings.get('settings.diagnostics.description'),
+            actionLabel: strings.get('action.open'),
             onPressed: () => showDialog<void>(
               context: context,
               builder: (context) =>
@@ -525,10 +495,9 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           _ActionSetting(
-            label: 'Ayuda contextual',
-            description:
-                'Resumen local de búsqueda, anotaciones, espacios y atajos.',
-            actionLabel: 'Ver ayuda',
+            label: strings.get('settings.contextualHelp'),
+            description: strings.get('settings.contextualHelp.description'),
+            actionLabel: strings.get('welcome.help'),
             onPressed: () => _showContextualHelp(context),
           ),
         ],
@@ -538,31 +507,8 @@ final class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _showContextualHelp(BuildContext context) => showDialog<void>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Ayuda de Yamantaka'),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: const SingleChildScrollView(
-          child: Text(
-            'Anotaciones: abre el panel de notas en el lector; se guardan '
-            'fuera del PDF y pueden exportarse en Markdown o JSON.\n\n'
-            'Búsqueda global: Ctrl+Mayús+F desde la biblioteca. La indexación '
-            'es opcional, cancelable y permanece en este dispositivo.\n\n'
-            'Espacios de trabajo: guarda documentos, posiciones y el panel para '
-            'restaurar una sesión. Los PDF nunca se copian.\n\n'
-            'Teclado: Ctrl+K abre comandos, Ctrl+F busca en la superficie '
-            'actual, F11 entra o sale de pantalla completa y Escape cierra la '
-            'superficie temporal activa.',
-          ),
-        ),
-      ),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Entendido'),
-        ),
-      ],
-    ),
+    builder: (context) =>
+        HelpCenterDialog(language: YamantakaLocalizations.of(context).language),
   );
 
   Future<void> _assignShortcut(
@@ -574,7 +520,12 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     final current = AppCommandRegistry.resolvedTokens(
       settings.shortcutOverrides,
     );
-    final error = AppCommandRegistry.assignmentError(id, token, current);
+    final error = AppCommandRegistry.assignmentError(
+      id,
+      token,
+      current,
+      localize: YamantakaLocalizations.of(context).get,
+    );
     if (error != null) {
       ScaffoldMessenger.of(
         context,
@@ -593,6 +544,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     BuildContext context,
     AppSettings settings,
   ) async {
+    final strings = YamantakaLocalizations.of(context);
     var entries = widget.services.readingSessions.history(
       limit: settings.readingHistoryLimit,
     );
@@ -631,12 +583,17 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
-                  'Páginas ${entry.session.startPage + 1}–'
-                  '${entry.session.endPage + 1} · '
-                  '${_formatDuration(entry.session.activeSeconds)}',
+                  strings.get(
+                    'settings.historyEntry',
+                    parameters: {
+                      'start': entry.session.startPage + 1,
+                      'end': entry.session.endPage + 1,
+                      'duration': _formatDuration(entry.session.activeSeconds),
+                    },
+                  ),
                 ),
                 trailing: IconButton(
-                  tooltip: 'Eliminar esta sesión',
+                  tooltip: strings.get('settings.deleteSession'),
                   onPressed: () {
                     widget.services.readingSessions.delete(entry.session.id);
                     setDialogState(() {
@@ -652,17 +609,15 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           }
           return AlertDialog(
             icon: const Icon(Icons.history_rounded),
-            title: const Text('Historial de lectura'),
+            title: Text(strings.get('settings.historyTitle')),
             content: SizedBox(
               width: 620,
               height: 460,
               child: entries.isEmpty
-                  ? const AppStatusView(
+                  ? AppStatusView(
                       icon: Icons.history_toggle_off_rounded,
-                      title: 'Sin sesiones guardadas',
-                      message:
-                          'El historial aparecerá aquí cuando cierres una '
-                          'sesión de lectura.',
+                      title: strings.get('settings.noSessions'),
+                      message: strings.get('settings.noSessions.description'),
                     )
                   : ListView(children: children),
             ),
@@ -673,11 +628,11 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                     widget.services.readingSessions.clear();
                     setDialogState(() => entries = const []);
                   },
-                  child: const Text('Eliminar todo'),
+                  child: Text(strings.get('action.deleteAll')),
                 ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cerrar'),
+                child: Text(strings.get('action.close')),
               ),
             ],
           );
@@ -687,15 +642,16 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _exportBackup(BuildContext context) async {
-    const type = XTypeGroup(
-      label: 'Copia local de Yamantaka',
+    final strings = YamantakaLocalizations.of(context);
+    final type = XTypeGroup(
+      label: strings.get('backup.fileType'),
       extensions: ['json'],
       mimeTypes: ['application/json'],
     );
     final stamp = DateTime.now().toIso8601String().split('T').first;
     final location = await getSaveLocation(
       suggestedName: 'yamantaka-backup-$stamp.json',
-      acceptedTypeGroups: const [type],
+      acceptedTypeGroups: [type],
     );
     if (location == null) return;
     try {
@@ -703,24 +659,29 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Copia local exportada.')));
+        ).showSnackBar(SnackBar(content: Text(strings.get('backup.exported'))));
       }
     } on Object catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('No se pudo exportar: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              strings.get('backup.exportFailed', parameters: {'error': error}),
+            ),
+          ),
+        );
       }
     }
   }
 
   Future<void> _importBackup(BuildContext context) async {
-    const type = XTypeGroup(
-      label: 'Copia local de Yamantaka',
+    final strings = YamantakaLocalizations.of(context);
+    final type = XTypeGroup(
+      label: strings.get('backup.fileType'),
       extensions: ['json'],
       mimeTypes: ['application/json'],
     );
-    final selected = await openFile(acceptedTypeGroups: const [type]);
+    final selected = await openFile(acceptedTypeGroups: [type]);
     if (selected == null || !context.mounted) return;
     try {
       final preview = await widget.services.backups.preview(selected.path);
@@ -737,7 +698,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Copia importada. Respaldo previo guardado en $safetyPath',
+              strings.get('backup.imported', parameters: {'path': safetyPath}),
             ),
           ),
         );
@@ -751,11 +712,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     } on Object {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'No se pudo importar. Los datos actuales se conservaron.',
-            ),
-          ),
+          SnackBar(content: Text(strings.get('backup.importFailed'))),
         );
       }
     }
@@ -765,27 +722,32 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     BuildContext context,
     BackupPreview preview,
   ) async {
+    final strings = YamantakaLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.inventory_2_outlined),
-        title: const Text('Importar copia local'),
+        title: Text(strings.get('settings.importBackup')),
         content: Text(
-          'Versión ${preview.version} · ${preview.documentCount} documentos · '
-          '${preview.bookmarkCount} marcadores · '
-          '${preview.annotationCount} anotaciones · '
-          '${preview.sessionCount} sesiones.\n\n'
-          'Se sustituirán los datos locales actuales. Antes se guardará una '
-          'copia de seguridad automática. Los PDF no se modifican.',
+          strings.get(
+            'backup.importPreview',
+            parameters: {
+              'version': preview.version,
+              'documents': preview.documentCount,
+              'bookmarks': preview.bookmarkCount,
+              'annotations': preview.annotationCount,
+              'sessions': preview.sessionCount,
+            },
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+            child: Text(strings.get('action.cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Importar'),
+            child: Text(strings.get('action.import')),
           ),
         ],
       ),
@@ -794,6 +756,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _update(AppSettings settings) async {
+    final strings = YamantakaLocalizations.of(context);
     try {
       await widget.services.settings.updateStrict(settings);
       if (!mounted) return;
@@ -801,10 +764,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         SnackBar(
-          content: const Text('Ajuste actualizado'),
+          content: Text(strings.get('settings.updated')),
           duration: const Duration(seconds: 4),
           action: SnackBarAction(
-            label: 'Deshacer',
+            label: strings.get('action.undo'),
             onPressed: () async {
               await widget.services.settings.undoLastUpdate();
               if (mounted) setState(() {});
@@ -816,9 +779,11 @@ final class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No se pudo guardar el ajuste: $error'),
+          content: Text(
+            strings.get('settings.saveFailed', parameters: {'error': error}),
+          ),
           action: SnackBarAction(
-            label: 'Reintentar',
+            label: strings.get('action.retry'),
             onPressed: () => unawaited(_update(settings)),
           ),
         ),
@@ -855,6 +820,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     required String body,
     required Future<void> Function() action,
   }) async {
+    final strings = YamantakaLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -867,14 +833,14 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
+            child: Text(strings.get('action.cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: dialogContext.appColors.danger,
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Eliminar'),
+            child: Text(strings.get('action.delete')),
           ),
         ],
       ),
@@ -883,679 +849,27 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-final class _StorageSummary extends StatelessWidget {
-  const _StorageSummary({
-    required this.service,
-    required this.onClearRebuildable,
-    required this.onClearBackups,
-  });
+/// Lightweight, independently testable settings chrome. Keeping it separate
+/// also prevents locale-only changes from rebuilding the settings sections.
+final class SettingsAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
+  const SettingsAppBar({super.key, required this.onBack});
 
-  final LocalStorageService service;
-  final Future<void> Function() onClearRebuildable;
-  final Future<void> Function() onClearBackups;
+  final VoidCallback onBack;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: service.measure(),
-      builder: (context, snapshot) {
-        final entries = snapshot.data;
-        if (entries is! List<StorageEntry>) {
-          return const ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('Almacenamiento local'),
-            subtitle: Text('Calculando tamaños…'),
-          );
-        }
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.space12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Almacenamiento local',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: AppSpacing.space8),
-              for (final entry in entries)
-                ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(entry.category.name),
-                  subtitle: Text(entry.description),
-                  trailing: Text(_formatStorageBytes(entry.bytes)),
-                ),
-              const SizedBox(height: AppSpacing.space4),
-              Text(
-                'Los archivos PDF originales no se borran desde estas acciones.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.space8),
-              Wrap(
-                spacing: AppSpacing.space8,
-                runSpacing: AppSpacing.space8,
-                children: [
-                  OutlinedButton(
-                    onPressed: onClearRebuildable,
-                    child: const Text('Limpiar recreables'),
-                  ),
-                  OutlinedButton(
-                    onPressed: onClearBackups,
-                    child: const Text('Eliminar copias'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-enum _SettingsSectionId {
-  appearance('Apariencia', Icons.contrast_rounded),
-  reading('Lectura', Icons.menu_book_outlined),
-  readerBar('Controles del lector', Icons.space_dashboard_outlined),
-  shortcuts('Atajos', Icons.keyboard_outlined),
-  library('Biblioteca', Icons.library_books_outlined),
-  history('Historial', Icons.history_rounded),
-  dataPrivacy('Datos y privacidad', Icons.shield_outlined),
-  advanced('Avanzado', Icons.health_and_safety_outlined);
-
-  const _SettingsSectionId(this.label, this.icon);
-
-  final String label;
-  final IconData icon;
-}
-
-final class _SettingsSectionData {
-  const _SettingsSectionData({
-    required this.id,
-    required this.description,
-    required this.children,
-  });
-
-  final _SettingsSectionId id;
-  final String description;
-  final List<Widget> children;
-}
-
-final class _DesktopSettings extends StatelessWidget {
-  const _DesktopSettings({
-    required this.sections,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final List<_SettingsSectionData> sections;
-  final _SettingsSectionId selected;
-  final ValueChanged<_SettingsSectionId> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedSection = sections.firstWhere(
-      (section) => section.id == selected,
-    );
-    return Row(
-      children: [
-        Container(
-          width: AppSizes.settingsNavigationWidth,
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceSecondary,
-            border: Border(
-              right: BorderSide(color: context.appColors.borderSubtle),
-            ),
-          ),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.space16,
-              AppSpacing.space24,
-              AppSpacing.space16,
-              AppSpacing.space32,
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.space12,
-                ),
-                child: Text(
-                  'Preferencias locales',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: context.appColors.textMuted,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.space12),
-              for (final section in sections)
-                _SettingsNavItem(
-                  section: section.id,
-                  selected: selected == section.id,
-                  onPressed: () => onSelected(section.id),
-                ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _SettingsSectionView(
-            section: selectedSection,
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.pagePadding(MediaQuery.sizeOf(context).width),
-              AppSpacing.space32,
-              AppSpacing.pagePadding(MediaQuery.sizeOf(context).width),
-              AppSpacing.space64,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-final class _CompactSettings extends StatelessWidget {
-  const _CompactSettings({required this.sections});
-
-  final List<_SettingsSectionData> sections;
-
-  @override
-  Widget build(BuildContext context) =>
-      _CompactSettingsNavigator(sections: sections);
-}
-
-final class _CompactSettingsNavigator extends StatefulWidget {
-  const _CompactSettingsNavigator({required this.sections});
-
-  final List<_SettingsSectionData> sections;
-
-  @override
-  State<_CompactSettingsNavigator> createState() =>
-      _CompactSettingsNavigatorState();
-}
-
-final class _CompactSettingsNavigatorState
-    extends State<_CompactSettingsNavigator> {
-  _SettingsSectionId? _selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = _selected;
-    if (selected != null) {
-      final section = widget.sections.firstWhere((item) => item.id == selected);
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.space20,
-          AppSpacing.space12,
-          AppSpacing.space20,
-          AppSpacing.space48,
-        ),
-        children: [
-          TextButton.icon(
-            onPressed: () => setState(() => _selected = null),
-            icon: const Icon(Icons.arrow_back_rounded, size: 18),
-            label: const Text('Todas las categorías'),
-            style: TextButton.styleFrom(alignment: Alignment.centerLeft),
-          ),
-          const SizedBox(height: AppSpacing.space12),
-          _SettingsSectionContent(section: section),
-        ],
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.space20,
-        AppSpacing.space24,
-        AppSpacing.space20,
-        AppSpacing.space48,
+    final strings = YamantakaLocalizations.of(context);
+    return AppBar(
+      leading: IconButton(
+        tooltip: strings.settingsBack,
+        onPressed: onBack,
+        icon: const Icon(Icons.arrow_back_rounded),
       ),
-      children: [
-        const AppSectionHeader(
-          title: 'Preferencias locales',
-          description: 'Los cambios reversibles se guardan al instante.',
-        ),
-        const SizedBox(height: AppSpacing.space20),
-        for (final section in widget.sections)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.space8),
-            child: _SettingsNavItem(
-              section: section.id,
-              selected: false,
-              onPressed: () => setState(() => _selected = section.id),
-            ),
-          ),
-      ],
+      title: Text(strings.settingsTitle),
     );
   }
-}
-
-final class _SettingsSectionView extends StatelessWidget {
-  const _SettingsSectionView({required this.section, required this.padding});
-
-  final _SettingsSectionData section;
-  final EdgeInsets padding;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: AppSizes.settingsContentMaxWidth,
-        ),
-        child: ListView(
-          padding: padding,
-          children: [_SettingsSectionContent(section: section)],
-        ),
-      ),
-    );
-  }
-}
-
-final class _SettingsSectionContent extends StatelessWidget {
-  const _SettingsSectionContent({required this.section});
-
-  final _SettingsSectionData section;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Semantics(
-          header: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                section.id.label,
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              const SizedBox(height: AppSpacing.space4),
-              Text(
-                section.description,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.space20),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space4),
-          child: Column(
-            children: [for (final child in section.children) child],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-final class _SettingsNavItem extends StatelessWidget {
-  const _SettingsNavItem({
-    required this.section,
-    required this.selected,
-    required this.onPressed,
-  });
-
-  final _SettingsSectionId section;
-  final bool selected;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: section.label,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.space4),
-        child: Material(
-          color: selected
-              ? context.appColors.selectionBackground
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadii.capsule),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.capsule),
-            onTap: onPressed,
-            child: Container(
-              height: AppSizes.desktopControlExtent,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.space12,
-              ),
-              child: Row(
-                children: [
-                  AnimatedContainer(
-                    duration: AppMotion.whenAllowed(
-                      MediaQuery.disableAnimationsOf(context),
-                      AppMotion.fast,
-                    ),
-                    width: 3,
-                    height: selected ? 18 : 3,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? context.appColors.accentPrimary
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(AppRadii.indicator),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.space8),
-                  Icon(section.icon, size: 18),
-                  const SizedBox(width: AppSpacing.space12),
-                  Expanded(child: Text(section.label)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-final class _AppearancePreview extends StatelessWidget {
-  const _AppearancePreview({required this.settings});
-
-  final AppSettings settings;
-
-  @override
-  Widget build(BuildContext context) {
-    final readerTheme = ReaderTheme.values
-        .where((theme) => theme.name == settings.defaultReaderTheme)
-        .firstOrNull;
-    return Semantics(
-      label:
-          'Vista previa: interfaz ${settings.darkMode ? 'oscura' : 'clara'}, '
-          'densidad ${settings.interfaceDensity.name}, '
-          'lienzo ${readerTheme?.label ?? 'Marfil'}',
-      child: Container(
-        key: const Key('appearance-preview'),
-        padding: const EdgeInsets.all(AppSpacing.space16),
-        decoration: BoxDecoration(
-          color: context.appColors.surfaceSecondary,
-          border: Border.all(color: context.appColors.borderSubtle),
-          borderRadius: BorderRadius.circular(AppRadii.field),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 68,
-              decoration: BoxDecoration(
-                color: Color(
-                  readerTheme?.colorValue ?? ReaderTheme.ivory.colorValue,
-                ),
-                border: Border.all(color: context.appColors.borderStrong),
-                boxShadow:
-                    settings.visualProfile == ReaderVisualProfile.electronicInk
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: context.appColors.readerPageShadow,
-                          blurRadius: AppShadow.readerPageBlur,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.space16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Vista previa',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: AppSpacing.space4),
-                  Text(
-                    '${settings.interfaceDensity == AppInterfaceDensity.compact ? 'Compacta' : 'Cómoda'} · '
-                    '${readerTheme?.label ?? 'Marfil'} · '
-                    '${settings.visualProfile == ReaderVisualProfile.electronicInk ? 'Tinta electrónica' : 'Estándar'}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-final class _SettingRow extends StatelessWidget {
-  const _SettingRow({
-    required this.label,
-    required this.control,
-    this.description,
-  });
-
-  final String label;
-  final String? description;
-  final Widget control;
-
-  @override
-  Widget build(BuildContext context) {
-    return YamaSettingRow(
-      label: label,
-      description: description,
-      control: control,
-    );
-  }
-}
-
-final class _SwitchSetting extends StatelessWidget {
-  const _SwitchSetting({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-    this.description,
-  });
-
-  final String label;
-  final String? description;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SettingRow(
-      label: label,
-      description: description,
-      control: Semantics(
-        label: label,
-        child: Switch(value: value, onChanged: onChanged),
-      ),
-    );
-  }
-}
-
-final class _DropdownSetting extends StatelessWidget {
-  const _DropdownSetting({
-    required this.label,
-    required this.value,
-    required this.values,
-    required this.onChanged,
-    this.description,
-  });
-
-  final String label;
-  final String? description;
-  final String value;
-  final Map<String, String> values;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SettingRow(
-      label: label,
-      description: description,
-      control: SizedBox(
-        width: 224,
-        child: DropdownButtonFormField<String>(
-          initialValue: value,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.space12,
-              vertical: AppSpacing.space8,
-            ),
-          ),
-          items: values.entries
-              .map(
-                (entry) => DropdownMenuItem(
-                  value: entry.key,
-                  child: Text(entry.value),
-                ),
-              )
-              .toList(growable: false),
-          onChanged: (next) {
-            if (next != null) onChanged(next);
-          },
-        ),
-      ),
-    );
-  }
-}
-
-final class _SliderSetting extends StatelessWidget {
-  const _SliderSetting({
-    required this.label,
-    required this.description,
-    required this.value,
-    required this.onChanged,
-    this.min = 8,
-    this.max = 72,
-    this.divisions = 8,
-  });
-
-  final String label;
-  final String description;
-  final double value;
-  final ValueChanged<double> onChanged;
-  final double min;
-  final double max;
-  final int divisions;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SettingRow(
-      label: label,
-      description: description,
-      control: SizedBox(
-        width: 224,
-        child: Row(
-          children: [
-            Expanded(
-              child: Slider(
-                value: value,
-                min: min,
-                max: max,
-                divisions: divisions,
-                label: '${value.round()} px',
-                onChanged: onChanged,
-              ),
-            ),
-            SizedBox(
-              width: 48,
-              child: Text(
-                '${value.round()} px',
-                textAlign: TextAlign.end,
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-final class _ShortcutSetting extends StatelessWidget {
-  const _ShortcutSetting({
-    required this.commandId,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final AppCommandId commandId;
-  final String value;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final definition = AppCommandRegistry.definitions.firstWhere(
-      (item) => item.id == commandId,
-    );
-    return _SettingRow(
-      label: definition.label,
-      description: 'Solo combinaciones prevalidadas; se rechazan conflictos.',
-      control: SizedBox(
-        width: 180,
-        child: DropdownButtonFormField<String>(
-          initialValue: value,
-          decoration: const InputDecoration(isDense: true),
-          items: [
-            for (final choice in AppCommandRegistry.shortcutChoices)
-              DropdownMenuItem(value: choice.token, child: Text(choice.label)),
-          ],
-          onChanged: (next) {
-            if (next != null) onChanged(next);
-          },
-        ),
-      ),
-    );
-  }
-}
-
-final class _ActionSetting extends StatelessWidget {
-  const _ActionSetting({
-    required this.label,
-    required this.description,
-    required this.actionLabel,
-    required this.onPressed,
-    this.destructive = false,
-  });
-
-  final String label;
-  final String description;
-  final String actionLabel;
-  final VoidCallback onPressed;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SettingRow(
-      label: label,
-      description: description,
-      control: destructive
-          ? OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: context.appColors.danger,
-                side: BorderSide(color: context.appColors.danger),
-              ),
-              onPressed: onPressed,
-              child: Text(actionLabel),
-            )
-          : OutlinedButton(onPressed: onPressed, child: Text(actionLabel)),
-    );
-  }
-}
-
-String _formatStorageBytes(int bytes) {
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  if (bytes < 1024 * 1024 * 1024) {
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-}
-
-String _formatDuration(int seconds) {
-  if (seconds < 60) return '$seconds s';
-  final minutes = seconds ~/ 60;
-  if (minutes < 60) return '$minutes min';
-  final hours = minutes ~/ 60;
-  final remainder = minutes % 60;
-  return '$hours h ${remainder.toString().padLeft(2, '0')} min';
 }

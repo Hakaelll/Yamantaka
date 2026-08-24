@@ -7,7 +7,7 @@ abstract final class AppConfig {
   static const String databaseFileName = 'yamantaka.sqlite3';
   static const String cacheDirectoryName = 'render-cache';
   static const String thumbnailDirectoryName = 'covers';
-  static const int databaseVersion = 8;
+  static const int databaseVersion = 9;
   static const int maxRecentDocuments = 40;
   static const int maxOpenTabs = 12;
   static const int maxWarmTabs = 2;

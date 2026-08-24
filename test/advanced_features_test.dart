@@ -194,6 +194,57 @@ void main() {
       expect(controller.annotations, hasLength(1));
     });
 
+    test(
+      'undo and redo persist combined create, edit and delete sequences',
+      () {
+        final first = controller.create(pageIndex: 1, note: 'Primera')!;
+        final second = controller.create(pageIndex: 2, note: 'Segunda')!;
+        expect(
+          controller.update(first.copyWith(note: 'Primera editada')),
+          isTrue,
+        );
+        expect(controller.delete(second), isTrue);
+        expect(repository.byId(second.id), isNull);
+
+        expect(controller.undo(), isTrue);
+        expect(repository.byId(second.id)?.note, 'Segunda');
+        expect(controller.undo(), isTrue);
+        expect(repository.byId(first.id)?.note, 'Primera');
+        expect(controller.redo(), isTrue);
+        expect(repository.byId(first.id)?.note, 'Primera editada');
+        expect(controller.redo(), isTrue);
+        expect(repository.byId(second.id), isNull);
+        expect(controller.canRedo, isFalse);
+      },
+    );
+
+    test(
+      'history is bounded, document-scoped and rejects invalid operations',
+      () {
+        final bounded = AnnotationController(repository, historyLimit: 2)
+          ..load(document.id, document.fingerprint);
+        addTearDown(bounded.dispose);
+        final first = bounded.create(pageIndex: 0, note: 'Uno')!;
+        bounded.create(pageIndex: 1, note: 'Dos');
+        bounded.create(pageIndex: 2, note: 'Tres');
+
+        expect(bounded.undo(), isTrue);
+        expect(bounded.undo(), isTrue);
+        expect(bounded.undo(), isFalse);
+        expect(repository.byId(first.id), isNotNull);
+
+        bounded.clear();
+        bounded.load(document.id, document.fingerprint);
+        expect(bounded.canUndo, isFalse);
+        final foreign = first.copyWith(note: 'No válido');
+        repository.remove(first.id);
+        expect(bounded.update(foreign), isFalse);
+        expect(bounded.delete(foreign), isFalse);
+        expect(bounded.undo(), isFalse);
+        expect(bounded.redo(), isFalse);
+      },
+    );
+
     test('rotates normalized coordinates without pixel coupling', () {
       const rect = NormalizedRect(left: 0.1, top: 0.2, right: 0.4, bottom: 0.5);
       final rotated = rect.rotatedClockwise();

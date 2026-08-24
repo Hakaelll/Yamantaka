@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../application/global_search_controller.dart';
 import '../application/library_index_controller.dart';
 import '../domain/global_search_models.dart';
@@ -35,6 +36,7 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     return Dialog(
       insetPadding: const EdgeInsets.all(AppSpacing.space16),
       child: ConstrainedBox(
@@ -59,12 +61,12 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Buscar en la biblioteca',
+                          strings.searchTitle,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Cerrar',
+                        tooltip: strings.get('action.close'),
                         onPressed: () => Navigator.pop(context),
                         icon: const Icon(Icons.close_rounded),
                       ),
@@ -82,11 +84,11 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
                     textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.manage_search_rounded),
-                      labelText: 'Documentos, contenido, notas y etiquetas',
+                      labelText: strings.searchField,
                       suffixIcon: _queryController.text.isEmpty
                           ? null
                           : IconButton(
-                              tooltip: 'Limpiar',
+                              tooltip: strings.get('action.clear'),
                               onPressed: () {
                                 _queryController.clear();
                                 widget.controller.clear();
@@ -118,25 +120,22 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
 
   Widget _results() {
     final controller = widget.controller;
+    final strings = YamantakaLocalizations.of(context);
     if (controller.isSearching && controller.results.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     if (controller.query.isEmpty) {
-      return const AppStatusView(
+      return AppStatusView(
         icon: Icons.search_rounded,
-        title: 'Búsqueda local unificada',
-        message:
-            'Busca por metadatos, contenido extraíble, anotaciones, '
-            'colecciones y etiquetas. El índice permanece en este dispositivo.',
+        title: strings.searchEmptyTitle,
+        message: strings.searchEmptyBody,
       );
     }
     if (controller.results.isEmpty) {
-      return const AppStatusView(
+      return AppStatusView(
         icon: Icons.search_off_rounded,
-        title: 'Sin resultados',
-        message:
-            'El documento puede no contener texto extraíble o aún no estar '
-            'indexado. Yamantaka no realiza OCR.',
+        title: strings.searchNoResultsTitle,
+        message: strings.searchNoResultsBody,
       );
     }
     return ListView.builder(
@@ -149,7 +148,7 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
             child: OutlinedButton(
               onPressed: () =>
                   controller.search(controller.query, loadMore: true),
-              child: const Text('Cargar más'),
+              child: Text(strings.get('action.loadMore')),
             ),
           );
         }
@@ -163,8 +162,12 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
           ),
           subtitle: Text(
             [
-              result.kind.label,
-              if (result.pageIndex != null) 'Página ${result.pageIndex! + 1}',
+              strings.get('search.kind.${result.kind.name}'),
+              if (result.pageIndex != null)
+                strings.get(
+                  'reader.page',
+                  parameters: {'page': result.pageIndex! + 1},
+                ),
               if (result.snippet.isNotEmpty) result.snippet,
             ].join(' · '),
             maxLines: 3,
@@ -196,6 +199,7 @@ final class _IndexStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
       child: Row(
@@ -209,10 +213,15 @@ final class _IndexStatusBar extends StatelessWidget {
                 Text(
                   controller.enabled
                       ? progress.isRunning
-                            ? 'Indexando ${progress.completedDocuments} de '
-                                  '${progress.totalDocuments}'
-                            : 'Índice local activado'
-                      : 'Índice local desactivado',
+                            ? strings.get(
+                                'search.indexing',
+                                parameters: {
+                                  'current': progress.completedDocuments,
+                                  'total': progress.totalDocuments,
+                                },
+                              )
+                            : strings.get('search.indexEnabled')
+                      : strings.get('search.indexDisabled'),
                   style: Theme.of(context).textTheme.labelMedium,
                 ),
                 if (progress.isRunning)
@@ -222,7 +231,9 @@ final class _IndexStatusBar extends StatelessWidget {
           ),
           if (progress.isRunning)
             IconButton(
-              tooltip: progress.isPaused ? 'Reanudar' : 'Pausar',
+              tooltip: strings.get(
+                progress.isPaused ? 'action.resume' : 'action.pause',
+              ),
               onPressed: progress.isPaused
                   ? controller.resume
                   : controller.pause,
@@ -234,12 +245,12 @@ final class _IndexStatusBar extends StatelessWidget {
             )
           else if (controller.enabled)
             IconButton(
-              tooltip: 'Actualizar índice',
+              tooltip: strings.get('search.updateIndex'),
               onPressed: controller.indexIncremental,
               icon: const Icon(Icons.refresh_rounded),
             ),
           PopupMenuButton<_IndexAction>(
-            tooltip: 'Mantenimiento del índice',
+            tooltip: strings.get('search.indexMaintenance'),
             onSelected: (action) {
               switch (action) {
                 case _IndexAction.rebuild:
@@ -248,14 +259,14 @@ final class _IndexStatusBar extends StatelessWidget {
                   controller.clearIndex();
               }
             },
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
                 value: _IndexAction.rebuild,
-                child: Text('Reconstruir índice'),
+                child: Text(strings.get('search.rebuildIndex')),
               ),
               PopupMenuItem(
                 value: _IndexAction.clear,
-                child: Text('Borrar índice'),
+                child: Text(strings.get('search.clearIndex')),
               ),
             ],
           ),

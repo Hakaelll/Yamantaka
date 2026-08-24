@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -141,7 +142,179 @@ void main() {
     await tester.pumpAndSettle();
     await _capture(tester, _suffix(capturePath, '-compact-dark'));
   });
+
+  testWidgets('captures the complete requested library widget matrix', (
+    tester,
+  ) async {
+    const outputRoot = String.fromEnvironment('YAMANTAKA_LIBRARY_MATRIX_DIR');
+    if (outputRoot.isEmpty) return;
+    final output = Directory(outputRoot)..createSync(recursive: true);
+    final directory = await Directory.systemTemp.createTemp(
+      'yamantaka-library-matrix-',
+    );
+    final logger = AppLogger(minimumLevel: LogLevel.error);
+    final database = AppDatabase.inMemory(logger);
+    final documents = DocumentRepository(database);
+    final controller = LibraryController(documents, logger);
+    addTearDown(() async {
+      controller.dispose();
+      database.close();
+      await directory.delete(recursive: true);
+    });
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await controller.load();
+    final evidence = <Map<String, Object?>>[];
+
+    Widget app({
+      required ThemeMode themeMode,
+      required bool highContrast,
+      required bool reduceMotion,
+    }) => MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(highContrast: highContrast),
+      darkTheme: AppTheme.dark(highContrast: highContrast),
+      themeMode: themeMode,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(highContrast: highContrast, disableAnimations: reduceMotion),
+        child: child!,
+      ),
+      home: RepaintBoundary(
+        key: const Key('library-capture-boundary'),
+        child: LibraryScreen(
+          controller: controller,
+          onOpenPath: (_) async {},
+          onPickDocument: () async {},
+          onOpenSettings: () {},
+          showRecents: true,
+          onDocumentInfo: (_) async {},
+        ),
+      ),
+    );
+
+    Future<void> capture({
+      required String state,
+      required String sizeName,
+      required Size size,
+      ThemeMode themeMode = ThemeMode.light,
+      bool highContrast = false,
+      bool reduceMotion = false,
+    }) async {
+      tester.view.physicalSize = size;
+      await tester.pumpWidget(
+        app(
+          themeMode: themeMode,
+          highContrast: highContrast,
+          reduceMotion: reduceMotion,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+      final qualifiers = [
+        themeMode == ThemeMode.dark ? 'dark' : 'light',
+        if (highContrast) 'high-contrast',
+        if (reduceMotion) 'reduced-motion',
+        'widget',
+      ].join('-');
+      final name = 'library-$state-$sizeName-$qualifiers';
+      final path = '${output.path}${Platform.pathSeparator}$name.png';
+      await _capture(tester, path);
+      evidence.add({
+        'name': name,
+        'state': state,
+        'width': size.width.round(),
+        'height': size.height.round(),
+        'theme': themeMode.name,
+        'highContrast': highContrast,
+        'reducedMotion': reduceMotion,
+        'source': 'flutter-widget-integration-test',
+        'path': path,
+      });
+    }
+
+    const sizes = [
+      ('640x480', Size(640, 480)),
+      ('800x600', Size(800, 600)),
+      ('1280x720', Size(1280, 720)),
+      ('1600x900', Size(1600, 900)),
+    ];
+    for (final size in sizes) {
+      await capture(state: 'empty', sizeName: size.$1, size: size.$2);
+    }
+
+    final now = DateTime.utc(2026, 8, 24, 12);
+    for (var index = 0; index < 4; index++) {
+      final cover = await _createCover(directory, index);
+      documents.save(
+        _matrixDocument(index: index, now: now, coverPath: cover.path),
+      );
+    }
+    await controller.load();
+    for (final size in sizes) {
+      await capture(state: 'few', sizeName: size.$1, size: size.$2);
+    }
+
+    for (var index = 4; index < 40; index++) {
+      documents.save(_matrixDocument(index: index, now: now));
+    }
+    await controller.load();
+    for (final size in sizes) {
+      await capture(state: 'many', sizeName: size.$1, size: size.$2);
+    }
+    await capture(
+      state: 'many',
+      sizeName: '1280x720',
+      size: const Size(1280, 720),
+      themeMode: ThemeMode.dark,
+    );
+    await capture(
+      state: 'many',
+      sizeName: '1280x720',
+      size: const Size(1280, 720),
+      highContrast: true,
+    );
+    await capture(
+      state: 'many',
+      sizeName: '1280x720',
+      size: const Size(1280, 720),
+      reduceMotion: true,
+    );
+    File(
+      '${output.path}${Platform.pathSeparator}library-matrix.json',
+    ).writeAsStringSync(
+      const JsonEncoder.withIndent('  ').convert({
+        'format': 'yamantaka-library-widget-matrix',
+        'generatedAt': DateTime.now().toUtc().toIso8601String(),
+        'source': 'flutter-widget-integration-test',
+        'cases': evidence,
+      }),
+    );
+  });
 }
+
+LibraryDocument _matrixDocument({
+  required int index,
+  required DateTime now,
+  String? coverPath,
+}) => LibraryDocument(
+  id: 'matrix-$index',
+  path: 'matrix-$index.pdf',
+  normalizedPath: 'matrix-$index.pdf',
+  fileName: 'matrix-$index.pdf',
+  title: 'Documento de muestra ${index + 1}',
+  author: 'Autor ${(index % 8) + 1}',
+  pageCount: 80 + index * 3,
+  fileSize: 1024 * (index + 1),
+  fileModifiedAt: now.subtract(Duration(days: index)),
+  addedAt: now.subtract(Duration(hours: index)),
+  lastOpenedAt: now.subtract(Duration(days: index % 9)),
+  lastPageIndex: index % 12,
+  readingProgress: (index % 10) / 10,
+  fingerprint: 'matrix-$index',
+  thumbnailPath: coverPath,
+);
 
 Future<void> _capture(WidgetTester tester, String path) async {
   final boundary = tester.renderObject<RenderRepaintBoundary>(
@@ -151,7 +324,7 @@ Future<void> _capture(WidgetTester tester, String path) async {
   final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
   final file = File(path);
   file.parent.createSync(recursive: true);
-  await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
+  file.writeAsBytesSync(bytes!.buffer.asUint8List(), flush: true);
 }
 
 String _suffix(String path, String suffix) =>

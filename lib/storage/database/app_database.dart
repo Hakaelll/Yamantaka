@@ -480,6 +480,50 @@ final class AppDatabase {
       });
       logger.info('Migrated database schema to version 8.');
     }
+    final versionAfterEnrichment =
+        database.select('PRAGMA user_version').first.columnAt(0) as int;
+    if (versionAfterEnrichment < 9) {
+      _transaction(() {
+        final columns = database
+            .select('PRAGMA table_info(documents)')
+            .map((row) => row['name'] as String)
+            .toSet();
+        if (!columns.contains('is_modified')) {
+          database.execute(
+            'ALTER TABLE documents ADD COLUMN is_modified INTEGER NOT NULL '
+            'DEFAULT 0 CHECK(is_modified IN (0, 1))',
+          );
+        }
+        if (!columns.contains('last_validated_at')) {
+          database.execute(
+            'ALTER TABLE documents ADD COLUMN last_validated_at TEXT',
+          );
+        }
+        database
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_validation '
+            'ON documents(last_validated_at, id)',
+          )
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_opened_stable '
+            'ON documents(last_opened_at DESC, id ASC)',
+          )
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_favorite_opened_stable '
+            'ON documents(is_favorite, last_opened_at DESC, id ASC)',
+          )
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_added_stable '
+            'ON documents(added_at DESC, id ASC)',
+          )
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_documents_progress_stable '
+            'ON documents(reading_progress DESC, id ASC)',
+          )
+          ..execute('PRAGMA user_version = 9');
+      });
+      logger.info('Migrated database schema to version 9.');
+    }
   }
 
   void _transaction(void Function() operation) {
@@ -492,6 +536,9 @@ final class AppDatabase {
       rethrow;
     }
   }
+
+  /// Groups a bounded repository mutation into one local SQLite transaction.
+  void writeTransaction(void Function() operation) => _transaction(operation);
 
   void clearUserData() {
     _transaction(() {

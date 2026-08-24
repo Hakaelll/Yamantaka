@@ -1,6 +1,9 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/features/help/domain/help_content.dart';
+import 'package:yamantaka/features/help/presentation/help_center_dialog.dart';
 
 void main() {
   test(
@@ -14,4 +17,28 @@ void main() {
       );
     },
   );
+
+  testWidgets('help center opens in Spanish and English', (tester) async {
+    for (final language in AppLanguage.values) {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: Locale(language.code),
+          supportedLocales: const [Locale('es'), Locale('en')],
+          localizationsDelegates: const [
+            YamantakaLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: HelpCenterDialog(language: language),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.text(language == AppLanguage.spanish ? 'Ayuda' : 'Help'),
+        findsOneWidget,
+      );
+    }
+  });
 }

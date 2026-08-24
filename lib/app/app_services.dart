@@ -19,6 +19,7 @@ import '../features/library/application/document_enrichment_controller.dart';
 import '../features/library/application/duplicate_resolution_service.dart';
 import '../features/library/application/library_bulk_operation_service.dart';
 import '../features/library/application/library_controller.dart';
+import '../features/library/application/library_file_validation_controller.dart';
 import '../features/library/application/folder_import_controller.dart';
 import '../features/library/application/folder_watch_controller.dart';
 import '../features/library/application/document_recovery_service.dart';
@@ -59,6 +60,7 @@ final class AppServices {
     required this.database,
     required this.logger,
     required this.library,
+    required this.fileValidation,
     required this.reader,
     required this.settings,
     required this.viewerAdapter,
@@ -98,6 +100,7 @@ final class AppServices {
   final AppDatabase database;
   final AppLogger logger;
   final LibraryController library;
+  final LibraryFileValidationController fileValidation;
   final ReaderController reader;
   final SettingsController settings;
   final PdfrxViewerAdapter viewerAdapter;
@@ -216,6 +219,12 @@ final class AppServices {
     final search = SearchController(engine, viewController, logger);
     final navigationHistory = NavigationHistoryController();
     final library = LibraryController(documents, logger);
+    final fileValidation = LibraryFileValidationController(
+      documents: documents,
+      jobs: jobs,
+      logger: logger,
+      onDocumentsChanged: library.refreshFileStates,
+    );
     final enrichment = DocumentEnrichmentController(documents, engine);
     thumbnails.onCoverUpdated = () => unawaited(library.load());
     final reader = ReaderController(
@@ -273,6 +282,7 @@ final class AppServices {
           reader.status == ReaderStatus.loading ||
           reader.status == ReaderStatus.ready;
       enrichment.setReaderPaused(readerActive);
+      fileValidation.setReaderPaused(readerActive);
       if (reader.status == ReaderStatus.idle &&
           !enrichment.progress.isRunning) {
         unawaited(enrichment.analyzePending().whenComplete(library.reload));
@@ -340,6 +350,7 @@ final class AppServices {
       },
     );
     await library.load();
+    fileValidation.startIncremental();
     if (settings.settings.generateCovers) {
       for (final document in library.documents) {
         if (!document.isMissing) thumbnails.enqueueCover(document);
@@ -351,6 +362,7 @@ final class AppServices {
       database: database,
       logger: logger,
       library: library,
+      fileValidation: fileValidation,
       reader: reader,
       settings: settings,
       viewerAdapter: PdfrxViewerAdapter(engine),
@@ -442,6 +454,7 @@ final class AppServices {
     enrichment.dispose();
     folderImport.dispose();
     folderWatch.dispose();
+    fileValidation.dispose();
     readingProfiles.dispose();
     library.dispose();
     settings.removeListener(_memorySettingsListener);

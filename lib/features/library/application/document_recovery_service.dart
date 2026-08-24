@@ -82,7 +82,6 @@ final class DocumentRecoveryService {
           notFound++;
       }
     }
-    _documents.refreshMissingState();
     return RecoverySummary(
       recovered: recovered,
       ambiguous: ambiguous,

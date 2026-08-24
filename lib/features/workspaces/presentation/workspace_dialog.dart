@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
+import '../../../core/i18n/app_localizations.dart';
 import '../application/workspace_controller.dart';
 import '../domain/workspace_models.dart';
 
@@ -21,6 +22,7 @@ final class WorkspaceDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 620, maxHeight: 620),
@@ -34,18 +36,18 @@ final class WorkspaceDialog extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Espacios de trabajo',
+                        strings.get('workspace.title'),
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
                     FilledButton.tonalIcon(
                       onPressed: () => _save(context),
                       icon: const Icon(Icons.save_outlined, size: 18),
-                      label: const Text('Guardar actual'),
+                      label: Text(strings.get('workspace.saveCurrent')),
                     ),
                     const SizedBox(width: AppSpacing.space8),
                     IconButton(
-                      tooltip: 'Cerrar',
+                      tooltip: strings.get('action.close'),
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close_rounded),
                     ),
@@ -55,12 +57,10 @@ final class WorkspaceDialog extends StatelessWidget {
               const Divider(height: 1),
               Expanded(
                 child: controller.workspaces.isEmpty
-                    ? const AppStatusView(
+                    ? AppStatusView(
                         icon: Icons.space_dashboard_outlined,
-                        title: 'Sin espacios guardados',
-                        message:
-                            'Guarda los documentos, posiciones y panel actuales '
-                            'para recuperar esta sesión de lectura.',
+                        title: strings.get('workspace.emptyTitle'),
+                        message: strings.get('workspace.emptyBody'),
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.symmetric(
@@ -84,26 +84,40 @@ final class WorkspaceDialog extends StatelessWidget {
                             ),
                             title: Text(workspace.name),
                             subtitle: Text(
-                              '${workspace.tabs.length} '
-                              '${workspace.tabs.length == 1 ? 'documento' : 'documentos'}'
-                              '${missing == 0 ? '' : ' · $missing ausentes'}',
+                              strings.get(
+                                'workspace.summary',
+                                parameters: {
+                                  'documents': strings.count(
+                                    'workspace.documents',
+                                    workspace.tabs.length,
+                                  ),
+                                  'missing': missing == 0
+                                      ? strings.get('workspace.missing.none')
+                                      : strings.count(
+                                          'workspace.missing',
+                                          missing,
+                                        ),
+                                },
+                              ),
                             ),
                             onTap: () {
                               Navigator.pop(context);
                               onRestore(workspace);
                             },
                             trailing: PopupMenuButton<_WorkspaceAction>(
-                              tooltip: 'Acciones del espacio',
+                              tooltip: strings.get('workspace.actions'),
                               onSelected: (action) =>
                                   _runAction(context, workspace, action),
-                              itemBuilder: (context) => const [
+                              itemBuilder: (context) => [
                                 PopupMenuItem(
                                   value: _WorkspaceAction.duplicate,
-                                  child: Text('Duplicar'),
+                                  child: Text(
+                                    strings.get('workspace.duplicate'),
+                                  ),
                                 ),
                                 PopupMenuItem(
                                   value: _WorkspaceAction.delete,
-                                  child: Text('Eliminar'),
+                                  child: Text(strings.get('action.delete')),
                                 ),
                               ],
                             ),
@@ -119,7 +133,10 @@ final class WorkspaceDialog extends StatelessWidget {
   }
 
   Future<void> _save(BuildContext context) async {
-    final name = await _askName(context, 'Guardar espacio');
+    final name = await _askName(
+      context,
+      YamantakaLocalizations.of(context).get('workspace.saveTitle'),
+    );
     if (name == null) return;
     controller.saveCurrent(
       name: name,
@@ -134,31 +151,32 @@ final class WorkspaceDialog extends StatelessWidget {
     WorkspaceSnapshot workspace,
     _WorkspaceAction action,
   ) async {
+    final strings = YamantakaLocalizations.of(context);
     switch (action) {
       case _WorkspaceAction.duplicate:
         final name = await _askName(
           context,
-          'Duplicar espacio',
-          initialValue: '${workspace.name} — copia',
+          strings.get('workspace.duplicateTitle'),
+          initialValue: strings.get(
+            'workspace.copySuffix',
+            parameters: {'name': workspace.name},
+          ),
         );
         if (name != null) controller.duplicate(workspace.id, name);
       case _WorkspaceAction.delete:
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Eliminar espacio'),
-            content: const Text(
-              'Se elimina la sesión guardada, no los documentos ni sus '
-              'anotaciones.',
-            ),
+            title: Text(strings.get('workspace.deleteTitle')),
+            content: Text(strings.get('workspace.deleteBody')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancelar'),
+                child: Text(strings.get('action.cancel')),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Eliminar'),
+                child: Text(strings.get('action.delete')),
               ),
             ],
           ),
@@ -181,17 +199,21 @@ final class WorkspaceDialog extends StatelessWidget {
           controller: textController,
           autofocus: true,
           maxLength: 80,
-          decoration: const InputDecoration(labelText: 'Nombre'),
+          decoration: InputDecoration(
+            labelText: YamantakaLocalizations.of(context).get('workspace.name'),
+          ),
           onSubmitted: (value) => Navigator.pop(context, value),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: Text(
+              YamantakaLocalizations.of(context).get('action.cancel'),
+            ),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, textController.text),
-            child: const Text('Guardar'),
+            child: Text(YamantakaLocalizations.of(context).get('action.save')),
           ),
         ],
       ),

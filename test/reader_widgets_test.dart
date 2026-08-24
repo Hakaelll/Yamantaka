@@ -1,10 +1,17 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/app/theme/app_tokens.dart';
+import 'package:yamantaka/app/theme/app_theme.dart';
 import 'package:yamantaka/core/errors/app_failure.dart';
+import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/core/platform/window_service.dart';
 import 'package:yamantaka/features/bookmarks/application/bookmark_controller.dart';
@@ -130,7 +137,7 @@ void main() {
     expect(harness.controller.currentPageIndex, 1);
     expect(find.text('2 / 3'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Buscar (Ctrl+F)'));
+    await tester.tap(find.byTooltip('Buscar en el documento (Ctrl+F)'));
     await tester.pump();
     expect(find.text('Buscar'), findsWidgets);
     expect(find.byTooltip('Cerrar panel'), findsOneWidget);
@@ -411,7 +418,7 @@ void main() {
     await tester.pump();
     expect(harness.controller.currentPageIndex, 0);
 
-    await tester.tap(find.byTooltip('Buscar (Ctrl+F)'));
+    await tester.tap(find.byTooltip('Buscar en el documento (Ctrl+F)'));
     await tester.pump();
     final searchField = find.byKey(const Key('pdf-search-field'));
     expect(searchField, findsOneWidget);
@@ -502,7 +509,10 @@ void main() {
           await tester.pump();
 
           expect(find.byTooltip('Volver a la biblioteca'), findsOneWidget);
-          expect(find.byTooltip('Buscar (Ctrl+F)'), findsOneWidget);
+          expect(
+            find.byTooltip('Buscar en el documento (Ctrl+F)'),
+            findsOneWidget,
+          );
           expect(find.byTooltip('Ajuste de zoom'), findsOneWidget);
           expect(
             find.byTooltip(
@@ -533,7 +543,7 @@ void main() {
           }
           if (compact) {
             for (final label in const [
-              'Paleta de comandos',
+              'Abrir paleta de comandos',
               'Miniaturas',
               'Índice',
               'Marcadores',
@@ -560,10 +570,10 @@ void main() {
           } else {
             expect(find.byTooltip('Tema de lectura'), findsOneWidget);
             expect(
-              find.byTooltip('Paleta de comandos (Ctrl+K)'),
+              find.byTooltip('Abrir paleta de comandos (Ctrl+K)'),
               findsOneWidget,
             );
-            await tester.tap(find.byTooltip('Herramientas'));
+            await tester.tap(find.byTooltip('Herramientas del lector'));
             await tester.pump();
             for (final label in const [
               'Miniaturas',
@@ -731,16 +741,113 @@ void main() {
 
     await tester.pumpWidget(_app(harness));
     await tester.pump(const Duration(seconds: 4));
-    expect(find.byTooltip('Buscar (Ctrl+F)').hitTestable(), findsNothing);
+    expect(
+      find.byTooltip('Buscar en el documento (Ctrl+F)').hitTestable(),
+      findsNothing,
+    );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
 
     expect(harness.controller.currentPageIndex, 2);
-    expect(find.byTooltip('Buscar (Ctrl+F)').hitTestable(), findsOneWidget);
+    expect(
+      find.byTooltip('Buscar en el documento (Ctrl+F)').hitTestable(),
+      findsOneWidget,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
   });
+
+  testWidgets(
+    'page changes rebuild page surfaces without notifying the reader shell',
+    (tester) async {
+      final harness = await _ReaderHarness.create(ready: true);
+      final adapter = _CountingViewerAdapter();
+      var shellNotifications = 0;
+      var pageNotifications = 0;
+      void onShellChanged() => shellNotifications++;
+      void onPageChanged() => pageNotifications++;
+      harness.controller.addListener(onShellChanged);
+      harness.controller.pageIndexListenable.addListener(onPageChanged);
+
+      await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
+      await tester.pump();
+      shellNotifications = 0;
+      pageNotifications = 0;
+
+      harness.controller.onPageChanged(1);
+      await tester.pump();
+
+      expect(shellNotifications, 0);
+      expect(pageNotifications, 1);
+      expect(adapter.buildCount, 1);
+      expect(find.text('2 / 3'), findsOneWidget);
+
+      harness.controller.removeListener(onShellChanged);
+      harness.controller.pageIndexListenable.removeListener(onPageChanged);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await harness.dispose();
+    },
+  );
+
+  testWidgets(
+    'temporary positions A and B restore every layout in LTR and RTL',
+    (tester) async {
+      final harness = await _ReaderHarness.create(ready: true);
+      for (final direction in ReadingDirection.values) {
+        for (final layout in PageLayoutMode.values) {
+          final mode = layout == PageLayoutMode.facing
+              ? ReaderMode.book
+              : ReaderMode.document;
+          await tester.pumpWidget(_app(harness, readingDirection: direction));
+          harness.controller.preferences = harness.controller.preferences!
+              .copyWith(viewMode: mode, pageLayout: layout, pageRotation: 90);
+          harness.controller.onPageChanged(1);
+          harness.viewController.update(zoom: 1.75, scrollOffset: 0.42);
+          final saved = harness.controller.saveTemporaryPosition(
+            ReaderTemporaryPositionSlot.a,
+          );
+          expect(saved, isNotNull);
+
+          harness.controller.preferences = harness.controller.preferences!
+              .copyWith(
+                viewMode: ReaderMode.document,
+                pageLayout: PageLayoutMode.single,
+                pageRotation: 0,
+              );
+          harness.controller.onPageChanged(0);
+          harness.viewController.update(zoom: 1, scrollOffset: 0);
+
+          expect(
+            await harness.controller.goToTemporaryPosition(
+              ReaderTemporaryPositionSlot.a,
+            ),
+            isTrue,
+          );
+          await tester.pump();
+          expect(harness.controller.currentPageIndex, 1);
+          expect(harness.controller.preferences!.viewMode, mode);
+          expect(harness.controller.preferences!.pageLayout, layout);
+          expect(harness.controller.preferences!.pageRotation, 90);
+          expect(harness.viewController.zoom, 1.75);
+          expect(harness.viewController.scrollOffset, 0.42);
+        }
+      }
+
+      harness.controller.saveTemporaryPosition(ReaderTemporaryPositionSlot.b);
+      final previousA = harness.controller.temporaryPositionA;
+      final previousB = harness.controller.temporaryPositionB;
+      expect(harness.controller.swapTemporaryPositions(), isTrue);
+      expect(harness.controller.temporaryPositionA, same(previousB));
+      expect(harness.controller.temporaryPositionB, same(previousA));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await harness.controller.closeDocument();
+      expect(harness.controller.temporaryPositionA, isNull);
+      expect(harness.controller.temporaryPositionB, isNull);
+      await harness.dispose();
+    },
+  );
 
   test(
     'viewer state feeds debounced zoom and relative position persistence',
@@ -757,6 +864,137 @@ void main() {
       expect(harness.controller.preferences!.verticalMargin, 52);
     },
   );
+
+  testWidgets('reader errors switch immediately between Spanish and English', (
+    tester,
+  ) async {
+    final harness = await _ReaderHarness.create(ready: false);
+    addTearDown(harness.dispose);
+    harness.controller
+      ..status = ReaderStatus.failure
+      ..error = const AppFailure(FailureKind.fileNotFound, 'private path');
+
+    for (final language in AppLanguage.values) {
+      await tester.pumpWidget(_app(harness, locale: Locale(language.code)));
+      await tester.pump();
+
+      expect(
+        find.text(
+          language == AppLanguage.spanish
+              ? 'El archivo ya no está disponible'
+              : 'The file is no longer available',
+        ),
+        findsOneWidget,
+      );
+    }
+  });
+
+  testWidgets('captures the requested reader widget visual matrix', (
+    tester,
+  ) async {
+    const outputRoot = String.fromEnvironment('YAMANTAKA_READER_MATRIX_DIR');
+    if (outputRoot.isEmpty) return;
+    final output = Directory(outputRoot)..createSync(recursive: true);
+    final harness = await _ReaderHarness.create(ready: true, pageCount: 12);
+    addTearDown(harness.dispose);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    const captureKey = Key('reader-visual-matrix-boundary');
+    final evidence = <Map<String, Object?>>[];
+
+    Future<void> capture({
+      required String name,
+      required Size size,
+      ThemeMode themeMode = ThemeMode.light,
+      bool highContrast = false,
+      bool reduceMotion = false,
+    }) async {
+      tester.view.physicalSize = size;
+      await tester.pumpWidget(
+        _visualApp(
+          harness,
+          captureKey: captureKey,
+          themeMode: themeMode,
+          highContrast: highContrast,
+          reduceMotion: reduceMotion,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump();
+      final path = '${output.path}${Platform.pathSeparator}$name.png';
+      await _captureBoundary(tester, captureKey, path);
+      evidence.add({
+        'name': name,
+        'width': size.width.round(),
+        'height': size.height.round(),
+        'theme': themeMode.name,
+        'highContrast': highContrast,
+        'reducedMotion': reduceMotion,
+        'mode': harness.controller.preferences!.viewMode.name,
+        'layout': harness.controller.preferences!.pageLayout.name,
+        'source': 'flutter-widget-test',
+        'path': path,
+      });
+    }
+
+    harness.controller
+      ..setReaderMode(ReaderMode.document)
+      ..setPageLayout(PageLayoutMode.single)
+      ..setTheme(ReaderTheme.ivory);
+    for (final entry in const [
+      ('640x480', Size(640, 480)),
+      ('800x600', Size(800, 600)),
+      ('1280x720', Size(1280, 720)),
+      ('1600x900', Size(1600, 900)),
+    ]) {
+      await capture(
+        name: 'reader-document-${entry.$1}-light-widget',
+        size: entry.$2,
+      );
+    }
+
+    const profileSize = Size(1280, 720);
+    harness.controller.setReaderMode(ReaderMode.book);
+    await capture(name: 'reader-book-1280x720-light-widget', size: profileSize);
+    harness.controller
+      ..setReaderMode(ReaderMode.document)
+      ..setPageLayout(PageLayoutMode.continuous);
+    await capture(
+      name: 'reader-continuous-1280x720-light-widget',
+      size: profileSize,
+    );
+    harness.controller
+      ..setPageLayout(PageLayoutMode.single)
+      ..setTheme(ReaderTheme.dark);
+    await capture(
+      name: 'reader-document-1280x720-dark-widget',
+      size: profileSize,
+      themeMode: ThemeMode.dark,
+    );
+    harness.controller.setTheme(ReaderTheme.light);
+    await capture(
+      name: 'reader-document-1280x720-high-contrast-widget',
+      size: profileSize,
+      highContrast: true,
+    );
+    await capture(
+      name: 'reader-document-1280x720-reduced-motion-widget',
+      size: profileSize,
+      reduceMotion: true,
+    );
+    File(
+      '${output.path}${Platform.pathSeparator}reader-matrix.json',
+    ).writeAsStringSync(
+      const JsonEncoder.withIndent('  ').convert({
+        'format': 'yamantaka-reader-widget-matrix',
+        'generatedAt': DateTime.now().toUtc().toIso8601String(),
+        'source': 'flutter-widget-test',
+        'cases': evidence,
+      }),
+    );
+  });
 }
 
 Future<void> _loadTestFont(String family, List<String> candidates) async {
@@ -781,7 +1019,17 @@ Widget _app(
   bool initialPanelOpen = false,
   String initialPanelSection = '',
   ValueChanged<double>? onPanelWidthChanged,
+  ReadingDirection readingDirection = ReadingDirection.leftToRight,
+  Locale? locale,
 }) => MaterialApp(
+  locale: locale ?? const Locale('es'),
+  supportedLocales: const [Locale('es'), Locale('en')],
+  localizationsDelegates: const [
+    YamantakaLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ],
   home: ReaderScreen(
     controller: harness.controller,
     engine: harness.engine,
@@ -791,13 +1039,67 @@ Widget _app(
     onOpenSettings: () {},
     reduceMotion: true,
     showProgress: true,
-    readingDirection: ReadingDirection.leftToRight,
+    readingDirection: readingDirection,
     visualProfile: visualProfile,
     initialPanelOpen: initialPanelOpen,
     initialPanelSection: initialPanelSection,
     onPanelWidthChanged: onPanelWidthChanged,
   ),
 );
+
+Widget _visualApp(
+  _ReaderHarness harness, {
+  required Key captureKey,
+  required ThemeMode themeMode,
+  required bool highContrast,
+  required bool reduceMotion,
+}) => MaterialApp(
+  debugShowCheckedModeBanner: false,
+  locale: const Locale('es'),
+  supportedLocales: const [Locale('es'), Locale('en')],
+  localizationsDelegates: const [
+    YamantakaLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ],
+  theme: AppTheme.light(highContrast: highContrast),
+  darkTheme: AppTheme.dark(highContrast: highContrast),
+  themeMode: themeMode,
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(
+      context,
+    ).copyWith(highContrast: highContrast, disableAnimations: reduceMotion),
+    child: child!,
+  ),
+  home: RepaintBoundary(
+    key: captureKey,
+    child: ReaderScreen(
+      controller: harness.controller,
+      engine: harness.engine,
+      viewerAdapter: const _VisualViewerAdapter(),
+      onBack: () async {},
+      onOpenDocument: () async {},
+      onOpenSettings: () {},
+      reduceMotion: reduceMotion,
+      showProgress: true,
+      readingDirection: ReadingDirection.leftToRight,
+    ),
+  ),
+);
+
+Future<void> _captureBoundary(WidgetTester tester, Key key, String path) async {
+  final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(key));
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 1);
+    try {
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      File(path).writeAsBytesSync(bytes!.buffer.asUint8List(), flush: true);
+    } finally {
+      image.dispose();
+    }
+  });
+}
 
 final class _ReaderHarness {
   _ReaderHarness({
@@ -900,6 +1202,8 @@ final class _ReaderHarness {
         },
         fitWidth: () async => viewController.update(zoom: 1.2),
         fitPage: () async => viewController.update(zoom: 1),
+        restorePosition: (zoom, scrollOffset) async =>
+            viewController.update(zoom: zoom, scrollOffset: scrollOffset),
       );
     }
     return _ReaderHarness(
@@ -934,6 +1238,138 @@ final class _FakeViewerAdapter implements PdfViewerAdapter {
     required ValueChanged<int> onPageChanged,
     required ValueChanged<Object> onError,
   }) => const ColoredBox(key: Key('test-pdf-viewer'), color: Colors.white);
+}
+
+final class _VisualViewerAdapter implements PdfViewerAdapter {
+  const _VisualViewerAdapter();
+
+  @override
+  Widget buildViewer({
+    required OpenedPdfDocument document,
+    required PdfViewController controller,
+    required PdfViewConfiguration configuration,
+    required int initialPageIndex,
+    required ValueChanged<int> onPageChanged,
+    required ValueChanged<Object> onError,
+  }) => ColoredBox(
+    key: const Key('visual-pdf-viewer'),
+    color: configuration.backgroundColor,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final availableHeight = (constraints.maxHeight - 36).clamp(
+          180.0,
+          760.0,
+        );
+        final availableWidth = (constraints.maxWidth - 48).clamp(180.0, 1400.0);
+        if (configuration.flow == PdfViewFlow.continuous) {
+          final width = (availableWidth * 0.54).clamp(220.0, 580.0);
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            itemCount: 4,
+            separatorBuilder: (_, _) => const SizedBox(height: 18),
+            itemBuilder: (context, index) => Center(
+              child: _VisualPage(
+                pageNumber: index + 1,
+                width: width,
+                height: width / 0.72,
+                shadow: configuration.pageShadow,
+              ),
+            ),
+          );
+        }
+        if (configuration.flow == PdfViewFlow.facing) {
+          final width = math.min(
+            availableWidth / 2 - 8,
+            availableHeight * 0.72,
+          );
+          return Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _VisualPage(
+                  pageNumber: initialPageIndex + 1,
+                  width: width,
+                  height: width / 0.72,
+                  shadow: configuration.pageShadow,
+                ),
+                const SizedBox(width: 8),
+                _VisualPage(
+                  pageNumber: initialPageIndex + 2,
+                  width: width,
+                  height: width / 0.72,
+                  shadow: configuration.pageShadow,
+                ),
+              ],
+            ),
+          );
+        }
+        final height = math.min(availableHeight, availableWidth / 0.72);
+        return Center(
+          child: _VisualPage(
+            pageNumber: initialPageIndex + 1,
+            width: height * 0.72,
+            height: height,
+            shadow: configuration.pageShadow,
+          ),
+        );
+      },
+    ),
+  );
+}
+
+final class _VisualPage extends StatelessWidget {
+  const _VisualPage({
+    required this.pageNumber,
+    required this.width,
+    required this.height,
+    required this.shadow,
+  });
+
+  final int pageNumber;
+  final double width;
+  final double height;
+  final BoxShadow? shadow;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: width,
+    height: height,
+    padding: EdgeInsets.all((width * 0.1).clamp(18.0, 52.0)),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFDFDFC),
+      boxShadow: [?shadow],
+      border: Border.all(color: const Color(0x1F000000)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'YAMANTAKA · $pageNumber',
+          style: TextStyle(
+            color: const Color(0xFF272823),
+            fontSize: (width * 0.045).clamp(11.0, 22.0),
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+          ),
+        ),
+        SizedBox(height: (height * 0.08).clamp(16.0, 42.0)),
+        Container(
+          width: width * 0.58,
+          height: 4,
+          color: const Color(0xFF575A50),
+        ),
+        SizedBox(height: (height * 0.04).clamp(10.0, 26.0)),
+        for (final factor in const [0.92, 0.82, 0.88, 0.68]) ...[
+          Container(
+            width: width * factor,
+            height: 2,
+            color: const Color(0xFFB6B6AF),
+          ),
+          SizedBox(height: (height * 0.025).clamp(7.0, 16.0)),
+        ],
+      ],
+    ),
+  );
 }
 
 final class _RecordingViewerAdapter implements PdfViewerAdapter {

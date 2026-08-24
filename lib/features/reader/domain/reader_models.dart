@@ -26,6 +26,26 @@ enum ReadingDirection { leftToRight, rightToLeft }
 
 enum ReaderVisualProfile { standard, electronicInk }
 
+enum ReaderTemporaryPositionSlot { a, b }
+
+final class ReaderTemporaryPosition {
+  const ReaderTemporaryPosition({
+    required this.pageIndex,
+    required this.zoom,
+    required this.scrollOffset,
+    required this.viewMode,
+    required this.pageLayout,
+    required this.rotation,
+  });
+
+  final int pageIndex;
+  final double zoom;
+  final double scrollOffset;
+  final ReaderMode viewMode;
+  final PageLayoutMode pageLayout;
+  final int rotation;
+}
+
 final class DocumentPreferences {
   const DocumentPreferences({
     required this.documentId,

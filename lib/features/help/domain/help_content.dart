@@ -94,8 +94,9 @@ abstract final class HelpContent {
       summary: 'Tus notas se guardan fuera del PDF.',
       body:
           'Resaltados, marcadores y comentarios se almacenan localmente y '
-          'pueden exportarse de forma explícita. Cambiar de archivo no mezcla '
-          'anotaciones entre documentos.',
+          'pueden exportarse de forma explícita. Crear, editar y eliminar '
+          'tienen un historial propio de deshacer y rehacer. Cambiar de '
+          'archivo no mezcla anotaciones entre documentos.',
       keywords: ['notas', 'resaltado', 'anotaciones'],
     ),
     HelpArticle(
@@ -116,7 +117,8 @@ abstract final class HelpContent {
           'Ctrl+O abre, Ctrl+F busca, Ctrl+K muestra la paleta, F11 alterna '
           'pantalla completa y Escape cierra la capa temporal superior. En el '
           'lector puedes elegir Una página, Dos páginas o Continua desde '
-          'Ctrl+K y ajustar el emparejado del pliego desde Más opciones.',
+          'Ctrl+K, guardar y recuperar posiciones temporales A/B, y ajustar '
+          'el emparejado del pliego desde Más opciones.',
       keywords: ['teclado', 'atajos', 'Ctrl'],
     ),
   ];
@@ -168,7 +170,8 @@ abstract final class HelpContent {
       summary: 'Your notes are stored outside the PDF.',
       body:
           'Highlights, bookmarks, and comments are stored locally and can be '
-          'exported explicitly. Changing files never mixes annotations.',
+          'exported explicitly. Create, edit, and delete have their own undo '
+          'and redo history. Changing files never mixes annotations.',
       keywords: ['notes', 'highlight', 'annotations'],
     ),
     HelpArticle(
@@ -188,7 +191,8 @@ abstract final class HelpContent {
           'Ctrl+O opens, Ctrl+F searches, Ctrl+K opens the command palette, '
           'F11 toggles fullscreen, and Escape closes the top temporary layer. '
           'Ctrl+K exposes One page, Two pages, and Continuous; More options '
-          'contains spread pairing adjustments.',
+          'contains spread pairing adjustments. The command palette can also '
+          'save, restore, and swap temporary positions A/B.',
       keywords: ['keyboard', 'shortcuts', 'Ctrl'],
     ),
   ];

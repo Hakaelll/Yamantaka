@@ -6,9 +6,11 @@ import '../domain/annotation.dart';
 enum AnnotationSort { page, newest }
 
 final class AnnotationController extends ChangeNotifier {
-  AnnotationController(this._repository);
+  AnnotationController(this._repository, {this.historyLimit = 100})
+    : assert(historyLimit > 0);
 
   final AnnotationRepository _repository;
+  final int historyLimit;
   String? _documentId;
   String? _fingerprint;
   List<PdfAnnotation> annotations = const [];
@@ -17,9 +19,12 @@ final class AnnotationController extends ChangeNotifier {
   String? tagFilter;
   String query = '';
   AnnotationSort sort = AnnotationSort.page;
-  PdfAnnotation? _lastDeleted;
+  final List<_AnnotationHistoryEntry> _undoHistory = [];
+  final List<_AnnotationHistoryEntry> _redoHistory = [];
 
-  bool get canUndoDelete => _lastDeleted != null;
+  bool get canUndo => _undoHistory.isNotEmpty;
+  bool get canRedo => _redoHistory.isNotEmpty;
+  bool get canUndoDelete => _undoHistory.lastOrNull?.isDeletion == true;
   int get reviewRequiredCount => annotations
       .where((item) => item.status == AnnotationAttachmentStatus.reviewRequired)
       .length;
@@ -31,6 +36,7 @@ final class AnnotationController extends ChangeNotifier {
     _documentId = documentId;
     _fingerprint = fingerprint;
     _repository.markDocumentChanged(documentId, fingerprint);
+    _clearHistory();
     _reload();
   }
 
@@ -38,7 +44,7 @@ final class AnnotationController extends ChangeNotifier {
     _documentId = null;
     _fingerprint = null;
     annotations = const [];
-    _lastDeleted = null;
+    _clearHistory();
     notifyListeners();
   }
 
@@ -71,29 +77,61 @@ final class AnnotationController extends ChangeNotifier {
       pageRotation: pageRotation,
       tags: tags,
     );
-    _lastDeleted = null;
+    _record(_AnnotationHistoryEntry(before: null, after: created));
     _reload();
     return created;
   }
 
-  void update(PdfAnnotation annotation) {
+  bool update(PdfAnnotation annotation) {
+    final before = _repository.byId(annotation.id);
+    if (before == null || before.documentId != _documentId) return false;
     _repository.save(annotation.copyWith(updatedAt: DateTime.now().toUtc()));
+    final after = _repository.byId(annotation.id)!;
+    _record(_AnnotationHistoryEntry(before: before, after: after));
     _reload();
+    return true;
   }
 
-  void delete(PdfAnnotation annotation) {
+  bool delete(PdfAnnotation annotation) {
+    final before = _repository.byId(annotation.id);
+    if (before == null || before.documentId != _documentId) return false;
     _repository.remove(annotation.id);
-    _lastDeleted = annotation;
+    _record(_AnnotationHistoryEntry(before: before, after: null));
     _reload();
+    return true;
   }
 
   bool undoDelete() {
-    final deleted = _lastDeleted;
-    if (deleted == null) return false;
-    _repository.save(deleted.copyWith(updatedAt: DateTime.now().toUtc()));
-    _lastDeleted = null;
-    _reload();
-    return true;
+    if (!canUndoDelete) return false;
+    return undo();
+  }
+
+  bool undo() {
+    if (_undoHistory.isEmpty || _documentId == null) return false;
+    final entry = _undoHistory.removeLast();
+    try {
+      _apply(entry.before, removeId: entry.after?.id);
+      _redoHistory.add(entry);
+      _reload();
+      return true;
+    } on Object {
+      _undoHistory.add(entry);
+      return false;
+    }
+  }
+
+  bool redo() {
+    if (_redoHistory.isEmpty || _documentId == null) return false;
+    final entry = _redoHistory.removeLast();
+    try {
+      _apply(entry.after, removeId: entry.before?.id);
+      _undoHistory.add(entry);
+      _reload();
+      return true;
+    } on Object {
+      _redoHistory.add(entry);
+      return false;
+    }
   }
 
   void setFilters({
@@ -128,4 +166,32 @@ final class AnnotationController extends ChangeNotifier {
           );
     notifyListeners();
   }
+
+  void _record(_AnnotationHistoryEntry entry) {
+    _undoHistory.add(entry);
+    if (_undoHistory.length > historyLimit) _undoHistory.removeAt(0);
+    _redoHistory.clear();
+  }
+
+  void _apply(PdfAnnotation? snapshot, {required String? removeId}) {
+    if (snapshot == null) {
+      if (removeId != null) _repository.remove(removeId);
+      return;
+    }
+    _repository.save(snapshot);
+  }
+
+  void _clearHistory() {
+    _undoHistory.clear();
+    _redoHistory.clear();
+  }
+}
+
+final class _AnnotationHistoryEntry {
+  const _AnnotationHistoryEntry({required this.before, required this.after});
+
+  final PdfAnnotation? before;
+  final PdfAnnotation? after;
+
+  bool get isDeletion => before != null && after == null;
 }
