@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = 'build/release',
-    [string]$Version = '0.5.0',
-    [string]$BuildNumber = '6',
+    [string]$OutputDirectory = 'build/release/0.6.0+7',
+    [string]$Version = '0.6.0',
+    [string]$BuildNumber = '7',
     [string]$FlutterExecutable,
     [string]$CertificateThumbprint,
     [string]$SignToolPath,
@@ -175,12 +175,23 @@ try {
     }
     $manifestPath = Join-Path $outputRoot 'package-manifest.json'
     $manifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 $manifestPath
-    $archiveName = if ($Portable) { 'yamantaka-portable.zip' } else { 'yamantaka-bundle.zip' }
+    $archiveName = if ($Portable) {
+        "yamantaka-$Version+$BuildNumber-windows-x64-portable.zip"
+    }
+    else {
+        "yamantaka-$Version+$BuildNumber-windows-x64.zip"
+    }
     $archive = Join-Path $outputRoot $archiveName
     if (Test-Path $archive) { Remove-Item -LiteralPath $archive -Force }
     Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath $archive
+    $hashesPath = Join-Path $outputRoot 'SHA256SUMS.txt'
+    @($manifestPath, $archive) | ForEach-Object {
+        $hash = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+        "$hash  $([System.IO.Path]::GetFileName($_))"
+    } | Set-Content -Encoding UTF8 $hashesPath
     Write-Host "Package manifest: $manifestPath"
     Write-Host "Package archive: $archive"
+    Write-Host "Release hashes: $hashesPath"
 }
 finally {
     Pop-Location

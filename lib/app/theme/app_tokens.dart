@@ -59,6 +59,7 @@ abstract final class AppSizes {
   static const double topRevealZone = 24;
   static const double readerPanelDefault = sidePanelWidth;
   static const double settingsNavigationWidth = 220;
+  static const double settingsPreviewWidth = 300;
   static const double settingsContentMaxWidth = 760;
   static const double settingsControlWidth = 240;
   static const double commandPaletteRowHeight = 52;

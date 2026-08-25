@@ -249,6 +249,10 @@ final class YamantakaLocalizations {
       'library.actionCompleted': 'Acción completada',
       'library.bulkSummary': '{succeeded} correctos · {failed} con error',
       'library.selectedDocument': 'Documento seleccionado',
+      'library.closeContext': 'Cerrar contexto del documento',
+      'library.selectionFiltered':
+          'El documento seleccionado ya no pertenece a este resultado.',
+      'library.showSelectionAgain': 'Volver a mostrarlo',
       'library.operationFailed': 'La operación no se pudo completar.',
       'library.locateFile': 'Localizar archivo',
       'library.continueReading': 'Continuar leyendo',
@@ -459,6 +463,8 @@ final class YamantakaLocalizations {
       'reader.customZoom': 'Zoom personalizado',
       'reader.readingTheme': 'Tema de lectura',
       'reader.moreReadingControls': 'Más controles de lectura',
+      'reader.expandReadingControls':
+          'Mostrar navegación y zoom. Posición actual: {position}',
       'reader.removeBookmark': 'Retirar marcador',
       'reader.addBookmark': 'Añadir marcador',
       'reader.zoom': 'Zoom',
@@ -720,6 +726,8 @@ final class YamantakaLocalizations {
       'settings.appearancePreview':
           'Vista previa: interfaz {theme}, densidad {density}, lienzo {canvas}',
       'settings.preview': 'Vista previa',
+      'settings.preview.description':
+          'Una muestra real del canvas, la página y el chrome del lector.',
       'settings.historyEntry': 'Páginas {start}–{end} · {duration}',
       'settings.deleteSession': 'Eliminar esta sesión',
       'settings.historyTitle': 'Historial de lectura',
@@ -1080,6 +1088,10 @@ final class YamantakaLocalizations {
       'library.actionCompleted': 'Action completed',
       'library.bulkSummary': '{succeeded} succeeded · {failed} failed',
       'library.selectedDocument': 'Selected document',
+      'library.closeContext': 'Close document context',
+      'library.selectionFiltered':
+          'The selected document is no longer part of these results.',
+      'library.showSelectionAgain': 'Show it again',
       'library.operationFailed': 'The operation could not be completed.',
       'library.locateFile': 'Locate file',
       'library.continueReading': 'Continue reading',
@@ -1288,6 +1300,8 @@ final class YamantakaLocalizations {
       'reader.customZoom': 'Custom zoom',
       'reader.readingTheme': 'Reading theme',
       'reader.moreReadingControls': 'More reading controls',
+      'reader.expandReadingControls':
+          'Show navigation and zoom. Current position: {position}',
       'reader.removeBookmark': 'Remove bookmark',
       'reader.addBookmark': 'Add bookmark',
       'reader.zoom': 'Zoom',
@@ -1543,6 +1557,8 @@ final class YamantakaLocalizations {
       'settings.appearancePreview':
           'Preview: {theme} interface, {density} density, {canvas} canvas',
       'settings.preview': 'Preview',
+      'settings.preview.description':
+          'A live sample of the reader canvas, page, and chrome.',
       'settings.historyEntry': 'Pages {start}–{end} · {duration}',
       'settings.deleteSession': 'Delete this session',
       'settings.historyTitle': 'Reading history',

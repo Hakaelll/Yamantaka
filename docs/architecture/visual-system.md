@@ -81,3 +81,20 @@ modo por un breakpoint.
 Los cambios visuales deben actualizar este documento o justificar la excepción
 en el mismo cambio. Las capturas y la matriz nativa siguen siendo evidencia
 externa: este contrato no las sustituye.
+
+## Contexto y chrome progresivo 0.6
+
+La portada seleccionada abre una banda de contexto, no otra tarjeta. La banda
+reserva una acción primaria y como máximo dos secundarias. En compacto se
+comporta como superficie inferior descartable; al filtrar fuera de la selección
+explica el cambio y permite recuperar el resultado sin perder el ID.
+
+Cuando el autoocultado entra en reposo, la barra superior desaparece y la dock
+se reduce a posición/progreso. Conserva 40 px accionables y revela los grupos
+completos con puntero, toque o teclado; el cambio nunca modifica las
+restricciones del visor. El panel acoplado usa un rail vertical de 52 px y el
+overlay conserva la barra horizontal.
+
+En Ajustes expandido, `settingsPreviewWidth` reserva 300 px a una muestra viva
+persistente que reutiliza `YamaToolbarGroup` y `YamaIconButton`. La muestra
+refleja preferencias sin abrir un documento ni duplicar el motor del lector.

@@ -670,3 +670,22 @@ prueba de widgets a 1600×900 y fija Libro con tema Marfil, grupos flotantes,
 pliego enfrentado y dock inferior. Las
 capturas generacionales se retiraron porque ya no representaban el producto.
 Narrador, varios monitores y DPI físico siguen requiriendo validación nativa.
+
+## 29. Sala de lectura digital — 0.6
+
+La selección de Biblioteca tiene dos capas: la portada conserva el acento
+violeta y un inspector anclado aporta título, autor, estado, última lectura y
+siguiente acción. En expandido es una banda horizontal; en medio una franja
+compacta; en compacto una superficie inferior descartable. Su aparición no
+recalcula el jitter y su salida dura 160 ms o cero con movimiento reducido.
+
+El lector distingue reposo y actividad. El reposo conserva una dock de 40 px
+con progreso, posición y affordance de expansión; la actividad revela los
+grupos completos. Ambas son overlays sobre la misma geometría del visor. En
+expandido, el panel usa un rail vertical de 52 px; en compacto/medio mantiene
+los cinco accesos en la cabecera.
+
+Ajustes reserva en expandido 300 px para una muestra persistente. La muestra
+reutiliza controles del producto, refleja canvas, papel, chrome y progreso, y
+responde a las preferencias sin abrir PDFium. En compacto vive dentro de
+Apariencia y no introduce desplazamiento horizontal.

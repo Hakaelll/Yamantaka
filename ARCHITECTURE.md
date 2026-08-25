@@ -262,3 +262,18 @@ ancho/alto a DPR y filtrado de alta calidad.
 Los atajos Page Up/Page Down permanecen reservados para navegacion estructural;
 el registro rechaza asignaciones y overrides persistidos que intenten
 usarlos para otra accion.
+
+## Composición contextual 0.6
+
+La iteración 0.6 mantiene el chrome progresivo fuera de la clave del visor: la
+barra superior puede ocultarse, mientras `ReaderBottomControls` cambia entre
+una dock de reposo y los controles activos mediante estado de presentación. El
+panel acoplado cambia su selector horizontal por un rail, pero continúa
+montando solo el contenido de la sección activa. El feedback del divisor es
+estado efímero del widget y el ancho persistente conserva el debounce existente.
+
+`ArtifactLibraryView` sigue siendo dueño del contexto de selección. El inspector
+recibe un `LibraryDocument` ya materializado y callbacks; no consulta SQLite ni
+abre PDFium. `LibraryController` conserva el ID aunque un filtro lo excluya y la
+presentación ofrece restablecer el query. La previsualización de Ajustes consume
+`AppSettings`, tokens y componentes de chrome, sin crear un segundo lector.

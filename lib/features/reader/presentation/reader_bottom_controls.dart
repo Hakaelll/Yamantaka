@@ -18,6 +18,9 @@ final class ReaderBottomControls extends StatelessWidget {
     required this.onGoToPage,
     required this.onChooseTheme,
     required this.readingDirection,
+    required this.active,
+    required this.onActivate,
+    required this.showProgress,
     this.flatChrome = false,
     this.shortcutOverrides = '{}',
   });
@@ -27,6 +30,9 @@ final class ReaderBottomControls extends StatelessWidget {
   final VoidCallback onGoToPage;
   final VoidCallback onChooseTheme;
   final ReadingDirection readingDirection;
+  final bool active;
+  final VoidCallback onActivate;
+  final bool showProgress;
   final bool flatChrome;
   final String shortcutOverrides;
 
@@ -60,6 +66,15 @@ final class ReaderBottomControls extends StatelessWidget {
         ? strings.get('reader.fitFullSpread')
         : strings.get('command.fitPage');
     final flat = flatChrome || MediaQuery.highContrastOf(context);
+    if (!active) {
+      return _ReaderRestingDock(
+        controller: controller,
+        compact: compact,
+        readingDirection: readingDirection,
+        showProgress: showProgress,
+        onActivate: onActivate,
+      );
+    }
     final navigation = YamaToolbarGroup(
       key: const Key('reader-navigation-group'),
       label: strings.get('reader.navigation'),
@@ -320,6 +335,97 @@ final class ReaderBottomControls extends StatelessWidget {
       final current = controller.viewController.zoom;
       if (current > 0) await controller.zoomBy(zoom / current);
     }
+  }
+}
+
+final class _ReaderRestingDock extends StatelessWidget {
+  const _ReaderRestingDock({
+    required this.controller,
+    required this.compact,
+    required this.readingDirection,
+    required this.showProgress,
+    required this.onActivate,
+  });
+
+  final ReaderController controller;
+  final bool compact;
+  final ReadingDirection readingDirection;
+  final bool showProgress;
+  final VoidCallback onActivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    final progress = controller.pageCount == 0
+        ? 0.0
+        : ReadingProgress.calculate(
+            pageIndex: controller.currentPageIndex,
+            pageCount: controller.pageCount,
+          );
+    final position = controller.readingUnitIndicator(
+      direction: readingDirection,
+    );
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Semantics(
+        button: true,
+        label: strings.get(
+          'reader.expandReadingControls',
+          parameters: {'position': position},
+        ),
+        child: Material(
+          color: context.appColors.surfaceFloating,
+          shape: StadiumBorder(
+            side: BorderSide(color: context.appColors.borderSubtle),
+          ),
+          child: InkWell(
+            key: const Key('reader-resting-dock'),
+            customBorder: const StadiumBorder(),
+            onTap: onActivate,
+            child: SizedBox(
+              width: compact ? 220 : 320,
+              height: AppSizes.desktopControlExtent,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.space16,
+                  vertical: AppSpacing.space8,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (showProgress) ...[
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppRadii.indicator,
+                          ),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 3,
+                            backgroundColor: context.appColors.borderSubtle,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.space12),
+                    ],
+                    Text(
+                      position,
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                    const SizedBox(width: AppSpacing.space8),
+                    Icon(
+                      Icons.expand_less_rounded,
+                      size: 17,
+                      color: context.appColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

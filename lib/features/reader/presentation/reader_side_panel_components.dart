@@ -49,11 +49,78 @@ final class _PanelSectionBar extends StatelessWidget {
   };
 }
 
-final class _PanelResizeHandle extends StatelessWidget {
+final class _PanelSectionRail extends StatelessWidget {
+  const _PanelSectionRail({required this.selected, required this.onSelected});
+
+  final ReaderPanelSection selected;
+  final ValueChanged<ReaderPanelSection> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    return Semantics(
+      container: true,
+      label: strings.get('reader.panelSections'),
+      child: SizedBox(
+        key: const Key('reader-panel-section-rail'),
+        width: 52,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
+          children: [
+            for (final section in ReaderPanelSection.values)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.space6,
+                  vertical: AppSpacing.space2,
+                ),
+                child: YamaIconButton(
+                  semanticLabel: _panelSectionLabel(section, strings),
+                  tooltip: _panelSectionLabel(section, strings),
+                  icon: _panelSectionIcon(section),
+                  selected: selected == section,
+                  onPressed: () => onSelected(section),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _panelSectionLabel(
+  ReaderPanelSection section,
+  YamantakaLocalizations strings,
+) => switch (section) {
+  ReaderPanelSection.thumbnails => strings.get('reader.thumbnails'),
+  ReaderPanelSection.outline => strings.get('reader.outline'),
+  ReaderPanelSection.bookmarks => strings.get('reader.bookmarks'),
+  ReaderPanelSection.annotations => strings.get('reader.annotations'),
+  ReaderPanelSection.search => strings.get('reader.search'),
+};
+
+IconData _panelSectionIcon(ReaderPanelSection section) => switch (section) {
+  ReaderPanelSection.thumbnails => Icons.grid_view_outlined,
+  ReaderPanelSection.outline => Icons.format_list_bulleted_rounded,
+  ReaderPanelSection.bookmarks => Icons.bookmarks_outlined,
+  ReaderPanelSection.annotations => Icons.rate_review_outlined,
+  ReaderPanelSection.search => Icons.search_rounded,
+};
+
+final class _PanelResizeHandle extends StatefulWidget {
   const _PanelResizeHandle({required this.width, required this.onWidthChanged});
 
   final double width;
   final ValueChanged<double> onWidthChanged;
+
+  @override
+  State<_PanelResizeHandle> createState() => _PanelResizeHandleState();
+}
+
+final class _PanelResizeHandleState extends State<_PanelResizeHandle> {
+  bool _hovered = false;
+  bool _focused = false;
+  bool _dragging = false;
 
   double _clamp(double value) => value
       .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth)
@@ -61,21 +128,28 @@ final class _PanelResizeHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    void changeBy(double delta) => onWidthChanged(_clamp(width + delta));
+    final active = _hovered || _focused || _dragging;
+    void changeBy(double delta) =>
+        widget.onWidthChanged(_clamp(widget.width + delta));
+    final strings = YamantakaLocalizations.of(context);
     return Semantics(
-      label: YamantakaLocalizations.of(context).get('reader.panelWidth'),
-      value: YamantakaLocalizations.of(
-        context,
-      ).get('reader.pixels', parameters: {'count': width.round()}),
-      increasedValue: YamantakaLocalizations.of(
-        context,
-      ).get('reader.pixels', parameters: {'count': _clamp(width + 16).round()}),
-      decreasedValue: YamantakaLocalizations.of(
-        context,
-      ).get('reader.pixels', parameters: {'count': _clamp(width - 16).round()}),
+      label: strings.get('reader.panelWidth'),
+      value: strings.get(
+        'reader.pixels',
+        parameters: {'count': widget.width.round()},
+      ),
+      increasedValue: strings.get(
+        'reader.pixels',
+        parameters: {'count': _clamp(widget.width + 16).round()},
+      ),
+      decreasedValue: strings.get(
+        'reader.pixels',
+        parameters: {'count': _clamp(widget.width - 16).round()},
+      ),
       onIncrease: () => changeBy(16),
       onDecrease: () => changeBy(-16),
       child: Focus(
+        onFocusChange: (value) => setState(() => _focused = value),
         onKeyEvent: (_, event) {
           if (event is! KeyDownEvent) return KeyEventResult.ignored;
           if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
@@ -91,22 +165,66 @@ final class _PanelResizeHandle extends StatelessWidget {
         child: Builder(
           builder: (handleContext) => MouseRegion(
             cursor: SystemMouseCursors.resizeColumn,
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
             child: GestureDetector(
               key: const Key('reader-panel-resize-handle'),
               behavior: HitTestBehavior.opaque,
               dragStartBehavior: DragStartBehavior.down,
               onTapDown: (_) => Focus.of(handleContext).requestFocus(),
-              onHorizontalDragStart: (_) =>
-                  Focus.of(handleContext).requestFocus(),
+              onHorizontalDragStart: (_) {
+                Focus.of(handleContext).requestFocus();
+                setState(() => _dragging = true);
+              },
               onHorizontalDragUpdate: (details) => changeBy(-details.delta.dx),
+              onHorizontalDragEnd: (_) => setState(() => _dragging = false),
+              onHorizontalDragCancel: () => setState(() => _dragging = false),
               child: SizedBox(
-                width: 10,
-                child: Center(
-                  child: Container(
-                    width: 2,
-                    height: 36,
-                    color: context.appColors.borderStrong,
-                  ),
+                width: active ? 12 : 10,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    AnimatedContainer(
+                      duration: AppMotion.whenAllowed(
+                        MediaQuery.disableAnimationsOf(context),
+                        AppMotion.feedback,
+                      ),
+                      width: active ? 4 : 2,
+                      height: active ? 52 : 36,
+                      color: active
+                          ? context.appColors.focusRing
+                          : context.appColors.borderStrong,
+                    ),
+                    if (active)
+                      Positioned(
+                        left: 12,
+                        child: Material(
+                          color: context.appColors.surfaceFloating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppRadii.control,
+                            ),
+                            side: BorderSide(
+                              color: context.appColors.borderStrong,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.space8,
+                              vertical: AppSpacing.space4,
+                            ),
+                            child: Text(
+                              strings.get(
+                                'reader.pixels',
+                                parameters: {'count': widget.width.round()},
+                              ),
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),

@@ -42,9 +42,12 @@ La suite automatizada comprueba:
 - alto contraste, movimiento reducido y perfil de tinta electrónica;
 - panel lateral, búsqueda, marcadores, temas de Documento y persistencia;
 - panel overlay en 680–1099 px y panel restado del visor en ≥1100 px, también
-  durante resize y sin reconstruir el adaptador PDF.
+  durante resize y sin reconstruir el adaptador PDF;
+- dock de reposo accionable sin hover, revelado por teclado y rail vertical del
+  panel acoplado con ancho semántico visible.
 
-La biblioteca cubre metadatos PDF, cuatro páginas iniciales, título multilínea,
+La biblioteca cubre inspector contextual, selección conservada y explicación al
+filtrar, además de metadatos PDF, cuatro páginas iniciales, título multilínea,
 autor/editor explícito o dudoso, fallback de nombre legible, ausencia de texto,
 temas ES/EN, límite de muestra, reanálisis y preservación manual, facetas
 completas, migración 7→8 y backup v7 con ajustes de pliego.
@@ -76,8 +79,9 @@ centrada y acciones de vista a la derecha sin un selector permanente.
 
 Las matrices widget de Biblioteca, Lector y Ajustes cubren 640×480, 800×600,
 1280×720, 1600×900, 1920×1080, 1920×1200, 2560×1440 y 3440×1440, además de
-tema oscuro, alto contraste, movimiento reducido y panel abierto. La evidencia
-local se escribe en `build/visual-evidence/v0.5.0/` y no se versiona.
+tema oscuro, alto contraste, movimiento reducido, chrome en reposo y panel
+abierto. La evidencia previa se conserva en `build/visual-evidence/v0.5.0/` y
+la actual se escribe en `build/visual-evidence/v0.6.0/`; ninguna se versiona.
 
 ## Validación nativa de Windows
 
@@ -125,6 +129,12 @@ de distribución; `-RequireSignature` conserva ese gate separado.
 El 24 de agosto de 2026 el bundle local `0.5.0+6` superó además un smoke de 5 s
 con un PDF sintético: permaneció activo hasta el cierre del harness y no abrió
 conexiones TCP/UDP. El informe está junto al paquete versionado bajo `build/`.
+
+La iteración `0.6.0+7` repitió formato, `git diff --check`, análisis, las 244
+pruebas, golden y build Release. El paquete de 21 archivos (41,11 MiB; ZIP de
+17,83 MiB) superó otro smoke de 5 s sin conexiones TCP/UDP. Manifiesto, hashes y
+reporte están en `build/release/0.6.0+7/`. Los nueve binarios nativos continúan
+sin firma; es evidencia local de prueba, no de distribución.
 
 ## Corpus y privacidad
 

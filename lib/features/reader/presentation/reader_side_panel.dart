@@ -146,12 +146,29 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                       ),
                     ),
                     const Divider(height: 1),
-                    _PanelSectionBar(
-                      selected: widget.section,
-                      onSelected: widget.onSectionChanged,
+                    Expanded(
+                      child: widget.docked
+                          ? Row(
+                              children: [
+                                _PanelSectionRail(
+                                  selected: widget.section,
+                                  onSelected: widget.onSectionChanged,
+                                ),
+                                const VerticalDivider(width: 1),
+                                Expanded(child: _content()),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                _PanelSectionBar(
+                                  selected: widget.section,
+                                  onSelected: widget.onSectionChanged,
+                                ),
+                                const Divider(height: 1),
+                                Expanded(child: _content()),
+                              ],
+                            ),
                     ),
-                    const Divider(height: 1),
-                    Expanded(child: _content()),
                   ],
                 ),
                 Positioned(

@@ -108,11 +108,13 @@ final class _SettingsSectionData {
 final class _DesktopSettings extends StatelessWidget {
   const _DesktopSettings({
     required this.sections,
+    required this.settings,
     required this.selected,
     required this.onSelected,
   });
 
   final List<_SettingsSectionData> sections;
+  final AppSettings settings;
   final _SettingsSectionId selected;
   final ValueChanged<_SettingsSectionId> onSelected;
 
@@ -171,6 +173,19 @@ final class _DesktopSettings extends StatelessWidget {
               AppSpacing.pagePadding(MediaQuery.sizeOf(context).width),
               AppSpacing.space64,
             ),
+          ),
+        ),
+        Container(
+          width: AppSizes.settingsPreviewWidth,
+          decoration: BoxDecoration(
+            color: context.appColors.surfaceSecondary,
+            border: Border(
+              left: BorderSide(color: context.appColors.borderSubtle),
+            ),
+          ),
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpacing.space20),
+            children: [_AppearancePreview(settings: settings, inline: false)],
           ),
         ),
       ],
@@ -392,12 +407,16 @@ final class _SettingsNavItem extends StatelessWidget {
 }
 
 final class _AppearancePreview extends StatelessWidget {
-  const _AppearancePreview({required this.settings});
+  const _AppearancePreview({required this.settings, this.inline = true});
 
   final AppSettings settings;
+  final bool inline;
 
   @override
   Widget build(BuildContext context) {
+    if (inline && context.windowClass == AppWindowClass.expanded) {
+      return const SizedBox.shrink();
+    }
     final strings = YamantakaLocalizations.of(context);
     final readerTheme = ReaderTheme.values
         .where((theme) => theme.name == settings.defaultReaderTheme)
@@ -419,55 +438,217 @@ final class _AppearancePreview extends StatelessWidget {
       ),
       child: Container(
         key: const Key('appearance-preview'),
-        padding: const EdgeInsets.all(AppSpacing.space12),
+        padding: EdgeInsets.all(
+          settings.interfaceDensity == AppInterfaceDensity.compact
+              ? AppSpacing.space8
+              : AppSpacing.space12,
+        ),
         decoration: BoxDecoration(
           color: context.appColors.surfaceSecondary,
           border: Border.all(color: context.appColors.borderSubtle),
           borderRadius: BorderRadius.circular(AppRadii.control),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 44,
-              height: 56,
-              decoration: BoxDecoration(
-                color: Color(
-                  readerTheme?.colorValue ?? ReaderTheme.ivory.colorValue,
-                ),
-                border: Border.all(color: context.appColors.borderStrong),
-                boxShadow:
-                    settings.visualProfile == ReaderVisualProfile.electronicInk
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: context.appColors.readerPageShadow,
-                          blurRadius: AppShadow.readerPageBlur,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
+            Text(
+              strings.get('settings.preview'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: AppSpacing.space4),
+            Text(
+              strings.get('settings.preview.description'),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.space12),
+            ExcludeSemantics(
+              child: _LiveReaderPreview(
+                settings: settings,
+                readerTheme: readerTheme ?? ReaderTheme.ivory,
               ),
             ),
-            const SizedBox(width: AppSpacing.space16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    strings.get('settings.preview'),
-                    style: Theme.of(context).textTheme.titleSmall,
+            const SizedBox(height: AppSpacing.space12),
+            Wrap(
+              spacing: AppSpacing.space6,
+              runSpacing: AppSpacing.space4,
+              children: [
+                _PreviewLabel(
+                  label: strings.get(
+                    'settings.value.${settings.interfaceDensity.name}',
                   ),
-                  const SizedBox(height: AppSpacing.space4),
-                  Text(
-                    '${strings.get('settings.value.${settings.interfaceDensity.name}')} · '
-                    '${strings.get('settings.value.${readerTheme?.name ?? 'ivory'}')} · '
-                    '${strings.get('settings.value.${settings.visualProfile.name}')}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                ),
+                _PreviewLabel(
+                  label: strings.get(
+                    'settings.value.${readerTheme?.name ?? 'ivory'}',
                   ),
-                ],
-              ),
+                ),
+                _PreviewLabel(
+                  label: strings.get(
+                    'settings.value.${settings.visualProfile.name}',
+                  ),
+                ),
+                _PreviewLabel(
+                  label: strings.get(
+                    'settings.value.${settings.resolvedMotionPreference.name == 'full'
+                        ? 'motionFull'
+                        : settings.resolvedMotionPreference.name == 'reduced'
+                        ? 'motionReduced'
+                        : 'motionNone'}',
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+final class _LiveReaderPreview extends StatelessWidget {
+  const _LiveReaderPreview({required this.settings, required this.readerTheme});
+
+  final AppSettings settings;
+  final ReaderTheme readerTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final eInk = settings.visualProfile == ReaderVisualProfile.electronicInk;
+    final compact = settings.interfaceDensity == AppInterfaceDensity.compact;
+    final canvas = eInk ? Colors.white : Color(readerTheme.colorValue);
+    return Container(
+      key: const Key('appearance-live-reader-preview'),
+      height: inlinePreviewHeight,
+      decoration: BoxDecoration(
+        color: canvas,
+        border: Border.all(color: context.appColors.borderStrong),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: compact ? 78 : 88,
+            height: compact ? 106 : 116,
+            padding: const EdgeInsets.all(AppSpacing.space12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: const Color(0x22000000)),
+              boxShadow: eInk
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: context.appColors.readerPageShadow,
+                        blurRadius: AppShadow.readerPageBlur,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(width: 34, height: 4, color: Colors.black87),
+                const SizedBox(height: AppSpacing.space12),
+                for (final width in [52.0, 58.0, 44.0]) ...[
+                  Container(width: width, height: 2, color: Colors.black38),
+                  const SizedBox(height: AppSpacing.space4),
+                ],
+              ],
+            ),
+          ),
+          Positioned(
+            left: AppSpacing.space8,
+            right: AppSpacing.space8,
+            bottom: AppSpacing.space8,
+            child: IgnorePointer(
+              child: settings.autoHideControls
+                  ? Container(
+                      height: 24,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.space8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: context.appColors.surfaceFloating,
+                        border: Border.all(
+                          color: context.appColors.borderSubtle,
+                        ),
+                        borderRadius: BorderRadius.circular(AppRadii.capsule),
+                      ),
+                      child: Row(
+                        children: [
+                          if (settings.showProgress)
+                            Expanded(
+                              child: LinearProgressIndicator(
+                                value: 0.42,
+                                minHeight: 2,
+                                backgroundColor: context.appColors.borderSubtle,
+                              ),
+                            ),
+                          if (settings.showProgress)
+                            const SizedBox(width: AppSpacing.space8),
+                          Text(
+                            '42 %',
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        ],
+                      ),
+                    )
+                  : FittedBox(
+                      alignment: Alignment.center,
+                      child: YamaToolbarGroup(
+                        label: 'Preview controls',
+                        flat: eInk,
+                        children: [
+                          YamaIconButton(
+                            icon: Icons.chevron_left_rounded,
+                            semanticLabel: 'Previous',
+                            onPressed: () {},
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.space8,
+                            ),
+                            child: Text(
+                              '4 / 12',
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
+                          ),
+                          YamaIconButton(
+                            icon: Icons.chevron_right_rounded,
+                            semanticLabel: 'Next',
+                            onPressed: () {},
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const double inlinePreviewHeight = 188;
+}
+
+final class _PreviewLabel extends StatelessWidget {
+  const _PreviewLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.appColors.surfaceSunken,
+        borderRadius: BorderRadius.circular(AppRadii.indicator),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.space6,
+          vertical: AppSpacing.space2,
+        ),
+        child: Text(label, style: Theme.of(context).textTheme.labelSmall),
       ),
     );
   }

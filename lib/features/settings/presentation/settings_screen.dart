@@ -56,6 +56,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               }
               return _DesktopSettings(
                 sections: sections,
+                settings: settings,
                 selected: _selectedSection,
                 onSelected: (section) {
                   setState(() => _selectedSection = section);

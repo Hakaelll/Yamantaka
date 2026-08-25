@@ -380,30 +380,23 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                   ? panelWidth + AppSpacing.space12
                   : AppSpacing.space12,
               bottom: AppSpacing.space12,
-              child: AnimatedSlide(
-                duration: _chromeTransition(context, controlsShown),
-                curve: Curves.easeOutCubic,
-                offset: controlsShown ? Offset.zero : const Offset(0, 1.3),
-                child: AnimatedOpacity(
+              child: Theme(
+                data: chromeTheme,
+                child: AnimatedSwitcher(
                   duration: _chromeTransition(context, controlsShown),
-                  opacity: controlsShown ? 1 : 0,
-                  child: IgnorePointer(
-                    ignoring: !controlsShown,
-                    child: Theme(
-                      data: chromeTheme,
-                      child: ReaderBottomControls(
-                        key: const Key('reader-bottom-controls'),
-                        controller: controller,
-                        compact: windowClass == AppWindowClass.compact,
-                        onGoToPage: () => _showGoToPage(context),
-                        onChooseTheme: () => _showThemeChooser(context),
-                        readingDirection: widget.readingDirection,
-                        flatChrome:
-                            _isElectronicInk ||
-                            MediaQuery.highContrastOf(context),
-                        shortcutOverrides: widget.shortcutOverrides,
-                      ),
-                    ),
+                  child: ReaderBottomControls(
+                    key: const Key('reader-bottom-controls'),
+                    controller: controller,
+                    compact: windowClass == AppWindowClass.compact,
+                    onGoToPage: () => _showGoToPage(context),
+                    onChooseTheme: () => _showThemeChooser(context),
+                    readingDirection: widget.readingDirection,
+                    active: controlsShown,
+                    onActivate: _revealControls,
+                    showProgress: widget.showProgress,
+                    flatChrome:
+                        _isElectronicInk || MediaQuery.highContrastOf(context),
+                    shortcutOverrides: widget.shortcutOverrides,
                   ),
                 ),
               ),

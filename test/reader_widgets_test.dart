@@ -679,6 +679,10 @@ void main() {
       await tester.pump();
       expect(adapter.buildCount, 1);
       expect(find.byKey(const Key('pdf-search-field')), findsOneWidget);
+      expect(
+        find.byKey(const Key('reader-panel-section-rail')),
+        findsOneWidget,
+      );
       expect(find.bySemanticsLabel('Ancho del panel lateral'), findsOneWidget);
       expect(find.byKey(const Key('reader-panel-scrim')), findsNothing);
       expect(
@@ -776,6 +780,18 @@ void main() {
       find.byTooltip('Buscar en el documento (Ctrl+F)').hitTestable(),
       findsNothing,
     );
+    expect(
+      find.byKey(const Key('reader-resting-dock')).hitTestable(),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('reader-resting-dock')));
+    await tester.pump();
+    expect(
+      find.byTooltip('Buscar en el documento (Ctrl+F)').hitTestable(),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 4));
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
@@ -941,6 +957,7 @@ void main() {
       bool highContrast = false,
       bool reduceMotion = false,
       bool panelOpen = false,
+      bool resting = false,
     }) async {
       tester.view.physicalSize = size;
       await tester.pumpWidget(
@@ -956,6 +973,10 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
+      if (resting) {
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pump(const Duration(milliseconds: 250));
+      }
       await tester.pump();
       final path = '${output.path}${Platform.pathSeparator}$name.png';
       await _captureBoundary(tester, captureKey, path);
@@ -967,6 +988,7 @@ void main() {
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
         'panelOpen': panelOpen,
+        'resting': resting,
         'mode': harness.controller.preferences!.viewMode.name,
         'layout': harness.controller.preferences!.pageLayout.name,
         'source': 'flutter-widget-test',
@@ -1032,6 +1054,11 @@ void main() {
       name: 'reader-document-1600x900-panel-docked-widget',
       size: const Size(1600, 900),
       panelOpen: true,
+    );
+    await capture(
+      name: 'reader-document-1600x900-resting-widget',
+      size: const Size(1600, 900),
+      resting: true,
     );
     File(
       '${output.path}${Platform.pathSeparator}reader-matrix.json',

@@ -7,7 +7,7 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.5.0+6 revisada el 24 de agosto de 2026:
+Base Flutter 0.6.0+7 revisada el 24 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
 - flutter test --no-pub: 244 pruebas aprobadas;
@@ -17,6 +17,10 @@ Base Flutter 0.5.0+6 revisada el 24 de agosto de 2026:
   PDF sintético y no abre conexiones TCP/UDP; el harness lo cierra al terminar;
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
+
+El release local versionado se genera en `build/release/0.6.0+7/` e incluye el
+ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt` y el reporte del
+smoke sin red. Debe extraerse entero antes de probarlo.
 
 La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
 vigente de pruebas en [TESTING.md](TESTING.md).
@@ -36,9 +40,10 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - La barra superior se divide en grupos flotantes superpuestos para documento,
   modo y herramientas, sin reservar una franja en el visor.
 - En ventanas expandidas el panel lateral ocupa una columna propia y el visor
-  se recentra en el ancho restante; en compacto/medio es overlay con scrim.
-- La navegación inferior está centrada respecto a toda la ventana; vista y
-  zoom permanecen agrupados a la derecha.
+  se recentra en el ancho restante y usa navegación interna vertical; en
+  compacto/medio es overlay con scrim y navegación superior.
+- En reposo la navegación inferior se reduce a posición y progreso; clic, toque,
+  foco o teclado revelan navegación y zoom sin alterar el centro del PDF.
 - Los laterales ofrecen zonas claras de paso de página, con estado deshabilitado
   y soporte semántico.
 - Flechas, Page Up/Down, Home/End, espacio, F11 y Escape comparten la misma
@@ -65,6 +70,8 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Biblioteca siempre oscura y espacial, con una paleta monocromática,
   selección violeta, foco blanco independiente del color y controles
   superiores en cápsulas discretas.
+- La selección abre un inspector contextual con metadatos y `Abrir`, `Continuar`
+  o `Localizar`; al filtrar conserva el documento o explica su exclusión.
 - “Abrir PDF” es la acción primaria y los filtros activos ofrecen un
   restablecimiento visible sin volver a abrir el menú.
 - Búsqueda PDF cancelable, índice, miniaturas y panel lateral redimensionable.
@@ -79,6 +86,8 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Confirmación de enlaces externos y bloqueo de esquemas no seguros.
 - Sistema visual monocromático con Segoe UI Variable, temas claro/oscuro,
   densidad cómoda/compacta y breakpoints en 680/1100 px.
+- Ajustes usa master-detail en expandido y una previsualización viva persistente
+  del canvas, la página y el chrome real del lector.
 - La ventana se abre maximizada y conserva su geometría normal para restaurarla.
 
 ## Referencia visual vigente

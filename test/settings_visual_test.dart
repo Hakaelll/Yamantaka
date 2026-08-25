@@ -94,6 +94,16 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 400));
+      if (size.width >= 1100) {
+        expect(
+          find.byKey(const Key('appearance-live-reader-preview')),
+          findsOneWidget,
+        );
+        final previewRect = tester.getRect(
+          find.byKey(const Key('appearance-live-reader-preview')),
+        );
+        expect(previewRect.right, greaterThan(size.width - 300));
+      }
       final qualifiers = [
         themeMode == ThemeMode.dark ? 'dark' : 'light',
         if (highContrast) 'high-contrast',

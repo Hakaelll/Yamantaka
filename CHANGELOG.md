@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.6.0 — 2026-08-24 (sala de lectura digital)
+
+- Convierte la selección de Biblioteca en un inspector editorial responsive con
+  título, autor, estado, progreso, última lectura y acción primaria contextual;
+  favorito e información son las únicas acciones secundarias visibles.
+- Conserva la selección al filtrar y explica cuándo el documento deja de formar
+  parte del resultado, con recuperación directa y cierre por Escape; en compacto
+  la superficie admite descarte gestual.
+- Introduce chrome progresivo en el lector: el reposo mantiene una dock fina de
+  posición/progreso y una interacción de teclado, toque o puntero revela
+  navegación y zoom sin cambiar la geometría ni la clave del visor PDF.
+- Mantiene las seis muestras accesibles de tema y añade rail vertical para las
+  cinco secciones del panel acoplado, con feedback de ancho en hover, foco,
+  teclado y arrastre.
+- Eleva Ajustes a master-detail con previsualización viva persistente que
+  reutiliza controles reales y responde a canvas, tema, densidad, chrome,
+  progreso, movimiento y perfil e-ink.
+- Amplía contratos de selección, dock en reposo, panel y preview; genera matrices
+  0.6.0 comparables con la evidencia 0.5.0 y conserva la golden normativa del
+  lector.
+- Prepara el paquete local `0.6.0+7` con ZIP versionado, manifiesto por archivo y
+  `SHA256SUMS.txt`; no publica y mantiene explícito el estado de firma.
+
 ## 0.5.0 — 2026-08-24 (refinamiento editorial y panel adaptativo)
 
 - Consolida tamaños, sombras y duraciones semánticas para chrome, portadas,

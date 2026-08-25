@@ -256,6 +256,7 @@ void main() {
       );
     }
     await controller.load();
+    controller.selectDocument('matrix-0');
     for (final size in sizes) {
       await capture(state: 'few', sizeName: size.$1, size: size.$2);
     }
@@ -264,6 +265,7 @@ void main() {
       documents.save(_matrixDocument(index: index, now: now));
     }
     await controller.load();
+    controller.selectDocument('matrix-0');
     for (final size in sizes) {
       await capture(state: 'many', sizeName: size.$1, size: size.$2);
     }

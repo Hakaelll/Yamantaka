@@ -32,6 +32,11 @@ Reglas:
 
 ## Punto de partida confirmado
 
+- [x] 0.6.0 añade inspector contextual de Biblioteca, dock progresiva, rail del
+  panel acoplado y preview viva persistente de Ajustes sin red ni dependencias.
+- [x] La matriz widget compara 0.5.0 y 0.6.0 en ocho tamaños y estados de tema,
+  contraste, movimiento, panel y chrome en reposo.
+
 - [x] `publish_to: none` impide publicar accidentalmente el paquete Dart en
   pub.dev.
 - [x] El repositorio no contiene un flujo de envío a Microsoft Store, winget ni

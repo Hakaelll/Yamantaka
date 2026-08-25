@@ -899,9 +899,24 @@ final class _ArtifactPlaceholder extends StatelessWidget {
 }
 
 final class DocumentInfoOverlay extends StatelessWidget {
-  const DocumentInfoOverlay({super.key, required this.document});
+  const DocumentInfoOverlay({
+    super.key,
+    required this.document,
+    this.windowClass = AppWindowClass.expanded,
+    this.interactive = false,
+    this.onPrimary,
+    this.onToggleFavorite,
+    this.onShowInfo,
+    this.onDismiss,
+  });
 
   final LibraryDocument document;
+  final AppWindowClass windowClass;
+  final bool interactive;
+  final VoidCallback? onPrimary;
+  final VoidCallback? onToggleFavorite;
+  final VoidCallback? onShowInfo;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -926,89 +941,281 @@ final class DocumentInfoOverlay extends StatelessWidget {
               'progress': (document.readingProgress * 100).round(),
             },
           );
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 560),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: context.appColors.surfaceFloating,
-          border: Border.all(color: context.appColors.borderSubtle),
-          borderRadius: BorderRadius.circular(AppRadii.floating),
-          boxShadow: MediaQuery.highContrastOf(context)
-              ? null
-              : [
-                  BoxShadow(
-                    color: context.appColors.ambientShadow,
-                    blurRadius: AppShadow.floatingControlBlur,
-                    offset: const Offset(0, AppShadow.floatingControlOffset),
+    final compact = windowClass == AppWindowClass.compact;
+    final content = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: compact ? 620 : 920),
+      child: Material(
+        color: Colors.transparent,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: context.appColors.surfaceFloating,
+            border: Border.all(color: context.appColors.borderSubtle),
+            borderRadius: BorderRadius.circular(
+              compact ? AppRadii.panel : AppRadii.floating,
+            ),
+            boxShadow: MediaQuery.highContrastOf(context)
+                ? null
+                : [
+                    BoxShadow(
+                      color: context.appColors.ambientShadow,
+                      blurRadius: AppShadow.floatingControlBlur,
+                      offset: const Offset(0, AppShadow.floatingControlOffset),
+                    ),
+                  ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.space20,
+              AppSpacing.space12,
+              interactive ? AppSpacing.space12 : AppSpacing.space20,
+              AppSpacing.space12,
+            ),
+            child: compact
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _DocumentContextSummary(
+                        document: document,
+                        progressLine: progressLine,
+                      ),
+                      if (interactive) ...[
+                        const SizedBox(height: AppSpacing.space12),
+                        _DocumentContextActions(
+                          document: document,
+                          onPrimary: onPrimary,
+                          onToggleFavorite: onToggleFavorite,
+                          onShowInfo: onShowInfo,
+                          onDismiss: onDismiss,
+                        ),
+                      ],
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _DocumentContextSummary(
+                          document: document,
+                          progressLine: progressLine,
+                        ),
+                      ),
+                      if (interactive) ...[
+                        const SizedBox(width: AppSpacing.space20),
+                        _DocumentContextActions(
+                          document: document,
+                          onPrimary: onPrimary,
+                          onToggleFavorite: onToggleFavorite,
+                          onShowInfo: onShowInfo,
+                          onDismiss: onDismiss,
+                        ),
+                      ],
+                    ],
                   ),
-                ],
+          ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.space20,
-            AppSpacing.space12,
-            AppSpacing.space20,
-            AppSpacing.space8,
+      ),
+    );
+    if (!compact || !interactive || onDismiss == null) return content;
+    return Dismissible(
+      key: ValueKey('library-context-dismiss-${document.id}'),
+      direction: DismissDirection.down,
+      resizeDuration: AppMotion.whenAllowed(
+        MediaQuery.disableAnimationsOf(context),
+        AppMotion.standard,
+      ),
+      onDismissed: (_) => onDismiss!(),
+      child: content,
+    );
+  }
+}
+
+final class _DocumentContextSummary extends StatelessWidget {
+  const _DocumentContextSummary({
+    required this.document,
+    required this.progressLine,
+  });
+
+  final LibraryDocument document;
+  final String progressLine;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Tooltip(
+          message: document.effectiveTitle,
+          child: Text(
+            document.effectiveTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Tooltip(
-                message: document.effectiveTitle,
-                child: Text(
-                  document.effectiveTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+        ),
+        const SizedBox(height: AppSpacing.space2),
+        Wrap(
+          spacing: AppSpacing.space8,
+          runSpacing: AppSpacing.space2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (document.effectiveAuthor case final author?)
+              Text(author, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              document.isMissing
+                  ? strings.get('library.documentUnavailable')
+                  : progressLine,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: document.isMissing
+                    ? context.appColors.warning
+                    : context.appColors.textSecondary,
               ),
-              if (document.effectiveAuthor case final author?)
-                Text(
-                  author,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              if (document.topics.isNotEmpty)
-                Text(
-                  document.topics
-                      .map(
-                        (assignment) =>
-                            strings.get('topic.${assignment.topic.name}'),
-                      )
-                      .join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-              if (document.enrichment?.needsReview == true)
-                Text(
-                  strings.get('library.metadataNeedsReview'),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: context.appColors.textSecondary,
-                  ),
-                ),
-              const SizedBox(height: AppSpacing.space4),
-              Text(
-                document.isMissing
-                    ? strings.get('library.documentUnavailable')
-                    : '$progressLine · ${_relativeArtifactDate(document.lastOpenedAt, strings)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
+            ),
+            Text(
+              _relativeArtifactDate(document.lastOpenedAt, strings),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: context.appColors.textMuted,
               ),
-              if (document.libraryNote case final note?)
-                Text(
-                  note,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-            ],
+            ),
+            if (document.isFavorite)
+              Icon(
+                Icons.bookmark_rounded,
+                size: 15,
+                color: context.appColors.textSecondary,
+              ),
+          ],
+        ),
+        if (document.libraryNote case final note?) ...[
+          const SizedBox(height: AppSpacing.space2),
+          Text(
+            note,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall,
           ),
+        ],
+      ],
+    );
+  }
+}
+
+final class _DocumentContextActions extends StatelessWidget {
+  const _DocumentContextActions({
+    required this.document,
+    required this.onPrimary,
+    required this.onToggleFavorite,
+    required this.onShowInfo,
+    required this.onDismiss,
+  });
+
+  final LibraryDocument document;
+  final VoidCallback? onPrimary;
+  final VoidCallback? onToggleFavorite;
+  final VoidCallback? onShowInfo;
+  final VoidCallback? onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    return Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpacing.space4,
+      runSpacing: AppSpacing.space4,
+      children: [
+        if (onToggleFavorite != null)
+          IconButton(
+            key: const Key('library-context-favorite'),
+            tooltip: strings.get(
+              document.isFavorite
+                  ? 'library.unmarkFavorite'
+                  : 'library.markFavorite',
+            ),
+            onPressed: onToggleFavorite,
+            icon: Icon(
+              document.isFavorite
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+            ),
+          ),
+        if (onShowInfo != null)
+          IconButton(
+            key: const Key('library-context-info'),
+            tooltip: strings.get('library.showInformation'),
+            onPressed: onShowInfo,
+            icon: const Icon(Icons.info_outline_rounded),
+          ),
+        FilledButton.icon(
+          key: const Key('library-context-primary'),
+          onPressed: onPrimary,
+          icon: Icon(
+            document.isMissing
+                ? Icons.link_rounded
+                : Icons.arrow_forward_rounded,
+            size: 18,
+          ),
+          label: Text(
+            document.isMissing
+                ? strings.get('library.locate')
+                : document.readingProgress > 0
+                ? strings.get('action.continue')
+                : strings.get('action.open'),
+          ),
+        ),
+        if (onDismiss != null)
+          IconButton(
+            key: const Key('library-context-close'),
+            tooltip: strings.get('library.closeContext'),
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close_rounded),
+          ),
+      ],
+    );
+  }
+}
+
+final class _FilteredSelectionNotice extends StatelessWidget {
+  const _FilteredSelectionNotice({
+    required this.onReset,
+    required this.onDismiss,
+  });
+
+  final VoidCallback onReset;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    return Material(
+      color: context.appColors.surfaceFloating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.floating),
+        side: BorderSide(color: context.appColors.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.space12,
+          vertical: AppSpacing.space8,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.filter_alt_off_outlined, size: 18),
+            const SizedBox(width: AppSpacing.space8),
+            Flexible(child: Text(strings.get('library.selectionFiltered'))),
+            const SizedBox(width: AppSpacing.space8),
+            TextButton(
+              key: const Key('library-selection-show-again'),
+              onPressed: onReset,
+              child: Text(strings.get('library.showSelectionAgain')),
+            ),
+            IconButton(
+              tooltip: strings.get('library.closeContext'),
+              onPressed: onDismiss,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ],
         ),
       ),
     );

@@ -315,6 +315,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(controller.selectedDocumentId, 'alpha');
       expect(find.text('Alpha'), findsOneWidget);
+      expect(find.byKey(const Key('library-context-primary')), findsOneWidget);
+      expect(find.text('Abrir'), findsOneWidget);
 
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
@@ -337,6 +339,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 220));
       await tester.pump();
       expect(find.textContaining('No hay documentos'), findsOneWidget);
+      expect(
+        find.text(
+          'El documento seleccionado ya no pertenece a este resultado.',
+        ),
+        findsOneWidget,
+      );
+      expect(controller.selectedDocumentId, 'alpha');
       await tester.tap(find.text('Restablecer'));
       await tester.pump();
       await tester.pump();
@@ -544,6 +553,9 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('artifact-actions')));
       await tester.pump();
+      expect(find.byKey(const Key('library-context-primary')), findsOneWidget);
+      expect(find.byKey(const Key('library-context-favorite')), findsOneWidget);
+      expect(find.text('Continuar'), findsOneWidget);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.f10);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);

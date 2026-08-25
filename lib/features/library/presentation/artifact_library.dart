@@ -153,6 +153,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     };
     _selection.retain(widget.documents.map((document) => document.id));
     final activeFilter =
+        widget.controller.query.isNotEmpty ||
         _readingState != LibraryReadingState.all ||
         _sortOrder != LibrarySortOrder.lastOpened ||
         _favoritesOnly ||
@@ -268,17 +269,55 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                     ValueListenableBuilder<String?>(
                       valueListenable: _hoveredDocumentId,
                       builder: (context, hoveredId, _) {
+                        final selectedDocument = _documentById(
+                          widget.documents,
+                          selectedId,
+                        );
                         final describedDocument =
-                            _documentById(widget.documents, hoveredId) ??
-                            _documentById(widget.documents, selectedId);
+                            selectedDocument ??
+                            _documentById(widget.documents, hoveredId);
                         if (describedDocument == null) {
+                          if (selectedId != null && activeFilter) {
+                            return Align(
+                              alignment: Alignment.bottomCenter,
+                              child: _FilteredSelectionNotice(
+                                onReset: _resetFilters,
+                                onDismiss: () =>
+                                    widget.controller.selectDocument(null),
+                              ),
+                            );
+                          }
                           return const SizedBox.shrink();
                         }
-                        return IgnorePointer(
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
+                        return Align(
+                          alignment: Alignment.bottomCenter,
+                          child: AnimatedSwitcher(
+                            duration: AppMotion.whenAllowed(
+                              reduceMotion,
+                              AppMotion.standard,
+                            ),
                             child: DocumentInfoOverlay(
+                              key: ValueKey(
+                                'library-context-${describedDocument.id}',
+                              ),
                               document: describedDocument,
+                              windowClass: context.windowClass,
+                              interactive: selectedDocument != null,
+                              onPrimary: () => _open(describedDocument),
+                              onToggleFavorite: widget.onToggleFavorite == null
+                                  ? null
+                                  : () => unawaited(
+                                      widget.onToggleFavorite!(
+                                        describedDocument,
+                                      ),
+                                    ),
+                              onShowInfo: widget.onDocumentInfo == null
+                                  ? null
+                                  : () => unawaited(
+                                      widget.onDocumentInfo!(describedDocument),
+                                    ),
+                              onDismiss: () =>
+                                  widget.controller.selectDocument(null),
                             ),
                           ),
                         );
