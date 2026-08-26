@@ -91,7 +91,20 @@ enum _SettingsSectionId {
 
   String label(YamantakaLocalizations strings) =>
       strings.get('settings.section.$name');
+
+  _SettingsNavGroup get group => switch (this) {
+    _SettingsSectionId.appearance ||
+    _SettingsSectionId.reading ||
+    _SettingsSectionId.readerBar ||
+    _SettingsSectionId.shortcuts => _SettingsNavGroup.preferences,
+    _SettingsSectionId.library ||
+    _SettingsSectionId.history ||
+    _SettingsSectionId.advanced => _SettingsNavGroup.maintenance,
+    _SettingsSectionId.dataPrivacy => _SettingsNavGroup.privacy,
+  };
 }
+
+enum _SettingsNavGroup { preferences, maintenance, privacy }
 
 final class _SettingsSectionData {
   const _SettingsSectionData({
@@ -123,6 +136,10 @@ final class _DesktopSettings extends StatelessWidget {
     final selectedSection = sections.firstWhere(
       (section) => section.id == selected,
     );
+    final navigationSections = [...sections]
+      ..sort(
+        (left, right) => left.id.group.index.compareTo(right.id.group.index),
+      );
     return Row(
       children: [
         Container(
@@ -155,12 +172,23 @@ final class _DesktopSettings extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.space12),
-              for (final section in sections)
+              for (
+                var index = 0;
+                index < navigationSections.length;
+                index++
+              ) ...[
+                if (index == 0 ||
+                    navigationSections[index - 1].id.group !=
+                        navigationSections[index].id.group)
+                  _SettingsNavGroupLabel(
+                    group: navigationSections[index].id.group,
+                  ),
                 _SettingsNavItem(
-                  section: section.id,
-                  selected: selected == section.id,
-                  onPressed: () => onSelected(section.id),
+                  section: navigationSections[index].id,
+                  selected: selected == navigationSections[index].id,
+                  onPressed: () => onSelected(navigationSections[index].id),
                 ),
+              ],
             ],
           ),
         ),
@@ -406,30 +434,68 @@ final class _SettingsNavItem extends StatelessWidget {
   }
 }
 
-final class _AppearancePreview extends StatelessWidget {
+final class _SettingsNavGroupLabel extends StatelessWidget {
+  const _SettingsNavGroupLabel({required this.group});
+
+  final _SettingsNavGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.space12,
+        AppSpacing.space12,
+        AppSpacing.space12,
+        AppSpacing.space6,
+      ),
+      child: Text(
+        YamantakaLocalizations.of(
+          context,
+        ).get('settings.navigationGroup.${group.name}'),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: context.appColors.textMuted,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+enum _PreviewMode { resting, active, panel, electronicInk }
+
+final class _AppearancePreview extends StatefulWidget {
   const _AppearancePreview({required this.settings, this.inline = true});
 
   final AppSettings settings;
   final bool inline;
 
   @override
+  State<_AppearancePreview> createState() => _AppearancePreviewState();
+}
+
+final class _AppearancePreviewState extends State<_AppearancePreview> {
+  _PreviewMode _mode = _PreviewMode.resting;
+
+  @override
   Widget build(BuildContext context) {
-    if (inline && context.windowClass == AppWindowClass.expanded) {
+    if (widget.inline && context.windowClass == AppWindowClass.expanded) {
       return const SizedBox.shrink();
     }
     final strings = YamantakaLocalizations.of(context);
     final readerTheme = ReaderTheme.values
-        .where((theme) => theme.name == settings.defaultReaderTheme)
+        .where((theme) => theme.name == widget.settings.defaultReaderTheme)
         .firstOrNull;
     return Semantics(
       label: strings.get(
         'settings.appearancePreview',
         parameters: {
           'theme': strings.get(
-            settings.darkMode ? 'settings.value.dark' : 'settings.value.light',
+            widget.settings.darkMode
+                ? 'settings.value.dark'
+                : 'settings.value.light',
           ),
           'density': strings.get(
-            'settings.value.${settings.interfaceDensity.name}',
+            'settings.value.${widget.settings.interfaceDensity.name}',
           ),
           'canvas': strings.get(
             'settings.value.${readerTheme?.name ?? 'ivory'}',
@@ -439,7 +505,7 @@ final class _AppearancePreview extends StatelessWidget {
       child: Container(
         key: const Key('appearance-preview'),
         padding: EdgeInsets.all(
-          settings.interfaceDensity == AppInterfaceDensity.compact
+          widget.settings.interfaceDensity == AppInterfaceDensity.compact
               ? AppSpacing.space8
               : AppSpacing.space12,
         ),
@@ -461,10 +527,16 @@ final class _AppearancePreview extends StatelessWidget {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: AppSpacing.space12),
+            _PreviewModeSelector(
+              value: _mode,
+              onChanged: (value) => setState(() => _mode = value),
+            ),
+            const SizedBox(height: AppSpacing.space8),
             ExcludeSemantics(
               child: _LiveReaderPreview(
-                settings: settings,
+                settings: widget.settings,
                 readerTheme: readerTheme ?? ReaderTheme.ivory,
+                mode: _mode,
               ),
             ),
             const SizedBox(height: AppSpacing.space12),
@@ -474,7 +546,7 @@ final class _AppearancePreview extends StatelessWidget {
               children: [
                 _PreviewLabel(
                   label: strings.get(
-                    'settings.value.${settings.interfaceDensity.name}',
+                    'settings.value.${widget.settings.interfaceDensity.name}',
                   ),
                 ),
                 _PreviewLabel(
@@ -484,14 +556,14 @@ final class _AppearancePreview extends StatelessWidget {
                 ),
                 _PreviewLabel(
                   label: strings.get(
-                    'settings.value.${settings.visualProfile.name}',
+                    'settings.value.${widget.settings.visualProfile.name}',
                   ),
                 ),
                 _PreviewLabel(
                   label: strings.get(
-                    'settings.value.${settings.resolvedMotionPreference.name == 'full'
+                    'settings.value.${widget.settings.resolvedMotionPreference.name == 'full'
                         ? 'motionFull'
-                        : settings.resolvedMotionPreference.name == 'reduced'
+                        : widget.settings.resolvedMotionPreference.name == 'reduced'
                         ? 'motionReduced'
                         : 'motionNone'}',
                   ),
@@ -505,23 +577,78 @@ final class _AppearancePreview extends StatelessWidget {
   }
 }
 
-final class _LiveReaderPreview extends StatelessWidget {
-  const _LiveReaderPreview({required this.settings, required this.readerTheme});
+final class _PreviewModeSelector extends StatelessWidget {
+  const _PreviewModeSelector({required this.value, required this.onChanged});
 
-  final AppSettings settings;
-  final ReaderTheme readerTheme;
+  final _PreviewMode value;
+  final ValueChanged<_PreviewMode> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final eInk = settings.visualProfile == ReaderVisualProfile.electronicInk;
+    final strings = YamantakaLocalizations.of(context);
+    String label(_PreviewMode mode) =>
+        strings.get('settings.previewMode.${mode.name}');
+    IconData icon(_PreviewMode mode) => switch (mode) {
+      _PreviewMode.resting => Icons.horizontal_rule_rounded,
+      _PreviewMode.active => Icons.tune_rounded,
+      _PreviewMode.panel => Icons.view_sidebar_outlined,
+      _PreviewMode.electronicInk => Icons.draw_outlined,
+    };
+    return Semantics(
+      container: true,
+      label: strings.get('settings.previewMode'),
+      child: Row(
+        children: [
+          for (final mode in _PreviewMode.values)
+            Expanded(
+              child: YamaIconButton(
+                key: ValueKey('settings-preview-mode-${mode.name}'),
+                icon: icon(mode),
+                semanticLabel: label(mode),
+                tooltip: label(mode),
+                selected: value == mode,
+                onPressed: () => onChanged(mode),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _LiveReaderPreview extends StatelessWidget {
+  const _LiveReaderPreview({
+    required this.settings,
+    required this.readerTheme,
+    required this.mode,
+  });
+
+  final AppSettings settings;
+  final ReaderTheme readerTheme;
+  final _PreviewMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    final eInk =
+        mode == _PreviewMode.electronicInk ||
+        settings.visualProfile == ReaderVisualProfile.electronicInk;
     final compact = settings.interfaceDensity == AppInterfaceDensity.compact;
     final canvas = eInk ? Colors.white : Color(readerTheme.colorValue);
+    final showActiveChrome =
+        mode == _PreviewMode.active || mode == _PreviewMode.panel;
+    final showPanel = mode == _PreviewMode.panel;
+    final highContrast = MediaQuery.highContrastOf(context);
     return Container(
       key: const Key('appearance-live-reader-preview'),
       height: inlinePreviewHeight,
       decoration: BoxDecoration(
         color: canvas,
-        border: Border.all(color: context.appColors.borderStrong),
+        border: Border.all(
+          color: highContrast
+              ? context.appColors.focusRing
+              : context.appColors.borderStrong,
+          width: highContrast ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
       child: Stack(
@@ -556,12 +683,47 @@ final class _LiveReaderPreview extends StatelessWidget {
               ],
             ),
           ),
+          if (showPanel)
+            Positioned(
+              top: AppSpacing.space8,
+              right: AppSpacing.space8,
+              bottom: AppSpacing.space40,
+              child: Container(
+                key: const Key('appearance-preview-panel'),
+                width: 64,
+                padding: const EdgeInsets.all(AppSpacing.space6),
+                decoration: BoxDecoration(
+                  color: context.appColors.surfacePrimary,
+                  border: Border.all(color: context.appColors.borderStrong),
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 3,
+                      color: context.appColors.accentPrimary,
+                    ),
+                    const SizedBox(height: AppSpacing.space8),
+                    for (final width in [42.0, 34.0, 46.0]) ...[
+                      Container(
+                        width: width,
+                        height: 2,
+                        color: context.appColors.textMuted,
+                      ),
+                      const SizedBox(height: AppSpacing.space6),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           Positioned(
             left: AppSpacing.space8,
             right: AppSpacing.space8,
             bottom: AppSpacing.space8,
             child: IgnorePointer(
-              child: settings.autoHideControls
+              child: !showActiveChrome
                   ? Container(
                       height: 24,
                       padding: const EdgeInsets.symmetric(
@@ -572,7 +734,7 @@ final class _LiveReaderPreview extends StatelessWidget {
                         border: Border.all(
                           color: context.appColors.borderSubtle,
                         ),
-                        borderRadius: BorderRadius.circular(AppRadii.capsule),
+                        borderRadius: BorderRadius.circular(AppRadii.floating),
                       ),
                       child: Row(
                         children: [
@@ -868,7 +1030,7 @@ final class _ActionSetting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _SettingRow(
+    final row = _SettingRow(
       label: label,
       description: description,
       control: destructive
@@ -881,6 +1043,15 @@ final class _ActionSetting extends StatelessWidget {
               child: Text(actionLabel),
             )
           : OutlinedButton(onPressed: onPressed, child: Text(actionLabel)),
+    );
+    if (!destructive) return row;
+    return Container(
+      margin: const EdgeInsets.only(top: AppSpacing.space12),
+      padding: const EdgeInsets.only(top: AppSpacing.space8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: context.appColors.borderSubtle)),
+      ),
+      child: row,
     );
   }
 }

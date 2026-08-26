@@ -143,12 +143,31 @@ final class _ReaderThemeChoice extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 24,
-                height: 24,
+                width: 34,
+                height: 30,
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: Color(theme.colorValue),
-                  shape: BoxShape.circle,
                   border: Border.all(color: colors.borderStrong),
+                  borderRadius: BorderRadius.circular(AppRadii.indicator),
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0x22000000)),
+                  ),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      height: 3,
+                      margin: const EdgeInsets.all(3),
+                      color:
+                          theme == ReaderTheme.dark ||
+                              theme == ReaderTheme.black
+                          ? Colors.white70
+                          : Colors.black54,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: AppSpacing.space8),

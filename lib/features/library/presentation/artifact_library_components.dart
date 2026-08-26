@@ -24,6 +24,7 @@ final class _LibraryCommandBar extends StatelessWidget {
     required this.sortOrder,
     required this.favoritesOnly,
     required this.activeFilter,
+    required this.activeFilterCount,
     required this.selectionMode,
     required this.selectedCount,
     required this.onSearch,
@@ -40,6 +41,7 @@ final class _LibraryCommandBar extends StatelessWidget {
   final LibrarySortOrder sortOrder;
   final bool favoritesOnly;
   final bool activeFilter;
+  final int activeFilterCount;
   final bool selectionMode;
   final int selectedCount;
   final VoidCallback onSearch;
@@ -50,152 +52,268 @@ final class _LibraryCommandBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.space20,
-        AppSpacing.space12,
-        AppSpacing.space20,
-        AppSpacing.space8,
-      ),
-      child: Row(
-        children: [
-          if (query.isNotEmpty || activeFilter)
-            Text(
+    final summary = _LibraryCollectionSummary(
+      resultCount: resultCount,
+      totalCount: totalCount,
+      filtered: query.isNotEmpty || activeFilter,
+    );
+    final expandedFilterContext = activeFilter
+        ? TextButton.icon(
+            key: const Key('library-reset-filters-button'),
+            onPressed: () => onFilter(_FilterCommand.reset),
+            icon: Badge(
+              label: Text('$activeFilterCount'),
+              child: const Icon(Icons.filter_alt_off_outlined, size: 18),
+            ),
+            label: Text(
               strings.get(
-                'library.resultOfTotal',
-                parameters: {'result': resultCount, 'total': totalCount},
+                'library.filtersApplied',
+                parameters: {'count': activeFilterCount},
               ),
-              style: Theme.of(context).textTheme.bodySmall,
             ),
-          const Spacer(),
-          if (selectedCount > 0)
-            Semantics(
-              liveRegion: true,
-              label: strings.count('count.documentsSelected', selectedCount),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.space8,
-                ),
+          )
+        : null;
+    final tools = YamaToolbarGroup(
+      label: strings.get('library.commandBar'),
+      flat: MediaQuery.highContrastOf(context),
+      children: [
+        YamaIconButton(
+          key: const Key('library-selection-mode-button'),
+          semanticLabel: selectionMode
+              ? strings.get('library.exitSelectionMode')
+              : strings.get('library.selectMultiple'),
+          tooltip: selectionMode
+              ? strings.get('library.exitSelectionMode')
+              : strings.get('library.selectMultiple'),
+          selected: selectionMode,
+          onPressed: onToggleSelectionMode,
+          icon: selectionMode
+              ? Icons.check_box_outlined
+              : Icons.checklist_rounded,
+          badge: selectedCount > 0
+              ? Badge(label: Text('$selectedCount'))
+              : null,
+        ),
+        YamaIconButton(
+          key: const Key('library-search-button'),
+          semanticLabel: strings.librarySearch,
+          tooltip: '${strings.librarySearch} (Ctrl+F)',
+          onPressed: onSearch,
+          icon: Icons.search_rounded,
+        ),
+        YamaIconButton(
+          key: const Key('library-facet-button'),
+          semanticLabel: strings.get('library.filterAuthorsTopics'),
+          tooltip: strings.get('library.authorsTopicsGrouping'),
+          onPressed: onFacets,
+          selected: activeFilter,
+          icon: Icons.account_tree_outlined,
+        ),
+        PopupMenuButton<_FilterCommand>(
+          key: const Key('library-filter-button'),
+          tooltip: strings.get('library.filterSort'),
+          onSelected: onFilter,
+          icon: Badge(
+            isLabelVisible: activeFilter,
+            smallSize: 6,
+            backgroundColor: context.appColors.textSecondary,
+            child: const Icon(Icons.tune_rounded),
+          ),
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              enabled: false,
+              height: 32,
+              child: Text(strings.get('library.state')),
+            ),
+            for (final state in LibraryReadingState.values)
+              CheckedPopupMenuItem(
+                value: switch (state) {
+                  LibraryReadingState.all => _FilterCommand.all,
+                  LibraryReadingState.inProgress => _FilterCommand.inProgress,
+                  LibraryReadingState.notStarted => _FilterCommand.notStarted,
+                  LibraryReadingState.completed => _FilterCommand.completed,
+                },
+                checked: readingState == state,
                 child: Text(
-                  strings.count('count.selected', selectedCount),
-                  style: Theme.of(context).textTheme.labelMedium,
+                  '${strings.get('library.readingState.${state.name}')} · ${counts[state] ?? 0}',
                 ),
               ),
+            const PopupMenuDivider(),
+            CheckedPopupMenuItem(
+              value: _FilterCommand.favorites,
+              checked: favoritesOnly,
+              child: Text(strings.get('library.favoritesOnly')),
             ),
-          YamaToolbarGroup(
-            label: strings.get('library.commandBar'),
-            flat: MediaQuery.highContrastOf(context),
-            children: [
-              YamaIconButton(
-                key: const Key('library-selection-mode-button'),
-                semanticLabel: selectionMode
-                    ? strings.get('library.exitSelectionMode')
-                    : strings.get('library.selectMultiple'),
-                tooltip: selectionMode
-                    ? strings.get('library.exitSelectionMode')
-                    : strings.get('library.selectMultiple'),
-                selected: selectionMode,
-                onPressed: onToggleSelectionMode,
-                icon: selectionMode
-                    ? Icons.check_box_outlined
-                    : Icons.checklist_rounded,
-                badge: selectedCount > 0
-                    ? Badge(label: Text('$selectedCount'))
-                    : null,
+            const PopupMenuDivider(),
+            PopupMenuItem(
+              enabled: false,
+              height: 32,
+              child: Text(strings.get('library.sort')),
+            ),
+            for (final order in LibrarySortOrder.values)
+              CheckedPopupMenuItem(
+                value: switch (order) {
+                  LibrarySortOrder.lastOpened => _FilterCommand.lastOpened,
+                  LibrarySortOrder.dateAdded => _FilterCommand.dateAdded,
+                  LibrarySortOrder.title => _FilterCommand.title,
+                  LibrarySortOrder.progress => _FilterCommand.progress,
+                },
+                checked: sortOrder == order,
+                child: Text(strings.get('library.sortOrder.${order.name}')),
               ),
-              YamaIconButton(
-                key: const Key('library-search-button'),
-                semanticLabel: strings.librarySearch,
-                tooltip: '${strings.librarySearch} (Ctrl+F)',
-                onPressed: onSearch,
-                icon: Icons.search_rounded,
-              ),
-              YamaIconButton(
-                key: const Key('library-facet-button'),
-                semanticLabel: strings.get('library.filterAuthorsTopics'),
-                tooltip: strings.get('library.authorsTopicsGrouping'),
-                onPressed: onFacets,
-                selected: activeFilter,
-                icon: Icons.account_tree_outlined,
-              ),
-              if (activeFilter)
-                YamaIconButton(
-                  key: const Key('library-reset-filters-button'),
-                  semanticLabel: strings.get('library.resetFilters'),
-                  tooltip: strings.get('library.resetFilters'),
-                  onPressed: () => onFilter(_FilterCommand.reset),
-                  icon: Icons.filter_alt_off_outlined,
-                ),
-              PopupMenuButton<_FilterCommand>(
-                key: const Key('library-filter-button'),
-                tooltip: strings.get('library.filterSort'),
-                onSelected: onFilter,
-                icon: Badge(
-                  isLabelVisible: activeFilter,
-                  smallSize: 6,
-                  backgroundColor: context.appColors.textSecondary,
-                  child: const Icon(Icons.tune_rounded),
-                ),
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    enabled: false,
-                    height: 32,
-                    child: Text(strings.get('library.state')),
-                  ),
-                  for (final state in LibraryReadingState.values)
-                    CheckedPopupMenuItem(
-                      value: switch (state) {
-                        LibraryReadingState.all => _FilterCommand.all,
-                        LibraryReadingState.inProgress =>
-                          _FilterCommand.inProgress,
-                        LibraryReadingState.notStarted =>
-                          _FilterCommand.notStarted,
-                        LibraryReadingState.completed =>
-                          _FilterCommand.completed,
-                      },
-                      checked: readingState == state,
-                      child: Text(
-                        '${strings.get('library.readingState.${state.name}')} · ${counts[state] ?? 0}',
-                      ),
-                    ),
-                  const PopupMenuDivider(),
-                  CheckedPopupMenuItem(
-                    value: _FilterCommand.favorites,
-                    checked: favoritesOnly,
-                    child: Text(strings.get('library.favoritesOnly')),
-                  ),
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    enabled: false,
-                    height: 32,
-                    child: Text(strings.get('library.sort')),
-                  ),
-                  for (final order in LibrarySortOrder.values)
-                    CheckedPopupMenuItem(
-                      value: switch (order) {
-                        LibrarySortOrder.lastOpened =>
-                          _FilterCommand.lastOpened,
-                        LibrarySortOrder.dateAdded => _FilterCommand.dateAdded,
-                        LibrarySortOrder.title => _FilterCommand.title,
-                        LibrarySortOrder.progress => _FilterCommand.progress,
-                      },
-                      checked: sortOrder == order,
-                      child: Text(
-                        strings.get('library.sortOrder.${order.name}'),
-                      ),
-                    ),
-                  if (activeFilter) ...[
-                    const PopupMenuDivider(),
-                    PopupMenuItem(
-                      value: _FilterCommand.reset,
-                      child: Text(strings.get('library.resetFilters')),
-                    ),
-                  ],
-                ],
+            if (activeFilter) ...[
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: _FilterCommand.reset,
+                child: Text(strings.get('library.resetFilters')),
               ),
             ],
+          ],
+        ),
+      ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Medium windows still need the two-row composition: the command bar
+        // carries four 40 px tools plus a localized result summary.
+        final compact = constraints.maxWidth < 820;
+        final compactFilterContext = activeFilter
+            ? Semantics(
+                label: strings.get(
+                  'library.filtersApplied',
+                  parameters: {'count': activeFilterCount},
+                ),
+                button: true,
+                child: IconButton(
+                  key: const Key('library-reset-filters-button'),
+                  tooltip: strings.get('library.resetFilters'),
+                  onPressed: () => onFilter(_FilterCommand.reset),
+                  icon: Badge(
+                    label: Text('$activeFilterCount'),
+                    child: const Icon(Icons.filter_alt_off_outlined),
+                  ),
+                ),
+              )
+            : null;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.space20,
+            AppSpacing.space12,
+            AppSpacing.space20,
+            AppSpacing.space8,
+          ),
+          child: compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: summary),
+                        ?compactFilterContext,
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.space8),
+                    Row(
+                      children: [
+                        if (selectedCount > 0)
+                          _LibrarySelectionCount(count: selectedCount),
+                        const Spacer(),
+                        tools,
+                      ],
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    summary,
+                    const Spacer(),
+                    if (selectedCount > 0) ...[
+                      _LibrarySelectionCount(count: selectedCount),
+                      const SizedBox(width: AppSpacing.space8),
+                    ],
+                    if (expandedFilterContext != null) ...[
+                      expandedFilterContext,
+                      const SizedBox(width: AppSpacing.space8),
+                    ],
+                    tools,
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+final class _LibraryCollectionSummary extends StatelessWidget {
+  const _LibraryCollectionSummary({
+    required this.resultCount,
+    required this.totalCount,
+    required this.filtered,
+  });
+
+  final int resultCount;
+  final int totalCount;
+  final bool filtered;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    final label = filtered
+        ? strings.get(
+            'library.resultOfTotal',
+            parameters: {'result': resultCount, 'total': totalCount},
+          )
+        : strings.count('count.documents', totalCount);
+    return Semantics(
+      liveRegion: filtered,
+      label: label,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              border: Border.all(color: context.appColors.borderSubtle),
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+            child: Icon(
+              filtered
+                  ? Icons.filter_list_rounded
+                  : Icons.auto_stories_outlined,
+              size: 16,
+              color: context.appColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.space8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: context.appColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+final class _LibrarySelectionCount extends StatelessWidget {
+  const _LibrarySelectionCount({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    return Semantics(
+      liveRegion: true,
+      label: strings.count('count.documentsSelected', count),
+      child: Text(
+        strings.count('count.selected', count),
+        style: Theme.of(context).textTheme.labelMedium,
       ),
     );
   }
@@ -581,6 +699,7 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
       widget.document,
       selected: widget.selected,
     );
+    final enrichmentStatus = widget.document.enrichment?.status;
 
     return Semantics(
       button: true,
@@ -814,6 +933,64 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                     ),
                                   ),
                                 ),
+                              if (!widget.selectionMode &&
+                                  widget.document.hasFileChanged)
+                                Positioned(
+                                  left: AppSpacing.space6,
+                                  top: AppSpacing.space6,
+                                  child: _ArtifactStateMarker(
+                                    icon: Icons.sync_problem_rounded,
+                                    label: strings.get('library.fileChanged'),
+                                    tone: AppStatusTone.warning,
+                                  ),
+                                )
+                              else if (!widget.selectionMode &&
+                                  enrichmentStatus != null &&
+                                  enrichmentStatus !=
+                                      EnrichmentStatus.completed &&
+                                  enrichmentStatus != EnrichmentStatus.noText)
+                                Positioned(
+                                  left: AppSpacing.space6,
+                                  top: AppSpacing.space6,
+                                  child: _ArtifactStateMarker(
+                                    icon: switch (enrichmentStatus) {
+                                      EnrichmentStatus.pending =>
+                                        Icons.hourglass_empty_rounded,
+                                      EnrichmentStatus.analyzing =>
+                                        Icons.sync_rounded,
+                                      EnrichmentStatus.review =>
+                                        Icons.fact_check_outlined,
+                                      EnrichmentStatus.failed =>
+                                        Icons.error_outline_rounded,
+                                      _ => Icons.info_outline_rounded,
+                                    },
+                                    label: switch (enrichmentStatus) {
+                                      EnrichmentStatus.pending => strings.get(
+                                        'library.analysisPending',
+                                      ),
+                                      EnrichmentStatus.analyzing => strings.get(
+                                        'library.analysisInProgress',
+                                      ),
+                                      EnrichmentStatus.review => strings.get(
+                                        'library.metadataNeedsReview',
+                                      ),
+                                      EnrichmentStatus.failed => strings.get(
+                                        'library.analysisFailed',
+                                      ),
+                                      _ => strings.get(
+                                        'library.analyzeMetadata',
+                                      ),
+                                    },
+                                    tone:
+                                        enrichmentStatus ==
+                                            EnrichmentStatus.failed
+                                        ? AppStatusTone.error
+                                        : enrichmentStatus ==
+                                              EnrichmentStatus.review
+                                        ? AppStatusTone.warning
+                                        : AppStatusTone.neutral,
+                                  ),
+                                ),
                               if (widget.selectionMode && widget.selected)
                                 Positioned(
                                   left: AppSpacing.space8,
@@ -850,6 +1027,45 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _ArtifactStateMarker extends StatelessWidget {
+  const _ArtifactStateMarker({
+    required this.icon,
+    required this.label,
+    required this.tone,
+  });
+
+  final IconData icon;
+  final String label;
+  final AppStatusTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (tone) {
+      AppStatusTone.neutral => context.appColors.textSecondary,
+      AppStatusTone.success => context.appColors.success,
+      AppStatusTone.warning => context.appColors.warning,
+      AppStatusTone.error => context.appColors.danger,
+    };
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        label: label,
+        child: Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: context.appColors.surfaceFloating,
+            border: Border.all(color: color),
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+          child: Icon(icon, size: 15, color: color),
         ),
       ),
     );
@@ -942,8 +1158,15 @@ final class DocumentInfoOverlay extends StatelessWidget {
             },
           );
     final compact = windowClass == AppWindowClass.compact;
+    final medium = windowClass == AppWindowClass.medium;
     final content = ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: compact ? 620 : 920),
+      constraints: BoxConstraints(
+        maxWidth: compact
+            ? 620
+            : medium
+            ? 880
+            : 1040,
+      ),
       child: Material(
         color: Colors.transparent,
         child: DecoratedBox(
@@ -975,7 +1198,9 @@ final class DocumentInfoOverlay extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _DocumentContextSummary(
+                      _DocumentContextSummary(document: document),
+                      const SizedBox(height: AppSpacing.space12),
+                      _DocumentProgressColumn(
                         document: document,
                         progressLine: progressLine,
                       ),
@@ -994,13 +1219,26 @@ final class DocumentInfoOverlay extends StatelessWidget {
                 : Row(
                     children: [
                       Expanded(
-                        child: _DocumentContextSummary(
+                        child: _DocumentContextSummary(document: document),
+                      ),
+                      const SizedBox(width: AppSpacing.space20),
+                      SizedBox(
+                        width: medium ? 156 : 190,
+                        child: _DocumentProgressColumn(
                           document: document,
                           progressLine: progressLine,
                         ),
                       ),
                       if (interactive) ...[
                         const SizedBox(width: AppSpacing.space20),
+                        SizedBox(
+                          height: 48,
+                          child: VerticalDivider(
+                            width: 1,
+                            color: context.appColors.borderSubtle,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.space12),
                         _DocumentContextActions(
                           document: document,
                           onPrimary: onPrimary,
@@ -1030,17 +1268,52 @@ final class DocumentInfoOverlay extends StatelessWidget {
 }
 
 final class _DocumentContextSummary extends StatelessWidget {
-  const _DocumentContextSummary({
-    required this.document,
-    required this.progressLine,
-  });
+  const _DocumentContextSummary({required this.document});
 
   final LibraryDocument document;
-  final String progressLine;
 
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
+    final enrichmentStatus = document.enrichment?.status;
+    final status = document.isMissing
+        ? (
+            icon: Icons.link_off_rounded,
+            label: strings.get('library.fileNotFound'),
+            tone: AppStatusTone.error,
+          )
+        : document.hasFileChanged
+        ? (
+            icon: Icons.sync_problem_rounded,
+            label: strings.get('library.fileChanged'),
+            tone: AppStatusTone.warning,
+          )
+        : enrichmentStatus == EnrichmentStatus.review
+        ? (
+            icon: Icons.fact_check_outlined,
+            label: strings.get('library.metadataNeedsReview'),
+            tone: AppStatusTone.warning,
+          )
+        : document.readingProgress >= 1
+        ? (
+            icon: Icons.check_circle_outline_rounded,
+            label: strings.get('library.finished'),
+            tone: AppStatusTone.success,
+          )
+        : document.readingProgress > 0
+        ? (
+            icon: Icons.menu_book_rounded,
+            label: strings.get(
+              'library.inProgress',
+              parameters: {'value': (document.readingProgress * 100).round()},
+            ),
+            tone: AppStatusTone.neutral,
+          )
+        : (
+            icon: Icons.fiber_new_outlined,
+            label: strings.get('library.notStarted'),
+            tone: AppStatusTone.neutral,
+          );
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1055,22 +1328,22 @@ final class _DocumentContextSummary extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.space2),
+        Text(
+          document.effectiveAuthor ?? strings.get('library.unknownAuthor'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: AppSpacing.space8),
         Wrap(
           spacing: AppSpacing.space8,
-          runSpacing: AppSpacing.space2,
+          runSpacing: AppSpacing.space6,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            if (document.effectiveAuthor case final author?)
-              Text(author, style: Theme.of(context).textTheme.bodySmall),
-            Text(
-              document.isMissing
-                  ? strings.get('library.documentUnavailable')
-                  : progressLine,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: document.isMissing
-                    ? context.appColors.warning
-                    : context.appColors.textSecondary,
-              ),
+            AppStatusLabel(
+              icon: status.icon,
+              label: status.label,
+              tone: status.tone,
             ),
             Text(
               _relativeArtifactDate(document.lastOpenedAt, strings),
@@ -1096,6 +1369,68 @@ final class _DocumentContextSummary extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+final class _DocumentProgressColumn extends StatelessWidget {
+  const _DocumentProgressColumn({
+    required this.document,
+    required this.progressLine,
+  });
+
+  final LibraryDocument document;
+  final String progressLine;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    final progress = document.readingProgress.clamp(0.0, 1.0).toDouble();
+    return Semantics(
+      label: progressLine,
+      value: '${(progress * 100).round()} %',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  strings.get('reader.progress'),
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ),
+              Text(
+                '${(progress * 100).round()} %',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: context.appColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.space6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.indicator),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 3,
+              backgroundColor: context.appColors.borderSubtle,
+              color: document.isMissing
+                  ? context.appColors.warning
+                  : context.appColors.librarySelectionAccent,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.space6),
+          Text(
+            progressLine,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1158,6 +1493,8 @@ final class _DocumentContextActions extends StatelessWidget {
           label: Text(
             document.isMissing
                 ? strings.get('library.locate')
+                : document.readingProgress >= 1
+                ? strings.get('action.reread')
                 : document.readingProgress > 0
                 ? strings.get('action.continue')
                 : strings.get('action.open'),

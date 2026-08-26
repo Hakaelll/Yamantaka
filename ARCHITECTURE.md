@@ -277,3 +277,22 @@ recibe un `LibraryDocument` ya materializado y callbacks; no consulta SQLite ni
 abre PDFium. `LibraryController` conserva el ID aunque un filtro lo excluya y la
 presentación ofrece restablecer el query. La previsualización de Ajustes consume
 `AppSettings`, tokens y componentes de chrome, sin crear un segundo lector.
+
+## Retícula visual 0.7 y estabilidad del visor
+
+La iteración 0.7 amplía únicamente presentación y contratos visuales. Los
+aliases de estado y `AppTypeScale` viven en el tema; Biblioteca materializa el
+conteo de filtros y el documento seleccionado ya cargado, sin consultas ni
+apertura de PDFium desde el inspector. Los estados de enriquecimiento son
+marcas derivadas de `LibraryDocument`.
+
+`ReaderTopBar`, `ReaderBottomControls` y el rail lateral cambian de composición
+sin entrar en `_viewerCacheKey`. La navegación de la dock se centra mediante un
+`Stack` solo cuando existe ancho suficiente; compacto y medio usan la misma
+familia en flujo. Mostrar chrome, cambiar la sección, hacer hover o arrastrar el
+divisor no reemplaza el adaptador ni el `RepaintBoundary` del PDF.
+
+La preview de Ajustes es un diagrama de widgets sin `PdfDocumentRef`: su selector
+vive en estado local y nunca persiste. La paleta calcula su preview desde la
+entrada ya filtrada y documentos recientes materializados. No se añadieron red,
+servicios, dependencias, tablas ni cambios de esquema.

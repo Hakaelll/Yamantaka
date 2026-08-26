@@ -89,42 +89,75 @@ final class YamaToolbarGroup extends StatelessWidget {
     this.label,
     this.padding = const EdgeInsets.all(AppSpacing.space4),
     this.flat = false,
+    this.mainAxisSize = MainAxisSize.min,
+    this.radius = AppRadii.capsule,
+    this.bare = false,
   });
 
   final List<Widget> children;
   final String? label;
   final EdgeInsets padding;
   final bool flat;
+  final MainAxisSize mainAxisSize;
+  final double radius;
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final flatSurface = flat || MediaQuery.highContrastOf(context);
-    final group = DecoratedBox(
-      decoration: BoxDecoration(
-        color: flatSurface
-            ? colors.surfaceFloating
-            : colors.surfaceFloating.withValues(alpha: 0.96),
-        border: Border.all(color: colors.borderSubtle),
-        borderRadius: BorderRadius.circular(AppRadii.capsule),
-        boxShadow: flatSurface
-            ? null
-            : [
-                BoxShadow(
-                  color: colors.ambientShadow,
-                  blurRadius: AppShadow.floatingControlBlur,
-                  offset: const Offset(0, AppShadow.floatingControlOffset),
-                ),
-              ],
-      ),
-      child: Padding(
-        padding: padding,
-        child: Row(mainAxisSize: MainAxisSize.min, children: children),
-      ),
+    final row = Padding(
+      padding: padding,
+      child: Row(mainAxisSize: mainAxisSize, children: children),
     );
+    final group = bare
+        ? row
+        : DecoratedBox(
+            decoration: BoxDecoration(
+              color: flatSurface
+                  ? colors.surfaceFloating
+                  : colors.surfaceFloating.withValues(alpha: 0.96),
+              border: Border.all(color: colors.borderSubtle),
+              borderRadius: BorderRadius.circular(radius),
+              boxShadow: flatSurface
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: colors.ambientShadow,
+                        blurRadius: AppShadow.floatingControlBlur,
+                        offset: const Offset(
+                          0,
+                          AppShadow.floatingControlOffset,
+                        ),
+                      ),
+                    ],
+            ),
+            child: row,
+          );
     if (label == null) return group;
     return Semantics(container: true, label: label, child: group);
   }
+}
+
+final class YamaToolbarDivider extends StatelessWidget {
+  const YamaToolbarDivider({super.key, this.height = 24});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space6),
+      child: SizedBox(
+        height: height,
+        child: VerticalDivider(
+          width: 1,
+          thickness: 1,
+          color: context.appColors.borderSubtle,
+        ),
+      ),
+    ),
+  );
 }
 
 final class YamaSegment<T> {

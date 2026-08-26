@@ -95,6 +95,24 @@ completos con puntero, toque o teclado; el cambio nunca modifica las
 restricciones del visor. El panel acoplado usa un rail vertical de 52 px y el
 overlay conserva la barra horizontal.
 
-En Ajustes expandido, `settingsPreviewWidth` reserva 300 px a una muestra viva
+En Ajustes expandido, `settingsPreviewWidth` reserva 320 px a una muestra viva
 persistente que reutiliza `YamaToolbarGroup` y `YamaIconButton`. La muestra
 refleja preferencias sin abrir un documento ni duplicar el motor del lector.
+
+## Retícula editorial 0.7
+
+`AppTypeScale` explicita título de pantalla/sección/documento, encabezado
+contextual, cuerpo, control, metadato, auxiliar, cifra y atajo. El mínimo
+esencial es 12 px y cifras, páginas, zoom, porcentajes y atajos son tabulares.
+
+Biblioteca usa una cabecera de 84 px y hace visible el número de filtros. Su
+inspector es una banda por columnas; los estados usan icono, texto y tono. El
+lector presenta una superficie continua arriba y una única dock abajo; los
+divisores internos sustituyen cápsulas independientes. En expandido la función
+primaria permanece centrada.
+
+El rail acoplado mide 60 px y usa indicador vertical. Ajustes reserva 236 px a
+la navegación y 320 px a la preview; sus grupos son Preferencias, Mantenimiento
+y Privacidad. La paleta puede crecer a 780 px y reserva 228 px a la preview del
+resultado solo en expandido. Ninguna de estas superficies crea un nivel de
+elevación adicional ni entra en la identidad del visor PDF.

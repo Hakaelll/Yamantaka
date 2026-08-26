@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_tokens.dart';
 
-enum AppStatusTone { neutral, warning, error }
+enum AppStatusTone { neutral, success, warning, error }
 
 final class AppSectionHeader extends StatelessWidget {
   const AppSectionHeader({
@@ -69,6 +69,7 @@ final class AppStatusView extends StatelessWidget {
     final colors = context.appColors;
     final toneColor = switch (tone) {
       AppStatusTone.neutral => colors.accentPrimary,
+      AppStatusTone.success => colors.success,
       AppStatusTone.warning => colors.warning,
       AppStatusTone.error => colors.danger,
     };
@@ -180,6 +181,7 @@ final class AppStatusLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = switch (tone) {
       AppStatusTone.neutral => context.appColors.textSecondary,
+      AppStatusTone.success => context.appColors.success,
       AppStatusTone.warning => context.appColors.warning,
       AppStatusTone.error => context.appColors.danger,
     };

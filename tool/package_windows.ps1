@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = 'build/release/0.6.0+7',
-    [string]$Version = '0.6.0',
-    [string]$BuildNumber = '7',
+    [string]$OutputDirectory = 'build/release/0.7.0+8',
+    [string]$Version = '0.7.0',
+    [string]$BuildNumber = '8',
     [string]$FlutterExecutable,
     [string]$CertificateThumbprint,
     [string]$SignToolPath,
@@ -167,6 +167,17 @@ try {
             $signatureState.binaries.subject |
                 Where-Object { $_ } |
                 Sort-Object -Unique
+        )
+        nativeBinaries = @(
+            $signatureState.binaries | ForEach-Object {
+                [ordered]@{
+                    path = $_.relativePath
+                    status = $_.status
+                    valid = $_.valid
+                    subject = $_.subject
+                    thumbprint = $_.thumbprint
+                }
+            }
         )
         distribution = if ($Portable) { 'portable' } else { 'installed-bundle' }
         dataIsExternal = $true

@@ -202,6 +202,7 @@ void main() {
       ThemeMode themeMode = ThemeMode.light,
       bool highContrast = false,
       bool reduceMotion = false,
+      Future<void> Function()? interaction,
     }) async {
       tester.view.physicalSize = size;
       await tester.pumpWidget(
@@ -212,6 +213,10 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 250));
+      if (interaction != null) {
+        await interaction();
+        await tester.pump(const Duration(milliseconds: 250));
+      }
       final qualifiers = [
         themeMode == ThemeMode.dark ? 'dark' : 'light',
         if (highContrast) 'high-contrast',
@@ -229,6 +234,7 @@ void main() {
         'theme': themeMode.name,
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
+        'interaction': interaction == null ? 'none' : state,
         'source': 'flutter-widget-integration-test',
         'path': path,
       });
@@ -287,6 +293,19 @@ void main() {
       size: const Size(1280, 720),
       reduceMotion: true,
     );
+    await capture(
+      state: 'multiselection',
+      sizeName: '1280x720',
+      size: const Size(1280, 720),
+      interaction: () async {
+        await tester.tap(
+          find.byKey(const Key('library-selection-mode-button')),
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('artifact-matrix-0')));
+        await tester.tap(find.byKey(const ValueKey('artifact-matrix-1')));
+      },
+    );
     File(
       '${output.path}${Platform.pathSeparator}library-matrix.json',
     ).writeAsStringSync(
@@ -318,6 +337,8 @@ LibraryDocument _matrixDocument({
   lastOpenedAt: now.subtract(Duration(days: index % 9)),
   lastPageIndex: index % 12,
   readingProgress: (index % 10) / 10,
+  isMissing: index == 4,
+  hasFileChanged: index == 5,
   fingerprint: 'matrix-$index',
   thumbnailPath: coverPath,
 );

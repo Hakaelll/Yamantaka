@@ -7,20 +7,24 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.6.0+7 revisada el 24 de agosto de 2026:
+Base Flutter 0.7.0+8 revisada el 25 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 244 pruebas aprobadas;
+- flutter test --no-pub: 247 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
-- el bundle Release local permanece receptivo durante un smoke de 5 s con un
+- el bundle Release local permanece receptivo durante un smoke de 8 s con un
   PDF sintético y no abre conexiones TCP/UDP; el harness lo cierra al terminar;
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
-El release local versionado se genera en `build/release/0.6.0+7/` e incluye el
+El release local versionado se genera en `build/release/0.7.0+8/` e incluye el
 ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt` y el reporte del
 smoke sin red. Debe extraerse entero antes de probarlo.
+
+El bundle 0.7 contiene 21 archivos (43.138.872 bytes) y el ZIP ocupa
+18.705.581 bytes. El smoke sintético de 8 s terminó sin conexiones TCP/UDP. Los
+nueve binarios nativos continúan sin firma; no es un artefacto de distribución.
 
 La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
 vigente de pruebas en [TESTING.md](TESTING.md).
@@ -37,8 +41,8 @@ vigente de pruebas en [TESTING.md](TESTING.md).
   sus bordes, por lo que el lomo acompaña zoom y paneo.
 - Los tres modos comparten los seis entornos de lectura; el tema se aplica
   al canvas y al chrome sin alterar los píxeles del PDF.
-- La barra superior se divide en grupos flotantes superpuestos para documento,
-  modo y herramientas, sin reservar una franja en el visor.
+- La barra superior usa una sola superficie editorial con región documental,
+  divisor y herramientas contextuales, sin reservar una franja en el visor.
 - En ventanas expandidas el panel lateral ocupa una columna propia y el visor
   se recentra en el ancho restante y usa navegación interna vertical; en
   compacto/medio es overlay con scrim y navegación superior.
@@ -70,14 +74,16 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Biblioteca siempre oscura y espacial, con una paleta monocromática,
   selección violeta, foco blanco independiente del color y controles
   superiores en cápsulas discretas.
-- La selección abre un inspector contextual con metadatos y `Abrir`, `Continuar`
-  o `Localizar`; al filtrar conserva el documento o explica su exclusión.
+- La selección abre un inspector contextual con estado icónico, progreso y
+  `Abrir`, `Continuar`, `Releer` o `Localizar`; al filtrar conserva el documento
+  o explica su exclusión.
 - “Abrir PDF” es la acción primaria y los filtros activos ofrecen un
   restablecimiento visible sin volver a abrir el menú.
 - Búsqueda PDF cancelable, índice, miniaturas y panel lateral redimensionable.
 - Marcadores, notas por página, historial local opcional y navegación
   atrás/adelante.
-- Paleta de comandos y atajos personalizables con detección de conflictos.
+- Paleta de comandos con iconos específicos, metadatos, preview expandida,
+  documentos recientes y atajos personalizables con detección de conflictos.
 - Recuperación opt-in de documento, página, zoom, disposición, panel, chrome y
   geometría de ventana.
 - Copia de seguridad JSON versionada, validada y transaccional; nunca incluye
@@ -86,16 +92,18 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Confirmación de enlaces externos y bloqueo de esquemas no seguros.
 - Sistema visual monocromático con Segoe UI Variable, temas claro/oscuro,
   densidad cómoda/compacta y breakpoints en 680/1100 px.
-- Ajustes usa master-detail en expandido y una previsualización viva persistente
-  del canvas, la página y el chrome real del lector.
+- Ajustes usa master-detail agrupado y una previsualización viva persistente del
+  canvas, la página y el chrome, alternable entre reposo, activo, panel y e-ink.
 - La ventana se abre maximizada y conserva su geometría normal para restaurarla.
 
 ## Referencia visual vigente
 
-![Modo Libro editorial mantenido por prueba](docs/screenshots/windows-reader-editorial-v05.png)
+![Modo Libro editorial 0.7 mantenido por prueba](docs/screenshots/windows-reader-editorial-v07.png)
 
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
+Las matrices 0.7 y diez comparaciones 0.6/0.7 reproducibles permanecen bajo
+`build/visual-evidence/v0.7.0/`.
 
 ## Requisitos
 

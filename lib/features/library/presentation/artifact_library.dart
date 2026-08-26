@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../app/ui/yama_components.dart';
 import '../../../core/i18n/app_localizations.dart';
@@ -160,6 +161,15 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         widget.controller.selectedAuthors.isNotEmpty ||
         widget.controller.selectedTopics.isNotEmpty ||
         widget.controller.groupByAuthor;
+    final activeFilterCount = <bool>[
+      widget.controller.query.isNotEmpty,
+      _readingState != LibraryReadingState.all,
+      _sortOrder != LibrarySortOrder.lastOpened,
+      _favoritesOnly,
+      widget.controller.selectedAuthors.isNotEmpty,
+      widget.controller.selectedTopics.isNotEmpty,
+      widget.controller.groupByAuthor,
+    ].where((active) => active).length;
 
     return CallbackShortcuts(
       bindings: {
@@ -203,6 +213,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                   sortOrder: _sortOrder,
                   favoritesOnly: _favoritesOnly,
                   activeFilter: activeFilter,
+                  activeFilterCount: activeFilterCount,
                   selectionMode: _selectionMode,
                   selectedCount: _selection.length,
                   onSearch: _openSearch,
@@ -294,7 +305,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                           child: AnimatedSwitcher(
                             duration: AppMotion.whenAllowed(
                               reduceMotion,
-                              AppMotion.standard,
+                              AppMotion.inspector,
                             ),
                             child: DocumentInfoOverlay(
                               key: ValueKey(

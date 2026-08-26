@@ -44,7 +44,7 @@ abstract final class AppSpacing {
 
 abstract final class AppSizes {
   static const double topBarHeight = 64;
-  static const double libraryHeaderHeight = 72;
+  static const double libraryHeaderHeight = 84;
   static const double bottomControlHeight = 48;
   static const double sidePanelWidth = 344;
   static const double sidePanelMinWidth = 288;
@@ -58,15 +58,37 @@ abstract final class AppSizes {
   static const double readerSpreadGutter = 2;
   static const double topRevealZone = 24;
   static const double readerPanelDefault = sidePanelWidth;
-  static const double settingsNavigationWidth = 220;
-  static const double settingsPreviewWidth = 300;
-  static const double settingsContentMaxWidth = 760;
+  static const double settingsNavigationWidth = 236;
+  static const double settingsPreviewWidth = 320;
+  static const double settingsContentMaxWidth = 780;
   static const double settingsControlWidth = 240;
   static const double commandPaletteRowHeight = 52;
+  static const double commandPaletteExpandedWidth = 780;
+  static const double commandPalettePreviewWidth = 228;
   static const double artifactSelectedScale = 1.035;
   static const double artifactHoverScale = 1.015;
   static const double artifactSelectedLift = 6;
   static const double artifactHoverLift = 2;
+}
+
+/// Editorial roles used by [AppTheme]. Feature widgets select a semantic text
+/// style instead of introducing local sizes. Essential information starts at
+/// 12 logical pixels; density never scales this typography down.
+abstract final class AppTypeScale {
+  static const double screenTitle = 24;
+  static const double sectionTitle = 19;
+  static const double documentTitle = 17;
+  static const double contextualHeading = 15;
+  static const double body = 14;
+  static const double control = 14;
+  static const double metadata = 12;
+  static const double auxiliary = 12;
+  static const double figure = 12;
+  static const double shortcut = 12;
+
+  static const List<FontFeature> tabularFigures = [
+    FontFeature.tabularFigures(),
+  ];
 }
 
 abstract final class AppRadii {
@@ -109,6 +131,8 @@ abstract final class AppMotion {
   static const Duration fast = Duration(milliseconds: 120);
   static const Duration standard = Duration(milliseconds: 160);
   static const Duration panel = Duration(milliseconds: 200);
+  static const Duration dialog = Duration(milliseconds: 200);
+  static const Duration inspector = Duration(milliseconds: 160);
   static const Duration controlsAutoHide = Duration(seconds: 3);
   static const Duration chromeReveal = Duration(milliseconds: 120);
   static const Duration chromeHide = Duration(milliseconds: 100);
@@ -211,6 +235,17 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
   final Color nightBackground;
   final Color ambientShadow;
   final Color pageShadow;
+
+  // Complete semantic interaction vocabulary. These aliases intentionally
+  // resolve from the smaller maintained palette so themes cannot drift by
+  // inventing one-off colors for a state.
+  Color get surfaceSelected => selectionBackground;
+  Color get surfaceFocused => accentSoft;
+  Color get surfaceDisabled => surfaceSunken;
+  Color get surfaceLoading => surfaceSecondary;
+  Color get borderFocus => focusRing;
+  Color get paperPdf => paperWhite;
+  Color get overlayShadow => ambientShadow;
 
   static const light = AppColorTokens(
     appBackground: Color(0xFFECEAE4),

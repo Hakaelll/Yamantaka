@@ -6,6 +6,40 @@ import 'package:yamantaka/features/command_palette/presentation/command_palette.
 import 'package:yamantaka/features/library/domain/library_document.dart';
 
 void main() {
+  testWidgets('expanded palette previews the selected result without cards', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CommandPalette(
+            actions: {
+              AppCommandId.openDocument: () {},
+              AppCommandId.search: () {},
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('command-palette-preview')), findsOneWidget);
+    final openTile = find.byKey(const ValueKey('command-openDocument'));
+    expect(
+      find.descendant(
+        of: openTile,
+        matching: find.byIcon(Icons.file_open_outlined),
+      ),
+      findsOneWidget,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    expect(find.text('Buscar en el documento'), findsNWidgets(2));
+  });
+
   testWidgets('command palette filters and executes a registered action', (
     tester,
   ) async {
@@ -85,10 +119,13 @@ void main() {
   testWidgets('Escape closes the palette dialog while search has focus', (
     tester,
   ) async {
+    final invokerFocus = FocusNode();
+    addTearDown(invokerFocus.dispose);
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
           builder: (context) => FilledButton(
+            focusNode: invokerFocus,
             onPressed: () => showDialog<void>(
               context: context,
               builder: (_) =>
@@ -99,6 +136,8 @@ void main() {
         ),
       ),
     );
+    invokerFocus.requestFocus();
+    await tester.pump();
     await tester.tap(find.text('Mostrar paleta'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('command-palette-search')), findsOneWidget);
@@ -107,6 +146,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('command-palette-search')), findsNothing);
+    expect(invokerFocus.hasFocus, isTrue);
   });
 
   testWidgets('system reduced motion uses immediate keyboard scrolling', (

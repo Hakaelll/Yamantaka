@@ -5,9 +5,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/app/app_services.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
+import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/settings/application/settings_controller.dart';
 import 'package:yamantaka/features/settings/presentation/settings_screen.dart';
@@ -72,6 +74,9 @@ void main() {
       ThemeMode themeMode = ThemeMode.light,
       bool highContrast = false,
       bool reduceMotion = false,
+      Locale locale = const Locale('es'),
+      double textScale = 1,
+      String? previewMode,
     }) async {
       tester.view.physicalSize = size;
       await tester.pumpWidget(
@@ -80,20 +85,45 @@ void main() {
           theme: AppTheme.light(highContrast: highContrast),
           darkTheme: AppTheme.dark(highContrast: highContrast),
           themeMode: themeMode,
+          locale: locale,
+          supportedLocales: const [Locale('es'), Locale('en')],
+          localizationsDelegates: const [
+            YamantakaLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(context).copyWith(
               highContrast: highContrast,
               disableAnimations: reduceMotion,
+              textScaler: TextScaler.linear(textScale),
             ),
             child: child!,
           ),
           home: RepaintBoundary(
             key: captureKey,
-            child: SettingsScreen(services: services, onBack: () {}),
+            child: SettingsScreen(
+              key: ValueKey(
+                'settings-$sizeName-${previewMode ?? 'default'}-${locale.languageCode}-$textScale',
+              ),
+              services: services,
+              onBack: () {},
+            ),
           ),
         ),
       );
       await tester.pump(const Duration(milliseconds: 400));
+      if (previewMode != null) {
+        await tester.tap(
+          find.byKey(ValueKey('settings-preview-mode-$previewMode')),
+        );
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(
+          find.byKey(const Key('appearance-preview-panel')),
+          previewMode == 'panel' ? findsOneWidget : findsNothing,
+        );
+      }
       if (size.width >= 1100) {
         expect(
           find.byKey(const Key('appearance-live-reader-preview')),
@@ -108,6 +138,9 @@ void main() {
         themeMode == ThemeMode.dark ? 'dark' : 'light',
         if (highContrast) 'high-contrast',
         if (reduceMotion) 'reduced-motion',
+        if (locale.languageCode == 'en') 'en',
+        if (textScale > 1) 'text-${textScale}x',
+        ?previewMode,
         'widget',
       ].join('-');
       final name = 'settings-$sizeName-$qualifiers';
@@ -131,6 +164,9 @@ void main() {
         'theme': themeMode.name,
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
+        'locale': locale.languageCode,
+        'textScale': textScale,
+        'previewMode': previewMode ?? 'resting',
         'source': 'flutter-widget-test',
         'path': path,
       });
@@ -163,6 +199,23 @@ void main() {
       size: const Size(1280, 720),
       reduceMotion: true,
     );
+    await capture(
+      sizeName: '1280x720',
+      size: const Size(1280, 720),
+      locale: const Locale('en'),
+    );
+    await capture(
+      sizeName: '1280x720',
+      size: const Size(1280, 720),
+      textScale: 1.3,
+    );
+    for (final mode in const ['active', 'panel', 'electronicInk']) {
+      await capture(
+        sizeName: '1280x720',
+        size: const Size(1280, 720),
+        previewMode: mode,
+      );
+    }
     File(
       '${output.path}${Platform.pathSeparator}settings-matrix.json',
     ).writeAsStringSync(

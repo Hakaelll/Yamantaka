@@ -62,15 +62,15 @@ extremo; los resultados bajo `build/` no contienen rutas ni títulos.
 
 La única captura normativa es:
 
-    docs/screenshots/windows-reader-editorial-v05.png
+    docs/screenshots/windows-reader-editorial-v07.png
 
 La genera y compara esta prueba:
 
-    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.5 baseline"
+    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.7 baseline"
 
 Para aceptar deliberadamente un cambio visual:
 
-    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.5 baseline"
+    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.7 baseline"
 
 Es una referencia de widgets ejecutados a 1600×900, no una captura nativa ni un
 mockup manual. Valida la composición fullscreen del contenido: barra opaca,
@@ -81,7 +81,8 @@ Las matrices widget de Biblioteca, Lector y Ajustes cubren 640×480, 800×600,
 1280×720, 1600×900, 1920×1080, 1920×1200, 2560×1440 y 3440×1440, además de
 tema oscuro, alto contraste, movimiento reducido, chrome en reposo y panel
 abierto. La evidencia previa se conserva en `build/visual-evidence/v0.5.0/` y
-la actual se escribe en `build/visual-evidence/v0.6.0/`; ninguna se versiona.
+la de 0.6 se conserva en `build/visual-evidence/v0.6.0/` y la actual se escribe
+en `build/visual-evidence/v0.7.0/`; ninguna se versiona.
 
 ## Validación nativa de Windows
 
@@ -135,6 +136,14 @@ pruebas, golden y build Release. El paquete de 21 archivos (41,11 MiB; ZIP de
 17,83 MiB) superó otro smoke de 5 s sin conexiones TCP/UDP. Manifiesto, hashes y
 reporte están en `build/release/0.6.0+7/`. Los nueve binarios nativos continúan
 sin firma; es evidencia local de prueba, no de distribución.
+
+La iteración `0.7.0+8` aprueba formato de 212 archivos, `git diff --check`,
+análisis sin incidencias, 247 pruebas y la golden 0.7. Las matrices generan 28
+capturas de Biblioteca, 16 del Lector, 16 de Ajustes, 6 de paleta/menú y 5 de
+diálogos; `tool/create_visual_comparisons.ps1` produce diez pares 0.6/0.7 con
+hash de cada fuente. El Release contiene 21 archivos (43.138.872 bytes), su ZIP
+18.705.581 bytes y un smoke sintético de 8 s registra cero conexiones. Los nueve
+binarios siguen sin firma.
 
 ## Corpus y privacidad
 

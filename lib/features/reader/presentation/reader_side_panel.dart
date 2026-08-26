@@ -113,10 +113,28 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                       child: Row(
                         children: [
                           const SizedBox(width: AppSpacing.space16),
+                          Container(
+                            width: 3,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: context.appColors.accentPrimary,
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.indicator,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.space8),
+                          Icon(
+                            _panelSectionIcon(widget.section),
+                            size: 18,
+                            color: context.appColors.textSecondary,
+                          ),
+                          const SizedBox(width: AppSpacing.space8),
                           Expanded(
                             child: Text(
                               title,
-                              style: Theme.of(context).textTheme.titleSmall,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                           ),
                           if (widget.allowPin)

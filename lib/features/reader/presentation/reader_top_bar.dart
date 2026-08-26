@@ -96,7 +96,16 @@ final class ReaderTopBar extends StatelessWidget
                 ? AppSpacing.space24
                 : AppSpacing.space20,
           ),
-          child: Row(
+          child: YamaToolbarGroup(
+            key: const Key('reader-unified-top-bar'),
+            label: strings.get('reader.tools'),
+            flat: flatChrome,
+            mainAxisSize: MainAxisSize.max,
+            radius: AppRadii.floating,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.space4,
+              vertical: AppSpacing.space4,
+            ),
             children: [
               Expanded(
                 child: Align(
@@ -104,6 +113,8 @@ final class ReaderTopBar extends StatelessWidget
                   child: YamaToolbarGroup(
                     label: strings.get('reader.currentDocument'),
                     flat: flatChrome,
+                    bare: true,
+                    padding: EdgeInsets.zero,
                     children: [
                       YamaIconButton(
                         semanticLabel: strings.get('reader.backToLibrary'),
@@ -126,10 +137,10 @@ final class ReaderTopBar extends StatelessWidget
                             document.effectiveTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium
+                            style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
-                                  color: colors.textSecondary,
-                                  fontWeight: FontWeight.w500,
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w600,
                                 ),
                           ),
                         ),
@@ -160,12 +171,15 @@ final class ReaderTopBar extends StatelessWidget
                   ),
                 ),
               ),
+              const YamaToolbarDivider(height: 28),
               Expanded(
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: YamaToolbarGroup(
                     label: strings.get('reader.tools'),
                     flat: flatChrome,
+                    bare: true,
+                    padding: EdgeInsets.zero,
                     children: [
                       YamaIconButton(
                         semanticLabel: strings.get('command.search'),

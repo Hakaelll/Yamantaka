@@ -106,7 +106,7 @@ final class _LibraryScreenState extends State<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    final compact = context.windowClass == AppWindowClass.compact;
+    final compactHeader = MediaQuery.sizeOf(context).width < 820;
     final libraryTheme = AppTheme.library(
       density: context.appDensity.interfaceDensity,
       highContrast: MediaQuery.highContrastOf(context),
@@ -157,35 +157,107 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                     ]),
                     builder: (context, _) => Semantics(
                       header: true,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text(
-                            strings.libraryTitle,
-                            style: Theme.of(context).textTheme.headlineSmall,
+                          Container(
+                            width: 3,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: context.appColors.textPrimary,
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.indicator,
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: AppSpacing.space2),
-                          Text(
-                            widget.enrichment?.progress.isRunning == true
-                                ? strings.get(
-                                    'library.analyzing',
-                                    parameters: {
-                                      'current':
+                          const SizedBox(width: AppSpacing.space12),
+                          Flexible(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  strings.get('library.localCollection'),
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: context.appColors.textMuted,
+                                        letterSpacing: 1.1,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                                const SizedBox(height: AppSpacing.space2),
+                                if (!compactHeader)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        strings.libraryTitle,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.headlineSmall,
+                                      ),
+                                      const SizedBox(width: AppSpacing.space12),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.space8,
+                                          vertical: AppSpacing.space2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color:
+                                                context.appColors.borderSubtle,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            AppRadii.control,
+                                          ),
+                                        ),
+                                        child: Text(
                                           widget
-                                              .enrichment!
-                                              .progress
-                                              .completed +
-                                          1,
-                                      'total':
-                                          widget.enrichment!.progress.total,
-                                    },
+                                                      .enrichment
+                                                      ?.progress
+                                                      .isRunning ==
+                                                  true
+                                              ? strings.get(
+                                                  'library.analyzing',
+                                                  parameters: {
+                                                    'current':
+                                                        widget
+                                                            .enrichment!
+                                                            .progress
+                                                            .completed +
+                                                        1,
+                                                    'total': widget
+                                                        .enrichment!
+                                                        .progress
+                                                        .total,
+                                                  },
+                                                )
+                                              : strings.count(
+                                                  'count.documents',
+                                                  widget
+                                                      .controller
+                                                      .libraryDocumentCount,
+                                                ),
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.labelMedium,
+                                        ),
+                                      ),
+                                    ],
                                   )
-                                : strings.count(
-                                    'count.documents',
-                                    widget.controller.libraryDocumentCount,
+                                else
+                                  Text(
+                                    strings.count(
+                                      'count.documents',
+                                      widget.controller.libraryDocumentCount,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelSmall,
                                   ),
-                            style: Theme.of(context).textTheme.labelSmall,
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -281,7 +353,7 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                       ],
                       icon: const Icon(Icons.more_horiz_rounded),
                     ),
-                    if (compact)
+                    if (compactHeader)
                       Tooltip(
                         message: '${strings.libraryOpenPdf} (Ctrl+O)',
                         child: Semantics(

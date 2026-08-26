@@ -45,6 +45,9 @@ final class _CommandPaletteState extends State<CommandPalette> {
     final selectedIndex = entries.isEmpty
         ? 0
         : _selectedIndex.clamp(0, entries.length - 1);
+    final selectedEntry = entries.isEmpty ? null : entries[selectedIndex];
+    final expanded =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
     return Focus(
       autofocus: true,
       onKeyEvent: (_, event) => _handleKey(event, entries, selectedIndex),
@@ -56,7 +59,7 @@ final class _CommandPaletteState extends State<CommandPalette> {
         ),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
-            maxWidth: AppSizes.dialogMaxWidth,
+            maxWidth: AppSizes.commandPaletteExpandedWidth,
             maxHeight: AppSizes.commandPaletteMaxHeight,
           ),
           child: Column(
@@ -92,20 +95,34 @@ final class _CommandPaletteState extends State<CommandPalette> {
               ),
               const Divider(height: 1),
               Flexible(
-                child: entries.isEmpty
-                    ? _EmptyPalette(message: strings.commandEmpty)
-                    : ListView(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.only(
-                          bottom: AppSpacing.space8,
-                        ),
-                        shrinkWrap: true,
-                        children: _entryWidgets(
-                          entries,
-                          selectedIndex,
-                          strings,
-                        ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: entries.isEmpty
+                          ? _EmptyPalette(message: strings.commandEmpty)
+                          : ListView(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.only(
+                                bottom: AppSpacing.space8,
+                              ),
+                              shrinkWrap: true,
+                              children: _entryWidgets(
+                                entries,
+                                selectedIndex,
+                                strings,
+                              ),
+                            ),
+                    ),
+                    if (expanded && selectedEntry != null) ...[
+                      const VerticalDivider(width: 1),
+                      SizedBox(
+                        width: AppSizes.commandPalettePreviewWidth,
+                        child: _PaletteSelectionPreview(entry: selectedEntry),
                       ),
+                    ],
+                  ],
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -153,7 +170,9 @@ final class _CommandPaletteState extends State<CommandPalette> {
           )) {
         continue;
       }
-      entries.add(_PaletteEntry.command(definition, localizedLabel));
+      entries.add(
+        _PaletteEntry.command(definition, localizedLabel, strings: strings),
+      );
     }
     if (widget.onOpenRecent != null) {
       for (final document in widget.recentDocuments.take(8)) {
@@ -374,11 +393,13 @@ final class _PaletteEntry {
 
   factory _PaletteEntry.command(
     AppCommandDefinition command,
-    String localizedLabel,
-  ) => _PaletteEntry._(
+    String localizedLabel, {
+    required YamantakaLocalizations strings,
+  }) => _PaletteEntry._(
     key: 'command-${command.id.name}',
     label: localizedLabel,
-    icon: Icons.bolt_rounded,
+    icon: _commandIcon(command.id),
+    subtitle: strings.get('command.category.${_commandCategory(command.id)}'),
     shortcutLabel: command.shortcutLabel,
     command: command,
   );
@@ -401,6 +422,170 @@ final class _PaletteEntry {
   final String? shortcutLabel;
   final AppCommandDefinition? command;
   final LibraryDocument? document;
+}
+
+String _commandCategory(AppCommandId id) => switch (id) {
+  AppCommandId.openDocument ||
+  AppCommandId.documentInfo ||
+  AppCommandId.settings => 'document',
+  AppCommandId.search ||
+  AppCommandId.commandPalette ||
+  AppCommandId.goToPage ||
+  AppCommandId.escape ||
+  AppCommandId.nextPage ||
+  AppCommandId.previousPage ||
+  AppCommandId.firstPage ||
+  AppCommandId.lastPage ||
+  AppCommandId.navigationBack ||
+  AppCommandId.navigationForward ||
+  AppCommandId.savePositionA ||
+  AppCommandId.savePositionB ||
+  AppCommandId.goToPositionA ||
+  AppCommandId.goToPositionB ||
+  AppCommandId.swapPositions => 'navigation',
+  AppCommandId.togglePanel ||
+  AppCommandId.showThumbnails ||
+  AppCommandId.showOutline ||
+  AppCommandId.showAnnotations => 'panel',
+  AppCommandId.toggleBookmark ||
+  AppCommandId.undoAnnotation ||
+  AppCommandId.redoAnnotation => 'annotation',
+  AppCommandId.zoomIn ||
+  AppCommandId.zoomOut ||
+  AppCommandId.resetZoom ||
+  AppCommandId.actualSize ||
+  AppCommandId.fitWidth ||
+  AppCommandId.fitPage ||
+  AppCommandId.singlePageLayout ||
+  AppCommandId.facingPageLayout ||
+  AppCommandId.continuousPageLayout ||
+  AppCommandId.changeReaderTheme ||
+  AppCommandId.fullScreen ||
+  AppCommandId.toggleChrome ||
+  AppCommandId.toggleImmersive => 'view',
+};
+
+IconData _commandIcon(AppCommandId id) => switch (id) {
+  AppCommandId.openDocument => Icons.file_open_outlined,
+  AppCommandId.search => Icons.search_rounded,
+  AppCommandId.commandPalette => Icons.keyboard_command_key_rounded,
+  AppCommandId.goToPage => Icons.find_in_page_outlined,
+  AppCommandId.togglePanel => Icons.view_sidebar_outlined,
+  AppCommandId.toggleBookmark => Icons.bookmark_add_outlined,
+  AppCommandId.zoomIn => Icons.zoom_in_rounded,
+  AppCommandId.zoomOut => Icons.zoom_out_rounded,
+  AppCommandId.resetZoom => Icons.restart_alt_rounded,
+  AppCommandId.actualSize => Icons.one_x_mobiledata_rounded,
+  AppCommandId.fullScreen => Icons.fullscreen_rounded,
+  AppCommandId.toggleChrome => Icons.visibility_off_outlined,
+  AppCommandId.toggleImmersive => Icons.center_focus_strong_rounded,
+  AppCommandId.escape => Icons.close_rounded,
+  AppCommandId.nextPage => Icons.chevron_right_rounded,
+  AppCommandId.previousPage => Icons.chevron_left_rounded,
+  AppCommandId.firstPage => Icons.first_page_rounded,
+  AppCommandId.lastPage => Icons.last_page_rounded,
+  AppCommandId.singlePageLayout => Icons.crop_portrait_rounded,
+  AppCommandId.facingPageLayout => Icons.menu_book_outlined,
+  AppCommandId.continuousPageLayout => Icons.view_stream_outlined,
+  AppCommandId.showThumbnails => Icons.grid_view_outlined,
+  AppCommandId.showOutline => Icons.format_list_bulleted_rounded,
+  AppCommandId.showAnnotations => Icons.rate_review_outlined,
+  AppCommandId.navigationBack => Icons.undo_rounded,
+  AppCommandId.navigationForward => Icons.redo_rounded,
+  AppCommandId.savePositionA ||
+  AppCommandId.savePositionB => Icons.push_pin_outlined,
+  AppCommandId.goToPositionA ||
+  AppCommandId.goToPositionB => Icons.near_me_outlined,
+  AppCommandId.swapPositions => Icons.swap_horiz_rounded,
+  AppCommandId.undoAnnotation => Icons.undo_rounded,
+  AppCommandId.redoAnnotation => Icons.redo_rounded,
+  AppCommandId.fitWidth => Icons.fit_screen_outlined,
+  AppCommandId.fitPage => Icons.crop_free_rounded,
+  AppCommandId.changeReaderTheme => Icons.tonality_outlined,
+  AppCommandId.documentInfo => Icons.info_outline_rounded,
+  AppCommandId.settings => Icons.settings_outlined,
+};
+
+final class _PaletteSelectionPreview extends StatelessWidget {
+  const _PaletteSelectionPreview({required this.entry});
+
+  final _PaletteEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    final document = entry.document;
+    final progress = document?.readingProgress.clamp(0.0, 1.0).toDouble();
+    final state = document == null
+        ? strings.get('command.preview.safeAction')
+        : document.isMissing
+        ? strings.get('library.fileNotFound')
+        : progress! >= 1
+        ? strings.get('library.finished')
+        : progress > 0
+        ? strings.get(
+            'library.inProgress',
+            parameters: {'value': (progress * 100).round()},
+          )
+        : strings.get('library.notStarted');
+    return Container(
+      key: const Key('command-palette-preview'),
+      color: context.appColors.surfaceSecondary,
+      padding: const EdgeInsets.all(AppSpacing.space20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(entry.icon, size: 24, color: context.appColors.iconActive),
+          const SizedBox(height: AppSpacing.space16),
+          Text(
+            entry.label,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          if (entry.subtitle case final subtitle?) ...[
+            const SizedBox(height: AppSpacing.space4),
+            Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+          ],
+          const SizedBox(height: AppSpacing.space20),
+          Text(
+            strings.get('command.preview.selection'),
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+          const SizedBox(height: AppSpacing.space6),
+          Text(state, style: Theme.of(context).textTheme.bodyMedium),
+          if (progress != null) ...[
+            const SizedBox(height: AppSpacing.space12),
+            Semantics(
+              label: strings.get(
+                'library.progressValue',
+                parameters: {'value': (progress * 100).round()},
+              ),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 3,
+                backgroundColor: context.appColors.borderSubtle,
+              ),
+            ),
+          ],
+          const Spacer(),
+          if (entry.shortcutLabel case final shortcut?)
+            Row(
+              children: [
+                const Icon(Icons.keyboard_outlined, size: 16),
+                const SizedBox(width: AppSpacing.space8),
+                AppShortcutHint(shortcut),
+              ],
+            ),
+          const SizedBox(height: AppSpacing.space8),
+          Text(
+            strings.get('command.preview.enterHint'),
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 final class _EmptyPalette extends StatelessWidget {

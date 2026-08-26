@@ -63,7 +63,7 @@ final class _PanelSectionRail extends StatelessWidget {
       label: strings.get('reader.panelSections'),
       child: SizedBox(
         key: const Key('reader-panel-section-rail'),
-        width: 52,
+        width: 60,
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
           children: [
@@ -73,12 +73,40 @@ final class _PanelSectionRail extends StatelessWidget {
                   horizontal: AppSpacing.space6,
                   vertical: AppSpacing.space2,
                 ),
-                child: YamaIconButton(
-                  semanticLabel: _panelSectionLabel(section, strings),
-                  tooltip: _panelSectionLabel(section, strings),
-                  icon: _panelSectionIcon(section),
-                  selected: selected == section,
-                  onPressed: () => onSelected(section),
+                child: SizedBox(
+                  height: 44,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AnimatedPositioned(
+                        duration: AppMotion.whenAllowed(
+                          MediaQuery.disableAnimationsOf(context),
+                          AppMotion.fast,
+                        ),
+                        left: 0,
+                        top: selected == section ? 10 : 21,
+                        bottom: selected == section ? 10 : 21,
+                        child: Container(
+                          width: 3,
+                          decoration: BoxDecoration(
+                            color: selected == section
+                                ? context.appColors.accentPrimary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(
+                              AppRadii.indicator,
+                            ),
+                          ),
+                        ),
+                      ),
+                      YamaIconButton(
+                        semanticLabel: _panelSectionLabel(section, strings),
+                        tooltip: _panelSectionLabel(section, strings),
+                        icon: _panelSectionIcon(section),
+                        selected: selected == section,
+                        onPressed: () => onSelected(section),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -129,6 +157,13 @@ final class _PanelResizeHandleState extends State<_PanelResizeHandle> {
   @override
   Widget build(BuildContext context) {
     final active = _hovered || _focused || _dragging;
+    final indicatorColor = _dragging
+        ? context.appColors.accentPrimary
+        : _focused
+        ? context.appColors.focusRing
+        : _hovered
+        ? context.appColors.textSecondary
+        : context.appColors.borderStrong;
     void changeBy(double delta) =>
         widget.onWidthChanged(_clamp(widget.width + delta));
     final strings = YamantakaLocalizations.of(context);
@@ -192,11 +227,9 @@ final class _PanelResizeHandleState extends State<_PanelResizeHandle> {
                       ),
                       width: active ? 4 : 2,
                       height: active ? 52 : 36,
-                      color: active
-                          ? context.appColors.focusRing
-                          : context.appColors.borderStrong,
+                      color: indicatorColor,
                     ),
-                    if (active)
+                    if (_focused || _dragging)
                       Positioned(
                         left: 12,
                         child: Material(

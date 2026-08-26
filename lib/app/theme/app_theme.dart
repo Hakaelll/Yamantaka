@@ -111,65 +111,66 @@ abstract final class AppTheme {
     );
     final textTheme = base.textTheme.copyWith(
       displaySmall: base.textTheme.displaySmall?.copyWith(
-        fontSize: 28,
+        fontSize: 30,
         height: 1.15,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.35,
       ),
       headlineSmall: base.textTheme.headlineSmall?.copyWith(
-        fontSize: 22,
+        fontSize: AppTypeScale.screenTitle,
         height: 1.2,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
       ),
       titleLarge: base.textTheme.titleLarge?.copyWith(
-        fontSize: 18,
+        fontSize: AppTypeScale.sectionTitle,
         height: 1.25,
         fontWeight: FontWeight.w600,
       ),
       titleMedium: base.textTheme.titleMedium?.copyWith(
-        fontSize: 16,
+        fontSize: AppTypeScale.documentTitle,
         height: 1.3,
         fontWeight: FontWeight.w600,
       ),
       titleSmall: base.textTheme.titleSmall?.copyWith(
-        fontSize: 14,
+        fontSize: AppTypeScale.contextualHeading,
         height: 1.3,
         fontWeight: FontWeight.w600,
       ),
       bodyLarge: base.textTheme.bodyLarge?.copyWith(
-        fontSize: 16,
+        fontSize: AppTypeScale.documentTitle,
         height: 1.35,
         fontWeight: FontWeight.w400,
       ),
       bodyMedium: base.textTheme.bodyMedium?.copyWith(
-        fontSize: 14,
+        fontSize: AppTypeScale.body,
         height: 1.35,
         fontWeight: FontWeight.w400,
       ),
       bodySmall: base.textTheme.bodySmall?.copyWith(
         color: tokens.textSecondary,
-        fontSize: 12,
+        fontSize: AppTypeScale.metadata,
         height: 1.35,
         fontWeight: FontWeight.w400,
       ),
       labelLarge: base.textTheme.labelLarge?.copyWith(
-        fontSize: 14,
+        fontSize: AppTypeScale.control,
         height: 1.3,
         fontWeight: FontWeight.w500,
       ),
       labelMedium: base.textTheme.labelMedium?.copyWith(
         color: tokens.textSecondary,
-        fontSize: 12,
+        fontSize: AppTypeScale.figure,
         height: 1.3,
         fontWeight: FontWeight.w500,
-        fontFeatures: const [FontFeature.tabularFigures()],
+        fontFeatures: AppTypeScale.tabularFigures,
       ),
       labelSmall: base.textTheme.labelSmall?.copyWith(
         color: tokens.textMuted,
-        fontSize: 11,
+        fontSize: AppTypeScale.auxiliary,
         height: 1.35,
         fontWeight: FontWeight.w500,
+        fontFeatures: AppTypeScale.tabularFigures,
       ),
     );
     final focusSide = WidgetStateProperty.resolveWith<BorderSide>((states) {
@@ -240,6 +241,9 @@ abstract final class AppTheme {
         ),
         titleTextStyle: textTheme.titleLarge?.copyWith(
           color: tokens.textPrimary,
+        ),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: tokens.textSecondary,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -378,6 +382,7 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(AppRadii.field),
         ),
         textStyle: textTheme.bodyMedium,
+        iconColor: tokens.iconNormal,
       ),
       menuTheme: MenuThemeData(
         style: MenuStyle(

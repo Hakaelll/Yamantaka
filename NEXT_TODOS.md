@@ -1,6 +1,6 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-08-24.
+Actualizado: 2026-08-25.
 
 Este documento es el backlog vivo posterior a la reconstrucción del lector. No
 es una colección de ideas sueltas: ordena trabajo de producto, funcionamiento,
@@ -32,6 +32,12 @@ Reglas:
 
 ## Punto de partida confirmado
 
+- [x] 0.7.0 unifica el chrome del lector, eleva el inspector a banda editorial,
+  hace legibles los filtros y estados de portada y agrupa Ajustes por tarea.
+- [x] La preview de Ajustes alterna cuatro demostraciones sin persistencia ni
+  PDFium; la paleta expandida añade iconos y contexto del resultado.
+- [x] La golden normativa pasa a `windows-reader-editorial-v07.png` y las
+  matrices 0.7 separan Biblioteca, Lector, Ajustes, paleta/menús y diálogos.
 - [x] 0.6.0 añade inspector contextual de Biblioteca, dock progresiva, rail del
   panel acoplado y preview viva persistente de Ajustes sin red ni dependencias.
 - [x] La matriz widget compara 0.5.0 y 0.6.0 en ocho tamaños y estados de tema,

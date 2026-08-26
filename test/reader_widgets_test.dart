@@ -274,7 +274,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('book reader matches the maintained editorial v0.5 baseline', (
+  testWidgets('book reader matches the maintained editorial v0.7 baseline', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1600, 900);
@@ -291,7 +291,7 @@ void main() {
 
     await expectLater(
       find.byType(ReaderScreen),
-      matchesGoldenFile('../docs/screenshots/windows-reader-editorial-v05.png'),
+      matchesGoldenFile('../docs/screenshots/windows-reader-editorial-v07.png'),
     );
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -331,10 +331,19 @@ void main() {
     }
 
     await openPalette('disposición');
-    expect(find.text('Disposición: Una página'), findsOneWidget);
-    expect(find.text('Disposición: Dos páginas'), findsOneWidget);
-    expect(find.text('Disposición: Continua'), findsOneWidget);
-    await tester.tap(find.text('Disposición: Dos páginas'));
+    expect(
+      find.byKey(const ValueKey('command-singlePageLayout')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('command-facingPageLayout')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('command-continuousPageLayout')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('command-facingPageLayout')));
     await tester.pump();
     expect(harness.controller.preferences!.viewMode, ReaderMode.book);
     expect(harness.controller.preferences!.pageLayout, PageLayoutMode.facing);
@@ -358,7 +367,9 @@ void main() {
     await tester.pump();
 
     await openPalette('continua');
-    await tester.tap(find.text('Disposición: Continua'));
+    await tester.tap(
+      find.byKey(const ValueKey('command-continuousPageLayout')),
+    );
     await tester.pump();
     expect(harness.controller.preferences!.viewMode, ReaderMode.document);
     expect(
@@ -368,7 +379,7 @@ void main() {
     expect(adapter.configuration?.flow, PdfViewFlow.continuous);
 
     await openPalette('una página');
-    await tester.tap(find.text('Disposición: Una página'));
+    await tester.tap(find.byKey(const ValueKey('command-singlePageLayout')));
     await tester.pump();
     expect(harness.controller.preferences!.viewMode, ReaderMode.document);
     expect(harness.controller.preferences!.pageLayout, PageLayoutMode.single);
@@ -511,7 +522,13 @@ void main() {
             find.byTooltip('Buscar en el documento (Ctrl+F)'),
             findsOneWidget,
           );
-          expect(find.byTooltip('Ajuste de zoom'), findsOneWidget);
+          expect(
+            find.byTooltip('Ajuste de zoom'),
+            compact ? findsNothing : findsOneWidget,
+          );
+          if (compact) {
+            expect(find.byTooltip('Más controles de lectura'), findsOneWidget);
+          }
           expect(
             find.byTooltip(
               mode == ReaderMode.book

@@ -142,7 +142,7 @@ space64 = 64
 
 ```text
 topBarHeight            = 64
-libraryHeaderHeight      = 72
+libraryHeaderHeight      = 84
 bottomControlHeight      = 48
 sidePanelWidth           = 344
 compactSidePanelWidth    = 360
@@ -150,6 +150,9 @@ desktopControlExtent     = 40
 touchControlExtent       = 48
 dialogMaxWidth           = 600
 commandPaletteMaxHeight  = 520
+commandPaletteExpandedWidth = 780
+settingsNavigationWidth  = 236
+settingsPreviewWidth     = 320
 contentMaxWidth          = 1000
 readerMinimumPageWidth   = 340
 readerMaximumPageWidth   = 920
@@ -165,6 +168,8 @@ motionFeedback         = 80 ms
 motionFast             = 120 ms
 motionStandard         = 160 ms
 motionPanel            = 200 ms
+motionDialog           = 200 ms
+motionInspector        = 160 ms
 motionControlsAutoHide = 3 s
 ```
 
@@ -255,16 +260,17 @@ alternativas. No se empaquetan fuentes.
 
 | Uso | Tamaño | Peso | Altura |
 | --- | ---: | ---: | ---: |
-| Metadato secundario | 11 | 400 | 1,35 |
-| Etiqueta auxiliar | 12 | 500 | 1,30 |
-| Estado compacto | 13 | 400 | 1,35 |
+| Metadato secundario | 12 | 400 | 1,35 |
+| Etiqueta auxiliar/atajo | 12 | 500 | 1,35 |
+| Cifra y progreso | 12 | 500, tabular | 1,30 |
 | Control/interfaz | 14 | 500 | 1,35 |
-| Texto destacado | 16 | 500 | 1,35 |
-| Título de sección | 18 | 600 | 1,25 |
-| Título de pantalla | 22 | 600 | 1,20 |
+| Encabezado contextual | 15 | 600 | 1,30 |
+| Título de documento | 17 | 600 | 1,30 |
+| Título de sección | 19 | 600 | 1,25 |
+| Título de pantalla | 24 | 600 | 1,20 |
 | Mensaje principal | 28 | 600 | 1,15 |
 
-No se usa texto inferior a 11 px. Páginas, porcentajes y atajos emplean
+No se usa información esencial inferior a 12 px. Páginas, porcentajes y atajos emplean
 números tabulares. Los títulos largos usan elipsis y ofrecen el nombre completo
 en tooltip o semántica.
 
@@ -665,7 +671,7 @@ Antes de cerrar una tarea visual:
 - Split no se muestra hasta que existan dos lectores reales y medidos; el
   breakpoint técnico por sí solo no constituye una función visual.
 
-La referencia vigente `windows-reader-editorial-v05.png` se genera desde una
+La referencia vigente `windows-reader-editorial-v07.png` se genera desde una
 prueba de widgets a 1600×900 y fija Libro con tema Marfil, grupos flotantes,
 pliego enfrentado y dock inferior. Las
 capturas generacionales se retiraron porque ya no representaban el producto.
@@ -685,7 +691,24 @@ grupos completos. Ambas son overlays sobre la misma geometría del visor. En
 expandido, el panel usa un rail vertical de 52 px; en compacto/medio mantiene
 los cinco accesos en la cabecera.
 
-Ajustes reserva en expandido 300 px para una muestra persistente. La muestra
+Ajustes reserva en expandido 320 px para una muestra persistente. La muestra
 reutiliza controles del producto, refleja canvas, papel, chrome y progreso, y
 responde a las preferencias sin abrir PDFium. En compacto vive dentro de
 Apariencia y no introduce desplazamiento horizontal.
+
+## 30. Retícula editorial de escritorio — 0.7
+
+Biblioteca convierte cabecera, contador, contexto de filtros e inspector en una
+secuencia editorial. El inspector separa identidad, estado y progreso y decide
+la acción primaria por disponibilidad y avance. Archivo modificado, análisis y
+revisión usan forma e icono además de color.
+
+El lector une navegación y herramientas en una sola banda con divisores. En
+expandido la navegación permanece geométricamente centrada; barra, dock y panel
+siguen fuera de la clave del visor. El rail acoplado usa una línea vertical y el
+divisor distingue reposo, hover, foco y arrastre.
+
+Ajustes agrupa preferencias, mantenimiento y privacidad, subordina las acciones
+destructivas y reserva 320 px a una preview manipulable. La paleta añade iconos
+por acción y una explicación lateral en expandido sin convertir filas en
+tarjetas. Los tres niveles de elevación siguen siendo plano, overlay y diálogo.

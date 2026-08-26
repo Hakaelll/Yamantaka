@@ -7,9 +7,9 @@ import '../../../core/i18n/app_localizations.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
 
-/// The bottom chrome is intentionally two coordinated floating groups.  The
-/// parent positions this widget over the PDF, so the viewer never reserves a
-/// toolbar-height strip for it.
+/// The bottom chrome is one editorial control family. The parent positions it
+/// over the PDF, so resting/active state never reserves a toolbar-height strip
+/// or changes viewer geometry.
 final class ReaderBottomControls extends StatelessWidget {
   const ReaderBottomControls({
     super.key,
@@ -75,10 +75,9 @@ final class ReaderBottomControls extends StatelessWidget {
         onActivate: onActivate,
       );
     }
-    final navigation = YamaToolbarGroup(
+    final navigation = Row(
       key: const Key('reader-navigation-group'),
-      label: strings.get('reader.navigation'),
-      flat: flat,
+      mainAxisSize: MainAxisSize.min,
       children: [
         YamaIconButton(
           semanticLabel: previousLabel,
@@ -117,10 +116,9 @@ final class ReaderBottomControls extends StatelessWidget {
         ),
       ],
     );
-    final zoom = YamaToolbarGroup(
+    final zoom = Row(
       key: const Key('reader-view-group'),
-      label: strings.get('reader.viewAndZoom'),
-      flat: flat,
+      mainAxisSize: MainAxisSize.min,
       children: [
         YamaIconButton(
           semanticLabel: strings.get('command.zoomOut'),
@@ -157,39 +155,47 @@ final class ReaderBottomControls extends StatelessWidget {
           icon: Icons.add_rounded,
           onPressed: () => controller.zoomBy(1.18),
         ),
-        PopupMenuButton<_ZoomAction>(
-          tooltip: strings.get('settings.zoomMode'),
-          icon: const Icon(Icons.fit_screen_outlined, size: 18),
-          onSelected: (action) {
-            switch (action) {
-              case _ZoomAction.actualSize:
-                controller.viewController.actualSize();
-              case _ZoomAction.fitWidth:
-                controller.fitWidth();
-              case _ZoomAction.fitPage:
-                controller.fitPage();
-            }
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              value: _ZoomAction.actualSize,
-              child: Text('${strings.get('command.actualSize')} · Ctrl+1'),
+        if (!compact)
+          PopupMenuButton<_ZoomAction>(
+            tooltip: strings.get('settings.zoomMode'),
+            icon: Icon(
+              Icons.fit_screen_outlined,
+              size: 18,
+              color: preferences.zoomMode == ZoomMode.custom
+                  ? context.appColors.iconNormal
+                  : context.appColors.iconActive,
             ),
-            PopupMenuItem(
-              value: _ZoomAction.fitWidth,
-              child: Text('$fitWidthLabel · Ctrl+2'),
-            ),
-            PopupMenuItem(
-              value: _ZoomAction.fitPage,
-              child: Text('$fitPageLabel · Ctrl+0'),
-            ),
-          ],
-        ),
+            onSelected: (action) {
+              switch (action) {
+                case _ZoomAction.actualSize:
+                  controller.viewController.actualSize();
+                case _ZoomAction.fitWidth:
+                  controller.fitWidth();
+                case _ZoomAction.fitPage:
+                  controller.fitPage();
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: _ZoomAction.actualSize,
+                child: Text('${strings.get('command.actualSize')} · Ctrl+1'),
+              ),
+              PopupMenuItem(
+                value: _ZoomAction.fitWidth,
+                child: Text('$fitWidthLabel · Ctrl+2'),
+              ),
+              PopupMenuItem(
+                value: _ZoomAction.fitPage,
+                child: Text('$fitPageLabel · Ctrl+0'),
+              ),
+            ],
+          ),
         if (!compact) ...[
           YamaIconButton(
             semanticLabel: strings.get('reader.readingTheme'),
             tooltip: strings.get('reader.readingTheme'),
             icon: Icons.tonality_outlined,
+            selected: true,
             onPressed: onChooseTheme,
           ),
         ] else
@@ -244,30 +250,77 @@ final class ReaderBottomControls extends StatelessWidget {
       ],
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (compact || constraints.maxWidth < 900) {
-          return Align(
-            alignment: Alignment.bottomCenter,
-            child: Wrap(
-              alignment: WrapAlignment.center,
-              runAlignment: WrapAlignment.center,
-              spacing: AppSpacing.space12,
-              runSpacing: AppSpacing.space8,
-              children: [navigation, zoom],
-            ),
-          );
-        }
-        return SizedBox(
-          height: AppSizes.bottomControlHeight + AppSpacing.space8,
-          child: Stack(
-            children: [
-              Align(alignment: Alignment.bottomCenter, child: navigation),
-              Align(alignment: Alignment.bottomRight, child: zoom),
-            ],
+    final availableWidth = MediaQuery.sizeOf(context).width;
+    if (!compact && availableWidth >= 900) {
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: YamaToolbarGroup(
+          key: const Key('reader-active-dock'),
+          label:
+              '${strings.get('reader.navigation')}. ${strings.get('reader.viewAndZoom')}',
+          flat: flat,
+          radius: AppRadii.floating,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.space6,
+            vertical: AppSpacing.space4,
           ),
-        );
-      },
+          children: [
+            SizedBox(
+              width: (availableWidth - AppSpacing.space32).clamp(0, 760),
+              height: AppSizes.desktopControlExtent,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: AppSpacing.space8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.menu_book_outlined,
+                            size: 16,
+                            color: context.appColors.textMuted,
+                          ),
+                          const SizedBox(width: AppSpacing.space6),
+                          Text(
+                            strings.get('reader.activeControls'),
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Center(child: navigation),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [const YamaToolbarDivider(), zoom],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: YamaToolbarGroup(
+        key: const Key('reader-active-dock'),
+        label:
+            '${strings.get('reader.navigation')}. ${strings.get('reader.viewAndZoom')}',
+        flat: flat,
+        radius: AppRadii.floating,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.space6,
+          vertical: AppSpacing.space4,
+        ),
+        children: [navigation, const YamaToolbarDivider(), zoom],
+      ),
     );
   }
 
@@ -375,15 +428,16 @@ final class _ReaderRestingDock extends StatelessWidget {
         ),
         child: Material(
           color: context.appColors.surfaceFloating,
-          shape: StadiumBorder(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.field),
             side: BorderSide(color: context.appColors.borderSubtle),
           ),
           child: InkWell(
             key: const Key('reader-resting-dock'),
-            customBorder: const StadiumBorder(),
+            borderRadius: BorderRadius.circular(AppRadii.field),
             onTap: onActivate,
             child: SizedBox(
-              width: compact ? 220 : 320,
+              width: compact ? 236 : 336,
               height: AppSizes.desktopControlExtent,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -414,8 +468,8 @@ final class _ReaderRestingDock extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.space8),
                     Icon(
-                      Icons.expand_less_rounded,
-                      size: 17,
+                      Icons.keyboard_arrow_up_rounded,
+                      size: 18,
                       color: context.appColors.textSecondary,
                     ),
                   ],

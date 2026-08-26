@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.0 — 2026-08-25 (retícula editorial de escritorio)
+
+- Define escala tipográfica editorial, cifras tabulares y vocabulario completo
+  de superficies normal, hover, pressed, selected, focused, disabled y loading.
+- Recompone Biblioteca con cabecera jerárquica, contador explícito, número y
+  reset visible de filtros, estados icónicos de portada e inspector por columnas
+  con `Abrir`, `Continuar`, `Releer` o `Localizar`.
+- Une navegación, zoom, ajuste, tema y marcador en una dock única; cohesiona la
+  barra superior y refuerza rail, cabecera y resize del panel sin reconstruir ni
+  desplazar el visor PDF.
+- Agrupa Ajustes en preferencias, mantenimiento y privacidad; separa acciones
+  destructivas y permite alternar reposo, activo, panel y e-ink en una preview
+  local que no abre PDFium.
+- Añade iconos específicos, metadatos y preview textual expandida a la paleta;
+  conserva Enter, Escape, retorno de foco y separación de documentos recientes.
+- Amplía pruebas a 247 casos y añade matrices reales de widgets para paleta,
+  menús y diálogos, además de la golden normativa 0.7.
+- Prepara el release local `0.7.0+8` sin publicación ni firma automática.
+
 ## 0.6.0 — 2026-08-24 (sala de lectura digital)
 
 - Convierte la selección de Biblioteca en un inspector editorial responsive con

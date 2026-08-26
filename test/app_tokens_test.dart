@@ -54,6 +54,20 @@ void main() {
     expect(AppSizes.readerPanelDefault, AppSizes.sidePanelWidth);
   });
 
+  test('editorial type scale keeps essential information at twelve pixels', () {
+    expect(AppTypeScale.screenTitle, greaterThan(AppTypeScale.sectionTitle));
+    expect(AppTypeScale.sectionTitle, greaterThan(AppTypeScale.documentTitle));
+    expect([
+      AppTypeScale.body,
+      AppTypeScale.control,
+      AppTypeScale.metadata,
+      AppTypeScale.auxiliary,
+      AppTypeScale.figure,
+      AppTypeScale.shortcut,
+    ], everyElement(greaterThanOrEqualTo(12)));
+    expect(AppMotion.inspector, const Duration(milliseconds: 160));
+  });
+
   test(
     'dark mode remains active even while safe mode is protecting startup',
     () {
