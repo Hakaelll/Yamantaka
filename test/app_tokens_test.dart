@@ -52,6 +52,9 @@ void main() {
     expect(AppShadow.artifactGlowSpread, 0);
     expect(AppSizes.settingsControlWidth, 240);
     expect(AppSizes.readerPanelDefault, AppSizes.sidePanelWidth);
+    expect(AppRadii.control, lessThan(AppRadii.panel));
+    expect(AppRadii.panel, lessThan(AppRadii.dialog));
+    expect(AppRadii.dialog, lessThanOrEqualTo(16));
   });
 
   test('editorial type scale keeps essential information at twelve pixels', () {

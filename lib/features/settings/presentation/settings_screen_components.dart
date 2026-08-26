@@ -1030,29 +1030,29 @@ final class _ActionSetting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (destructive) {
+      return Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.space16),
+        child: AppDangerZone(
+          title: label,
+          description: description,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: context.appColors.danger,
+              side: BorderSide(color: context.appColors.danger),
+            ),
+            onPressed: onPressed,
+            child: Text(actionLabel),
+          ),
+        ),
+      );
+    }
     final row = _SettingRow(
       label: label,
       description: description,
-      control: destructive
-          ? OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: context.appColors.danger,
-                side: BorderSide(color: context.appColors.danger),
-              ),
-              onPressed: onPressed,
-              child: Text(actionLabel),
-            )
-          : OutlinedButton(onPressed: onPressed, child: Text(actionLabel)),
+      control: OutlinedButton(onPressed: onPressed, child: Text(actionLabel)),
     );
-    if (!destructive) return row;
-    return Container(
-      margin: const EdgeInsets.only(top: AppSpacing.space12),
-      padding: const EdgeInsets.only(top: AppSpacing.space8),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: context.appColors.borderSubtle)),
-      ),
-      child: row,
-    );
+    return row;
   }
 }
 

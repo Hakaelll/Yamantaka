@@ -5,6 +5,7 @@ import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/search/application/global_search_controller.dart';
 import 'package:yamantaka/features/search/application/library_index_controller.dart';
+import 'package:yamantaka/features/search/domain/global_search_models.dart';
 import 'package:yamantaka/features/search/presentation/global_search_dialog.dart';
 import 'package:yamantaka/features/settings/presentation/settings_screen.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
@@ -99,5 +100,56 @@ void main() {
         findsOneWidget,
       );
     }
+  });
+
+  testWidgets('expanded global search relates its list to a detail preview', (
+    tester,
+  ) async {
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    final documents = DocumentRepository(database);
+    final repository = GlobalSearchRepository(database);
+    final search = GlobalLibrarySearchController(repository);
+    final engine = StubPdfDocumentEngine();
+    final index = LibraryIndexController(documents, repository, engine);
+    search
+      ..query = 'privada'
+      ..results = const [
+        GlobalSearchResult(
+          documentId: 'precision',
+          pageIndex: 2,
+          kind: GlobalSearchKind.pageText,
+          title: 'Lectura de precisión',
+          snippet: 'Un fragmento indexado de forma privada en este equipo.',
+          rank: 1,
+        ),
+      ];
+    addTearDown(() async {
+      search.dispose();
+      index.dispose();
+      await engine.dispose();
+      database.close();
+    });
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlobalSearchDialog(
+          controller: search,
+          indexController: index,
+          onOpen: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Lectura de precisión'), findsNWidgets(2));
+    expect(find.text('Abrir resultado'), findsOneWidget);
+    expect(find.text('Texto de página'), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 }

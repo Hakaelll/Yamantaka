@@ -732,13 +732,49 @@ final class EmptyLibraryState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    return AppStatusView(
-      icon: Icons.menu_book_outlined,
-      title: strings.libraryEmptyTitle,
-      message: strings.libraryEmptyBody,
-      action: onOpen,
-      actionLabel: strings.libraryOpenPdf,
-      actionKey: const Key('open-pdf-button'),
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.space32),
+        child: Semantics(
+          container: true,
+          label: 'Yamantaka. ${strings.get('library.emptyTagline')}',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/branding/yamantaka-logo-purple.png',
+                width: 96,
+                height: 96,
+                filterQuality: FilterQuality.high,
+                semanticLabel: 'Yamantaka',
+              ),
+              const SizedBox(height: AppSpacing.space20),
+              Text(
+                'Yamantaka',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.space6),
+              Text(
+                strings.get('library.emptyTagline'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.appColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.space24),
+              FilledButton.icon(
+                key: const Key('open-pdf-button'),
+                onPressed: onOpen,
+                icon: const Icon(Icons.file_open_outlined, size: 18),
+                label: Text(strings.libraryOpenPdf),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

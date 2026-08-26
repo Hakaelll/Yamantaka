@@ -840,6 +840,9 @@ final class _YamantakaAppState extends State<YamantakaApp>
             label: Text(_strings.get('reader.editMetadata')),
           ),
           TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: context.appColors.danger,
+            ),
             onPressed: () => Navigator.pop(context, _DocumentInfoAction.remove),
             child: Text(_strings.get('library.remove')),
           ),
@@ -866,22 +869,21 @@ final class _YamantakaAppState extends State<YamantakaApp>
                   Navigator.pop(context, _DocumentInfoAction.reveal),
               icon: const Icon(Icons.folder_open_rounded, size: 18),
               label: Text(_strings.get('reader.show')),
-            )
-          else
-            TextButton.icon(
-              onPressed: () =>
-                  Navigator.pop(context, _DocumentInfoAction.relocate),
-              icon: const Icon(Icons.drive_file_move_outline, size: 18),
-              label: Text(_strings.get('library.locate')),
             ),
           FilledButton(
             onPressed: () => Navigator.pop(
               context,
-              isCurrentDocument ? null : _DocumentInfoAction.open,
+              isCurrentDocument
+                  ? null
+                  : isAvailable
+                  ? _DocumentInfoAction.open
+                  : _DocumentInfoAction.relocate,
             ),
             child: Text(
               isCurrentDocument
                   ? _strings.get('action.close')
+                  : !isAvailable
+                  ? _strings.get('library.locate')
                   : document.readingProgress > 0
                   ? _strings.get('reader.continue')
                   : _strings.get('action.open'),
@@ -942,6 +944,11 @@ final class _YamantakaAppState extends State<YamantakaApp>
     final title = TextEditingController(text: document.titleOverride ?? '');
     final author = TextEditingController(text: document.authorOverride ?? '');
     final note = TextEditingController(text: document.libraryNote ?? '');
+    final initialTitle = title.text;
+    final initialAuthor = author.text;
+    final initialNote = note.text;
+    final sourceTitle = document.sourceTitle ?? document.title;
+    final sourceAuthor = document.sourceAuthor ?? document.author;
     final initialTopics = document.topics
         .map((assignment) => assignment.topic)
         .toSet();
@@ -949,91 +956,157 @@ final class _YamantakaAppState extends State<YamantakaApp>
     final edited = await showDialog<_MetadataEditResult>(
       context: _navigatorKey.currentContext!,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          icon: const Icon(Icons.edit_note_rounded),
-          title: Text(_strings.get('reader.editLocalMetadata')),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 660),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: title,
-                    autofocus: true,
-                    maxLength: 512,
-                    decoration: InputDecoration(
-                      labelText: _strings.get('reader.documentTitle'),
-                      helperText: _strings.get('reader.emptyRestoresTitle'),
+        builder: (context, setDialogState) {
+          final dirty =
+              title.text != initialTitle ||
+              author.text != initialAuthor ||
+              note.text != initialNote ||
+              !setEquals(initialTopics, selectedTopics);
+          return AlertDialog(
+            title: AppDialogHeader(
+              icon: Icons.edit_note_rounded,
+              title: _strings.get('reader.editLocalMetadata'),
+              description: _strings.get('reader.metadataLocal.description'),
+              trailing: dirty
+                  ? AppStatusLabel(
+                      icon: Icons.edit_outlined,
+                      label: _strings.get('reader.unsavedChanges'),
+                      tone: AppStatusTone.warning,
+                    )
+                  : null,
+            ),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560, maxHeight: 660),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _strings.get('reader.metadataIdentity'),
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
-                  ),
-                  TextField(
-                    controller: author,
-                    maxLength: 512,
-                    decoration: InputDecoration(
-                      labelText: _strings.get('reader.documentAuthor'),
-                    ),
-                  ),
-                  TextField(
-                    controller: note,
-                    maxLength: 4000,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: InputDecoration(
-                      labelText: _strings.get('reader.libraryNote'),
-                      helperText: _strings.get('reader.storedOutsidePdf'),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  Text(
-                    _strings.get('library.topics'),
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  Wrap(
-                    spacing: AppSpacing.space8,
-                    runSpacing: AppSpacing.space8,
-                    children: [
-                      for (final topic in LibraryTopic.values)
-                        FilterChip(
-                          label: Text(_strings.get('topic.${topic.name}')),
-                          selected: selectedTopics.contains(topic),
-                          onSelected: (selected) => setDialogState(() {
-                            selected
-                                ? selectedTopics.add(topic)
-                                : selectedTopics.remove(topic);
-                          }),
+                    const SizedBox(height: AppSpacing.space12),
+                    TextField(
+                      controller: title,
+                      autofocus: true,
+                      maxLength: 512,
+                      decoration: InputDecoration(
+                        labelText: _strings.get('reader.documentTitle'),
+                        helperText: _strings.get(
+                          'reader.detectedValue',
+                          parameters: {
+                            'value':
+                                sourceTitle ??
+                                _strings.get('reader.noDetectedValue'),
+                          },
                         ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(_strings.get('action.cancel')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(
-                context,
-                _MetadataEditResult(
-                  metadata: MetadataEditState(
-                    sourceTitle: document.sourceTitle ?? document.title,
-                    sourceAuthor: document.sourceAuthor ?? document.author,
-                    titleOverride: title.text,
-                    authorOverride: author.text,
-                    libraryNote: note.text,
-                  ),
-                  topics: Set.unmodifiable(selectedTopics),
+                        helperMaxLines: 2,
+                        suffixIcon: title.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: _strings.get('reader.restoreDetected'),
+                                onPressed: () => setDialogState(title.clear),
+                                icon: const Icon(Icons.restore_rounded),
+                              ),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    TextField(
+                      controller: author,
+                      maxLength: 512,
+                      decoration: InputDecoration(
+                        labelText: _strings.get('reader.documentAuthor'),
+                        helperText: _strings.get(
+                          'reader.detectedValue',
+                          parameters: {
+                            'value':
+                                sourceAuthor ??
+                                _strings.get('reader.noDetectedValue'),
+                          },
+                        ),
+                        helperMaxLines: 2,
+                        suffixIcon: author.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: _strings.get('reader.restoreDetected'),
+                                onPressed: () => setDialogState(author.clear),
+                                icon: const Icon(Icons.restore_rounded),
+                              ),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: AppSpacing.space16),
+                    Text(
+                      _strings.get('reader.metadataOrganization'),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.space8),
+                    Wrap(
+                      spacing: AppSpacing.space8,
+                      runSpacing: AppSpacing.space8,
+                      children: [
+                        for (final topic in LibraryTopic.values)
+                          FilterChip(
+                            label: Text(_strings.get('topic.${topic.name}')),
+                            selected: selectedTopics.contains(topic),
+                            onSelected: (selected) => setDialogState(() {
+                              selected
+                                  ? selectedTopics.add(topic)
+                                  : selectedTopics.remove(topic);
+                            }),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.space20),
+                    Text(
+                      _strings.get('reader.metadataNotes'),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.space8),
+                    TextField(
+                      controller: note,
+                      maxLength: 4000,
+                      minLines: 3,
+                      maxLines: 6,
+                      decoration: InputDecoration(
+                        labelText: _strings.get('reader.libraryNote'),
+                        helperText: _strings.get('reader.storedOutsidePdf'),
+                      ),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                  ],
                 ),
               ),
-              child: Text(_strings.get('action.save')),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(_strings.get('action.cancel')),
+              ),
+              FilledButton.icon(
+                onPressed: dirty
+                    ? () => Navigator.pop(
+                        context,
+                        _MetadataEditResult(
+                          metadata: MetadataEditState(
+                            sourceTitle: document.sourceTitle ?? document.title,
+                            sourceAuthor:
+                                document.sourceAuthor ?? document.author,
+                            titleOverride: title.text,
+                            authorOverride: author.text,
+                            libraryNote: note.text,
+                          ),
+                          topics: Set.unmodifiable(selectedTopics),
+                        ),
+                      )
+                    : null,
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: Text(_strings.get('action.save')),
+              ),
+            ],
+          );
+        },
       ),
     );
     title.dispose();

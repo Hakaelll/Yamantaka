@@ -712,3 +712,25 @@ Ajustes agrupa preferencias, mantenimiento y privacidad, subordina las acciones
 destructivas y reserva 320 px a una preview manipulable. La paleta añade iconos
 por acción y una explicación lateral en expandido sin convertir filas en
 tarjetas. Los tres niveles de elevación siguen siendo plano, overlay y diálogo.
+
+## 31. Archivo privado y lectura de precisión — 0.8
+
+Biblioteca ofrece dos lecturas del mismo modelo efímero. La cuadrícula conserva
+reconocimiento visual y añade un título estable debajo de cada portada; la lista
+densa prioriza comparación de identidad, estado, progreso y fecha. Con texto al
+150 % desaparecen las columnas auxiliares y su información esencial pasa a una
+tercera línea semántica. Cambiar de vista no persiste una preferencia nueva ni
+abre el PDF. Los filtros activos son visibles y eliminables por grupo.
+
+El estado vacío no funciona como landing page: muestra el símbolo, `Yamantaka`,
+“Tu archivo privado de lectura.” y `Abrir PDF`. El bitmap violeta conserva cada
+coordenada, borde, relieve y variación de luminancia de la marca azul original;
+la transformación reproducible usa `#B58AFF` como croma y no aplica generación,
+recorte, warp ni remaquetación.
+
+El lector rebaja radios y separa contexto de estado: la dock nombra Una página,
+Dos páginas o Continua, mientras el selector de tema solo se activa al abrirse.
+La búsqueda global usa master-detail en expanded; metadatos separa detectado y
+local, permite restaurar por campo y señala cambios sin guardar. Menús y
+diálogos comparten icono, etiqueta, atajo, encabezado y tratamiento destructivo.
+Ninguno de estos cambios modifica el contenido del PDF ni la clave del visor.

@@ -101,7 +101,7 @@ final class ReaderTopBar extends StatelessWidget
             label: strings.get('reader.tools'),
             flat: flatChrome,
             mainAxisSize: MainAxisSize.max,
-            radius: AppRadii.floating,
+            radius: AppRadii.control,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.space4,
               vertical: AppSpacing.space4,

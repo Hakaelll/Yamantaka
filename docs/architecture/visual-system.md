@@ -20,8 +20,8 @@ equivalente.
 
 - `page` (3 px) identifica papel PDF y portadas, nunca chrome.
 - `control` (10 px) se reserva para controles editoriales discretos.
-- `field` (12 px) unifica entradas y menús.
-- `floating`/`panel`/`dialog` (16/18/20 px) escalan con la superficie.
+- `field` (10 px) unifica entradas y menús.
+- `floating`/`panel`/`dialog` (12/14/16 px) escalan con la superficie.
 - `capsule` solo agrupa acciones, selector Documento/Libro y dock; no se aplica
   a filas de contenido ni páginas.
 
@@ -116,3 +116,23 @@ la navegación y 320 px a la preview; sus grupos son Preferencias, Mantenimiento
 y Privacidad. La paleta puede crecer a 780 px y reserva 228 px a la preview del
 resultado solo en expandido. Ninguna de estas superficies crea un nivel de
 elevación adicional ni entra en la identidad del visor PDF.
+
+## Archivo de precisión 0.8
+
+Biblioteca reserva cuadrícula para reconocimiento y lista para comparación. La
+primera añade títulos sin bajar opacidad ni saturación; la segunda usa cifras
+tabulares y colapsa estado, progreso y páginas dentro de la fila cuando el texto
+supera 130 % y no hay 1400 px útiles. El cambio es efímero y ambas vistas
+conservan selección, foco, doble clic, teclado y menú contextual.
+
+`AppMenuItemContent` normaliza icono, etiqueta, atajo, check y peligro;
+`AppDialogHeader` une identidad y cierre; `AppDangerZone` separa alcance,
+consecuencia y acción destructiva. El color de peligro siempre acompaña texto e
+icono. La búsqueda global divide lista y preview solo en expanded; la lista
+continúa siendo la fuente de selección.
+
+El estado inicial de Biblioteca usa el asset raster
+`assets/branding/yamantaka-logo-purple.png`. Su geometría procede exactamente de
+la marca anterior: una sustitución de croma por coordenada conserva luminancia,
+alfa y tamaño y se replica en PNG e ICO. La marca no se convierte en fondo,
+textura ni decoración persistente.

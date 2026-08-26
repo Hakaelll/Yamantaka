@@ -326,7 +326,7 @@ final class _PaletteEntryTile extends StatelessWidget {
       child: MouseRegion(
         onEnter: (_) => onHover(),
         child: Material(
-          color: selected ? colors.selectionBackground : Colors.transparent,
+          color: selected ? colors.surfaceActive : Colors.transparent,
           child: InkWell(
             key: ValueKey(entry.key),
             onTap: onTap,
@@ -345,7 +345,11 @@ final class _PaletteEntryTile extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(entry.icon, size: 18, color: colors.textMuted),
+                  Icon(
+                    entry.icon,
+                    size: 18,
+                    color: selected ? colors.iconActive : colors.textMuted,
+                  ),
                   const SizedBox(width: AppSpacing.space12),
                   Expanded(
                     child: Column(

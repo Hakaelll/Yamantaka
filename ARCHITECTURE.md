@@ -296,3 +296,29 @@ La preview de Ajustes es un diagrama de widgets sin `PdfDocumentRef`: su selecto
 vive en estado local y nunca persiste. La paleta calcula su preview desde la
 entrada ya filtrada y documentos recientes materializados. No se añadieron red,
 servicios, dependencias, tablas ni cambios de esquema.
+
+## Archivo privado 0.8 y límites de estado
+
+`ArtifactLibraryView` incorpora un modo de vista efímero `grid/list`. Las dos
+composiciones consumen la misma lista materializada, `ValueListenable` de
+selección y callbacks existentes; no se añade tabla, migración ni preferencia.
+La banda de filtros deriva exclusivamente del estado actual del controlador y
+cada chip revierte su grupo mediante la API ya disponible. La lista cambia a
+fila compacta según ancho y escalado de texto sin perder estado semántico.
+
+`GlobalSearchDialog` puede dividir resultados y preview, pero la selección sigue
+perteneciendo a `GlobalSearchController` y la preview no indexa ni abre un
+segundo documento. El editor de metadatos mantiene por separado fuente
+detectada, override y borrador de UI; cancelar descarta el borrador y guardar
+solo escribe metadatos locales.
+
+Los componentes compartidos `AppMenuItemContent`, `AppDialogHeader` y
+`AppDangerZone` son presentación pura. `ReaderTopBar`,
+`ReaderBottomControls` y el panel cambian forma y etiquetas sin aportar panel,
+chrome, hover, foco, breakpoint o tamaño a `_viewerCacheKey`. PDFium, SQLite,
+backup, red y modelo de persistencia permanecen sin cambios.
+
+La marca se deriva de los assets rastreados en `HEAD` mediante transformación
+de croma 1:1. El script conserva dimensiones, alfa, coordenadas y luminancia
+local y aplica la misma operación a cada frame ICO; no usa el resultado
+generativo como fuente del producto.

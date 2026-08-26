@@ -27,6 +27,7 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
   late final TextEditingController _queryController = TextEditingController(
     text: widget.controller.query,
   );
+  int _selectedIndex = 0;
 
   @override
   void dispose() {
@@ -40,7 +41,7 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
     return Dialog(
       insetPadding: const EdgeInsets.all(AppSpacing.space16),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 680),
+        constraints: const BoxConstraints(maxWidth: 980, maxHeight: 680),
         child: ListenableBuilder(
           listenable: Listenable.merge([
             widget.controller,
@@ -57,20 +58,15 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
                     AppSpacing.space8,
                     AppSpacing.space12,
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          strings.searchTitle,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: strings.get('action.close'),
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
+                  child: AppDialogHeader(
+                    icon: Icons.manage_search_rounded,
+                    title: strings.searchTitle,
+                    description: strings.get('search.localDescription'),
+                    trailing: IconButton(
+                      tooltip: strings.get('action.close'),
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
                   ),
                 ),
                 Padding(
@@ -109,7 +105,37 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
                   progress: progress,
                 ),
                 const Divider(height: 1),
-                Expanded(child: _results()),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final canPreview =
+                          constraints.maxWidth >= 820 &&
+                          widget.controller.results.isNotEmpty &&
+                          widget.controller.query.isNotEmpty;
+                      if (!canPreview) return _results(showSelection: false);
+                      final selected = _selectedResult;
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: _results(showSelection: true)),
+                          VerticalDivider(
+                            width: 1,
+                            color: context.appColors.borderStrong,
+                          ),
+                          SizedBox(
+                            width: 310,
+                            child: selected == null
+                                ? const SizedBox.shrink()
+                                : _SearchResultPreview(
+                                    result: selected,
+                                    onOpen: () => _openResult(selected),
+                                  ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ],
             );
           },
@@ -118,11 +144,23 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
     );
   }
 
-  Widget _results() {
+  GlobalSearchResult? get _selectedResult {
+    final results = widget.controller.results;
+    if (results.isEmpty) return null;
+    _selectedIndex = _selectedIndex.clamp(0, results.length - 1);
+    return results[_selectedIndex];
+  }
+
+  Widget _results({required bool showSelection}) {
     final controller = widget.controller;
     final strings = YamantakaLocalizations.of(context);
     if (controller.isSearching && controller.results.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return AppStatusView(
+        icon: Icons.manage_search_rounded,
+        title: strings.get('search.searchingTitle'),
+        message: strings.get('search.searchingBody'),
+        loading: true,
+      );
     }
     if (controller.query.isEmpty) {
       return AppStatusView(
@@ -153,7 +191,18 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
           );
         }
         final result = controller.results[index];
-        return ListTile(
+        final tile = ListTile(
+          selected: showSelection && index == _selectedIndex,
+          selectedTileColor: context.appColors.surfaceActive,
+          shape: Border(
+            left: BorderSide(
+              color: showSelection && index == _selectedIndex
+                  ? context.appColors.focusRing
+                  : Colors.transparent,
+              width: 2,
+            ),
+            bottom: BorderSide(color: context.appColors.borderSubtle),
+          ),
           leading: Icon(_icon(result.kind)),
           title: Text(
             result.title,
@@ -173,13 +222,25 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
-          onTap: () {
-            Navigator.pop(context);
-            widget.onOpen(result);
-          },
+          onTap: () => _openResult(result),
+        );
+        if (!showSelection) return tile;
+        return MouseRegion(
+          onEnter: (_) => setState(() => _selectedIndex = index),
+          child: Focus(
+            onFocusChange: (focused) {
+              if (focused) setState(() => _selectedIndex = index);
+            },
+            child: tile,
+          ),
         );
       },
     );
+  }
+
+  void _openResult(GlobalSearchResult result) {
+    Navigator.pop(context);
+    widget.onOpen(result);
   }
 
   static IconData _icon(GlobalSearchKind kind) => switch (kind) {
@@ -189,6 +250,62 @@ final class _GlobalSearchDialogState extends State<GlobalSearchDialog> {
     GlobalSearchKind.collection => Icons.folder_outlined,
     GlobalSearchKind.tag => Icons.label_outline_rounded,
   };
+}
+
+final class _SearchResultPreview extends StatelessWidget {
+  const _SearchResultPreview({required this.result, required this.onOpen});
+
+  final GlobalSearchResult result;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    return ColoredBox(
+      color: context.appColors.surfaceSecondary,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.space20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppStatusLabel(
+              icon: _GlobalSearchDialogState._icon(result.kind),
+              label: strings.get('search.kind.${result.kind.name}'),
+            ),
+            const SizedBox(height: AppSpacing.space20),
+            Text(result.title, style: Theme.of(context).textTheme.titleLarge),
+            if (result.pageIndex case final page?) ...[
+              const SizedBox(height: AppSpacing.space8),
+              Text(
+                strings.get('reader.page', parameters: {'page': page + 1}),
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ],
+            const SizedBox(height: AppSpacing.space16),
+            Text(
+              result.snippet.isEmpty
+                  ? strings.get('search.previewNoSnippet')
+                  : result.snippet,
+              maxLines: 12,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: context.appColors.textSecondary,
+              ),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onOpen,
+                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                label: Text(strings.get('search.openResult')),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 final class _IndexStatusBar extends StatelessWidget {
@@ -262,11 +379,18 @@ final class _IndexStatusBar extends StatelessWidget {
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: _IndexAction.rebuild,
-                child: Text(strings.get('search.rebuildIndex')),
+                child: AppMenuItemContent(
+                  icon: Icons.replay_rounded,
+                  label: strings.get('search.rebuildIndex'),
+                ),
               ),
               PopupMenuItem(
                 value: _IndexAction.clear,
-                child: Text(strings.get('search.clearIndex')),
+                child: AppMenuItemContent(
+                  icon: Icons.delete_sweep_outlined,
+                  label: strings.get('search.clearIndex'),
+                  destructive: true,
+                ),
               ),
             ],
           ),

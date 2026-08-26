@@ -954,15 +954,25 @@ final class _AnnotationsPanelState extends State<_AnnotationsPanel> {
                             itemBuilder: (context) => [
                               PopupMenuItem(
                                 value: _AnnotationAction.edit,
-                                child: Text(strings.get('action.edit')),
+                                child: AppMenuItemContent(
+                                  icon: Icons.edit_outlined,
+                                  label: strings.get('action.edit'),
+                                ),
                               ),
                               PopupMenuItem(
                                 value: _AnnotationAction.copy,
-                                child: Text(strings.get('action.copyContent')),
+                                child: AppMenuItemContent(
+                                  icon: Icons.content_copy_outlined,
+                                  label: strings.get('action.copyContent'),
+                                ),
                               ),
                               PopupMenuItem(
                                 value: _AnnotationAction.delete,
-                                child: Text(strings.get('action.delete')),
+                                child: AppMenuItemContent(
+                                  icon: Icons.delete_outline_rounded,
+                                  label: strings.get('action.delete'),
+                                  destructive: true,
+                                ),
                               ),
                             ],
                           ),

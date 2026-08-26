@@ -70,7 +70,7 @@ abstract final class LibraryArtifactLayout {
         artifactWidth: width,
         artifactHeight: width * 1.42,
         horizontalCellExtent: width,
-        cellExtent: width * 1.42 + 32,
+        cellExtent: width * 1.42 + 48,
       );
     }
     if (documentCount <= 6) {
@@ -86,7 +86,7 @@ abstract final class LibraryArtifactLayout {
         artifactWidth: width,
         artifactHeight: width * 1.42,
         horizontalCellExtent: slotWidth,
-        cellExtent: width * 1.42 + 32,
+        cellExtent: width * 1.42 + 48,
       );
     }
     final targetCellWidth = switch (usableWidth) {
@@ -113,7 +113,7 @@ abstract final class LibraryArtifactLayout {
       artifactWidth: width,
       artifactHeight: width * 1.42,
       horizontalCellExtent: cellWidth,
-      cellExtent: width * 1.42 + 32,
+      cellExtent: width * 1.42 + 48,
     );
   }
 

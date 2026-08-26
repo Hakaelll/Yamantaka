@@ -79,6 +79,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   final ValueNotifier<String?> _hoveredDocumentId = ValueNotifier(null);
   late bool _searchOpen;
   bool _selectionMode = false;
+  _LibraryViewMode _viewMode = _LibraryViewMode.grid;
   final LibrarySelection _selection = LibrarySelection();
   String? _selectionAnchorId;
   Timer? _queryDebounce;
@@ -216,10 +217,22 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                   activeFilterCount: activeFilterCount,
                   selectionMode: _selectionMode,
                   selectedCount: _selection.length,
+                  viewMode: _viewMode,
+                  selectedAuthorCount: widget.controller.selectedAuthors.length,
+                  selectedTopicCount: widget.controller.selectedTopics.length,
+                  groupByAuthor: widget.controller.groupByAuthor,
                   onSearch: _openSearch,
                   onFilter: _applyFilterCommand,
                   onFacets: _showFacetFilters,
                   onToggleSelectionMode: _toggleSelectionMode,
+                  onViewModeChanged: (mode) => setState(() {
+                    _viewMode = mode;
+                    widget.controller.scrollOffset = 0;
+                    if (_scrollController.hasClients) {
+                      _scrollController.jumpTo(0);
+                    }
+                  }),
+                  onClearActiveFilter: _clearActiveFilter,
                 ),
                 if (_selectionMode && _selection.isNotEmpty)
                   _BulkActionBar(
@@ -244,6 +257,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                           reserveInfoSpace: widget.documents.isNotEmpty,
                           reduceMotion: reduceMotion,
                           groupByAuthor: widget.controller.groupByAuthor,
+                          viewMode: _viewMode,
                           onSelect: _select,
                           onOpen: _open,
                           onHover: (documentId) =>
@@ -731,19 +745,21 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         (document) => document.id == widget.controller.selectedDocumentId,
       ),
     );
+    final columns = _viewMode == _LibraryViewMode.list ? 1 : metrics.columns;
     final nextIndex = LibraryArtifactLayout.indexAfterNavigation(
       currentIndex: currentIndex,
       itemCount: documents.length,
-      columns: metrics.columns,
+      columns: columns,
       direction: direction,
     );
     if (nextIndex < 0) return;
     widget.controller.selectDocument(documents[nextIndex].id);
     if (_scrollController.hasClients && documents.length > 6) {
-      final row = nextIndex ~/ metrics.columns;
-      final offset = row * metrics.cellExtent;
+      final row = nextIndex ~/ columns;
+      final offset =
+          row * (_viewMode == _LibraryViewMode.list ? 60 : metrics.cellExtent);
       _scrollController.animateTo(
-        offset.clamp(0, _scrollController.position.maxScrollExtent),
+        offset.clamp(0, _scrollController.position.maxScrollExtent).toDouble(),
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : AppMotion.standard,
@@ -769,8 +785,11 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       items: [
         PopupMenuItem(
           value: _ArtifactMenuAction.open,
-          child: Text(
-            document.isMissing
+          child: AppMenuItemContent(
+            icon: document.isMissing
+                ? Icons.link_rounded
+                : Icons.menu_book_outlined,
+            label: document.isMissing
                 ? strings.get('library.locateFile')
                 : document.readingProgress > 0
                 ? strings.get('library.continueReading')
@@ -779,8 +798,11 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         ),
         PopupMenuItem(
           value: _ArtifactMenuAction.favorite,
-          child: Text(
-            document.isFavorite
+          child: AppMenuItemContent(
+            icon: document.isFavorite
+                ? Icons.bookmark_remove_outlined
+                : Icons.bookmark_add_outlined,
+            label: document.isFavorite
                 ? strings.get('library.unmarkFavorite')
                 : strings.get('library.markFavorite'),
           ),
@@ -788,26 +810,42 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         if (!document.isMissing)
           PopupMenuItem(
             value: _ArtifactMenuAction.cover,
-            child: Text(strings.get('library.changeCover')),
+            child: AppMenuItemContent(
+              icon: Icons.image_outlined,
+              label: strings.get('library.changeCover'),
+            ),
           ),
         if (!document.isMissing && widget.onReanalyzeDocument != null)
           PopupMenuItem(
             value: _ArtifactMenuAction.reanalyze,
-            child: Text(strings.get('library.reanalyzeMetadata')),
+            child: AppMenuItemContent(
+              icon: Icons.manage_search_rounded,
+              label: strings.get('library.reanalyzeMetadata'),
+            ),
           ),
         PopupMenuItem(
           value: _ArtifactMenuAction.info,
-          child: Text(strings.get('library.showInformation')),
+          child: AppMenuItemContent(
+            icon: Icons.info_outline_rounded,
+            label: strings.get('library.showInformation'),
+          ),
         ),
         if (!document.isMissing)
           PopupMenuItem(
             value: _ArtifactMenuAction.reveal,
-            child: Text(strings.get('library.showInExplorer')),
+            child: AppMenuItemContent(
+              icon: Icons.folder_open_outlined,
+              label: strings.get('library.showInExplorer'),
+            ),
           ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: _ArtifactMenuAction.remove,
-          child: Text(strings.get('library.removeFromLibrary')),
+          child: AppMenuItemContent(
+            icon: Icons.remove_circle_outline,
+            label: strings.get('library.removeFromLibrary'),
+            destructive: true,
+          ),
         ),
       ],
     );
@@ -859,6 +897,28 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
           ..selectedAuthors = const {}
           ..selectedTopics = const {}
           ..groupByAuthor = false;
+    }
+    widget.onReadingStateChanged(_readingState);
+    unawaited(widget.controller.reload());
+  }
+
+  void _clearActiveFilter(_ActiveFilterKind filter) {
+    switch (filter) {
+      case _ActiveFilterKind.query:
+        _searchController.clear();
+        widget.controller.query = '';
+      case _ActiveFilterKind.readingState:
+        widget.controller.readingState = 'all';
+      case _ActiveFilterKind.favorites:
+        widget.controller.favoritesOnly = false;
+      case _ActiveFilterKind.sort:
+        widget.controller.sortOrder = 'lastOpened';
+      case _ActiveFilterKind.authors:
+        widget.controller.selectedAuthors = const {};
+      case _ActiveFilterKind.topics:
+        widget.controller.selectedTopics = const {};
+      case _ActiveFilterKind.grouping:
+        widget.controller.groupByAuthor = false;
     }
     widget.onReadingStateChanged(_readingState);
     unawaited(widget.controller.reload());

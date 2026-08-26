@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = 'build/release/0.7.0+8',
-    [string]$Version = '0.7.0',
-    [string]$BuildNumber = '8',
+    [string]$OutputDirectory = 'build/release/0.8.0+9',
+    [string]$Version = '0.8.0',
+    [string]$BuildNumber = '9',
     [string]$FlutterExecutable,
     [string]$CertificateThumbprint,
     [string]$SignToolPath,
@@ -195,13 +195,26 @@ try {
     $archive = Join-Path $outputRoot $archiveName
     if (Test-Path $archive) { Remove-Item -LiteralPath $archive -Force }
     Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath $archive
+    $releaseEvidence = [System.Collections.Generic.List[string]]::new()
+    $networkEvidenceSource = Join-Path $root 'build/verification/no-network.json'
+    $networkEvidenceDestination = Join-Path $outputRoot 'no-network.json'
+    if (Test-Path -LiteralPath $networkEvidenceSource) {
+        Copy-Item -LiteralPath $networkEvidenceSource -Destination $networkEvidenceDestination -Force
+        $releaseEvidence.Add($networkEvidenceDestination)
+    }
+    elseif (Test-Path -LiteralPath $networkEvidenceDestination) {
+        Remove-Item -LiteralPath $networkEvidenceDestination -Force
+    }
     $hashesPath = Join-Path $outputRoot 'SHA256SUMS.txt'
-    @($manifestPath, $archive) | ForEach-Object {
+    @($manifestPath, $archive) + @($releaseEvidence) | ForEach-Object {
         $hash = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
         "$hash  $([System.IO.Path]::GetFileName($_))"
     } | Set-Content -Encoding UTF8 $hashesPath
     Write-Host "Package manifest: $manifestPath"
     Write-Host "Package archive: $archive"
+    if ($releaseEvidence.Count -gt 0) {
+        Write-Host "Release evidence: $($releaseEvidence -join ', ')"
+    }
     Write-Host "Release hashes: $hashesPath"
 }
 finally {

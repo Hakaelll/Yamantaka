@@ -7,10 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.7.0+8 revisada el 25 de agosto de 2026:
+Base Flutter 0.8.0+9 revisada el 26 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 247 pruebas aprobadas;
+- flutter test --no-pub: 252 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local permanece receptivo durante un smoke de 8 s con un
@@ -18,13 +18,13 @@ Base Flutter 0.7.0+8 revisada el 25 de agosto de 2026:
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
-El release local versionado se genera en `build/release/0.7.0+8/` e incluye el
+El release local versionado se genera en `build/release/0.8.0+9/` e incluye el
 ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt` y el reporte del
 smoke sin red. Debe extraerse entero antes de probarlo.
 
-El bundle 0.7 contiene 21 archivos (43.138.872 bytes) y el ZIP ocupa
-18.705.581 bytes. El smoke sintético de 8 s terminó sin conexiones TCP/UDP. Los
-nueve binarios nativos continúan sin firma; no es un artefacto de distribución.
+El bundle 0.8 contiene 22 archivos (43.523.377 bytes) y el ZIP ocupa 19.418.873
+bytes. El smoke sintético de 8 s terminó sin conexiones TCP/UDP. Sus nueve
+binarios nativos continúan sin firma; no es un artefacto de distribución.
 
 La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
 vigente de pruebas en [TESTING.md](TESTING.md).
@@ -63,6 +63,12 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Biblioteca local con portadas, filtros combinables por autor, tema, estado y
   favorito, agrupación por autor, colecciones, etiquetas, vistas inteligentes,
   selección múltiple y operaciones por lote.
+- La biblioteca alterna una cuadrícula con títulos y una lista densa para
+  comparar documento, estado, progreso y última apertura. A 150 % de texto la
+  lista reduce columnas y conserva estado, páginas y progreso en cada fila.
+- El estado inicial muestra únicamente el símbolo de Yamantaka, el nombre, una
+  frase breve y `Abrir PDF`. El símbolo conserva exactamente el dibujo original
+  y sustituye el azul por el violeta `#B58AFF` mediante recoloración 1:1.
 - Título, autor y hasta tres temas se proponen mediante metadatos y texto PDF
   procesados localmente; los resultados dudosos se revisan y las ediciones
   manuales prevalecen siempre.
@@ -89,6 +95,11 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Copia de seguridad JSON versionada, validada y transaccional; nunca incluye
   los PDF.
 - Búsqueda global FTS5 opt-in, diagnósticos redactados y safe mode conservador.
+- La búsqueda global usa lista y preview en ancho expandido; selección,
+  indexación y carga tienen texto de estado y no dependen de un spinner aislado.
+- El editor de metadatos separa valores detectados de overrides locales,
+  identifica cambios sin guardar y permite restaurar cada campo sin tocar el
+  PDF original.
 - Confirmación de enlaces externos y bloqueo de esquemas no seguros.
 - Sistema visual monocromático con Segoe UI Variable, temas claro/oscuro,
   densidad cómoda/compacta y breakpoints en 680/1100 px.
@@ -98,12 +109,14 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 
 ## Referencia visual vigente
 
-![Modo Libro editorial 0.7 mantenido por prueba](docs/screenshots/windows-reader-editorial-v07.png)
+![Modo Libro editorial 0.8 mantenido por prueba](docs/screenshots/windows-reader-editorial-v08.png)
 
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
-Las matrices 0.7 y diez comparaciones 0.6/0.7 reproducibles permanecen bajo
-`build/visual-evidence/v0.7.0/`.
+Las matrices 0.8 reúnen 54 capturas de Biblioteca, Lector, Ajustes, paleta,
+menús y diálogos, más diez comparaciones 0.7/0.8 reproducibles bajo
+`build/visual-evidence/v0.8.0/`. La prueba de marca registra dimensiones, alfa,
+mapeo de coordenadas y correlación de luminancia para cada PNG y frame ICO.
 
 ## Requisitos
 

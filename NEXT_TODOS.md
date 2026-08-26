@@ -1,6 +1,6 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-08-25.
+Actualizado: 2026-08-26.
 
 Este documento es el backlog vivo posterior a la reconstrucción del lector. No
 es una colección de ideas sueltas: ordena trabajo de producto, funcionamiento,
@@ -32,6 +32,17 @@ Reglas:
 
 ## Punto de partida confirmado
 
+- [x] 0.8.0 añade cuadrícula titulada y lista densa con filtros activos
+  eliminables, adaptación a texto 150 % e inspector compartido sin alterar los
+  datos persistidos.
+- [x] El vacío inicial queda reducido a marca, nombre, frase breve y `Abrir PDF`;
+  la marca violeta conserva la matriz de píxeles y luminancia de la original.
+- [x] Lector, búsqueda global, metadatos, paleta, menús, diálogos y zonas de
+  peligro comparten jerarquía y componentes 0.8 sin entrar en la clave del visor.
+- [x] La golden `windows-reader-editorial-v08.png`, 54 capturas de widgets y diez
+  comparaciones 0.7/0.8 respaldan la revisión; la suite alcanza 252 pruebas.
+- [ ] Completar validación física 0.8 con Narrator, varios monitores y escalas
+  reales de 100 %, 125 %, 150 %, 175 % y 200 %.
 - [x] 0.7.0 unifica el chrome del lector, eleva el inspector a banda editorial,
   hace legibles los filtros y estados de portada y agrupa Ajustes por tarea.
 - [x] La preview de Ajustes alterna cuatro demostraciones sin persistencia ni

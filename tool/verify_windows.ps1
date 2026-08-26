@@ -311,12 +311,28 @@ try {
     }
 
     if (-not $SkipPerformance) {
-        Invoke-Gate '5,000-document performance benchmark' {
+        Invoke-Gate 'library performance benchmark' {
             $performancePath = Join-Path $outputRoot 'performance/library-benchmark.json'
             Invoke-External $DartExecutable @('run', 'tool/benchmark_library.dart', $performancePath) 'library-benchmark.log'
             $performance = Get-Content $performancePath -Raw | ConvertFrom-Json
-            if ($performance.integrity -ne 'ok' -or $performance.documents -ne 5000) {
-                throw 'The performance fixture did not complete with an intact 5,000-document database.'
+            $results = @($performance.results)
+            $fiveThousand = @(
+                $results | Where-Object { $_.documents -eq 5000 }
+            ) | Select-Object -First 1
+            $invalid = @(
+                $results | Where-Object {
+                    $_.integrity -ne 'ok' -or
+                    $_.materializedDocuments -gt $performance.pageSize -or
+                    $_.totalDocuments -ne $_.documents
+                }
+            )
+            if (
+                $performance.containsPersonalData -ne $false -or
+                $results.Count -eq 0 -or
+                -not $fiveThousand -or
+                $invalid.Count -gt 0
+            ) {
+                throw 'The performance fixture did not complete with intact, bounded databases including 5,000 documents.'
             }
         }
     }
@@ -424,7 +440,7 @@ try {
                 '--no-pub',
                 'test/reader_widgets_test.dart',
                 '--plain-name',
-                'book reader matches the maintained editorial v0.5 baseline'
+                'book reader matches the maintained editorial v0.8 baseline'
             ) 'reader-visual-baseline.log'
         }
     }

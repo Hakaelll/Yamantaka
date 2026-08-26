@@ -32,8 +32,8 @@ void main() {
       expect(
         find.text(
           language == AppLanguage.spanish
-              ? 'Una biblioteca tranquila'
-              : 'A quiet library',
+              ? 'Tu archivo privado de lectura.'
+              : 'Your private reading archive.',
         ),
         findsOneWidget,
       );
@@ -48,7 +48,8 @@ void main() {
       MaterialApp(home: EmptyLibraryState(onOpen: () => opened = true)),
     );
 
-    expect(find.text('Una biblioteca tranquila'), findsOneWidget);
+    expect(find.text('Yamantaka'), findsOneWidget);
+    expect(find.text('Tu archivo privado de lectura.'), findsOneWidget);
     expect(find.byKey(const Key('open-pdf-button')), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('open-pdf-button')));
     await tester.tap(find.byKey(const Key('open-pdf-button')));
@@ -314,7 +315,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('artifact-alpha')));
       await tester.pump(const Duration(milliseconds: 400));
       expect(controller.selectedDocumentId, 'alpha');
-      expect(find.text('Alpha'), findsOneWidget);
+      expect(find.text('Alpha'), findsWidgets);
       expect(find.byKey(const Key('library-context-primary')), findsOneWidget);
       expect(find.text('Abrir'), findsOneWidget);
 
@@ -438,6 +439,144 @@ void main() {
       expect(find.byKey(const ValueKey('artifact-done')), findsOneWidget);
     },
   );
+
+  testWidgets('grid and dense list are distinct, keyboard-safe archive views', (
+    tester,
+  ) async {
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    addTearDown(database.close);
+    final repository = DocumentRepository(database)
+      ..save(
+        _document(
+          id: 'alpha',
+          fileName: 'alpha.pdf',
+          title: 'Alpha',
+          author: 'Ana',
+          openedAt: DateTime.utc(2026, 7, 29),
+          progress: 0.35,
+        ),
+      )
+      ..save(
+        _document(
+          id: 'beta',
+          fileName: 'beta.pdf',
+          title: 'Beta',
+          author: 'Luis',
+          openedAt: DateTime.utc(2026, 7, 28),
+        ),
+      );
+    final controller = LibraryController(
+      repository,
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    await controller.load();
+    tester.view.physicalSize = const Size(1280, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(1.5)),
+          child: child!,
+        ),
+        home: LibraryScreen(
+          controller: controller,
+          onOpenPath: (_) async {},
+          onPickDocument: () async {},
+          onOpenSettings: () {},
+          showRecents: true,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('library-list-view-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('artifact-alpha')), findsNothing);
+    expect(find.byKey(const ValueKey('artifact-list-alpha')), findsOneWidget);
+    expect(find.text('Documento'), findsOneWidget);
+    expect(find.text('Última apertura'), findsNothing);
+    expect(find.textContaining('En curso · 35 %'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Alpha').first, warnIfMissed: false);
+    await tester.pump();
+    expect(controller.selectedDocumentId, 'alpha');
+
+    await tester.tap(find.byKey(const Key('library-grid-view-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
+    expect(find.byKey(const ValueKey('artifact-list-alpha')), findsNothing);
+  });
+
+  testWidgets('active library filters are visible and removable by group', (
+    tester,
+  ) async {
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    addTearDown(database.close);
+    final repository = DocumentRepository(database)
+      ..save(
+        _document(
+          id: 'new',
+          fileName: 'new.pdf',
+          openedAt: DateTime.utc(2026, 7, 27),
+        ),
+      )
+      ..save(
+        _document(
+          id: 'active',
+          fileName: 'active.pdf',
+          openedAt: DateTime.utc(2026, 7, 28),
+          progress: 0.5,
+        ),
+      );
+    final controller = LibraryController(
+      repository,
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    await controller.load();
+    tester.view.physicalSize = const Size(1100, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: LibraryScreen(
+          controller: controller,
+          onOpenPath: (_) async {},
+          onPickDocument: () async {},
+          onOpenSettings: () {},
+          showRecents: true,
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('library-filter-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('En curso · 1'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    final activeChip = find.widgetWithText(InputChip, 'En curso');
+    expect(find.text('Filtros activos'), findsOneWidget);
+    expect(activeChip, findsOneWidget);
+    tester.widget<InputChip>(activeChip).onDeleted!();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('artifact-active')), findsOneWidget);
+    expect(find.byKey(const ValueKey('artifact-new')), findsOneWidget);
+    expect(find.text('Filtros activos'), findsNothing);
+  });
 
   testWidgets('library selection mode supports multiple accessible items', (
     tester,

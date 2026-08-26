@@ -274,7 +274,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('book reader matches the maintained editorial v0.7 baseline', (
+  testWidgets('book reader matches the maintained editorial v0.8 baseline', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1600, 900);
@@ -291,7 +291,7 @@ void main() {
 
     await expectLater(
       find.byType(ReaderScreen),
-      matchesGoldenFile('../docs/screenshots/windows-reader-editorial-v07.png'),
+      matchesGoldenFile('../docs/screenshots/windows-reader-editorial-v08.png'),
     );
 
     await tester.pumpWidget(const SizedBox.shrink());

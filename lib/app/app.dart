@@ -37,6 +37,7 @@ import 'app_services.dart';
 import 'shortcuts/app_commands.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_tokens.dart';
+import 'theme/app_components.dart';
 
 part 'app_shell.dart';
 

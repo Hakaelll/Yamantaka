@@ -62,15 +62,15 @@ extremo; los resultados bajo `build/` no contienen rutas ni títulos.
 
 La única captura normativa es:
 
-    docs/screenshots/windows-reader-editorial-v07.png
+    docs/screenshots/windows-reader-editorial-v08.png
 
 La genera y compara esta prueba:
 
-    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.7 baseline"
+    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.8 baseline"
 
 Para aceptar deliberadamente un cambio visual:
 
-    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.7 baseline"
+    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.8 baseline"
 
 Es una referencia de widgets ejecutados a 1600×900, no una captura nativa ni un
 mockup manual. Valida la composición fullscreen del contenido: barra opaca,
@@ -81,8 +81,9 @@ Las matrices widget de Biblioteca, Lector y Ajustes cubren 640×480, 800×600,
 1280×720, 1600×900, 1920×1080, 1920×1200, 2560×1440 y 3440×1440, además de
 tema oscuro, alto contraste, movimiento reducido, chrome en reposo y panel
 abierto. La evidencia previa se conserva en `build/visual-evidence/v0.5.0/` y
-la de 0.6 se conserva en `build/visual-evidence/v0.6.0/` y la actual se escribe
-en `build/visual-evidence/v0.7.0/`; ninguna se versiona.
+la de 0.6 se conserva en `build/visual-evidence/v0.6.0/`, la de 0.7 en
+`build/visual-evidence/v0.7.0/` y la actual se escribe en
+`build/visual-evidence/v0.8.0/`; ninguna se versiona.
 
 ## Validación nativa de Windows
 
@@ -144,6 +145,23 @@ diálogos; `tool/create_visual_comparisons.ps1` produce diez pares 0.6/0.7 con
 hash de cada fuente. El Release contiene 21 archivos (43.138.872 bytes), su ZIP
 18.705.581 bytes y un smoke sintético de 8 s registra cero conexiones. Los nueve
 binarios siguen sin firma.
+
+La iteración `0.8.0+9` aprueba análisis sin incidencias, 252 pruebas y la golden
+0.8. Sus matrices generan 11 capturas de Biblioteca, 16 del Lector, 16 de
+Ajustes, 6 de paleta/menú y 5 de diálogos; diez pares 0.7/0.8 registran hash de
+cada fuente. `tool/recolor_brand_assets.py` recupera la marca desde `HEAD`,
+recolorea cada coordenada sin recorte ni deformación y escribe
+`build/visual-evidence/v0.8.0/branding/pixel-proof.json`: dimensiones y alfa son
+idénticas, la correlación de luminancia del PNG 512 es 0,999998978 y la
+desviación máxima es inferior a 0,461. Narrator, varios monitores y DPI físico
+siguen siendo validaciones manuales pendientes; una matriz de widgets no se
+presenta como sustituto.
+
+El gate Windows 0.8 aprueba además corpus sintético, benchmark con 5.000,
+25.000 y 100.000 documentos materializados en ventanas de 80, build Release,
+smoke de 8 s con cero conexiones y baseline visual. La matriz DPI nativa se
+omitió explícitamente. El paquete contiene 22 archivos (43.523.377 bytes) y su
+ZIP ocupa 19.418.873 bytes; los nueve PE permanecen `NotSigned`.
 
 ## Corpus y privacidad
 

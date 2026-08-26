@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/shortcuts/app_commands.dart';
+import '../../../app/theme/app_components.dart';
 import '../../../app/ui/yama_components.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/i18n/app_localizations.dart';
@@ -65,6 +66,11 @@ final class ReaderBottomControls extends StatelessWidget {
     final fitPageLabel = facing
         ? strings.get('reader.fitFullSpread')
         : strings.get('command.fitPage');
+    final layoutLabel = strings.get(switch (preferences.pageLayout) {
+      PageLayoutMode.single => 'settings.value.singlePage',
+      PageLayoutMode.facing => 'settings.value.facingPages',
+      PageLayoutMode.continuous => 'settings.value.continuous',
+    });
     final flat = flatChrome || MediaQuery.highContrastOf(context);
     if (!active) {
       return _ReaderRestingDock(
@@ -178,15 +184,27 @@ final class ReaderBottomControls extends StatelessWidget {
             itemBuilder: (_) => [
               PopupMenuItem(
                 value: _ZoomAction.actualSize,
-                child: Text('${strings.get('command.actualSize')} · Ctrl+1'),
+                child: AppMenuItemContent(
+                  icon: Icons.looks_one_outlined,
+                  label: strings.get('command.actualSize'),
+                  shortcut: 'Ctrl+1',
+                ),
               ),
               PopupMenuItem(
                 value: _ZoomAction.fitWidth,
-                child: Text('$fitWidthLabel · Ctrl+2'),
+                child: AppMenuItemContent(
+                  icon: Icons.fit_screen_outlined,
+                  label: fitWidthLabel,
+                  shortcut: 'Ctrl+2',
+                ),
               ),
               PopupMenuItem(
                 value: _ZoomAction.fitPage,
-                child: Text('$fitPageLabel · Ctrl+0'),
+                child: AppMenuItemContent(
+                  icon: Icons.crop_free_rounded,
+                  label: fitPageLabel,
+                  shortcut: 'Ctrl+0',
+                ),
               ),
             ],
           ),
@@ -195,7 +213,6 @@ final class ReaderBottomControls extends StatelessWidget {
             semanticLabel: strings.get('reader.readingTheme'),
             tooltip: strings.get('reader.readingTheme'),
             icon: Icons.tonality_outlined,
-            selected: true,
             onPressed: onChooseTheme,
           ),
         ] else
@@ -259,7 +276,7 @@ final class ReaderBottomControls extends StatelessWidget {
           label:
               '${strings.get('reader.navigation')}. ${strings.get('reader.viewAndZoom')}',
           flat: flat,
-          radius: AppRadii.floating,
+          radius: AppRadii.control,
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.space6,
             vertical: AppSpacing.space4,
@@ -285,7 +302,7 @@ final class ReaderBottomControls extends StatelessWidget {
                           ),
                           const SizedBox(width: AppSpacing.space6),
                           Text(
-                            strings.get('reader.activeControls'),
+                            layoutLabel.toUpperCase(),
                             style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ],
@@ -314,7 +331,7 @@ final class ReaderBottomControls extends StatelessWidget {
         label:
             '${strings.get('reader.navigation')}. ${strings.get('reader.viewAndZoom')}',
         flat: flat,
-        radius: AppRadii.floating,
+        radius: AppRadii.control,
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.space6,
           vertical: AppSpacing.space4,

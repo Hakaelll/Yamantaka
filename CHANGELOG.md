@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.8.0 — 2026-08-26 (archivo privado y lectura de precisión)
+
+- Convierte Biblioteca en un archivo de escritorio con cuadrícula titulada y
+  lista densa; ambas conservan selección, navegación, inspector y estados de
+  ausencia, modificación, revisión y progreso.
+- Expone una banda eliminable de filtros activos y adapta la lista al 150 % de
+  texto sin comprimir columnas auxiliares hasta volverlas ilegibles.
+- Reduce el estado inicial a la marca Yamantaka, una frase breve y `Abrir PDF`;
+  recolorea píxel a píxel el símbolo original de azul a violeta `#B58AFF`, sin
+  regenerar geometría, relieve, textura, alfa ni tamaños de icono.
+- Refina barra, dock y panel del lector con radios de instrumento más sobrios,
+  elimina el falso estado seleccionado del selector de tema y muestra la
+  disposición de página actual como contexto sin cambiar la identidad del
+  visor PDF.
+- Eleva búsqueda global a lista + preview en expandido, fortalece selección y
+  estados de carga, y normaliza iconos, atajos y acciones destructivas en
+  paleta, menús, anotaciones y diálogos.
+- Hace explícitos en metadatos el valor detectado, el override local, los cambios
+  pendientes y la restauración por campo; guardar continúa siendo local y no
+  modifica el PDF.
+- Separa zonas peligrosas y errores recuperables en Ajustes, conserva una sola
+  acción primaria por superficie y evita mostrar excepciones técnicas.
+- Amplía la suite a 252 pruebas, mantiene una golden 0.8, genera 54 capturas y
+  diez comparaciones 0.7/0.8, y prepara el release local `0.8.0+9` sin publicar
+  ni firmar automáticamente.
+
 ## 0.7.0 — 2026-08-25 (retícula editorial de escritorio)
 
 - Define escala tipográfica editorial, cifras tabulares y vocabulario completo

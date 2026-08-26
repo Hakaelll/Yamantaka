@@ -218,3 +218,182 @@ final class AppStatusLabel extends StatelessWidget {
     );
   }
 }
+
+/// Consistent content for popup menus and context menus on desktop.
+///
+/// The popup owns activation and keyboard behavior; this widget owns visual
+/// hierarchy so checked, destructive and shortcut states do not drift between
+/// features.
+final class AppMenuItemContent extends StatelessWidget {
+  const AppMenuItemContent({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.shortcut,
+    this.checked = false,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? shortcut;
+  final bool checked;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final foreground = destructive ? colors.danger : colors.textPrimary;
+    return Row(
+      children: [
+        SizedBox(
+          width: 24,
+          child: Icon(
+            checked ? Icons.check_rounded : icon,
+            size: 17,
+            color: foreground,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.space8),
+        Expanded(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: foreground),
+          ),
+        ),
+        if (shortcut case final value?) ...[
+          const SizedBox(width: AppSpacing.space20),
+          AppShortcutHint(value),
+        ],
+      ],
+    );
+  }
+}
+
+/// Desktop dialog heading with a stable icon, title and explanatory text.
+final class AppDialogHeader extends StatelessWidget {
+  const AppDialogHeader({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.description,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? description;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: context.appColors.surfaceActive,
+            border: Border.all(color: context.appColors.borderSubtle),
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+          child: Icon(icon, size: 19),
+        ),
+        const SizedBox(width: AppSpacing.space12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              if (description case final value?) ...[
+                const SizedBox(height: AppSpacing.space4),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.appColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (trailing case final value?) ...[
+          const SizedBox(width: AppSpacing.space12),
+          value,
+        ],
+      ],
+    );
+  }
+}
+
+/// Visually isolates a destructive or privacy-sensitive operation from normal
+/// settings and dialog actions.
+final class AppDangerZone extends StatelessWidget {
+  const AppDangerZone({
+    super.key,
+    required this.title,
+    required this.description,
+    required this.child,
+  });
+
+  final String title;
+  final String description;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = context.appColors.danger;
+    final details = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.warning_amber_rounded, size: 20, color: danger),
+        const SizedBox(width: AppSpacing.space12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(color: danger),
+              ),
+              const SizedBox(height: AppSpacing.space4),
+              Text(description, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) => Container(
+        padding: const EdgeInsets.all(AppSpacing.space16),
+        decoration: BoxDecoration(
+          color: danger.withValues(alpha: 0.06),
+          border: Border.all(color: danger.withValues(alpha: 0.55)),
+          borderRadius: BorderRadius.circular(AppRadii.panel),
+        ),
+        child: constraints.maxWidth < 520
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  details,
+                  const SizedBox(height: AppSpacing.space12),
+                  Align(alignment: Alignment.centerRight, child: child),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: details),
+                  const SizedBox(width: AppSpacing.space16),
+                  child,
+                ],
+              ),
+      ),
+    );
+  }
+}

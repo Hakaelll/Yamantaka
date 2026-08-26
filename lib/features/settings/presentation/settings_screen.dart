@@ -776,13 +776,11 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       );
-    } on Object catch (error) {
+    } on Object catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            strings.get('settings.saveFailed', parameters: {'error': error}),
-          ),
+          content: Text(strings.get('settings.saveFailed')),
           action: SnackBarAction(
             label: strings.get('action.retry'),
             onPressed: () => unawaited(_update(settings)),

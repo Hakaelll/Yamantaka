@@ -128,6 +128,17 @@ final class YamantakaLocalizations {
       'library.emptyBody':
           'Abre un PDF o arrástralo a esta ventana. El archivo permanece en '
           'su carpeta original y tu progreso se guarda solo aquí.',
+      'library.emptyTagline': 'Tu archivo privado de lectura.',
+      'library.archiveKicker': 'Archivo privado',
+      'library.archiveLocal.title': 'Índice local',
+      'library.archiveLocal.description':
+          'Títulos, portadas y progreso se organizan en este equipo.',
+      'library.archivePrivate.title': 'Sin cuentas ni nube',
+      'library.archivePrivate.description':
+          'La lectura y la búsqueda funcionan sin conexión.',
+      'library.archiveSafe.title': 'PDF intactos',
+      'library.archiveSafe.description':
+          'Notas y metadatos locales nunca reescriben el documento.',
       'library.search': 'Buscar en la biblioteca',
       'library.noResults': 'No hay documentos con estos filtros.',
       'library.noQueryResults':
@@ -191,6 +202,12 @@ final class YamantakaLocalizations {
       'time.daysAgo': 'hace {count} d',
       'library.resultOfTotal': '{result} de {total}',
       'library.commandBar': 'Buscar, seleccionar, filtrar y ordenar',
+      'library.view.grid': 'Vista de cuadrícula',
+      'library.view.list': 'Vista de lista',
+      'library.column.document': 'Documento',
+      'library.column.state': 'Estado',
+      'library.column.progress': 'Progreso',
+      'library.column.opened': 'Última apertura',
       'library.exitSelectionMode': 'Salir del modo de selección',
       'library.selectMultiple': 'Seleccionar varios documentos',
       'library.filterAuthorsTopics': 'Filtrar por autores y temas',
@@ -209,6 +226,10 @@ final class YamantakaLocalizations {
       'library.sortOrder.progress': 'Progreso',
       'library.resetFilters': 'Restablecer filtros',
       'library.filtersApplied': '{count} filtros aplicados',
+      'library.activeFilters': 'Filtros activos',
+      'library.authorFilters': '{count} autores',
+      'library.topicFilters': '{count} temas',
+      'library.removeFilter': 'Quitar filtro {filter}',
       'library.actionsForSelection':
           'Acciones para {count} documentos seleccionados',
       'library.bulkActions': 'Acciones masivas',
@@ -414,6 +435,15 @@ final class YamantakaLocalizations {
       'reader.reset': 'Reiniciar',
       'reader.progressReset': 'Progreso reiniciado.',
       'reader.editLocalMetadata': 'Editar metadata local',
+      'reader.metadataLocal.description':
+          'Los cambios se guardan solo en Yamantaka y nunca modifican el PDF.',
+      'reader.metadataIdentity': 'Identidad',
+      'reader.metadataOrganization': 'Organización · temas locales',
+      'reader.metadataNotes': 'Notas privadas',
+      'reader.detectedValue': 'Detectado en el PDF: {value}',
+      'reader.noDetectedValue': 'sin valor',
+      'reader.restoreDetected': 'Restaurar el valor detectado',
+      'reader.unsavedChanges': 'Cambios sin guardar',
       'reader.emptyRestoresTitle': 'Vacío restaura el título detectado.',
       'reader.libraryNote': 'Nota de biblioteca',
       'reader.storedOutsidePdf': 'Se guarda fuera del PDF.',
@@ -752,7 +782,8 @@ final class YamantakaLocalizations {
       'settings.noSessions.description':
           'El historial aparecerá aquí cuando cierres una sesión de lectura.',
       'settings.updated': 'Ajuste actualizado',
-      'settings.saveFailed': 'No se pudo guardar el ajuste: {error}',
+      'settings.saveFailed':
+          'No se pudo guardar el ajuste local. Inténtalo de nuevo.',
       'settings.section.appearance': 'Apariencia',
       'settings.section.reading': 'Lectura',
       'settings.section.readerBar': 'Controles del lector',
@@ -839,6 +870,14 @@ final class YamantakaLocalizations {
       'search.emptyBody':
           'Busca por metadatos, contenido extraíble, anotaciones, colecciones '
           'y etiquetas. El índice permanece en este dispositivo.',
+      'search.localDescription':
+          'Títulos, contenido y notas indexados únicamente en este equipo.',
+      'search.searchingTitle': 'Buscando en el índice local',
+      'search.searchingBody':
+          'Consultando documentos, páginas, anotaciones y organización.',
+      'search.previewNoSnippet':
+          'Este resultado no necesita un fragmento de texto para abrirse.',
+      'search.openResult': 'Abrir resultado',
       'search.noResultsTitle': 'Sin resultados',
       'search.noResultsBody':
           'El documento puede no contener texto extraíble o aún no estar '
@@ -998,6 +1037,17 @@ final class YamantakaLocalizations {
       'library.emptyBody':
           'Open or drag a PDF into this window. The file stays in its original '
           'folder and your progress is stored only here.',
+      'library.emptyTagline': 'Your private reading archive.',
+      'library.archiveKicker': 'Private archive',
+      'library.archiveLocal.title': 'Local index',
+      'library.archiveLocal.description':
+          'Titles, covers, and progress are organized on this device.',
+      'library.archivePrivate.title': 'No account or cloud',
+      'library.archivePrivate.description':
+          'Reading and search work without a connection.',
+      'library.archiveSafe.title': 'PDFs stay intact',
+      'library.archiveSafe.description':
+          'Local notes and metadata never rewrite the document.',
       'library.search': 'Search library',
       'library.noResults': 'No documents match these filters.',
       'library.noQueryResults': 'No documents match “{query}”.',
@@ -1059,6 +1109,12 @@ final class YamantakaLocalizations {
       'library.resultOfTotal': '{result} of {total}',
       'library.commandBar': 'Search, select, filter, and sort',
       'library.exitSelectionMode': 'Exit selection mode',
+      'library.view.grid': 'Grid view',
+      'library.view.list': 'List view',
+      'library.column.document': 'Document',
+      'library.column.state': 'State',
+      'library.column.progress': 'Progress',
+      'library.column.opened': 'Last opened',
       'library.selectMultiple': 'Select multiple documents',
       'library.filterAuthorsTopics': 'Filter by authors and topics',
       'library.authorsTopicsGrouping': 'Authors, topics, and grouping',
@@ -1076,6 +1132,10 @@ final class YamantakaLocalizations {
       'library.sortOrder.progress': 'Progress',
       'library.resetFilters': 'Reset filters',
       'library.filtersApplied': '{count} filters applied',
+      'library.activeFilters': 'Active filters',
+      'library.authorFilters': '{count} authors',
+      'library.topicFilters': '{count} topics',
+      'library.removeFilter': 'Remove {filter} filter',
       'library.actionsForSelection': 'Actions for {count} selected documents',
       'library.bulkActions': 'Bulk actions',
       'library.markFavorite': 'Mark as favorite',
@@ -1277,6 +1337,15 @@ final class YamantakaLocalizations {
       'reader.reset': 'Reset',
       'reader.progressReset': 'Progress reset.',
       'reader.editLocalMetadata': 'Edit local metadata',
+      'reader.metadataLocal.description':
+          'Changes are stored only in Yamantaka and never modify the PDF.',
+      'reader.metadataIdentity': 'Identity',
+      'reader.metadataOrganization': 'Organization · local topics',
+      'reader.metadataNotes': 'Private notes',
+      'reader.detectedValue': 'Detected in the PDF: {value}',
+      'reader.noDetectedValue': 'no value',
+      'reader.restoreDetected': 'Restore the detected value',
+      'reader.unsavedChanges': 'Unsaved changes',
       'reader.emptyRestoresTitle': 'Empty restores the detected title.',
       'reader.libraryNote': 'Library note',
       'reader.storedOutsidePdf': 'Stored outside the PDF.',
@@ -1609,7 +1678,7 @@ final class YamantakaLocalizations {
       'settings.noSessions.description':
           'History will appear here when you close a reading session.',
       'settings.updated': 'Setting updated',
-      'settings.saveFailed': 'The setting could not be saved: {error}',
+      'settings.saveFailed': 'The local setting could not be saved. Try again.',
       'settings.section.appearance': 'Appearance',
       'settings.section.reading': 'Reading',
       'settings.section.readerBar': 'Reader controls',
@@ -1693,6 +1762,14 @@ final class YamantakaLocalizations {
       'search.emptyBody':
           'Search metadata, extractable content, annotations, collections, '
           'and tags. The index stays on this device.',
+      'search.localDescription':
+          'Titles, content, and notes indexed only on this device.',
+      'search.searchingTitle': 'Searching the local index',
+      'search.searchingBody':
+          'Checking documents, pages, annotations, and organization.',
+      'search.previewNoSnippet':
+          'This result does not need a text snippet before opening.',
+      'search.openResult': 'Open result',
       'search.noResultsTitle': 'No results',
       'search.noResultsBody':
           'The document may not contain extractable text or may not be indexed '
