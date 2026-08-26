@@ -274,7 +274,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('book reader matches the maintained editorial v0.8 baseline', (
+  testWidgets('book reader matches the maintained editorial v0.9 baseline', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1600, 900);
@@ -291,7 +291,50 @@ void main() {
 
     await expectLater(
       find.byType(ReaderScreen),
-      matchesGoldenFile('../docs/screenshots/windows-reader-editorial-v08.png'),
+      matchesGoldenFile('../docs/screenshots/windows-reader-editorial-v09.png'),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('reader chrome uses the compact 0.9 geometry and 40 px targets', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true, pageCount: 6);
+
+    for (final entry in const [
+      (Size(640, 480), AppSizes.readerCompactTopBarHeight),
+      (Size(1280, 720), AppSizes.topBarHeight),
+    ]) {
+      tester.view.physicalSize = entry.$1;
+      await tester.pumpWidget(_app(harness));
+      await tester.pump();
+
+      expect(
+        tester.getSize(find.byKey(const Key('reader-top-surface'))).height,
+        entry.$2,
+      );
+      expect(
+        tester.getSize(find.byTooltip('Volver a la biblioteca')),
+        const Size.square(AppSizes.desktopControlExtent),
+      );
+      expect(
+        tester.getSize(find.byKey(const Key('reader-active-dock'))).height,
+        AppSizes.bottomControlHeight,
+      );
+      expect(find.text('book.pdf'), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: '${entry.$1}');
+    }
+
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump();
+    expect(
+      tester.getSize(find.byKey(const Key('reader-resting-dock'))).height,
+      AppSizes.readerRestingDockHeight,
     );
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -625,6 +668,7 @@ void main() {
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
     expect(adapter.configuration?.coverPolicy, ReaderCoverPolicy.noCover);
     expect(adapter.configuration?.initialSide, ReaderInitialSide.left);
+    final configuredMargin = adapter.configuration?.margin;
 
     tester.view.physicalSize = const Size(1200, 800);
     await tester.pump();
@@ -635,7 +679,7 @@ void main() {
     tester.view.physicalSize = const Size(1200, 460);
     await tester.pump();
     expect(adapter.configuration?.flow, PdfViewFlow.facing);
-    expect(adapter.configuration?.margin, 16);
+    expect(adapter.configuration?.margin, configuredMargin);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
@@ -748,6 +792,12 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pump();
       expect(find.byKey(const Key('reader-side-panel')), findsNothing);
+      tester.view.physicalSize = const Size(800, 600);
+      await tester.pump();
+      expect(adapter.buildCount, 1);
+      tester.view.physicalSize = const Size(1440, 900);
+      await tester.pump();
+      expect(adapter.buildCount, 1);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await harness.dispose();

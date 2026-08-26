@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.0 — 2026-08-26 (lector compacto de precisión)
+
+- Reduce la barra superior del lector a 56 px en escritorio y 52 px en
+  compacto, con targets de 40 px, iconos de 18 px, margen superior de 8 px y
+  título real truncado; atrás/adelante solo aparecen cuando están disponibles.
+- Limita la dock activa a 48 px y su reposo a 38 px, conserva navegación
+  geométricamente centrada y mueve las acciones secundarias al menú compacto.
+- Reduce rail y cabecera del panel a 52 px, acorta sombras de papel y chrome y
+  adapta los márgenes a 12/16/24/32 px dentro del visor sin añadir tamaño,
+  breakpoint, panel ni visibilidad del chrome a su identidad cacheada.
+- Compacta cabeceras, filas de Ajustes, resultados y paleta; unifica estas
+  últimas en 48 px y reduce radios de paneles y diálogos.
+- Conserva selección, filtros y scroll al alternar cuadrícula/lista mediante una
+  transición breve de opacidad, inmediata con movimiento reducido; las filas
+  usan 52 px a texto 100 % y crecen desde 64 px por encima de 130 %.
+- Añade aserciones geométricas para barra, dock, targets y estabilidad del visor,
+  actualiza la golden 0.9 y prepara evidencia 0.8/0.9 y release local
+  `0.9.0+10` sin publicar ni firmar.
+
 ## 0.8.0 — 2026-08-26 (archivo privado y lectura de precisión)
 
 - Convierte Biblioteca en un archivo de escritorio con cuadrícula titulada y

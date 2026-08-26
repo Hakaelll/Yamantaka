@@ -55,6 +55,12 @@ void main() {
     expect(AppRadii.control, lessThan(AppRadii.panel));
     expect(AppRadii.panel, lessThan(AppRadii.dialog));
     expect(AppRadii.dialog, lessThanOrEqualTo(16));
+    expect(AppSizes.topBarHeight, 56);
+    expect(AppSizes.readerCompactTopBarHeight, 52);
+    expect(AppSizes.bottomControlHeight, 48);
+    expect(AppSizes.readerRestingDockHeight, 38);
+    expect(AppSizes.readerPanelRailWidth, 52);
+    expect(AppSizes.commandPaletteRowHeight, 48);
   });
 
   test('editorial type scale keeps essential information at twelve pixels', () {

@@ -225,13 +225,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                   onFilter: _applyFilterCommand,
                   onFacets: _showFacetFilters,
                   onToggleSelectionMode: _toggleSelectionMode,
-                  onViewModeChanged: (mode) => setState(() {
-                    _viewMode = mode;
-                    widget.controller.scrollOffset = 0;
-                    if (_scrollController.hasClients) {
-                      _scrollController.jumpTo(0);
-                    }
-                  }),
+                  onViewModeChanged: (mode) => setState(() => _viewMode = mode),
                   onClearActiveFilter: _clearActiveFilter,
                 ),
                 if (_selectionMode && _selection.isNotEmpty)
@@ -247,23 +241,34 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                           query: widget.controller.query,
                           onReset: _resetFilters,
                         )
-                      : _ArtifactCanvas(
-                          controller: _scrollController,
-                          documents: widget.documents,
-                          selectionListenableFor:
-                              widget.controller.selectionListenableFor,
-                          selectedDocumentIds: _selection.ids.toSet(),
-                          selectionMode: _selectionMode,
-                          reserveInfoSpace: widget.documents.isNotEmpty,
-                          reduceMotion: reduceMotion,
-                          groupByAuthor: widget.controller.groupByAuthor,
-                          viewMode: _viewMode,
-                          onSelect: _select,
-                          onOpen: _open,
-                          onHover: (documentId) =>
-                              _hoveredDocumentId.value = documentId,
-                          onMenu: _showDocumentMenu,
-                          onDocumentVisible: widget.onDocumentVisible,
+                      : TweenAnimationBuilder<double>(
+                          key: ValueKey(_viewMode),
+                          duration: AppMotion.whenAllowed(
+                            reduceMotion,
+                            AppMotion.fast,
+                          ),
+                          curve: Curves.easeOutCubic,
+                          tween: Tween(begin: 0.88, end: 1),
+                          builder: (context, opacity, child) =>
+                              Opacity(opacity: opacity, child: child),
+                          child: _ArtifactCanvas(
+                            controller: _scrollController,
+                            documents: widget.documents,
+                            selectionListenableFor:
+                                widget.controller.selectionListenableFor,
+                            selectedDocumentIds: _selection.ids.toSet(),
+                            selectionMode: _selectionMode,
+                            reserveInfoSpace: widget.documents.isNotEmpty,
+                            reduceMotion: reduceMotion,
+                            groupByAuthor: widget.controller.groupByAuthor,
+                            viewMode: _viewMode,
+                            onSelect: _select,
+                            onOpen: _open,
+                            onHover: (documentId) =>
+                                _hoveredDocumentId.value = documentId,
+                            onMenu: _showDocumentMenu,
+                            onDocumentVisible: widget.onDocumentVisible,
+                          ),
                         ),
                 ),
               ],

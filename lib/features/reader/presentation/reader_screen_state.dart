@@ -148,13 +148,18 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 _lastPointerPosition = event.position;
                 _showCursor();
                 _scheduleCursorHide();
-                final height = MediaQuery.sizeOf(context).height;
+                final mediaSize = MediaQuery.sizeOf(context);
+                final height = mediaSize.height;
+                final compact =
+                    AppBreakpoints.classify(mediaSize.width) ==
+                    AppWindowClass.compact;
                 final atRevealEdge =
                     event.localPosition.dy <= AppSizes.topRevealZone ||
                     event.localPosition.dy >= height - AppSpacing.space12;
                 final inTopChrome =
                     event.localPosition.dy <=
-                    AppSizes.topBarHeight + AppSpacing.space8;
+                    AppSizes.readerTopBarHeight(compact: compact) +
+                        AppSpacing.space8;
                 final inBottomChrome =
                     event.localPosition.dy >=
                     height - AppSizes.bottomControlHeight - AppSpacing.space24;
@@ -215,12 +220,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     final windowClass = AppBreakpoints.classify(constraints.maxWidth);
     final panelDocked =
         _panel != null && windowClass == AppWindowClass.expanded;
-    final viewerSize = Size(constraints.maxWidth, constraints.maxHeight);
-    final readerMargin = ReaderViewportMetrics.adaptiveMargin(
-      viewport: viewerSize,
-      preferred:
-          (preferences.horizontalMargin + preferences.verticalMargin) / 2,
-    );
+    final readerMargin =
+        (preferences.horizontalMargin + preferences.verticalMargin) / 2;
     // The PDF layout already contains the editorial outer margin.  Keeping
     // this separate viewport margin at zero is what makes chrome genuinely
     // overlay-only instead of reserving a hidden toolbar strip.
@@ -494,7 +495,10 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 return Positioned(
                   left: AppSpacing.space12,
                   top: controlsShown
-                      ? AppSizes.topBarHeight + AppSpacing.space8
+                      ? AppSizes.readerTopBarHeight(
+                              compact: windowClass == AppWindowClass.compact,
+                            ) +
+                            AppSpacing.space8
                       : AppSpacing.space12,
                   child: Semantics(
                     label: strings.get(
@@ -544,7 +548,11 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     }) => Positioned(
       left: left ? 0 : null,
       right: left ? null : (panelVisible ? panelWidth : 0),
-      top: AppSizes.topBarHeight,
+      top: AppSizes.readerTopBarHeight(
+        compact:
+            AppBreakpoints.classify(MediaQuery.sizeOf(context).width) ==
+            AppWindowClass.compact,
+      ),
       bottom: AppSizes.bottomControlHeight + AppSpacing.space24,
       width: AppSizes.readerEdgeNavigation,
       child: Semantics(
@@ -658,7 +666,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
           ? AppShadow.readerGrayPageBlur
           : AppShadow.readerPageBlur,
       spreadRadius: 0,
-      offset: const Offset(0, 2),
+      offset: const Offset(0, 1),
     );
   }
 

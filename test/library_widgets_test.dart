@@ -497,6 +497,7 @@ void main() {
     );
     await tester.pump();
     expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
+    controller.scrollOffset = 42;
 
     await tester.tap(find.byKey(const Key('library-list-view-button')));
     await tester.pumpAndSettle();
@@ -505,6 +506,7 @@ void main() {
     expect(find.text('Documento'), findsOneWidget);
     expect(find.text('Última apertura'), findsNothing);
     expect(find.textContaining('En curso · 35 %'), findsOneWidget);
+    expect(controller.scrollOffset, 42);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Alpha').first, warnIfMissed: false);

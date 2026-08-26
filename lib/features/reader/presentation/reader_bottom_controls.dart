@@ -142,10 +142,17 @@ final class ReaderBottomControls extends StatelessWidget {
             message: strings.get('reader.customZoom'),
             child: TextButton(
               key: const Key('reader-zoom-indicator'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(40, AppSizes.desktopControlExtent),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: () => _showZoomChooser(context),
               child: Text(
                 '${(controller.viewController.zoom * 100).round()} %',
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                softWrap: false,
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
@@ -271,72 +278,72 @@ final class ReaderBottomControls extends StatelessWidget {
     if (!compact && availableWidth >= 900) {
       return Align(
         alignment: Alignment.bottomCenter,
+        child: SizedBox(
+          height: AppSizes.bottomControlHeight,
+          child: YamaToolbarGroup(
+            key: const Key('reader-active-dock'),
+            label:
+                '${strings.get('reader.navigation')}. ${strings.get('reader.viewAndZoom')}',
+            flat: flat,
+            radius: AppRadii.control,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space6),
+            children: [
+              SizedBox(
+                width: (availableWidth - AppSpacing.space32).clamp(0, 760),
+                height: AppSizes.desktopControlExtent,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: AppSpacing.space8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.menu_book_outlined,
+                              size: 16,
+                              color: context.appColors.textMuted,
+                            ),
+                            const SizedBox(width: AppSpacing.space6),
+                            Text(
+                              layoutLabel.toUpperCase(),
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Center(child: navigation),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [const YamaToolbarDivider(), zoom],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SizedBox(
+        height: AppSizes.bottomControlHeight,
         child: YamaToolbarGroup(
           key: const Key('reader-active-dock'),
           label:
               '${strings.get('reader.navigation')}. ${strings.get('reader.viewAndZoom')}',
           flat: flat,
           radius: AppRadii.control,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.space6,
-            vertical: AppSpacing.space4,
-          ),
-          children: [
-            SizedBox(
-              width: (availableWidth - AppSpacing.space32).clamp(0, 760),
-              height: AppSizes.desktopControlExtent,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: AppSpacing.space8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.menu_book_outlined,
-                            size: 16,
-                            color: context.appColors.textMuted,
-                          ),
-                          const SizedBox(width: AppSpacing.space6),
-                          Text(
-                            layoutLabel.toUpperCase(),
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Center(child: navigation),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [const YamaToolbarDivider(), zoom],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space6),
+          children: [navigation, const YamaToolbarDivider(), zoom],
         ),
-      );
-    }
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: YamaToolbarGroup(
-        key: const Key('reader-active-dock'),
-        label:
-            '${strings.get('reader.navigation')}. ${strings.get('reader.viewAndZoom')}',
-        flat: flat,
-        radius: AppRadii.control,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.space6,
-          vertical: AppSpacing.space4,
-        ),
-        children: [navigation, const YamaToolbarDivider(), zoom],
       ),
     );
   }
@@ -455,11 +462,11 @@ final class _ReaderRestingDock extends StatelessWidget {
             onTap: onActivate,
             child: SizedBox(
               width: compact ? 236 : 336,
-              height: AppSizes.desktopControlExtent,
+              height: AppSizes.readerRestingDockHeight,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.space16,
-                  vertical: AppSpacing.space8,
+                  horizontal: AppSpacing.space12,
+                  vertical: AppSpacing.space6,
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

@@ -51,12 +51,12 @@ abstract final class ReaderViewportMetrics {
   }) {
     final shortestSide = math.min(viewport.width, viewport.height);
     final maximum = switch (shortestSide) {
-      < 520 => 16.0,
-      < 720 => 24.0,
-      < 1000 => 32.0,
-      _ => 40.0,
+      < 520 => 12.0,
+      < 720 => 16.0,
+      < 1000 => 24.0,
+      _ => 32.0,
     };
-    return preferred.clamp(12.0, maximum).toDouble();
+    return preferred.clamp(10.0, maximum).toDouble();
   }
 
   static ReaderPageLayoutGeometry facingPageLayout({

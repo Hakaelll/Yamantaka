@@ -63,18 +63,18 @@ final class _PanelSectionRail extends StatelessWidget {
       label: strings.get('reader.panelSections'),
       child: SizedBox(
         key: const Key('reader-panel-section-rail'),
-        width: 60,
+        width: AppSizes.readerPanelRailWidth,
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
           children: [
             for (final section in ReaderPanelSection.values)
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.space6,
+                  horizontal: AppSpacing.space4,
                   vertical: AppSpacing.space2,
                 ),
                 child: SizedBox(
-                  height: 44,
+                  height: AppSizes.desktopControlExtent,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [

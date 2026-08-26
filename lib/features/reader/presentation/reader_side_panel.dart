@@ -109,13 +109,13 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                 Column(
                   children: [
                     SizedBox(
-                      height: AppSizes.topBarHeight,
+                      height: AppSizes.readerPanelHeaderHeight,
                       child: Row(
                         children: [
-                          const SizedBox(width: AppSpacing.space16),
+                          const SizedBox(width: AppSpacing.space12),
                           Container(
                             width: 3,
-                            height: 24,
+                            height: 20,
                             decoration: BoxDecoration(
                               color: context.appColors.accentPrimary,
                               borderRadius: BorderRadius.circular(

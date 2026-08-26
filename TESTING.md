@@ -1,6 +1,6 @@
 # Pruebas
 
-Estado actualizado: 2026-08-24.
+Estado actualizado: 2026-08-26.
 
 Este documento describe únicamente evidencia reproducible del árbol actual. Se
 han retirado las tablas y capturas históricas que correspondían a lectores
@@ -44,7 +44,9 @@ La suite automatizada comprueba:
 - panel overlay en 680–1099 px y panel restado del visor en ≥1100 px, también
   durante resize y sin reconstruir el adaptador PDF;
 - dock de reposo accionable sin hover, revelado por teclado y rail vertical del
-  panel acoplado con ancho semántico visible.
+  panel acoplado con ancho semántico visible;
+- barra 56/52 px, dock 48/38 px y targets de 40 px medidos por widget;
+- identidad estable del adaptador al abrir/cerrar panel y cruzar 680/1100 px.
 
 La biblioteca cubre inspector contextual, selección conservada y explicación al
 filtrar, además de metadatos PDF, cuatro páginas iniciales, título multilínea,
@@ -62,15 +64,15 @@ extremo; los resultados bajo `build/` no contienen rutas ni títulos.
 
 La única captura normativa es:
 
-    docs/screenshots/windows-reader-editorial-v08.png
+    docs/screenshots/windows-reader-editorial-v09.png
 
 La genera y compara esta prueba:
 
-    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.8 baseline"
+    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.9 baseline"
 
 Para aceptar deliberadamente un cambio visual:
 
-    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.8 baseline"
+    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.9 baseline"
 
 Es una referencia de widgets ejecutados a 1600×900, no una captura nativa ni un
 mockup manual. Valida la composición fullscreen del contenido: barra opaca,
@@ -82,8 +84,14 @@ Las matrices widget de Biblioteca, Lector y Ajustes cubren 640×480, 800×600,
 tema oscuro, alto contraste, movimiento reducido, chrome en reposo y panel
 abierto. La evidencia previa se conserva en `build/visual-evidence/v0.5.0/` y
 la de 0.6 se conserva en `build/visual-evidence/v0.6.0/`, la de 0.7 en
-`build/visual-evidence/v0.7.0/` y la actual se escribe en
-`build/visual-evidence/v0.8.0/`; ninguna se versiona.
+`build/visual-evidence/v0.7.0/` y la de 0.8 en
+`build/visual-evidence/v0.8.0/`. La actual se escribe en
+`build/visual-evidence/v0.9.0/`; ninguna se versiona.
+
+La matriz 0.9 añade la prueba geométrica del chrome y conserva los casos de
+Biblioteca, Lector, panel, Ajustes, búsqueda, paleta, menús y diálogos en claro,
+oscuro, alto contraste y movimiento reducido. Las comparaciones usan 0.8 como
+fuente anterior y registran el SHA-256 de ambos PNG.
 
 ## Validación nativa de Windows
 
@@ -162,6 +170,15 @@ El gate Windows 0.8 aprueba además corpus sintético, benchmark con 5.000,
 smoke de 8 s con cero conexiones y baseline visual. La matriz DPI nativa se
 omitió explícitamente. El paquete contiene 22 archivos (43.523.377 bytes) y su
 ZIP ocupa 19.418.873 bytes; los nueve PE permanecen `NotSigned`.
+
+La iteración `0.9.0+10` añade aserciones geométricas para las barras del lector,
+la identidad estable del visor al redimensionar, la conservación de posición al
+cambiar entre lista y cuadrícula y una matriz visual propia de la búsqueda
+global. Las matrices producen 59 capturas de superficies y diez comparaciones
+0.8/0.9. Tras empaquetar, este comando contrasta inventario, tamaños y SHA-256
+del manifiesto con el contenido real del ZIP y rechaza rutas inseguras o PDF:
+
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/verify_windows_package.ps1
 
 ## Corpus y privacidad
 

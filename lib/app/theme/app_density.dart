@@ -18,26 +18,26 @@ final class AppDensityTokens extends ThemeExtension<AppDensityTokens> {
 
   static const comfortable = AppDensityTokens(
     interfaceDensity: AppInterfaceDensity.comfortable,
-    listRowVerticalPadding: 12,
-    settingsRowVerticalPadding: 16,
-    sectionSpacing: 40,
+    listRowVerticalPadding: 10,
+    settingsRowVerticalPadding: 12,
+    sectionSpacing: 32,
     recentCoverWidth: 44,
     recentCoverHeight: 60,
     targetExtent: 40,
-    settingRowMinHeight: 56,
-    compactMenuRowHeight: 34,
+    settingRowMinHeight: 52,
+    compactMenuRowHeight: 40,
   );
 
   static const compact = AppDensityTokens(
     interfaceDensity: AppInterfaceDensity.compact,
-    listRowVerticalPadding: 8,
-    settingsRowVerticalPadding: 10,
-    sectionSpacing: 28,
+    listRowVerticalPadding: 6,
+    settingsRowVerticalPadding: 8,
+    sectionSpacing: 24,
     recentCoverWidth: 38,
     recentCoverHeight: 52,
     targetExtent: 40,
-    settingRowMinHeight: 48,
-    compactMenuRowHeight: 34,
+    settingRowMinHeight: 44,
+    compactMenuRowHeight: 40,
   );
 
   final AppInterfaceDensity interfaceDensity;

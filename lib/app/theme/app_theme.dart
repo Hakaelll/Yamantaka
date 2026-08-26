@@ -106,7 +106,7 @@ abstract final class AppTheme {
       visualDensity: density == AppInterfaceDensity.compact
           ? const VisualDensity(horizontal: -1, vertical: -1)
           : VisualDensity.standard,
-      materialTapTargetSize: MaterialTapTargetSize.padded,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       extensions: [tokens, densityTokens],
     );
     final textTheme = base.textTheme.copyWith(

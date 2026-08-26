@@ -322,3 +322,22 @@ La marca se deriva de los assets rastreados en `HEAD` mediante transformación
 de croma 1:1. El script conserva dimensiones, alfa, coordenadas y luminancia
 local y aplica la misma operación a cada frame ICO; no usa el resultado
 generativo como fuente del producto.
+
+## Densidad 0.9 y margen responsive sin identidad nueva
+
+`AppSizes` concentra las medidas verificables del chrome 0.9: barra 56/52 px,
+dock 48/38 px, cabecera y rail lateral de 52 px. Ninguna entra en
+`_viewerCacheKey`. El visor cacheado sigue dependiendo del documento y de
+configuración PDF estable; abrir panel, cambiar sección, ocultar chrome, pasar
+un breakpoint o redimensionar la ventana conserva la misma instancia.
+
+El margen preferido del documento se entrega estable a `PdfrxViewerAdapter`.
+`_PdfrxViewerState` deriva el margen efectivo de sus constraints (12/16/24/32
+px) y actualiza `PdfViewerParams` desde el mismo estado. Así la página gana área
+útil y se recentra en la columna restante sin reconstruir el documento ni
+alterar PDFium, caché, zoom, paneo o renderizado progresivo.
+
+El modo grid/list continúa siendo estado efímero. La transición 0.9 envuelve la
+composición siguiente en un único `TweenAnimationBuilder`, evitando montar dos
+scrollables con el mismo controlador; no reinicia selección, filtros ni offset.
+No hay migraciones, dependencias, telemetría ni nuevos accesos de red.

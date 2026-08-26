@@ -60,7 +60,8 @@ final class ReaderTopBar extends StatelessWidget
   final String shortcutOverrides;
 
   @override
-  Size get preferredSize => const Size.fromHeight(AppSizes.topBarHeight);
+  Size get preferredSize =>
+      Size.fromHeight(AppSizes.readerTopBarHeight(compact: compact));
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +78,7 @@ final class ReaderTopBar extends StatelessWidget
     final preferences = controller.preferences;
     final document = controller.document;
     if (preferences == null || document == null) {
-      return const SizedBox(height: AppSizes.topBarHeight);
+      return SizedBox(height: AppSizes.readerTopBarHeight(compact: compact));
     }
     final colors = context.appColors;
     final veilColor = canvasColor ?? colors.readerBackground;
@@ -87,14 +88,13 @@ final class ReaderTopBar extends StatelessWidget
         color: veilColor.withValues(alpha: flatChrome ? 1 : 0.92),
       ),
       child: SizedBox(
-        height: AppSizes.topBarHeight,
+        height: AppSizes.readerTopBarHeight(compact: compact),
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: compact
-                ? AppSpacing.space12
-                : expanded
-                ? AppSpacing.space24
-                : AppSpacing.space20,
+          padding: EdgeInsets.fromLTRB(
+            compact ? AppSpacing.space8 : AppSpacing.space12,
+            AppSpacing.space8,
+            compact ? AppSpacing.space8 : AppSpacing.space12,
+            0,
           ),
           child: YamaToolbarGroup(
             key: const Key('reader-unified-top-bar'),
@@ -104,7 +104,7 @@ final class ReaderTopBar extends StatelessWidget
             radius: AppRadii.control,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.space4,
-              vertical: AppSpacing.space4,
+              vertical: AppSpacing.space2,
             ),
             children: [
               Expanded(
@@ -126,10 +126,10 @@ final class ReaderTopBar extends StatelessWidget
                       ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: compact
-                              ? 112
+                              ? 148
                               : expanded
-                              ? 280
-                              : 180,
+                              ? 360
+                              : 240,
                         ),
                         child: Tooltip(
                           message: document.fileName,
@@ -145,16 +145,17 @@ final class ReaderTopBar extends StatelessWidget
                           ),
                         ),
                       ),
-                      if (!compact && controller.navigationHistory != null) ...[
+                      if (!compact &&
+                          controller.navigationHistory?.canGoBack == true)
                         YamaIconButton(
                           semanticLabel: strings.get('command.navigationBack'),
                           tooltip:
                               '${strings.get('command.navigationBack')} (Alt+←)',
                           icon: Icons.undo_rounded,
-                          onPressed: controller.navigationHistory!.canGoBack
-                              ? controller.historyBack
-                              : null,
+                          onPressed: controller.historyBack,
                         ),
+                      if (!compact &&
+                          controller.navigationHistory?.canGoForward == true)
                         YamaIconButton(
                           semanticLabel: strings.get(
                             'command.navigationForward',
@@ -162,288 +163,278 @@ final class ReaderTopBar extends StatelessWidget
                           tooltip:
                               '${strings.get('command.navigationForward')} (Alt+→)',
                           icon: Icons.redo_rounded,
-                          onPressed: controller.navigationHistory!.canGoForward
-                              ? controller.historyForward
-                              : null,
+                          onPressed: controller.historyForward,
                         ),
-                      ],
                     ],
                   ),
                 ),
               ),
-              const YamaToolbarDivider(height: 28),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: YamaToolbarGroup(
-                    label: strings.get('reader.tools'),
-                    flat: flatChrome,
-                    bare: true,
-                    padding: EdgeInsets.zero,
-                    children: [
+              const YamaToolbarDivider(height: 24),
+              Align(
+                alignment: Alignment.centerRight,
+                child: YamaToolbarGroup(
+                  label: strings.get('reader.tools'),
+                  flat: flatChrome,
+                  bare: true,
+                  padding: EdgeInsets.zero,
+                  children: [
+                    YamaIconButton(
+                      semanticLabel: strings.get('command.search'),
+                      tooltip:
+                          '${strings.get('command.search')} (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides, strings: strings)})',
+                      icon: Icons.search_rounded,
+                      onPressed: onSearch,
+                      selected: activePanel == ReaderPanelSection.search,
+                    ),
+                    if (expanded && showPanelControls)
                       YamaIconButton(
-                        semanticLabel: strings.get('command.search'),
+                        semanticLabel: strings.get('reader.openThumbnails'),
                         tooltip:
-                            '${strings.get('command.search')} (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides, strings: strings)})',
-                        icon: Icons.search_rounded,
-                        onPressed: onSearch,
-                        selected: activePanel == ReaderPanelSection.search,
+                            '${strings.get('reader.thumbnails')} (${AppCommandRegistry.shortcutLabel(AppCommandId.togglePanel, shortcutOverrides, strings: strings)})',
+                        icon: Icons.grid_view_outlined,
+                        selected: activePanel == ReaderPanelSection.thumbnails,
+                        onPressed: onShowThumbnails,
                       ),
-                      if (expanded && showPanelControls)
-                        YamaIconButton(
-                          semanticLabel: strings.get('reader.openThumbnails'),
-                          tooltip:
-                              '${strings.get('reader.thumbnails')} (${AppCommandRegistry.shortcutLabel(AppCommandId.togglePanel, shortcutOverrides, strings: strings)})',
-                          icon: Icons.grid_view_outlined,
-                          selected:
-                              activePanel == ReaderPanelSection.thumbnails,
-                          onPressed: onShowThumbnails,
-                        ),
-                      if (showPanelControls)
-                        PopupMenuButton<_ReaderToolsAction>(
-                          tooltip: strings.get('reader.tools'),
-                          onSelected: _runToolsAction,
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: _ReaderToolsAction.thumbnails,
-                              child: _ReaderMenuItem(
-                                icon: Icons.grid_view_outlined,
-                                label: strings.get('reader.thumbnails'),
-                                shortcut: AppCommandRegistry.shortcutLabel(
-                                  AppCommandId.togglePanel,
-                                  shortcutOverrides,
-                                  strings: strings,
-                                ),
-                                selected:
-                                    activePanel ==
-                                    ReaderPanelSection.thumbnails,
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: _ReaderToolsAction.outline,
-                              child: _ReaderMenuItem(
-                                icon: Icons.format_list_bulleted_rounded,
-                                label: strings.get('reader.outline'),
-                                selected:
-                                    activePanel == ReaderPanelSection.outline,
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: _ReaderToolsAction.bookmarks,
-                              child: _ReaderMenuItem(
-                                icon: Icons.bookmarks_outlined,
-                                label: strings.get('reader.bookmarks'),
-                                selected:
-                                    activePanel == ReaderPanelSection.bookmarks,
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: _ReaderToolsAction.annotations,
-                              child: _ReaderMenuItem(
-                                icon: Icons.rate_review_outlined,
-                                label: strings.get('reader.annotations'),
-                                selected:
-                                    activePanel ==
-                                    ReaderPanelSection.annotations,
-                              ),
-                            ),
-                          ],
-                          icon: Icon(
-                            Icons.build_outlined,
-                            color: activePanel == null
-                                ? colors.iconNormal
-                                : colors.iconActive,
-                          ),
-                        ),
-                      if (!compact && expanded)
-                        YamaIconButton(
-                          semanticLabel: strings.get('command.commandPalette'),
-                          tooltip:
-                              '${strings.get('command.commandPalette')} (${AppCommandRegistry.shortcutLabel(AppCommandId.commandPalette, shortcutOverrides, strings: strings)})',
-                          icon: Icons.keyboard_command_key_rounded,
-                          onPressed: onCommandPalette,
-                        ),
-                      PopupMenuButton<_ReaderMenuAction>(
-                        tooltip: strings.get('reader.moreOptions'),
-                        onSelected: _runAction,
-                        constraints: const BoxConstraints(
-                          minWidth: 252,
-                          maxWidth: 292,
-                        ),
+                    if (showPanelControls)
+                      PopupMenuButton<_ReaderToolsAction>(
+                        tooltip: strings.get('reader.tools'),
+                        onSelected: _runToolsAction,
                         itemBuilder: (context) => [
                           PopupMenuItem(
-                            value: _ReaderMenuAction.openDocument,
-                            height: 40,
+                            value: _ReaderToolsAction.thumbnails,
                             child: _ReaderMenuItem(
-                              icon: Icons.file_open_outlined,
-                              label: strings.get('reader.openAnotherPdf'),
+                              icon: Icons.grid_view_outlined,
+                              label: strings.get('reader.thumbnails'),
                               shortcut: AppCommandRegistry.shortcutLabel(
-                                AppCommandId.openDocument,
+                                AppCommandId.togglePanel,
                                 shortcutOverrides,
                                 strings: strings,
                               ),
-                            ),
-                          ),
-                          const PopupMenuDivider(height: 9),
-                          if (preferences.pageLayout ==
-                              PageLayoutMode.facing) ...[
-                            CheckedPopupMenuItem(
-                              value: _ReaderMenuAction.coverAlone,
-                              checked:
-                                  preferences.coverPolicy ==
-                                  ReaderCoverPolicy.firstPageIsCover,
-                              child: Text(strings.get('reader.coverAlone')),
-                            ),
-                            CheckedPopupMenuItem(
-                              value: _ReaderMenuAction.firstPageRight,
-                              checked:
-                                  preferences.initialSide ==
-                                  ReaderInitialSide.right,
-                              child: Text(strings.get('reader.firstPageRight')),
-                            ),
-                            PopupMenuItem(
-                              value: _ReaderMenuAction.resetPairing,
-                              child: Text(strings.get('reader.resetPairing')),
-                            ),
-                            const PopupMenuDivider(height: 9),
-                          ],
-                          if (compact) ...[
-                            PopupMenuItem(
-                              value: _ReaderMenuAction.commandPalette,
-                              height: 40,
-                              child: _ReaderMenuItem(
-                                icon: Icons.keyboard_command_key_rounded,
-                                label: strings.get('command.commandPalette'),
-                              ),
-                            ),
-                            const PopupMenuDivider(height: 9),
-                          ],
-                          if (!expanded || !showPanelControls) ...[
-                            PopupMenuItem(
-                              value: _ReaderMenuAction.thumbnails,
-                              height: 40,
-                              child: _ReaderMenuItem(
-                                icon: Icons.grid_view_outlined,
-                                label: strings.get('reader.thumbnails'),
-                                selected:
-                                    activePanel ==
-                                    ReaderPanelSection.thumbnails,
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: _ReaderMenuAction.outline,
-                              height: 40,
-                              child: _ReaderMenuItem(
-                                icon: Icons.format_list_bulleted_rounded,
-                                label: strings.get('reader.outline'),
-                                selected:
-                                    activePanel == ReaderPanelSection.outline,
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: _ReaderMenuAction.bookmarks,
-                              height: 40,
-                              child: _ReaderMenuItem(
-                                icon: Icons.bookmarks_outlined,
-                                label: strings.get('reader.bookmarks'),
-                                selected:
-                                    activePanel == ReaderPanelSection.bookmarks,
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: _ReaderMenuAction.annotations,
-                              height: 40,
-                              child: _ReaderMenuItem(
-                                icon: Icons.rate_review_outlined,
-                                label: strings.get('reader.annotations'),
-                                selected:
-                                    activePanel ==
-                                    ReaderPanelSection.annotations,
-                              ),
-                            ),
-                            const PopupMenuDivider(height: 9),
-                          ],
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.rotate,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.rotate_right_rounded,
-                              label: strings.get('reader.rotatePage'),
+                              selected:
+                                  activePanel == ReaderPanelSection.thumbnails,
                             ),
                           ),
                           PopupMenuItem(
-                            value: _ReaderMenuAction.margins,
-                            height: 40,
+                            value: _ReaderToolsAction.outline,
                             child: _ReaderMenuItem(
-                              icon: Icons.width_normal_rounded,
-                              label: strings.get('reader.readingMargins'),
+                              icon: Icons.format_list_bulleted_rounded,
+                              label: strings.get('reader.outline'),
+                              selected:
+                                  activePanel == ReaderPanelSection.outline,
                             ),
                           ),
                           PopupMenuItem(
-                            value: _ReaderMenuAction.fullscreen,
-                            height: 40,
+                            value: _ReaderToolsAction.bookmarks,
                             child: _ReaderMenuItem(
-                              icon: controller.isFullScreen
-                                  ? Icons.fullscreen_exit_rounded
-                                  : Icons.fullscreen_rounded,
-                              label: controller.isFullScreen
-                                  ? strings.get('reader.exitFullScreen')
-                                  : strings.get('command.fullScreen'),
-                              shortcut: AppCommandRegistry.shortcutLabel(
-                                AppCommandId.fullScreen,
-                                shortcutOverrides,
-                                strings: strings,
-                              ),
+                              icon: Icons.bookmarks_outlined,
+                              label: strings.get('reader.bookmarks'),
+                              selected:
+                                  activePanel == ReaderPanelSection.bookmarks,
                             ),
                           ),
                           PopupMenuItem(
-                            value: _ReaderMenuAction.toggleChrome,
-                            height: 40,
+                            value: _ReaderToolsAction.annotations,
                             child: _ReaderMenuItem(
-                              icon: Icons.visibility_off_outlined,
-                              label: strings.get('reader.hideInterface'),
-                              shortcut: AppCommandRegistry.shortcutLabel(
-                                AppCommandId.toggleChrome,
-                                shortcutOverrides,
-                                strings: strings,
-                              ),
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.toggleImmersive,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.center_focus_strong_rounded,
-                              label: strings.get('reader.immersiveReading'),
-                              shortcut: AppCommandRegistry.shortcutLabel(
-                                AppCommandId.toggleImmersive,
-                                shortcutOverrides,
-                                strings: strings,
-                              ),
-                            ),
-                          ),
-                          const PopupMenuDivider(height: 9),
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.documentInfo,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.info_outline_rounded,
-                              label: strings.get('command.documentInfo'),
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: _ReaderMenuAction.settings,
-                            height: 40,
-                            child: _ReaderMenuItem(
-                              icon: Icons.settings_outlined,
-                              label: strings.settingsTitle,
+                              icon: Icons.rate_review_outlined,
+                              label: strings.get('reader.annotations'),
+                              selected:
+                                  activePanel == ReaderPanelSection.annotations,
                             ),
                           ),
                         ],
+                        icon: Icon(
+                          Icons.build_outlined,
+                          color: activePanel == null
+                              ? colors.iconNormal
+                              : colors.iconActive,
+                        ),
                       ),
-                      const SizedBox(width: AppSpacing.space4),
-                    ],
-                  ),
+                    if (!compact && expanded)
+                      YamaIconButton(
+                        semanticLabel: strings.get('command.commandPalette'),
+                        tooltip:
+                            '${strings.get('command.commandPalette')} (${AppCommandRegistry.shortcutLabel(AppCommandId.commandPalette, shortcutOverrides, strings: strings)})',
+                        icon: Icons.keyboard_command_key_rounded,
+                        onPressed: onCommandPalette,
+                      ),
+                    PopupMenuButton<_ReaderMenuAction>(
+                      tooltip: strings.get('reader.moreOptions'),
+                      onSelected: _runAction,
+                      constraints: const BoxConstraints(
+                        minWidth: 252,
+                        maxWidth: 292,
+                      ),
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.openDocument,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: Icons.file_open_outlined,
+                            label: strings.get('reader.openAnotherPdf'),
+                            shortcut: AppCommandRegistry.shortcutLabel(
+                              AppCommandId.openDocument,
+                              shortcutOverrides,
+                              strings: strings,
+                            ),
+                          ),
+                        ),
+                        const PopupMenuDivider(height: 9),
+                        if (preferences.pageLayout ==
+                            PageLayoutMode.facing) ...[
+                          CheckedPopupMenuItem(
+                            value: _ReaderMenuAction.coverAlone,
+                            checked:
+                                preferences.coverPolicy ==
+                                ReaderCoverPolicy.firstPageIsCover,
+                            child: Text(strings.get('reader.coverAlone')),
+                          ),
+                          CheckedPopupMenuItem(
+                            value: _ReaderMenuAction.firstPageRight,
+                            checked:
+                                preferences.initialSide ==
+                                ReaderInitialSide.right,
+                            child: Text(strings.get('reader.firstPageRight')),
+                          ),
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.resetPairing,
+                            child: Text(strings.get('reader.resetPairing')),
+                          ),
+                          const PopupMenuDivider(height: 9),
+                        ],
+                        if (compact) ...[
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.commandPalette,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.keyboard_command_key_rounded,
+                              label: strings.get('command.commandPalette'),
+                            ),
+                          ),
+                          const PopupMenuDivider(height: 9),
+                        ],
+                        if (!expanded || !showPanelControls) ...[
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.thumbnails,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.grid_view_outlined,
+                              label: strings.get('reader.thumbnails'),
+                              selected:
+                                  activePanel == ReaderPanelSection.thumbnails,
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.outline,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.format_list_bulleted_rounded,
+                              label: strings.get('reader.outline'),
+                              selected:
+                                  activePanel == ReaderPanelSection.outline,
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.bookmarks,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.bookmarks_outlined,
+                              label: strings.get('reader.bookmarks'),
+                              selected:
+                                  activePanel == ReaderPanelSection.bookmarks,
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.annotations,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.rate_review_outlined,
+                              label: strings.get('reader.annotations'),
+                              selected:
+                                  activePanel == ReaderPanelSection.annotations,
+                            ),
+                          ),
+                          const PopupMenuDivider(height: 9),
+                        ],
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.rotate,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: Icons.rotate_right_rounded,
+                            label: strings.get('reader.rotatePage'),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.margins,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: Icons.width_normal_rounded,
+                            label: strings.get('reader.readingMargins'),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.fullscreen,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: controller.isFullScreen
+                                ? Icons.fullscreen_exit_rounded
+                                : Icons.fullscreen_rounded,
+                            label: controller.isFullScreen
+                                ? strings.get('reader.exitFullScreen')
+                                : strings.get('command.fullScreen'),
+                            shortcut: AppCommandRegistry.shortcutLabel(
+                              AppCommandId.fullScreen,
+                              shortcutOverrides,
+                              strings: strings,
+                            ),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.toggleChrome,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: Icons.visibility_off_outlined,
+                            label: strings.get('reader.hideInterface'),
+                            shortcut: AppCommandRegistry.shortcutLabel(
+                              AppCommandId.toggleChrome,
+                              shortcutOverrides,
+                              strings: strings,
+                            ),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.toggleImmersive,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: Icons.center_focus_strong_rounded,
+                            label: strings.get('reader.immersiveReading'),
+                            shortcut: AppCommandRegistry.shortcutLabel(
+                              AppCommandId.toggleImmersive,
+                              shortcutOverrides,
+                              strings: strings,
+                            ),
+                          ),
+                        ),
+                        const PopupMenuDivider(height: 9),
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.documentInfo,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: Icons.info_outline_rounded,
+                            label: strings.get('command.documentInfo'),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.settings,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: Icons.settings_outlined,
+                            label: strings.settingsTitle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: AppSpacing.space4),
+                  ],
                 ),
               ),
             ],

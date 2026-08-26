@@ -1104,7 +1104,11 @@ final class _ArtifactListRowState extends State<_ArtifactListRow> {
                   MediaQuery.disableAnimationsOf(context),
                   AppMotion.fast,
                 ),
-                constraints: const BoxConstraints(minHeight: 58),
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                      ? 64
+                      : 52,
+                ),
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.space12,
                   vertical: AppSpacing.space6,
@@ -1136,16 +1140,21 @@ final class _ArtifactListRowState extends State<_ArtifactListRow> {
                           Row(
                             children: [
                               Flexible(
-                                child: Text(
-                                  document.effectiveTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        fontWeight: widget.selected
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
-                                      ),
+                                child: Tooltip(
+                                  message: document.effectiveTitle,
+                                  child: Text(
+                                    document.effectiveTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          fontWeight: widget.selected
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                        ),
+                                  ),
                                 ),
                               ),
                               if (document.isFavorite) ...[

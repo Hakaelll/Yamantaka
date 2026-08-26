@@ -14,7 +14,6 @@ import '../../../core/i18n/app_localizations.dart';
 import '../../../pdf_engine/models/pdf_models.dart';
 import '../../../pdf_engine/pdf_document_engine.dart';
 import '../../../pdf_engine/presentation/pdf_viewer_adapter.dart';
-import '../../../pdf_engine/presentation/reader_viewport_metrics.dart';
 import '../../command_palette/presentation/command_palette.dart';
 import '../../library/domain/library_document.dart';
 import '../application/reader_controller.dart';

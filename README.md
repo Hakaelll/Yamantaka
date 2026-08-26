@@ -7,10 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.8.0+9 revisada el 26 de agosto de 2026:
+Base Flutter 0.9.0+10 revisada el 26 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 252 pruebas aprobadas;
+- flutter test --no-pub: suite completa aprobada;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local permanece receptivo durante un smoke de 8 s con un
@@ -18,13 +18,13 @@ Base Flutter 0.8.0+9 revisada el 26 de agosto de 2026:
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
-El release local versionado se genera en `build/release/0.8.0+9/` e incluye el
+El release local versionado se genera en `build/release/0.9.0+10/` e incluye el
 ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt` y el reporte del
 smoke sin red. Debe extraerse entero antes de probarlo.
 
-El bundle 0.8 contiene 22 archivos (43.523.377 bytes) y el ZIP ocupa 19.418.873
-bytes. El smoke sintético de 8 s terminó sin conexiones TCP/UDP. Sus nueve
-binarios nativos continúan sin firma; no es un artefacto de distribución.
+El bundle 0.9 se valida contra su manifiesto después del último cambio. El smoke
+sintético comprueba conexiones TCP/UDP y el inventario separa explícitamente los
+binarios sin firma; sigue siendo evidencia local, no un artefacto de distribución.
 
 La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
 vigente de pruebas en [TESTING.md](TESTING.md).
@@ -41,13 +41,14 @@ vigente de pruebas en [TESTING.md](TESTING.md).
   sus bordes, por lo que el lomo acompaña zoom y paneo.
 - Los tres modos comparten los seis entornos de lectura; el tema se aplica
   al canvas y al chrome sin alterar los píxeles del PDF.
-- La barra superior usa una sola superficie editorial con región documental,
-  divisor y herramientas contextuales, sin reservar una franja en el visor.
+- La barra superior mide 56 px (52 px en compacto), deja 8 px superiores y usa
+  targets de 40 px con iconos de 18 px; título y herramientas comparten una sola
+  superficie sin reservar una franja en el visor.
 - En ventanas expandidas el panel lateral ocupa una columna propia y el visor
   se recentra en el ancho restante y usa navegación interna vertical; en
   compacto/medio es overlay con scrim y navegación superior.
-- En reposo la navegación inferior se reduce a posición y progreso; clic, toque,
-  foco o teclado revelan navegación y zoom sin alterar el centro del PDF.
+- La dock mide 48 px activa y 38 px en reposo; clic, toque, foco o teclado revelan
+  navegación y zoom sin alterar el centro del PDF.
 - Los laterales ofrecen zonas claras de paso de página, con estado deshabilitado
   y soporte semántico.
 - Flechas, Page Up/Down, Home/End, espacio, F11 y Escape comparten la misma
@@ -109,14 +110,14 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 
 ## Referencia visual vigente
 
-![Modo Libro editorial 0.8 mantenido por prueba](docs/screenshots/windows-reader-editorial-v08.png)
+![Modo Libro editorial 0.9 mantenido por prueba](docs/screenshots/windows-reader-editorial-v09.png)
 
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
-Las matrices 0.8 reúnen 54 capturas de Biblioteca, Lector, Ajustes, paleta,
-menús y diálogos, más diez comparaciones 0.7/0.8 reproducibles bajo
-`build/visual-evidence/v0.8.0/`. La prueba de marca registra dimensiones, alfa,
-mapeo de coordenadas y correlación de luminancia para cada PNG y frame ICO.
+Las matrices 0.9 cubren Biblioteca, Lector, panel, Ajustes, paleta, búsqueda,
+menús y diálogos, con comparaciones 0.8/0.9 reproducibles bajo
+`build/visual-evidence/v0.9.0/`. La identidad del logo violeta se comprueba por
+hash; no se regenera ni se altera su geometría.
 
 ## Requisitos
 

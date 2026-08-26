@@ -292,15 +292,15 @@ final class AppDialogHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: 32,
+          height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: context.appColors.surfaceActive,
             border: Border.all(color: context.appColors.borderSubtle),
             borderRadius: BorderRadius.circular(AppRadii.control),
           ),
-          child: Icon(icon, size: 19),
+          child: Icon(icon, size: 18),
         ),
         const SizedBox(width: AppSpacing.space12),
         Expanded(

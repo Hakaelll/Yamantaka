@@ -136,3 +136,20 @@ El estado inicial de Biblioteca usa el asset raster
 la marca anterior: una sustitución de croma por coordenada conserva luminancia,
 alfa y tamaño y se replica en PNG e ICO. La marca no se convierte en fondo,
 textura ni decoración persistente.
+
+## Instrumentación compacta 0.9
+
+- barra del lector: 56 px, o 52 px en compacto; margen superior 8 px;
+- target de escritorio: 40×40 px; iconografía: 18 px; foco: 2 px;
+- dock activa: 48 px; dock en reposo: 38 px;
+- cabecera y rail del panel: 52 px;
+- cabecera de Biblioteca: 76 px;
+- fila de resultado/paleta: 48 px;
+- fila de Biblioteca: 52 px a 100 %, desde 64 px por encima de 130 %;
+- fila de Ajustes: 52 px cómoda y 44 px compacta, con control de 40 px;
+- radios de control/panel/diálogo: 10/12/14 px.
+
+El orden de estados permanece `focus > pressed > selected > hover > rest`.
+Disabled combina icono y color; alto contraste elimina sombras; movimiento
+reducido o desactivado elimina la transición grid/list. Los márgenes del papel
+son 12/16/24/32 px por lado corto y se calculan dentro del visor, no en su clave.

@@ -32,6 +32,14 @@ Reglas:
 
 ## Punto de partida confirmado
 
+- [x] 0.9.0 compacta barra, dock, panel, Biblioteca, búsqueda, paleta y Ajustes
+  con medidas verificables, sin alterar PDFium ni la persistencia.
+- [x] Cuadrícula/lista conserva selección, filtros y scroll; el cambio usa una
+  transición breve que desaparece con movimiento reducido.
+- [x] La identidad del visor permanece estable al ocultar chrome, alternar panel
+  y cruzar breakpoints; el margen responsive se resuelve dentro del adaptador.
+- [ ] Completar validación física 0.9 con Narrator, varios monitores y escalas
+  reales de 100 %, 125 %, 150 %, 175 % y 200 %.
 - [x] 0.8.0 añade cuadrícula titulada y lista densa con filtros activos
   eliminables, adaptación a texto 150 % e inspector compartido sin alterar los
   datos persistidos.
@@ -41,8 +49,8 @@ Reglas:
   peligro comparten jerarquía y componentes 0.8 sin entrar en la clave del visor.
 - [x] La golden `windows-reader-editorial-v08.png`, 54 capturas de widgets y diez
   comparaciones 0.7/0.8 respaldan la revisión; la suite alcanza 252 pruebas.
-- [ ] Completar validación física 0.8 con Narrator, varios monitores y escalas
-  reales de 100 %, 125 %, 150 %, 175 % y 200 %.
+- [ ] Conservar la validación física histórica 0.8 como referencia; queda
+  sustituida para aceptación por la matriz manual pendiente de 0.9.
 - [x] 0.7.0 unifica el chrome del lector, eleva el inspector a banda editorial,
   hace legibles los filtros y estados de portada y agrupa Ajustes por tarea.
 - [x] La preview de Ajustes alterna cuatro demostraciones sin persistencia ni

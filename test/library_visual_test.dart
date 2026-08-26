@@ -31,7 +31,7 @@ void main() {
     ]);
   });
 
-  testWidgets('captures the 0.8 library archive matrix', (tester) async {
+  testWidgets('captures the 0.9 compact library matrix', (tester) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_LIBRARY_MATRIX_DIR');
     if (outputRoot.isEmpty) return;
     final output = Directory(outputRoot)..createSync(recursive: true);
@@ -218,7 +218,7 @@ void main() {
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-library-visual-matrix',
         'version': 1,
-        'productVersion': '0.8.0',
+        'productVersion': '0.9.0',
         'generatedAt': '2026-08-26T12:00:00Z',
         'cases': cases,
       }),

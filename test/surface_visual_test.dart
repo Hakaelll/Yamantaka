@@ -166,6 +166,7 @@ void main() {
           key: boundaryKey,
           child: MaterialApp(
             key: const ValueKey('menu-open'),
+            debugShowCheckedModeBanner: false,
             theme: AppTheme.light(),
             home: const Scaffold(body: Center(child: _MenuFixture())),
           ),

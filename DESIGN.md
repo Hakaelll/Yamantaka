@@ -734,3 +734,27 @@ La búsqueda global usa master-detail en expanded; metadatos separa detectado y
 local, permite restaurar por campo y señala cambios sin guardar. Menús y
 diálogos comparten icono, etiqueta, atajo, encabezado y tratamiento destructivo.
 Ninguno de estos cambios modifica el contenido del PDF ni la clave del visor.
+
+## 32. Lector compacto de precisión — 0.9
+
+La barra superior ocupa 56 px en escritorio y 52 px en compacto. Dentro de esa
+huella deja 8 px sobre una superficie de radio 10 px: controles de 40 px e
+iconos de 18 px se alinean con un divisor de 24 px. El nombre real del documento
+recibe el espacio restante y las acciones secundarias salen del flujo antes de
+comprimirlo. La dock activa mide 48 px y la señal de reposo 38 px.
+
+El panel usa cabecera y rail de 52 px. La página conserva el dominio visual con
+márgenes efectivos de 12, 16, 24 o 32 px según el lado corto, sombra de 7 px y
+desplazamiento de 1 px. Ese margen se resuelve dentro del adaptador a partir de
+sus constraints; la configuración estable que identifica al visor sigue siendo
+la preferencia del documento, nunca el tamaño de la ventana.
+
+Biblioteca reduce su cabecera a 76 px y sus filas normales a 52 px; a más de
+130 % de texto crecen desde 64 px y reagrupan estado y progreso. Cuadrícula y
+lista comparten selección, filtros, foco y offset de scroll. El cambio usa solo
+opacidad durante 120 ms y se vuelve instantáneo con movimiento reducido.
+
+Búsqueda, paleta y menús convergen en filas de 48 px. Ajustes usa filas de 52 px
+en densidad cómoda y 44 px en compacta, siempre con controles de al menos 40 px.
+Paneles y diálogos limitan sus radios a 12/14 px y reservan la cápsula para
+estado o segmentación.

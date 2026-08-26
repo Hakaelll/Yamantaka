@@ -213,14 +213,14 @@ void main() {
         viewport: const Size(640, 460),
         preferred: 40,
       ),
-      16,
+      12,
     );
     expect(
       ReaderViewportMetrics.adaptiveMargin(
         viewport: const Size(1920, 1080),
         preferred: 40,
       ),
-      40,
+      32,
     );
   });
 }

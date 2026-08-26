@@ -43,9 +43,13 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppSizes {
-  static const double topBarHeight = 64;
-  static const double libraryHeaderHeight = 84;
+  static const double topBarHeight = 56;
+  static const double readerCompactTopBarHeight = 52;
+  static const double libraryHeaderHeight = 76;
   static const double bottomControlHeight = 48;
+  static const double readerRestingDockHeight = 38;
+  static const double readerPanelHeaderHeight = 52;
+  static const double readerPanelRailWidth = 52;
   static const double sidePanelWidth = 344;
   static const double sidePanelMinWidth = 288;
   static const double sidePanelMaxWidth = 480;
@@ -62,13 +66,16 @@ abstract final class AppSizes {
   static const double settingsPreviewWidth = 320;
   static const double settingsContentMaxWidth = 780;
   static const double settingsControlWidth = 240;
-  static const double commandPaletteRowHeight = 52;
+  static const double commandPaletteRowHeight = 48;
   static const double commandPaletteExpandedWidth = 780;
   static const double commandPalettePreviewWidth = 228;
   static const double artifactSelectedScale = 1.035;
   static const double artifactHoverScale = 1.015;
   static const double artifactSelectedLift = 6;
   static const double artifactHoverLift = 2;
+
+  static double readerTopBarHeight({required bool compact}) =>
+      compact ? readerCompactTopBarHeight : topBarHeight;
 }
 
 /// Editorial roles used by [AppTheme]. Feature widgets select a semantic text
@@ -97,8 +104,8 @@ abstract final class AppRadii {
   static const double control = 10;
   static const double field = 10;
   static const double floating = 12;
-  static const double panel = 14;
-  static const double dialog = 16;
+  static const double panel = 12;
+  static const double dialog = 14;
   static const double touchSurface = 12;
   static const double capsule = 999;
 }
@@ -112,11 +119,11 @@ abstract final class AppElevation {
 }
 
 abstract final class AppShadow {
-  static const double readerPageBlur = 10;
-  static const double readerGrayPageBlur = 6;
-  static const double readerPanelBlur = 10;
-  static const double floatingControlBlur = 10;
-  static const double floatingControlOffset = 3;
+  static const double readerPageBlur = 7;
+  static const double readerGrayPageBlur = 4;
+  static const double readerPanelBlur = 8;
+  static const double floatingControlBlur = 6;
+  static const double floatingControlOffset = 2;
   static const double artifactRestBlur = 8;
   static const double artifactSelectedBlur = 14;
   static const double artifactRestOffset = 4;

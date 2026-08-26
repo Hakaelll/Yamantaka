@@ -82,6 +82,11 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
       ? Duration.zero
       : const Duration(milliseconds: 120);
 
+  double get _effectiveMargin => ReaderViewportMetrics.adaptiveMargin(
+    viewport: _viewportSize ?? Size.zero,
+    preferred: widget.configuration.margin,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -117,7 +122,7 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
       initialPageNumber: widget.initialPageIndex + 1,
       params: pdfrx.PdfViewerParams(
         backgroundColor: widget.configuration.backgroundColor,
-        margin: widget.configuration.margin,
+        margin: _effectiveMargin,
         pageDropShadow: widget.configuration.pageShadow,
         pageOverlaysBuilder: widget.configuration.flow == PdfViewFlow.facing
             ? _buildBookPageOverlays
@@ -498,9 +503,8 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   }) {
     final rect = _readingUnitRect(controller, pageNumber);
     if (rect.isEmpty) return Future<void>.value();
-    final fitMargin =
-        widget.configuration.margin > widget.configuration.viewportMargin
-        ? widget.configuration.margin
+    final fitMargin = _effectiveMargin > widget.configuration.viewportMargin
+        ? _effectiveMargin
         : widget.configuration.viewportMargin;
     final zoom = ReaderViewportMetrics.fitPageZoom(
       viewport: controller.viewSize,
@@ -522,9 +526,8 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
   }) async {
     final rect = _readingUnitRect(controller, pageNumber);
     if (rect.isEmpty) return;
-    final fitMargin =
-        widget.configuration.margin > widget.configuration.viewportMargin
-        ? widget.configuration.margin
+    final fitMargin = _effectiveMargin > widget.configuration.viewportMargin
+        ? _effectiveMargin
         : widget.configuration.viewportMargin;
     final zoom = ReaderViewportMetrics.fitWidthZoom(
       viewport: controller.viewSize,

@@ -35,6 +35,7 @@ final class YamaIconButton extends StatelessWidget {
         tooltip: tooltip ?? semanticLabel,
         onPressed: onPressed,
         style: ButtonStyle(
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           minimumSize: const WidgetStatePropertyAll(
             Size.square(AppSizes.desktopControlExtent),
           ),
