@@ -18,6 +18,7 @@ import 'app_services.dart';
 Future<void> bootstrap(List<String> arguments) async {
   final startupStopwatch = Stopwatch()..start();
   final startup = StartupTimeline();
+  final bootstrapSpan = startup.start(StartupPhase.bootstrap);
   final bindingSpan = startup.start(StartupPhase.binding);
   WidgetsFlutterBinding.ensureInitialized();
   bindingSpan.end();
@@ -66,6 +67,7 @@ Future<void> bootstrap(List<String> arguments) async {
   );
   servicesSpan.end();
   final initialPaths = initialPdfPaths(arguments);
+  bootstrapSpan.end();
   logger.info(
     'Bootstrap completed in ${startupStopwatch.elapsedMilliseconds} ms.',
   );

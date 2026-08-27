@@ -341,3 +341,31 @@ El modo grid/list continúa siendo estado efímero. La transición 0.9 envuelve 
 composición siguiente en un único `TweenAnimationBuilder`, evitando montar dos
 scrollables con el mismo controlador; no reinicia selección, filtros ni offset.
 No hay migraciones, dependencias, telemetría ni nuevos accesos de red.
+
+## Continuidad y métricas locales 0.10
+
+`DocumentTabsController` continúa almacenando solo estado ligero y aplica tres
+estados de recurso: activo, caliente y suspendido. `ReaderController` mantiene
+un mapa acotado a `AppConfig.maxWarmTabs` de handles `OpenedPdfDocument`; al
+cambiar de pestaña guarda posición/preferencias, desconecta el viewer y conserva
+como máximo dos documentos nativos. La política de pestañas decide qué IDs
+pueden seguir calientes y `retainWarmDocuments` cierra de forma determinista el
+resto. Volver a un documento con fingerprint idéntico reutiliza su handle; un
+cambio externo invalida y cierra la entrada antes de abrir de nuevo.
+
+El selector avanzado traduce número, porcentaje e inicio/fin a una página
+canónica antes de tocar el controlador. Una entrada inválida permanece en el
+diálogo y el historial usa `NavigationHistoryController`; no se persiste texto
+de entrada.
+
+La búsqueda global filtra tipos dentro de SQL FTS5 y conserva placeholders para
+todos los valores. Anotaciones, marcadores y organización se regeneran una vez
+por sesión de diálogo, no por pulsación; cada consulta usa debounce, generación
+cancelable y paginación. Los resultados unen únicamente flags locales de
+ausencia/modificación y nunca exponen rutas ni texto en diagnósticos.
+
+`StartupTimeline` distingue bootstrap, base de datos, primera Biblioteca,
+primer frame y primer PDF. `LocalPerformanceMonitor` registra duraciones con
+nombres constantes (`library_first_page`, `library_page_more`,
+`global_search`, `pdf_open` y renderizado); ningún sample contiene documento,
+ruta, título, consulta o página.

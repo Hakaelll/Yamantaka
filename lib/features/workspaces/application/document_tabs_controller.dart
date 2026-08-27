@@ -19,16 +19,25 @@ final class DocumentTabsController extends ChangeNotifier {
   List<DocumentTab> tabs = const [];
   String? activeTabId;
   final List<DocumentTab> _closedTabs = [];
+  int _tabSequence = 0;
 
   DocumentTab? get activeTab =>
       tabs.where((tab) => tab.id == activeTabId).firstOrNull;
   bool get canReopenClosed => _closedTabs.isNotEmpty;
 
-  DocumentTab open(LibraryDocument document) {
+  DocumentTab? relativeTab({required bool reverse}) {
+    if (tabs.length < 2) return activeTab;
+    final currentIndex = tabs.indexWhere((tab) => tab.id == activeTabId);
+    final start = currentIndex < 0 ? 0 : currentIndex;
+    final delta = reverse ? -1 : 1;
+    return tabs[(start + delta) % tabs.length];
+  }
+
+  DocumentTab open(LibraryDocument document, {bool forceNew = false}) {
     final existing = tabs
         .where((tab) => tab.documentId == document.id)
         .firstOrNull;
-    if (existing != null) {
+    if (existing != null && !forceNew) {
       activate(existing.id);
       return activeTab!;
     }
@@ -47,7 +56,8 @@ final class DocumentTabsController extends ChangeNotifier {
     final id = sha256
         .convert(
           utf8.encode(
-            'tab:${document.id}:${DateTime.now().microsecondsSinceEpoch}',
+            'tab:${document.id}:${DateTime.now().microsecondsSinceEpoch}:'
+            '${++_tabSequence}',
           ),
         )
         .toString();
@@ -66,6 +76,7 @@ final class DocumentTabsController extends ChangeNotifier {
         readingProgress: document.readingProgress,
         isPinned: false,
         resourceState: TabResourceState.active,
+        readingTheme: document.preferredTheme.name,
         isMissing: document.isMissing,
         isExternallyModified: document.hasFileChanged,
       ),
@@ -164,6 +175,7 @@ final class DocumentTabsController extends ChangeNotifier {
     required String pageLayout,
     required String readingMode,
     required double scrollOffset,
+    required String readingTheme,
     double? readingProgress,
   }) {
     final id = activeTabId;
@@ -177,9 +189,19 @@ final class DocumentTabsController extends ChangeNotifier {
                 pageLayout: pageLayout,
                 readingMode: readingMode,
                 scrollOffset: scrollOffset,
+                readingTheme: readingTheme,
                 readingProgress: readingProgress,
               )
             : tab,
+    ];
+  }
+
+  void updateActivePanel(String? panelSection) {
+    final id = activeTabId;
+    if (id == null) return;
+    tabs = [
+      for (final tab in tabs)
+        tab.id == id ? tab.copyWith(panelSection: panelSection) : tab,
     ];
   }
 

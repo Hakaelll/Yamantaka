@@ -1,13 +1,17 @@
 import 'dart:collection';
 
 enum StartupPhase {
+  bootstrap,
   binding,
   paths,
   settings,
   nativePdf,
   window,
+  database,
   services,
+  firstLibrary,
   firstFrame,
+  firstPdf,
 }
 
 final class StartupPhaseTiming {
@@ -35,6 +39,15 @@ final class StartupTimeline {
   StartupSpan start(StartupPhase phase) {
     _active[phase] = _clock();
     return StartupSpan._(this, phase);
+  }
+
+  bool startIfAbsent(StartupPhase phase) {
+    if (_active.containsKey(phase) ||
+        _completed.any((timing) => timing.phase == phase)) {
+      return false;
+    }
+    _active[phase] = _clock();
+    return true;
   }
 
   StartupPhaseTiming? complete(StartupPhase phase) {

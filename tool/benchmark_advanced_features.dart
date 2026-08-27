@@ -82,6 +82,7 @@ Future<void> main(List<String> arguments) async {
         resourceState: index == 4
             ? TabResourceState.active
             : TabResourceState.suspended,
+        readingTheme: 'ivory',
       ),
   ];
   final workspaces = WorkspaceRepository(database, documents);

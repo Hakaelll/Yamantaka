@@ -10,6 +10,7 @@ import '../../../pdf_engine/cache/thumbnail_service.dart';
 import '../../../storage/repositories/document_repository.dart';
 import '../../../storage/repositories/import_queue_repository.dart';
 import '../domain/import_queue.dart';
+import '../domain/library_document.dart';
 import 'document_service.dart';
 
 enum FolderCandidateStatus { newDocument, duplicate, inaccessible, invalid }
@@ -70,6 +71,7 @@ final class FolderImportController extends ChangeNotifier {
   final ImportQueue queue;
   bool isScanning = false;
   bool isImporting = false;
+  FolderImportSummary? lastSummary;
   int processed = 0;
   int total = 0;
   bool _cancelled = false;
@@ -119,6 +121,7 @@ final class FolderImportController extends ChangeNotifier {
   }) async {
     if (isScanning || isImporting) return candidates;
     _cancelled = false;
+    lastSummary = null;
     isScanning = true;
     processed = 0;
     candidates = const [];
@@ -274,13 +277,31 @@ final class FolderImportController extends ChangeNotifier {
     }
     isImporting = false;
     notifyListeners();
-    return _summary(imported: imported, cancelled: _cancelled);
+    lastSummary = _summary(imported: imported, cancelled: _cancelled);
+    notifyListeners();
+    return lastSummary!;
   }
 
   void cancel() {
     _cancelled = true;
     queue.cancelPending();
     _queueRepository?.save(queue);
+  }
+
+  ImportWorkState? workStateFor(FolderImportCandidate candidate) {
+    final normalizedPath = candidate.inspected?.normalizedPath;
+    if (normalizedPath == null) return null;
+    return queue.items
+        .where((item) => item.normalizedPath == normalizedPath)
+        .firstOrNull
+        ?.state;
+  }
+
+  LibraryDocument? duplicateDocumentFor(FolderImportCandidate candidate) {
+    final inspected = candidate.inspected;
+    if (inspected == null) return null;
+    return _documents.byNormalizedPath(inspected.normalizedPath) ??
+        _documents.byFingerprint(inspected.fingerprint);
   }
 
   FolderImportSummary _summary({

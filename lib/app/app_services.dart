@@ -143,9 +143,11 @@ final class AppServices {
     StartupTimeline? startupTimeline,
   }) async {
     final startup = startupTimeline ?? StartupTimeline();
+    final databaseSpan = startup.start(StartupPhase.database);
     final database = AppDatabase.open(paths.databasePath, logger);
     final storage = LocalStorageService(paths);
     final safeMode = database.recordStartup();
+    databaseSpan.end();
     final documents = DocumentRepository(database);
     final documentPreferences = DocumentPreferencesRepository(database);
     final bookmarksRepository = BookmarkRepository(database);
@@ -154,7 +156,6 @@ final class AppServices {
     final organizationRepository = OrganizationRepository(database);
     final organization = OrganizationController(organizationRepository);
     final globalSearchRepository = GlobalSearchRepository(database);
-    final globalSearch = GlobalLibrarySearchController(globalSearchRepository);
     final sessions = ReadingSessionRepository(database);
     final settings =
         preloadedSettings ??
@@ -179,6 +180,10 @@ final class AppServices {
       minimumVisibleBytes: 32 * 1024 * 1024,
     );
     final performance = LocalPerformanceMonitor()..startFrameMonitoring();
+    final globalSearch = GlobalLibrarySearchController(
+      globalSearchRepository,
+      performance,
+    );
     void syncMemoryLimit() {
       memory.setLimit(settings.settings.maxCacheMegabytes * 1024 * 1024);
     }
@@ -218,7 +223,7 @@ final class AppServices {
     final bookmarks = BookmarkController(bookmarksRepository);
     final search = SearchController(engine, viewController, logger);
     final navigationHistory = NavigationHistoryController();
-    final library = LibraryController(documents, logger);
+    final library = LibraryController(documents, logger, performance);
     final fileValidation = LibraryFileValidationController(
       documents: documents,
       jobs: jobs,
@@ -349,7 +354,9 @@ final class AppServices {
         return path;
       },
     );
+    final firstLibrarySpan = startup.start(StartupPhase.firstLibrary);
     await library.load();
+    firstLibrarySpan.end();
     fileValidation.startIncremental();
     if (settings.settings.generateCovers) {
       for (final document in library.documents) {

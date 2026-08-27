@@ -28,6 +28,18 @@ enum ReaderVisualProfile { standard, electronicInk }
 
 enum ReaderTemporaryPositionSlot { a, b }
 
+final class ReaderDestinationCue {
+  const ReaderDestinationCue({
+    required this.pageIndex,
+    required this.label,
+    required this.sequence,
+  });
+
+  final int pageIndex;
+  final String label;
+  final int sequence;
+}
+
 final class ReaderTemporaryPosition {
   const ReaderTemporaryPosition({
     required this.pageIndex,

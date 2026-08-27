@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/core/i18n/app_localizations.dart';
@@ -151,5 +152,136 @@ void main() {
     expect(find.text('Abrir resultado'), findsOneWidget);
     expect(find.text('Texto de página'), findsWidgets);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('compact global search opens detail and returns to its list', (
+    tester,
+  ) async {
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    final documents = DocumentRepository(database);
+    final repository = GlobalSearchRepository(database);
+    final search = GlobalLibrarySearchController(repository)
+      ..query = 'privada'
+      ..results = const [
+        GlobalSearchResult(
+          documentId: 'compact-result',
+          pageIndex: 2,
+          kind: GlobalSearchKind.pageText,
+          title: 'Lectura compacta',
+          snippet: 'Un fragmento local con contexto suficiente.',
+          rank: 1,
+        ),
+      ];
+    final engine = StubPdfDocumentEngine();
+    final index = LibraryIndexController(documents, repository, engine);
+    var opened = false;
+    addTearDown(() async {
+      search.dispose();
+      index.dispose();
+      await engine.dispose();
+      database.close();
+    });
+    tester.view.physicalSize = const Size(640, 480);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlobalSearchDialog(
+          controller: search,
+          indexController: index,
+          onOpen: (_) => opened = true,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Lectura compacta'));
+    await tester.pump();
+    expect(
+      find.byKey(const Key('global-search-compact-detail')),
+      findsOneWidget,
+    );
+    expect(find.text('Volver a resultados'), findsOneWidget);
+    expect(opened, isFalse);
+
+    await tester.tap(find.byKey(const Key('global-search-back-to-results')));
+    await tester.pump();
+    expect(find.byKey(const Key('global-search-compact-detail')), findsNothing);
+    expect(find.text('Lectura compacta'), findsOneWidget);
+
+    await tester.tap(find.text('Lectura compacta'));
+    await tester.pump();
+    expect(
+      find.byKey(const Key('global-search-compact-detail')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.byKey(const Key('global-search-compact-detail')), findsNothing);
+    expect(find.byType(GlobalSearchDialog), findsOneWidget);
+  });
+
+  testWidgets('global search keyboard opens the selected result in a new tab', (
+    tester,
+  ) async {
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    final documents = DocumentRepository(database);
+    final repository = GlobalSearchRepository(database);
+    final search = GlobalLibrarySearchController(repository)
+      ..query = 'atlas'
+      ..results = const [
+        GlobalSearchResult(
+          documentId: 'first',
+          pageIndex: 1,
+          kind: GlobalSearchKind.pageText,
+          title: 'Atlas primero',
+          snippet: 'Primer resultado',
+          rank: 1,
+        ),
+        GlobalSearchResult(
+          documentId: 'second',
+          pageIndex: 8,
+          kind: GlobalSearchKind.annotation,
+          title: 'Atlas segundo',
+          snippet: 'Segundo resultado',
+          rank: 1,
+        ),
+      ];
+    final engine = StubPdfDocumentEngine();
+    final index = LibraryIndexController(documents, repository, engine);
+    GlobalSearchResult? openedInNewTab;
+    addTearDown(() async {
+      search.dispose();
+      index.dispose();
+      await engine.dispose();
+      database.close();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GlobalSearchDialog(
+          controller: search,
+          indexController: index,
+          onOpen: (_) => fail('Enter with Control must use the new-tab path'),
+          onOpenInNewTab: (result) => openedInNewTab = result,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('global-search-field')));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(openedInNewTab?.documentId, 'second');
+    expect(openedInNewTab?.pageIndex, 8);
   });
 }

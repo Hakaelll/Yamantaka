@@ -28,6 +28,8 @@ final class LibraryIndexController extends ChangeNotifier {
   bool _paused = false;
   bool _backgroundPaused = false;
   bool _interactionPaused = false;
+  final List<String> _priorityDocumentIds = [];
+  final Map<String, int> _priorityPages = {};
   bool get _effectivelyPaused =>
       _paused || _backgroundPaused || _interactionPaused;
   int _generation = 0;
@@ -98,9 +100,10 @@ final class LibraryIndexController extends ChangeNotifier {
                 !excludedDocumentIds.contains(document.id) &&
                 _search.needsIndex(document),
           )
-          .toList(growable: false);
+          .toList();
+      final totalCandidates = candidates.length;
       progress = LibraryIndexProgress(
-        totalDocuments: candidates.length,
+        totalDocuments: totalCandidates,
         completedDocuments: 0,
         currentPage: 0,
         totalPages: 0,
@@ -109,8 +112,19 @@ final class LibraryIndexController extends ChangeNotifier {
       );
       notifyListeners();
       var completed = 0;
-      for (final document in candidates) {
+      while (candidates.isNotEmpty) {
         if (_cancelled || operationToken.isCancelled) break;
+        var nextDocumentIndex = 0;
+        for (final priorityId in _priorityDocumentIds) {
+          final candidateIndex = candidates.indexWhere(
+            (candidate) => candidate.id == priorityId,
+          );
+          if (candidateIndex >= 0) {
+            nextDocumentIndex = candidateIndex;
+            break;
+          }
+        }
+        final document = candidates.removeAt(nextDocumentIndex);
         while (_effectivelyPaused &&
             !_cancelled &&
             !operationToken.isCancelled) {
@@ -122,8 +136,19 @@ final class LibraryIndexController extends ChangeNotifier {
           final opened = await _engine.openDocument(document.path);
           engineDocumentId = opened.documentId;
           var hasText = false;
-          for (var pageIndex = 0; pageIndex < opened.pageCount; pageIndex++) {
+          final remainingPages = List<int>.generate(
+            opened.pageCount,
+            (index) => index,
+          );
+          while (remainingPages.isNotEmpty) {
             if (_cancelled || operationToken.isCancelled) break;
+            final prioritizedPage = _priorityPages[document.id];
+            final prioritizedIndex = prioritizedPage == null
+                ? -1
+                : remainingPages.indexOf(prioritizedPage);
+            final pageIndex = remainingPages.removeAt(
+              prioritizedIndex < 0 ? 0 : prioritizedIndex,
+            );
             while (_effectivelyPaused &&
                 !_cancelled &&
                 !operationToken.isCancelled) {
@@ -143,7 +168,7 @@ final class LibraryIndexController extends ChangeNotifier {
               );
             }
             progress = LibraryIndexProgress(
-              totalDocuments: candidates.length,
+              totalDocuments: totalCandidates,
               completedDocuments: completed,
               currentPage: pageIndex + 1,
               totalPages: opened.pageCount,
@@ -173,7 +198,7 @@ final class LibraryIndexController extends ChangeNotifier {
         }
         completed++;
         progress = LibraryIndexProgress(
-          totalDocuments: candidates.length,
+          totalDocuments: totalCandidates,
           completedDocuments: completed,
           currentPage: 0,
           totalPages: 0,
@@ -184,9 +209,10 @@ final class LibraryIndexController extends ChangeNotifier {
       }
       _search
         ..refreshAnnotationEntries()
+        ..refreshBookmarkEntries()
         ..refreshOrganizationEntries();
       progress = LibraryIndexProgress(
-        totalDocuments: candidates.length,
+        totalDocuments: totalCandidates,
         completedDocuments: completed,
         currentPage: 0,
         totalPages: 0,
@@ -203,6 +229,22 @@ final class LibraryIndexController extends ChangeNotifier {
     enabled = value;
     if (!value) cancel();
     notifyListeners();
+  }
+
+  /// Moves visible work to the front without interrupting the current native
+  /// operation. The next document and, when known, its visible page are
+  /// indexed first; the bounded list avoids retaining the whole viewport.
+  void prioritizeDocument(String documentId, {int? pageIndex}) {
+    _priorityDocumentIds
+      ..remove(documentId)
+      ..insert(0, documentId);
+    if (_priorityDocumentIds.length > 24) {
+      final removed = _priorityDocumentIds.removeLast();
+      _priorityPages.remove(removed);
+    }
+    if (pageIndex != null && pageIndex >= 0) {
+      _priorityPages[documentId] = pageIndex;
+    }
   }
 
   void pause() {

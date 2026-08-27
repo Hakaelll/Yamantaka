@@ -30,6 +30,7 @@ import '../features/settings/presentation/settings_screen.dart';
 import '../features/search/domain/global_search_models.dart';
 import '../features/search/presentation/global_search_dialog.dart';
 import '../features/workspaces/domain/workspace_models.dart';
+import '../features/workspaces/presentation/document_tab_switcher.dart';
 import '../features/workspaces/presentation/workspace_dialog.dart';
 import '../storage/repositories/app_settings_repository.dart';
 import 'app_config.dart';

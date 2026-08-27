@@ -47,6 +47,16 @@ void main() {
     const boundaryKey = Key('surface-visual-boundary');
     final paletteCases = <Map<String, Object?>>[];
     final dialogCases = <Map<String, Object?>>[];
+    const matrixSizes = <(String, Size)>[
+      ('640x480', Size(640, 480)),
+      ('800x600', Size(800, 600)),
+      ('1280x720', Size(1280, 720)),
+      ('1600x900', Size(1600, 900)),
+      ('1920x1080', Size(1920, 1080)),
+      ('1920x1200', Size(1920, 1200)),
+      ('2560x1440', Size(2560, 1440)),
+      ('3440x1440', Size(3440, 1440)),
+    ];
     final now = DateTime.utc(2026, 8, 25, 12);
     final recent = LibraryDocument(
       id: 'visual-recent',
@@ -86,6 +96,7 @@ void main() {
       ThemeMode mode = ThemeMode.light,
       bool highContrast = false,
       bool reduceMotion = false,
+      double textScale = 1,
     }) async {
       if (paletteOutput == null) return;
       tester.view.physicalSize = size;
@@ -102,6 +113,7 @@ void main() {
               data: MediaQuery.of(context).copyWith(
                 highContrast: highContrast,
                 disableAnimations: reduceMotion,
+                textScaler: TextScaler.linear(textScale),
               ),
               child: child!,
             ),
@@ -129,20 +141,19 @@ void main() {
         'theme': mode.name,
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
+        'textScale': textScale,
         'surface': 'palette',
         'source': 'flutter-widget-test',
         'path': path,
       });
     }
 
-    await paletteCase(
-      name: 'palette-640x480-light-widget',
-      size: const Size(640, 480),
-    );
-    await paletteCase(
-      name: 'palette-1280x720-light-widget',
-      size: const Size(1280, 720),
-    );
+    for (final entry in matrixSizes) {
+      await paletteCase(
+        name: 'palette-${entry.$1}-light-widget',
+        size: entry.$2,
+      );
+    }
     await paletteCase(
       name: 'palette-1280x720-dark-widget',
       size: const Size(1280, 720),
@@ -158,34 +169,106 @@ void main() {
       size: const Size(1280, 720),
       reduceMotion: true,
     );
+    await paletteCase(
+      name: 'palette-1280x720-text-130-widget',
+      size: const Size(1280, 720),
+      textScale: 1.3,
+    );
+    await paletteCase(
+      name: 'palette-1280x720-text-150-widget',
+      size: const Size(1280, 720),
+      textScale: 1.5,
+    );
+    await paletteCase(
+      name: 'palette-1280x720-text-200-widget',
+      size: const Size(1280, 720),
+      textScale: 2,
+    );
 
-    if (paletteOutput != null) {
-      tester.view.physicalSize = const Size(1280, 720);
+    Future<void> menuCase({
+      required String name,
+      required Size size,
+      ThemeMode mode = ThemeMode.light,
+      bool highContrast = false,
+      bool reduceMotion = false,
+      double textScale = 1,
+    }) async {
+      if (paletteOutput == null) return;
+      tester.view.physicalSize = size;
       await tester.pumpWidget(
         RepaintBoundary(
           key: boundaryKey,
           child: MaterialApp(
-            key: const ValueKey('menu-open'),
+            key: ValueKey('menu-$name'),
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(),
+            theme: AppTheme.light(highContrast: highContrast),
+            darkTheme: AppTheme.dark(highContrast: highContrast),
+            themeMode: mode,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                highContrast: highContrast,
+                disableAnimations: reduceMotion,
+                textScaler: TextScaler.linear(textScale),
+              ),
+              child: child!,
+            ),
             home: const Scaffold(body: Center(child: _MenuFixture())),
           ),
         ),
       );
       await tester.tap(find.byKey(const Key('surface-menu-button')));
       await tester.pumpAndSettle();
-      final path =
-          '${paletteOutput.path}${Platform.pathSeparator}menu-1280x720-open-widget.png';
+      final path = '${paletteOutput.path}${Platform.pathSeparator}$name.png';
       await capture(path);
       paletteCases.add({
-        'name': 'menu-1280x720-open-widget',
-        'width': 1280,
-        'height': 720,
-        'theme': 'light',
+        'name': name,
+        'width': size.width.round(),
+        'height': size.height.round(),
+        'theme': mode.name,
+        'highContrast': highContrast,
+        'reducedMotion': reduceMotion,
+        'textScale': textScale,
         'surface': 'menu-open',
         'source': 'flutter-widget-test',
         'path': path,
       });
+    }
+
+    for (final entry in matrixSizes) {
+      await menuCase(name: 'menu-${entry.$1}-light-widget', size: entry.$2);
+    }
+    await menuCase(
+      name: 'menu-1280x720-dark-widget',
+      size: const Size(1280, 720),
+      mode: ThemeMode.dark,
+    );
+    await menuCase(
+      name: 'menu-1280x720-high-contrast-widget',
+      size: const Size(1280, 720),
+      highContrast: true,
+    );
+    await menuCase(
+      name: 'menu-1280x720-reduced-motion-widget',
+      size: const Size(1280, 720),
+      reduceMotion: true,
+    );
+    await menuCase(
+      name: 'menu-1280x720-text-130-widget',
+      size: const Size(1280, 720),
+      textScale: 1.3,
+    );
+    await menuCase(
+      name: 'menu-1280x720-text-150-widget',
+      size: const Size(1280, 720),
+      textScale: 1.5,
+    );
+    await menuCase(
+      name: 'menu-1280x720-text-200-widget',
+      size: const Size(1280, 720),
+      textScale: 2,
+    );
+
+    if (paletteOutput != null) {
       File(
         '${paletteOutput.path}${Platform.pathSeparator}palette-matrix.json',
       ).writeAsStringSync(
@@ -203,6 +286,7 @@ void main() {
       ThemeMode mode = ThemeMode.light,
       bool highContrast = false,
       bool reduceMotion = false,
+      double textScale = 1,
     }) async {
       if (dialogsOutput == null) return;
       tester.view.physicalSize = size;
@@ -219,6 +303,7 @@ void main() {
               data: MediaQuery.of(context).copyWith(
                 highContrast: highContrast,
                 disableAnimations: reduceMotion,
+                textScaler: TextScaler.linear(textScale),
               ),
               child: child!,
             ),
@@ -249,20 +334,16 @@ void main() {
         'theme': mode.name,
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
+        'textScale': textScale,
         'surface': 'dialog',
         'source': 'flutter-widget-test',
         'path': path,
       });
     }
 
-    await dialogCase(
-      name: 'dialog-640x480-light-widget',
-      size: const Size(640, 480),
-    );
-    await dialogCase(
-      name: 'dialog-1280x720-light-widget',
-      size: const Size(1280, 720),
-    );
+    for (final entry in matrixSizes) {
+      await dialogCase(name: 'dialog-${entry.$1}-light-widget', size: entry.$2);
+    }
     await dialogCase(
       name: 'dialog-1280x720-dark-widget',
       size: const Size(1280, 720),
@@ -277,6 +358,21 @@ void main() {
       name: 'dialog-1280x720-reduced-motion-widget',
       size: const Size(1280, 720),
       reduceMotion: true,
+    );
+    await dialogCase(
+      name: 'dialog-1280x720-text-130-widget',
+      size: const Size(1280, 720),
+      textScale: 1.3,
+    );
+    await dialogCase(
+      name: 'dialog-1280x720-text-150-widget',
+      size: const Size(1280, 720),
+      textScale: 1.5,
+    );
+    await dialogCase(
+      name: 'dialog-1280x720-text-200-widget',
+      size: const Size(1280, 720),
+      textScale: 2,
     );
     if (dialogsOutput != null) {
       File(

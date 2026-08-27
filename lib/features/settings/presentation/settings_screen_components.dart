@@ -111,11 +111,68 @@ final class _SettingsSectionData {
     required this.id,
     required this.description,
     required this.children,
+    this.onReset,
   });
 
   final _SettingsSectionId id;
   final String description;
   final List<Widget> children;
+  final VoidCallback? onReset;
+}
+
+final class _SettingsSearchField extends StatelessWidget {
+  const _SettingsSearchField({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: context.appColors.surfaceSecondary,
+        border: Border(
+          bottom: BorderSide(color: context.appColors.borderSubtle),
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.space20,
+              vertical: AppSpacing.space8,
+            ),
+            child: TextField(
+              key: const Key('settings-search-field'),
+              controller: controller,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search_rounded),
+                hintText: strings.get('settings.search'),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: strings.get('action.clear'),
+                        onPressed: onClear,
+                        icon: const Icon(Icons.clear_rounded),
+                      ),
+              ),
+              textInputAction: TextInputAction.search,
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 final class _DesktopSettings extends StatelessWidget {
@@ -349,6 +406,22 @@ final class _SettingsSectionContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.space20),
+        AppStatusLabel(
+          icon: Icons.language_rounded,
+          label: YamantakaLocalizations.of(context).get('settings.globalScope'),
+        ),
+        if (section.onReset != null) ...[
+          const SizedBox(height: AppSpacing.space8),
+          TextButton.icon(
+            key: ValueKey('settings-reset-${section.id.name}'),
+            onPressed: section.onReset,
+            icon: const Icon(Icons.restart_alt_rounded, size: 18),
+            label: Text(
+              YamantakaLocalizations.of(context).get('settings.resetSection'),
+            ),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.space12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space4),
           child: Column(
@@ -748,9 +821,15 @@ final class _LiveReaderPreview extends StatelessWidget {
                             ),
                           if (settings.showProgress)
                             const SizedBox(width: AppSpacing.space8),
-                          Text(
-                            '42 %',
-                            style: Theme.of(context).textTheme.labelSmall,
+                          SizedBox(
+                            width: 30,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '42 %',
+                                style: Theme.of(context).textTheme.labelSmall,
+                              ),
+                            ),
                           ),
                         ],
                       ),

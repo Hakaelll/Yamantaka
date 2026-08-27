@@ -1,6 +1,6 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-08-26.
+Actualizado: 2026-08-27.
 
 Este documento es el backlog vivo posterior a la reconstrucción del lector. No
 es una colección de ideas sueltas: ordena trabajo de producto, funcionamiento,
@@ -32,6 +32,15 @@ Reglas:
 
 ## Punto de partida confirmado
 
+- [x] 0.10.0 añade Continuar leyendo, selector avanzado de página, conmutador
+  Ctrl+Tab, búsqueda FTS5 filtrable, cola de importación detallada y búsqueda/
+  reset por sección en Ajustes sin introducir red, cuentas ni telemetría.
+- [x] Dos documentos nativos pueden permanecer calientes; el resto se suspende
+  y libera según una política acotada, conservando el snapshot de navegación.
+- [x] Arranque, base de datos, primera Biblioteca, primer PDF, consultas y
+  búsqueda publican solo métricas locales con nombres constantes.
+- [ ] Completar validación física 0.10 con Narrator, varios monitores y escalas
+  reales de 100 %, 125 %, 150 %, 175 % y 200 %.
 - [x] 0.9.0 compacta barra, dock, panel, Biblioteca, búsqueda, paleta y Ajustes
   con medidas verificables, sin alterar PDFium ni la persistencia.
 - [x] Cuadrícula/lista conserva selección, filtros y scroll; el cambio usa una

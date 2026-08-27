@@ -440,7 +440,7 @@ try {
                 '--no-pub',
                 'test/reader_widgets_test.dart',
                 '--plain-name',
-                'book reader matches the maintained editorial v0.9 baseline'
+                'book reader matches the maintained editorial v0.10 baseline'
             ) 'reader-visual-baseline.log'
         }
     }

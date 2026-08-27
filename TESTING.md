@@ -1,6 +1,6 @@
 # Pruebas
 
-Estado actualizado: 2026-08-26.
+Estado actualizado: 2026-08-27.
 
 Este documento describe únicamente evidencia reproducible del árbol actual. Se
 han retirado las tablas y capturas históricas que correspondían a lectores
@@ -60,19 +60,28 @@ diagnóstico de rendimiento sin campos privados. El perfil Windows añade
 documentos sintéticos de 1, 50, 500 y 5.000 páginas, vector pesado y raster
 extremo; los resultados bajo `build/` no contienen rutas ni títulos.
 
+El perfil nativo reproducible se ejecuta en modo Profile y después se compara:
+
+    flutter drive --driver=test_driver/performance_driver.dart --target=integration_test/performance_profile_test.dart -d windows --profile --no-pub
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/compare_pdf_profile.ps1
+
+La referencia PDF aún corresponde a `0.3.0+4`; es histórica, no una línea base
+0.9 comparable. Un fallo frente a ella se conserva y documenta, y no autoriza a
+sobrescribir la referencia para obtener un resultado verde.
+
 ## Referencia visual mantenida
 
 La única captura normativa es:
 
-    docs/screenshots/windows-reader-editorial-v09.png
+    docs/screenshots/windows-reader-editorial-v010.png
 
 La genera y compara esta prueba:
 
-    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.9 baseline"
+    flutter test --no-pub test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.10 baseline"
 
 Para aceptar deliberadamente un cambio visual:
 
-    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.9 baseline"
+    flutter test --no-pub --update-goldens test/reader_widgets_test.dart --plain-name "book reader matches the maintained editorial v0.10 baseline"
 
 Es una referencia de widgets ejecutados a 1600×900, no una captura nativa ni un
 mockup manual. Valida la composición fullscreen del contenido: barra opaca,
@@ -86,11 +95,13 @@ abierto. La evidencia previa se conserva en `build/visual-evidence/v0.5.0/` y
 la de 0.6 se conserva en `build/visual-evidence/v0.6.0/`, la de 0.7 en
 `build/visual-evidence/v0.7.0/` y la de 0.8 en
 `build/visual-evidence/v0.8.0/`. La actual se escribe en
-`build/visual-evidence/v0.9.0/`; ninguna se versiona.
+`build/visual-evidence/v0.10.0/`; ninguna se versiona.
 
-La matriz 0.9 añade la prueba geométrica del chrome y conserva los casos de
+La matriz 0.10 conserva la prueba geométrica del chrome y añade Continuar
+leyendo, filtros FTS5, búsqueda de Ajustes, cola de importación y texto al
+150/200 %. Conserva los casos de
 Biblioteca, Lector, panel, Ajustes, búsqueda, paleta, menús y diálogos en claro,
-oscuro, alto contraste y movimiento reducido. Las comparaciones usan 0.8 como
+oscuro, alto contraste y movimiento reducido. Las comparaciones usan 0.9 como
 fuente anterior y registran el SHA-256 de ambos PNG.
 
 ## Validación nativa de Windows
@@ -179,6 +190,16 @@ global. Las matrices producen 59 capturas de superficies y diez comparaciones
 del manifiesto con el contenido real del ZIP y rechaza rutas inseguras o PDF:
 
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File tool/verify_windows_package.ps1
+
+La iteración `0.10.0+11` añade pruebas específicas para destinos de página,
+cancelación y filtros FTS5, marcadores en el índice y orden del conmutador de
+pestañas, apertura nueva con estado independiente, drag & drop múltiple,
+teclado en búsqueda y filtro combinado de notas. Las matrices de Lector,
+Biblioteca, Búsqueda, Ajustes, paleta, menús y diálogos usan los ocho tamaños
+principales y añaden 130/150/200 % de texto. La salida actual contiene 128 PNG
+de superficies y diez comparaciones 0.9/0.10. La evidencia manual de Narrator,
+varios monitores y DPI físico sigue separada y nunca se deduce de estas
+capturas.
 
 ## Corpus y privacidad
 

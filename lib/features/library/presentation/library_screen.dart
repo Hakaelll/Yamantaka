@@ -23,6 +23,17 @@ import 'artifact_library.dart';
 
 export '../application/library_filter.dart';
 
+@visibleForTesting
+List<String> acceptedDroppedPdfPaths(Iterable<String> paths) {
+  final accepted = <String>[];
+  final seen = <String>{};
+  for (final path in paths) {
+    if (!path.toLowerCase().endsWith('.pdf')) continue;
+    if (seen.add(path.toLowerCase())) accepted.add(path);
+  }
+  return List.unmodifiable(accepted);
+}
+
 final class LibraryScreen extends StatefulWidget {
   const LibraryScreen({
     super.key,
@@ -130,11 +141,9 @@ final class _LibraryScreenState extends State<LibraryScreen> {
               onDragExited: (_) => setState(() => _dragging = false),
               onDragDone: (details) {
                 setState(() => _dragging = false);
-                final pdfs = details.files
-                    .where((file) => file.path.toLowerCase().endsWith('.pdf'))
-                    .map((file) => file.path)
-                    .toSet()
-                    .toList(growable: false);
+                final pdfs = acceptedDroppedPdfPaths(
+                  details.files.map((file) => file.path),
+                );
                 if (pdfs.isEmpty) return;
                 if (widget.onOpenPaths != null) {
                   widget.onOpenPaths!(pdfs);
@@ -702,27 +711,227 @@ final class _LibraryBody extends StatelessWidget {
         ),
       );
     }
-    return ArtifactLibraryView(
-      controller: controller,
-      documents: documents,
-      onOpenPath: onOpenPath,
-      onPickDocument: onPickDocument,
-      initialReadingState: readingState,
-      onReadingStateChanged: onReadingStateChanged,
-      onBulkOperation: onBulkOperation,
-      collections: collections,
-      tags: tags,
-      onDocumentInfo: onDocumentInfo,
-      onRelocateDocument: onRelocateDocument,
-      onToggleFavorite: onToggleFavorite,
-      onChangeCover: onChangeCover,
-      onRevealDocument: onRevealDocument,
-      onRemoveDocument: onRemoveDocument,
-      onReanalyzeDocument: onReanalyzeDocument,
-      onDocumentVisible: onDocumentVisible,
+    final continueReading = controller.continueReading;
+    return Column(
+      children: [
+        if (continueReading != null)
+          ContinueReadingStrip(
+            document: continueReading,
+            onOpen: () => onOpenPath(continueReading.path),
+            onInfo: onDocumentInfo == null
+                ? null
+                : () => onDocumentInfo!(continueReading),
+          ),
+        Expanded(
+          child: ArtifactLibraryView(
+            controller: controller,
+            documents: documents,
+            onOpenPath: onOpenPath,
+            onPickDocument: onPickDocument,
+            initialReadingState: readingState,
+            onReadingStateChanged: onReadingStateChanged,
+            onBulkOperation: onBulkOperation,
+            collections: collections,
+            tags: tags,
+            onDocumentInfo: onDocumentInfo,
+            onRelocateDocument: onRelocateDocument,
+            onToggleFavorite: onToggleFavorite,
+            onChangeCover: onChangeCover,
+            onRevealDocument: onRevealDocument,
+            onRemoveDocument: onRemoveDocument,
+            onReanalyzeDocument: onReanalyzeDocument,
+            onDocumentVisible: onDocumentVisible,
+          ),
+        ),
+      ],
     );
   }
 }
+
+final class ContinueReadingStrip extends StatefulWidget {
+  const ContinueReadingStrip({
+    super.key,
+    required this.document,
+    required this.onOpen,
+    this.onInfo,
+  });
+
+  final LibraryDocument document;
+  final VoidCallback onOpen;
+  final VoidCallback? onInfo;
+
+  @override
+  State<ContinueReadingStrip> createState() => _ContinueReadingStripState();
+}
+
+final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
+  final FocusNode _focusNode = FocusNode(debugLabel: 'continue-reading');
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    final document = widget.document;
+    final page = (document.lastPageIndex + 1).clamp(1, document.pageCount);
+    final percent = (document.readingProgress * 100).round().clamp(1, 99);
+    final progress = strings.get(
+      'library.pageProgress',
+      parameters: {
+        'page': page,
+        'count': document.pageCount,
+        'progress': percent,
+      },
+    );
+    return Semantics(
+      container: true,
+      button: true,
+      label:
+          '${strings.get('library.continueReading')}. '
+          '${document.effectiveTitle}. $progress.',
+      hint: 'Enter',
+      child: Focus(
+        focusNode: _focusNode,
+        onKeyEvent: (_, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.enter ||
+                  event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+            widget.onOpen();
+            return KeyEventResult.handled;
+          }
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.contextMenu ||
+                  (event.logicalKey == LogicalKeyboardKey.f10 &&
+                      HardwareKeyboard.instance.isShiftPressed))) {
+            _showContextMenu(context, const Offset(48, 96));
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: GestureDetector(
+          onSecondaryTapDown: (details) =>
+              _showContextMenu(context, details.globalPosition),
+          child: Material(
+            color: context.appColors.surfaceSecondary,
+            child: InkWell(
+              key: const Key('continue-reading-strip'),
+              onTap: widget.onOpen,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.space20,
+                  AppSpacing.space8,
+                  AppSpacing.space12,
+                  AppSpacing.space8,
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 720;
+                    return Row(
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: context.appColors.focusRing,
+                            borderRadius: BorderRadius.circular(
+                              AppRadii.indicator,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.space12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                strings.get('library.continueReading'),
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: context.appColors.textMuted,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              RichText(
+                                text: TextSpan(
+                                  text: document.effectiveTitle,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!compact) ...[
+                          const SizedBox(width: AppSpacing.space16),
+                          Text(
+                            '$progress · ${_relativeDate(document.lastOpenedAt, strings)}',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: context.appColors.textSecondary,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                          ),
+                        ],
+                        const SizedBox(width: AppSpacing.space12),
+                        FilledButton.icon(
+                          onPressed: widget.onOpen,
+                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                          label: Text(strings.get('action.resumeReading')),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showContextMenu(BuildContext context, Offset position) async {
+    final strings = YamantakaLocalizations.of(context);
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selected = await showMenu<_ContinueReadingAction>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(position, position),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          value: _ContinueReadingAction.open,
+          child: Text(strings.get('action.continue')),
+        ),
+        if (widget.onInfo != null)
+          PopupMenuItem(
+            value: _ContinueReadingAction.info,
+            child: Text(strings.get('command.documentInfo')),
+          ),
+      ],
+    );
+    if (!mounted) return;
+    switch (selected) {
+      case _ContinueReadingAction.open:
+        widget.onOpen();
+      case _ContinueReadingAction.info:
+        widget.onInfo?.call();
+      case null:
+        _focusNode.requestFocus();
+    }
+  }
+}
+
+enum _ContinueReadingAction { open, info }
 
 final class EmptyLibraryState extends StatelessWidget {
   const EmptyLibraryState({super.key, required this.onOpen});

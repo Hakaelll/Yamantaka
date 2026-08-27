@@ -14,6 +14,7 @@ import 'package:yamantaka/core/errors/app_failure.dart';
 import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/core/platform/window_service.dart';
+import 'package:yamantaka/features/annotations/application/annotation_controller.dart';
 import 'package:yamantaka/features/bookmarks/application/bookmark_controller.dart';
 import 'package:yamantaka/features/library/application/document_service.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
@@ -28,6 +29,7 @@ import 'package:yamantaka/pdf_engine/presentation/pdf_viewer_adapter.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/paths/app_paths.dart';
 import 'package:yamantaka/storage/repositories/bookmark_repository.dart';
+import 'package:yamantaka/storage/repositories/annotation_repository.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
 import 'package:yamantaka/storage/repositories/preferences_repository.dart';
 import 'package:yamantaka/storage/repositories/reading_session_repository.dart';
@@ -274,7 +276,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('book reader matches the maintained editorial v0.9 baseline', (
+  testWidgets('book reader matches the maintained editorial v0.10 baseline', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1600, 900);
@@ -291,7 +293,9 @@ void main() {
 
     await expectLater(
       find.byType(ReaderScreen),
-      matchesGoldenFile('../docs/screenshots/windows-reader-editorial-v09.png'),
+      matchesGoldenFile(
+        '../docs/screenshots/windows-reader-editorial-v010.png',
+      ),
     );
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -828,6 +832,52 @@ void main() {
     await harness.dispose();
   });
 
+  testWidgets(
+    'combined notes filter orders entries and marks a jumped destination',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await _ReaderHarness.create(ready: true, pageCount: 8);
+      harness.annotations.create(pageIndex: 5, note: 'Conclusión local');
+      harness.bookmarks.add(2, label: 'Tesis principal');
+
+      await tester.pumpWidget(
+        _app(
+          harness,
+          initialPanelOpen: true,
+          initialPanelSection: 'annotations',
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('reader-note-kind-filter')), findsOneWidget);
+      expect(find.text('Tesis principal'), findsOneWidget);
+      expect(find.text('Conclusión local'), findsOneWidget);
+      final bookmarkY = tester.getTopLeft(find.text('Tesis principal')).dy;
+      final annotationY = tester.getTopLeft(find.text('Conclusión local')).dy;
+      expect(bookmarkY, lessThan(annotationY));
+
+      await tester.tap(find.byKey(const Key('reader-note-kind-filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Solo marcadores').last);
+      await tester.pump();
+      expect(find.text('Tesis principal'), findsOneWidget);
+      expect(find.text('Conclusión local'), findsNothing);
+
+      await tester.tap(find.text('Tesis principal'));
+      await tester.pump();
+      expect(harness.controller.currentPageIndex, 2);
+      expect(find.byKey(const Key('reader-destination-cue')), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(find.byKey(const Key('reader-destination-cue')), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await harness.dispose();
+    },
+  );
+
   testWidgets('a relevant key reveals hidden book controls and navigates', (
     tester,
   ) async {
@@ -1024,7 +1074,9 @@ void main() {
       bool highContrast = false,
       bool reduceMotion = false,
       bool panelOpen = false,
+      String panelSection = 'search',
       bool resting = false,
+      double textScale = 1,
     }) async {
       tester.view.physicalSize = size;
       await tester.pumpWidget(
@@ -1036,6 +1088,8 @@ void main() {
           reduceMotion: reduceMotion,
           scenarioKey: name,
           panelOpen: panelOpen,
+          panelSection: panelSection,
+          textScale: textScale,
         ),
       );
       await tester.pump();
@@ -1055,7 +1109,9 @@ void main() {
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
         'panelOpen': panelOpen,
+        'panelSection': panelOpen ? panelSection : null,
         'resting': resting,
+        'textScale': textScale,
         'mode': harness.controller.preferences!.viewMode.name,
         'layout': harness.controller.preferences!.pageLayout.name,
         'source': 'flutter-widget-test',
@@ -1122,10 +1178,80 @@ void main() {
       size: const Size(1600, 900),
       panelOpen: true,
     );
+    for (final entry in const [
+      ('640x480', Size(640, 480)),
+      ('1280x720', Size(1280, 720)),
+      ('1920x1080', Size(1920, 1080)),
+      ('1920x1200', Size(1920, 1200)),
+      ('2560x1440', Size(2560, 1440)),
+      ('3440x1440', Size(3440, 1440)),
+    ]) {
+      await capture(
+        name: 'reader-document-${entry.$1}-panel-light-widget',
+        size: entry.$2,
+        panelOpen: true,
+      );
+    }
+    harness.annotations.create(
+      pageIndex: 6,
+      note: 'Relacionar este argumento con la conclusión.',
+    );
+    harness.bookmarks.add(2, label: 'Tesis principal');
+    await capture(
+      name: 'reader-document-1600x900-notes-docked-widget',
+      size: const Size(1600, 900),
+      panelOpen: true,
+      panelSection: 'annotations',
+    );
+    await capture(
+      name: 'reader-document-1280x720-panel-dark-widget',
+      size: profileSize,
+      themeMode: ThemeMode.dark,
+      panelOpen: true,
+      panelSection: 'annotations',
+    );
+    await capture(
+      name: 'reader-document-1280x720-panel-high-contrast-widget',
+      size: profileSize,
+      highContrast: true,
+      panelOpen: true,
+      panelSection: 'annotations',
+    );
+    await capture(
+      name: 'reader-document-1280x720-panel-reduced-motion-widget',
+      size: profileSize,
+      reduceMotion: true,
+      panelOpen: true,
+      panelSection: 'annotations',
+    );
+    for (final entry in const [(1.3, '130'), (1.5, '150'), (2.0, '200')]) {
+      await capture(
+        name: 'reader-document-1280x720-panel-text-${entry.$2}-widget',
+        size: profileSize,
+        panelOpen: true,
+        panelSection: 'annotations',
+        textScale: entry.$1,
+      );
+    }
     await capture(
       name: 'reader-document-1600x900-resting-widget',
       size: const Size(1600, 900),
       resting: true,
+    );
+    await capture(
+      name: 'reader-document-1280x720-text-130-widget',
+      size: profileSize,
+      textScale: 1.3,
+    );
+    await capture(
+      name: 'reader-document-1280x720-text-150-widget',
+      size: profileSize,
+      textScale: 1.5,
+    );
+    await capture(
+      name: 'reader-document-1280x720-text-200-widget',
+      size: profileSize,
+      textScale: 2,
     );
     File(
       '${output.path}${Platform.pathSeparator}reader-matrix.json',
@@ -1198,6 +1324,8 @@ Widget _visualApp(
   required bool reduceMotion,
   required String scenarioKey,
   required bool panelOpen,
+  String panelSection = 'search',
+  required double textScale,
 }) => MaterialApp(
   debugShowCheckedModeBanner: false,
   locale: const Locale('es'),
@@ -1212,9 +1340,11 @@ Widget _visualApp(
   darkTheme: AppTheme.dark(highContrast: highContrast),
   themeMode: themeMode,
   builder: (context, child) => MediaQuery(
-    data: MediaQuery.of(
-      context,
-    ).copyWith(highContrast: highContrast, disableAnimations: reduceMotion),
+    data: MediaQuery.of(context).copyWith(
+      highContrast: highContrast,
+      disableAnimations: reduceMotion,
+      textScaler: TextScaler.linear(textScale),
+    ),
     child: child!,
   ),
   home: RepaintBoundary(
@@ -1231,7 +1361,7 @@ Widget _visualApp(
       showProgress: true,
       readingDirection: ReadingDirection.leftToRight,
       initialPanelOpen: panelOpen,
-      initialPanelSection: panelOpen ? 'search' : '',
+      initialPanelSection: panelOpen ? panelSection : '',
     ),
   ),
 );
@@ -1256,6 +1386,7 @@ final class _ReaderHarness {
     required this.viewController,
     required this.database,
     required this.bookmarks,
+    required this.annotations,
     required this.search,
     required this.windowService,
   });
@@ -1265,6 +1396,7 @@ final class _ReaderHarness {
   final PdfViewController viewController;
   final AppDatabase database;
   final BookmarkController bookmarks;
+  final AnnotationController annotations;
   final app_search.SearchController search;
   final FakeWindowService windowService;
 
@@ -1278,6 +1410,7 @@ final class _ReaderHarness {
     final engine = _FakePdfEngine();
     final viewController = PdfViewController();
     final bookmarks = BookmarkController(BookmarkRepository(database));
+    final annotations = AnnotationController(AnnotationRepository(database));
     final search = app_search.SearchController(engine, viewController, logger);
     final windowService = FakeWindowService();
     final directory = Directory.current;
@@ -1302,6 +1435,7 @@ final class _ReaderHarness {
       thumbnails: thumbnailService,
       windowService: windowService,
       logger: logger,
+      annotations: annotations,
       bookmarks: bookmarks,
       search: search,
       viewController: viewController,
@@ -1337,6 +1471,7 @@ final class _ReaderHarness {
         ..preferences = const DocumentPreferences(documentId: 'doc-1')
         ..status = ReaderStatus.ready;
       bookmarks.load(document.id);
+      annotations.load(document.id, document.fingerprint);
       viewController.attach(
         pageCount: pageCount,
         currentPageIndex: 0,
@@ -1360,6 +1495,7 @@ final class _ReaderHarness {
       viewController: viewController,
       database: database,
       bookmarks: bookmarks,
+      annotations: annotations,
       search: search,
       windowService: windowService,
     );
@@ -1369,6 +1505,7 @@ final class _ReaderHarness {
     await controller.closeDocument();
     controller.dispose();
     bookmarks.dispose();
+    annotations.dispose();
     search.dispose();
     database.close();
   }

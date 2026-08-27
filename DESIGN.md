@@ -758,3 +758,33 @@ Búsqueda, paleta y menús convergen en filas de 48 px. Ajustes usa filas de 52 
 en densidad cómoda y 44 px en compacta, siempre con controles de al menos 40 px.
 Paneles y diálogos limitan sus radios a 12/14 px y reservan la cápsula para
 estado o segmentación.
+
+## 33. Continuidad y orientación — 0.10
+
+Biblioteca abre con una única franja editorial de Continuar leyendo solo cuando
+hay avance mayor que cero y menor que cien por cien. La franja no replica la
+portada ni crea otra tarjeta: usa indicador vertical, título truncado, página,
+total, porcentaje, fecha relativa y un único botón Retomar. Enter y menú
+contextual ofrecen el mismo resultado.
+
+El conmutador de documentos es un diálogo compacto alineado sobre el lector.
+Muestra título, página, porcentaje y estado suspendido/modificado; Ctrl+Tab,
+Ctrl+Shift+Tab, flechas, Enter y Escape forman un ciclo completo sin introducir
+una tira permanente que reste alto al PDF.
+
+El indicador normal sigue siendo compacto. Al activarlo, el editor acepta
+página, porcentaje, primera/última, scrubber e historial y valida dentro del
+campo. La búsqueda global añade chips horizontales operables por teclado,
+ordena por relevancia y usa recencia solo para desempatar; los marcadores usan
+el mismo vocabulario que anotaciones, páginas, colecciones y etiquetas.
+
+El panel de Anotaciones reúne notas y marcadores bajo un filtro combinado,
+ordena por página y conserva acciones de edición, borrado, undo/redo y
+exportación. Activar un resultado muestra durante 1,4 s un foco de 2 px y una
+etiqueta semántica sobre el visor, sin superponer color a los píxeles del PDF.
+
+Ajustes conserva master-detail y preview, pero añade una búsqueda superior que
+salta directamente a categorías coincidentes. Cada sección declara alcance
+global y ofrece su propio reset antes de cualquier zona destructiva. Ninguna de
+estas superficies añade gradientes, tarjetas anidadas, sombra ornamental o
+radio superior al contrato 0.9.

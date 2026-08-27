@@ -7,10 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.9.0+10 revisada el 26 de agosto de 2026:
+Base Flutter 0.10.0+11 revisada el 27 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: suite completa aprobada;
+- flutter test --no-pub: 266 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local permanece receptivo durante un smoke de 8 s con un
@@ -18,11 +18,11 @@ Base Flutter 0.9.0+10 revisada el 26 de agosto de 2026:
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
-El release local versionado se genera en `build/release/0.9.0+10/` e incluye el
+El release local versionado se genera en `build/release/0.10.0+11/` e incluye el
 ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt` y el reporte del
 smoke sin red. Debe extraerse entero antes de probarlo.
 
-El bundle 0.9 se valida contra su manifiesto después del último cambio. El smoke
+El bundle 0.10 se valida contra su manifiesto después del último cambio. El smoke
 sintético comprueba conexiones TCP/UDP y el inventario separa explícitamente los
 binarios sin firma; sigue siendo evidencia local, no un artefacto de distribución.
 
@@ -60,7 +60,13 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 
 ## Otras funciones
 
-- Apertura mediante selector nativo, arrastrar y soltar o argumento.
+- Apertura mediante selector nativo, arrastrar y soltar uno o varios PDF, o
+  argumentos múltiples; las rutas repetidas se descartan sin perder el orden.
+- “Continuar leyendo” aparece solo cuando existe una lectura reciente sin
+  terminar y resume con título, página, total, porcentaje y última apertura.
+- `Ctrl+Tab` y `Ctrl+Shift+Tab` abren un conmutador compacto de documentos; dos
+  documentos PDFium permanecen calientes como máximo y los demás se suspenden
+  conservando página, zoom, layout, modo, scroll, tema y panel.
 - Biblioteca local con portadas, filtros combinables por autor, tema, estado y
   favorito, agrupación por autor, colecciones, etiquetas, vistas inteligentes,
   selección múltiple y operaciones por lote.
@@ -87,15 +93,18 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - “Abrir PDF” es la acción primaria y los filtros activos ofrecen un
   restablecimiento visible sin volver a abrir el menú.
 - Búsqueda PDF cancelable, índice, miniaturas y panel lateral redimensionable.
-- Marcadores, notas por página, historial local opcional y navegación
-  atrás/adelante.
+- Marcadores y anotaciones comparten filtro y orden por página; saltar a uno
+  anuncia y enfoca temporalmente el destino. Se conservan notas por página,
+  historial local opcional y navegación atrás/adelante.
 - Paleta de comandos con iconos específicos, metadatos, preview expandida,
   documentos recientes y atajos personalizables con detección de conflictos.
 - Recuperación opt-in de documento, página, zoom, disposición, panel, chrome y
   geometría de ventana.
 - Copia de seguridad JSON versionada, validada y transaccional; nunca incluye
   los PDF.
-- Búsqueda global FTS5 opt-in, diagnósticos redactados y safe mode conservador.
+- Búsqueda global FTS5 opt-in con filtros de documento, página, anotación,
+  marcador, colección y etiqueta, relevancia con recencia solo como desempate,
+  cancelación, diagnósticos redactados y safe mode conservador.
 - La búsqueda global usa lista y preview en ancho expandido; selección,
   indexación y carga tienen texto de estado y no dependen de un spinner aislado.
 - El editor de metadatos separa valores detectados de overrides locales,
@@ -104,19 +113,20 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Confirmación de enlaces externos y bloqueo de esquemas no seguros.
 - Sistema visual monocromático con Segoe UI Variable, temas claro/oscuro,
   densidad cómoda/compacta y breakpoints en 680/1100 px.
-- Ajustes usa master-detail agrupado y una previsualización viva persistente del
-  canvas, la página y el chrome, alternable entre reposo, activo, panel y e-ink.
+- Ajustes usa master-detail agrupado, búsqueda de preferencias, reset por
+  sección y una previsualización viva persistente del canvas, la página y el
+  chrome, alternable entre reposo, activo, panel y e-ink.
 - La ventana se abre maximizada y conserva su geometría normal para restaurarla.
 
 ## Referencia visual vigente
 
-![Modo Libro editorial 0.9 mantenido por prueba](docs/screenshots/windows-reader-editorial-v09.png)
+![Modo Libro editorial 0.10 mantenido por prueba](docs/screenshots/windows-reader-editorial-v010.png)
 
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
-Las matrices 0.9 cubren Biblioteca, Lector, panel, Ajustes, paleta, búsqueda,
-menús y diálogos, con comparaciones 0.8/0.9 reproducibles bajo
-`build/visual-evidence/v0.9.0/`. La identidad del logo violeta se comprueba por
+Las matrices 0.10 cubren Biblioteca, Lector, panel, Ajustes, paleta, búsqueda,
+menús y diálogos, con comparaciones 0.9/0.10 reproducibles bajo
+`build/visual-evidence/v0.10.0/`. La identidad del logo violeta se comprueba por
 hash; no se regenera ni se altera su geometría.
 
 ## Requisitos

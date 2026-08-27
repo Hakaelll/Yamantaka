@@ -90,6 +90,7 @@ void main() {
       final encoded = report.toJson();
 
       expect(report.values['integrity'], 'ok');
+      expect(report.values['yamantaka_version'], '0.10.0+11');
       expect(encoded, isNot(contains(directory.path)));
       expect(report.values['contains_paths_titles_or_queries'], isFalse);
     });
@@ -457,6 +458,35 @@ void main() {
         expect(engine.closedDocumentIds, ['fake-1', 'fake-2']);
       },
     );
+
+    test(
+      'incremental indexing prioritizes visible documents and pages',
+      () async {
+        final second = _document(id: 'second', path: r'C:\second.pdf');
+        final visible = _document(id: 'visible', path: r'C:\visible.pdf');
+        documents
+          ..save(second)
+          ..save(visible);
+        final search = GlobalSearchRepository(database);
+        final extractedPages = <int>[];
+        final engine = _RecordingPdfEngine(
+          pageCount: 4,
+          pageText: (page) => 'contenido $page',
+        )..onExtract = extractedPages.add;
+        final index = LibraryIndexController(documents, search, engine)
+          ..setEnabled(true)
+          ..prioritizeDocument(visible.id, pageIndex: 2);
+        addTearDown(index.dispose);
+
+        await index.indexIncremental();
+
+        expect(engine.openedPaths.first, visible.path);
+        expect(extractedPages.first, 2);
+        expect(index.progress.completedDocuments, 3);
+        expect(search.indexedDocumentCount, 3);
+        expect(engine.closedDocumentIds, hasLength(3));
+      },
+    );
   });
 
   group('folder import, recovery and profiles', () {
@@ -498,6 +528,13 @@ void main() {
           ),
           hasLength(2),
         );
+        for (final duplicate in candidates.where(
+          (item) => item.status == FolderCandidateStatus.duplicate,
+        )) {
+          final matched = controller.duplicateDocumentFor(duplicate);
+          expect(matched, isNotNull);
+          expect(matched!.fingerprint, duplicate.inspected!.fingerprint);
+        }
         expect(
           candidates.where(
             (item) => item.status == FolderCandidateStatus.newDocument,

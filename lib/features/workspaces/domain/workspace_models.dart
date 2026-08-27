@@ -1,5 +1,12 @@
 enum TabResourceState { active, warm, suspended }
 
+const Object _keepPanelSection = Object();
+
+abstract final class WorkspaceLayoutConstraints {
+  static const double sidePanelMinWidth = 288;
+  static const double sidePanelMaxWidth = 480;
+}
+
 final class DocumentTab {
   const DocumentTab({
     required this.id,
@@ -14,6 +21,8 @@ final class DocumentTab {
     required this.readingProgress,
     required this.isPinned,
     required this.resourceState,
+    this.readingTheme = 'ivory',
+    this.panelSection,
     this.isMissing = false,
     this.isExternallyModified = false,
   });
@@ -30,6 +39,8 @@ final class DocumentTab {
   final double readingProgress;
   final bool isPinned;
   final TabResourceState resourceState;
+  final String readingTheme;
+  final String? panelSection;
   final bool isMissing;
   final bool isExternallyModified;
 
@@ -42,6 +53,8 @@ final class DocumentTab {
     double? readingProgress,
     bool? isPinned,
     TabResourceState? resourceState,
+    String? readingTheme,
+    Object? panelSection = _keepPanelSection,
     bool? isMissing,
     bool? isExternallyModified,
   }) => DocumentTab(
@@ -57,6 +70,10 @@ final class DocumentTab {
     readingProgress: readingProgress ?? this.readingProgress,
     isPinned: isPinned ?? this.isPinned,
     resourceState: resourceState ?? this.resourceState,
+    readingTheme: readingTheme ?? this.readingTheme,
+    panelSection: identical(panelSection, _keepPanelSection)
+        ? this.panelSection
+        : panelSection as String?,
     isMissing: isMissing ?? this.isMissing,
     isExternallyModified: isExternallyModified ?? this.isExternallyModified,
   );

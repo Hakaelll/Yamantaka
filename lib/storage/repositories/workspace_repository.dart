@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
-import '../../app/theme/app_tokens.dart';
 import '../../features/workspaces/domain/workspace_models.dart';
 import '../database/app_database.dart';
 import 'document_repository.dart';
@@ -42,6 +41,7 @@ final class WorkspaceRepository {
                 readingProgress: document.readingProgress,
                 isPinned: (tabRow['is_pinned'] as int) == 1,
                 resourceState: TabResourceState.suspended,
+                readingTheme: document.preferredTheme.name,
                 isMissing: document.isMissing,
                 isExternallyModified: document.hasFileChanged,
               ),
@@ -114,8 +114,8 @@ final class WorkspaceRepository {
           activeTabId,
           panelSection,
           panelWidth.clamp(
-            AppSizes.sidePanelMinWidth,
-            AppSizes.sidePanelMaxWidth,
+            WorkspaceLayoutConstraints.sidePanelMinWidth,
+            WorkspaceLayoutConstraints.sidePanelMaxWidth,
           ),
           jsonEncode(_encodeSplit(split)),
           collectionId,
@@ -177,6 +177,8 @@ final class WorkspaceRepository {
           readingProgress: tab.readingProgress,
           isPinned: tab.isPinned,
           resourceState: TabResourceState.suspended,
+          readingTheme: tab.readingTheme,
+          panelSection: tab.panelSection,
           isMissing: tab.isMissing,
           isExternallyModified: tab.isExternallyModified,
         ),

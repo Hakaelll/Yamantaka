@@ -18,6 +18,7 @@ import '../../command_palette/presentation/command_palette.dart';
 import '../../library/domain/library_document.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
+import '../domain/page_destination.dart';
 import 'reader_bottom_controls.dart';
 import 'reader_side_panel.dart';
 import 'reader_top_bar.dart';

@@ -12,20 +12,36 @@ final class GlobalSearchRepository {
     String query, {
     int limit = AppConfig.maxSearchResults,
     int offset = 0,
+    Set<GlobalSearchKind> kinds = const {},
   }) {
     final expression = _ftsExpression(query);
     if (expression.isEmpty) return const [];
+    final selectedKinds = kinds.isEmpty
+        ? GlobalSearchKind.values
+        : kinds.toList(growable: false);
+    final kindPlaceholders = List.filled(selectedKinds.length, '?').join(',');
     final rows = _database.database.select(
       '''
-      SELECT document_id, page_index, kind, title,
+      SELECT library_search.document_id, library_search.page_index,
+        library_search.kind, library_search.title,
         snippet(library_search, 4, '‹', '›', ' … ', 18) AS excerpt,
-        bm25(library_search, 4.0, 1.0, 0.5) AS rank
+        bm25(library_search, 4.0, 1.0, 0.5) AS rank,
+        d.is_missing, d.is_modified
       FROM library_search
+      JOIN documents d ON d.id = library_search.document_id
       WHERE library_search MATCH ?
-      ORDER BY rank
+        AND library_search.kind IN ($kindPlaceholders)
+      ORDER BY rank, d.last_opened_at DESC,
+        library_search.document_id, library_search.page_index,
+        library_search.kind
       LIMIT ? OFFSET ?
       ''',
-      [expression, limit.clamp(1, 200), offset.clamp(0, 10000)],
+      [
+        expression,
+        ...selectedKinds.map((kind) => kind.name),
+        limit.clamp(1, 200),
+        offset.clamp(0, 10000),
+      ],
     );
     return rows
         .map(
@@ -42,6 +58,8 @@ final class GlobalSearchRepository {
             title: row['title'] as String? ?? 'Documento',
             snippet: row['excerpt'] as String? ?? '',
             rank: (row['rank'] as num).toDouble(),
+            isMissing: (row['is_missing'] as int? ?? 0) == 1,
+            isStale: (row['is_modified'] as int? ?? 0) == 1,
           ),
         )
         .toList(growable: false);
@@ -231,6 +249,26 @@ final class GlobalSearchRepository {
         FROM document_tags dt
         JOIN tags t ON t.id = dt.tag_id
         JOIN documents d ON d.id = dt.document_id
+      ''');
+  }
+
+  void refreshBookmarkEntries() {
+    final db = _database.database;
+    db
+      ..execute('DELETE FROM library_search WHERE kind = ?', [
+        GlobalSearchKind.bookmark.name,
+      ])
+      ..execute('''
+        INSERT INTO library_search(
+          document_id, page_index, kind, title, body, tags
+        )
+        SELECT b.document_id, b.page_index,
+          '${GlobalSearchKind.bookmark.name}',
+          COALESCE(d.title_override, d.title, d.file_name),
+          COALESCE(b.label, '') || ' página ' || CAST(b.page_index + 1 AS TEXT),
+          ''
+        FROM bookmarks b
+        JOIN documents d ON d.id = b.document_id
       ''');
   }
 

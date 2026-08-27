@@ -209,6 +209,16 @@ void main() {
       size: const Size(1280, 720),
       textScale: 1.3,
     );
+    await capture(
+      sizeName: '1280x720',
+      size: const Size(1280, 720),
+      textScale: 1.5,
+    );
+    await capture(
+      sizeName: '1280x720',
+      size: const Size(1280, 720),
+      textScale: 2,
+    );
     for (final mode in const ['active', 'panel', 'electronicInk']) {
       await capture(
         sizeName: '1280x720',

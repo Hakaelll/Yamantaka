@@ -256,7 +256,7 @@ void main() {
     for (var run = 0; run < 5; run++) {
       await binding.watchPerformance(() async {
         final stopwatch = Stopwatch()..start();
-        await tester.tap(find.byTooltip('Buscar (Ctrl+F)'));
+        await tester.tap(find.byTooltip('Buscar en el documento (Ctrl+F)'));
         await tester.pump();
         await tester.drag(
           find.byKey(const Key('reader-panel-resize-handle')),

@@ -2,6 +2,7 @@ enum GlobalSearchKind {
   metadata('Documento'),
   pageText('Contenido'),
   annotation('Anotación'),
+  bookmark('Marcador'),
   collection('Colección'),
   tag('Etiqueta');
 
@@ -17,6 +18,8 @@ final class GlobalSearchResult {
     required this.title,
     required this.snippet,
     required this.rank,
+    this.isMissing = false,
+    this.isStale = false,
   });
 
   final String documentId;
@@ -25,7 +28,11 @@ final class GlobalSearchResult {
   final String title;
   final String snippet;
   final double rank;
+  final bool isMissing;
+  final bool isStale;
 }
+
+enum GlobalSearchState { idle, searching, results, noResults, cancelled }
 
 enum IndexDocumentStatus {
   pending,

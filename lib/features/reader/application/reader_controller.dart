@@ -27,6 +27,13 @@ import '../domain/reading_session.dart';
 
 enum ReaderStatus { idle, loading, ready, failure }
 
+final class _WarmReaderDocument {
+  const _WarmReaderDocument({required this.document, required this.opened});
+
+  final LibraryDocument document;
+  final OpenedPdfDocument opened;
+}
+
 int _defaultHistoryLimit() => 250;
 
 @visibleForTesting
@@ -103,6 +110,8 @@ final class ReaderController extends ChangeNotifier {
   String? pendingPath;
   List<PdfOutlineItem> outline = const [];
   final ValueNotifier<int> pageIndexListenable = ValueNotifier<int>(0);
+  final ValueNotifier<ReaderDestinationCue?> destinationCue =
+      ValueNotifier<ReaderDestinationCue?>(null);
   bool isFullScreen = false;
   ProgressiveOpenState openProgress = const ProgressiveOpenState(
     phase: ProgressiveOpenPhase.idle,
@@ -113,12 +122,14 @@ final class ReaderController extends ChangeNotifier {
 
   Timer? _saveTimer;
   Timer? _activityTimer;
+  Timer? _destinationCueTimer;
   PdfOperationToken? _coverToken;
   ReadingSession? _session;
   DateTime _lastActivity = DateTime.now();
   int _activeSeconds = 0;
   bool _isVisible = true;
   int _openGeneration = 0;
+  final Map<String, _WarmReaderDocument> _warmDocuments = {};
 
   int get pageCount => openedDocument?.pageCount ?? 0;
   int get currentPageIndex => pageIndexListenable.value;
@@ -144,26 +155,55 @@ final class ReaderController extends ChangeNotifier {
     OpenedPdfDocument? newlyOpened;
     try {
       final inspected = await _documentService.inspect(path);
-      newlyOpened = await _engine.openDocument(
-        inspected.path,
-        password: password,
-      );
+      final current = document;
+      if (current != null &&
+          current.normalizedPath == inspected.normalizedPath &&
+          current.fingerprint == inspected.fingerprint) {
+        status = ReaderStatus.ready;
+        pendingPath = null;
+        notifyListeners();
+        return true;
+      }
+      final registered = _documents.byNormalizedPath(inspected.normalizedPath);
+      var warm = registered == null
+          ? null
+          : _warmDocuments.remove(registered.id);
+      if (warm != null && warm.document.fingerprint != inspected.fingerprint) {
+        await _engine.closeDocument(warm.opened.documentId);
+        warm = null;
+      }
+      final OpenedPdfDocument selectedOpened;
+      final LibraryDocument libraryDocument;
+      if (warm != null) {
+        selectedOpened = warm.opened;
+        libraryDocument = _documentService.register(
+          file: inspected,
+          pageCount: selectedOpened.pageCount,
+        );
+      } else {
+        newlyOpened = await _engine.openDocument(
+          inspected.path,
+          password: password,
+        );
+        selectedOpened = newlyOpened;
+        libraryDocument = _documentService.register(
+          file: inspected,
+          pageCount: newlyOpened.pageCount,
+        );
+      }
       openProgress = ProgressiveOpenState(
         phase: ProgressiveOpenPhase.firstLayout,
         generation: openGeneration,
         pageIndex: 0,
       );
       if (openGeneration != _openGeneration) {
-        await _engine.closeDocument(newlyOpened.documentId);
+        await _engine.closeDocument(selectedOpened.documentId);
+        newlyOpened = null;
         return false;
       }
-      final libraryDocument = _documentService.register(
-        file: inspected,
-        pageCount: newlyOpened.pageCount,
-      );
-      await _closeCurrent();
+      await _closeCurrent(retainNative: true);
       document = libraryDocument;
-      openedDocument = newlyOpened;
+      openedDocument = selectedOpened;
       newlyOpened = null;
       final restoredPreferences = _preferences.exists(libraryDocument.id)
           ? _preferences.load(libraryDocument.id)
@@ -305,13 +345,14 @@ final class ReaderController extends ChangeNotifier {
     _openGeneration++;
     openProgress = ProgressiveOpenPolicy.cancel(openProgress);
     await _closeCurrent();
+    await retainWarmDocuments(const {});
     status = ReaderStatus.idle;
     error = null;
     pendingPath = null;
     notifyListeners();
   }
 
-  Future<void> _closeCurrent() async {
+  Future<void> _closeCurrent({bool retainNative = false}) async {
     _saveTimer?.cancel();
     _coverToken?.cancel();
     _coverToken = null;
@@ -321,16 +362,70 @@ final class ReaderController extends ChangeNotifier {
     annotations?.clear();
     bookmarks.clear();
     navigationHistory?.clear();
+    _destinationCueTimer?.cancel();
+    destinationCue.value = null;
     temporaryPositionA = null;
     temporaryPositionB = null;
     final opened = openedDocument;
+    final currentDocument = document;
     document = null;
     openedDocument = null;
     preferences = null;
     viewController.detach();
     outline = const [];
     currentPageIndex = 0;
-    if (opened != null) await _engine.closeDocument(opened.documentId);
+    if (opened == null) return;
+    if (retainNative && currentDocument != null) {
+      final replaced = _warmDocuments.remove(currentDocument.id);
+      if (replaced != null && replaced.opened.documentId != opened.documentId) {
+        await _engine.closeDocument(replaced.opened.documentId);
+      }
+      _warmDocuments[currentDocument.id] = _WarmReaderDocument(
+        document: currentDocument,
+        opened: opened,
+      );
+      while (_warmDocuments.length > AppConfig.maxWarmTabs) {
+        final oldestId = _warmDocuments.keys.first;
+        final oldest = _warmDocuments.remove(oldestId);
+        if (oldest != null) {
+          await _engine.closeDocument(oldest.opened.documentId);
+        }
+      }
+    } else {
+      await _engine.closeDocument(opened.documentId);
+    }
+  }
+
+  Future<void> retainWarmDocuments(Iterable<String> documentIds) async {
+    final keep = documentIds.toSet();
+    final evicted = _warmDocuments.entries
+        .where((entry) => !keep.contains(entry.key))
+        .toList(growable: false);
+    for (final entry in evicted) {
+      _warmDocuments.remove(entry.key);
+      await _engine.closeDocument(entry.value.opened.documentId);
+    }
+  }
+
+  void restoreNavigationSnapshot({
+    required int pageIndex,
+    required double zoomLevel,
+    required PageLayoutMode pageLayout,
+    required ReaderMode readingMode,
+    required double scrollOffset,
+    required ReaderTheme readingTheme,
+  }) {
+    final currentPreferences = preferences;
+    if (status != ReaderStatus.ready || currentPreferences == null) return;
+    preferences = currentPreferences.copyWith(
+      zoomLevel: zoomLevel,
+      pageLayout: pageLayout,
+      viewMode: readingMode,
+      scrollOffset: scrollOffset,
+      readingTheme: readingTheme,
+    );
+    currentPageIndex = pageIndex.clamp(0, pageCount - 1);
+    notifyListeners();
   }
 
   void onPageChanged(int pageIndex) {
@@ -413,6 +508,7 @@ final class ReaderController extends ChangeNotifier {
     int pageIndex, {
     required NavigationReason reason,
     required String label,
+    bool focusDestination = false,
   }) async {
     if (pageCount == 0) return;
     final target = pageIndex.clamp(0, pageCount - 1);
@@ -426,6 +522,20 @@ final class ReaderController extends ChangeNotifier {
       ),
     );
     await viewController.goToPage(target);
+    if (focusDestination) _showDestinationCue(target, label);
+  }
+
+  void _showDestinationCue(int pageIndex, String label) {
+    _destinationCueTimer?.cancel();
+    final sequence = (destinationCue.value?.sequence ?? 0) + 1;
+    destinationCue.value = ReaderDestinationCue(
+      pageIndex: pageIndex,
+      label: label,
+      sequence: sequence,
+    );
+    _destinationCueTimer = Timer(const Duration(milliseconds: 1400), () {
+      destinationCue.value = null;
+    });
   }
 
   Future<void> historyBack() async {
@@ -744,6 +854,7 @@ final class ReaderController extends ChangeNotifier {
 
   void _startSession() {
     _activityTimer?.cancel();
+    _destinationCueTimer?.cancel();
     _activeSeconds = 0;
     final libraryDocument = document;
     if (libraryDocument == null || !_shouldRecordSessions()) return;
@@ -782,12 +893,18 @@ final class ReaderController extends ChangeNotifier {
     _savePositionNow();
     _finishSession();
     pageIndexListenable.dispose();
-    unawaited(_closeEngineDocument());
+    destinationCue.dispose();
+    unawaited(_closeEngineDocuments());
     super.dispose();
   }
 
-  Future<void> _closeEngineDocument() async {
+  Future<void> _closeEngineDocuments() async {
     final opened = openedDocument;
     if (opened != null) await _engine.closeDocument(opened.documentId);
+    final warm = _warmDocuments.values.toList(growable: false);
+    _warmDocuments.clear();
+    for (final item in warm) {
+      await _engine.closeDocument(item.opened.documentId);
+    }
   }
 }

@@ -79,6 +79,33 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void didUpdateWidget(covariant ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialPanelOpen != widget.initialPanelOpen ||
+        oldWidget.initialPanelSection != widget.initialPanelSection) {
+      final nextPanel = widget.initialPanelOpen
+          ? ReaderPanelSection.values
+                .where((section) => section.name == widget.initialPanelSection)
+                .firstOrNull
+          : null;
+      if (_panel != nextPanel) {
+        _panel = nextPanel;
+        if (nextPanel == null) {
+          _chromeCoordinator.closePanel();
+        } else {
+          _chromeCoordinator.openPanel(
+            nextPanel,
+            presentation: _panelPinned
+                ? ReaderPanelPresentation.pinned
+                : ReaderPanelPresentation.overlay,
+          );
+        }
+      }
+    }
+    if ((oldWidget.initialPanelWidth - widget.initialPanelWidth).abs() > 0.5) {
+      _panelWidthValue = widget.initialPanelWidth
+          .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth)
+          .toDouble();
+      _chromeCoordinator.setPanelWidth(_panelWidthValue);
+    }
     if (oldWidget.controlsAutoHide == widget.controlsAutoHide &&
         oldWidget.reduceMotion == widget.reduceMotion) {
       return;
@@ -305,6 +332,61 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                 ),
               ),
             ),
+          ),
+          ValueListenableBuilder<ReaderDestinationCue?>(
+            valueListenable: controller.destinationCue,
+            builder: (context, cue, _) {
+              if (cue == null) return const SizedBox.shrink();
+              return Positioned(
+                left: 0,
+                top: 0,
+                right: panelDocked ? panelWidth : 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: Semantics(
+                    liveRegion: true,
+                    label: cue.label,
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey(cue.sequence),
+                      duration: AppMotion.whenAllowed(
+                        widget.reduceMotion ||
+                            MediaQuery.disableAnimationsOf(context),
+                        AppMotion.fast,
+                      ),
+                      tween: Tween(begin: 0, end: 1),
+                      builder: (context, opacity, child) =>
+                          Opacity(opacity: opacity, child: child),
+                      child: DecoratedBox(
+                        key: const Key('reader-destination-cue'),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: context.appColors.focusRing,
+                            width: 2,
+                          ),
+                        ),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              top:
+                                  AppSizes.readerTopBarHeight(
+                                    compact:
+                                        windowClass == AppWindowClass.compact,
+                                  ) +
+                                  AppSpacing.space8,
+                            ),
+                            child: AppStatusLabel(
+                              icon: Icons.center_focus_strong_rounded,
+                              label: cue.label,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           if (_isBookMode && !immersive)
             Positioned.fill(
@@ -1201,98 +1283,184 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       text: '${widget.controller.currentPageIndex + 1}',
     );
     var previewPage = widget.controller.currentPageIndex + 1;
-    final page = await showDialog<int>(
+    PageDestination? validation;
+    final destination = await showDialog<Object>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(strings.get('command.goToPage')),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  key: const Key('go-to-page-field'),
-                  controller: textController,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: strings.get('reader.pageNumber'),
-                    helperText: strings.get(
-                      'reader.pageRange',
-                      parameters: {'count': widget.controller.pageCount},
+        builder: (context, setDialogState) {
+          void validate([String? raw]) {
+            final parsed = PageDestination.parse(
+              raw ?? textController.text,
+              pageCount: widget.controller.pageCount,
+            );
+            setDialogState(() {
+              validation = parsed;
+              if (parsed.page != null) previewPage = parsed.page!;
+            });
+          }
+
+          void submit() {
+            final parsed = PageDestination.parse(
+              textController.text,
+              pageCount: widget.controller.pageCount,
+            );
+            if (parsed.isValid) {
+              Navigator.pop(context, parsed.page);
+            } else {
+              setDialogState(() => validation = parsed);
+            }
+          }
+
+          String? errorText() => switch (validation?.error) {
+            PageDestinationError.invalidFormat || PageDestinationError.empty =>
+              strings.get('reader.pageDestinationInvalid'),
+            PageDestinationError.outOfRange => strings.get(
+              'reader.pageDestinationOutOfRange',
+              parameters: {'count': widget.controller.pageCount},
+            ),
+            null => null,
+          };
+
+          return AlertDialog(
+            title: Text(strings.get('command.goToPage')),
+            content: SizedBox(
+              width: 390,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    key: const Key('go-to-page-field'),
+                    controller: textController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.go,
+                    decoration: InputDecoration(
+                      labelText: strings.get('reader.pageDestination'),
+                      helperText: strings.get('reader.pageDestinationHint'),
+                      errorText: errorText(),
                     ),
+                    onChanged: validate,
+                    onSubmitted: (_) => submit(),
                   ),
-                  onChanged: (value) {
-                    final parsed = int.tryParse(value);
-                    if (parsed != null) {
-                      setDialogState(
-                        () => previewPage = parsed.clamp(
-                          1,
-                          widget.controller.pageCount,
+                  const SizedBox(height: AppSpacing.space8),
+                  Wrap(
+                    spacing: AppSpacing.space8,
+                    runSpacing: AppSpacing.space4,
+                    children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.first_page_rounded, size: 17),
+                        label: Text(strings.get('reader.firstPage')),
+                        onPressed: () {
+                          textController.text = '1';
+                          validate('1');
+                        },
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.last_page_rounded, size: 17),
+                        label: Text(strings.get('reader.lastPage')),
+                        onPressed: () {
+                          final last = '${widget.controller.pageCount}';
+                          textController.text = last;
+                          validate(last);
+                        },
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.undo_rounded, size: 17),
+                        label: Text(strings.get('command.navigationBack')),
+                        onPressed:
+                            widget.controller.navigationHistory?.canGoBack ==
+                                true
+                            ? () => Navigator.pop(
+                                context,
+                                _PagePickerHistory.back,
+                              )
+                            : null,
+                      ),
+                      ActionChip(
+                        avatar: const Icon(Icons.redo_rounded, size: 17),
+                        label: Text(strings.get('command.navigationForward')),
+                        onPressed:
+                            widget.controller.navigationHistory?.canGoForward ==
+                                true
+                            ? () => Navigator.pop(
+                                context,
+                                _PagePickerHistory.forward,
+                              )
+                            : null,
+                      ),
+                    ],
+                  ),
+                  if (widget.controller.pageCount >= 20) ...[
+                    const SizedBox(height: AppSpacing.space8),
+                    Semantics(
+                      label: strings.get('reader.pageScrubber'),
+                      value: strings.get(
+                        'reader.pageIndicator',
+                        parameters: {
+                          'page': previewPage,
+                          'count': widget.controller.pageCount,
+                        },
+                      ),
+                      child: Slider(
+                        key: const Key('reader-page-scrubber'),
+                        min: 1,
+                        max: widget.controller.pageCount.toDouble(),
+                        divisions: math.min(
+                          widget.controller.pageCount - 1,
+                          500,
                         ),
-                      );
-                    }
-                  },
-                  onSubmitted: (value) =>
-                      Navigator.pop(context, int.tryParse(value)),
-                ),
-                if (widget.controller.pageCount >= 20) ...[
-                  const SizedBox(height: AppSpacing.space12),
-                  Semantics(
-                    label: strings.get('reader.pageScrubber'),
-                    value: strings.get(
-                      'reader.pageIndicator',
-                      parameters: {
-                        'page': previewPage,
-                        'count': widget.controller.pageCount,
-                      },
+                        value: previewPage.toDouble(),
+                        label: '$previewPage',
+                        onChanged: (value) {
+                          final page = value.round();
+                          textController.text = '$page';
+                          validate('$page');
+                        },
+                      ),
                     ),
-                    child: Slider(
-                      key: const Key('reader-page-scrubber'),
-                      min: 1,
-                      max: widget.controller.pageCount.toDouble(),
-                      divisions: math.min(widget.controller.pageCount - 1, 500),
-                      value: previewPage.toDouble(),
-                      label: '$previewPage',
-                      onChanged: (value) {
-                        setDialogState(() {
-                          previewPage = value.round();
-                          textController.text = '$previewPage';
-                        });
-                      },
+                    Text(
+                      _outlineLabelForPage(previewPage - 1) ??
+                          strings.get(
+                            'reader.page',
+                            parameters: {'page': previewPage},
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelMedium,
                     ),
-                  ),
-                  Text(
-                    _outlineLabelForPage(previewPage - 1) ??
-                        strings.get(
-                          'reader.page',
-                          parameters: {'page': previewPage},
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(strings.get('action.cancel')),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.pop(context, int.tryParse(textController.text)),
-              child: Text(strings.get('action.go')),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(strings.get('action.cancel')),
+              ),
+              FilledButton(
+                onPressed: submit,
+                child: Text(strings.get('action.go')),
+              ),
+            ],
+          );
+        },
       ),
     );
     textController.dispose();
-    if (page != null) await widget.controller.goToPage(page);
+    if (!mounted) return;
+    switch (destination) {
+      case final int page:
+        await widget.controller.goToPage(page);
+      case _PagePickerHistory.back:
+        await widget.controller.historyBack();
+      case _PagePickerHistory.forward:
+        await widget.controller.historyForward();
+      case null:
+        break;
+      default:
+        break;
+    }
+    if (mounted) _readerFocusNode.requestFocus();
   }
 
   String? _outlineLabelForPage(int pageIndex) {
@@ -1465,3 +1633,5 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     if (selected != null) widget.controller.setMargins(selected);
   }
 }
+
+enum _PagePickerHistory { back, forward }

@@ -31,7 +31,7 @@ void main() {
     ]);
   });
 
-  testWidgets('captures the 0.9 compact library matrix', (tester) async {
+  testWidgets('captures the 0.10 library matrix', (tester) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_LIBRARY_MATRIX_DIR');
     if (outputRoot.isEmpty) return;
     final output = Directory(outputRoot)..createSync(recursive: true);
@@ -73,6 +73,8 @@ void main() {
       bool selected = false,
       bool filtered = false,
       bool highContrast = false,
+      bool reduceMotion = false,
+      ThemeMode themeMode = ThemeMode.light,
       double textScale = 1,
     }) async {
       controller
@@ -94,9 +96,12 @@ void main() {
             key: ValueKey('library-$name'),
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(highContrast: highContrast),
+            darkTheme: AppTheme.dark(highContrast: highContrast),
+            themeMode: themeMode,
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(context).copyWith(
                 highContrast: highContrast,
+                disableAnimations: reduceMotion,
                 textScaler: TextScaler.linear(textScale),
               ),
               child: child!,
@@ -151,6 +156,8 @@ void main() {
         'selected': selected,
         'filtered': filtered,
         'highContrast': highContrast,
+        'reducedMotion': reduceMotion,
+        'theme': themeMode.name,
         'textScale': textScale,
         'source': 'flutter-widget-test',
         'path': path,
@@ -179,6 +186,18 @@ void main() {
       name: 'library-many-1600x900-light-widget',
       size: const Size(1600, 900),
     );
+    for (final entry in const [
+      ('800x600', Size(800, 600)),
+      ('1920x1080', Size(1920, 1080)),
+      ('1920x1200', Size(1920, 1200)),
+      ('2560x1440', Size(2560, 1440)),
+      ('3440x1440', Size(3440, 1440)),
+    ]) {
+      await captureCase(
+        name: 'library-many-${entry.$1}-light-widget',
+        size: entry.$2,
+      );
+    }
     await captureCase(
       name: 'library-selected-1280x720-light-widget',
       size: const Size(1280, 720),
@@ -201,15 +220,37 @@ void main() {
       selected: true,
     );
     await captureCase(
+      name: 'library-many-1280x720-dark-widget',
+      size: const Size(1280, 720),
+      themeMode: ThemeMode.dark,
+    );
+    await captureCase(
       name: 'library-many-1280x720-high-contrast-widget',
       size: const Size(1280, 720),
       highContrast: true,
+    );
+    await captureCase(
+      name: 'library-many-1280x720-reduced-motion-widget',
+      size: const Size(1280, 720),
+      reduceMotion: true,
+    );
+    await captureCase(
+      name: 'library-list-1280x720-text-130-widget',
+      size: const Size(1280, 720),
+      list: true,
+      textScale: 1.3,
     );
     await captureCase(
       name: 'library-list-1100x720-text-150-widget',
       size: const Size(1100, 720),
       list: true,
       textScale: 1.5,
+    );
+    await captureCase(
+      name: 'library-list-1280x720-text-200-widget',
+      size: const Size(1280, 720),
+      list: true,
+      textScale: 2,
     );
 
     File(
@@ -218,7 +259,7 @@ void main() {
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-library-visual-matrix',
         'version': 1,
-        'productVersion': '0.9.0',
+        'productVersion': '0.10.0',
         'generatedAt': '2026-08-26T12:00:00Z',
         'cases': cases,
       }),

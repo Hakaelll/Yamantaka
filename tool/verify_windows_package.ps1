@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$ReleaseDirectory = 'build/release/0.9.0+10',
-    [string]$ArchiveName = 'yamantaka-0.9.0+10-windows-x64.zip'
+    [string]$ReleaseDirectory = 'build/release/0.10.0+11',
+    [string]$ArchiveName = 'yamantaka-0.10.0+11-windows-x64.zip'
 )
 
 $ErrorActionPreference = 'Stop'

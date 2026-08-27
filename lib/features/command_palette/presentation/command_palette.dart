@@ -320,6 +320,7 @@ final class _PaletteEntryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
     return Semantics(
       selected: selected,
       button: true,
@@ -331,7 +332,8 @@ final class _PaletteEntryTile extends StatelessWidget {
             key: ValueKey(entry.key),
             onTap: onTap,
             child: Container(
-              height: AppSizes.commandPaletteRowHeight,
+              height:
+                  AppSizes.commandPaletteRowHeight * textScale.clamp(1.0, 2.0),
               decoration: BoxDecoration(
                 border: Border(
                   left: BorderSide(
@@ -535,56 +537,72 @@ final class _PaletteSelectionPreview extends StatelessWidget {
     return Container(
       key: const Key('command-palette-preview'),
       color: context.appColors.surfaceSecondary,
-      padding: const EdgeInsets.all(AppSpacing.space20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(entry.icon, size: 24, color: context.appColors.iconActive),
-          const SizedBox(height: AppSpacing.space16),
-          Text(
-            entry.label,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          if (entry.subtitle case final subtitle?) ...[
-            const SizedBox(height: AppSpacing.space4),
-            Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-          ],
-          const SizedBox(height: AppSpacing.space20),
-          Text(
-            strings.get('command.preview.selection'),
-            style: Theme.of(context).textTheme.labelSmall,
-          ),
-          const SizedBox(height: AppSpacing.space6),
-          Text(state, style: Theme.of(context).textTheme.bodyMedium),
-          if (progress != null) ...[
-            const SizedBox(height: AppSpacing.space12),
-            Semantics(
-              label: strings.get(
-                'library.progressValue',
-                parameters: {'value': (progress * 100).round()},
-              ),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 3,
-                backgroundColor: context.appColors.borderSubtle,
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.space20),
+            sliver: SliverFillRemaining(
+              hasScrollBody: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    entry.icon,
+                    size: 24,
+                    color: context.appColors.iconActive,
+                  ),
+                  const SizedBox(height: AppSpacing.space16),
+                  Text(
+                    entry.label,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  if (entry.subtitle case final subtitle?) ...[
+                    const SizedBox(height: AppSpacing.space4),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.space20),
+                  Text(
+                    strings.get('command.preview.selection'),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                  const SizedBox(height: AppSpacing.space6),
+                  Text(state, style: Theme.of(context).textTheme.bodyMedium),
+                  if (progress != null) ...[
+                    const SizedBox(height: AppSpacing.space12),
+                    Semantics(
+                      label: strings.get(
+                        'library.progressValue',
+                        parameters: {'value': (progress * 100).round()},
+                      ),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 3,
+                        backgroundColor: context.appColors.borderSubtle,
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (entry.shortcutLabel case final shortcut?)
+                    Row(
+                      children: [
+                        const Icon(Icons.keyboard_outlined, size: 16),
+                        const SizedBox(width: AppSpacing.space8),
+                        AppShortcutHint(shortcut),
+                      ],
+                    ),
+                  const SizedBox(height: AppSpacing.space8),
+                  Text(
+                    strings.get('command.preview.enterHint'),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ],
               ),
             ),
-          ],
-          const Spacer(),
-          if (entry.shortcutLabel case final shortcut?)
-            Row(
-              children: [
-                const Icon(Icons.keyboard_outlined, size: 16),
-                const SizedBox(width: AppSpacing.space8),
-                AppShortcutHint(shortcut),
-              ],
-            ),
-          const SizedBox(height: AppSpacing.space8),
-          Text(
-            strings.get('command.preview.enterHint'),
-            style: Theme.of(context).textTheme.labelSmall,
           ),
         ],
       ),

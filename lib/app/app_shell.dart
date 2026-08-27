@@ -6,6 +6,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
   _AppPage _page = _AppPage.library;
   Timer? _windowSaveTimer;
   bool _restorationAttempted = false;
+  bool _tabSwitcherOpen = false;
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -182,10 +183,23 @@ final class _YamantakaAppState extends State<YamantakaApp>
               ? AppMotion.instant
               : AppMotion.standard,
           home: CallbackShortcuts(
-            bindings: AppCommandRegistry.applicationShortcuts(
-              openDocument: () => unawaited(_pickAndOpen()),
-              overrides: settings.shortcutOverrides,
-            ),
+            bindings: {
+              ...AppCommandRegistry.applicationShortcuts(
+                openDocument: () => unawaited(_pickAndOpen()),
+                overrides: settings.shortcutOverrides,
+              ),
+              const SingleActivator(
+                LogicalKeyboardKey.tab,
+                control: true,
+              ): () =>
+                  unawaited(_showTabSwitcher(reverse: false)),
+              const SingleActivator(
+                LogicalKeyboardKey.tab,
+                control: true,
+                shift: true,
+              ): () =>
+                  unawaited(_showTabSwitcher(reverse: true)),
+            },
             child: Focus(
               autofocus: true,
               child: Builder(
@@ -255,7 +269,10 @@ final class _YamantakaAppState extends State<YamantakaApp>
       onRevealDocument: (document) =>
           widget.services.revealDocument(document.path),
       onRemoveDocument: _removeDocument,
-      onDocumentVisible: widget.services.thumbnails.promoteVisibleCover,
+      onDocumentVisible: (document) {
+        widget.services.thumbnails.promoteVisibleCover(document);
+        widget.services.libraryIndex.prioritizeDocument(document.id);
+      },
       organization: widget.services.organization,
       onGlobalSearch: _showGlobalSearch,
       onOpenPaths: _openPaths,
@@ -307,14 +324,17 @@ final class _YamantakaAppState extends State<YamantakaApp>
         widget.services.settings.settings.copyWith(readerPanelWidth: width),
       ),
     ),
-    onPanelChanged: (section) => unawaited(
-      widget.services.settings.update(
-        widget.services.settings.settings.copyWith(
-          readerPanelOpen: section != null,
-          readerPanelSection: section?.name ?? '',
+    onPanelChanged: (section) {
+      widget.services.tabs.updateActivePanel(section?.name);
+      unawaited(
+        widget.services.settings.update(
+          widget.services.settings.settings.copyWith(
+            readerPanelOpen: section != null,
+            readerPanelSection: section?.name ?? '',
+          ),
         ),
-      ),
-    ),
+      );
+    },
     onChromeVisibilityChanged: (visible) => unawaited(
       widget.services.settings.update(
         widget.services.settings.settings.copyWith(
@@ -352,12 +372,15 @@ final class _YamantakaAppState extends State<YamantakaApp>
   Future<void> _showGlobalSearch() async {
     final context = _navigatorKey.currentContext;
     if (context == null) return;
+    widget.services.globalSearch.invalidateDerivedEntries();
     await showDialog<void>(
       context: context,
       builder: (context) => GlobalSearchDialog(
         controller: widget.services.globalSearch,
         indexController: widget.services.libraryIndex,
         onOpen: (result) => unawaited(_openGlobalSearchResult(result)),
+        onOpenInNewTab: (result) =>
+            unawaited(_openGlobalSearchResult(result, forceNewTab: true)),
       ),
     );
   }
@@ -375,6 +398,38 @@ final class _YamantakaAppState extends State<YamantakaApp>
         onRestore: (workspace) => unawaited(_restoreWorkspace(workspace)),
       ),
     );
+  }
+
+  Future<void> _showTabSwitcher({required bool reverse}) async {
+    if (_page != _AppPage.reader ||
+        _tabSwitcherOpen ||
+        widget.services.tabs.tabs.length < 2) {
+      return;
+    }
+    final primaryContext = FocusManager.instance.primaryFocus?.context;
+    if (primaryContext?.findAncestorWidgetOfExactType<EditableText>() != null) {
+      return;
+    }
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    _tabSwitcherOpen = true;
+    final selectedId = await showDialog<String>(
+      context: context,
+      barrierColor: Colors.black26,
+      builder: (context) => DocumentTabSwitcherDialog(
+        tabs: widget.services.tabs.tabs,
+        activeTabId: widget.services.tabs.activeTabId,
+        reverse: reverse,
+      ),
+    );
+    _tabSwitcherOpen = false;
+    if (!mounted || selectedId == null) return;
+    final tab = widget.services.tabs.tabs
+        .where((candidate) => candidate.id == selectedId)
+        .firstOrNull;
+    if (tab != null && tab.id != widget.services.tabs.activeTabId) {
+      await _activateTab(tab);
+    }
   }
 
   Future<void> _importFolder() async {
@@ -395,11 +450,16 @@ final class _YamantakaAppState extends State<YamantakaApp>
       builder: (context) => FolderImportDialog(
         controller: widget.services.folderImport,
         directoryPath: directory,
+        onOpenDuplicate: (candidate) async {
+          final existing = widget.services.folderImport.duplicateDocumentFor(
+            candidate,
+          );
+          if (existing != null) await _openPath(existing.path);
+        },
         onImport: (watchRoot) async {
           if (watchRoot) widget.services.folderWatch.authorize(directory);
           final summary = await widget.services.folderImport.importNew();
           await widget.services.library.load();
-          if (context.mounted) Navigator.pop(context);
           _showNotice(
             _strings.get(
               'library.importSummary',
@@ -462,13 +522,16 @@ final class _YamantakaAppState extends State<YamantakaApp>
     }
   }
 
-  Future<void> _openGlobalSearchResult(GlobalSearchResult result) async {
+  Future<void> _openGlobalSearchResult(
+    GlobalSearchResult result, {
+    bool forceNewTab = false,
+  }) async {
     final document = widget.services.documents.byId(result.documentId);
     if (document == null || document.isMissing) {
       _showNotice(_strings.get('search.resultUnavailable'));
       return;
     }
-    await _openPath(document.path);
+    await _openPath(document.path, forceNewTab: forceNewTab);
     final pageIndex = result.pageIndex;
     if (pageIndex != null &&
         widget.services.reader.status == ReaderStatus.ready) {
@@ -554,7 +617,12 @@ final class _YamantakaAppState extends State<YamantakaApp>
     return openFile(acceptedTypeGroups: const [pdfTypes]);
   }
 
-  Future<void> _openPath(String path) async {
+  Future<void> _openPath(
+    String path, {
+    bool forceNewTab = false,
+    bool registerTab = true,
+  }) async {
+    widget.services.startup.startIfAbsent(StartupPhase.firstPdf);
     var opened = await widget.services.reader.openPath(path);
     if (!mounted) return;
     final failure = widget.services.reader.error;
@@ -574,8 +642,22 @@ final class _YamantakaAppState extends State<YamantakaApp>
     }
     if (!mounted) return;
     if (opened) {
+      widget.services.startup.complete(StartupPhase.firstPdf);
       final document = widget.services.reader.document;
-      if (document != null) widget.services.tabs.open(document);
+      if (document != null && registerTab) {
+        widget.services.tabs.open(document, forceNew: forceNewTab);
+      }
+      widget.services.tabs.updateActivePanel(
+        widget.services.settings.settings.readerPanelOpen
+            ? widget.services.settings.settings.readerPanelSection
+            : null,
+      );
+      _syncActiveTab();
+      await widget.services.reader.retainWarmDocuments(
+        widget.services.tabs.tabs
+            .where((tab) => tab.resourceState == TabResourceState.warm)
+            .map((tab) => tab.documentId),
+      );
       setState(() => _page = _AppPage.reader);
       unawaited(
         widget.services.settings.update(
@@ -599,7 +681,31 @@ final class _YamantakaAppState extends State<YamantakaApp>
       return;
     }
     widget.services.tabs.activate(tab.id);
-    await _openPath(tab.path);
+    await widget.services.settings.update(
+      widget.services.settings.settings.copyWith(
+        readerPanelOpen: tab.panelSection != null,
+        readerPanelSection: tab.panelSection ?? '',
+      ),
+    );
+    await _openPath(tab.path, registerTab: false);
+    if (widget.services.reader.status != ReaderStatus.ready) return;
+    widget.services.reader.restoreNavigationSnapshot(
+      pageIndex: tab.pageIndex,
+      zoomLevel: tab.zoomLevel,
+      pageLayout: PageLayoutMode.values.firstWhere(
+        (value) => value.name == tab.pageLayout,
+        orElse: () => PageLayoutMode.single,
+      ),
+      readingMode: ReaderMode.values.firstWhere(
+        (value) => value.name == tab.readingMode,
+        orElse: () => ReaderMode.document,
+      ),
+      scrollOffset: tab.scrollOffset,
+      readingTheme: ReaderTheme.values.firstWhere(
+        (value) => value.name == tab.readingTheme,
+        orElse: () => ReaderTheme.ivory,
+      ),
+    );
   }
 
   void _syncActiveTab() {
@@ -612,10 +718,18 @@ final class _YamantakaAppState extends State<YamantakaApp>
       pageLayout: preferences.pageLayout.name,
       readingMode: preferences.viewMode.name,
       scrollOffset: preferences.scrollOffset,
+      readingTheme: preferences.readingTheme.name,
       readingProgress: reader.pageCount == 0
           ? 0
           : (reader.currentPageIndex + 1) / reader.pageCount,
     );
+    final document = reader.document;
+    if (document != null) {
+      widget.services.libraryIndex.prioritizeDocument(
+        document.id,
+        pageIndex: reader.currentPageIndex,
+      );
+    }
   }
 
   Future<String?> _askForPassword({required bool wrongPassword}) async {

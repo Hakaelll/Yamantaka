@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/performance/local_performance_monitor.dart';
 import '../../../storage/repositories/document_repository.dart';
 import '../domain/library_document.dart';
 import '../domain/library_query.dart';
@@ -11,10 +12,11 @@ import '../domain/document_enrichment.dart';
 import '../../organization/domain/organization_models.dart';
 
 final class LibraryController extends ChangeNotifier {
-  LibraryController(this._repository, this._logger);
+  LibraryController(this._repository, this._logger, [this._performance]);
 
   final DocumentRepository _repository;
   final AppLogger _logger;
+  final LocalPerformanceMonitor? _performance;
 
   List<LibraryDocument> documents = const [];
   int totalDocuments = 0;
@@ -72,6 +74,7 @@ final class LibraryController extends ChangeNotifier {
     }
     error = null;
     notifyListeners();
+    final stopwatch = Stopwatch()..start();
     try {
       final page = _repository.page(requested);
       if (generation != _loadGeneration) return;
@@ -107,6 +110,11 @@ final class LibraryController extends ChangeNotifier {
         debugMessage: exception.toString(),
       );
     } finally {
+      stopwatch.stop();
+      _performance?.recordDuration(
+        append ? 'library_page_more' : 'library_first_page',
+        stopwatch.elapsed,
+      );
       if (generation == _loadGeneration) {
         if (append) {
           isLoadingMore = false;

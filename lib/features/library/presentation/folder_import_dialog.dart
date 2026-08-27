@@ -4,6 +4,7 @@ import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../application/folder_import_controller.dart';
+import '../domain/import_queue.dart';
 
 final class FolderImportDialog extends StatefulWidget {
   const FolderImportDialog({
@@ -11,11 +12,13 @@ final class FolderImportDialog extends StatefulWidget {
     required this.controller,
     required this.onImport,
     required this.directoryPath,
+    this.onOpenDuplicate,
   });
 
   final FolderImportController controller;
   final Future<void> Function(bool watchRoot) onImport;
   final String directoryPath;
+  final Future<void> Function(FolderImportCandidate candidate)? onOpenDuplicate;
 
   @override
   State<FolderImportDialog> createState() => _FolderImportDialogState();
@@ -23,6 +26,7 @@ final class FolderImportDialog extends StatefulWidget {
 
 final class _FolderImportDialogState extends State<FolderImportDialog> {
   bool _watchRoot = false;
+  final Set<String> _ignoredDuplicates = {};
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +53,7 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
             final invalid = widget.controller.candidates
                 .where((item) => item.status == FolderCandidateStatus.invalid)
                 .length;
+            final summary = widget.controller.lastSummary;
             return Column(
               children: [
                 Padding(
@@ -71,6 +76,30 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                     ],
                   ),
                 ),
+                if (summary != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.space16,
+                      0,
+                      AppSpacing.space16,
+                      AppSpacing.space8,
+                    ),
+                    child: AppStatusLabel(
+                      icon: summary.cancelled
+                          ? Icons.stop_circle_outlined
+                          : Icons.task_alt_rounded,
+                      label: strings.get(
+                        summary.cancelled
+                            ? 'folderImport.summaryCancelled'
+                            : 'folderImport.summaryComplete',
+                        parameters: {
+                          'imported': summary.imported,
+                          'duplicates': summary.duplicates,
+                          'failed': summary.inaccessible + summary.invalid,
+                        },
+                      ),
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.space16,
@@ -143,8 +172,17 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                           itemBuilder: (context, index) {
                             final candidate =
                                 widget.controller.candidates[index];
+                            final workState = widget.controller.workStateFor(
+                              candidate,
+                            );
+                            final duplicateIgnored = _ignoredDuplicates
+                                .contains(candidate.path);
                             return ListTile(
-                              leading: Icon(_icon(candidate.status)),
+                              leading: Icon(
+                                workState == null
+                                    ? _icon(candidate.status)
+                                    : _workIcon(workState),
+                              ),
                               title: Text(
                                 candidate.fileName,
                                 maxLines: 1,
@@ -152,9 +190,59 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
                               ),
                               subtitle: Text(
                                 strings.get(
-                                  'folderImport.status.${candidate.status.name}',
+                                  duplicateIgnored
+                                      ? 'folderImport.status.ignored'
+                                      : workState == null
+                                      ? 'folderImport.status.${candidate.status.name}'
+                                      : 'folderImport.work.${workState.name}',
                                 ),
                               ),
+                              trailing:
+                                  candidate.status ==
+                                      FolderCandidateStatus.duplicate
+                                  ? PopupMenuButton<_DuplicateAction>(
+                                      tooltip: strings.get(
+                                        'folderImport.duplicateActions',
+                                      ),
+                                      enabled: !widget.controller.isImporting,
+                                      onSelected: (action) =>
+                                          _runDuplicateAction(
+                                            action,
+                                            candidate,
+                                          ),
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem(
+                                          value: _DuplicateAction.open,
+                                          enabled:
+                                              widget.onOpenDuplicate != null,
+                                          child: AppMenuItemContent(
+                                            icon: Icons.open_in_new_rounded,
+                                            label: strings.get(
+                                              'folderImport.openExisting',
+                                            ),
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: _DuplicateAction.review,
+                                          child: AppMenuItemContent(
+                                            icon: Icons.difference_outlined,
+                                            label: strings.get(
+                                              'folderImport.reviewDifferences',
+                                            ),
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: _DuplicateAction.ignore,
+                                          child: AppMenuItemContent(
+                                            icon: Icons.visibility_off_outlined,
+                                            label: strings.get(
+                                              'folderImport.ignore',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : null,
                             );
                           },
                         ),
@@ -222,6 +310,124 @@ final class _FolderImportDialogState extends State<FolderImportDialog> {
     FolderCandidateStatus.inaccessible => Icons.lock_outline_rounded,
     FolderCandidateStatus.invalid => Icons.error_outline_rounded,
   };
+
+  static IconData _workIcon(ImportWorkState state) => switch (state) {
+    ImportWorkState.pending => Icons.schedule_rounded,
+    ImportWorkState.running => Icons.sync_rounded,
+    ImportWorkState.completed => Icons.task_alt_rounded,
+    ImportWorkState.failed => Icons.error_outline_rounded,
+    ImportWorkState.cancelled => Icons.stop_circle_outlined,
+  };
+
+  Future<void> _runDuplicateAction(
+    _DuplicateAction action,
+    FolderImportCandidate candidate,
+  ) async {
+    switch (action) {
+      case _DuplicateAction.open:
+        final open = widget.onOpenDuplicate;
+        if (open == null || !mounted) return;
+        Navigator.pop(context);
+        await open(candidate);
+      case _DuplicateAction.review:
+        await _showDuplicateReview(candidate);
+      case _DuplicateAction.ignore:
+        setState(() => _ignoredDuplicates.add(candidate.path));
+    }
+  }
+
+  Future<void> _showDuplicateReview(FolderImportCandidate candidate) async {
+    final existing = widget.controller.duplicateDocumentFor(candidate);
+    final incoming = candidate.inspected;
+    if (existing == null || incoming == null || !mounted) return;
+    final strings = YamantakaLocalizations.of(context);
+    final exactContent = existing.fingerprint == incoming.fingerprint;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.difference_outlined),
+        title: Text(strings.get('folderImport.reviewTitle')),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                strings.get(
+                  exactContent
+                      ? 'folderImport.sameContent'
+                      : 'folderImport.differentContent',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.space16),
+              _DuplicateDifferenceRow(
+                label: strings.get('folderImport.incomingFile'),
+                value:
+                    '${incoming.fileName} · ${_formatBytes(incoming.fileSize)}',
+              ),
+              _DuplicateDifferenceRow(
+                label: strings.get('folderImport.existingFile'),
+                value:
+                    '${existing.fileName} · ${_formatBytes(existing.fileSize)}',
+              ),
+              _DuplicateDifferenceRow(
+                label: strings.get('folderImport.modified'),
+                value:
+                    '${incoming.modifiedAt.toLocal()} / ${existing.fileModifiedAt.toLocal()}',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(strings.get('action.close')),
+          ),
+          if (widget.onOpenDuplicate != null)
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                Navigator.pop(this.context);
+                await widget.onOpenDuplicate!(candidate);
+              },
+              child: Text(strings.get('folderImport.openExisting')),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kib = bytes / 1024;
+    if (kib < 1024) return '${kib.toStringAsFixed(1)} KiB';
+    return '${(kib / 1024).toStringAsFixed(1)} MiB';
+  }
+}
+
+enum _DuplicateAction { open, review, ignore }
+
+final class _DuplicateDifferenceRow extends StatelessWidget {
+  const _DuplicateDifferenceRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: AppSpacing.space8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 132,
+          child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+        ),
+        Expanded(child: Text(value)),
+      ],
+    ),
+  );
 }
 
 final class _CountChip extends StatelessWidget {

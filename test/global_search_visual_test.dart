@@ -34,7 +34,7 @@ void main() {
     ]);
   });
 
-  testWidgets('captures global search 0.9 visual evidence', (tester) async {
+  testWidgets('captures global search 0.10 visual evidence', (tester) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_SEARCH_MATRIX_DIR');
     if (outputRoot.isEmpty) return;
     final output = Directory(outputRoot)..createSync(recursive: true);
@@ -106,6 +106,8 @@ void main() {
       ThemeMode themeMode = ThemeMode.light,
       bool highContrast = false,
       bool reduceMotion = false,
+      double textScale = 1,
+      bool compactDetail = false,
     }) async {
       tester.view.physicalSize = size;
       await tester.pumpWidget(
@@ -129,6 +131,7 @@ void main() {
               data: MediaQuery.of(context).copyWith(
                 highContrast: highContrast,
                 disableAnimations: reduceMotion,
+                textScaler: TextScaler.linear(textScale),
               ),
               child: child!,
             ),
@@ -143,7 +146,22 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 250));
+      if (compactDetail) {
+        await tester.tap(find.text('Cuaderno de lectura').first);
+        await tester.pump();
+      }
       expect(tester.takeException(), isNull, reason: name);
+      final closeRect = tester.getRect(find.byIcon(Icons.close_rounded));
+      expect(
+        closeRect.top >= 0 &&
+            closeRect.left >= 0 &&
+            closeRect.right <= size.width &&
+            closeRect.bottom <= size.height,
+        isTrue,
+        reason:
+            '$name must keep its close action inside the viewport: '
+            '$closeRect',
+      );
       final path = '${output.path}${Platform.pathSeparator}$name.png';
       final boundary = tester.renderObject<RenderRepaintBoundary>(
         find.byKey(boundaryKey),
@@ -164,6 +182,14 @@ void main() {
         'theme': themeMode.name,
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
+        'textScale': textScale,
+        'view': compactDetail ? 'detail' : 'list',
+        'closeActionBounds': {
+          'left': closeRect.left,
+          'top': closeRect.top,
+          'right': closeRect.right,
+          'bottom': closeRect.bottom,
+        },
         'source': 'flutter-widget-test',
         'path': path,
       });
@@ -174,9 +200,30 @@ void main() {
       size: const Size(640, 480),
     );
     await capture(
+      name: 'search-640x480-detail-light-widget',
+      size: const Size(640, 480),
+      compactDetail: true,
+    );
+    await capture(
+      name: 'search-640x480-detail-text-200-widget',
+      size: const Size(640, 480),
+      textScale: 2,
+      compactDetail: true,
+    );
+    await capture(
       name: 'search-1280x720-light-widget',
       size: const Size(1280, 720),
     );
+    for (final entry in const [
+      ('800x600', Size(800, 600)),
+      ('1600x900', Size(1600, 900)),
+      ('1920x1080', Size(1920, 1080)),
+      ('1920x1200', Size(1920, 1200)),
+      ('2560x1440', Size(2560, 1440)),
+      ('3440x1440', Size(3440, 1440)),
+    ]) {
+      await capture(name: 'search-${entry.$1}-light-widget', size: entry.$2);
+    }
     await capture(
       name: 'search-1280x720-dark-widget',
       size: const Size(1280, 720),
@@ -192,13 +239,28 @@ void main() {
       size: const Size(1280, 720),
       reduceMotion: true,
     );
+    await capture(
+      name: 'search-1280x720-text-130-widget',
+      size: const Size(1280, 720),
+      textScale: 1.3,
+    );
+    await capture(
+      name: 'search-1280x720-text-150-widget',
+      size: const Size(1280, 720),
+      textScale: 1.5,
+    );
+    await capture(
+      name: 'search-1280x720-text-200-widget',
+      size: const Size(1280, 720),
+      textScale: 2,
+    );
 
     File(
       '${output.path}${Platform.pathSeparator}search-matrix.json',
     ).writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-global-search-widget-matrix',
-        'productVersion': '0.9.0',
+        'productVersion': '0.10.0',
         'generatedAt': '2026-08-26T12:00:00Z',
         'cases': cases,
       }),

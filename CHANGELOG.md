@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.10.0 — 2026-08-27 (continuidad y orientación local)
+
+- Añade una franja condicional de Continuar leyendo con página, total,
+  porcentaje, última apertura, acción primaria, Enter y menú contextual.
+- Añade conmutador compacto de documentos con Ctrl+Tab/Ctrl+Shift+Tab y una
+  política de dos handles PDFium calientes como máximo; los documentos
+  suspendidos conservan página, zoom, layout, modo, scroll, tema y panel, y
+  liberan recursos nativos. Ctrl+Enter abre un resultado en otra pestaña.
+- Amplía Ir a página con número, porcentaje, inicio/fin, scrubber, historial,
+  validación inline, Escape y retorno de foco.
+- Amplía FTS5 con filtros por documento, texto, anotación, marcador, colección
+  y etiqueta, relevancia con recencia como desempate, resaltado y estados
+  cancelado, ausente y obsoleto; en compacto navega de lista a detalle con
+  retorno predecible y el debounce evita refrescar fuentes derivadas por tecla.
+- Mantiene el resultado por archivo en la cola de importación; cada duplicado
+  permite abrir el existente, comparar huella/tamaño/fecha o ignorarlo, sin
+  mover ni copiar PDF.
+- Combina anotaciones y marcadores en un filtro ordenado por página; saltar a
+  un resultado anuncia y marca temporalmente el destino sin modificar el PDF.
+- Añade búsqueda de preferencias, alcance global explícito y reset por sección
+  antes de las acciones de borrado total.
+- Instrumenta bootstrap, base de datos, primera Biblioteca, primer PDF,
+  consultas de Biblioteca y búsqueda con métricas locales sin datos privados.
+- Prioriza en la cola incremental el documento y la página visibles, y mantiene
+  la pausa de tareas no críticas durante interacción o ventana minimizada.
+- Desacopla el repositorio de espacios de trabajo de los tokens Flutter para
+  recuperar el benchmark Dart puro y mantener las restricciones en el dominio.
+- Conserva el contrato visual 0.9, adapta paleta y previews a texto 150/200 % y
+  genera golden 0.10, comparaciones 0.9/0.10 y release local `0.10.0+11` sin
+  publicar ni firmar.
+
 ## 0.9.0 — 2026-08-26 (lector compacto de precisión)
 
 - Reduce la barra superior del lector a 56 px en escritorio y 52 px en

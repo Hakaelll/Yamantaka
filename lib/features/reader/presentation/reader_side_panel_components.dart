@@ -614,6 +614,7 @@ final class _BookmarksPanel extends StatelessWidget {
                         onOpen: () => controller.navigateTo(
                           bookmarks[index].pageIndex,
                           reason: NavigationReason.bookmark,
+                          focusDestination: true,
                           label: strings.get(
                             'reader.bookmarkOnPage',
                             parameters: {
@@ -673,6 +674,7 @@ final class _BookmarksPanel extends StatelessWidget {
 
 final class _BookmarkTile extends StatelessWidget {
   const _BookmarkTile({
+    super.key,
     required this.bookmark,
     required this.onOpen,
     required this.onDelete,
@@ -715,6 +717,27 @@ final class _BookmarkTile extends StatelessWidget {
   }
 }
 
+enum _ReaderNoteFilter { all, annotations, bookmarks }
+
+final class _ReaderNoteEntry {
+  _ReaderNoteEntry.annotation(PdfAnnotation value)
+    : annotation = value,
+      bookmark = null,
+      pageIndex = value.pageIndex,
+      updatedAt = value.updatedAt;
+
+  _ReaderNoteEntry.bookmark(Bookmark value)
+    : annotation = null,
+      bookmark = value,
+      pageIndex = value.pageIndex,
+      updatedAt = value.updatedAt;
+
+  final PdfAnnotation? annotation;
+  final Bookmark? bookmark;
+  final int pageIndex;
+  final DateTime updatedAt;
+}
+
 final class _AnnotationsPanel extends StatefulWidget {
   const _AnnotationsPanel({required this.controller, this.onExport});
 
@@ -727,6 +750,7 @@ final class _AnnotationsPanel extends StatefulWidget {
 
 final class _AnnotationsPanelState extends State<_AnnotationsPanel> {
   final TextEditingController _queryController = TextEditingController();
+  _ReaderNoteFilter _noteFilter = _ReaderNoteFilter.all;
 
   @override
   void dispose() {
@@ -746,245 +770,356 @@ final class _AnnotationsPanelState extends State<_AnnotationsPanel> {
       );
     }
     return ListenableBuilder(
-      listenable: annotations,
-      builder: (context, _) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.space12),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.tonalIcon(
-                        key: const Key('annotation-add-page-note'),
-                        onPressed: () => _editAnnotation(),
-                        icon: const Icon(Icons.add_comment_outlined, size: 18),
-                        label: Text(
-                          strings.get(
-                            'reader.annotatePage',
-                            parameters: {
-                              'page': widget.controller.currentPageIndex + 1,
-                            },
+      listenable: Listenable.merge([annotations, widget.controller.bookmarks]),
+      builder: (context, _) {
+        final entries = _combinedEntries(annotations.annotations);
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.space12),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          key: const Key('annotation-add-page-note'),
+                          onPressed: () => _editAnnotation(),
+                          icon: const Icon(
+                            Icons.add_comment_outlined,
+                            size: 18,
+                          ),
+                          label: Text(
+                            strings.get(
+                              'reader.annotatePage',
+                              parameters: {
+                                'page': widget.controller.currentPageIndex + 1,
+                              },
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.space8),
-                    IconButton.outlined(
-                      tooltip: strings.get('command.undoAnnotation'),
-                      onPressed: annotations.canUndo ? annotations.undo : null,
-                      icon: const Icon(Icons.undo_rounded),
-                    ),
-                    const SizedBox(width: AppSpacing.space4),
-                    IconButton.outlined(
-                      tooltip: strings.get('command.redoAnnotation'),
-                      onPressed: annotations.canRedo ? annotations.redo : null,
-                      icon: const Icon(Icons.redo_rounded),
-                    ),
-                    if (widget.onExport != null) ...[
                       const SizedBox(width: AppSpacing.space8),
                       IconButton.outlined(
-                        tooltip: strings.get('reader.exportAnnotations'),
-                        onPressed: widget.onExport,
-                        icon: const Icon(Icons.ios_share_outlined),
+                        tooltip: strings.get('command.undoAnnotation'),
+                        onPressed: annotations.canUndo
+                            ? annotations.undo
+                            : null,
+                        icon: const Icon(Icons.undo_rounded),
                       ),
+                      const SizedBox(width: AppSpacing.space4),
+                      IconButton.outlined(
+                        tooltip: strings.get('command.redoAnnotation'),
+                        onPressed: annotations.canRedo
+                            ? annotations.redo
+                            : null,
+                        icon: const Icon(Icons.redo_rounded),
+                      ),
+                      if (widget.onExport != null) ...[
+                        const SizedBox(width: AppSpacing.space8),
+                        IconButton.outlined(
+                          tooltip: strings.get('reader.exportAnnotations'),
+                          onPressed: widget.onExport,
+                          icon: const Icon(Icons.ios_share_outlined),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.space8),
-                TextField(
-                  controller: _queryController,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                    labelText: strings.get('reader.searchNotes'),
                   ),
-                  onChanged: (value) => annotations.setFilters(search: value),
-                ),
-                const SizedBox(height: AppSpacing.space8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<AnnotationType?>(
-                        initialValue: annotations.typeFilter,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          isDense: true,
-                          labelText: strings.get('reader.type'),
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                            value: null,
-                            child: Text(strings.get('reader.all')),
+                  const SizedBox(height: AppSpacing.space8),
+                  DropdownButtonFormField<_ReaderNoteFilter>(
+                    key: const Key('reader-note-kind-filter'),
+                    initialValue: _noteFilter,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      labelText: strings.get('reader.noteFilter'),
+                    ),
+                    items: [
+                      for (final filter in _ReaderNoteFilter.values)
+                        DropdownMenuItem(
+                          value: filter,
+                          child: Text(
+                            strings.get('reader.noteFilter.${filter.name}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          ...AnnotationType.values.map(
-                            (type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(
-                                strings.get('annotation.type.${type.name}'),
-                                overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => _noteFilter = value);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.space8),
+                  TextField(
+                    controller: _queryController,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                      labelText: strings.get('reader.searchNotes'),
+                    ),
+                    onChanged: (value) => annotations.setFilters(search: value),
+                  ),
+                  const SizedBox(height: AppSpacing.space8),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked =
+                          MediaQuery.textScalerOf(context).scale(1) > 1.5;
+                      final fieldWidth = stacked
+                          ? constraints.maxWidth
+                          : (constraints.maxWidth - AppSpacing.space8) / 2;
+                      return Wrap(
+                        spacing: AppSpacing.space8,
+                        runSpacing: AppSpacing.space8,
+                        children: [
+                          SizedBox(
+                            width: fieldWidth,
+                            child: DropdownButtonFormField<AnnotationType?>(
+                              initialValue: annotations.typeFilter,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                labelText: strings.get('reader.type'),
+                              ),
+                              items: [
+                                DropdownMenuItem(
+                                  value: null,
+                                  child: Text(
+                                    strings.get('reader.all'),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                ...AnnotationType.values.map(
+                                  (type) => DropdownMenuItem(
+                                    value: type,
+                                    child: Text(
+                                      strings.get(
+                                        'annotation.type.${type.name}',
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (value) => annotations.setFilters(
+                                type: value,
+                                clearType: value == null,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: fieldWidth,
+                            child: DropdownButtonFormField<AnnotationColor?>(
+                              initialValue: annotations.colorFilter,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                labelText: strings.get('reader.color'),
+                              ),
+                              items: [
+                                DropdownMenuItem(
+                                  value: null,
+                                  child: Text(
+                                    strings.get('reader.all'),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                ...AnnotationColor.values.map(
+                                  (color) => DropdownMenuItem(
+                                    value: color,
+                                    child: Text(
+                                      strings.get(
+                                        'annotation.color.${color.name}',
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (value) => annotations.setFilters(
+                                color: value,
+                                clearColor: value == null,
                               ),
                             ),
                           ),
                         ],
-                        onChanged: (value) => annotations.setFilters(
-                          type: value,
-                          clearType: value == null,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.space8),
-                    Expanded(
-                      child: DropdownButtonFormField<AnnotationColor?>(
-                        initialValue: annotations.colorFilter,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          isDense: true,
-                          labelText: strings.get('reader.color'),
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                            value: null,
-                            child: Text(strings.get('reader.all')),
-                          ),
-                          ...AnnotationColor.values.map(
-                            (color) => DropdownMenuItem(
-                              value: color,
-                              child: Text(
-                                strings.get('annotation.color.${color.name}'),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ],
-                        onChanged: (value) => annotations.setFilters(
-                          color: value,
-                          clearColor: value == null,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (annotations.reviewRequiredCount > 0)
-            MaterialBanner(
-              content: Text(
-                strings.count(
-                  'count.annotationsReview',
-                  annotations.reviewRequiredCount,
-                ),
-              ),
-              leading: const Icon(Icons.warning_amber_rounded),
-              actions: const [SizedBox.shrink()],
-            ),
-          const Divider(height: 1),
-          Expanded(
-            child: annotations.annotations.isEmpty
-                ? _PanelEmptyState(
-                    icon: Icons.rate_review_outlined,
-                    title: strings.get('reader.noAnnotations'),
-                    message: strings.get('reader.noAnnotations.description'),
-                  )
-                : ListView.builder(
-                    key: const PageStorageKey('reader-annotations'),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: AppSpacing.space8,
-                    ),
-                    itemCount: annotations.annotations.length,
-                    itemBuilder: (context, index) {
-                      final annotation = annotations.annotations[index];
-                      return Semantics(
-                        button: true,
-                        label: strings.get(
-                          'reader.annotationSemantics',
-                          parameters: {
-                            'type': strings.get(
-                              'annotation.type.${annotation.type.name}',
-                            ),
-                            'page': annotation.pageIndex + 1,
-                            'color': strings.get(
-                              'annotation.color.${annotation.color.name}',
-                            ),
-                          },
-                        ),
-                        child: ListTile(
-                          leading: _AnnotationColorMarker(
-                            color: Color(annotation.color.argb),
-                            type: annotation.type,
-                          ),
-                          title: Text(
-                            annotation.note ??
-                                annotation.selectedText ??
-                                strings.get(
-                                  'annotation.type.${annotation.type.name}',
-                                ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            [
-                              strings.get(
-                                'reader.page',
-                                parameters: {'page': annotation.pageIndex + 1},
-                              ),
-                              if (annotation.tags.isNotEmpty)
-                                annotation.tags.take(2).join(', '),
-                              if (annotation.status ==
-                                  AnnotationAttachmentStatus.reviewRequired)
-                                strings.get('reader.reviewPosition'),
-                            ].join(' · '),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () => widget.controller.navigateTo(
-                            annotation.pageIndex,
-                            reason: NavigationReason.annotation,
-                            label: strings.get(
-                              'reader.annotationOnPage',
-                              parameters: {'page': annotation.pageIndex + 1},
-                            ),
-                          ),
-                          trailing: PopupMenuButton<_AnnotationAction>(
-                            tooltip: strings.get('reader.annotationActions'),
-                            onSelected: (action) =>
-                                _runAction(action, annotation),
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: _AnnotationAction.edit,
-                                child: AppMenuItemContent(
-                                  icon: Icons.edit_outlined,
-                                  label: strings.get('action.edit'),
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: _AnnotationAction.copy,
-                                child: AppMenuItemContent(
-                                  icon: Icons.content_copy_outlined,
-                                  label: strings.get('action.copyContent'),
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: _AnnotationAction.delete,
-                                child: AppMenuItemContent(
-                                  icon: Icons.delete_outline_rounded,
-                                  label: strings.get('action.delete'),
-                                  destructive: true,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       );
                     },
                   ),
+                ],
+              ),
+            ),
+            if (annotations.reviewRequiredCount > 0)
+              MaterialBanner(
+                content: Text(
+                  strings.count(
+                    'count.annotationsReview',
+                    annotations.reviewRequiredCount,
+                  ),
+                ),
+                leading: const Icon(Icons.warning_amber_rounded),
+                actions: const [SizedBox.shrink()],
+              ),
+            const Divider(height: 1),
+            Expanded(
+              child: entries.isEmpty
+                  ? _PanelEmptyState(
+                      icon: Icons.speaker_notes_off_outlined,
+                      title: strings.get('reader.noNotes'),
+                      message: strings.get('reader.noNotes.description'),
+                    )
+                  : ListView.builder(
+                      key: const PageStorageKey('reader-notes'),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.space8,
+                      ),
+                      itemCount: entries.length,
+                      itemBuilder: (context, index) {
+                        final entry = entries[index];
+                        final bookmark = entry.bookmark;
+                        if (bookmark != null) {
+                          return _BookmarkTile(
+                            key: ValueKey(
+                              'reader-note-bookmark-${bookmark.id}',
+                            ),
+                            bookmark: bookmark,
+                            onOpen: () => widget.controller.navigateTo(
+                              bookmark.pageIndex,
+                              reason: NavigationReason.bookmark,
+                              focusDestination: true,
+                              label: strings.get(
+                                'reader.bookmarkOnPage',
+                                parameters: {'page': bookmark.pageIndex + 1},
+                              ),
+                            ),
+                            onDelete: () =>
+                                widget.controller.bookmarks.remove(bookmark),
+                          );
+                        }
+                        return _buildAnnotationTile(
+                          context,
+                          entry.annotation!,
+                          strings,
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<_ReaderNoteEntry> _combinedEntries(
+    List<PdfAnnotation> visibleAnnotations,
+  ) {
+    final entries = <_ReaderNoteEntry>[];
+    if (_noteFilter != _ReaderNoteFilter.bookmarks) {
+      entries.addAll(visibleAnnotations.map(_ReaderNoteEntry.annotation));
+    }
+    if (_noteFilter != _ReaderNoteFilter.annotations) {
+      final query = _queryController.text.trim().toLowerCase();
+      entries.addAll(
+        widget.controller.bookmarks.bookmarks
+            .where(
+              (bookmark) =>
+                  query.isEmpty ||
+                  (bookmark.label ?? '').toLowerCase().contains(query) ||
+                  '${bookmark.pageIndex + 1}'.contains(query),
+            )
+            .map(_ReaderNoteEntry.bookmark),
+      );
+    }
+    entries.sort((left, right) {
+      final page = left.pageIndex.compareTo(right.pageIndex);
+      if (page != 0) return page;
+      final updated = right.updatedAt.compareTo(left.updatedAt);
+      if (updated != 0) return updated;
+      return (left.annotation?.id ?? left.bookmark!.id).compareTo(
+        right.annotation?.id ?? right.bookmark!.id,
+      );
+    });
+    return entries;
+  }
+
+  Widget _buildAnnotationTile(
+    BuildContext context,
+    PdfAnnotation annotation,
+    YamantakaLocalizations strings,
+  ) => Semantics(
+    button: true,
+    label: strings.get(
+      'reader.annotationSemantics',
+      parameters: {
+        'type': strings.get('annotation.type.${annotation.type.name}'),
+        'page': annotation.pageIndex + 1,
+        'color': strings.get('annotation.color.${annotation.color.name}'),
+      },
+    ),
+    child: ListTile(
+      key: ValueKey('reader-note-annotation-${annotation.id}'),
+      leading: _AnnotationColorMarker(
+        color: Color(annotation.color.argb),
+        type: annotation.type,
+      ),
+      title: Text(
+        annotation.note ??
+            annotation.selectedText ??
+            strings.get('annotation.type.${annotation.type.name}'),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        [
+          strings.get(
+            'reader.page',
+            parameters: {'page': annotation.pageIndex + 1},
+          ),
+          if (annotation.tags.isNotEmpty) annotation.tags.take(2).join(', '),
+          if (annotation.status == AnnotationAttachmentStatus.reviewRequired)
+            strings.get('reader.reviewPosition'),
+        ].join(' · '),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () => widget.controller.navigateTo(
+        annotation.pageIndex,
+        reason: NavigationReason.annotation,
+        focusDestination: true,
+        label: strings.get(
+          'reader.annotationOnPage',
+          parameters: {'page': annotation.pageIndex + 1},
+        ),
+      ),
+      trailing: PopupMenuButton<_AnnotationAction>(
+        tooltip: strings.get('reader.annotationActions'),
+        onSelected: (action) => _runAction(action, annotation),
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: _AnnotationAction.edit,
+            child: AppMenuItemContent(
+              icon: Icons.edit_outlined,
+              label: strings.get('action.edit'),
+            ),
+          ),
+          PopupMenuItem(
+            value: _AnnotationAction.copy,
+            child: AppMenuItemContent(
+              icon: Icons.content_copy_outlined,
+              label: strings.get('action.copyContent'),
+            ),
+          ),
+          PopupMenuItem(
+            value: _AnnotationAction.delete,
+            child: AppMenuItemContent(
+              icon: Icons.delete_outline_rounded,
+              label: strings.get('action.delete'),
+              destructive: true,
+            ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 
   Future<void> _runAction(
     _AnnotationAction action,

@@ -36,6 +36,14 @@ final class SettingsScreen extends StatefulWidget {
 
 final class _SettingsScreenState extends State<SettingsScreen> {
   _SettingsSectionId _selectedSection = _SettingsSectionId.appearance;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,33 +55,121 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         return Scaffold(
           backgroundColor: context.appColors.settingsBackground,
           appBar: SettingsAppBar(onBack: widget.onBack),
-          body: LayoutBuilder(
-            builder: (context, constraints) {
-              final sections = _buildSections(settings, strings);
-              if (AppBreakpoints.classify(constraints.maxWidth) !=
-                  AppWindowClass.expanded) {
-                return _CompactSettings(sections: sections);
-              }
-              return _DesktopSettings(
-                sections: sections,
-                settings: settings,
-                selected: _selectedSection,
-                onSelected: (section) {
-                  setState(() => _selectedSection = section);
+          body: Column(
+            children: [
+              _SettingsSearchField(
+                controller: _searchController,
+                query: _searchQuery,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                onClear: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
                 },
-              );
-            },
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final allSections = _buildSections(settings, strings);
+                    final sections = _filteredSections(allSections, strings);
+                    if (sections.isEmpty) {
+                      return AppStatusView(
+                        icon: Icons.search_off_rounded,
+                        title: strings.get('settings.searchNoResults'),
+                        message: strings.get(
+                          'settings.searchNoResults.description',
+                        ),
+                        action: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                        actionLabel: strings.get('action.clear'),
+                      );
+                    }
+                    final selected =
+                        sections.any(
+                          (section) => section.id == _selectedSection,
+                        )
+                        ? _selectedSection
+                        : sections.first.id;
+                    if (AppBreakpoints.classify(constraints.maxWidth) !=
+                        AppWindowClass.expanded) {
+                      return _CompactSettings(sections: sections);
+                    }
+                    return _DesktopSettings(
+                      sections: sections,
+                      settings: settings,
+                      selected: selected,
+                      onSelected: (section) {
+                        setState(() => _selectedSection = section);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
+  List<_SettingsSectionData> _filteredSections(
+    List<_SettingsSectionData> sections,
+    YamantakaLocalizations strings,
+  ) {
+    final terms = _searchQuery
+        .trim()
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((term) => term.isNotEmpty)
+        .toList(growable: false);
+    if (terms.isEmpty) return sections;
+    return sections
+        .where((section) {
+          final text = _settingsSearchText(section, strings).toLowerCase();
+          return terms.every(text.contains);
+        })
+        .toList(growable: false);
+  }
+
+  String _settingsSearchText(
+    _SettingsSectionData section,
+    YamantakaLocalizations strings,
+  ) {
+    final values = <String>[section.id.label(strings), section.description];
+    for (final child in section.children) {
+      switch (child) {
+        case final _SwitchSetting setting:
+          values.addAll([setting.label, ?setting.description]);
+        case final _DropdownSetting setting:
+          values.addAll([
+            setting.label,
+            ?setting.description,
+            ...setting.values.values,
+          ]);
+        case final _SliderSetting setting:
+          values.addAll([setting.label, setting.description]);
+        case final _ActionSetting setting:
+          values.addAll([setting.label, setting.description]);
+        case final _ShortcutSetting setting:
+          final definition = AppCommandRegistry.definitions.firstWhere(
+            (item) => item.id == setting.commandId,
+          );
+          values.add(strings.get('command.${definition.id.name}'));
+        case final _SettingRow setting:
+          values.addAll([setting.label, ?setting.description]);
+        default:
+          break;
+      }
+    }
+    return values.join(' ');
+  }
+
   List<_SettingsSectionData> _buildSections(
     AppSettings settings,
     YamantakaLocalizations strings,
   ) {
-    return [
+    final sections = [
       _SettingsSectionData(
         id: _SettingsSectionId.appearance,
         description: strings.get('settings.appearance.description'),
@@ -504,6 +600,79 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     ];
+    return [
+      for (final section in sections)
+        _SettingsSectionData(
+          id: section.id,
+          description: section.description,
+          children: section.children,
+          onReset: _isResettableSection(section.id)
+              ? () => _resetSection(section.id, settings)
+              : null,
+        ),
+    ];
+  }
+
+  bool _isResettableSection(_SettingsSectionId id) => switch (id) {
+    _SettingsSectionId.appearance ||
+    _SettingsSectionId.reading ||
+    _SettingsSectionId.readerBar ||
+    _SettingsSectionId.shortcuts ||
+    _SettingsSectionId.library ||
+    _SettingsSectionId.history => true,
+    _SettingsSectionId.dataPrivacy || _SettingsSectionId.advanced => false,
+  };
+
+  void _resetSection(_SettingsSectionId id, AppSettings settings) {
+    const defaults = AppSettings();
+    final next = switch (id) {
+      _SettingsSectionId.appearance => settings.copyWith(
+        darkMode: defaults.darkMode,
+        defaultReaderTheme: defaults.defaultReaderTheme,
+        autoHideControls: defaults.autoHideControls,
+        showProgress: defaults.showProgress,
+        reduceMotion: defaults.reduceMotion,
+        disableAnimations: defaults.disableAnimations,
+        motionPreference: AppMotionPreference.full,
+        interfaceDensity: defaults.interfaceDensity,
+        visualProfile: defaults.visualProfile,
+        languageCode: defaults.languageCode,
+      ),
+      _SettingsSectionId.reading => settings.copyWith(
+        defaultViewMode: defaults.defaultViewMode,
+        defaultPageLayout: defaults.defaultPageLayout,
+        defaultZoomMode: defaults.defaultZoomMode,
+        readingDirection: defaults.readingDirection,
+        defaultMargin: defaults.defaultMargin,
+        restoreLastPosition: defaults.restoreLastPosition,
+      ),
+      _SettingsSectionId.readerBar => settings.copyWith(
+        showReaderPanelControls: defaults.showReaderPanelControls,
+        readerPanelWidth: defaults.readerPanelWidth,
+        restoreLastSession: defaults.restoreLastSession,
+        startInLibrary: defaults.startInLibrary,
+      ),
+      _SettingsSectionId.shortcuts => settings.copyWith(
+        shortcutOverrides: defaults.shortcutOverrides,
+      ),
+      _SettingsSectionId.library => settings.copyWith(
+        showRecents: defaults.showRecents,
+        generateCovers: defaults.generateCovers,
+        maxCacheMegabytes: defaults.maxCacheMegabytes,
+        libraryReadingFilter: defaults.libraryReadingFilter,
+      ),
+      _SettingsSectionId.history => settings.copyWith(
+        recordReadingSessions: defaults.recordReadingSessions,
+        readingHistoryLimit: defaults.readingHistoryLimit,
+      ),
+      _SettingsSectionId.dataPrivacy || _SettingsSectionId.advanced => settings,
+    };
+    if (id == _SettingsSectionId.reading) {
+      widget.services.readingProfiles
+        ..setDefault('builtin-reading')
+        ..apply('builtin-reading');
+    }
+    unawaited(_update(next));
   }
 
   Future<void> _showContextualHelp(BuildContext context) => showDialog<void>(
