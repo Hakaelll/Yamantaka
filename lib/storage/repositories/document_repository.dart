@@ -766,6 +766,19 @@ final class DocumentRepository {
     );
   }
 
+  void markFinished(String documentId) {
+    _database.database.execute(
+      '''
+      UPDATE documents
+      SET last_page_index = CASE WHEN page_count > 0 THEN page_count - 1 ELSE 0 END,
+          reading_progress = 1,
+          last_opened_at = ?
+      WHERE id = ?
+      ''',
+      [_date(DateTime.now()), documentId],
+    );
+  }
+
   void remove(String documentId) {
     _database.database.execute('DELETE FROM documents WHERE id = ?', [
       documentId,

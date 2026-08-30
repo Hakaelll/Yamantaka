@@ -47,12 +47,19 @@ La suite automatizada comprueba:
   panel acoplado con ancho semántico visible;
 - barra 56/52 px, dock 48/38 px y targets de 40 px medidos por widget;
 - identidad estable del adaptador al abrir/cerrar panel y cruzar 680/1100 px.
+- navegador `Ctrl+J` con 100 destinos, filtro, teclado, lista + detalle,
+  retorno `Alt+←` e identidad estable del adaptador;
+- anotación desde selección real, fallback multipágina honesto y persistencia
+  de texto, contexto y coordenadas normalizadas.
 
 La biblioteca cubre inspector contextual, selección conservada y explicación al
 filtrar, además de metadatos PDF, cuatro páginas iniciales, título multilínea,
 autor/editor explícito o dudoso, fallback de nombre legible, ausencia de texto,
 temas ES/EN, límite de muestra, reanálisis y preservación manual, facetas
 completas, migración 7→8 y backup v7 con ajustes de pliego.
+La iteración 0.11 añade máximo materializado de 80, agrupación por autor,
+colección, etiqueta y estado, plegado estable, límite de tres pestañas fijadas,
+sesiones ricas, cerrados recientes, metas locales y cursor FTS reanudable.
 
 El motor cubre PDFium real, contraseña, corrupción, cancelación previa,
 generaciones obsoletas, cierre sin pendientes, reducción dinámica de LRU y
@@ -95,14 +102,16 @@ abierto. La evidencia previa se conserva en `build/visual-evidence/v0.5.0/` y
 la de 0.6 se conserva en `build/visual-evidence/v0.6.0/`, la de 0.7 en
 `build/visual-evidence/v0.7.0/` y la de 0.8 en
 `build/visual-evidence/v0.8.0/`. La actual se escribe en
-`build/visual-evidence/v0.10.0/`; ninguna se versiona.
+`build/visual-evidence/v0.11.0/`; ninguna se versiona.
 
-La matriz 0.10 conserva la prueba geométrica del chrome y añade Continuar
-leyendo, filtros FTS5, búsqueda de Ajustes, cola de importación y texto al
-150/200 %. Conserva los casos de
-Biblioteca, Lector, panel, Ajustes, búsqueda, paleta, menús y diálogos en claro,
-oscuro, alto contraste y movimiento reducido. Las comparaciones usan 0.9 como
-fuente anterior y registran el SHA-256 de ambos PNG.
+La matriz 0.11 conserva la prueba geométrica del chrome y añade el navegador
+documental en los ocho tamaños, cerrados recientes, agrupación y selección
+anotable. Mantiene Continuar leyendo, filtros FTS5, búsqueda de Ajustes y texto
+al 130/150/200 %. El diálogo real de importación se captura con documentos
+nuevos, duplicados, inaccesibles e inválidos. Conserva los casos de Biblioteca,
+Lector, panel, Ajustes, búsqueda, paleta, menús y diálogos en claro, oscuro, alto
+contraste y movimiento reducido. Las comparaciones usan 0.10 como fuente
+anterior y registran el SHA-256 de ambos PNG.
 
 ## Validación nativa de Windows
 
@@ -200,6 +209,40 @@ principales y añaden 130/150/200 % de texto. La salida actual contiene 128 PNG
 de superficies y diez comparaciones 0.9/0.10. La evidencia manual de Narrator,
 varios monitores y DPI físico sigue separada y nunca se deduce de estas
 capturas.
+
+La iteración `0.11.0+12` aprueba 277 pruebas y añade contratos para 100 destinos
+sin reconstruir el visor, retorno al origen, selección geométrica y fallback,
+sesiones ricas, máximo de tres pestañas fijadas, cursor FTS reanudable,
+prioridad cambiada mientras el índice está activo, consultas globales
+solapadas y decodificaciones de portada evitadas al salir del viewport. Las
+matrices producen 164 PNG de origen: 21 Biblioteca, 43 Lector, 16 Búsqueda, 18
+Ajustes, 28 paleta/menús, 28 diálogos —incluida importación— y diez
+comparaciones 0.10/0.11. `tool/create_contact_sheets.ps1` genera 17 hojas con
+hashes para revisar el conjunto completo.
+
+Los cinco perfiles comparables están bajo
+`build/performance/0.10.0-baseline/` y
+`build/performance/0.11.0-current/`. El comparador exige una mediana superior
+al 10 % y al menos cuatro de cinco muestras actuales sobre el límite para
+declarar una regresión fiable. El resultado 0.11 es `pass-with-watch`: no hay
+regresiones ni invariantes fallidos. Dos medianas crudas quedan en observación
+—interacción de Biblioteca +17,08 % y scroll continuo +18,98 %— porque solo
+tres de cinco muestras cruzan el límite y los rangos se solapan.
+
+La validación física disponible corresponde a un único monitor 1920×1200 a DPI
+96/escala 100 %, locale es-ES y alto contraste del sistema desactivado. El gate
+nativo cubre sus cuatro casos a esa escala. No se extrapola a 125/150/175/200
+%, dos monitores, Narrator, en-US ni alto contraste real: esas combinaciones
+permanecen pendientes hasta disponer del hardware o estado del sistema.
+
+El smoke físico del ZIP se ejecutó contra el `yamantaka.exe` exacto del bundle:
+arrancó en español, permitió mover la selección de Biblioteca con teclado,
+abrir el PDF local con Enter, avanzar de la página 1/2 a la 2/2 y cerrar de
+forma normal. La inyección de teclado de la automatización de Windows no logró
+reproducir `Ctrl+J`, por lo que ese atajo conserva cobertura de widget pero no
+se presenta como validado físicamente. La captura WGC mostró rectángulos
+obsoletos del frame anterior; se usó el árbol UIA para comprobar el estado y
+esas imágenes no forman parte de la evidencia visual aprobada.
 
 ## Corpus y privacidad
 

@@ -22,6 +22,8 @@ final class GlobalLibrarySearchController extends ChangeNotifier {
   bool hasMore = false;
   int _generation = 0;
   bool _derivedEntriesFresh = false;
+  bool _hasCompletedSearch = false;
+  Stopwatch? _activeSearchStopwatch;
 
   Future<void> search(String value, {bool loadMore = false}) async {
     final clean = value.trim();
@@ -38,6 +40,7 @@ final class GlobalLibrarySearchController extends ChangeNotifier {
       return;
     }
     isSearching = true;
+    _activeSearchStopwatch = Stopwatch()..start();
     state = GlobalSearchState.searching;
     notifyListeners();
     await Future<void>.delayed(
@@ -60,6 +63,16 @@ final class GlobalLibrarySearchController extends ChangeNotifier {
     );
     stopwatch.stop();
     _performance?.recordDuration('global_search', stopwatch.elapsed);
+    _performance?.recordDuration(
+      !_hasCompletedSearch
+          ? 'global_search_cold'
+          : selectedKinds.length < GlobalSearchKind.values.length
+          ? 'global_search_filtered'
+          : 'global_search_warm',
+      stopwatch.elapsed,
+    );
+    _hasCompletedSearch = true;
+    _activeSearchStopwatch = null;
     if (generation != _generation) return;
     results = loadMore ? [...results, ...page] : page;
     offset = results.length;
@@ -85,6 +98,16 @@ final class GlobalLibrarySearchController extends ChangeNotifier {
 
   void cancel() {
     if (!isSearching) return;
+    final stopwatch = _activeSearchStopwatch;
+    stopwatch?.stop();
+    if (stopwatch != null) {
+      _performance?.recordDuration(
+        'global_search_cancelled',
+        stopwatch.elapsed,
+      );
+      _performance?.increment('global_search_cancellations');
+    }
+    _activeSearchStopwatch = null;
     _generation++;
     isSearching = false;
     state = GlobalSearchState.cancelled;

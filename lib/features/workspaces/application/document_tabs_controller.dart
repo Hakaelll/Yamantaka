@@ -16,6 +16,7 @@ final class DocumentTabsController extends ChangeNotifier {
 
   final int maxTabs;
   final int maxWarmTabs;
+  static const maxPinnedTabs = 3;
   List<DocumentTab> tabs = const [];
   String? activeTabId;
   final List<DocumentTab> _closedTabs = [];
@@ -152,6 +153,12 @@ final class DocumentTabsController extends ChangeNotifier {
   }
 
   void togglePinned(String id) {
+    final target = tabs.where((tab) => tab.id == id).firstOrNull;
+    if (target == null) return;
+    if (!target.isPinned &&
+        tabs.where((tab) => tab.isPinned).length >= maxPinnedTabs) {
+      return;
+    }
     tabs = [
       for (final tab in tabs)
         tab.id == id ? tab.copyWith(isPinned: !tab.isPinned) : tab,

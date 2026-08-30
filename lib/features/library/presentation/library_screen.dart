@@ -13,6 +13,7 @@ import '../../../core/errors/failure_presentation.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../../organization/application/organization_controller.dart';
 import '../../organization/domain/organization_models.dart';
+import '../../reader/domain/reading_session.dart';
 import '../application/library_controller.dart';
 import '../application/library_file_validation_controller.dart';
 import '../application/document_enrichment_controller.dart';
@@ -52,6 +53,7 @@ final class LibraryScreen extends StatefulWidget {
     this.onRevealDocument,
     this.onRemoveDocument,
     this.onDocumentVisible,
+    this.onDocumentHidden,
     this.organization,
     this.onGlobalSearch,
     this.onOpenPaths,
@@ -61,6 +63,13 @@ final class LibraryScreen extends StatefulWidget {
     this.safeMode = false,
     this.enrichment,
     this.fileValidation,
+    this.recentlyClosed = const [],
+    this.onRestoreClosed,
+    this.onDismissClosed,
+    this.onReread,
+    this.onMarkFinished,
+    this.readingGoal,
+    this.onSetReadingGoal,
   });
 
   final LibraryController controller;
@@ -78,6 +87,7 @@ final class LibraryScreen extends StatefulWidget {
   final Future<void> Function(LibraryDocument document)? onRevealDocument;
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
   final ValueChanged<LibraryDocument>? onDocumentVisible;
+  final ValueChanged<LibraryDocument>? onDocumentHidden;
   final OrganizationController? organization;
   final VoidCallback? onGlobalSearch;
   final Future<void> Function(List<String> paths)? onOpenPaths;
@@ -87,6 +97,13 @@ final class LibraryScreen extends StatefulWidget {
   final bool safeMode;
   final DocumentEnrichmentController? enrichment;
   final LibraryFileValidationController? fileValidation;
+  final List<RecentlyClosedDocument> recentlyClosed;
+  final ValueChanged<RecentlyClosedDocument>? onRestoreClosed;
+  final ValueChanged<RecentlyClosedDocument>? onDismissClosed;
+  final Future<void> Function(LibraryDocument document)? onReread;
+  final Future<void> Function(LibraryDocument document)? onMarkFinished;
+  final ReadingGoal? readingGoal;
+  final ValueChanged<LibraryDocument>? onSetReadingGoal;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -433,9 +450,22 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                                 await widget.controller.reload();
                               },
                         onDocumentVisible: widget.onDocumentVisible,
+                        onDocumentHidden: widget.onDocumentHidden,
                         collections:
                             widget.organization?.collections ?? const [],
                         tags: widget.organization?.tags ?? const [],
+                        collectionMemberships:
+                            widget.organization?.collectionMemberships ??
+                            const {},
+                        tagMemberships:
+                            widget.organization?.tagMemberships ?? const {},
+                        recentlyClosed: widget.recentlyClosed,
+                        onRestoreClosed: widget.onRestoreClosed,
+                        onDismissClosed: widget.onDismissClosed,
+                        onReread: widget.onReread,
+                        onMarkFinished: widget.onMarkFinished,
+                        readingGoal: widget.readingGoal,
+                        onSetReadingGoal: widget.onSetReadingGoal,
                       ),
                     ),
                     if (_dragging)
@@ -651,8 +681,18 @@ final class _LibraryBody extends StatelessWidget {
     required this.onRemoveDocument,
     this.onReanalyzeDocument,
     this.onDocumentVisible,
+    this.onDocumentHidden,
     this.collections = const [],
     this.tags = const [],
+    this.collectionMemberships = const {},
+    this.tagMemberships = const {},
+    this.recentlyClosed = const [],
+    this.onRestoreClosed,
+    this.onDismissClosed,
+    this.onReread,
+    this.onMarkFinished,
+    this.readingGoal,
+    this.onSetReadingGoal,
   });
 
   final LibraryController controller;
@@ -670,8 +710,18 @@ final class _LibraryBody extends StatelessWidget {
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
   final Future<void> Function(LibraryDocument document)? onReanalyzeDocument;
   final ValueChanged<LibraryDocument>? onDocumentVisible;
+  final ValueChanged<LibraryDocument>? onDocumentHidden;
   final List<DocumentCollection> collections;
   final List<DocumentTag> tags;
+  final Map<String, Set<String>> collectionMemberships;
+  final Map<String, Set<String>> tagMemberships;
+  final List<RecentlyClosedDocument> recentlyClosed;
+  final ValueChanged<RecentlyClosedDocument>? onRestoreClosed;
+  final ValueChanged<RecentlyClosedDocument>? onDismissClosed;
+  final Future<void> Function(LibraryDocument document)? onReread;
+  final Future<void> Function(LibraryDocument document)? onMarkFinished;
+  final ReadingGoal? readingGoal;
+  final ValueChanged<LibraryDocument>? onSetReadingGoal;
 
   @override
   Widget build(BuildContext context) {
@@ -721,6 +771,22 @@ final class _LibraryBody extends StatelessWidget {
             onInfo: onDocumentInfo == null
                 ? null
                 : () => onDocumentInfo!(continueReading),
+            onReread: onReread == null
+                ? null
+                : () => onReread!(continueReading),
+            onMarkFinished: onMarkFinished == null
+                ? null
+                : () => onMarkFinished!(continueReading),
+            goal: readingGoal,
+            onSetGoal: onSetReadingGoal == null
+                ? null
+                : () => onSetReadingGoal!(continueReading),
+          ),
+        if (recentlyClosed.isNotEmpty)
+          RecentlyClosedStrip(
+            entries: recentlyClosed.take(3).toList(growable: false),
+            onRestore: onRestoreClosed,
+            onDismiss: onDismissClosed,
           ),
         Expanded(
           child: ArtifactLibraryView(
@@ -733,6 +799,8 @@ final class _LibraryBody extends StatelessWidget {
             onBulkOperation: onBulkOperation,
             collections: collections,
             tags: tags,
+            collectionMemberships: collectionMemberships,
+            tagMemberships: tagMemberships,
             onDocumentInfo: onDocumentInfo,
             onRelocateDocument: onRelocateDocument,
             onToggleFavorite: onToggleFavorite,
@@ -741,6 +809,7 @@ final class _LibraryBody extends StatelessWidget {
             onRemoveDocument: onRemoveDocument,
             onReanalyzeDocument: onReanalyzeDocument,
             onDocumentVisible: onDocumentVisible,
+            onDocumentHidden: onDocumentHidden,
           ),
         ),
       ],
@@ -754,11 +823,19 @@ final class ContinueReadingStrip extends StatefulWidget {
     required this.document,
     required this.onOpen,
     this.onInfo,
+    this.onReread,
+    this.onMarkFinished,
+    this.goal,
+    this.onSetGoal,
   });
 
   final LibraryDocument document;
   final VoidCallback onOpen;
   final VoidCallback? onInfo;
+  final VoidCallback? onReread;
+  final VoidCallback? onMarkFinished;
+  final ReadingGoal? goal;
+  final VoidCallback? onSetGoal;
 
   @override
   State<ContinueReadingStrip> createState() => _ContinueReadingStripState();
@@ -864,6 +941,26 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              if (widget.goal case final goal?)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: AppSpacing.space4,
+                                  ),
+                                  child: Text(
+                                    _goalLabel(strings, goal),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: context.appColors.textMuted,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
+                                        ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -917,6 +1014,21 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
             value: _ContinueReadingAction.info,
             child: Text(strings.get('command.documentInfo')),
           ),
+        if (widget.onReread != null)
+          PopupMenuItem(
+            value: _ContinueReadingAction.reread,
+            child: Text(strings.get('action.reread')),
+          ),
+        if (widget.onMarkFinished != null)
+          PopupMenuItem(
+            value: _ContinueReadingAction.finished,
+            child: Text(strings.get('library.finished')),
+          ),
+        if (widget.onSetGoal != null)
+          PopupMenuItem(
+            value: _ContinueReadingAction.goal,
+            child: Text(strings.get('library.localGoal')),
+          ),
       ],
     );
     if (!mounted) return;
@@ -925,13 +1037,142 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
         widget.onOpen();
       case _ContinueReadingAction.info:
         widget.onInfo?.call();
+      case _ContinueReadingAction.reread:
+        widget.onReread?.call();
+      case _ContinueReadingAction.finished:
+        widget.onMarkFinished?.call();
+      case _ContinueReadingAction.goal:
+        widget.onSetGoal?.call();
       case null:
         _focusNode.requestFocus();
     }
   }
+
+  String _goalLabel(YamantakaLocalizations strings, ReadingGoal goal) {
+    final parts = <String>[];
+    if (goal.pages case final pages?) {
+      final done = (widget.document.lastPageIndex + 1).clamp(0, pages);
+      parts.add('$done/$pages ${strings.get('library.goalPages')}');
+    }
+    if (goal.minutes case final minutes?) {
+      parts.add('$minutes ${strings.get('library.goalMinutes')}');
+    }
+    return '${strings.get('library.localGoal')}: ${parts.join(' · ')}';
+  }
 }
 
-enum _ContinueReadingAction { open, info }
+enum _ContinueReadingAction { open, info, reread, finished, goal }
+
+final class RecentlyClosedStrip extends StatelessWidget {
+  const RecentlyClosedStrip({
+    super.key,
+    required this.entries,
+    this.onRestore,
+    this.onDismiss,
+  });
+
+  final List<RecentlyClosedDocument> entries;
+  final ValueChanged<RecentlyClosedDocument>? onRestore;
+  final ValueChanged<RecentlyClosedDocument>? onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1, 2);
+    final rowHeight = 54.0 + ((textScale - 1) * 32);
+    return Material(
+      color: context.appColors.surfacePrimary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+            child: Text(
+              strings.get('library.recentlyClosed'),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: context.appColors.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(
+            height: rowHeight,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: entries.length,
+              separatorBuilder: (_, _) => const VerticalDivider(width: 1),
+              itemBuilder: (context, index) {
+                final entry = entries[index];
+                final state = entry.isMissing
+                    ? strings.get('library.fileMissing')
+                    : entry.isModified
+                    ? strings.get('library.fileModified')
+                    : strings.get(
+                        'reader.pageNumber',
+                        parameters: {'page': entry.pageIndex + 1},
+                      );
+                return Semantics(
+                  button: true,
+                  label: '${entry.title}. $state',
+                  child: InkWell(
+                    key: ValueKey('recently-closed-${entry.documentId}'),
+                    onTap: onRestore == null ? null : () => onRestore!(entry),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            entry.isMissing
+                                ? Icons.link_off_rounded
+                                : Icons.restore_page_outlined,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 210),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Tooltip(
+                                  message: entry.title,
+                                  child: Text(
+                                    entry.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  state,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (onDismiss != null)
+                            IconButton(
+                              tooltip: strings.get('action.close'),
+                              onPressed: () => onDismiss!(entry),
+                              icon: const Icon(Icons.close_rounded, size: 16),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1),
+        ],
+      ),
+    );
+  }
+}
 
 final class EmptyLibraryState extends StatelessWidget {
   const EmptyLibraryState({super.key, required this.onOpen});

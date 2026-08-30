@@ -9,6 +9,7 @@ import '../../../core/performance/startup_timeline.dart';
 import '../../../core/performance/local_performance_monitor.dart';
 import '../../../core/privacy/diagnostics_redactor.dart';
 import '../../../pdf_engine/adapters/pdfrx_document_engine.dart';
+import '../../../pdf_engine/cache/thumbnail_service.dart';
 import '../../../storage/database/app_database.dart';
 import '../../../storage/paths/app_paths.dart';
 
@@ -41,6 +42,7 @@ final class DiagnosticsService {
     this.lifecycle,
     this.startup,
     this.performance,
+    this.thumbnails,
   });
 
   final AppDatabase database;
@@ -52,11 +54,12 @@ final class DiagnosticsService {
   final LifecycleTracker? lifecycle;
   final StartupTimeline? startup;
   final LocalPerformanceMonitor? performance;
+  final ThumbnailService? thumbnails;
 
   Future<SafeDiagnosticsReport> collect() async {
     final databaseFile = File(paths.databasePath);
     return SafeDiagnosticsReport({
-      'yamantaka_version': '0.10.0+11',
+      'yamantaka_version': '0.11.0+12',
       'flutter_version': const String.fromEnvironment(
         'FLUTTER_VERSION',
         defaultValue: 'bundled',
@@ -92,6 +95,7 @@ final class DiagnosticsService {
       'lifecycle': lifecycle?.snapshot.toJson() ?? const <String, int>{},
       'startup': startup?.toJson() ?? const <String, Object>{},
       'performance': performance?.toJson() ?? const <String, Object>{},
+      'thumbnails': thumbnails?.diagnostics ?? const <String, int>{},
       'contains_paths_titles_or_queries': false,
     });
   }

@@ -431,6 +431,15 @@ final class ReaderTopBar extends StatelessWidget
                             label: strings.settingsTitle,
                           ),
                         ),
+                        const PopupMenuDivider(height: 9),
+                        PopupMenuItem(
+                          value: _ReaderMenuAction.closeSession,
+                          height: 40,
+                          child: _ReaderMenuItem(
+                            icon: Icons.save_alt_rounded,
+                            label: strings.get('reader.closeSessionPreserve'),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(width: AppSpacing.space4),
@@ -500,6 +509,8 @@ final class ReaderTopBar extends StatelessWidget
         onDocumentInfo();
       case _ReaderMenuAction.settings:
         onOpenSettings();
+      case _ReaderMenuAction.closeSession:
+        onBack();
     }
   }
 }
@@ -521,6 +532,7 @@ enum _ReaderMenuAction {
   toggleImmersive,
   documentInfo,
   settings,
+  closeSession,
 }
 
 enum _ReaderToolsAction { thumbnails, outline, bookmarks, annotations }

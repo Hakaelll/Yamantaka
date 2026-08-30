@@ -8,9 +8,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/app/shortcuts/app_commands.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
+import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/command_palette/presentation/command_palette.dart';
 import 'package:yamantaka/features/help/presentation/welcome_dialog.dart';
+import 'package:yamantaka/features/library/application/document_service.dart';
+import 'package:yamantaka/features/library/application/folder_import_controller.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
+import 'package:yamantaka/features/library/presentation/folder_import_dialog.dart';
+import 'package:yamantaka/storage/database/app_database.dart';
+import 'package:yamantaka/storage/repositories/document_repository.dart';
+
+import 'support/stub_pdf_engine.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -371,6 +379,143 @@ void main() {
     );
     await dialogCase(
       name: 'dialog-1280x720-text-200-widget',
+      size: const Size(1280, 720),
+      textScale: 2,
+    );
+
+    final importDatabase = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    addTearDown(importDatabase.close);
+    final importDocuments = DocumentRepository(importDatabase);
+    final importController =
+        FolderImportController(
+            importDocuments,
+            DocumentService(importDocuments),
+            StubPdfDocumentEngine(),
+          )
+          ..candidates = const [
+            FolderImportCandidate(
+              path: r'C:\Biblioteca\arquitectura-local.pdf',
+              fileName: 'arquitectura-local.pdf',
+              status: FolderCandidateStatus.newDocument,
+            ),
+            FolderImportCandidate(
+              path: r'C:\Biblioteca\ensayo-duplicado.pdf',
+              fileName: 'ensayo-duplicado.pdf',
+              status: FolderCandidateStatus.duplicate,
+            ),
+            FolderImportCandidate(
+              path: r'C:\Biblioteca\archivo-protegido.pdf',
+              fileName: 'archivo-protegido.pdf',
+              status: FolderCandidateStatus.inaccessible,
+            ),
+            FolderImportCandidate(
+              path: r'C:\Biblioteca\contenido-invalido.pdf',
+              fileName: 'contenido-invalido.pdf',
+              status: FolderCandidateStatus.invalid,
+            ),
+          ];
+    addTearDown(importController.dispose);
+
+    Future<void> importDialogCase({
+      required String name,
+      required Size size,
+      ThemeMode mode = ThemeMode.light,
+      bool highContrast = false,
+      bool reduceMotion = false,
+      double textScale = 1,
+    }) async {
+      if (dialogsOutput == null) return;
+      tester.view.physicalSize = size;
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundaryKey,
+          child: MaterialApp(
+            key: ValueKey('folder-import-$name'),
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light(highContrast: highContrast),
+            darkTheme: AppTheme.dark(highContrast: highContrast),
+            themeMode: mode,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                highContrast: highContrast,
+                disableAnimations: reduceMotion,
+                textScaler: TextScaler.linear(textScale),
+              ),
+              child: child!,
+            ),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: FilledButton(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => FolderImportDialog(
+                        controller: importController,
+                        onImport: (_) async {},
+                        directoryPath: r'C:\Biblioteca\Lecturas locales',
+                      ),
+                    ),
+                    child: const Text('Open import'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open import'));
+      await tester.pumpAndSettle();
+      final path = '${dialogsOutput.path}${Platform.pathSeparator}$name.png';
+      await capture(path);
+      dialogCases.add({
+        'name': name,
+        'width': size.width.round(),
+        'height': size.height.round(),
+        'theme': mode.name,
+        'highContrast': highContrast,
+        'reducedMotion': reduceMotion,
+        'textScale': textScale,
+        'surface': 'folder-import',
+        'source': 'flutter-widget-test',
+        'path': path,
+      });
+    }
+
+    for (final entry in matrixSizes) {
+      await importDialogCase(
+        name: 'folder-import-${entry.$1}-light-widget',
+        size: entry.$2,
+      );
+    }
+    await importDialogCase(
+      name: 'folder-import-1280x720-dark-widget',
+      size: const Size(1280, 720),
+      mode: ThemeMode.dark,
+    );
+    await importDialogCase(
+      name: 'folder-import-1280x720-high-contrast-widget',
+      size: const Size(1280, 720),
+      highContrast: true,
+    );
+    await importDialogCase(
+      name: 'folder-import-1280x720-reduced-motion-widget',
+      size: const Size(1280, 720),
+      reduceMotion: true,
+    );
+    await importDialogCase(
+      name: 'folder-import-1280x720-text-130-widget',
+      size: const Size(1280, 720),
+      textScale: 1.3,
+    );
+    await importDialogCase(
+      name: 'folder-import-1280x720-text-150-widget',
+      size: const Size(1280, 720),
+      textScale: 1.5,
+    );
+    await importDialogCase(
+      name: 'folder-import-1280x720-text-200-widget',
       size: const Size(1280, 720),
       textScale: 2,
     );

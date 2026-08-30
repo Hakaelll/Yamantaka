@@ -10,6 +10,7 @@ enum AppCommandId {
   search,
   commandPalette,
   goToPage,
+  documentNavigator,
   togglePanel,
   toggleBookmark,
   zoomIn,
@@ -94,6 +95,7 @@ abstract final class AppCommandRegistry {
     AppCommandId.search,
     AppCommandId.commandPalette,
     AppCommandId.goToPage,
+    AppCommandId.documentNavigator,
     AppCommandId.togglePanel,
     AppCommandId.toggleBookmark,
     AppCommandId.nextPage,
@@ -300,7 +302,8 @@ abstract final class AppCommandRegistry {
     AppCommandId.search: 'ctrl-f',
     AppCommandId.commandPalette: 'ctrl-k',
     AppCommandId.goToPage: 'ctrl-g',
-    AppCommandId.togglePanel: 'ctrl-j',
+    AppCommandId.documentNavigator: 'ctrl-j',
+    AppCommandId.togglePanel: 'ctrl-shift-j',
     AppCommandId.toggleBookmark: 'ctrl-b',
     AppCommandId.nextPage: 'arrow-right',
     AppCommandId.previousPage: 'arrow-left',
@@ -337,6 +340,12 @@ abstract final class AppCommandRegistry {
       shortcutLabel: 'Ctrl+G',
     ),
     AppCommandDefinition(
+      id: AppCommandId.documentNavigator,
+      label: 'Abrir navegador del documento',
+      shortcutLabel: 'Ctrl+J',
+      keywords: ['índice', 'miniaturas', 'marcadores', 'anotaciones'],
+    ),
+    AppCommandDefinition(
       id: AppCommandId.nextPage,
       label: 'Página siguiente',
       shortcutLabel: '→',
@@ -349,7 +358,7 @@ abstract final class AppCommandRegistry {
     AppCommandDefinition(
       id: AppCommandId.togglePanel,
       label: 'Abrir o cerrar panel',
-      shortcutLabel: 'Ctrl+J',
+      shortcutLabel: 'Ctrl+Mayús+J',
     ),
     AppCommandDefinition(
       id: AppCommandId.toggleBookmark,

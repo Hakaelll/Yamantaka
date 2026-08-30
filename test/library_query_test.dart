@@ -5,6 +5,6 @@ void main() {
   test('library query bounds the materialized window', () {
     final query = const LibraryQuery(offset: -10, limit: 500).normalized();
     expect(query.offset, 0);
-    expect(query.limit, 200);
+    expect(query.limit, 80);
   });
 }

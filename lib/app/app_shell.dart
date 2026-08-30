@@ -273,6 +273,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
         widget.services.thumbnails.promoteVisibleCover(document);
         widget.services.libraryIndex.prioritizeDocument(document.id);
       },
+      onDocumentHidden: (document) =>
+          widget.services.thumbnails.cancelOffscreen(document.id),
       organization: widget.services.organization,
       onGlobalSearch: _showGlobalSearch,
       onOpenPaths: _openPaths,
@@ -282,6 +284,25 @@ final class _YamantakaAppState extends State<YamantakaApp>
       safeMode: widget.services.safeMode,
       enrichment: widget.services.enrichment,
       fileValidation: widget.services.fileValidation,
+      recentlyClosed: widget.services.readingSessions.recentlyClosed(),
+      onRestoreClosed: (entry) => unawaited(_restoreRecentlyClosed(entry)),
+      onDismissClosed: (entry) {
+        widget.services.readingSessions.removeRecentlyClosed(entry.documentId);
+        setState(() {});
+      },
+      onReread: (document) async {
+        await widget.services.library.reread(document.id);
+        await _openPath(document.path);
+      },
+      onMarkFinished: (document) async {
+        await widget.services.library.markFinished(document.id);
+        if (mounted) setState(() {});
+      },
+      readingGoal: switch (widget.services.library.continueReading) {
+        final document? => widget.services.readingSessions.goalFor(document.id),
+        _ => null,
+      },
+      onSetReadingGoal: (document) => unawaited(_showReadingGoal(document)),
     ),
     _AppPage.reader => _buildReaderPage(),
     _AppPage.settings => SettingsScreen(
@@ -326,6 +347,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
     ),
     onPanelChanged: (section) {
       widget.services.tabs.updateActivePanel(section?.name);
+      widget.services.reader.setSessionPanelSection(section?.name);
       unawaited(
         widget.services.settings.update(
           widget.services.settings.settings.copyWith(
@@ -644,6 +666,9 @@ final class _YamantakaAppState extends State<YamantakaApp>
     if (opened) {
       widget.services.startup.complete(StartupPhase.firstPdf);
       final document = widget.services.reader.document;
+      if (document != null) {
+        widget.services.readingSessions.removeRecentlyClosed(document.id);
+      }
       if (document != null && registerTab) {
         widget.services.tabs.open(document, forceNew: forceNewTab);
       }
@@ -653,6 +678,14 @@ final class _YamantakaAppState extends State<YamantakaApp>
             : null,
       );
       _syncActiveTab();
+      widget.services.libraryIndex.prioritizeSecondary([
+        ...widget.services.tabs.tabs
+            .where((tab) => tab.isPinned)
+            .map((tab) => tab.documentId),
+        ...widget.services.readingSessions.recentlyClosed().map(
+          (entry) => entry.documentId,
+        ),
+      ]);
       await widget.services.reader.retainWarmDocuments(
         widget.services.tabs.tabs
             .where((tab) => tab.resourceState == TabResourceState.warm)
@@ -780,6 +813,28 @@ final class _YamantakaAppState extends State<YamantakaApp>
   }
 
   Future<void> _closeReader() async {
+    _syncActiveTab();
+    final tab = widget.services.tabs.activeTab;
+    if (tab != null) {
+      widget.services.readingSessions.rememberClosed(
+        RecentlyClosedDocument(
+          documentId: tab.documentId,
+          path: tab.path,
+          title: tab.title,
+          pageIndex: tab.pageIndex,
+          zoomLevel: tab.zoomLevel,
+          pageLayout: tab.pageLayout,
+          readingMode: tab.readingMode,
+          readingTheme: tab.readingTheme,
+          scrollOffset: tab.scrollOffset,
+          panelSection: tab.panelSection,
+          closedAt: DateTime.now().toUtc(),
+          isMissing: tab.isMissing,
+          isModified: tab.isExternallyModified,
+        ),
+      );
+      widget.services.tabs.close(tab.id);
+    }
     await widget.services.reader.closeDocument();
     await widget.services.settings.update(
       widget.services.settings.settings.copyWith(
@@ -789,6 +844,106 @@ final class _YamantakaAppState extends State<YamantakaApp>
     );
     await widget.services.library.load();
     if (mounted) setState(() => _page = _AppPage.library);
+  }
+
+  Future<void> _restoreRecentlyClosed(RecentlyClosedDocument entry) async {
+    if (entry.isMissing || !File(entry.path).existsSync()) {
+      _showNotice(_strings.get('reader.savedDocumentUnavailable'));
+      return;
+    }
+    await _openPath(entry.path);
+    if (widget.services.reader.status != ReaderStatus.ready) return;
+    widget.services.reader.restoreNavigationSnapshot(
+      pageIndex: entry.pageIndex,
+      zoomLevel: entry.zoomLevel,
+      pageLayout: PageLayoutMode.values.firstWhere(
+        (value) => value.name == entry.pageLayout,
+        orElse: () => PageLayoutMode.single,
+      ),
+      readingMode: ReaderMode.values.firstWhere(
+        (value) => value.name == entry.readingMode,
+        orElse: () => ReaderMode.document,
+      ),
+      scrollOffset: entry.scrollOffset,
+      readingTheme: ReaderTheme.values.firstWhere(
+        (value) => value.name == entry.readingTheme,
+        orElse: () => ReaderTheme.ivory,
+      ),
+    );
+    widget.services.tabs.updateActivePanel(entry.panelSection);
+    widget.services.reader.setSessionPanelSection(entry.panelSection);
+    await widget.services.settings.update(
+      widget.services.settings.settings.copyWith(
+        readerPanelOpen: entry.panelSection != null,
+        readerPanelSection: entry.panelSection ?? '',
+      ),
+    );
+  }
+
+  Future<void> _showReadingGoal(LibraryDocument document) async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    final current = widget.services.readingSessions.goalFor(document.id);
+    final pages = TextEditingController(text: current?.pages?.toString() ?? '');
+    final minutes = TextEditingController(
+      text: current?.minutes?.toString() ?? '',
+    );
+    final goal = await showDialog<ReadingGoal?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_strings.get('library.localGoal')),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: pages,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: _strings.get('library.goalPages'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.space12),
+              TextField(
+                controller: minutes,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: _strings.get('library.goalMinutes'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(_strings.get('action.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, const ReadingGoal()),
+            child: Text(_strings.get('action.clear')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              context,
+              ReadingGoal(
+                pages: int.tryParse(pages.text),
+                minutes: int.tryParse(minutes.text),
+              ),
+            ),
+            child: Text(_strings.get('action.save')),
+          ),
+        ],
+      ),
+    );
+    pages.dispose();
+    minutes.dispose();
+    if (goal == null) return;
+    widget.services.readingSessions.setGoal(document.id, goal);
+    if (mounted) setState(() {});
   }
 
   Future<void> _restoreLastSession() async {

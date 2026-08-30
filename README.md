@@ -7,10 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.10.0+11 revisada el 27 de agosto de 2026:
+Base Flutter 0.11.0+12 revisada el 28 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 266 pruebas aprobadas;
+- flutter test --no-pub: 277 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local permanece receptivo durante un smoke de 8 s con un
@@ -18,11 +18,11 @@ Base Flutter 0.10.0+11 revisada el 27 de agosto de 2026:
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
-El release local versionado se genera en `build/release/0.10.0+11/` e incluye el
+El release local versionado se genera en `build/release/0.11.0+12/` e incluye el
 ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt` y el reporte del
 smoke sin red. Debe extraerse entero antes de probarlo.
 
-El bundle 0.10 se valida contra su manifiesto después del último cambio. El smoke
+El bundle 0.11 se valida contra su manifiesto después del último cambio. El smoke
 sintético comprueba conexiones TCP/UDP y el inventario separa explícitamente los
 binarios sin firma; sigue siendo evidencia local, no un artefacto de distribución.
 
@@ -64,12 +64,25 @@ vigente de pruebas en [TESTING.md](TESTING.md).
   argumentos múltiples; las rutas repetidas se descartan sin perder el orden.
 - “Continuar leyendo” aparece solo cuando existe una lectura reciente sin
   terminar y resume con título, página, total, porcentaje y última apertura.
+- `Ctrl+J` abre un navegador documental único para índice, miniaturas, búsqueda,
+  marcadores, anotaciones, historial y posiciones A/B; `Ctrl+Mayús+J` mantiene
+  el acceso directo al panel. Los saltos no reconstruyen el visor ni cambian el
+  zoom y `Alt+←` vuelve al origen.
+- Los documentos cerrados recientemente restauran página, zoom, layout, modo,
+  tema, scroll y panel. Continuar, Releer y Terminado son acciones explícitas;
+  una meta opcional por páginas o minutos permanece solo en el dispositivo. El
+  menú del lector expone además `Cerrar sesión y conservar contexto`.
 - `Ctrl+Tab` y `Ctrl+Shift+Tab` abren un conmutador compacto de documentos; dos
   documentos PDFium permanecen calientes como máximo y los demás se suspenden
   conservando página, zoom, layout, modo, scroll, tema y panel.
 - Biblioteca local con portadas, filtros combinables por autor, tema, estado y
-  favorito, agrupación por autor, colecciones, etiquetas, vistas inteligentes,
+  favorito, agrupación plegable por autor, colección, etiqueta o estado,
+  colecciones, etiquetas, vistas inteligentes,
   selección múltiple y operaciones por lote.
+- La virtualización de Biblioteca eleva la prioridad de portadas visibles y
+  cancela decodificaciones recreables al salir del viewport; el diagnóstico
+  local expone intentos, cancelaciones y decodificaciones evitadas sin guardar
+  rutas, títulos ni identificadores.
 - La biblioteca alterna una cuadrícula con títulos y una lista densa para
   comparar documento, estado, progreso y última apertura. A 150 % de texto la
   lista reduce columnas y conserva estado, páginas y progreso en cada fila.
@@ -96,13 +109,16 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Marcadores y anotaciones comparten filtro y orden por página; saltar a uno
   anuncia y enfoca temporalmente el destino. Se conservan notas por página,
   historial local opcional y navegación atrás/adelante.
+- La selección real del texto permite resaltar, subrayar o tachar con geometría
+  normalizada. Si el motor no entrega geometría fiable se crea y anuncia una
+  nota de página, sin inventar coordenadas.
 - Paleta de comandos con iconos específicos, metadatos, preview expandida,
   documentos recientes y atajos personalizables con detección de conflictos.
 - Recuperación opt-in de documento, página, zoom, disposición, panel, chrome y
   geometría de ventana.
 - Copia de seguridad JSON versionada, validada y transaccional; nunca incluye
   los PDF.
-- Búsqueda global FTS5 opt-in con filtros de documento, página, anotación,
+- Búsqueda global FTS5 opt-in y reanudable con filtros de documento, página, anotación,
   marcador, colección y etiqueta, relevancia con recencia solo como desempate,
   cancelación, diagnósticos redactados y safe mode conservador.
 - La búsqueda global usa lista y preview en ancho expandido; selección,
@@ -122,11 +138,15 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 
 ![Modo Libro editorial 0.10 mantenido por prueba](docs/screenshots/windows-reader-editorial-v010.png)
 
+![Navegador documental 0.11 mantenido por prueba](docs/screenshots/windows-document-navigator-v011.png)
+
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
-Las matrices 0.10 cubren Biblioteca, Lector, panel, Ajustes, paleta, búsqueda,
-menús y diálogos, con comparaciones 0.9/0.10 reproducibles bajo
-`build/visual-evidence/v0.10.0/`. La identidad del logo violeta se comprueba por
+Las 164 capturas de las matrices 0.11 cubren Biblioteca, Lector, navegador,
+panel, Ajustes, paleta, búsqueda, menús, bienvenida e importación, con la base
+0.10 conservada bajo
+`build/visual-evidence/v0.10.0/` y la evidencia actual en
+`build/visual-evidence/v0.11.0/`. La identidad del logo violeta se comprueba por
 hash; no se regenera ni se altera su geometría.
 
 ## Requisitos
@@ -233,8 +253,9 @@ Captura de una ventana ya abierta, conservando sus bounds y enviando F11:
 - No hay OCR, IA, clasificación remota ni edición o firma del PDF. Los PDF
   escaneados sin capa de texto conservan el nombre de archivo hasta una edición
   manual.
-- La selección geométrica para highlight, subrayado y tachado depende aún del
-  adaptador nativo; hoy las notas se ligan a página.
+- Highlight, subrayado y tachado usan la geometría normalizada que entrega el
+  adaptador nativo. Selecciones multipágina o sin geometría fiable degradan de
+  forma anunciada a nota de página.
 - Split/comparación conservan modelos internos, pero no se anuncian sin dos
   visores reales y medidos.
 - Android e iOS están inicializados, pero esta iteración solo valida Windows.

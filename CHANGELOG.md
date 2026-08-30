@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.11.0 — 2026-08-28 (navegación documental y continuidad)
+
+- Añade un navegador unificado con `Ctrl+J` para índice, miniaturas, búsqueda
+  interna, marcadores, anotaciones, historial y posiciones A/B; filtra todas
+  las fuentes, usa lista + detalle en expandido y lista → detalle → retorno en
+  compacto, conserva zoom y permite volver al origen con `Alt+←`.
+- Conserva el panel lateral en `Ctrl+Mayús+J` y mantiene navegador, panel,
+  chrome y breakpoints fuera de la identidad cacheada del visor PDF.
+- Persiste contexto rico de sesión y documentos cerrados recientemente en el
+  almacén local incluido en backup; restaura página, zoom, layout, modo, tema,
+  scroll y sección del panel, limita a tres documentos fijados y añade acciones
+  Continuar, Releer y Terminado.
+- Expone `Cerrar sesión y conservar contexto` como acción inequívoca del lector
+  y restaura el snapshot desde la banda de documentos cerrados recientemente.
+- Añade metas locales opcionales por páginas o minutos, visibles como progreso
+  tipográfico discreto, sin cuentas, nube, avisos ni gamificación.
+- Conecta la selección real de `pdfrx` con resaltado, subrayado y tachado:
+  conserva texto, contexto y rectángulos normalizados; una selección multipágina
+  o sin geometría fiable degrada de forma explícita a nota de página.
+- Generaliza la agrupación de Biblioteca por autor, colección, etiqueta o estado
+  de lectura, con secciones plegables, selección y scroll estables, una sola
+  barra masiva, consultas SQL acotadas y máximo de 80 filas materializadas.
+- Cancela portadas recreables cuando una tarjeta virtualizada abandona el
+  viewport y publica contadores locales redactados de decodificaciones
+  iniciadas y evitadas.
+- Reanuda el índice FTS5 desde un cursor persistente, preserva páginas ya
+  completadas, reajusta prioridad para documento/página visibles y mantiene una
+  cola secundaria acotada de documentos fijados o recientes.
+- Separa métricas locales de búsqueda fría, caliente, filtrada y cancelada sin
+  registrar consultas, rutas, títulos ni contenido del PDF.
+- Amplía pruebas, matrices visuales y benchmarks comparables con la base 0.10;
+  cubre también el diálogo de importación, prioridades cambiadas durante un
+  índice activo y consultas solapadas; genera el release local `0.11.0+12` sin
+  firma ni publicación.
+
 ## 0.10.0 — 2026-08-27 (continuidad y orientación local)
 
 - Añade una franja condicional de Continuar leyendo con página, total,

@@ -9,6 +9,8 @@ import '../../app/app_config.dart';
 import '../../app/theme/app_tokens.dart';
 import '../../core/security/local_input_policy.dart';
 import '../../features/reader/domain/reader_models.dart';
+import '../../features/annotations/domain/annotation.dart';
+import '../../features/reader/domain/text_selection.dart' as reader;
 import '../models/pdf_models.dart';
 import '../presentation/pdf_viewer_adapter.dart';
 import '../presentation/reader_viewport_metrics.dart';
@@ -124,6 +126,9 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
         backgroundColor: widget.configuration.backgroundColor,
         margin: _effectiveMargin,
         pageDropShadow: widget.configuration.pageShadow,
+        textSelectionParams: pdfrx.PdfTextSelectionParams(
+          onTextSelectionChange: _onTextSelectionChanged,
+        ),
         pageOverlaysBuilder: widget.configuration.flow == PdfViewFlow.facing
             ? _buildBookPageOverlays
             : null,
@@ -148,6 +153,7 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
                   coverPolicy: widget.configuration.coverPolicy,
                   initialSide: widget.configuration.initialSide,
                 );
+
                 final normalizedCenter = ReaderViewportMetrics.normalizeCenter(
                   proposedCenter: proposedCenter,
                   viewport: viewSize,
@@ -299,6 +305,88 @@ final class _PdfrxViewerState extends State<_PdfrxViewer> {
     );
     final turns = (widget.configuration.rotation ~/ 90) % 4;
     return turns == 0 ? viewer : RotatedBox(quarterTurns: turns, child: viewer);
+  }
+
+  void _onTextSelectionChanged(pdfrx.PdfTextSelection selection) {
+    final callback = widget.configuration.onTextSelectionChanged;
+    if (callback == null) return;
+    if (!selection.isCopyAllowed || !selection.hasSelectedText) {
+      callback(null);
+      return;
+    }
+    unawaited(_readTextSelection(selection, callback));
+  }
+
+  Future<void> _readTextSelection(
+    pdfrx.PdfTextSelection selection,
+    ValueChanged<reader.TextSelection?> callback,
+  ) async {
+    try {
+      final ranges = await selection.getSelectedTextRanges();
+      if (!mounted || ranges.isEmpty || !selection.hasSelectedText) {
+        callback(null);
+        return;
+      }
+      ranges.sort((left, right) => left.pageNumber.compareTo(right.pageNumber));
+      final pages = <reader.TextSelectionPageGeometry>[];
+      for (final range in ranges) {
+        final pageIndex = range.pageNumber - 1;
+        if (pageIndex < 0 || pageIndex >= widget.document.pageSizes.length) {
+          callback(null);
+          return;
+        }
+        final size = widget.document.pageSizes[pageIndex];
+        if (!size.width.isFinite ||
+            !size.height.isFinite ||
+            size.width <= 0 ||
+            size.height <= 0) {
+          callback(null);
+          return;
+        }
+        final rects = <NormalizedRect>[];
+        for (final fragment in range.enumerateFragmentBoundingRects()) {
+          final bounds = fragment.bounds;
+          final left = (bounds.left / size.width).clamp(0.0, 1.0);
+          final top = (bounds.top / size.height).clamp(0.0, 1.0);
+          final right = (bounds.right / size.width).clamp(0.0, 1.0);
+          final bottom = (bounds.bottom / size.height).clamp(0.0, 1.0);
+          if (![left, top, right, bottom].every((value) => value.isFinite) ||
+              left >= right ||
+              top >= bottom) {
+            continue;
+          }
+          rects.add(
+            NormalizedRect(left: left, top: top, right: right, bottom: bottom),
+          );
+        }
+        pages.add(
+          reader.TextSelectionPageGeometry(
+            pageIndex: pageIndex,
+            text: range.pageText.fullText,
+            rects: rects,
+          ),
+        );
+      }
+      final first = ranges.first;
+      final last = ranges.last;
+      callback(
+        reader.TextSelection(
+          range: reader.TextSelectionRange(
+            start: reader.TextSelectionPosition(
+              pageIndex: first.pageNumber - 1,
+              offset: first.start,
+            ),
+            end: reader.TextSelectionPosition(
+              pageIndex: last.pageNumber - 1,
+              offset: last.end,
+            ),
+          ),
+          pages: pages,
+        ),
+      );
+    } on Object {
+      if (mounted) callback(null);
+    }
   }
 
   double _safeRenderingScale(

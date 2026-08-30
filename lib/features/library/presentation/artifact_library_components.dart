@@ -42,7 +42,7 @@ final class _LibraryCommandBar extends StatelessWidget {
     required this.viewMode,
     required this.selectedAuthorCount,
     required this.selectedTopicCount,
-    required this.groupByAuthor,
+    required this.grouping,
     required this.onSearch,
     required this.onFilter,
     required this.onFacets,
@@ -65,7 +65,7 @@ final class _LibraryCommandBar extends StatelessWidget {
   final _LibraryViewMode viewMode;
   final int selectedAuthorCount;
   final int selectedTopicCount;
-  final bool groupByAuthor;
+  final LibraryGrouping grouping;
   final VoidCallback onSearch;
   final ValueChanged<_FilterCommand> onFilter;
   final VoidCallback onFacets;
@@ -148,7 +148,7 @@ final class _LibraryCommandBar extends StatelessWidget {
           selected:
               selectedAuthorCount > 0 ||
               selectedTopicCount > 0 ||
-              groupByAuthor,
+              grouping != LibraryGrouping.none,
           icon: Icons.account_tree_outlined,
         ),
         PopupMenuButton<_FilterCommand>(
@@ -293,7 +293,7 @@ final class _LibraryCommandBar extends StatelessWidget {
                   favoritesOnly: favoritesOnly,
                   selectedAuthorCount: selectedAuthorCount,
                   selectedTopicCount: selectedTopicCount,
-                  groupByAuthor: groupByAuthor,
+                  grouping: grouping,
                   onClear: onClearActiveFilter,
                 ),
               ],
@@ -313,7 +313,7 @@ final class _ActiveFilterStrip extends StatelessWidget {
     required this.favoritesOnly,
     required this.selectedAuthorCount,
     required this.selectedTopicCount,
-    required this.groupByAuthor,
+    required this.grouping,
     required this.onClear,
   });
 
@@ -323,7 +323,7 @@ final class _ActiveFilterStrip extends StatelessWidget {
   final bool favoritesOnly;
   final int selectedAuthorCount;
   final int selectedTopicCount;
-  final bool groupByAuthor;
+  final LibraryGrouping grouping;
   final ValueChanged<_ActiveFilterKind> onClear;
 
   @override
@@ -380,9 +380,9 @@ final class _ActiveFilterStrip extends StatelessWidget {
                 ),
                 onDeleted: () => onClear(_ActiveFilterKind.topics),
               ),
-            if (groupByAuthor)
+            if (grouping != LibraryGrouping.none)
               _ActiveFilterChip(
-                label: strings.get('library.groupByAuthor'),
+                label: strings.get('library.grouping.${grouping.name}'),
                 onDeleted: () => onClear(_ActiveFilterKind.grouping),
               ),
           ],
@@ -589,13 +589,20 @@ final class _ArtifactCanvas extends StatelessWidget {
     required this.selectionMode,
     required this.reserveInfoSpace,
     required this.reduceMotion,
-    required this.groupByAuthor,
+    required this.grouping,
+    required this.collections,
+    required this.tags,
+    required this.collectionMemberships,
+    required this.tagMemberships,
+    required this.collapsedGroups,
+    required this.onToggleGroup,
     required this.viewMode,
     required this.onSelect,
     required this.onOpen,
     required this.onHover,
     required this.onMenu,
     this.onDocumentVisible,
+    this.onDocumentHidden,
   });
 
   final ScrollController controller;
@@ -606,13 +613,20 @@ final class _ArtifactCanvas extends StatelessWidget {
   final bool selectionMode;
   final bool reserveInfoSpace;
   final bool reduceMotion;
-  final bool groupByAuthor;
+  final LibraryGrouping grouping;
+  final List<DocumentCollection> collections;
+  final List<DocumentTag> tags;
+  final Map<String, Set<String>> collectionMemberships;
+  final Map<String, Set<String>> tagMemberships;
+  final Set<String> collapsedGroups;
+  final ValueChanged<String> onToggleGroup;
   final _LibraryViewMode viewMode;
   final ValueChanged<LibraryDocument> onSelect;
   final ValueChanged<LibraryDocument> onOpen;
   final ValueChanged<String?> onHover;
   final void Function(LibraryDocument document, Offset position) onMenu;
   final ValueChanged<LibraryDocument>? onDocumentVisible;
+  final ValueChanged<LibraryDocument>? onDocumentHidden;
 
   @override
   Widget build(BuildContext context) {
@@ -628,12 +642,16 @@ final class _ArtifactCanvas extends StatelessWidget {
             selectedDocumentIds: selectedDocumentIds,
             selectionMode: selectionMode,
             reserveInfoSpace: reserveInfoSpace,
-            groupByAuthor: groupByAuthor,
+            grouping: grouping,
+            groups: _groups(context),
+            collapsedGroups: collapsedGroups,
+            onToggleGroup: onToggleGroup,
             onSelect: onSelect,
             onOpen: onOpen,
             onHover: onHover,
             onMenu: onMenu,
             onDocumentVisible: onDocumentVisible,
+            onDocumentHidden: onDocumentHidden,
           );
         }
         final metrics = LibraryArtifactLayout.metricsFor(
@@ -643,8 +661,8 @@ final class _ArtifactCanvas extends StatelessWidget {
               AppBreakpoints.classify(constraints.maxWidth) ==
               AppWindowClass.compact,
         );
-        if (groupByAuthor) {
-          final groups = groupLibraryDocumentsByAuthor(documents);
+        if (grouping != LibraryGrouping.none) {
+          final groups = _groups(context);
           return CustomScrollView(
             controller: controller,
             slivers: [
@@ -660,44 +678,38 @@ final class _ArtifactCanvas extends StatelessWidget {
                     AppSpacing.space8,
                   ),
                   sliver: SliverToBoxAdapter(
-                    child: Row(
-                      children: [
-                        Text(
-                          entry.key,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        const SizedBox(width: AppSpacing.space8),
-                        Text(
-                          '${entry.value.length}',
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                      ],
+                    child: _ArtifactGroupHeader(
+                      label: entry.key,
+                      count: entry.value.length,
+                      collapsed: collapsedGroups.contains(entry.key),
+                      onToggle: () => onToggleGroup(entry.key),
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(
-                    horizontalPadding,
-                    0,
-                    horizontalPadding,
-                    AppSpacing.space24,
-                  ),
-                  sliver: SliverGrid.builder(
-                    itemCount: entry.value.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: metrics.columns,
-                      mainAxisExtent: metrics.cellExtent,
-                      mainAxisSpacing: AppSpacing.space16,
-                      crossAxisSpacing: AppSpacing.space16,
+                if (!collapsedGroups.contains(entry.key))
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      0,
+                      horizontalPadding,
+                      AppSpacing.space24,
                     ),
-                    itemBuilder: (context, index) {
-                      final document = entry.value[index];
-                      return Center(
-                        child: _artifact(document, metrics.artifactWidth),
-                      );
-                    },
+                    sliver: SliverGrid.builder(
+                      itemCount: entry.value.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: metrics.columns,
+                        mainAxisExtent: metrics.cellExtent,
+                        mainAxisSpacing: AppSpacing.space16,
+                        crossAxisSpacing: AppSpacing.space16,
+                      ),
+                      itemBuilder: (context, index) {
+                        final document = entry.value[index];
+                        return Center(
+                          child: _artifact(document, metrics.artifactWidth),
+                        );
+                      },
+                    ),
                   ),
-                ),
               ],
               SliverToBoxAdapter(
                 child: SizedBox(height: reserveInfoSpace ? 156 : 48),
@@ -799,6 +811,7 @@ final class _ArtifactCanvas extends StatelessWidget {
       onHover: (hovered) => onHover(hovered ? document.id : null),
       onMenu: (position) => onMenu(document, position),
       onVisible: () => onDocumentVisible?.call(document),
+      onHidden: () => onDocumentHidden?.call(document),
     );
     if (selectionMode) {
       return buildArtifact(selectedDocumentIds.contains(document.id));
@@ -808,6 +821,95 @@ final class _ArtifactCanvas extends StatelessWidget {
       builder: (context, selected, _) => buildArtifact(selected),
     );
   }
+
+  Map<String, List<LibraryDocument>> _groups(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    final result = <String, List<LibraryDocument>>{};
+    for (final document in documents) {
+      final label = switch (grouping) {
+        LibraryGrouping.none => '',
+        LibraryGrouping.author =>
+          document.effectiveAuthor?.trim().isNotEmpty == true
+              ? document.effectiveAuthor!.trim()
+              : strings.get('library.unknownAuthor'),
+        LibraryGrouping.collection =>
+          collections
+                  .where(
+                    (collection) =>
+                        collectionMemberships[collection.id]?.contains(
+                          document.id,
+                        ) ==
+                        true,
+                  )
+                  .firstOrNull
+                  ?.name ??
+              strings.get('library.ungroupedCollection'),
+        LibraryGrouping.tag =>
+          tags
+                  .where(
+                    (tag) =>
+                        tagMemberships[tag.id]?.contains(document.id) == true,
+                  )
+                  .firstOrNull
+                  ?.name ??
+              strings.get('library.untagged'),
+        LibraryGrouping.readingState => strings.get(
+          'library.readingState.${readingStateOf(document).name}',
+        ),
+      };
+      result.putIfAbsent(label, () => <LibraryDocument>[]).add(document);
+    }
+    return result;
+  }
+}
+
+final class _ArtifactGroupHeader extends StatelessWidget {
+  const _ArtifactGroupHeader({
+    required this.label,
+    required this.count,
+    required this.collapsed,
+    required this.onToggle,
+  });
+
+  final String label;
+  final int count;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    expanded: !collapsed,
+    label: '$label, $count',
+    child: InkWell(
+      onTap: onToggle,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minHeight: AppSizes.touchControlExtent,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              collapsed
+                  ? Icons.chevron_right_rounded
+                  : Icons.expand_more_rounded,
+              size: 20,
+            ),
+            const SizedBox(width: AppSpacing.space6),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            Text('$count', style: Theme.of(context).textTheme.labelSmall),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 final class _ArtifactList extends StatelessWidget {
@@ -819,12 +921,16 @@ final class _ArtifactList extends StatelessWidget {
     required this.selectedDocumentIds,
     required this.selectionMode,
     required this.reserveInfoSpace,
-    required this.groupByAuthor,
+    required this.grouping,
+    required this.groups,
+    required this.collapsedGroups,
+    required this.onToggleGroup,
     required this.onSelect,
     required this.onOpen,
     required this.onHover,
     required this.onMenu,
     required this.onDocumentVisible,
+    required this.onDocumentHidden,
   });
 
   final ScrollController controller;
@@ -835,21 +941,26 @@ final class _ArtifactList extends StatelessWidget {
   final Set<String> selectedDocumentIds;
   final bool selectionMode;
   final bool reserveInfoSpace;
-  final bool groupByAuthor;
+  final LibraryGrouping grouping;
+  final Map<String, List<LibraryDocument>> groups;
+  final Set<String> collapsedGroups;
+  final ValueChanged<String> onToggleGroup;
   final ValueChanged<LibraryDocument> onSelect;
   final ValueChanged<LibraryDocument> onOpen;
   final ValueChanged<String?> onHover;
   final void Function(LibraryDocument document, Offset position) onMenu;
   final ValueChanged<LibraryDocument>? onDocumentVisible;
+  final ValueChanged<LibraryDocument>? onDocumentHidden;
 
   @override
   Widget build(BuildContext context) {
     final items = <Object>[];
-    if (groupByAuthor) {
-      for (final entry in groupLibraryDocumentsByAuthor(documents).entries) {
-        items
-          ..add(entry.key)
-          ..addAll(entry.value);
+    if (grouping != LibraryGrouping.none) {
+      for (final entry in groups.entries) {
+        items.add(
+          _ArtifactGroupMarker(label: entry.key, count: entry.value.length),
+        );
+        if (!collapsedGroups.contains(entry.key)) items.addAll(entry.value);
       }
     } else {
       items.addAll(documents);
@@ -885,7 +996,7 @@ final class _ArtifactList extends StatelessWidget {
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final item = items[index];
-                  if (item is String) {
+                  if (item is _ArtifactGroupMarker) {
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.space8,
@@ -893,9 +1004,11 @@ final class _ArtifactList extends StatelessWidget {
                         AppSpacing.space8,
                         AppSpacing.space8,
                       ),
-                      child: Text(
-                        item,
-                        style: Theme.of(context).textTheme.titleSmall,
+                      child: _ArtifactGroupHeader(
+                        label: item.label,
+                        count: item.count,
+                        collapsed: collapsedGroups.contains(item.label),
+                        onToggle: () => onToggleGroup(item.label),
                       ),
                     );
                   }
@@ -911,6 +1024,7 @@ final class _ArtifactList extends StatelessWidget {
                     onHover: (hovered) => onHover(hovered ? document.id : null),
                     onMenu: (position) => onMenu(document, position),
                     onVisible: () => onDocumentVisible?.call(document),
+                    onHidden: () => onDocumentHidden?.call(document),
                   );
                   if (selectionMode) {
                     return row(selectedDocumentIds.contains(document.id));
@@ -927,6 +1041,13 @@ final class _ArtifactList extends StatelessWidget {
       },
     );
   }
+}
+
+final class _ArtifactGroupMarker {
+  const _ArtifactGroupMarker({required this.label, required this.count});
+
+  final String label;
+  final int count;
 }
 
 final class _ArtifactListHeader extends StatelessWidget {
@@ -990,6 +1111,7 @@ final class _ArtifactListRow extends StatefulWidget {
     required this.onHover,
     required this.onMenu,
     this.onVisible,
+    this.onHidden,
   });
 
   final LibraryDocument document;
@@ -1001,6 +1123,7 @@ final class _ArtifactListRow extends StatefulWidget {
   final ValueChanged<bool> onHover;
   final ValueChanged<Offset> onMenu;
   final VoidCallback? onVisible;
+  final VoidCallback? onHidden;
 
   @override
   State<_ArtifactListRow> createState() => _ArtifactListRowState();
@@ -1009,13 +1132,22 @@ final class _ArtifactListRow extends StatefulWidget {
 final class _ArtifactListRowState extends State<_ArtifactListRow> {
   bool _hovered = false;
   bool _focused = false;
+  bool _reportedVisible = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => widget.onVisible?.call(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _reportedVisible = true;
+      widget.onVisible?.call();
+    });
+  }
+
+  @override
+  void dispose() {
+    if (_reportedVisible) widget.onHidden?.call();
+    super.dispose();
   }
 
   @override
@@ -1306,6 +1438,7 @@ final class ArtifactDocument extends StatefulWidget {
     required this.onHover,
     required this.onMenu,
     this.onVisible,
+    this.onHidden,
   });
 
   final LibraryDocument document;
@@ -1318,6 +1451,7 @@ final class ArtifactDocument extends StatefulWidget {
   final ValueChanged<bool> onHover;
   final ValueChanged<Offset> onMenu;
   final VoidCallback? onVisible;
+  final VoidCallback? onHidden;
 
   @override
   State<ArtifactDocument> createState() => _ArtifactDocumentState();
@@ -1326,13 +1460,22 @@ final class ArtifactDocument extends StatefulWidget {
 final class _ArtifactDocumentState extends State<ArtifactDocument> {
   bool _hovered = false;
   bool _focused = false;
+  bool _reportedVisible = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.onVisible?.call();
+      if (!mounted) return;
+      _reportedVisible = true;
+      widget.onVisible?.call();
     });
+  }
+
+  @override
+  void dispose() {
+    if (_reportedVisible) widget.onHidden?.call();
+    super.dispose();
   }
 
   @override

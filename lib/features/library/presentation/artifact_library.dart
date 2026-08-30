@@ -34,6 +34,8 @@ final class ArtifactLibraryView extends StatefulWidget {
     this.onBulkOperation,
     this.collections = const [],
     this.tags = const [],
+    this.collectionMemberships = const {},
+    this.tagMemberships = const {},
     this.onDocumentInfo,
     this.onRelocateDocument,
     this.onToggleFavorite,
@@ -42,6 +44,7 @@ final class ArtifactLibraryView extends StatefulWidget {
     this.onRemoveDocument,
     this.onReanalyzeDocument,
     this.onDocumentVisible,
+    this.onDocumentHidden,
   });
 
   final LibraryController controller;
@@ -53,6 +56,8 @@ final class ArtifactLibraryView extends StatefulWidget {
   final BulkOperationHandler? onBulkOperation;
   final List<DocumentCollection> collections;
   final List<DocumentTag> tags;
+  final Map<String, Set<String>> collectionMemberships;
+  final Map<String, Set<String>> tagMemberships;
   final Future<void> Function(LibraryDocument document)? onDocumentInfo;
   final Future<void> Function(LibraryDocument document)? onRelocateDocument;
   final Future<void> Function(LibraryDocument document)? onToggleFavorite;
@@ -61,6 +66,7 @@ final class ArtifactLibraryView extends StatefulWidget {
   final Future<void> Function(LibraryDocument document)? onRemoveDocument;
   final Future<void> Function(LibraryDocument document)? onReanalyzeDocument;
   final ValueChanged<LibraryDocument>? onDocumentVisible;
+  final ValueChanged<LibraryDocument>? onDocumentHidden;
 
   @override
   State<ArtifactLibraryView> createState() => _ArtifactLibraryViewState();
@@ -83,6 +89,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   final LibrarySelection _selection = LibrarySelection();
   String? _selectionAnchorId;
   Timer? _queryDebounce;
+  final Set<String> _collapsedGroups = <String>{};
 
   @override
   void initState() {
@@ -161,7 +168,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         _favoritesOnly ||
         widget.controller.selectedAuthors.isNotEmpty ||
         widget.controller.selectedTopics.isNotEmpty ||
-        widget.controller.groupByAuthor;
+        widget.controller.grouping != LibraryGrouping.none;
     final activeFilterCount = <bool>[
       widget.controller.query.isNotEmpty,
       _readingState != LibraryReadingState.all,
@@ -169,7 +176,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       _favoritesOnly,
       widget.controller.selectedAuthors.isNotEmpty,
       widget.controller.selectedTopics.isNotEmpty,
-      widget.controller.groupByAuthor,
+      widget.controller.grouping != LibraryGrouping.none,
     ].where((active) => active).length;
 
     return CallbackShortcuts(
@@ -220,7 +227,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                   viewMode: _viewMode,
                   selectedAuthorCount: widget.controller.selectedAuthors.length,
                   selectedTopicCount: widget.controller.selectedTopics.length,
-                  groupByAuthor: widget.controller.groupByAuthor,
+                  grouping: widget.controller.grouping,
                   onSearch: _openSearch,
                   onFilter: _applyFilterCommand,
                   onFacets: _showFacetFilters,
@@ -260,7 +267,17 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                             selectionMode: _selectionMode,
                             reserveInfoSpace: widget.documents.isNotEmpty,
                             reduceMotion: reduceMotion,
-                            groupByAuthor: widget.controller.groupByAuthor,
+                            grouping: widget.controller.grouping,
+                            collections: widget.collections,
+                            tags: widget.tags,
+                            collectionMemberships: widget.collectionMemberships,
+                            tagMemberships: widget.tagMemberships,
+                            collapsedGroups: _collapsedGroups,
+                            onToggleGroup: (group) => setState(() {
+                              _collapsedGroups.contains(group)
+                                  ? _collapsedGroups.remove(group)
+                                  : _collapsedGroups.add(group);
+                            }),
                             viewMode: _viewMode,
                             onSelect: _select,
                             onOpen: _open,
@@ -268,6 +285,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                                 _hoveredDocumentId.value = documentId,
                             onMenu: _showDocumentMenu,
                             onDocumentVisible: widget.onDocumentVisible,
+                            onDocumentHidden: widget.onDocumentHidden,
                           ),
                         ),
                 ),
@@ -933,7 +951,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     final strings = YamantakaLocalizations.of(context);
     var authors = Set<String>.from(widget.controller.selectedAuthors);
     var topics = Set<LibraryTopic>.from(widget.controller.selectedTopics);
-    var groupAuthors = widget.controller.groupByAuthor;
+    var grouping = widget.controller.grouping;
     final applied = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -946,15 +964,24 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(strings.get('library.groupByAuthor')),
-                    subtitle: Text(
-                      strings.get('library.groupByAuthor.description'),
+                  DropdownButtonFormField<LibraryGrouping>(
+                    initialValue: grouping,
+                    decoration: InputDecoration(
+                      labelText: strings.get('library.grouping'),
+                      helperText: strings.get('library.grouping.description'),
                     ),
-                    value: groupAuthors,
-                    onChanged: (value) =>
-                        setDialogState(() => groupAuthors = value),
+                    items: [
+                      for (final value in LibraryGrouping.values)
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            strings.get('library.grouping.${value.name}'),
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setDialogState(
+                      () => grouping = value ?? LibraryGrouping.none,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.space12),
                   Text(
@@ -1014,7 +1041,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
               onPressed: () => setDialogState(() {
                 authors.clear();
                 topics.clear();
-                groupAuthors = false;
+                grouping = LibraryGrouping.none;
               }),
               child: Text(strings.get('action.reset')),
             ),
@@ -1034,8 +1061,9 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     await widget.controller.setFacets(
       authors: authors,
       topics: topics,
-      groupAuthors: groupAuthors,
+      groupAuthors: false,
     );
+    widget.controller.setGrouping(grouping);
     if (mounted) setState(() {});
   }
 

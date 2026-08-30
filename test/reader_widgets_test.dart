@@ -15,11 +15,16 @@ import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/core/platform/window_service.dart';
 import 'package:yamantaka/features/annotations/application/annotation_controller.dart';
+import 'package:yamantaka/features/annotations/domain/annotation.dart';
 import 'package:yamantaka/features/bookmarks/application/bookmark_controller.dart';
 import 'package:yamantaka/features/library/application/document_service.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
 import 'package:yamantaka/features/reader/application/reader_controller.dart';
 import 'package:yamantaka/features/reader/domain/reader_models.dart';
+import 'package:yamantaka/features/reader/domain/text_selection.dart'
+    as reader_selection;
+import 'package:yamantaka/features/navigation/application/navigation_history_controller.dart';
+import 'package:yamantaka/features/reader/presentation/document_navigator_dialog.dart';
 import 'package:yamantaka/features/reader/presentation/reader_screen.dart';
 import 'package:yamantaka/features/search/application/search_controller.dart'
     as app_search;
@@ -166,6 +171,138 @@ void main() {
   });
 
   testWidgets(
+    'Ctrl+J unifies document destinations without rebuilding the viewer',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await _ReaderHarness.create(ready: true, pageCount: 100);
+      final adapter = _CountingViewerAdapter();
+      harness.bookmarks.add(23, label: 'Tesis principal');
+
+      await tester.pumpWidget(_app(harness, viewerAdapter: adapter));
+      await tester.pump();
+      expect(adapter.buildCount, 1);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyJ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('document-navigator-filter')),
+        findsOneWidget,
+      );
+      tester.binding.focusManager.primaryFocus?.unfocus();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.text('Miniaturas'), findsWidgets);
+      expect(find.text('Marcadores'), findsWidgets);
+      await tester.enterText(
+        find.byKey(const Key('document-navigator-filter')),
+        'Tesis principal',
+      );
+      await tester.pump(const Duration(milliseconds: 180));
+      final destination = find.descendant(
+        of: find.byKey(const Key('document-navigator-list')),
+        matching: find.text('Tesis principal'),
+      );
+      expect(destination, findsOneWidget);
+      await tester.tap(destination);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('document-navigator-open')));
+      await tester.pump();
+      expect(harness.controller.currentPageIndex, 23);
+      expect(adapter.buildCount, 1);
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+      await tester.pump();
+      expect(harness.controller.currentPageIndex, 0);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await harness.dispose();
+    },
+  );
+
+  test(
+    'selection annotations use real geometry and degrade explicitly',
+    () async {
+      final harness = await _ReaderHarness.create(ready: true);
+      const rect = NormalizedRect(
+        left: 0.1,
+        top: 0.2,
+        right: 0.4,
+        bottom: 0.24,
+      );
+      harness.controller.updateTextSelection(
+        const reader_selection.TextSelection(
+          range: reader_selection.TextSelectionRange(
+            start: reader_selection.TextSelectionPosition(
+              pageIndex: 0,
+              offset: 6,
+            ),
+            end: reader_selection.TextSelectionPosition(
+              pageIndex: 0,
+              offset: 11,
+            ),
+          ),
+          pages: [
+            reader_selection.TextSelectionPageGeometry(
+              pageIndex: 0,
+              text: 'Antes texto después',
+              rects: [rect],
+            ),
+          ],
+        ),
+      );
+      final precise = harness.controller.createAnnotationFromSelection(
+        type: AnnotationType.highlight,
+      );
+      expect(precise?.usedPreciseGeometry, isTrue);
+      expect(precise?.annotation.type, AnnotationType.highlight);
+      expect(precise?.annotation.rects.single.toJson(), rect.toJson());
+      expect(precise?.annotation.selectedText, 'texto');
+
+      harness.controller.updateTextSelection(
+        const reader_selection.TextSelection(
+          range: reader_selection.TextSelectionRange(
+            start: reader_selection.TextSelectionPosition(
+              pageIndex: 0,
+              offset: 0,
+            ),
+            end: reader_selection.TextSelectionPosition(
+              pageIndex: 1,
+              offset: 4,
+            ),
+          ),
+          pages: [
+            reader_selection.TextSelectionPageGeometry(
+              pageIndex: 0,
+              text: 'uno',
+              rects: [],
+            ),
+            reader_selection.TextSelectionPageGeometry(
+              pageIndex: 1,
+              text: 'dos',
+              rects: [],
+            ),
+          ],
+        ),
+      );
+      final fallback = harness.controller.createAnnotationFromSelection(
+        type: AnnotationType.underline,
+      );
+      expect(fallback?.usedPreciseGeometry, isFalse);
+      expect(fallback?.annotation.type, AnnotationType.pageComment);
+      expect(fallback?.annotation.rects, isEmpty);
+      await harness.dispose();
+    },
+  );
+
+  testWidgets(
     'reader overflow is compact and replaces the document tab strip',
     (tester) async {
       tester.view.physicalSize = const Size(1280, 800);
@@ -295,6 +432,48 @@ void main() {
       find.byType(ReaderScreen),
       matchesGoldenFile(
         '../docs/screenshots/windows-reader-editorial-v010.png',
+      ),
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets('document navigator matches the maintained v0.11 baseline', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1600, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true, pageCount: 100);
+    harness.bookmarks.add(23, label: 'Tesis principal');
+    harness.annotations.create(
+      pageIndex: 41,
+      note: 'Revisar este argumento antes de continuar.',
+    );
+    const boundaryKey = Key('navigator-golden-boundary');
+
+    await tester.pumpWidget(
+      _visualApp(
+        harness,
+        captureKey: boundaryKey,
+        themeMode: ThemeMode.light,
+        highContrast: false,
+        reduceMotion: true,
+        scenarioKey: 'navigator-golden',
+        panelOpen: false,
+        navigatorOpen: true,
+        textScale: 1,
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('document-navigator-filter')), findsOneWidget);
+
+    await expectLater(
+      find.byKey(boundaryKey),
+      matchesGoldenFile(
+        '../docs/screenshots/windows-document-navigator-v011.png',
       ),
     );
 
@@ -788,7 +967,7 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('reader-side-panel')), findsNothing);
 
-      await tester.tap(find.byTooltip('Miniaturas (Ctrl+J)'));
+      await tester.tap(find.byTooltip('Miniaturas (Ctrl+Mayús+J)'));
       await tester.pump();
       await tester.pump();
       expect(find.byKey(const Key('pdf-search-field')), findsNothing);
@@ -1076,6 +1255,7 @@ void main() {
       bool panelOpen = false,
       String panelSection = 'search',
       bool resting = false,
+      bool navigatorOpen = false,
       double textScale = 1,
     }) async {
       tester.view.physicalSize = size;
@@ -1089,11 +1269,18 @@ void main() {
           scenarioKey: name,
           panelOpen: panelOpen,
           panelSection: panelSection,
+          navigatorOpen: navigatorOpen,
           textScale: textScale,
         ),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
+      if (navigatorOpen) {
+        expect(
+          find.byKey(const Key('document-navigator-filter')),
+          findsOneWidget,
+        );
+      }
       if (resting) {
         await tester.pump(const Duration(seconds: 4));
         await tester.pump(const Duration(milliseconds: 250));
@@ -1111,6 +1298,8 @@ void main() {
         'panelOpen': panelOpen,
         'panelSection': panelOpen ? panelSection : null,
         'resting': resting,
+        'navigatorOpen': navigatorOpen,
+        'captureScope': navigatorOpen ? 'dialog' : 'surface',
         'textScale': textScale,
         'mode': harness.controller.preferences!.viewMode.name,
         'layout': harness.controller.preferences!.pageLayout.name,
@@ -1197,6 +1386,40 @@ void main() {
       note: 'Relacionar este argumento con la conclusión.',
     );
     harness.bookmarks.add(2, label: 'Tesis principal');
+    for (final entry in const [
+      ('640x480', Size(640, 480)),
+      ('800x600', Size(800, 600)),
+      ('1280x720', Size(1280, 720)),
+      ('1600x900', Size(1600, 900)),
+      ('1920x1080', Size(1920, 1080)),
+      ('1920x1200', Size(1920, 1200)),
+      ('2560x1440', Size(2560, 1440)),
+      ('3440x1440', Size(3440, 1440)),
+    ]) {
+      await capture(
+        name: 'navigator-${entry.$1}-light-widget',
+        size: entry.$2,
+        navigatorOpen: true,
+      );
+    }
+    await capture(
+      name: 'navigator-1280x720-dark-widget',
+      size: profileSize,
+      themeMode: ThemeMode.dark,
+      navigatorOpen: true,
+    );
+    await capture(
+      name: 'navigator-1280x720-high-contrast-widget',
+      size: profileSize,
+      highContrast: true,
+      navigatorOpen: true,
+    );
+    await capture(
+      name: 'navigator-1280x720-reduced-motion-widget',
+      size: profileSize,
+      reduceMotion: true,
+      navigatorOpen: true,
+    );
     await capture(
       name: 'reader-document-1600x900-notes-docked-widget',
       size: const Size(1600, 900),
@@ -1325,43 +1548,54 @@ Widget _visualApp(
   required String scenarioKey,
   required bool panelOpen,
   String panelSection = 'search',
+  bool navigatorOpen = false,
   required double textScale,
-}) => MaterialApp(
-  debugShowCheckedModeBanner: false,
-  locale: const Locale('es'),
-  supportedLocales: const [Locale('es'), Locale('en')],
-  localizationsDelegates: const [
-    YamantakaLocalizations.delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ],
-  theme: AppTheme.light(highContrast: highContrast),
-  darkTheme: AppTheme.dark(highContrast: highContrast),
-  themeMode: themeMode,
-  builder: (context, child) => MediaQuery(
-    data: MediaQuery.of(context).copyWith(
-      highContrast: highContrast,
-      disableAnimations: reduceMotion,
-      textScaler: TextScaler.linear(textScale),
+}) => RepaintBoundary(
+  key: captureKey,
+  child: MaterialApp(
+    debugShowCheckedModeBanner: false,
+    locale: const Locale('es'),
+    supportedLocales: const [Locale('es'), Locale('en')],
+    localizationsDelegates: const [
+      YamantakaLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    theme: AppTheme.light(highContrast: highContrast),
+    darkTheme: AppTheme.dark(highContrast: highContrast),
+    themeMode: themeMode,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        highContrast: highContrast,
+        disableAnimations: reduceMotion,
+        textScaler: TextScaler.linear(textScale),
+      ),
+      child: child!,
     ),
-    child: child!,
-  ),
-  home: RepaintBoundary(
-    key: captureKey,
-    child: ReaderScreen(
-      key: ValueKey(scenarioKey),
-      controller: harness.controller,
-      engine: harness.engine,
-      viewerAdapter: const _VisualViewerAdapter(),
-      onBack: () async {},
-      onOpenDocument: () async {},
-      onOpenSettings: () {},
-      reduceMotion: reduceMotion,
-      showProgress: true,
-      readingDirection: ReadingDirection.leftToRight,
-      initialPanelOpen: panelOpen,
-      initialPanelSection: panelOpen ? panelSection : '',
+    home: Stack(
+      children: [
+        ReaderScreen(
+          key: ValueKey(scenarioKey),
+          controller: harness.controller,
+          engine: harness.engine,
+          viewerAdapter: const _VisualViewerAdapter(),
+          onBack: () async {},
+          onOpenDocument: () async {},
+          onOpenSettings: () {},
+          reduceMotion: reduceMotion,
+          showProgress: true,
+          readingDirection: ReadingDirection.leftToRight,
+          initialPanelOpen: panelOpen,
+          initialPanelSection: panelOpen ? panelSection : '',
+        ),
+        if (navigatorOpen) ...[
+          const Positioned.fill(child: ColoredBox(color: Color(0x52000000))),
+          Positioned.fill(
+            child: DocumentNavigatorDialog(controller: harness.controller),
+          ),
+        ],
+      ],
     ),
   ),
 );
@@ -1389,6 +1623,7 @@ final class _ReaderHarness {
     required this.annotations,
     required this.search,
     required this.windowService,
+    required this.navigationHistory,
   });
 
   final ReaderController controller;
@@ -1399,6 +1634,7 @@ final class _ReaderHarness {
   final AnnotationController annotations;
   final app_search.SearchController search;
   final FakeWindowService windowService;
+  final NavigationHistoryController navigationHistory;
 
   static Future<_ReaderHarness> create({
     required bool ready,
@@ -1413,6 +1649,7 @@ final class _ReaderHarness {
     final annotations = AnnotationController(AnnotationRepository(database));
     final search = app_search.SearchController(engine, viewController, logger);
     final windowService = FakeWindowService();
+    final navigationHistory = NavigationHistoryController();
     final directory = Directory.current;
     final thumbnails = Directory('${directory.path}/build/test-covers');
     final thumbnailService = ThumbnailService(
@@ -1437,6 +1674,7 @@ final class _ReaderHarness {
       logger: logger,
       annotations: annotations,
       bookmarks: bookmarks,
+      navigationHistory: navigationHistory,
       search: search,
       viewController: viewController,
       shouldGenerateCovers: () => false,
@@ -1488,6 +1726,15 @@ final class _ReaderHarness {
         restorePosition: (zoom, scrollOffset) async =>
             viewController.update(zoom: zoom, scrollOffset: scrollOffset),
       );
+      navigationHistory.reset(
+        const NavigationLocation(
+          pageIndex: 0,
+          offset: 0,
+          zoom: 1,
+          reason: NavigationReason.history,
+          label: 'Inicio',
+        ),
+      );
     }
     return _ReaderHarness(
       controller: controller,
@@ -1498,6 +1745,7 @@ final class _ReaderHarness {
       annotations: annotations,
       search: search,
       windowService: windowService,
+      navigationHistory: navigationHistory,
     );
   }
 
@@ -1507,6 +1755,7 @@ final class _ReaderHarness {
     bookmarks.dispose();
     annotations.dispose();
     search.dispose();
+    navigationHistory.dispose();
     database.close();
   }
 }

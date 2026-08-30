@@ -132,14 +132,25 @@ final class LibraryIndexController extends ChangeNotifier {
         }
         String? engineDocumentId;
         try {
-          _search.beginDocument(document);
           final opened = await _engine.openDocument(document.path);
           engineDocumentId = opened.documentId;
-          var hasText = false;
+          final storedCursor = _search.resumableCursor(document);
+          var cursor = storedCursor ?? 0;
+          final canResume = storedCursor != null && cursor <= opened.pageCount;
+          if (!canResume) cursor = 0;
+          _search.beginDocument(document, resume: canResume);
+          final indexedPages = canResume
+              ? _search.indexedPageIndexes(document.id)
+              : <int>{};
+          var hasText = indexedPages.isNotEmpty;
+          final completedPages = <int>{
+            for (var page = 0; page < cursor; page++) page,
+            ...indexedPages,
+          };
           final remainingPages = List<int>.generate(
             opened.pageCount,
             (index) => index,
-          );
+          ).where((index) => !completedPages.contains(index)).toList();
           while (remainingPages.isNotEmpty) {
             if (_cancelled || operationToken.isCancelled) break;
             final prioritizedPage = _priorityPages[document.id];
@@ -167,6 +178,11 @@ final class LibraryIndexController extends ChangeNotifier {
                 text: text,
               );
             }
+            completedPages.add(pageIndex);
+            while (completedPages.contains(cursor)) {
+              cursor++;
+            }
+            _search.updateCursor(document.id, cursor);
             progress = LibraryIndexProgress(
               totalDocuments: totalCandidates,
               completedDocuments: completed,
@@ -244,6 +260,19 @@ final class LibraryIndexController extends ChangeNotifier {
     }
     if (pageIndex != null && pageIndex >= 0) {
       _priorityPages[documentId] = pageIndex;
+    }
+  }
+
+  /// Adds pinned or recently used documents behind the visible/active item.
+  /// This secondary queue remains bounded and contains identifiers only.
+  void prioritizeSecondary(Iterable<String> documentIds) {
+    for (final documentId in documentIds) {
+      if (_priorityDocumentIds.contains(documentId)) continue;
+      _priorityDocumentIds.add(documentId);
+      if (_priorityDocumentIds.length > 24) {
+        final removed = _priorityDocumentIds.removeLast();
+        _priorityPages.remove(removed);
+      }
     }
   }
 

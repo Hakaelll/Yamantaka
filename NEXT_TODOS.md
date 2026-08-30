@@ -1,6 +1,6 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-08-27.
+Actualizado: 2026-08-28.
 
 Este documento es el backlog vivo posterior a la reconstrucción del lector. No
 es una colección de ideas sueltas: ordena trabajo de producto, funcionamiento,
@@ -31,6 +31,20 @@ Reglas:
 - Yamantaka sigue siendo local-first y sin red durante el uso normal.
 
 ## Punto de partida confirmado
+
+- [x] 0.11.0 añade navegador documental `Ctrl+J`, sesiones ricas, cerrados
+  recientes, selección anotable real, agrupación plegable e índice reanudable
+  sin red, cuentas, telemetría ni modificación del PDF.
+- [x] Biblioteca materializa como máximo 80 documentos y agrupa con dos
+  consultas de membresía acotadas, sin recorridos del sistema de archivos.
+- [x] Portadas fuera del viewport se cancelan y el diagnóstico local mide
+  intentos y decodificaciones evitadas sin datos privados.
+- [x] El índice acepta prioridades nuevas durante la ejecución y las búsquedas
+  solapadas solo publican la generación más reciente.
+- [x] La matriz 0.11 incluye 164 capturas revisadas, importación en los ocho
+  tamaños base, 130/150/200 % de texto y diez comparaciones 0.10/0.11.
+- [ ] Completar la matriz física 0.11 con Narrator, dos monitores y escalas
+  reales 100/125/150/175/200; la automatización no sustituye esa evidencia.
 
 - [x] 0.10.0 añade Continuar leyendo, selector avanzado de página, conmutador
   Ctrl+Tab, búsqueda FTS5 filtrable, cola de importación detallada y búsqueda/

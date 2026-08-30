@@ -443,9 +443,19 @@ try {
                 'book reader matches the maintained editorial v0.10 baseline'
             ) 'reader-visual-baseline.log'
         }
+        Invoke-Gate 'maintained document navigator visual baseline' {
+            Invoke-External $FlutterExecutable @(
+                'test',
+                '--no-pub',
+                'test/reader_widgets_test.dart',
+                '--plain-name',
+                'document navigator matches the maintained v0.11 baseline'
+            ) 'document-navigator-visual-baseline.log'
+        }
     }
     else {
         Add-SkippedGate 'maintained reader visual baseline' 'SkipVisual'
+        Add-SkippedGate 'maintained document navigator visual baseline' 'SkipVisual'
     }
 
     if (-not $SkipDpiMatrix -and -not $SkipNative -and $nativeExecutionReady) {

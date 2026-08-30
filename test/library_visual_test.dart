@@ -11,6 +11,7 @@ import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/application/library_controller.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
 import 'package:yamantaka/features/library/presentation/library_screen.dart';
+import 'package:yamantaka/features/reader/domain/reading_session.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
 
@@ -31,7 +32,7 @@ void main() {
     ]);
   });
 
-  testWidgets('captures the 0.10 library matrix', (tester) async {
+  testWidgets('captures the 0.11 library matrix', (tester) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_LIBRARY_MATRIX_DIR');
     if (outputRoot.isEmpty) return;
     final output = Directory(outputRoot)..createSync(recursive: true);
@@ -76,6 +77,7 @@ void main() {
       bool reduceMotion = false,
       ThemeMode themeMode = ThemeMode.light,
       double textScale = 1,
+      LibraryGrouping grouping = LibraryGrouping.none,
     }) async {
       controller
         ..query = ''
@@ -84,7 +86,7 @@ void main() {
         ..favoritesOnly = false
         ..selectedAuthors = const {}
         ..selectedTopics = const {}
-        ..groupByAuthor = false
+        ..grouping = grouping
         ..selectDocument(null)
         ..scrollOffset = 0;
       await controller.reload();
@@ -117,6 +119,22 @@ void main() {
                     onPickDocument: () async {},
                     onOpenSettings: () {},
                     showRecents: true,
+                    recentlyClosed: [
+                      RecentlyClosedDocument(
+                        documentId: 'recent-1',
+                        path: r'C:\Archivo privado\cerrado.pdf',
+                        title: 'Ensayo cerrado recientemente',
+                        pageIndex: 18,
+                        zoomLevel: 1.2,
+                        pageLayout: 'single',
+                        readingMode: 'document',
+                        readingTheme: 'ivory',
+                        scrollOffset: 0.3,
+                        closedAt: DateTime.utc(2026, 8, 27),
+                      ),
+                    ],
+                    onRestoreClosed: (_) {},
+                    onDismissClosed: (_) {},
                   ),
           ),
         ),
@@ -159,6 +177,7 @@ void main() {
         'reducedMotion': reduceMotion,
         'theme': themeMode.name,
         'textScale': textScale,
+        'grouping': grouping.name,
         'source': 'flutter-widget-test',
         'path': path,
       });
@@ -207,6 +226,12 @@ void main() {
       name: 'library-filtered-1280x720-light-widget',
       size: const Size(1280, 720),
       filtered: true,
+    );
+    await captureCase(
+      name: 'library-grouped-state-1280x720-light-widget',
+      size: const Size(1280, 720),
+      list: true,
+      grouping: LibraryGrouping.readingState,
     );
     await captureCase(
       name: 'library-list-1280x720-light-widget',
@@ -259,7 +284,7 @@ void main() {
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-library-visual-matrix',
         'version': 1,
-        'productVersion': '0.10.0',
+        'productVersion': '0.11.0',
         'generatedAt': '2026-08-26T12:00:00Z',
         'cases': cases,
       }),

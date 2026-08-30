@@ -11,6 +11,8 @@ final class OrganizationController extends ChangeNotifier {
   final OrganizationRepository _repository;
   List<DocumentCollection> collections = const [];
   List<DocumentTag> tags = const [];
+  Map<String, Set<String>> collectionMemberships = const {};
+  Map<String, Set<String>> tagMemberships = const {};
   String? selectedCollectionId;
   SmartCollection? selectedSmartCollection;
   Set<String>? visibleDocumentIds;
@@ -18,6 +20,8 @@ final class OrganizationController extends ChangeNotifier {
   void reload() {
     collections = _repository.collections();
     tags = _repository.tags();
+    collectionMemberships = _repository.collectionMemberships();
+    tagMemberships = _repository.tagMemberships();
     _refreshVisibleDocuments();
     notifyListeners();
   }

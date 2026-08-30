@@ -35,7 +35,12 @@ final class LibraryController extends ChangeNotifier {
   bool favoritesOnly = false;
   Set<String> selectedAuthors = const {};
   Set<LibraryTopic> selectedTopics = const {};
-  bool groupByAuthor = false;
+  LibraryGrouping grouping = LibraryGrouping.none;
+  bool get groupByAuthor => grouping == LibraryGrouping.author;
+  set groupByAuthor(bool value) {
+    grouping = value ? LibraryGrouping.author : LibraryGrouping.none;
+  }
+
   String? selectedCollectionId;
   SmartCollection? selectedSmartCollection;
   List<LibraryFacet> authorFacets = const [];
@@ -207,6 +212,12 @@ final class LibraryController extends ChangeNotifier {
     return reload();
   }
 
+  void setGrouping(LibraryGrouping value) {
+    if (grouping == value) return;
+    grouping = value;
+    notifyListeners();
+  }
+
   Future<void> setFacets({
     required Set<String> authors,
     required Set<LibraryTopic> topics,
@@ -276,6 +287,16 @@ final class LibraryController extends ChangeNotifier {
     await load();
   }
 
+  Future<void> reread(String documentId) async {
+    _repository.resetProgress(documentId);
+    await reload();
+  }
+
+  Future<void> markFinished(String documentId) async {
+    _repository.markFinished(documentId);
+    await reload();
+  }
+
   @override
   void dispose() {
     selectedDocumentListenable.dispose();
@@ -286,3 +307,5 @@ final class LibraryController extends ChangeNotifier {
     super.dispose();
   }
 }
+
+enum LibraryGrouping { none, author, collection, tag, readingState }

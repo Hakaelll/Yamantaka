@@ -25,6 +25,7 @@ import '../features/help/presentation/welcome_dialog.dart';
 import '../features/navigation/application/navigation_history_controller.dart';
 import '../features/reader/application/reader_controller.dart';
 import '../features/reader/domain/reader_models.dart';
+import '../features/reader/domain/reading_session.dart';
 import '../features/reader/presentation/reader_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/search/domain/global_search_models.dart';

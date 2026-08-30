@@ -48,6 +48,10 @@ final class ThumbnailService {
   final Map<String, PdfOperationToken> _activeCoverTokens = {};
   final Map<String, JobHandle<void>> _activeCoverJobs = {};
   final Map<String, int> _coverGenerations = <String, int>{};
+  final Map<String, int> _pendingCoverDecodeCounts = <String, int>{};
+  int _coverDecodeAttempts = 0;
+  int _coverDecodesAvoided = 0;
+  int _offscreenCancellations = 0;
   int _coverQueueGeneration = 0;
   Future<void> _backgroundQueue = Future<void>.value();
 
@@ -140,6 +144,12 @@ final class ThumbnailService {
       currentAlgorithmVersion: CoverSelectionPolicy.algorithmVersion,
     );
     if (valid == true && await _coverFilesExist(current.coverMetadata!)) return;
+    _pendingCoverDecodeCounts[current.id] =
+        math.min(
+          CoverSelectionPolicy.maximumCandidatePages,
+          current.pageCount,
+        ) +
+        2;
 
     Future<void> execute(JobCancellationToken? schedulerToken) async {
       String? engineDocumentId;
@@ -174,7 +184,11 @@ final class ThumbnailService {
 
     final jobs = _jobs;
     if (jobs == null) {
-      await execute(null);
+      try {
+        await execute(null);
+      } finally {
+        _pendingCoverDecodeCounts.remove(current.id);
+      }
       return;
     }
     final handle = jobs.submit<void>(
@@ -193,6 +207,7 @@ final class ThumbnailService {
       if (identical(_activeCoverJobs[current.id], handle)) {
         _activeCoverJobs.remove(current.id);
       }
+      _pendingCoverDecodeCounts.remove(current.id);
     }
   }
 
@@ -201,7 +216,32 @@ final class ThumbnailService {
     _coverGenerations[documentId] = (_coverGenerations[documentId] ?? 0) + 1;
     _activeCoverTokens.remove(documentId)?.cancel();
     _activeCoverJobs.remove(documentId)?.cancel();
+    _pendingCoverDecodeCounts.remove(documentId);
   }
+
+  /// Cancels recreable cover work after a library item leaves the viewport.
+  /// The counter records render/decode operations that had been scheduled but
+  /// had not started, so diagnostics can prove that virtualization saved work.
+  void cancelOffscreen(String documentId) {
+    final remaining = _pendingCoverDecodeCounts[documentId] ?? 0;
+    if (remaining > 0) {
+      _coverDecodesAvoided += remaining;
+      _offscreenCancellations++;
+    }
+    cancel(documentId);
+  }
+
+  Map<String, int> get diagnostics => {
+    'cover_decode_attempts': _coverDecodeAttempts,
+    'cover_decodes_avoided': _coverDecodesAvoided,
+    'offscreen_cancellations': _offscreenCancellations,
+    'active_cover_jobs': _activeCoverJobs.length,
+    'active_cover_tokens': _activeCoverTokens.length,
+    'pending_cover_decodes': _pendingCoverDecodeCounts.values.fold(
+      0,
+      (total, value) => total + value,
+    ),
+  };
 
   Future<List<CoverPreview>> previewPages(
     LibraryDocument document, {
@@ -282,6 +322,7 @@ final class ThumbnailService {
             'Generación de portada cancelada.',
           );
         }
+        _markCoverDecodeStarted(document.id);
         final rendered = await _engine.renderPage(
           documentId: engineDocumentId,
           pageIndex: pageIndex,
@@ -365,6 +406,7 @@ final class ThumbnailService {
             'Generación de portada cancelada.',
           );
         }
+        _markCoverDecodeStarted(document.id);
         final rendered = await _engine.renderPage(
           documentId: engineDocumentId,
           pageIndex: pageIndex,
@@ -479,6 +521,7 @@ final class ThumbnailService {
     }
     _activeCoverTokens.clear();
     _activeCoverJobs.clear();
+    _pendingCoverDecodeCounts.clear();
     _coverGenerations.clear();
     final directory = _paths.thumbnailDirectory;
     if (await directory.exists()) {
@@ -514,6 +557,17 @@ final class ThumbnailService {
   static Future<Uint8List?> _pngBytes(ui.Image image) async {
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     return data?.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+  }
+
+  void _markCoverDecodeStarted(String documentId) {
+    final remaining = _pendingCoverDecodeCounts[documentId];
+    if (remaining == null) return;
+    _coverDecodeAttempts++;
+    if (remaining <= 1) {
+      _pendingCoverDecodeCounts.remove(documentId);
+    } else {
+      _pendingCoverDecodeCounts[documentId] = remaining - 1;
+    }
   }
 
   static int _lineCount(String text) =>

@@ -90,7 +90,7 @@ void main() {
       final encoded = report.toJson();
 
       expect(report.values['integrity'], 'ok');
-      expect(report.values['yamantaka_version'], '0.10.0+11');
+      expect(report.values['yamantaka_version'], '0.11.0+12');
       expect(encoded, isNot(contains(directory.path)));
       expect(report.values['contains_paths_titles_or_queries'], isFalse);
     });
@@ -485,6 +485,35 @@ void main() {
         expect(index.progress.completedDocuments, 3);
         expect(search.indexedDocumentCount, 3);
         expect(engine.closedDocumentIds, hasLength(3));
+      },
+    );
+
+    test(
+      'an active index applies a newly visible page on its next turn',
+      () async {
+        final search = GlobalSearchRepository(database);
+        final extractedPages = <int>[];
+        late final LibraryIndexController index;
+        final engine =
+            _RecordingPdfEngine(
+                pageCount: 5,
+                pageText: (page) => 'contenido $page',
+              )
+              ..onExtract = (page) {
+                extractedPages.add(page);
+                if (page == 0) {
+                  index.prioritizeDocument(document.id, pageIndex: 4);
+                }
+              };
+        index = LibraryIndexController(documents, search, engine)
+          ..setEnabled(true);
+        addTearDown(index.dispose);
+
+        await index.indexIncremental();
+
+        expect(extractedPages.take(2), [0, 4]);
+        expect(search.indexedDocumentCount, 1);
+        expect(engine.closedDocumentIds, ['fake-1']);
       },
     );
   });

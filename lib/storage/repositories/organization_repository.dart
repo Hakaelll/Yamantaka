@@ -150,6 +150,18 @@ final class OrganizationRepository {
       .map((row) => row['document_id'] as String)
       .toSet();
 
+  Map<String, Set<String>> collectionMemberships() {
+    final result = <String, Set<String>>{};
+    for (final row in _database.database.select(
+      'SELECT collection_id, document_id FROM collection_documents',
+    )) {
+      result
+          .putIfAbsent(row['collection_id'] as String, () => <String>{})
+          .add(row['document_id'] as String);
+    }
+    return result;
+  }
+
   Set<String> smartDocumentIds(SmartCollection smart) {
     final sql = switch (smart) {
       SmartCollection.inProgress =>
@@ -203,6 +215,18 @@ final class OrganizationRepository {
       'INSERT OR IGNORE INTO document_tags(document_id, tag_id) VALUES (?, ?)',
       [documentId, tagId],
     );
+  }
+
+  Map<String, Set<String>> tagMemberships() {
+    final result = <String, Set<String>>{};
+    for (final row in _database.database.select(
+      'SELECT tag_id, document_id FROM document_tags',
+    )) {
+      result
+          .putIfAbsent(row['tag_id'] as String, () => <String>{})
+          .add(row['document_id'] as String);
+    }
+    return result;
   }
 
   void mergeTags(String sourceId, String targetId) {

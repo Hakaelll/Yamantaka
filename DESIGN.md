@@ -788,3 +788,36 @@ salta directamente a categorías coincidentes. Cada sección declara alcance
 global y ofrece su propio reset antes de cualquier zona destructiva. Ninguna de
 estas superficies añade gradientes, tarjetas anidadas, sombra ornamental o
 radio superior al contrato 0.9.
+
+## 34. Navegación documental y continuidad — 0.11
+
+`Ctrl+J` abre una única superficie temporal para índice, miniaturas, búsqueda,
+marcadores, anotaciones, historial y posiciones A/B. En ancho expandido usa
+lista y detalle simultáneos; en compacto conserva una sola columna y un retorno
+explícito. El origen permanece recuperable con `Alt+←`. El navegador no cambia
+zoom, layout ni chrome, y no forma parte de la identidad del visor.
+
+Las sesiones cerradas recientemente se muestran como una banda secundaria,
+limitada y descartable. El lector nombra la acción irreversible de abandonar la
+vista como `Cerrar sesión y conservar contexto`; Continuar restaura página,
+zoom, layout, modo, tema, scroll y panel. Releer y Terminado nunca compiten como
+acciones primarias simultáneas. Las metas por páginas o minutos son texto e
+indicador discreto, sin rachas, premios, avisos ni color celebratorio.
+
+La selección real de texto abre una barra compacta ligada al contenido con
+resaltar, subrayar, tachar y cerrar. La previsualización de la anotación conserva
+texto legible para tecnologías de asistencia. Si no hay geometría fiable, el
+producto explica que guardará una nota de página; no dibuja rectángulos
+aproximados sobre el PDF.
+
+Biblioteca agrupa por autor, colección, etiqueta o estado con cabeceras
+plegables y recuento. Plegar conserva selección y scroll. Los filtros activos
+explican por qué un resultado desapareció y ofrecen restablecimiento. Las
+portadas visibles ganan prioridad y las que salen del viewport cancelan trabajo
+recreable, evitando que una biblioteca grande parezca ocupada fuera de lo que
+el usuario puede ver.
+
+La matriz visual 0.11 añade el navegador y la importación de carpetas a los ocho
+tamaños base, además de oscuro, alto contraste, movimiento reducido y texto
+130/150/200 %. La marca, su geometría y su violeta permanecen byte a byte
+idénticos; ningún refinamiento de esta iteración autoriza a reinterpretarla.

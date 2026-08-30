@@ -91,7 +91,7 @@ Future<void> main() async {
       'documents': 2,
     }).containsKey('path'),
   );
-  assert(const LibraryQuery(limit: 999).normalized().limit == 200);
+  assert(const LibraryQuery(limit: 999).normalized().limit == 80);
   assert(
     const UnifiedNavigationTarget(
           pageIndex: 2,

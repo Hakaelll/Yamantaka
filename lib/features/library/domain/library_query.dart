@@ -63,7 +63,7 @@ final class LibraryQuery {
 
   LibraryQuery normalized() => LibraryQuery(
     offset: offset.clamp(0, 1000000),
-    limit: limit.clamp(1, 200),
+    limit: limit.clamp(1, 80),
     text: text.trim(),
     sort: sort,
     favoritesOnly: favoritesOnly,

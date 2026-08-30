@@ -318,6 +318,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                         preferences.readingTheme,
                       ),
                       onInteractionChanged: widget.onViewportInteractionChanged,
+                      onTextSelectionChanged: controller.updateTextSelection,
                     ),
                     initialPageIndex: controller.currentPageIndex,
                     onPageChanged: controller.onPageChanged,
@@ -333,6 +334,25 @@ final class _ReaderScreenState extends State<ReaderScreen> {
               ),
             ),
           ),
+          if (!immersive && controller.textSelection?.hasText == true)
+            Positioned(
+              left: AppSpacing.space12,
+              right: panelDocked
+                  ? panelWidth + AppSpacing.space12
+                  : AppSpacing.space12,
+              bottom: AppSizes.bottomControlHeight + AppSpacing.space24,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Theme(
+                  data: chromeTheme,
+                  child: _SelectionAnnotationToolbar(
+                    text: controller.textSelection!.selectedText,
+                    onCreate: _createSelectionAnnotation,
+                    onDismiss: () => controller.updateTextSelection(null),
+                  ),
+                ),
+              ),
+            ),
           ValueListenableBuilder<ReaderDestinationCue?>(
             valueListenable: controller.destinationCue,
             builder: (context, cue, _) {
@@ -919,6 +939,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     AppCommandId.search: () => _showPanel(ReaderPanelSection.search),
     AppCommandId.commandPalette: () => _showCommandPalette(context),
     AppCommandId.goToPage: () => _showGoToPage(context),
+    AppCommandId.documentNavigator: () =>
+        unawaited(showDocumentNavigatorDialog(context, widget.controller)),
     AppCommandId.togglePanel: () => _panel == null
         ? _showPanel(ReaderPanelSection.thumbnails)
         : _closePanel(),
@@ -1040,6 +1062,20 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       changed
           ? strings.get('reader.annotationRedone')
           : strings.get('reader.noAnnotationRedo'),
+    );
+  }
+
+  void _createSelectionAnnotation(AnnotationType type) {
+    final result = widget.controller.createAnnotationFromSelection(type: type);
+    if (result == null) {
+      _showTemporaryPositionNotice('No se pudo crear la anotación.');
+      return;
+    }
+    widget.controller.updateTextSelection(null);
+    _showTemporaryPositionNotice(
+      result.usedPreciseGeometry
+          ? 'Anotación vinculada a la selección.'
+          : 'La geometría no era fiable; se creó una nota de página.',
     );
   }
 

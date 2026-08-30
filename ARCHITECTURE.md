@@ -369,3 +369,62 @@ primer frame y primer PDF. `LocalPerformanceMonitor` registra duraciones con
 nombres constantes (`library_first_page`, `library_page_more`,
 `global_search`, `pdf_open` y renderizado); ningún sample contiene documento,
 ruta, título, consulta o página.
+
+## Navegación, sesiones e índice reanudable 0.11
+
+`DocumentNavigatorDialog` agrega destinos ya existentes del lector sin abrir
+otro documento ni entrar en `_viewerCacheKey`. El filtro consulta índice,
+miniaturas, resultados internos, marcadores, anotaciones, historial y A/B; la
+activación termina siempre en `ReaderController.navigateTo`, por lo que la
+historia conserva el origen y el visor mantiene zoom y handle. El adaptador
+solo se reconstruye por identidad o configuración PDF estable.
+
+`PdfViewConfiguration.onTextSelectionChanged` es el único puente nuevo hacia
+`pdfrx`. El adaptador lee rangos permitidos por copia, convierte los bounds de
+fragmento a `NormalizedRect` usando el tamaño real de página y entrega un modelo
+sin dependencia del motor. `ReaderController` acepta geometría precisa solo
+para una página y rectángulos válidos; en selección multipágina, sin texto o
+sin bounds crea una nota de página sin rectángulos. El repositorio de
+anotaciones conserva undo/redo, edición, huella y exportación versionada.
+
+El contexto adicional de sesión, cerrados recientes y metas se serializa bajo
+claves versionadas de `app_metadata`. Esta tabla ya forma parte del backup y
+permite evolucionar datos auxiliares sin una migración del esquema ni del
+formato de copia. Las entradas guardan estado de navegación y rutas locales,
+pero nunca consultas ni texto PDF. Los handles siguen sujetos a dos calientes
+y las pestañas fijadas a tres.
+
+`LibraryGrouping` es presentación efímera sobre la página SQL materializada.
+Colecciones y etiquetas cargan sus membresías completas mediante una consulta
+por relación, no una consulta por fila. Cada documento se asigna a una sola
+sección visible y plegar no cambia selección ni offset. `LibraryQuery` limita
+todo resultado a 80 elementos.
+
+`search_index_state.indexed_pages` es un cursor contiguo seguro. Las páginas de
+texto ya escritas se detectan por SQL para conservar prioridad fuera de orden;
+solo se avanza el cursor cuando el prefijo está completo. Una huella distinta,
+estado fallido o cursor incompatible reinicia el documento. El índice abre un
+handle propio porque el handle del visor pertenece al árbol y ciclo de vida de
+`pdfrx`; compartirlo cruzaría propietarios nativos y podría cerrar o usar un
+documento mientras el viewer renderiza. Ambos handles se cierran de forma
+determinista y la cola sigue limitada a un trabajo de indexación.
+
+Las tarjetas y filas materializadas notifican entrada y salida del viewport.
+Entrar eleva la portada a prioridad visible; salir cancela el trabajo
+recreable pendiente. `ThumbnailService` cuenta intentos de render,
+decodificaciones aún no iniciadas que se evitaron y cancelaciones offscreen.
+Esos contadores solo contienen enteros y se incorporan al diagnóstico seguro;
+no conservan identificadores, rutas, títulos ni contenido. Volver a materializar
+la tarjeta crea una generación nueva y descarta cualquier resultado tardío.
+
+El índice consulta la cola de prioridad antes de cada documento y antes de cada
+página, no solo al comenzar la operación. Así un documento o página que se
+vuelve visible durante el indexado se procesa en el siguiente turno sin
+cancelar el handle nativo actual. Las consultas globales usan generaciones
+independientes: una búsqueda solapada puede terminar, pero solo la generación
+más reciente publica resultados.
+
+Cerrar el lector sincroniza primero pestaña y snapshot, añade una entrada
+deduplicada a cerrados recientes, libera el handle y vuelve a Biblioteca. La
+acción visible `Cerrar sesión y conservar contexto` y el botón Atrás recorren
+exactamente la misma ruta; no existe un cierre visual que omita persistencia.

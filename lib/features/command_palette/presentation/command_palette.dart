@@ -437,6 +437,7 @@ String _commandCategory(AppCommandId id) => switch (id) {
   AppCommandId.search ||
   AppCommandId.commandPalette ||
   AppCommandId.goToPage ||
+  AppCommandId.documentNavigator ||
   AppCommandId.escape ||
   AppCommandId.nextPage ||
   AppCommandId.previousPage ||
@@ -476,6 +477,7 @@ IconData _commandIcon(AppCommandId id) => switch (id) {
   AppCommandId.search => Icons.search_rounded,
   AppCommandId.commandPalette => Icons.keyboard_command_key_rounded,
   AppCommandId.goToPage => Icons.find_in_page_outlined,
+  AppCommandId.documentNavigator => Icons.explore_outlined,
   AppCommandId.togglePanel => Icons.view_sidebar_outlined,
   AppCommandId.toggleBookmark => Icons.bookmark_add_outlined,
   AppCommandId.zoomIn => Icons.zoom_in_rounded,

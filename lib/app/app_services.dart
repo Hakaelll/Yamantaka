@@ -330,6 +330,7 @@ final class AppServices {
       lifecycle: lifecycle,
       startup: startup,
       performance: performance,
+      thumbnails: thumbnails,
     );
     final readingProfiles = ReadingProfilesController(reader);
     final backups = LocalBackupService(

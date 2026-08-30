@@ -15,10 +15,12 @@ import '../../../pdf_engine/models/pdf_models.dart';
 import '../../../pdf_engine/pdf_document_engine.dart';
 import '../../../pdf_engine/presentation/pdf_viewer_adapter.dart';
 import '../../command_palette/presentation/command_palette.dart';
+import '../../annotations/domain/annotation.dart';
 import '../../library/domain/library_document.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
 import '../domain/page_destination.dart';
+import 'document_navigator_dialog.dart';
 import 'reader_bottom_controls.dart';
 import 'reader_side_panel.dart';
 import 'reader_top_bar.dart';
@@ -213,6 +215,80 @@ String _formatFileSize(int bytes) {
   final kib = bytes / 1024;
   if (kib < 1024) return '${kib.toStringAsFixed(1)} KiB';
   return '${(kib / 1024).toStringAsFixed(1)} MiB';
+}
+
+final class _SelectionAnnotationToolbar extends StatelessWidget {
+  const _SelectionAnnotationToolbar({
+    required this.text,
+    required this.onCreate,
+    required this.onDismiss,
+  });
+
+  final String text;
+  final ValueChanged<AnnotationType> onCreate;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return Semantics(
+      container: true,
+      label: 'Acciones para el texto seleccionado',
+      child: Material(
+        elevation: 4,
+        color: context.appColors.surfaceFloating,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: context.appColors.borderStrong),
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.space8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Tooltip(
+                    message: preview,
+                    child: Text(
+                      preview,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.space8),
+                IconButton(
+                  key: const Key('selection-highlight'),
+                  tooltip: 'Resaltar selección',
+                  onPressed: () => onCreate(AnnotationType.highlight),
+                  icon: const Icon(Icons.border_color_outlined),
+                ),
+                IconButton(
+                  key: const Key('selection-underline'),
+                  tooltip: 'Subrayar selección',
+                  onPressed: () => onCreate(AnnotationType.underline),
+                  icon: const Icon(Icons.format_underlined_rounded),
+                ),
+                IconButton(
+                  key: const Key('selection-strikeout'),
+                  tooltip: 'Tachar selección',
+                  onPressed: () => onCreate(AnnotationType.strikeout),
+                  icon: const Icon(Icons.format_strikethrough_rounded),
+                ),
+                IconButton(
+                  tooltip: 'Cerrar acciones de selección',
+                  onPressed: onDismiss,
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 final class _ReaderErrorState extends StatelessWidget {

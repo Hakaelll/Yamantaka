@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../models/pdf_models.dart';
 import '../../features/reader/domain/reader_models.dart';
+import '../../features/reader/domain/text_selection.dart' as reader;
 
 enum PdfViewFlow { continuous, single, facing }
 
@@ -25,6 +26,7 @@ final class PdfViewConfiguration {
     this.coverPolicy = ReaderCoverPolicy.noCover,
     this.initialSide = ReaderInitialSide.left,
     this.onInteractionChanged,
+    this.onTextSelectionChanged,
   });
 
   final Color backgroundColor;
@@ -41,6 +43,7 @@ final class PdfViewConfiguration {
   final ReaderCoverPolicy coverPolicy;
   final ReaderInitialSide initialSide;
   final ValueChanged<bool>? onInteractionChanged;
+  final ValueChanged<reader.TextSelection?>? onTextSelectionChanged;
 }
 
 final class PdfViewController extends ChangeNotifier {

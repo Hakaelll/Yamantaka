@@ -65,8 +65,12 @@ final class GlobalSearchRepository {
         .toList(growable: false);
   }
 
-  void beginDocument(LibraryDocument document) {
+  void beginDocument(LibraryDocument document, {bool resume = false}) {
     final db = _database.database;
+    if (resume && resumableCursor(document) != null) {
+      refreshMetadataEntry(document);
+      return;
+    }
     db
       ..execute('DELETE FROM library_search WHERE document_id = ?', [
         document.id,
@@ -150,27 +154,57 @@ final class GlobalSearchRepository {
     required int pageIndex,
     required String text,
   }) {
-    _database.database
-      ..execute(
-        '''
-        INSERT INTO library_search(
+    _database.database.execute(
+      '''
+        INSERT OR REPLACE INTO library_search(
           document_id, page_index, kind, title, body, tags
         ) VALUES (?, ?, ?, ?, ?, ?)
         ''',
-        [
-          document.id,
-          pageIndex,
-          GlobalSearchKind.pageText.name,
-          document.effectiveTitle,
-          text,
-          _documentTags(document.id),
-        ],
+      [
+        document.id,
+        pageIndex,
+        GlobalSearchKind.pageText.name,
+        document.effectiveTitle,
+        text,
+        _documentTags(document.id),
+      ],
+    );
+  }
+
+  int? resumableCursor(LibraryDocument document) {
+    final rows = _database.database.select(
+      'SELECT fingerprint, status, indexed_pages FROM search_index_state '
+      'WHERE document_id = ?',
+      [document.id],
+    );
+    if (rows.isEmpty ||
+        rows.first['fingerprint'] != document.fingerprint ||
+        rows.first['status'] != IndexDocumentStatus.indexing.name) {
+      return null;
+    }
+    return (rows.first['indexed_pages'] as int? ?? 0).clamp(0, 10000000);
+  }
+
+  Set<int> indexedPageIndexes(String documentId) => _database.database
+      .select(
+        'SELECT page_index FROM library_search WHERE document_id = ? '
+        'AND kind = ? AND page_index >= 0',
+        [documentId, GlobalSearchKind.pageText.name],
       )
-      ..execute(
-        'UPDATE search_index_state SET indexed_pages = ?, updated_at = ? '
-        'WHERE document_id = ?',
-        [pageIndex + 1, DateTime.now().toUtc().toIso8601String(), document.id],
-      );
+      .map((row) => row['page_index'] as int)
+      .toSet();
+
+  void updateCursor(String documentId, int indexedPages) {
+    _database.database.execute(
+      'UPDATE search_index_state SET indexed_pages = ?, updated_at = ? '
+      'WHERE document_id = ? AND status = ?',
+      [
+        indexedPages.clamp(0, 10000000),
+        DateTime.now().toUtc().toIso8601String(),
+        documentId,
+        IndexDocumentStatus.indexing.name,
+      ],
+    );
   }
 
   void finishDocument(String documentId, {required bool hasExtractableText}) {

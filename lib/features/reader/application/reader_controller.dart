@@ -17,6 +17,7 @@ import '../../../storage/repositories/document_repository.dart';
 import '../../../storage/repositories/preferences_repository.dart';
 import '../../../storage/repositories/reading_session_repository.dart';
 import '../../annotations/application/annotation_controller.dart';
+import '../../annotations/domain/annotation.dart';
 import '../../bookmarks/application/bookmark_controller.dart';
 import '../../library/application/document_service.dart';
 import '../../library/domain/library_document.dart';
@@ -24,8 +25,19 @@ import '../../navigation/application/navigation_history_controller.dart';
 import '../../search/application/search_controller.dart';
 import '../domain/reader_models.dart';
 import '../domain/reading_session.dart';
+import '../domain/text_selection.dart';
 
 enum ReaderStatus { idle, loading, ready, failure }
+
+final class SelectionAnnotationResult {
+  const SelectionAnnotationResult({
+    required this.annotation,
+    required this.usedPreciseGeometry,
+  });
+
+  final PdfAnnotation annotation;
+  final bool usedPreciseGeometry;
+}
 
 final class _WarmReaderDocument {
   const _WarmReaderDocument({required this.document, required this.opened});
@@ -119,6 +131,8 @@ final class ReaderController extends ChangeNotifier {
   );
   ReaderTemporaryPosition? temporaryPositionA;
   ReaderTemporaryPosition? temporaryPositionB;
+  TextSelection? textSelection;
+  String? sessionPanelSection;
 
   Timer? _saveTimer;
   Timer? _activityTimer;
@@ -141,6 +155,67 @@ final class ReaderController extends ChangeNotifier {
       _previousReadingUnitTarget() != _canonicalReadingUnitPage();
   bool get canGoToNextReadingUnit =>
       _nextReadingUnitTarget() != _canonicalReadingUnitPage();
+  bool get hasReliableTextSelection {
+    final selection = textSelection;
+    if (selection == null ||
+        !selection.hasText ||
+        selection.pages.length != 1) {
+      return false;
+    }
+    final rects = selection.pages.single.rects;
+    return rects.isNotEmpty && rects.every((rect) => rect.isMeaningful);
+  }
+
+  void updateTextSelection(TextSelection? value) {
+    final hadSelection = textSelection?.hasText == true;
+    final hasSelection = value?.hasText == true;
+    textSelection = hasSelection ? value : null;
+    if (hadSelection != hasSelection || hasSelection) notifyListeners();
+  }
+
+  void setSessionPanelSection(String? value) {
+    sessionPanelSection = value;
+  }
+
+  SelectionAnnotationResult? createAnnotationFromSelection({
+    required AnnotationType type,
+    AnnotationColor color = AnnotationColor.yellow,
+    String? note,
+  }) {
+    final annotationController = annotations;
+    final selection = textSelection;
+    if (annotationController == null ||
+        selection == null ||
+        !selection.hasText) {
+      return null;
+    }
+    final ordered = selection.range.ordered();
+    final geometryIsReliable = hasReliableTextSelection;
+    final page = selection.pages.first;
+    final start = ordered.start.offset.clamp(0, page.text.length);
+    final end = ordered.end.pageIndex == page.pageIndex
+        ? ordered.end.offset.clamp(start, page.text.length)
+        : page.text.length;
+    final beforeStart = (start - 80).clamp(0, page.text.length);
+    final afterEnd = (end + 80).clamp(0, page.text.length);
+    final created = annotationController.create(
+      pageIndex: page.pageIndex,
+      type: geometryIsReliable ? type : AnnotationType.pageComment,
+      color: color,
+      note: note,
+      selectedText: selection.selectedText.trim(),
+      contextBefore: page.text.substring(beforeStart, start).trim(),
+      contextAfter: page.text.substring(end, afterEnd).trim(),
+      rects: geometryIsReliable ? page.normalized().rects : const [],
+      pageRotation: preferences?.pageRotation ?? 0,
+    );
+    if (created == null) return null;
+    registerActivity();
+    return SelectionAnnotationResult(
+      annotation: created,
+      usedPreciseGeometry: geometryIsReliable,
+    );
+  }
 
   Future<bool> openPath(String path, {String? password}) async {
     final openGeneration = ++_openGeneration;
@@ -213,6 +288,7 @@ final class ReaderController extends ChangeNotifier {
           ? libraryDocument.lastPageIndex.clamp(0, pageCount - 1)
           : 0;
       annotations?.load(libraryDocument.id, libraryDocument.fingerprint);
+      textSelection = null;
       bookmarks.load(libraryDocument.id);
       search.attach(openedDocument!.documentId, pageCount);
       navigationHistory?.reset(
@@ -360,6 +436,7 @@ final class ReaderController extends ChangeNotifier {
     _finishSession();
     search.reset();
     annotations?.clear();
+    textSelection = null;
     bookmarks.clear();
     navigationHistory?.clear();
     _destinationCueTimer?.cancel();
@@ -586,6 +663,7 @@ final class ReaderController extends ChangeNotifier {
       case ReaderTemporaryPositionSlot.b:
         temporaryPositionB = position;
     }
+    notifyListeners();
     return position;
   }
 
@@ -594,6 +672,15 @@ final class ReaderController extends ChangeNotifier {
     final current = preferences;
     if (position == null || current == null || pageCount == 0) return false;
     final target = position.pageIndex.clamp(0, pageCount - 1);
+    navigationHistory?.record(
+      NavigationLocation(
+        pageIndex: target,
+        offset: position.scrollOffset,
+        zoom: position.zoom,
+        reason: NavigationReason.history,
+        label: 'Posición temporal ${slot.name.toUpperCase()}',
+      ),
+    );
     preferences = current.copyWith(
       viewMode: position.viewMode,
       pageLayout: position.pageLayout,
@@ -618,6 +705,7 @@ final class ReaderController extends ChangeNotifier {
     final previousA = temporaryPositionA;
     temporaryPositionA = temporaryPositionB;
     temporaryPositionB = previousA;
+    notifyListeners();
     return true;
   }
 
@@ -875,10 +963,21 @@ final class ReaderController extends ChangeNotifier {
     final session = _session;
     _session = null;
     if (session != null) {
+      final current = preferences;
       _sessions.finish(
         id: session.id,
         endPage: currentPageIndex,
         activeSeconds: _activeSeconds,
+        context: current == null
+            ? null
+            : ReaderSessionContext(
+                zoomLevel: viewController.zoom,
+                pageLayout: current.pageLayout.name,
+                readingMode: current.viewMode.name,
+                readingTheme: current.readingTheme.name,
+                scrollOffset: viewController.scrollOffset,
+                panelSection: sessionPanelSection,
+              ),
       );
     }
   }

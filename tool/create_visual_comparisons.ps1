@@ -1,8 +1,10 @@
 [CmdletBinding()]
 param(
-    [string]$BeforeDirectory = 'build/visual-evidence/v0.9.0',
-    [string]$AfterDirectory = 'build/visual-evidence/v0.10.0',
-    [string]$OutputDirectory = 'build/visual-evidence/v0.10.0/comparisons'
+    [string]$BeforeDirectory = 'build/visual-evidence/v0.10.0',
+    [string]$AfterDirectory = 'build/visual-evidence/v0.11.0',
+    [string]$OutputDirectory = 'build/visual-evidence/v0.11.0/comparisons',
+    [string]$BeforeLabel = '0.10',
+    [string]$AfterLabel = '0.11'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,8 +63,8 @@ foreach ($case in $cases) {
                 $font = [System.Drawing.Font]::new('Segoe UI', 11, [System.Drawing.FontStyle]::Bold)
                 $brush = [System.Drawing.Brushes]::White
                 try {
-                    $graphics.DrawString('0.9', $font, $brush, 12, 8)
-                    $graphics.DrawString('0.10', $font, $brush, $before.Width + $gap + 12, 8)
+                    $graphics.DrawString($BeforeLabel, $font, $brush, 12, 8)
+                    $graphics.DrawString($AfterLabel, $font, $brush, $before.Width + $gap + 12, 8)
                     $graphics.DrawImageUnscaled($before, 0, $headerHeight)
                     $graphics.DrawImageUnscaled($after, $before.Width + $gap, $headerHeight)
                 }
@@ -73,7 +75,7 @@ foreach ($case in $cases) {
             finally {
                 $graphics.Dispose()
             }
-            $outputPath = Join-Path $outputRoot "$($case.name)-0.9-vs-0.10.png"
+            $outputPath = Join-Path $outputRoot "$($case.name)-$BeforeLabel-vs-$AfterLabel.png"
             $comparison.Save($outputPath, [System.Drawing.Imaging.ImageFormat]::Png)
         }
         finally {
@@ -100,8 +102,8 @@ $manifest = [ordered]@{
     format = 'yamantaka-visual-comparisons'
     version = 1
     generatedAt = [DateTime]::UtcNow.ToString('o')
-    beforeVersion = '0.9.0'
-    afterVersion = '0.10.0'
+    beforeVersion = $BeforeLabel
+    afterVersion = $AfterLabel
     cases = @($evidence)
 }
 $manifestPath = Join-Path $outputRoot 'comparisons.json'
