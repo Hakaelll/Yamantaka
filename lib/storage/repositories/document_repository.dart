@@ -21,6 +21,16 @@ final class DocumentRepository {
               .columnAt(0)
           as int;
 
+  Set<String> exactDuplicateFingerprints({int limit = 100000}) => _database
+      .database
+      .select(
+        'SELECT fingerprint FROM documents GROUP BY fingerprint '
+        'HAVING COUNT(*) > 1 LIMIT ?',
+        [limit.clamp(1, 100000)],
+      )
+      .map((row) => row['fingerprint'] as String)
+      .toSet();
+
   List<LibraryDocument> recent({int limit = 40}) {
     final rows = _database.database.select(
       '$_documentSelect ORDER BY d.last_opened_at DESC LIMIT ?',
@@ -34,6 +44,42 @@ final class DocumentRepository {
       '$_documentSelect ORDER BY d.last_opened_at DESC',
     );
     return rows.map(_fromRow).toList(growable: false);
+  }
+
+  /// Streams the library in bounded SQLite windows without materializing the
+  /// complete collection or repeating a COUNT query for each page.
+  Iterable<LibraryDocument> scan({
+    int limit = 100000,
+    int batchSize = 80,
+  }) sync* {
+    final boundedLimit = limit.clamp(1, 100000);
+    final boundedBatch = batchSize.clamp(1, 80);
+    var emitted = 0;
+    String? lastOpened;
+    String? lastId;
+    while (emitted < boundedLimit) {
+      final take = (boundedLimit - emitted).clamp(1, boundedBatch);
+      final cursorClause = lastOpened == null
+          ? ''
+          : 'WHERE (d.last_opened_at < ? OR '
+                '(d.last_opened_at = ? AND d.id > ?))';
+      final rows = _database.database.select(
+        '$_documentSelect $cursorClause '
+        'ORDER BY d.last_opened_at DESC, d.id LIMIT ?',
+        [
+          if (lastOpened != null) ...[lastOpened, lastOpened, lastId],
+          take,
+        ],
+      );
+      if (rows.isEmpty) break;
+      for (final row in rows) {
+        yield _fromRow(row);
+      }
+      emitted += rows.length;
+      lastOpened = rows.last['last_opened_at'] as String;
+      lastId = rows.last['id'] as String;
+      if (rows.length < take) break;
+    }
   }
 
   List<LibraryDocument> needingEnrichment(int analyzerVersion) {

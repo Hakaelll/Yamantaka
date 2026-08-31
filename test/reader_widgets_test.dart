@@ -772,7 +772,7 @@ void main() {
             'Márgenes de lectura',
             'Pantalla completa',
             'Ocultar interfaz',
-            'Lectura inmersiva',
+            'Modo de concentración',
             'Información del documento',
             'Ajustes',
           ]) {

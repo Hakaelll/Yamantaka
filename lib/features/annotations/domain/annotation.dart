@@ -24,6 +24,13 @@ enum AnnotationColor {
 
 enum AnnotationAttachmentStatus { attached, reviewRequired }
 
+/// Editorial review state. This is deliberately independent from
+/// [AnnotationAttachmentStatus], which only describes whether the geometry is
+/// still attached to the same document fingerprint.
+enum AnnotationReviewState { pending, accepted, resolved }
+
+const Object _keepAnnotationText = Object();
+
 final class NormalizedRect {
   const NormalizedRect({
     required this.left,
@@ -86,6 +93,7 @@ final class PdfAnnotation {
     this.rects = const [],
     this.pageRotation = 0,
     this.status = AnnotationAttachmentStatus.attached,
+    this.reviewState = AnnotationReviewState.pending,
     this.tags = const [],
   });
 
@@ -102,6 +110,7 @@ final class PdfAnnotation {
   final int pageRotation;
   final String documentFingerprint;
   final AnnotationAttachmentStatus status;
+  final AnnotationReviewState reviewState;
   final List<String> tags;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -109,7 +118,7 @@ final class PdfAnnotation {
   PdfAnnotation copyWith({
     AnnotationType? type,
     AnnotationColor? color,
-    String? note,
+    Object? note = _keepAnnotationText,
     String? selectedText,
     String? contextBefore,
     String? contextAfter,
@@ -117,6 +126,7 @@ final class PdfAnnotation {
     int? pageRotation,
     String? documentFingerprint,
     AnnotationAttachmentStatus? status,
+    AnnotationReviewState? reviewState,
     List<String>? tags,
     DateTime? updatedAt,
   }) => PdfAnnotation(
@@ -125,7 +135,7 @@ final class PdfAnnotation {
     pageIndex: pageIndex,
     type: type ?? this.type,
     color: color ?? this.color,
-    note: note ?? this.note,
+    note: identical(note, _keepAnnotationText) ? this.note : note as String?,
     selectedText: selectedText ?? this.selectedText,
     contextBefore: contextBefore ?? this.contextBefore,
     contextAfter: contextAfter ?? this.contextAfter,
@@ -133,6 +143,7 @@ final class PdfAnnotation {
     pageRotation: pageRotation ?? this.pageRotation,
     documentFingerprint: documentFingerprint ?? this.documentFingerprint,
     status: status ?? this.status,
+    reviewState: reviewState ?? this.reviewState,
     tags: tags ?? this.tags,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,

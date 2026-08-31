@@ -35,6 +35,29 @@ List<String> acceptedDroppedPdfPaths(Iterable<String> paths) {
   return List.unmodifiable(accepted);
 }
 
+final class ContinuitySummary {
+  const ContinuitySummary({
+    this.openDocuments = 0,
+    this.pinnedDocuments = 0,
+    this.pendingReadings = 0,
+    this.workspaceCount = 0,
+    this.problemCount = 0,
+  });
+
+  final int openDocuments;
+  final int pinnedDocuments;
+  final int pendingReadings;
+  final int workspaceCount;
+  final int problemCount;
+
+  bool get isEmpty =>
+      openDocuments == 0 &&
+      pinnedDocuments == 0 &&
+      pendingReadings == 0 &&
+      workspaceCount == 0 &&
+      problemCount == 0;
+}
+
 final class LibraryScreen extends StatefulWidget {
   const LibraryScreen({
     super.key,
@@ -70,6 +93,13 @@ final class LibraryScreen extends StatefulWidget {
     this.onMarkFinished,
     this.readingGoal,
     this.onSetReadingGoal,
+    this.continuity = const ContinuitySummary(),
+    this.onOpenNext,
+    this.onResumeSession,
+    this.onDiscardContext,
+    this.onProblems,
+    this.onAnnotations,
+    this.onAutomations,
   });
 
   final LibraryController controller;
@@ -104,6 +134,13 @@ final class LibraryScreen extends StatefulWidget {
   final Future<void> Function(LibraryDocument document)? onMarkFinished;
   final ReadingGoal? readingGoal;
   final ValueChanged<LibraryDocument>? onSetReadingGoal;
+  final ContinuitySummary continuity;
+  final VoidCallback? onOpenNext;
+  final VoidCallback? onResumeSession;
+  final VoidCallback? onDiscardContext;
+  final VoidCallback? onProblems;
+  final VoidCallback? onAnnotations;
+  final VoidCallback? onAutomations;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -330,6 +367,12 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                             unawaited(_reanalyzeLibrary());
                           case _LibraryAppMenuAction.checkFiles:
                             unawaited(_checkFiles());
+                          case _LibraryAppMenuAction.annotations:
+                            widget.onAnnotations?.call();
+                          case _LibraryAppMenuAction.automations:
+                            widget.onAutomations?.call();
+                          case _LibraryAppMenuAction.problems:
+                            widget.onProblems?.call();
                         }
                       },
                       itemBuilder: (context) => [
@@ -360,6 +403,21 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                           PopupMenuItem(
                             value: _LibraryAppMenuAction.globalSearch,
                             child: Text(strings.get('library.globalSearch')),
+                          ),
+                        if (widget.onAnnotations != null)
+                          PopupMenuItem(
+                            value: _LibraryAppMenuAction.annotations,
+                            child: Text(strings.get('annotations.globalTitle')),
+                          ),
+                        if (widget.onAutomations != null)
+                          PopupMenuItem(
+                            value: _LibraryAppMenuAction.automations,
+                            child: Text(strings.get('automation.title')),
+                          ),
+                        if (widget.onProblems != null)
+                          PopupMenuItem(
+                            value: _LibraryAppMenuAction.problems,
+                            child: Text(strings.get('problems.title')),
                           ),
                         if (widget.enrichment != null)
                           PopupMenuItem(
@@ -466,6 +524,11 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                         onMarkFinished: widget.onMarkFinished,
                         readingGoal: widget.readingGoal,
                         onSetReadingGoal: widget.onSetReadingGoal,
+                        continuity: widget.continuity,
+                        onOpenNext: widget.onOpenNext,
+                        onResumeSession: widget.onResumeSession,
+                        onDiscardContext: widget.onDiscardContext,
+                        onProblems: widget.onProblems,
                       ),
                     ),
                     if (_dragging)
@@ -693,6 +756,11 @@ final class _LibraryBody extends StatelessWidget {
     this.onMarkFinished,
     this.readingGoal,
     this.onSetReadingGoal,
+    this.continuity = const ContinuitySummary(),
+    this.onOpenNext,
+    this.onResumeSession,
+    this.onDiscardContext,
+    this.onProblems,
   });
 
   final LibraryController controller;
@@ -722,6 +790,11 @@ final class _LibraryBody extends StatelessWidget {
   final Future<void> Function(LibraryDocument document)? onMarkFinished;
   final ReadingGoal? readingGoal;
   final ValueChanged<LibraryDocument>? onSetReadingGoal;
+  final ContinuitySummary continuity;
+  final VoidCallback? onOpenNext;
+  final VoidCallback? onResumeSession;
+  final VoidCallback? onDiscardContext;
+  final VoidCallback? onProblems;
 
   @override
   Widget build(BuildContext context) {
@@ -748,23 +821,24 @@ final class _LibraryBody extends StatelessWidget {
         tone: AppStatusTone.error,
       );
     }
-    if (controller.libraryDocumentCount == 0) {
-      return EmptyLibraryState(onOpen: onPickDocument);
-    }
     final documents = controller.documents;
-    if (!showRecents) {
-      return Center(
-        child: OutlinedButton.icon(
-          onPressed: onPickDocument,
-          icon: const Icon(Icons.file_open_outlined, size: 18),
-          label: Text(strings.get('reader.openAnotherPdf')),
-        ),
-      );
-    }
     final continueReading = controller.continueReading;
     return Column(
       children: [
-        if (continueReading != null)
+        if (showRecents)
+          ContinuityCenter(
+            summary: continuity,
+            hasActiveReading: continueReading != null,
+            hasRecentlyClosed: recentlyClosed.isNotEmpty,
+            onContinue: continueReading == null
+                ? null
+                : () => onOpenPath(continueReading.path),
+            onOpenNext: onOpenNext,
+            onResumeSession: onResumeSession,
+            onDiscardContext: onDiscardContext,
+            onProblems: onProblems,
+          ),
+        if (showRecents && continueReading != null)
           ContinueReadingStrip(
             document: continueReading,
             onOpen: () => onOpenPath(continueReading.path),
@@ -782,37 +856,232 @@ final class _LibraryBody extends StatelessWidget {
                 ? null
                 : () => onSetReadingGoal!(continueReading),
           ),
-        if (recentlyClosed.isNotEmpty)
+        if (showRecents && recentlyClosed.isNotEmpty)
           RecentlyClosedStrip(
             entries: recentlyClosed.take(3).toList(growable: false),
             onRestore: onRestoreClosed,
             onDismiss: onDismissClosed,
           ),
         Expanded(
-          child: ArtifactLibraryView(
-            controller: controller,
-            documents: documents,
-            onOpenPath: onOpenPath,
-            onPickDocument: onPickDocument,
-            initialReadingState: readingState,
-            onReadingStateChanged: onReadingStateChanged,
-            onBulkOperation: onBulkOperation,
-            collections: collections,
-            tags: tags,
-            collectionMemberships: collectionMemberships,
-            tagMemberships: tagMemberships,
-            onDocumentInfo: onDocumentInfo,
-            onRelocateDocument: onRelocateDocument,
-            onToggleFavorite: onToggleFavorite,
-            onChangeCover: onChangeCover,
-            onRevealDocument: onRevealDocument,
-            onRemoveDocument: onRemoveDocument,
-            onReanalyzeDocument: onReanalyzeDocument,
-            onDocumentVisible: onDocumentVisible,
-            onDocumentHidden: onDocumentHidden,
-          ),
+          child: controller.libraryDocumentCount == 0
+              ? EmptyLibraryState(onOpen: onPickDocument)
+              : ArtifactLibraryView(
+                  controller: controller,
+                  documents: documents,
+                  onOpenPath: onOpenPath,
+                  onPickDocument: onPickDocument,
+                  initialReadingState: readingState,
+                  onReadingStateChanged: onReadingStateChanged,
+                  onBulkOperation: onBulkOperation,
+                  collections: collections,
+                  tags: tags,
+                  collectionMemberships: collectionMemberships,
+                  tagMemberships: tagMemberships,
+                  onDocumentInfo: onDocumentInfo,
+                  onRelocateDocument: onRelocateDocument,
+                  onToggleFavorite: onToggleFavorite,
+                  onChangeCover: onChangeCover,
+                  onRevealDocument: onRevealDocument,
+                  onRemoveDocument: onRemoveDocument,
+                  onReanalyzeDocument: onReanalyzeDocument,
+                  onDocumentVisible: onDocumentVisible,
+                  onDocumentHidden: onDocumentHidden,
+                ),
         ),
       ],
+    );
+  }
+}
+
+final class ContinuityCenter extends StatelessWidget {
+  const ContinuityCenter({
+    super.key,
+    required this.summary,
+    required this.hasActiveReading,
+    required this.hasRecentlyClosed,
+    this.onContinue,
+    this.onOpenNext,
+    this.onResumeSession,
+    this.onDiscardContext,
+    this.onProblems,
+  });
+
+  final ContinuitySummary summary;
+  final bool hasActiveReading;
+  final bool hasRecentlyClosed;
+  final VoidCallback? onContinue;
+  final VoidCallback? onOpenNext;
+  final VoidCallback? onResumeSession;
+  final VoidCallback? onDiscardContext;
+  final VoidCallback? onProblems;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = YamantakaLocalizations.of(context);
+    final theme = Theme.of(context);
+    final stats =
+        <({IconData icon, String label, int value, VoidCallback? tap})>[
+          (
+            icon: Icons.tab_outlined,
+            label: strings.get('continuity.open'),
+            value: summary.openDocuments,
+            tap: onResumeSession,
+          ),
+          (
+            icon: Icons.push_pin_outlined,
+            label: strings.get('continuity.pinned'),
+            value: summary.pinnedDocuments,
+            tap: onResumeSession,
+          ),
+          (
+            icon: Icons.schedule_outlined,
+            label: strings.get('continuity.pending'),
+            value: summary.pendingReadings,
+            tap: onOpenNext,
+          ),
+          (
+            icon: Icons.space_dashboard_outlined,
+            label: strings.get('continuity.workspaces'),
+            value: summary.workspaceCount,
+            tap: onResumeSession,
+          ),
+          (
+            icon: Icons.report_problem_outlined,
+            label: strings.get('continuity.problems'),
+            value: summary.problemCount,
+            tap: onProblems,
+          ),
+        ];
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.space16,
+          AppSpacing.space12,
+          AppSpacing.space16,
+          AppSpacing.space8,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final heading = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.get('continuity.title'),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    Text(
+                      summary.isEmpty
+                          ? strings.get('continuity.empty')
+                          : strings.get('continuity.description'),
+                      maxLines: constraints.maxWidth < 720 ? 3 : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                );
+                final actions = Wrap(
+                  spacing: AppSpacing.space8,
+                  runSpacing: AppSpacing.space8,
+                  alignment: constraints.maxWidth < 720
+                      ? WrapAlignment.start
+                      : WrapAlignment.end,
+                  children: [
+                    if (hasActiveReading)
+                      FilledButton.tonalIcon(
+                        key: const Key('continuity-continue'),
+                        onPressed: onContinue,
+                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                        label: Text(strings.get('continuity.continue')),
+                      ),
+                    if (onOpenNext != null)
+                      OutlinedButton.icon(
+                        key: const Key('continuity-open-next'),
+                        onPressed: onOpenNext,
+                        icon: const Icon(Icons.skip_next_rounded, size: 18),
+                        label: Text(strings.get('continuity.openNext')),
+                      ),
+                    if (onResumeSession != null)
+                      TextButton.icon(
+                        key: const Key('continuity-resume'),
+                        onPressed: onResumeSession,
+                        icon: const Icon(Icons.restore_rounded, size: 18),
+                        label: Text(strings.get('continuity.resume')),
+                      ),
+                    if ((hasActiveReading || hasRecentlyClosed) &&
+                        onDiscardContext != null)
+                      IconButton(
+                        key: const Key('continuity-discard'),
+                        tooltip: strings.get('continuity.discard'),
+                        onPressed: onDiscardContext,
+                        icon: const Icon(Icons.layers_clear_outlined),
+                      ),
+                  ],
+                );
+                if (constraints.maxWidth < 720) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      heading,
+                      const SizedBox(height: AppSpacing.space8),
+                      actions,
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: heading),
+                    const SizedBox(width: AppSpacing.space12),
+                    Flexible(child: actions),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: AppSpacing.space8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final stat in stats)
+                    Padding(
+                      padding: const EdgeInsets.only(right: AppSpacing.space16),
+                      child: Semantics(
+                        button: stat.tap != null,
+                        label: '${stat.label}: ${stat.value}',
+                        child: InkWell(
+                          onTap: stat.tap,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.space4,
+                              vertical: AppSpacing.space4,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(stat.icon, size: 16),
+                                const SizedBox(width: AppSpacing.space4),
+                                Text(
+                                  '${stat.value} ${stat.label}',
+                                  style: theme.textTheme.labelMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1504,4 +1773,7 @@ enum _LibraryAppMenuAction {
   enrich,
   reanalyze,
   checkFiles,
+  annotations,
+  automations,
+  problems,
 }

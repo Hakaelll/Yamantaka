@@ -91,7 +91,7 @@ void main() {
       final backup = File('${directory.path}/backup.json');
       await service.exportTo(backup.path);
       final exported = await backup.readAsString();
-      expect((jsonDecode(exported) as Map<String, dynamic>)['version'], 7);
+      expect((jsonDecode(exported) as Map<String, dynamic>)['version'], 8);
       expect(exported, contains('"containsPdfFiles": false'));
       expect(exported, isNot(contains('%PDF-')));
       final preview = await service.preview(backup.path);

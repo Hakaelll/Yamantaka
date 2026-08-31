@@ -1,12 +1,21 @@
+import 'dart:collection';
+
 import '../../app/app_config.dart';
 import '../../features/library/domain/library_document.dart';
 import '../../features/search/domain/global_search_models.dart';
 import '../database/app_database.dart';
 
 final class GlobalSearchRepository {
-  const GlobalSearchRepository(this._database);
+  GlobalSearchRepository(this._database);
 
   final AppDatabase _database;
+  final LinkedHashMap<String, _SearchCacheEntry> _recentSearches =
+      LinkedHashMap();
+  static final Map<String, GlobalSearchKind> _kindsByName = GlobalSearchKind
+      .values
+      .asNameMap();
+  static const int _cacheLifetimeMicroseconds = 1000000;
+  static const int _maxCachedSearches = 8;
 
   List<GlobalSearchResult> search(
     String query, {
@@ -16,10 +25,24 @@ final class GlobalSearchRepository {
   }) {
     final expression = _ftsExpression(query);
     if (expression.isEmpty) return const [];
-    final selectedKinds = kinds.isEmpty
-        ? GlobalSearchKind.values
-        : kinds.toList(growable: false);
-    final kindPlaceholders = List.filled(selectedKinds.length, '?').join(',');
+    final selectedKinds = kinds.toList(growable: false);
+    selectedKinds.sort((left, right) => left.index.compareTo(right.index));
+    final boundedLimit = limit.clamp(1, 200);
+    final boundedOffset = offset.clamp(0, 10000);
+    final cacheKey =
+        '$expression|$boundedLimit|$boundedOffset|'
+        '${selectedKinds.map((kind) => kind.name).join(',')}';
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final cached = _recentSearches.remove(cacheKey);
+    if (cached != null &&
+        now - cached.createdAtMicroseconds <= _cacheLifetimeMicroseconds) {
+      _recentSearches[cacheKey] = cached;
+      return cached.results;
+    }
+    final kindClause = selectedKinds.isEmpty
+        ? ''
+        : 'AND library_search.kind IN '
+              '(${List.filled(selectedKinds.length, '?').join(',')})';
     final rows = _database.database.select(
       '''
       SELECT library_search.document_id, library_search.page_index,
@@ -30,7 +53,7 @@ final class GlobalSearchRepository {
       FROM library_search
       JOIN documents d ON d.id = library_search.document_id
       WHERE library_search MATCH ?
-        AND library_search.kind IN ($kindPlaceholders)
+        $kindClause
       ORDER BY rank, d.last_opened_at DESC,
         library_search.document_id, library_search.page_index,
         library_search.kind
@@ -39,33 +62,38 @@ final class GlobalSearchRepository {
       [
         expression,
         ...selectedKinds.map((kind) => kind.name),
-        limit.clamp(1, 200),
-        offset.clamp(0, 10000),
+        boundedLimit,
+        boundedOffset,
       ],
     );
-    return rows
-        .map(
-          (row) => GlobalSearchResult(
-            documentId: row['document_id'] as String,
-            pageIndex: (row['page_index'] as int) == -1
-                ? null
-                : row['page_index'] as int,
-            kind:
-                GlobalSearchKind.values
-                    .where((value) => value.name == row['kind'])
-                    .firstOrNull ??
-                GlobalSearchKind.metadata,
-            title: row['title'] as String? ?? 'Documento',
-            snippet: row['excerpt'] as String? ?? '',
-            rank: (row['rank'] as num).toDouble(),
-            isMissing: (row['is_missing'] as int? ?? 0) == 1,
-            isStale: (row['is_modified'] as int? ?? 0) == 1,
-          ),
-        )
-        .toList(growable: false);
+    final results = List<GlobalSearchResult>.unmodifiable(
+      rows.map(
+        (row) => GlobalSearchResult(
+          documentId: row['document_id'] as String,
+          pageIndex: (row['page_index'] as int) == -1
+              ? null
+              : row['page_index'] as int,
+          kind: _kindsByName[row['kind']] ?? GlobalSearchKind.metadata,
+          title: row['title'] as String? ?? 'Documento',
+          snippet: row['excerpt'] as String? ?? '',
+          rank: (row['rank'] as num).toDouble(),
+          isMissing: (row['is_missing'] as int? ?? 0) == 1,
+          isStale: (row['is_modified'] as int? ?? 0) == 1,
+        ),
+      ),
+    );
+    _recentSearches[cacheKey] = _SearchCacheEntry(
+      createdAtMicroseconds: now,
+      results: results,
+    );
+    while (_recentSearches.length > _maxCachedSearches) {
+      _recentSearches.remove(_recentSearches.keys.first);
+    }
+    return results;
   }
 
   void beginDocument(LibraryDocument document, {bool resume = false}) {
+    _invalidateSearchCache();
     final db = _database.database;
     if (resume && resumableCursor(document) != null) {
       refreshMetadataEntry(document);
@@ -117,6 +145,7 @@ final class GlobalSearchRepository {
   /// Updates metadata rows immediately after a local title, author or note
   /// edit without forcing a full PDF re-index. Page text remains untouched.
   void refreshMetadataEntry(LibraryDocument document) {
+    _invalidateSearchCache();
     final db = _database.database;
     final body = [
       document.effectiveAuthor,
@@ -154,6 +183,7 @@ final class GlobalSearchRepository {
     required int pageIndex,
     required String text,
   }) {
+    _invalidateSearchCache();
     _database.database.execute(
       '''
         INSERT OR REPLACE INTO library_search(
@@ -235,6 +265,7 @@ final class GlobalSearchRepository {
   }
 
   void refreshAnnotationEntries() {
+    _invalidateSearchCache();
     final db = _database.database;
     db.execute('DELETE FROM library_search WHERE kind = ?', [
       GlobalSearchKind.annotation.name,
@@ -258,6 +289,7 @@ final class GlobalSearchRepository {
   }
 
   void refreshOrganizationEntries() {
+    _invalidateSearchCache();
     final db = _database.database;
     db
       ..execute('DELETE FROM library_search WHERE kind IN (?, ?)', [
@@ -287,6 +319,7 @@ final class GlobalSearchRepository {
   }
 
   void refreshBookmarkEntries() {
+    _invalidateSearchCache();
     final db = _database.database;
     db
       ..execute('DELETE FROM library_search WHERE kind = ?', [
@@ -307,6 +340,7 @@ final class GlobalSearchRepository {
   }
 
   void clear() {
+    _invalidateSearchCache();
     _database.database
       ..execute('DELETE FROM library_search')
       ..execute('DELETE FROM search_index_state');
@@ -371,4 +405,16 @@ final class GlobalSearchRepository {
       .take(8)
       .map((term) => '"$term"*')
       .join(' AND ');
+
+  void _invalidateSearchCache() => _recentSearches.clear();
+}
+
+final class _SearchCacheEntry {
+  const _SearchCacheEntry({
+    required this.createdAtMicroseconds,
+    required this.results,
+  });
+
+  final int createdAtMicroseconds;
+  final List<GlobalSearchResult> results;
 }

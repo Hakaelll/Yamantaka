@@ -5,8 +5,10 @@ final class _YamantakaAppState extends State<YamantakaApp>
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   _AppPage _page = _AppPage.library;
   Timer? _windowSaveTimer;
+  Timer? _sessionSaveTimer;
   bool _restorationAttempted = false;
   bool _tabSwitcherOpen = false;
+  bool _readerFocusMode = false;
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
@@ -44,6 +46,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
   }
 
   Future<void> _showWelcomeOrRestore() async {
+    if (await _offerInterruptedSessionRecovery()) return;
     if (!mounted || widget.services.safeMode) {
       await _restoreLastSession();
       return;
@@ -90,6 +93,11 @@ final class _YamantakaAppState extends State<YamantakaApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _persistAtomicSession(clean: false);
+    }
     widget.services.reader.setVisible(
       state == AppLifecycleState.resumed || state == AppLifecycleState.inactive,
     );
@@ -118,6 +126,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
   @override
   void dispose() {
     _windowSaveTimer?.cancel();
+    _sessionSaveTimer?.cancel();
+    _persistAtomicSession(clean: true);
     WidgetsBinding.instance.removeObserver(this);
     widget.services.reader.removeListener(_syncActiveTab);
     if (_isDesktop) windowManager.removeListener(this);
@@ -136,7 +146,10 @@ final class _YamantakaAppState extends State<YamantakaApp>
   void onWindowUnmaximize() => _scheduleWindowBoundsSave();
 
   @override
-  void onWindowClose() => unawaited(_saveWindowBounds());
+  void onWindowClose() {
+    _persistAtomicSession(clean: true);
+    unawaited(_saveWindowBounds());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -303,6 +316,27 @@ final class _YamantakaAppState extends State<YamantakaApp>
         _ => null,
       },
       onSetReadingGoal: (document) => unawaited(_showReadingGoal(document)),
+      continuity: ContinuitySummary(
+        openDocuments: widget.services.tabs.tabs.length,
+        pinnedDocuments: widget.services.tabs.tabs
+            .where((tab) => tab.isPinned)
+            .length,
+        pendingReadings:
+            (widget.services.library.readingStateCounts[LibraryQueryReadingState
+                    .all] ??
+                widget.services.library.libraryDocumentCount) -
+            (widget.services.library.readingStateCounts[LibraryQueryReadingState
+                    .completed] ??
+                0),
+        workspaceCount: widget.services.workspaces.workspaces.length,
+        problemCount: widget.services.recovery.problems().length,
+      ),
+      onOpenNext: () => unawaited(_openNextReading()),
+      onResumeSession: () => unawaited(_resumeWorkspaceSession()),
+      onDiscardContext: () => unawaited(_discardContinuityContext()),
+      onProblems: () => unawaited(_showProblems()),
+      onAnnotations: () => unawaited(_showGlobalAnnotations()),
+      onAutomations: () => unawaited(_showAutomations()),
     ),
     _AppPage.reader => _buildReaderPage(),
     _AppPage.settings => SettingsScreen(
@@ -312,6 +346,26 @@ final class _YamantakaAppState extends State<YamantakaApp>
             ? _AppPage.reader
             : _AppPage.library,
       ),
+    ),
+    _AppPage.problems => ProblemsScreen(
+      problems: widget.services.recovery.problems(),
+      onBack: () => setState(() => _page = _AppPage.library),
+      onCheckIntegrity: () {
+        final result = widget.services.recovery.integrityCheck();
+        _showNotice(
+          result.toLowerCase() == 'ok'
+              ? _strings.get('problems.integrityOk')
+              : _strings.get('problems.integrityFailed'),
+        );
+      },
+      onDiscard: (problem) {
+        widget.services.recovery.discardProblem(problem.id);
+        setState(() {});
+      },
+      onResume: (problem) {
+        setState(() => _page = _AppPage.library);
+        unawaited(_resumeInterruptedAutomation(problem.id));
+      },
     ),
   };
 
@@ -370,7 +424,70 @@ final class _YamantakaAppState extends State<YamantakaApp>
       widget.services.libraryIndex.setInteractionPaused(isActive);
       widget.services.enrichment.setInteractionPaused(isActive);
     },
+    onCompare: () => unawaited(_showComparison()),
+    initialFocusMode: _readerFocusMode,
+    onFocusModeChanged: (enabled) {
+      _readerFocusMode = enabled;
+      widget.services.workspaces.updateFocusMode(enabled);
+    },
   );
+
+  Future<void> _showComparison() async {
+    final context = _navigatorKey.currentContext;
+    final primary = widget.services.reader.openedDocument;
+    final primaryDocument = widget.services.reader.document;
+    if (context == null || primary == null || primaryDocument == null) return;
+    final candidates = widget.services.library.documents
+        .where(
+          (document) =>
+              document.id != primaryDocument.id && !document.isMissing,
+        )
+        .take(80)
+        .toList(growable: false);
+    if (candidates.isEmpty) {
+      _showNotice(_strings.get('comparison.noCandidates'));
+      return;
+    }
+    final selected = await showDialog<LibraryDocument>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(_strings.get('comparison.chooseDocument')),
+        children: [
+          for (final document in candidates)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, document),
+              child: ListTile(
+                leading: const Icon(Icons.picture_as_pdf_outlined),
+                title: Text(
+                  document.effectiveTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  _strings.get(
+                    'comparison.pages',
+                    parameters: {'count': document.pageCount},
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (selected == null || !context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => DocumentComparisonDialog(
+        engine: widget.services.engine,
+        primary: primary,
+        primaryTitle: primaryDocument.effectiveTitle,
+        secondaryPath: selected.path,
+        secondaryTitle: selected.effectiveTitle,
+        initialPage: widget.services.reader.currentPageIndex,
+      ),
+    );
+  }
 
   Future<void> _pickAndOpen() async {
     final selected = await _pickPdf();
@@ -417,7 +534,9 @@ final class _YamantakaAppState extends State<YamantakaApp>
         controller: widget.services.workspaces,
         panelSection: settings.readerPanelSection,
         panelWidth: settings.readerPanelWidth,
+        focusMode: _readerFocusMode,
         onRestore: (workspace) => unawaited(_restoreWorkspace(workspace)),
+        onOpenQueued: (tab) => unawaited(_activateTab(tab)),
       ),
     );
   }
@@ -461,7 +580,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
     if (directory == null) return;
     if (!mounted) return;
     final context = _navigatorKey.currentContext;
-    if (context == null) return;
+    if (context == null || !context.mounted) return;
     if (!context.mounted) return;
     unawaited(
       widget.services.folderImport.scan(directory, includeSubdirectories: true),
@@ -524,6 +643,7 @@ final class _YamantakaAppState extends State<YamantakaApp>
   }
 
   Future<void> _restoreWorkspace(WorkspaceSnapshot workspace) async {
+    _readerFocusMode = workspace.focusMode;
     widget.services.workspaces.restore(workspace.id);
     final available = workspace.tabs
         .where((tab) => !tab.isMissing && File(tab.path).existsSync())
@@ -541,6 +661,489 @@ final class _YamantakaAppState extends State<YamantakaApp>
           parameters: {'count': missingCount},
         ),
       );
+    }
+  }
+
+  Future<void> _openNextReading() async {
+    final queued = widget.services.workspaces.openNext();
+    if (queued != null && !queued.isMissing && File(queued.path).existsSync()) {
+      await _activateTab(queued);
+      return;
+    }
+    final next = widget.services.library.documents
+        .where(
+          (document) => !document.isMissing && document.readingProgress < 1,
+        )
+        .firstOrNull;
+    if (next != null) {
+      await _openPath(next.path);
+      return;
+    }
+    _showNotice(_strings.get('continuity.noNext'));
+  }
+
+  Future<void> _resumeWorkspaceSession() async {
+    final workspaces = widget.services.workspaces.workspaces;
+    final activeId = widget.services.workspaces.activeWorkspaceId;
+    final target =
+        workspaces.where((workspace) => workspace.id == activeId).firstOrNull ??
+        workspaces.where((workspace) => workspace.isDefault).firstOrNull ??
+        workspaces.firstOrNull;
+    if (target == null) {
+      final tab =
+          widget.services.tabs.activeTab ??
+          widget.services.tabs.tabs.firstOrNull;
+      if (tab != null) {
+        await _activateTab(tab);
+      } else {
+        _showNotice(_strings.get('continuity.noSession'));
+      }
+      return;
+    }
+    await _restoreWorkspace(target);
+  }
+
+  Future<void> _discardContinuityContext() async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_strings.get('continuity.discardTitle')),
+        content: Text(_strings.get('continuity.discardBody')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_strings.get('action.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_strings.get('continuity.discard')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final closed = widget.services.readingSessions.recentlyClosed(limit: 50);
+    for (final entry in closed) {
+      widget.services.readingSessions.removeRecentlyClosed(entry.documentId);
+    }
+    widget.services.recovery.discardSession();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _showProblems() async {
+    if (!mounted) return;
+    setState(() => _page = _AppPage.problems);
+  }
+
+  Future<void> _resumeInterruptedAutomation(String journalId) async {
+    final journal = widget.services.automationRepository.journal(journalId);
+    final ruleId = journal?.summary['ruleId'] as String?;
+    final rule = widget.services.automationRepository
+        .all()
+        .where((item) => item.id == ruleId)
+        .firstOrNull;
+    if (journal == null || rule == null) {
+      _showNotice(_strings.get('problems.resumeUnavailable'));
+      return;
+    }
+    final matchContext = AutomationMatchContext(
+      tagIds: widget.services.organization.tagMemberships,
+      collectionIds: widget.services.organization.collectionMemberships,
+      duplicateFingerprints: widget.services.documents
+          .exactDuplicateFingerprints(),
+    );
+    final simulation = await widget.services.automations.simulateAsync(
+      rule,
+      widget.services.documents.scan(),
+      context: matchContext,
+    );
+    if (!mounted) return;
+    final context = _navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_strings.get('problems.resumeTitle')),
+        content: Text(
+          _strings.get(
+            'problems.resumeBody',
+            parameters: {'count': simulation.affected},
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(_strings.get('action.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(_strings.get('problems.resume')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || !context.mounted) return;
+    final cancellation = AutomationCancellationToken();
+    final operation = widget.services.automations.apply(
+      rule: rule,
+      documents: widget.services.documents.scan(),
+      context: matchContext,
+      cancellationToken: cancellation,
+      applyAction: _applyAutomationAction,
+      rollbackAction: _undoAutomationAction,
+    );
+    void closeProgress() {
+      if (!context.mounted) return;
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) navigator.pop();
+    }
+
+    unawaited(
+      operation.then<void>(
+        (_) {
+          closeProgress();
+        },
+        onError: (Object _, StackTrace _) {
+          closeProgress();
+        },
+      ),
+    );
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.sync_rounded),
+        title: Text(_strings.get('problems.resuming')),
+        content: const LinearProgressIndicator(),
+        actions: [
+          TextButton.icon(
+            onPressed: cancellation.cancel,
+            icon: const Icon(Icons.stop_circle_outlined),
+            label: Text(_strings.get('action.cancel')),
+          ),
+        ],
+      ),
+    );
+    late final AutomationApplyResult result;
+    try {
+      result = await operation;
+    } on Object {
+      _showNotice(_strings.get('problems.resumeFailed'));
+      return;
+    }
+    widget.services.recovery.discardProblem(journalId);
+    widget.services.organization.reload();
+    widget.services.workspaces.reload();
+    await widget.services.library.reload();
+    _showNotice(
+      _strings.get(
+        'problems.resumeResult',
+        parameters: {'completed': result.completed, 'total': result.total},
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _showGlobalAnnotations() async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => GlobalAnnotationsDialog(
+        repository: widget.services.annotationRepository,
+        documentTitle: (documentId) =>
+            widget.services.documents.byId(documentId)?.effectiveTitle ??
+            _strings.get('annotations.unknownDocument'),
+        onOpen: (annotation) {
+          Navigator.pop(dialogContext);
+          unawaited(_openAnnotation(annotation));
+        },
+        onExport: _exportGlobalAnnotations,
+      ),
+    );
+  }
+
+  Future<void> _exportGlobalAnnotations(List<PdfAnnotation> annotations) async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    final format = await showDialog<_AnnotationExportFormat>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(_strings.get('reader.exportAnnotations')),
+        children: [
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.pop(context, _AnnotationExportFormat.markdown),
+            child: const ListTile(
+              leading: Icon(Icons.description_outlined),
+              title: Text('Markdown'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.pop(context, _AnnotationExportFormat.json),
+            child: const ListTile(
+              leading: Icon(Icons.data_object_rounded),
+              title: Text('JSON'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (format == null) return;
+    final extension = format == _AnnotationExportFormat.markdown
+        ? 'md'
+        : 'json';
+    final location = await getSaveLocation(
+      suggestedName: 'yamantaka-revision-anotaciones.$extension',
+      acceptedTypeGroups: [
+        XTypeGroup(label: extension.toUpperCase(), extensions: [extension]),
+      ],
+    );
+    if (location == null) return;
+    final byDocument = <String, List<PdfAnnotation>>{};
+    for (final annotation in annotations.take(80)) {
+      (byDocument[annotation.documentId] ??= []).add(annotation);
+    }
+    final content = switch (format) {
+      _AnnotationExportFormat.markdown =>
+        byDocument.entries
+            .map((entry) {
+              final document = widget.services.documents.byId(entry.key);
+              return widget.services.annotationExporter.toMarkdown(
+                title:
+                    document?.effectiveTitle ??
+                    _strings.get('annotations.unknownDocument'),
+                author: document?.effectiveAuthor,
+                progress: document?.readingProgress ?? 0,
+                annotations: entry.value,
+              );
+            })
+            .join('\n---\n\n'),
+      _AnnotationExportFormat.json => const JsonEncoder.withIndent(' ').convert(
+        {
+          'format': 'yamantaka-global-annotations',
+          'version': 1,
+          'exportedAt': DateTime.now().toUtc().toIso8601String(),
+          'documents': [
+            for (final entry in byDocument.entries)
+              jsonDecode(
+                widget.services.annotationExporter.toVersionedJson(
+                  documentId: entry.key,
+                  title:
+                      widget.services.documents
+                          .byId(entry.key)
+                          ?.effectiveTitle ??
+                      _strings.get('annotations.unknownDocument'),
+                  author: widget.services.documents
+                      .byId(entry.key)
+                      ?.effectiveAuthor,
+                  progress:
+                      widget.services.documents
+                          .byId(entry.key)
+                          ?.readingProgress ??
+                      0,
+                  annotations: entry.value,
+                ),
+              ),
+          ],
+        },
+      ),
+    };
+    try {
+      await File(location.path).writeAsString(content, flush: true);
+      _showNotice(_strings.get('annotations.exported'));
+    } on Object {
+      _showNotice(_strings.get('annotations.exportFailed'));
+    }
+  }
+
+  Future<void> _openAnnotation(PdfAnnotation annotation) async {
+    final document = widget.services.documents.byId(annotation.documentId);
+    if (document == null || document.isMissing) {
+      _showNotice(_strings.get('search.resultUnavailable'));
+      return;
+    }
+    await _openPath(document.path);
+    if (widget.services.reader.status == ReaderStatus.ready) {
+      await widget.services.reader.navigateTo(
+        annotation.pageIndex,
+        reason: NavigationReason.annotation,
+        label: _strings.get('annotations.globalTitle'),
+      );
+    }
+  }
+
+  Future<void> _showAutomations() async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    final duplicateFingerprints = widget.services.documents
+        .exactDuplicateFingerprints();
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AutomationManagerDialog(
+        repository: widget.services.automationRepository,
+        engine: widget.services.automations,
+        documents: widget.services.documents.scan(),
+        matchContext: AutomationMatchContext(
+          tagIds: widget.services.organization.tagMemberships,
+          collectionIds: widget.services.organization.collectionMemberships,
+          duplicateFingerprints: duplicateFingerprints,
+        ),
+        applyAction: _applyAutomationAction,
+        applyUndo: _undoAutomationAction,
+      ),
+    );
+    widget.services.organization.reload();
+    widget.services.workspaces.reload();
+    await widget.services.library.reload();
+    if (mounted) setState(() {});
+  }
+
+  Future<Map<String, Object?>> _applyAutomationAction(
+    LibraryDocument document,
+    AutomationAction action,
+  ) async {
+    switch (action.kind) {
+      case AutomationActionKind.addTag:
+        final tag =
+            widget.services.organization.tags
+                .where(
+                  (item) =>
+                      item.id == action.value ||
+                      item.name.toLowerCase() == action.value.toLowerCase(),
+                )
+                .firstOrNull ??
+            widget.services.organization.ensureTag(action.value);
+        final alreadyAssigned =
+            widget.services.organization.tagMemberships[tag.id]?.contains(
+              document.id,
+            ) ??
+            false;
+        widget.services.organization.assignTagSilently(tag.id, document.id);
+        return {
+          'kind': 'removeTag',
+          'tagId': tag.id,
+          'documentId': document.id,
+          'changed': !alreadyAssigned,
+        };
+      case AutomationActionKind.addCollection:
+        final collection =
+            widget.services.organization.collections
+                .where(
+                  (item) =>
+                      item.id == action.value ||
+                      item.name.toLowerCase() == action.value.toLowerCase(),
+                )
+                .firstOrNull ??
+            widget.services.organization.createCollection(action.value);
+        final alreadyAssigned =
+            widget.services.organization.collectionMemberships[collection.id]
+                ?.contains(document.id) ??
+            false;
+        widget.services.organization.addDocumentSilently(
+          collection.id,
+          document.id,
+        );
+        return {
+          'kind': 'removeCollection',
+          'collectionId': collection.id,
+          'documentId': document.id,
+          'changed': !alreadyAssigned,
+        };
+      case AutomationActionKind.addWorkspace:
+      case AutomationActionKind.addReadingQueue:
+        final workspace = widget.services.workspaces.workspaces
+            .where(
+              (item) =>
+                  item.id == action.value ||
+                  item.name.toLowerCase() == action.value.toLowerCase(),
+            )
+            .firstOrNull;
+        if (workspace == null) throw StateError('workspace_not_found');
+        final changed = widget.services.workspaces.addDocumentToQueue(
+          workspace.id,
+          document,
+        );
+        return {
+          'kind': 'removeQueue',
+          'workspaceId': workspace.id,
+          'documentId': document.id,
+          'changed': changed,
+        };
+      case AutomationActionKind.setReadingState:
+        final state = action.value.trim().toLowerCase();
+        if (state == 'finished' || state == 'terminado') {
+          widget.services.documents.markFinished(document.id);
+        } else if (state == 'pending' ||
+            state == 'pendiente' ||
+            state == 'notstarted') {
+          widget.services.documents.resetProgress(document.id);
+        } else {
+          throw StateError('unsupported_reading_state');
+        }
+        return {
+          'kind': 'restoreProgress',
+          'documentId': document.id,
+          'pageIndex': document.lastPageIndex,
+          'pageCount': document.pageCount,
+          'viewMode': document.preferredViewMode.name,
+          'theme': document.preferredTheme.name,
+        };
+      case AutomationActionKind.setPriority:
+        final oldValue = document.isFavorite;
+        final value = !{
+          '0',
+          'false',
+          'normal',
+        }.contains(action.value.trim().toLowerCase());
+        widget.services.documents.setFavorite(document.id, value);
+        return {
+          'kind': 'restoreFavorite',
+          'documentId': document.id,
+          'value': oldValue,
+        };
+    }
+  }
+
+  Future<void> _undoAutomationAction(Map<String, Object?> undo) async {
+    if (undo['changed'] == false) return;
+    switch (undo['kind']) {
+      case 'removeTag':
+        widget.services.organization.removeTagSilently(
+          undo['tagId']! as String,
+          undo['documentId']! as String,
+        );
+      case 'removeCollection':
+        widget.services.organization.removeDocumentSilently(
+          undo['collectionId']! as String,
+          undo['documentId']! as String,
+        );
+      case 'removeQueue':
+        widget.services.workspaces.removeDocumentFromQueue(
+          undo['workspaceId']! as String,
+          undo['documentId']! as String,
+        );
+      case 'restoreProgress':
+        widget.services.documents.updateProgress(
+          documentId: undo['documentId']! as String,
+          pageIndex: undo['pageIndex']! as int,
+          pageCount: undo['pageCount']! as int,
+          viewMode: ReaderMode.values.firstWhere(
+            (item) => item.name == undo['viewMode'],
+          ),
+          theme: ReaderTheme.values.firstWhere(
+            (item) => item.name == undo['theme'],
+          ),
+        );
+      case 'restoreFavorite':
+        widget.services.documents.setFavorite(
+          undo['documentId']! as String,
+          undo['value']! as bool,
+        );
     }
   }
 
@@ -763,6 +1366,86 @@ final class _YamantakaAppState extends State<YamantakaApp>
         pageIndex: reader.currentPageIndex,
       );
     }
+    _scheduleAtomicSessionSave();
+  }
+
+  void _scheduleAtomicSessionSave() {
+    _sessionSaveTimer?.cancel();
+    _sessionSaveTimer = Timer(
+      const Duration(milliseconds: 500),
+      () => _persistAtomicSession(clean: false),
+    );
+  }
+
+  void _persistAtomicSession({required bool clean}) {
+    if (widget.services.safeMode) return;
+    widget.services.recovery.saveSession(
+      AtomicSessionSnapshot(
+        workspaceId: widget.services.workspaces.activeWorkspaceId,
+        activeDocumentId:
+            widget.services.reader.document?.id ??
+            widget.services.tabs.activeTab?.documentId,
+        savedAt: DateTime.now().toUtc(),
+        clean: clean,
+      ),
+    );
+  }
+
+  Future<bool> _offerInterruptedSessionRecovery() async {
+    if (!mounted || widget.services.safeMode) return false;
+    final snapshot = widget.services.recovery.session();
+    if (snapshot == null || snapshot.clean) return false;
+    final action = await showDialog<_RecoveryStartupAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.restore_page_outlined),
+        title: Text(_strings.get('recovery.sessionTitle')),
+        content: Text(_strings.get('recovery.sessionBody')),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context, _RecoveryStartupAction.startClean),
+            child: Text(_strings.get('recovery.startClean')),
+          ),
+          FilledButton.icon(
+            onPressed: () =>
+                Navigator.pop(context, _RecoveryStartupAction.restore),
+            icon: const Icon(Icons.restore_rounded, size: 18),
+            label: Text(_strings.get('recovery.restoreSession')),
+          ),
+        ],
+      ),
+    );
+    if (action == _RecoveryStartupAction.startClean) {
+      widget.services.recovery.discardSession();
+      _restorationAttempted = true;
+      return true;
+    }
+    if (action != _RecoveryStartupAction.restore) return false;
+    _restorationAttempted = true;
+    await _restoreAtomicSnapshot(snapshot);
+    return true;
+  }
+
+  Future<void> _restoreAtomicSnapshot(AtomicSessionSnapshot snapshot) async {
+    final workspace = widget.services.workspaces.workspaces
+        .where((item) => item.id == snapshot.workspaceId)
+        .firstOrNull;
+    if (workspace != null) {
+      await _restoreWorkspace(workspace);
+      return;
+    }
+    final document = widget.services.documents.byId(
+      snapshot.activeDocumentId ?? '',
+    );
+    if (document != null &&
+        !document.isMissing &&
+        File(document.path).existsSync()) {
+      await _openPath(document.path);
+      return;
+    }
+    _showNotice(_strings.get('recovery.sessionUnavailable'));
   }
 
   Future<String?> _askForPassword({required bool wrongPassword}) async {
@@ -995,6 +1678,9 @@ final class _YamantakaAppState extends State<YamantakaApp>
         : document.hasFileChanged
         ? _strings.get('reader.availableChanged')
         : _strings.get('reader.available');
+    final relationCount = widget.services.relations
+        .forDocument(document.id)
+        .length;
     final action = await showDialog<_DocumentInfoAction>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1075,6 +1761,13 @@ final class _YamantakaAppState extends State<YamantakaApp>
                   label: _strings.get('reader.presence'),
                   value: presence,
                 ),
+                _DocumentMetadataLine(
+                  label: _strings.get('relations.title'),
+                  value: _strings.get(
+                    'relations.count',
+                    parameters: {'count': relationCount},
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.space8),
                 Text(
                   _strings.get('reader.path'),
@@ -1107,6 +1800,12 @@ final class _YamantakaAppState extends State<YamantakaApp>
                 Navigator.pop(context, _DocumentInfoAction.editMetadata),
             icon: const Icon(Icons.edit_note_rounded, size: 18),
             label: Text(_strings.get('reader.editMetadata')),
+          ),
+          TextButton.icon(
+            onPressed: () =>
+                Navigator.pop(context, _DocumentInfoAction.relations),
+            icon: const Icon(Icons.hub_outlined, size: 18),
+            label: Text(_strings.get('relations.title')),
           ),
           TextButton(
             style: TextButton.styleFrom(
@@ -1206,7 +1905,34 @@ final class _YamantakaAppState extends State<YamantakaApp>
         } else {
           await _relocateDocument(document);
         }
+      case _DocumentInfoAction.relations:
+        await _showDocumentRelations(document);
     }
+  }
+
+  Future<void> _showDocumentRelations(LibraryDocument document) async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => DocumentRelationsDialog(
+        repository: widget.services.relations,
+        document: document,
+        candidates: widget.services.library.documents
+            .where((candidate) => candidate.id != document.id)
+            .take(80)
+            .toList(growable: false),
+        onOpenDocument: (documentId) {
+          final target = widget.services.documents.byId(documentId);
+          if (target == null || target.isMissing) {
+            _showNotice(_strings.get('search.resultUnavailable'));
+            return;
+          }
+          Navigator.pop(dialogContext);
+          unawaited(_openPath(target.path));
+        },
+      ),
+    );
   }
 
   Future<void> _editDocumentMetadata(LibraryDocument document) async {

@@ -43,7 +43,7 @@ final class LocalBackupService {
        _settings = settings;
 
   static const format = 'yamantaka-local-backup';
-  static const version = 7;
+  static const version = 8;
   static const maxBackupBytes = 128 * 1024 * 1024;
 
   final AppDatabase _database;
@@ -140,6 +140,11 @@ final class LocalBackupService {
   void _replaceTables(Map<String, dynamic> tables) {
     final database = _database.database;
     database
+      ..execute('DELETE FROM operation_journal')
+      ..execute('DELETE FROM automation_rules')
+      ..execute('DELETE FROM document_revision_members')
+      ..execute('DELETE FROM document_revision_groups')
+      ..execute('DELETE FROM document_relations')
       ..execute('DELETE FROM workspace_tabs')
       ..execute('DELETE FROM workspaces')
       ..execute('DELETE FROM collection_documents')
@@ -228,6 +233,31 @@ final class LocalBackupService {
       tables['workspace_tabs']! as List,
     );
     _restoreTable(
+      'document_relations',
+      _relationColumns,
+      tables['document_relations']! as List,
+    );
+    _restoreTable(
+      'document_revision_groups',
+      _revisionGroupColumns,
+      tables['document_revision_groups']! as List,
+    );
+    _restoreTable(
+      'document_revision_members',
+      _revisionMemberColumns,
+      tables['document_revision_members']! as List,
+    );
+    _restoreTable(
+      'automation_rules',
+      _automationRuleColumns,
+      tables['automation_rules']! as List,
+    );
+    _restoreTable(
+      'operation_journal',
+      _journalColumns,
+      tables['operation_journal']! as List,
+    );
+    _restoreTable(
       'app_metadata',
       _metadataColumns,
       tables['app_metadata']! as List,
@@ -271,6 +301,11 @@ final class LocalBackupService {
       'reading_profiles': _tableRows('reading_profiles'),
       'workspaces': _tableRows('workspaces'),
       'workspace_tabs': _tableRows('workspace_tabs'),
+      'document_relations': _tableRows('document_relations'),
+      'document_revision_groups': _tableRows('document_revision_groups'),
+      'document_revision_members': _tableRows('document_revision_members'),
+      'automation_rules': _tableRows('automation_rules'),
+      'operation_journal': _tableRows('operation_journal'),
       'app_metadata': _tableRows('app_metadata'),
     };
     final exportedAt = DateTime.now().toUtc();
@@ -361,6 +396,15 @@ final class LocalBackupService {
     tables.putIfAbsent('document_notes', () => <Object?>[]);
     tables.putIfAbsent('document_enrichment', () => <Object?>[]);
     tables.putIfAbsent('document_topics', () => <Object?>[]);
+    for (final name in const [
+      'document_relations',
+      'document_revision_groups',
+      'document_revision_members',
+      'automation_rules',
+      'operation_journal',
+    ]) {
+      tables.putIfAbsent(name, () => <Object?>[]);
+    }
     final backupVersion = decoded['version'] as int;
     _validateTable(
       tables,
@@ -381,15 +425,32 @@ final class LocalBackupService {
     _validateTable(tables, 'document_notes', _noteColumns);
     _validateTable(tables, 'bookmarks', _bookmarkColumns);
     _validateTable(tables, 'reading_sessions', _sessionColumns);
-    _validateTable(tables, 'annotations', _annotationColumns);
+    _validateTable(
+      tables,
+      'annotations',
+      backupVersion >= 8 ? _annotationColumns : _v7AnnotationColumns,
+    );
     _validateTable(tables, 'tags', _tagColumns);
     _validateTable(tables, 'annotation_tags', _annotationTagColumns);
     _validateTable(tables, 'document_tags', _documentTagColumns);
     _validateTable(tables, 'collections', _collectionColumns);
     _validateTable(tables, 'collection_documents', _collectionDocumentColumns);
     _validateTable(tables, 'reading_profiles', _readingProfileColumns);
-    _validateTable(tables, 'workspaces', _workspaceColumns);
-    _validateTable(tables, 'workspace_tabs', _workspaceTabColumns);
+    _validateTable(
+      tables,
+      'workspaces',
+      backupVersion >= 8 ? _workspaceColumns : _v7WorkspaceColumns,
+    );
+    _validateTable(
+      tables,
+      'workspace_tabs',
+      backupVersion >= 8 ? _workspaceTabColumns : _v7WorkspaceTabColumns,
+    );
+    _validateTable(tables, 'document_relations', _relationColumns);
+    _validateTable(tables, 'document_revision_groups', _revisionGroupColumns);
+    _validateTable(tables, 'document_revision_members', _revisionMemberColumns);
+    _validateTable(tables, 'automation_rules', _automationRuleColumns);
+    _validateTable(tables, 'operation_journal', _journalColumns);
     _validateTable(tables, 'app_metadata', _metadataColumns);
     if (decoded['settings'] is! Map<String, dynamic>) {
       throw const FormatException('La copia no contiene ajustes válidos.');
@@ -483,6 +544,22 @@ final class LocalBackupService {
           row[column] ??
               (table == 'documents' && column == 'is_favorite'
                   ? 0
+                  : table == 'annotations' && column == 'review_state'
+                  ? 'pending'
+                  : table == 'workspaces' && column == 'query_json'
+                  ? '{}'
+                  : table == 'workspaces' && column == 'grouping'
+                  ? 'none'
+                  : table == 'workspaces' && column == 'sort_mode'
+                  ? 'lastOpened'
+                  : table == 'workspaces' && column == 'density'
+                  ? 'comfortable'
+                  : table == 'workspaces' && column == 'visible_columns_json'
+                  ? '["document","status","progress"]'
+                  : table == 'workspaces' && column == 'focus_mode'
+                  ? 0
+                  : table == 'workspace_tabs' && column == 'queue_status'
+                  ? 'pending'
                   : table == 'document_preferences' && column == 'cover_policy'
                   ? ReaderCoverPolicy.noCover.name
                   : table == 'document_preferences' && column == 'initial_side'
@@ -779,6 +856,25 @@ const _annotationColumns = <String>[
   'status',
   'created_at',
   'updated_at',
+  'review_state',
+];
+
+const _v7AnnotationColumns = <String>[
+  'id',
+  'document_id',
+  'page_index',
+  'type',
+  'color',
+  'note',
+  'selected_text',
+  'context_before',
+  'context_after',
+  'rects_json',
+  'page_rotation',
+  'document_fingerprint',
+  'status',
+  'created_at',
+  'updated_at',
 ];
 
 const _tagColumns = <String>[
@@ -786,6 +882,19 @@ const _tagColumns = <String>[
   'name',
   'normalized_name',
   'color',
+  'created_at',
+  'updated_at',
+];
+
+const _v7WorkspaceColumns = <String>[
+  'id',
+  'name',
+  'is_default',
+  'active_tab_id',
+  'panel_section',
+  'panel_width',
+  'split_json',
+  'collection_id',
   'created_at',
   'updated_at',
 ];
@@ -830,6 +939,12 @@ const _workspaceColumns = <String>[
   'collection_id',
   'created_at',
   'updated_at',
+  'query_json',
+  'grouping',
+  'sort_mode',
+  'density',
+  'visible_columns_json',
+  'focus_mode',
 ];
 
 const _workspaceTabColumns = <String>[
@@ -843,4 +958,65 @@ const _workspaceTabColumns = <String>[
   'page_layout',
   'reading_mode',
   'scroll_offset',
+  'queue_status',
+  'blocking_reason',
+  'next_action',
+];
+
+const _v7WorkspaceTabColumns = <String>[
+  'id',
+  'workspace_id',
+  'document_id',
+  'sort_order',
+  'is_pinned',
+  'page_index',
+  'zoom_level',
+  'page_layout',
+  'reading_mode',
+  'scroll_offset',
+];
+
+const _relationColumns = <String>[
+  'id',
+  'source_document_id',
+  'target_document_id',
+  'relation_type',
+  'source_anchor_kind',
+  'source_anchor_id',
+  'target_anchor_kind',
+  'target_anchor_id',
+  'created_at',
+];
+
+const _revisionGroupColumns = <String>[
+  'id',
+  'name',
+  'current_document_id',
+  'created_at',
+  'updated_at',
+];
+
+const _revisionMemberColumns = <String>['group_id', 'document_id', 'added_at'];
+
+const _automationRuleColumns = <String>[
+  'id',
+  'name',
+  'enabled',
+  'trigger_json',
+  'actions_json',
+  'created_at',
+  'updated_at',
+];
+
+const _journalColumns = <String>[
+  'id',
+  'operation_kind',
+  'status',
+  'summary_json',
+  'total_items',
+  'completed_items',
+  'undo_json',
+  'error_code',
+  'started_at',
+  'updated_at',
 ];

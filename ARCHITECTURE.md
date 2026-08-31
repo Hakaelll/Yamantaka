@@ -142,7 +142,7 @@ acciones; persistencia, PDFium y SQL quedan fuera del widget.
 ## Copias, historial y recuperación
 
 `LocalBackupService` es el único límite de exportación/importación. Serializa
-un contenedor JSON `yamantaka-local-backup` versión 7 con ajustes y tablas
+un contenedor JSON `yamantaka-local-backup` versión 8 con ajustes y tablas
 privadas permitidas, pero nunca bytes PDF ni FTS reconstruible. También importa
 los formatos 1–6 con las tablas posteriores vacías y defaults seguros. La vista
 previa valida formato, versión,
@@ -428,3 +428,36 @@ Cerrar el lector sincroniza primero pestaña y snapshot, añade una entrada
 deduplicada a cerrados recientes, libera el handle y vuelve a Biblioteca. La
 acción visible `Cerrar sesión y conservar contexto` y el botón Atrás recorren
 exactamente la misma ruta; no existe un cierre visual que omita persistencia.
+
+## Continuidad, relaciones y journal 0.12
+
+SQLite v10 mantiene `documents` como raíz de identidad y añade tres conjuntos
+ortogonales: estado editorial de anotaciones, vistas/cola de espacios y grafos
+de relaciones/revisiones. `automation_rules` solo acepta enums allowlist;
+`operation_journal` conserva cantidades, estado, códigos seguros y datos de undo,
+pero nunca rutas, títulos, consultas o contenido. Las FK eliminan relaciones
+rotas al retirar un documento de la Biblioteca sin tocar el PDF.
+
+`WorkspaceRepository.all()` carga espacios y pestañas en dos consultas, y
+`AnnotationRepository` y `DocumentRelationRepository` precargan membresías por
+lote. Ninguna vista materializa más de 80 documentos. El escaneo exclusivo de
+reglas usa keyset pagination, un límite duro de 100.000 y cede el hilo cada 80.
+La simulación y la aplicación comparten además un límite total de 30 segundos;
+agotarlo termina como cancelación registrada y aplica rollback cuando procede.
+
+La sesión atómica vive en `app_metadata`: se escribe primero como estado sucio,
+se actualiza con debounce y solo se marca limpia tras cierre normal. Al arrancar,
+una sesión sucia ofrece restaurar o empezar limpio. Los journals `running` se
+marcan `interrupted`, aparecen en una pantalla no modal y pueden reanudarse como
+una ejecución nueva o descartarse. Cancelar o fallar intenta rollback inverso y
+si este no es seguro conserva un estado terminal `failed`, nunca una tarea zombi.
+
+La comparación posee únicamente el segundo handle. Cada lado renderiza su página
+visible con token de generación; cerrar cancela y libera el secundario, mientras
+el primario sigue perteneciendo al lector. El modo Foco, página, zoom, scroll,
+panel y pestaña activa se conservan en el espacio, no en la identidad del visor.
+
+FTS5 añade una LRU de ocho consultas por un segundo. La clave contiene expresión,
+filtros, límite y offset; cualquier mutación de metadatos, páginas, anotaciones,
+marcadores u organización la invalida. El TTL limita la obsolescencia de flags
+externos y evita mantener un segundo índice en memoria.

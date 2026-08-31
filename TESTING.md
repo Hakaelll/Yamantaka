@@ -265,3 +265,31 @@ informes permanecen bajo build/, que está ignorado por Git.
 - Un bundle descargado, incompleto o fuera de la raíz `build/` nunca se abre
   automáticamente. La build local se distingue de una distribución firmada y
   nunca se desactiva Smart App Control para hacer pasar un gate.
+
+## Verificación 0.12
+
+La suite alcanza 287 pruebas. `iteration_012_test.dart` cubre migración v10,
+anotaciones acotadas y masivas, vista/cola de espacio, backlinks/revisiones,
+sesión atómica, journal interrumpido, reglas simuladas/aplicadas/canceladas/
+deshechas, límite de 100.000, texto 200 % y liberación de comparación.
+El mismo caso fuerza el límite temporal a cero y verifica truncado seguro antes
+de procesar el primer documento; producción usa 30 segundos.
+`iteration_012_visual_test.dart` ejecuta las ocho superficies nuevas y escribe
+un manifiesto SHA-256.
+
+La evidencia actual está en `build/visual-evidence/v0.12.0/`: 172 PNG (incluye
+10 comparaciones 0.11/0.12) y 18 hojas bajo `build/visual-review-012/`. No se
+versionan. Marca, alto contraste simulado, movimiento reducido, claro/oscuro,
+texto 130/150/200 % y los ocho tamaños base forman parte del arnés.
+
+Las cinco pasadas comparables están en `build/performance/0.12.0-baseline/` y
+`build/performance/0.12.0-current/`. El resultado es `pass-with-watch`: cero
+regresiones fiables y cero invariantes fallidos. Permanecen cinco observaciones
+ruidosas porque solo tres de cinco muestras cruzan el umbral: p95 de búsqueda y
+colecciones, consulta de 25.000, primera carga de 100.000 y memoria mínima tras
+volver. La búsqueda caliente mediana baja de 592 a 28 µs; 100.000 documentos
+materializan 80 y no recorren archivos en la primera carga.
+
+La validación física declarada sigue limitada al monitor disponible 1920×1200,
+96 DPI/100 %, es-ES y alto contraste desactivado. Narrator, varios monitores y
+DPI 125/150/175/200 % no se infieren de widgets y quedan pendientes.

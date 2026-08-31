@@ -14,7 +14,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   Object? _viewerCacheKey;
   Widget? _viewerCache;
   late final ReaderChromeCoordinator _chromeCoordinator;
-  bool _immersive = false;
+  late bool _immersive;
   bool _cursorHidden = false;
   bool _panelPinned = false;
   Offset? _lastPointerPosition;
@@ -42,6 +42,11 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       reduceMotion: widget.reduceMotion,
     );
     _controlsVisible = widget.initialChromeVisible;
+    _immersive = widget.initialFocusMode;
+    if (_immersive) {
+      _controlsVisible = false;
+      _chromeCoordinator.setImmersive(true);
+    }
     _panelPinned = widget.initialPanelPinned;
     _panelWidthValue = widget.initialPanelWidth
         .clamp(AppSizes.sidePanelMinWidth, AppSizes.sidePanelMaxWidth)
@@ -79,6 +84,12 @@ final class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void didUpdateWidget(covariant ReaderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialFocusMode != widget.initialFocusMode &&
+        _immersive != widget.initialFocusMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _setImmersive(widget.initialFocusMode);
+      });
+    }
     if (oldWidget.initialPanelOpen != widget.initialPanelOpen ||
         oldWidget.initialPanelSection != widget.initialPanelSection) {
       final nextPanel = widget.initialPanelOpen
@@ -469,6 +480,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                         onToggleFullScreen: _toggleFullScreen,
                         onToggleChrome: _toggleChrome,
                         onToggleImmersive: _toggleImmersive,
+                        onCompare: widget.onCompare,
                         onOpenSettings: widget.onOpenSettings,
                       ),
                     ),
@@ -1246,6 +1258,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       _scheduleCursorHide();
     }
     _chromeCoordinator.setImmersive(value);
+    widget.onFocusModeChanged?.call(value);
     widget.onChromeVisibilityChanged?.call(!value);
     if (!value) _revealControls();
   }

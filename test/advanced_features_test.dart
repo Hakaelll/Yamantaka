@@ -90,7 +90,7 @@ void main() {
       final encoded = report.toJson();
 
       expect(report.values['integrity'], 'ok');
-      expect(report.values['yamantaka_version'], '0.11.0+12');
+      expect(report.values['yamantaka_version'], '0.12.0+13');
       expect(encoded, isNot(contains(directory.path)));
       expect(report.values['contains_paths_titles_or_queries'], isFalse);
     });

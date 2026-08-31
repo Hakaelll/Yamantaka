@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
-    [string]$ReleaseDirectory = 'build/release/0.11.0+12',
-    [string]$ArchiveName = 'yamantaka-0.11.0+12-windows-x64.zip'
+    [string]$ReleaseDirectory = 'build/release/0.12.0+13',
+    [string]$ArchiveName = 'yamantaka-0.12.0+13-windows-x64.zip',
+    [string]$ExpectedVersion = '0.12.0',
+    [string]$ExpectedBuildNumber = '13'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,6 +26,10 @@ $manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath $manifestPath |
     ConvertFrom-Json
 if ($manifest.format -ne 'yamantaka-windows-package') {
     throw "Unexpected manifest format: $($manifest.format)"
+}
+if ($manifest.productVersion -ne $ExpectedVersion -or
+    $manifest.buildNumber -ne $ExpectedBuildNumber) {
+    throw "Unexpected package version/build: $($manifest.productVersion)+$($manifest.buildNumber)"
 }
 if ($manifest.containsPdfFiles -ne $false) {
     throw 'Manifest must declare containsPdfFiles=false.'
@@ -98,16 +104,64 @@ finally {
     $archive.Dispose()
 }
 
+$requiredReleaseFiles = @(
+    'package-manifest.json',
+    $ArchiveName,
+    'signature-state.json',
+    'zip-no-network.json',
+    'no-network.json',
+    'test-report.json',
+    'performance-report.json'
+)
 $hashRows = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $releaseRoot 'SHA256SUMS.txt')
-foreach ($name in @('package-manifest.json', $ArchiveName)) {
-    $row = @($hashRows | Where-Object { $_ -match "  $([regex]::Escape($name))$" })
-    if ($row.Count -ne 1) { throw "Expected one checksum row for $name." }
-    $expectedHash = ($row[0] -split '\s+', 2)[0]
-    $actualHash = (Get-FileHash -LiteralPath (Join-Path $releaseRoot $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+$hashedNames = @{}
+foreach ($row in $hashRows) {
+    if ($row -notmatch '^([0-9a-fA-F]{64})\s{2}(.+)$') {
+        throw "Malformed checksum row: $row"
+    }
+    $expectedHash = $Matches[1].ToLowerInvariant()
+    $name = $Matches[2]
+    if ([System.IO.Path]::GetFileName($name) -ne $name) {
+        throw "Checksum paths must remain at release root: $name"
+    }
+    if ($hashedNames.ContainsKey($name)) {
+        throw "Duplicate checksum row for $name."
+    }
+    $hashedNames[$name] = $true
+    $candidate = Join-Path $releaseRoot $name
+    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+        throw "Checksummed release file not found: $name"
+    }
+    $actualHash = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualHash -ne $expectedHash) { throw "Release checksum mismatch for $name." }
+}
+foreach ($name in $requiredReleaseFiles) {
+    if (-not $hashedNames.ContainsKey($name)) {
+        throw "Required release file is not checksummed: $name"
+    }
+}
+
+$zipSmoke = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $releaseRoot 'zip-no-network.json') |
+    ConvertFrom-Json
+if (-not $zipSmoke.passed -or @($zipSmoke.connections).Count -ne 0 -or
+    $zipSmoke.navigation.sentKeyCount -ne $zipSmoke.navigation.requestedKeyCount -or
+    -not $zipSmoke.processExited) {
+    throw 'The executable extracted from the ZIP did not pass its offline navigation smoke.'
+}
+$testReport = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $releaseRoot 'test-report.json') |
+    ConvertFrom-Json
+if ($testReport.status -ne 'passed' -or $testReport.skippedPhaseCount -ne 0 -or
+    @($testReport.phases | Where-Object { $_.status -ne 'passed' }).Count -ne 0) {
+    throw 'The packaged verification report is not a complete passing gate.'
+}
+$signatureState = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $releaseRoot 'signature-state.json') |
+    ConvertFrom-Json
+if ([bool]$manifest.signed -ne [bool]$signatureState.readyForNativeExecution) {
+    throw 'Manifest and signature evidence disagree about signed state.'
 }
 
 $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 Write-Host "Verified $($manifest.files.Count) package files against ZIP paths, sizes, and SHA-256."
 Write-Host 'Verified that the archive contains no PDF document or unsafe path.'
+Write-Host "Verified $($hashedNames.Count) release hashes and complete gate/smoke/signature evidence."
 Write-Host "Archive SHA-256: $archiveHash"

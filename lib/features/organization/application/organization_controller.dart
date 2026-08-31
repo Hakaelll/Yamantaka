@@ -63,6 +63,33 @@ final class OrganizationController extends ChangeNotifier {
     reload();
   }
 
+  void assignTagSilently(String tagId, String documentId) {
+    _repository.assignTagToDocument(tagId, documentId);
+  }
+
+  DocumentTag ensureTag(String name) {
+    final tag = _repository.ensureTag(name);
+    reload();
+    return tag;
+  }
+
+  void removeTagFromDocument(String tagId, String documentId) {
+    _repository.removeTagFromDocument(tagId, documentId);
+    reload();
+  }
+
+  void removeTagSilently(String tagId, String documentId) {
+    _repository.removeTagFromDocument(tagId, documentId);
+  }
+
+  void addDocumentSilently(String collectionId, String documentId) {
+    _repository.addDocument(collectionId, documentId);
+  }
+
+  void removeDocumentSilently(String collectionId, String documentId) {
+    _repository.removeDocument(collectionId, documentId);
+  }
+
   void selectCollection(String? id) {
     selectedCollectionId = id;
     selectedSmartCollection = null;

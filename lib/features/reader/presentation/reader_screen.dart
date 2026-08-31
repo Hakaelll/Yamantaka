@@ -57,6 +57,9 @@ final class ReaderScreen extends StatefulWidget {
     this.onDocumentInfo,
     this.onExportAnnotations,
     this.onViewportInteractionChanged,
+    this.onCompare,
+    this.initialFocusMode = false,
+    this.onFocusModeChanged,
   });
 
   final ReaderController controller;
@@ -88,6 +91,9 @@ final class ReaderScreen extends StatefulWidget {
   final VoidCallback? onDocumentInfo;
   final Future<void> Function()? onExportAnnotations;
   final ValueChanged<bool>? onViewportInteractionChanged;
+  final VoidCallback? onCompare;
+  final bool initialFocusMode;
+  final ValueChanged<bool>? onFocusModeChanged;
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();

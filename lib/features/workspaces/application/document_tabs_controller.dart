@@ -176,6 +176,37 @@ final class DocumentTabsController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateQueueEntry(
+    String id, {
+    WorkspaceQueueStatus? status,
+    Object? blockingReason = _keepValue,
+    Object? nextAction = _keepValue,
+  }) {
+    tabs = [
+      for (final tab in tabs)
+        tab.id == id
+            ? tab.copyWith(
+                queueStatus: status,
+                blockingReason: identical(blockingReason, _keepValue)
+                    ? tab.blockingReason
+                    : blockingReason as String?,
+                nextAction: identical(nextAction, _keepValue)
+                    ? tab.nextAction
+                    : nextAction as String?,
+              )
+            : tab,
+    ];
+    notifyListeners();
+  }
+
+  DocumentTab? get nextQueueItem => tabs
+      .where(
+        (tab) =>
+            tab.queueStatus == WorkspaceQueueStatus.pending ||
+            tab.queueStatus == WorkspaceQueueStatus.inReview,
+      )
+      .firstOrNull;
+
   void updateActiveNavigation({
     required int pageIndex,
     required double zoomLevel,
@@ -236,3 +267,5 @@ final class DocumentTabsController extends ChangeNotifier {
     tabs = reversed.reversed.toList(growable: false);
   }
 }
+
+const Object _keepValue = Object();

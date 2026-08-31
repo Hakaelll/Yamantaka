@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
@@ -16,7 +17,13 @@ import '../core/platform/activation_channel.dart';
 import '../features/library/domain/library_document.dart';
 import '../features/library/domain/document_enrichment.dart';
 import '../features/library/domain/library_selection.dart';
+import '../features/library/domain/library_query.dart';
 import '../features/library/domain/metadata_editor.dart';
+import '../features/annotations/domain/annotation.dart';
+import '../features/annotations/presentation/global_annotations_dialog.dart';
+import '../features/automations/domain/local_automation.dart';
+import '../features/automations/application/local_automation_engine.dart';
+import '../features/automations/presentation/automation_manager_dialog.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/library/presentation/document_cover_picker.dart';
 import '../features/library/presentation/folder_import_dialog.dart';
@@ -27,6 +34,10 @@ import '../features/reader/application/reader_controller.dart';
 import '../features/reader/domain/reader_models.dart';
 import '../features/reader/domain/reading_session.dart';
 import '../features/reader/presentation/reader_screen.dart';
+import '../features/reader/presentation/document_comparison_dialog.dart';
+import '../features/relations/presentation/document_relations_dialog.dart';
+import '../features/recovery/domain/recovery_models.dart';
+import '../features/recovery/presentation/problems_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/search/domain/global_search_models.dart';
 import '../features/search/presentation/global_search_dialog.dart';
@@ -66,7 +77,7 @@ final class YamantakaApp extends StatefulWidget {
   State<YamantakaApp> createState() => _YamantakaAppState();
 }
 
-enum _AppPage { library, reader, settings }
+enum _AppPage { library, reader, settings, problems }
 
 enum _DocumentInfoAction {
   editMetadata,
@@ -79,6 +90,7 @@ enum _DocumentInfoAction {
   remove,
   relocate,
   open,
+  relations,
 }
 
 final class _MetadataEditResult {
@@ -89,6 +101,8 @@ final class _MetadataEditResult {
 }
 
 enum _AnnotationExportFormat { markdown, json }
+
+enum _RecoveryStartupAction { restore, startClean }
 
 final class _DocumentMetadataLine extends StatelessWidget {
   const _DocumentMetadataLine({required this.label, required this.value});

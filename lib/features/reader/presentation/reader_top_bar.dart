@@ -31,6 +31,7 @@ final class ReaderTopBar extends StatelessWidget
     required this.onToggleChrome,
     required this.onToggleImmersive,
     required this.onOpenSettings,
+    this.onCompare,
     this.canvasColor,
     this.flatChrome = false,
     this.shortcutOverrides = '{}',
@@ -55,6 +56,7 @@ final class ReaderTopBar extends StatelessWidget
   final VoidCallback onToggleChrome;
   final VoidCallback onToggleImmersive;
   final VoidCallback onOpenSettings;
+  final VoidCallback? onCompare;
   final Color? canvasColor;
   final bool flatChrome;
   final String shortcutOverrides;
@@ -414,6 +416,15 @@ final class ReaderTopBar extends StatelessWidget
                             ),
                           ),
                         ),
+                        if (onCompare != null)
+                          PopupMenuItem(
+                            value: _ReaderMenuAction.compare,
+                            height: 40,
+                            child: _ReaderMenuItem(
+                              icon: Icons.compare_rounded,
+                              label: strings.get('comparison.title'),
+                            ),
+                          ),
                         const PopupMenuDivider(height: 9),
                         PopupMenuItem(
                           value: _ReaderMenuAction.documentInfo,
@@ -505,6 +516,8 @@ final class ReaderTopBar extends StatelessWidget
         onToggleChrome();
       case _ReaderMenuAction.toggleImmersive:
         onToggleImmersive();
+      case _ReaderMenuAction.compare:
+        onCompare?.call();
       case _ReaderMenuAction.documentInfo:
         onDocumentInfo();
       case _ReaderMenuAction.settings:
@@ -530,6 +543,7 @@ enum _ReaderMenuAction {
   fullscreen,
   toggleChrome,
   toggleImmersive,
+  compare,
   documentInfo,
   settings,
   closeSession,

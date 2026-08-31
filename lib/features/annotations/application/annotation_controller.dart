@@ -17,6 +17,7 @@ final class AnnotationController extends ChangeNotifier {
   AnnotationType? typeFilter;
   AnnotationColor? colorFilter;
   String? tagFilter;
+  AnnotationReviewState? reviewFilter;
   String query = '';
   AnnotationSort sort = AnnotationSort.page;
   final List<_AnnotationHistoryEntry> _undoHistory = [];
@@ -140,13 +141,16 @@ final class AnnotationController extends ChangeNotifier {
     String? tag,
     String? search,
     AnnotationSort? order,
+    AnnotationReviewState? reviewState,
     bool clearType = false,
     bool clearColor = false,
     bool clearTag = false,
+    bool clearReview = false,
   }) {
     typeFilter = clearType ? null : type ?? typeFilter;
     colorFilter = clearColor ? null : color ?? colorFilter;
     tagFilter = clearTag ? null : tag ?? tagFilter;
+    reviewFilter = clearReview ? null : reviewState ?? reviewFilter;
     query = search ?? query;
     sort = order ?? sort;
     _reload();
@@ -163,6 +167,7 @@ final class AnnotationController extends ChangeNotifier {
             query: query,
             tag: tagFilter,
             newestFirst: sort == AnnotationSort.newest,
+            reviewState: reviewFilter,
           );
     notifyListeners();
   }
@@ -184,6 +189,19 @@ final class AnnotationController extends ChangeNotifier {
   void _clearHistory() {
     _undoHistory.clear();
     _redoHistory.clear();
+  }
+
+  void updateReviewState(
+    Iterable<PdfAnnotation> selection,
+    AnnotationReviewState state,
+  ) {
+    _repository.updateReviewState(selection.map((item) => item.id), state);
+    _reload();
+  }
+
+  void addTagToSelection(Iterable<PdfAnnotation> selection, String tag) {
+    _repository.addTag(selection.map((item) => item.id), tag);
+    _reload();
   }
 }
 

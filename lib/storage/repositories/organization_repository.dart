@@ -217,6 +217,32 @@ final class OrganizationRepository {
     );
   }
 
+  DocumentTag ensureTag(String name, {String color = 'blue'}) {
+    final clean = _validatedName(name);
+    final normalized = clean.toLowerCase();
+    final existing = _database.database.select(
+      'SELECT id FROM tags WHERE normalized_name = ?',
+      [normalized],
+    );
+    if (existing.isEmpty) {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final id = sha256.convert(utf8.encode('tag:$normalized')).toString();
+      _database.database.execute(
+        'INSERT INTO tags(id, name, normalized_name, color, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        [id, clean, normalized, color, now, now],
+      );
+    }
+    return tags().firstWhere((tag) => tag.name.toLowerCase() == normalized);
+  }
+
+  void removeTagFromDocument(String tagId, String documentId) {
+    _database.database.execute(
+      'DELETE FROM document_tags WHERE document_id = ? AND tag_id = ?',
+      [documentId, tagId],
+    );
+  }
+
   Map<String, Set<String>> tagMemberships() {
     final result = <String, Set<String>>{};
     for (final row in _database.database.select(

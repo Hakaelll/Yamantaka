@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$BaselineDirectory = 'build/performance/0.10.0-baseline',
-    [string]$CurrentDirectory = 'build/performance/0.11.0-current',
-    [string]$OutputPath = 'build/performance/0.11.0-current/comparison-0.10-vs-0.11.json',
+    [string]$BaselineDirectory = 'build/performance/0.12.0-baseline',
+    [string]$CurrentDirectory = 'build/performance/0.12.0-current',
+    [string]$OutputPath = 'build/performance/0.12.0-current/comparison-0.11-vs-0.12.json',
     [ValidateRange(0, 1)][double]$Tolerance = 0.10
 )
 
@@ -130,11 +130,11 @@ $report = [ordered]@{
     version = 1
     generatedAt = [DateTime]::UtcNow.ToString('o')
     host = [ordered]@{ operatingSystem = [System.Environment]::OSVersion.VersionString; processorCount = [Environment]::ProcessorCount }
-    baselineVersion = '0.10.0'
-    currentVersion = '0.11.0'
+    baselineVersion = '0.11.0'
+    currentVersion = '0.12.0'
     passes = 5
     tolerance = $Tolerance
-    reliabilityRule = 'A regression is reliable when the median exceeds the 0.10 median by more than the tolerance and at least four of five current samples exceed that limit. A median-only movement with three or fewer samples above the limit is retained as watch because the ranges overlap.'
+    reliabilityRule = 'A regression is reliable when the median exceeds the 0.11 median by more than the tolerance and at least four of five current samples exceed that limit. A median-only movement with three or fewer samples above the limit is retained as watch because the ranges overlap.'
     comparisons = @($comparisons)
     invariants = @($invariants)
     failedMetricCount = $failedMetrics.Count

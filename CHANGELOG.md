@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.12.0 — 2026-08-31 (continuidad, revisión y recuperación)
+
+- Rediseña el inicio como centro compacto de continuidad con lectura activa,
+  pestañas, fijados, pendientes, espacios, problemas y acciones de reanudación.
+- Amplía espacios a vistas completas de Biblioteca y añade cola manual con
+  estados, bloqueo, siguiente acción, reordenado por teclado/puntero y undo de
+  eliminación; el modo Foco se recuerda por espacio.
+- Añade comparación local lado a lado, sincronía opcional de página/zoom,
+  intercambio de lados, marcas manuales y liberación determinista del segundo
+  handle.
+- Convierte anotaciones en una revisión global paginada con filtros, agrupación,
+  edición inline, selección masiva, estados editoriales, etiquetas y exportación
+  Markdown/JSON.
+- Añade relaciones, backlinks y grupos de revisiones con selección explícita de
+  revisión actual, sin fusionar ni borrar archivos.
+- Introduce reglas locales allowlist con simulación, confirmación, cancelación,
+  límites de 100.000 elementos, lotes de 80 y 30 segundos, journal, rollback y
+  deshacer; no admite scripts ni red.
+- Migra SQLite a v10, elimina N+1 en espacios/anotaciones/revisiones, añade
+  sesión atómica, integridad y centro de problemas no modal.
+- Añade caché LRU de ocho búsquedas recientes con TTL de un segundo e
+  invalidación por mutación; la mediana caliente medida baja de 592 a 28 µs.
+- Amplía a 287 pruebas y 172 capturas verificadas en 18 hojas de contacto; las
+  cinco pasadas terminan `pass-with-watch`, sin regresión fiable ni invariantes
+  fallidos.
+- Prepara el release local `0.12.0+13` con manifiesto, hashes, informes, smoke y
+  estado de firma, sin commit, tag, push, firma ni publicación.
+
 ## 0.11.0 — 2026-08-28 (navegación documental y continuidad)
 
 - Añade un navegador unificado con `Ctrl+J` para índice, miniaturas, búsqueda

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$OutputPath = 'build/visual-evidence/v0.11.0/branding/hash-proof.json'
+    [string]$OutputPath = 'build/visual-evidence/v0.12.0/branding/hash-proof.json'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,9 +44,9 @@ $report = [ordered]@{
     format = 'yamantaka-brand-hash-proof'
     version = 1
     generatedAt = [DateTime]::UtcNow.ToString('o')
-    baselineVersion = '0.10.0'
-    currentVersion = '0.11.0'
-    geometryPolicy = 'Assets must remain byte-identical to the tracked 0.10 baseline.'
+    baselineVersion = '0.11.0'
+    currentVersion = '0.12.0'
+    geometryPolicy = 'Assets must remain byte-identical to the tracked 0.11 baseline.'
     status = if (@($rows | Where-Object { -not $_.matchesBaseline }).Count -eq 0) { 'pass' } else { 'fail' }
     assets = $rows
 }

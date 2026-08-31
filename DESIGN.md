@@ -821,3 +821,31 @@ La matriz visual 0.11 añade el navegador y la importación de carpetas a los oc
 tamaños base, además de oscuro, alto contraste, movimiento reducido y texto
 130/150/200 %. La marca, su geometría y su violeta permanecen byte a byte
 idénticos; ningún refinamiento de esta iteración autoriza a reinterpretarla.
+
+## 35. Centro documental y revisión — 0.12
+
+Continuidad es una cabecera editorial, no un dashboard: título, frase breve,
+cinco recuentos funcionales y como máximo tres acciones textuales. Se pliega en
+columna bajo 720 px, mantiene Biblioteca como contenido principal y puede
+ocultarse desde Ajustes.
+
+Espacios usa una lista plegable y la cola aparece solo al expandir el activo.
+Cada fila reserva dos controles de 44×44 para reordenar, título/siguiente acción
+y un selector de estado. La alternativa Ctrl+↑/↓ usa el mismo comando. No hay
+color celebratorio; Bloqueado se explica por texto y no solo por tono.
+
+Comparación ocupa pantalla completa, divide el lienzo con una línea física y
+conserva controles comunes arriba. Vincular página y zoom son chips de estado;
+intercambio y diferencias manuales son acciones discretas. Cada lado mantiene
+su propio indicador, slider y zoom sin superponer controles al documento.
+
+Revisión de anotaciones, Relaciones y Reglas comparten encabezado, filtros
+compactos y contenido lineal. Las operaciones masivas aparecen al seleccionar;
+simular siempre precede a aplicar. Problemas es una pantalla navegable, no un
+diálogo bloqueante. Todos los estados tienen texto ES/EN, foco visible y acciones
+de 44 px; movimiento reducido evita transiciones espaciales.
+
+La matriz 0.12 conserva los ocho tamaños y los estados oscuro, alto contraste,
+movimiento reducido y texto 130/150/200 %, y añade ocho capturas ejecutadas de
+continuidad, espacios, cola, comparación, anotaciones, relaciones, reglas y
+problemas. Los assets de marca permanecen byte a byte idénticos a HEAD.

@@ -19,6 +19,9 @@ final class AnnotationRepository {
     String? query,
     String? tag,
     bool newestFirst = false,
+    AnnotationReviewState? reviewState,
+    int limit = 80,
+    int offset = 0,
   }) {
     final clauses = <String>['a.document_id = ?'];
     final arguments = <Object?>[documentId];
@@ -29,6 +32,10 @@ final class AnnotationRepository {
     if (color != null) {
       clauses.add('a.color = ?');
       arguments.add(color.name);
+    }
+    if (reviewState != null) {
+      clauses.add('a.review_state = ?');
+      arguments.add(reviewState.name);
     }
     final normalizedQuery = query?.trim().toLowerCase();
     if (normalizedQuery != null && normalizedQuery.isNotEmpty) {
@@ -50,12 +57,118 @@ final class AnnotationRepository {
       ''');
       arguments.add(_normalizeTag(tag));
     }
+    arguments
+      ..add(limit.clamp(1, 80))
+      ..add(offset.clamp(0, 100000));
     final rows = _database.database.select('''
       SELECT a.* FROM annotations a
       WHERE ${clauses.join(' AND ')}
       ORDER BY ${newestFirst ? 'a.updated_at DESC, a.page_index' : 'a.page_index, a.created_at'}
+      LIMIT ? OFFSET ?
       ''', arguments);
-    return rows.map(_fromRow).toList(growable: false);
+    return _fromRows(rows);
+  }
+
+  List<PdfAnnotation> all({
+    AnnotationType? type,
+    AnnotationColor? color,
+    AnnotationReviewState? reviewState,
+    String? tag,
+    String? query,
+    DateTime? updatedAfter,
+    DateTime? updatedBefore,
+    int limit = 80,
+    int offset = 0,
+  }) {
+    final clauses = <String>[];
+    final arguments = <Object?>[];
+    if (type != null) {
+      clauses.add('a.type = ?');
+      arguments.add(type.name);
+    }
+    if (color != null) {
+      clauses.add('a.color = ?');
+      arguments.add(color.name);
+    }
+    if (reviewState != null) {
+      clauses.add('a.review_state = ?');
+      arguments.add(reviewState.name);
+    }
+    if (updatedAfter != null) {
+      clauses.add('a.updated_at >= ?');
+      arguments.add(updatedAfter.toUtc().toIso8601String());
+    }
+    if (updatedBefore != null) {
+      clauses.add('a.updated_at < ?');
+      arguments.add(updatedBefore.toUtc().toIso8601String());
+    }
+    if (tag != null && tag.trim().isNotEmpty) {
+      clauses.add('''
+        EXISTS (
+          SELECT 1 FROM annotation_tags at
+          JOIN tags t ON t.id = at.tag_id
+          WHERE at.annotation_id = a.id AND t.normalized_name = ?
+        )
+      ''');
+      arguments.add(_normalizeTag(tag));
+    }
+    final normalizedQuery = query?.trim().toLowerCase();
+    if (normalizedQuery != null && normalizedQuery.isNotEmpty) {
+      clauses.add(
+        "(LOWER(COALESCE(a.note, '')) LIKE ? OR "
+        "LOWER(COALESCE(a.selected_text, '')) LIKE ?)",
+      );
+      arguments
+        ..add('%$normalizedQuery%')
+        ..add('%$normalizedQuery%');
+    }
+    final where = clauses.isEmpty ? '' : 'WHERE ${clauses.join(' AND ')}';
+    arguments
+      ..add(limit.clamp(1, 80))
+      ..add(offset.clamp(0, 100000));
+    final rows = _database.database.select('''
+          SELECT a.* FROM annotations a
+          $where
+          ORDER BY a.updated_at DESC, a.id
+          LIMIT ? OFFSET ?
+          ''', arguments);
+    return _fromRows(rows);
+  }
+
+  void updateReviewState(
+    Iterable<String> annotationIds,
+    AnnotationReviewState state,
+  ) {
+    final ids = annotationIds.toSet().take(80).toList(growable: false);
+    if (ids.isEmpty) return;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    _database.database.execute(
+      'UPDATE annotations SET review_state = ?, updated_at = ? '
+      'WHERE id IN ($placeholders)',
+      [state.name, DateTime.now().toUtc().toIso8601String(), ...ids],
+    );
+  }
+
+  void addTag(Iterable<String> annotationIds, String tag) {
+    final ids = annotationIds.toSet().take(80).toList(growable: false);
+    final clean = tag.trim();
+    if (ids.isEmpty || clean.isEmpty) return;
+    final db = _database.database;
+    db.execute('BEGIN IMMEDIATE');
+    try {
+      final tagId = _ensureTag(clean, db);
+      for (final id in ids) {
+        db.execute(
+          'INSERT OR IGNORE INTO annotation_tags(annotation_id, tag_id) '
+          'VALUES (?, ?)',
+          [id, tagId],
+        );
+      }
+      db.execute('COMMIT');
+    } catch (_) {
+      db.execute('ROLLBACK');
+      rethrow;
+    }
   }
 
   PdfAnnotation? byId(String id) {
@@ -63,7 +176,7 @@ final class AnnotationRepository {
       'SELECT * FROM annotations WHERE id = ?',
       [id],
     );
-    return rows.isEmpty ? null : _fromRow(rows.first);
+    return rows.isEmpty ? null : _fromRows(rows).first;
   }
 
   PdfAnnotation create({
@@ -126,7 +239,8 @@ final class AnnotationRepository {
           id, document_id, page_index, type, color, note, selected_text,
           context_before, context_after, rects_json, page_rotation,
           document_fingerprint, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          , review_state
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           type = excluded.type,
           color = excluded.color,
@@ -138,6 +252,7 @@ final class AnnotationRepository {
           page_rotation = excluded.page_rotation,
           document_fingerprint = excluded.document_fingerprint,
           status = excluded.status,
+          review_state = excluded.review_state,
           updated_at = excluded.updated_at
         ''',
         [
@@ -156,6 +271,7 @@ final class AnnotationRepository {
           annotation.status.name,
           annotation.createdAt.toUtc().toIso8601String(),
           annotation.updatedAt.toUtc().toIso8601String(),
+          annotation.reviewState.name,
         ],
       );
       db.execute('DELETE FROM annotation_tags WHERE annotation_id = ?', [
@@ -194,17 +310,33 @@ final class AnnotationRepository {
     );
   }
 
-  PdfAnnotation _fromRow(Row row) {
-    final id = row['id'] as String;
+  List<PdfAnnotation> _fromRows(List<Row> rows) {
+    if (rows.isEmpty) return const [];
+    final ids = rows.map((row) => row['id'] as String).toList(growable: false);
+    final placeholders = List.filled(ids.length, '?').join(',');
     final tagRows = _database.database.select(
-      '''
-      SELECT t.name FROM tags t
-      JOIN annotation_tags at ON at.tag_id = t.id
-      WHERE at.annotation_id = ?
-      ORDER BY t.name COLLATE NOCASE
-      ''',
-      [id],
+      'SELECT at.annotation_id, t.name FROM tags t '
+      'JOIN annotation_tags at ON at.tag_id = t.id '
+      'WHERE at.annotation_id IN ($placeholders) '
+      'ORDER BY at.annotation_id, t.name COLLATE NOCASE',
+      ids,
     );
+    final tagsByAnnotation = <String, List<String>>{};
+    for (final row in tagRows) {
+      (tagsByAnnotation[row['annotation_id'] as String] ??= <String>[]).add(
+        row['name'] as String,
+      );
+    }
+    return rows
+        .map(
+          (row) =>
+              _fromRow(row, tagsByAnnotation[row['id'] as String] ?? const []),
+        )
+        .toList(growable: false);
+  }
+
+  PdfAnnotation _fromRow(Row row, List<String> tags) {
+    final id = row['id'] as String;
     final rawRects = jsonDecode(row['rects_json'] as String) as List<Object?>;
     return PdfAnnotation(
       id: id,
@@ -237,9 +369,12 @@ final class AnnotationRepository {
         row['status'] as String,
         AnnotationAttachmentStatus.reviewRequired,
       ),
-      tags: tagRows
-          .map((tagRow) => tagRow['name'] as String)
-          .toList(growable: false),
+      reviewState: _enumByName(
+        AnnotationReviewState.values,
+        row['review_state'] as String? ?? 'pending',
+        AnnotationReviewState.pending,
+      ),
+      tags: List.unmodifiable(tags),
       createdAt: DateTime.parse(row['created_at'] as String),
       updatedAt: DateTime.parse(row['updated_at'] as String),
     );

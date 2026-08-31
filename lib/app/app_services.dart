@@ -13,6 +13,7 @@ import '../core/privacy/local_storage_service.dart';
 import '../core/platform/window_service.dart';
 import '../features/annotations/application/annotation_controller.dart';
 import '../features/annotations/application/annotation_export_service.dart';
+import '../features/automations/application/local_automation_engine.dart';
 import '../features/bookmarks/application/bookmark_controller.dart';
 import '../features/library/application/document_service.dart';
 import '../features/library/application/document_enrichment_controller.dart';
@@ -43,13 +44,16 @@ import '../storage/backup/local_backup_service.dart';
 import '../storage/paths/app_paths.dart';
 import '../storage/repositories/app_settings_repository.dart';
 import '../storage/repositories/annotation_repository.dart';
+import '../storage/repositories/automation_repository.dart';
 import '../storage/repositories/bookmark_repository.dart';
 import '../storage/repositories/document_repository.dart';
+import '../storage/repositories/document_relation_repository.dart';
 import '../storage/repositories/global_search_repository.dart';
 import '../storage/repositories/import_queue_repository.dart';
 import '../storage/repositories/organization_repository.dart';
 import '../storage/repositories/preferences_repository.dart';
 import '../storage/repositories/reading_session_repository.dart';
+import '../storage/repositories/recovery_repository.dart';
 import '../storage/repositories/workspace_repository.dart';
 import '../features/workspaces/application/document_tabs_controller.dart';
 import '../features/workspaces/application/workspace_controller.dart';
@@ -69,6 +73,11 @@ final class AppServices {
     required this.readingSessions,
     required this.annotations,
     required this.annotationExporter,
+    required this.annotationRepository,
+    required this.automationRepository,
+    required this.automations,
+    required this.relations,
+    required this.recovery,
     required this.tabs,
     required this.workspaces,
     required this.organization,
@@ -109,6 +118,11 @@ final class AppServices {
   final ReadingSessionRepository readingSessions;
   final AnnotationController annotations;
   final AnnotationExportService annotationExporter;
+  final AnnotationRepository annotationRepository;
+  final AutomationRepository automationRepository;
+  final LocalAutomationEngine automations;
+  final DocumentRelationRepository relations;
+  final RecoveryRepository recovery;
   final DocumentTabsController tabs;
   final WorkspaceController workspaces;
   final OrganizationController organization;
@@ -157,6 +171,11 @@ final class AppServices {
     final organization = OrganizationController(organizationRepository);
     final globalSearchRepository = GlobalSearchRepository(database);
     final sessions = ReadingSessionRepository(database);
+    final automationRepository = AutomationRepository(database)
+      ..markRunningAsInterrupted();
+    final automations = LocalAutomationEngine(automationRepository);
+    final relations = DocumentRelationRepository(database);
+    final recovery = RecoveryRepository(database);
     final settings =
         preloadedSettings ??
         SettingsController(AppSettingsRepository(), logger);
@@ -379,6 +398,11 @@ final class AppServices {
       readingSessions: sessions,
       annotations: annotations,
       annotationExporter: const AnnotationExportService(),
+      annotationRepository: annotationsRepository,
+      automationRepository: automationRepository,
+      automations: automations,
+      relations: relations,
+      recovery: recovery,
       tabs: tabs,
       workspaces: workspaces,
       organization: organization,

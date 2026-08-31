@@ -1,6 +1,6 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-08-28.
+Actualizado: 2026-08-31.
 
 Este documento es el backlog vivo posterior a la reconstrucción del lector. No
 es una colección de ideas sueltas: ordena trabajo de producto, funcionamiento,
@@ -31,6 +31,18 @@ Reglas:
 - Yamantaka sigue siendo local-first y sin red durante el uso normal.
 
 ## Punto de partida confirmado
+
+- [x] 0.12.0 añade centro de continuidad, espacios completos y cola, modo Foco,
+  comparación, revisión global de anotaciones, relaciones/revisiones, reglas
+  reversibles y recuperación atómica sobre SQLite v10.
+- [x] La matriz 0.12 reúne 172 capturas en 18 hojas, diez comparaciones 0.11/0.12
+  y prueba de marca byte-idéntica; 287 pruebas conservan toda la suite anterior.
+- [x] Cinco pasadas comparables terminan `pass-with-watch`, sin regresiones
+  fiables ni invariantes fallidos, y confirman máximo de 80 documentos.
+- [ ] Repetir validación física 0.12 con Narrator, dos monitores, en-US, alto
+  contraste real y DPI 125/150/175/200 % cuando el hardware esté disponible.
+- [ ] Sustituir el artefacto local sin firma por una distribución Authenticode
+  solo cuando exista certificado y autorización expresa de publicación.
 
 - [x] 0.11.0 añade navegador documental `Ctrl+J`, sesiones ricas, cerrados
   recientes, selección anotable real, agrupación plegable e índice reanudable

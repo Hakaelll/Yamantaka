@@ -7,10 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Base Flutter 0.11.0+12 revisada el 28 de agosto de 2026:
+Versión Flutter 0.12.0+13 revisada el 31 de agosto de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 277 pruebas aprobadas;
+- flutter test --no-pub: 287 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local permanece receptivo durante un smoke de 8 s con un
@@ -18,16 +18,40 @@ Base Flutter 0.11.0+12 revisada el 28 de agosto de 2026:
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
-El release local versionado se genera en `build/release/0.11.0+12/` e incluye el
-ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt` y el reporte del
-smoke sin red. Debe extraerse entero antes de probarlo.
+El release local versionado se genera en `build/release/0.12.0+13/` e incluye el
+ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt`, estado de firma,
+informe de pruebas, comparación de rendimiento y smoke sin red. Debe extraerse
+entero antes de probarlo.
 
-El bundle 0.11 se valida contra su manifiesto después del último cambio. El smoke
+El bundle 0.12 se valida contra su manifiesto después del último cambio. El smoke
 sintético comprueba conexiones TCP/UDP y el inventario separa explícitamente los
 binarios sin firma; sigue siendo evidencia local, no un artefacto de distribución.
 
 La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
 vigente de pruebas en [TESTING.md](TESTING.md).
+
+## Continuidad y revisión 0.12
+
+- El inicio reúne lectura activa, pestañas, fijados, pendientes, espacios y
+  problemas sin recorrer archivos ni abrir PDF durante el primer frame.
+- Los espacios guardan consulta, agrupación, orden, densidad, columnas, pestañas,
+  documento activo, modo Foco y una cola reordenable con estados y siguiente
+  acción; crear, renombrar, duplicar y eliminar con deshacer son operaciones
+  locales.
+- El lector ofrece modo Foco por espacio y comparación lado a lado con página y
+  zoom sincronizables, intercambio de lados y diferencias marcadas manualmente.
+- La revisión global de anotaciones filtra y agrupa, edita notas con guardado
+  automático, aplica estado/etiqueta en lote y exporta Markdown o JSON.
+- Relaciones direccionales, backlinks y grupos de revisiones conservan siempre
+  cada archivo; nunca fusionan ni eliminan PDF automáticamente.
+- Las reglas locales tienen editor guiado, simulación, confirmación, lotes de 80,
+  cancelación, journal y deshacer. No ejecutan scripts, red ni cambios en el PDF.
+- La sesión se persiste atómicamente. Tras una interrupción puede restaurarse o
+  descartarse y el centro no modal de problemas permite comprobar SQLite,
+  reanudar o descartar operaciones.
+
+Atajos y recuperación se documentan en [docs/SHORTCUTS.md](docs/SHORTCUTS.md) y
+[docs/backup-and-recovery.md](docs/backup-and-recovery.md).
 
 ## Lector
 
@@ -142,11 +166,12 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
-Las 164 capturas de las matrices 0.11 cubren Biblioteca, Lector, navegador,
+Las 172 capturas de las matrices 0.12 cubren Biblioteca, Lector, navegador,
 panel, Ajustes, paleta, búsqueda, menús, bienvenida e importación, con la base
-0.10 conservada bajo
-`build/visual-evidence/v0.10.0/` y la evidencia actual en
-`build/visual-evidence/v0.11.0/`. La identidad del logo violeta se comprueba por
+0.11 conservada bajo
+`build/visual-evidence/v0.11.0/` y la evidencia actual en
+`build/visual-evidence/v0.12.0/`. Incluye continuidad, espacios, cola,
+comparación, anotaciones, relaciones, reglas y problemas. La identidad del logo violeta se comprueba por
 hash; no se regenera ni se altera su geometría.
 
 ## Requisitos

@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = 'build/release/0.11.0+12',
-    [string]$Version = '0.11.0',
-    [string]$BuildNumber = '12',
+    [string]$OutputDirectory = 'build/release/0.12.0+13',
+    [string]$Version = '0.12.0',
+    [string]$BuildNumber = '13',
     [string]$FlutterExecutable,
     [string]$CertificateThumbprint,
     [string]$SignToolPath,
@@ -135,6 +135,8 @@ try {
     }
     $signatureState = Get-YamantakaWindowsBundleSignatureState -BundlePath $bundle
     $signed = $signatureState.readyForNativeExecution
+    $signatureStatePath = Join-Path $outputRoot 'signature-state.json'
+    $signatureState | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 $signatureStatePath
     if ($RequireSignature -and -not $signed) {
         $invalid = @(
             $signatureState.binaries |
@@ -196,14 +198,62 @@ try {
     if (Test-Path $archive) { Remove-Item -LiteralPath $archive -Force }
     Compress-Archive -Path (Join-Path $bundle '*') -DestinationPath $archive
     $releaseEvidence = [System.Collections.Generic.List[string]]::new()
-    $networkEvidenceSource = Join-Path $root 'build/verification/no-network.json'
-    $networkEvidenceDestination = Join-Path $outputRoot 'no-network.json'
-    if (Test-Path -LiteralPath $networkEvidenceSource) {
-        Copy-Item -LiteralPath $networkEvidenceSource -Destination $networkEvidenceDestination -Force
-        $releaseEvidence.Add($networkEvidenceDestination)
+    $releaseEvidence.Add($signatureStatePath)
+    $zipSmokePath = Join-Path $outputRoot 'zip-no-network.json'
+    $verificationRoot = [System.IO.Path]::GetFullPath(
+        (Join-Path $root 'build/verification')
+    )
+    $smokeExtractRoot = [System.IO.Path]::GetFullPath(
+        (Join-Path $verificationRoot "package-smoke-$Version+$BuildNumber")
+    )
+    if (-not $smokeExtractRoot.StartsWith(
+            $verificationRoot + [System.IO.Path]::DirectorySeparatorChar,
+            [StringComparison]::OrdinalIgnoreCase
+        )) {
+        throw "Package smoke extraction escaped the verification directory: $smokeExtractRoot"
     }
-    elseif (Test-Path -LiteralPath $networkEvidenceDestination) {
-        Remove-Item -LiteralPath $networkEvidenceDestination -Force
+    if (Test-Path -LiteralPath $smokeExtractRoot) {
+        Remove-Item -LiteralPath $smokeExtractRoot -Recurse -Force
+    }
+    try {
+        Expand-Archive -LiteralPath $archive -DestinationPath $smokeExtractRoot
+        $smokeArguments = @(
+            '-NoProfile',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', (Join-Path $PSScriptRoot 'verify_no_network.ps1'),
+            '-ExecutablePath', (Join-Path $smokeExtractRoot 'yamantaka.exe'),
+            '-FixturePath', (Join-Path $root 'build/verification/corpus/normal.pdf'),
+            '-DurationSeconds', '8',
+            '-NavigationKeyCount', '2',
+            '-OutputPath', $zipSmokePath
+        )
+        if ($RequireSignature) { $smokeArguments += '-RequireSignature' }
+        & powershell @smokeArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "The executable extracted from the ZIP failed its zero-network navigation smoke with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $smokeExtractRoot) {
+            Remove-Item -LiteralPath $smokeExtractRoot -Recurse -Force
+        }
+    }
+    $releaseEvidence.Add($zipSmokePath)
+    $evidenceSources = @(
+        @{ source = 'build/verification/no-network.json'; destination = 'no-network.json' },
+        @{ source = 'build/verification/verification-report.json'; destination = 'test-report.json' },
+        @{ source = 'build/performance/0.12.0-current/comparison-0.11-vs-0.12.json'; destination = 'performance-report.json' }
+    )
+    foreach ($evidence in $evidenceSources) {
+        $evidenceSource = Join-Path $root $evidence.source
+        $evidenceDestination = Join-Path $outputRoot $evidence.destination
+        if (Test-Path -LiteralPath $evidenceSource) {
+            Copy-Item -LiteralPath $evidenceSource -Destination $evidenceDestination -Force
+            $releaseEvidence.Add($evidenceDestination)
+        }
+        elseif (Test-Path -LiteralPath $evidenceDestination) {
+            Remove-Item -LiteralPath $evidenceDestination -Force
+        }
     }
     $hashesPath = Join-Path $outputRoot 'SHA256SUMS.txt'
     @($manifestPath, $archive) + @($releaseEvidence) | ForEach-Object {

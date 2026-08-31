@@ -34,7 +34,7 @@ void main() {
     ]);
   });
 
-  testWidgets('captures global search 0.11 visual evidence', (tester) async {
+  testWidgets('captures global search 0.12 visual evidence', (tester) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_SEARCH_MATRIX_DIR');
     if (outputRoot.isEmpty) return;
     final output = Directory(outputRoot)..createSync(recursive: true);
@@ -260,7 +260,7 @@ void main() {
     ).writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-global-search-widget-matrix',
-        'productVersion': '0.11.0',
+        'productVersion': '0.12.0',
         'generatedAt': '2026-08-26T12:00:00Z',
         'cases': cases,
       }),

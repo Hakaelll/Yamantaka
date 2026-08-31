@@ -1,6 +1,13 @@
 enum TabResourceState { active, warm, suspended }
 
 const Object _keepPanelSection = Object();
+const Object _keepQueueText = Object();
+
+enum WorkspaceQueueStatus { pending, inReview, blocked, reviewed, archived }
+
+enum WorkspaceGrouping { none, author, collection, tag, readingState }
+
+enum WorkspaceDensity { comfortable, compact }
 
 abstract final class WorkspaceLayoutConstraints {
   static const double sidePanelMinWidth = 288;
@@ -25,6 +32,9 @@ final class DocumentTab {
     this.panelSection,
     this.isMissing = false,
     this.isExternallyModified = false,
+    this.queueStatus = WorkspaceQueueStatus.pending,
+    this.blockingReason,
+    this.nextAction,
   });
 
   final String id;
@@ -43,6 +53,9 @@ final class DocumentTab {
   final String? panelSection;
   final bool isMissing;
   final bool isExternallyModified;
+  final WorkspaceQueueStatus queueStatus;
+  final String? blockingReason;
+  final String? nextAction;
 
   DocumentTab copyWith({
     int? pageIndex,
@@ -57,6 +70,9 @@ final class DocumentTab {
     Object? panelSection = _keepPanelSection,
     bool? isMissing,
     bool? isExternallyModified,
+    WorkspaceQueueStatus? queueStatus,
+    Object? blockingReason = _keepQueueText,
+    Object? nextAction = _keepQueueText,
   }) => DocumentTab(
     id: id,
     documentId: documentId,
@@ -76,6 +92,13 @@ final class DocumentTab {
         : panelSection as String?,
     isMissing: isMissing ?? this.isMissing,
     isExternallyModified: isExternallyModified ?? this.isExternallyModified,
+    queueStatus: queueStatus ?? this.queueStatus,
+    blockingReason: identical(blockingReason, _keepQueueText)
+        ? this.blockingReason
+        : blockingReason as String?,
+    nextAction: identical(nextAction, _keepQueueText)
+        ? this.nextAction
+        : nextAction as String?,
   );
 }
 
@@ -143,6 +166,12 @@ final class WorkspaceSnapshot {
     this.panelWidth = 320,
     this.split = const SplitViewState(),
     this.collectionId,
+    this.queryJson = '{}',
+    this.grouping = WorkspaceGrouping.none,
+    this.sortMode = 'lastOpened',
+    this.density = WorkspaceDensity.comfortable,
+    this.visibleColumns = const ['document', 'status', 'progress'],
+    this.focusMode = false,
   });
 
   final String id;
@@ -154,6 +183,12 @@ final class WorkspaceSnapshot {
   final double panelWidth;
   final SplitViewState split;
   final String? collectionId;
+  final String queryJson;
+  final WorkspaceGrouping grouping;
+  final String sortMode;
+  final WorkspaceDensity density;
+  final List<String> visibleColumns;
+  final bool focusMode;
   final DateTime createdAt;
   final DateTime updatedAt;
 }
