@@ -373,6 +373,7 @@ final class AppServices {
         await backups.exportTo(path);
         return path;
       },
+      restoreBackup: backups.importFrom,
     );
     final firstLibrarySpan = startup.start(StartupPhase.firstLibrary);
     await library.load();

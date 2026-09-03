@@ -1,7 +1,14 @@
 import '../i18n/app_localizations.dart';
 import 'app_failure.dart';
 
-enum FailureAction { retry, chooseAnotherFile, enterPassword, goBack, dismiss }
+enum FailureAction {
+  retry,
+  chooseAnotherFile,
+  enterPassword,
+  openDiagnostics,
+  goBack,
+  dismiss,
+}
 
 final class FailurePresentation {
   const FailurePresentation({
@@ -40,6 +47,9 @@ abstract final class FailurePresentations {
       FailureKind.cancelled ||
       FailureKind.unauthorizedLink => FailureAction.dismiss,
       FailureKind.restoreFailed => FailureAction.goBack,
+      FailureKind.databaseFailed ||
+      FailureKind.outOfMemory ||
+      FailureKind.unknown => FailureAction.openDiagnostics,
       _ => FailureAction.retry,
     };
     return FailurePresentation(

@@ -33,12 +33,19 @@ final class GlobalSearchRepository {
         '$expression|$boundedLimit|$boundedOffset|'
         '${selectedKinds.map((kind) => kind.name).join(',')}';
     final now = DateTime.now().microsecondsSinceEpoch;
-    final cached = _recentSearches.remove(cacheKey);
+    final cached = _recentSearches[cacheKey];
     if (cached != null &&
         now - cached.createdAtMicroseconds <= _cacheLifetimeMicroseconds) {
-      _recentSearches[cacheKey] = cached;
+      // The common repeated-query path is already the newest LRU entry. Avoid
+      // a remove/reinsert pair there; it was measurable at microsecond scale.
+      if (_recentSearches.keys.last != cacheKey) {
+        _recentSearches
+          ..remove(cacheKey)
+          ..[cacheKey] = cached;
+      }
       return cached.results;
     }
+    if (cached != null) _recentSearches.remove(cacheKey);
     final kindClause = selectedKinds.isEmpty
         ? ''
         : 'AND library_search.kind IN '

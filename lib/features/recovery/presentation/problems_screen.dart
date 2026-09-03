@@ -13,6 +13,8 @@ final class ProblemsScreen extends StatelessWidget {
     required this.onCheckIntegrity,
     required this.onDiscard,
     required this.onResume,
+    this.onRollback,
+    this.onReviewDuplicates,
   });
 
   final List<RecoveryProblem> problems;
@@ -20,6 +22,8 @@ final class ProblemsScreen extends StatelessWidget {
   final VoidCallback onCheckIntegrity;
   final ValueChanged<RecoveryProblem> onDiscard;
   final ValueChanged<RecoveryProblem> onResume;
+  final ValueChanged<RecoveryProblem>? onRollback;
+  final VoidCallback? onReviewDuplicates;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +37,12 @@ final class ProblemsScreen extends StatelessWidget {
         ),
         title: Text(strings.get('problems.title')),
         actions: [
+          if (onReviewDuplicates != null)
+            TextButton.icon(
+              onPressed: onReviewDuplicates,
+              icon: const Icon(Icons.content_copy_rounded, size: 18),
+              label: Text(strings.get('duplicates.review')),
+            ),
           TextButton.icon(
             onPressed: onCheckIntegrity,
             icon: const Icon(Icons.fact_check_outlined, size: 18),
@@ -60,11 +70,20 @@ final class ProblemsScreen extends StatelessWidget {
                     leading: const Icon(Icons.warning_amber_rounded),
                     title: Text(strings.get('problems.${problem.code}')),
                     subtitle: Text(
-                      strings.get(
-                        problem.canResume
-                            ? 'problems.canResume'
-                            : 'problems.localOnly',
-                      ),
+                      [
+                        strings.get(
+                          problem.canResume
+                              ? 'problems.canResume'
+                              : problem.canRollback
+                              ? 'problems.canRollback'
+                              : 'problems.localOnly',
+                        ),
+                        if (problem.phase != null)
+                          strings.get(
+                            'problems.phase',
+                            parameters: {'phase': problem.phase!},
+                          ),
+                      ].join('\n'),
                     ),
                     trailing: Wrap(
                       spacing: AppSpacing.space4,
@@ -74,6 +93,12 @@ final class ProblemsScreen extends StatelessWidget {
                             tooltip: strings.get('problems.resume'),
                             onPressed: () => onResume(problem),
                             icon: const Icon(Icons.play_arrow_rounded),
+                          ),
+                        if (problem.canRollback && onRollback != null)
+                          IconButton(
+                            tooltip: strings.get('problems.rollback'),
+                            onPressed: () => onRollback!(problem),
+                            icon: const Icon(Icons.undo_rounded),
                           ),
                         if (problem.canDiscard)
                           IconButton(

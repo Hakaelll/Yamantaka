@@ -1,10 +1,10 @@
 [CmdletBinding()]
 param(
-    [string]$BeforeDirectory = 'build/visual-evidence/v0.11.0',
-    [string]$AfterDirectory = 'build/visual-evidence/v0.12.0',
-    [string]$OutputDirectory = 'build/visual-evidence/v0.12.0/comparisons',
-    [string]$BeforeLabel = '0.11',
-    [string]$AfterLabel = '0.12'
+    [string]$BeforeDirectory = 'build/visual-evidence/v0.12.0',
+    [string]$AfterDirectory = 'build/visual-evidence/v0.13.0',
+    [string]$OutputDirectory = 'build/visual-evidence/v0.13.0/comparisons',
+    [string]$BeforeLabel = '0.12',
+    [string]$AfterLabel = '0.13'
 )
 
 $ErrorActionPreference = 'Stop'

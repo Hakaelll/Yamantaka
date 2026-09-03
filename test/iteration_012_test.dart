@@ -37,7 +37,7 @@ void main() {
         database.database.select('PRAGMA user_version').first.columnAt(0),
         AppConfig.databaseVersion,
       );
-      expect(AppConfig.databaseVersion, 10);
+      expect(AppConfig.databaseVersion, greaterThanOrEqualTo(10));
       final tables = database.database
           .select("SELECT name FROM sqlite_master WHERE type = 'table'")
           .map((row) => row['name'])

@@ -154,6 +154,41 @@ abstract final class MetadataMergePolicy {
     );
   }
 
+  static MetadataMergeResult mergePerField(
+    LibraryDocument existing,
+    LibraryDocument incoming,
+    Map<String, MetadataConflictChoice> choices,
+  ) {
+    final title = _mergeField(
+      'title',
+      existing.effectiveTitle,
+      incoming.effectiveTitle,
+      choices['title'] ?? MetadataConflictChoice.nonEmptyExisting,
+    );
+    final author = _mergeField(
+      'author',
+      existing.effectiveAuthor,
+      incoming.effectiveAuthor,
+      choices['author'] ?? MetadataConflictChoice.nonEmptyExisting,
+    );
+    final libraryNote = _mergeField(
+      'libraryNote',
+      existing.libraryNote,
+      incoming.libraryNote,
+      choices['library_note'] ?? MetadataConflictChoice.nonEmptyExisting,
+    );
+    return MetadataMergeResult(
+      title: title.value,
+      author: author.value,
+      libraryNote: libraryNote.value,
+      conflicts: [
+        if (title.conflict) 'title',
+        if (author.conflict) 'author',
+        if (libraryNote.conflict) 'library_note',
+      ],
+    );
+  }
+
   static ({String? value, bool conflict}) _mergeField(
     String _,
     String? existing,

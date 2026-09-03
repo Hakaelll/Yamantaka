@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.13.0 — 2026-09-02 (resiliencia documental y confianza local)
+
+- Formaliza el ciclo de apertura con generación, cancelación y estados tipados;
+  limita las contraseñas a tres intentos en memoria y bloquea la restauración
+  automática del documento que provocó un fallo.
+- Amplía la sesión recuperable con huella, página, total, estado y cuarentena;
+  verifica identidad antes de reabrir y conserva la relocalización exacta.
+- Migra SQLite a v11 con procedencia de anotaciones, cuarentena documental,
+  journal por fases y registro reversible de consolidaciones.
+- Eleva el backup local a v9 con manifiesto, ensayo y plan detallado de altas,
+  reemplazos, eliminaciones y conflictos, pre-backup y rollback transaccional.
+- Añade revisión de duplicados exactos/probables con evidencias, impacto,
+  decisiones por conflicto, mantener ambos, consolidación completa y undo; los
+  PDF nunca se escriben ni se eliminan.
+- Añade fixtures reales e idempotentes de migración v1–v11, carreras de
+  apertura/cierre, interrupciones de restore, rutas Unicode/acotadas y 305
+  pruebas; la matriz ejecutada reúne 179 PNG en 19 hojas y diez comparaciones.
+- Compara cinco series avanzadas, cinco de Biblioteca y cinco nativas por
+  versión; la serie 0.12/0.13 emparejada termina `pass` sin fallos, observaciones
+  ni invariantes rotos y conserva aparte la divergencia histórica del host.
+- Genera un SBOM CycloneDX 1.5 offline con versiones, hashes, licencias y
+  procedencia de paquetes y binarios nativos.
+- Prepara el release local `0.13.0+14` sin commit, tag, push, firma ni
+  publicación.
+
 ## 0.12.0 — 2026-08-31 (continuidad, revisión y recuperación)
 
 - Rediseña el inicio como centro compacto de continuidad con lectura activa,

@@ -11,3 +11,6 @@ sin sus archivos vecinos puede impedir el arranque.
 Este archivo no acredita una firma digital. Si Windows bloquea un paquete
 descargado, no desactives sus protecciones: usa una distribucion firmada y
 verifica siempre el origen del bundle.
+
+SBOM.cdx.json contiene el inventario CycloneDX 1.5 generado sin red con
+versiones, hashes, licencias y procedencia de paquetes y binarios nativos.

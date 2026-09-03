@@ -51,7 +51,8 @@ final class RecoveryRepository {
   List<RecoveryProblem> problems({int limit = 80}) {
     final result = <RecoveryProblem>[];
     final journals = _database.database.select(
-      "SELECT id, status, operation_kind, updated_at FROM operation_journal "
+      "SELECT id, status, operation_kind, updated_at, phase, "
+      "interruption_reason, resume_capability FROM operation_journal "
       "WHERE status IN ('running', 'interrupted', 'failed') "
       'ORDER BY updated_at DESC LIMIT ?',
       [limit.clamp(1, 80)],
@@ -63,7 +64,13 @@ final class RecoveryRepository {
           kind: RecoveryProblemKind.interruptedOperation,
           code: 'operation_${row['status'] as String}',
           createdAt: DateTime.parse(row['updated_at'] as String),
-          canResume: row['status'] == 'interrupted',
+          canResume:
+              row['status'] == 'interrupted' &&
+              (row['resume_capability'] == 'retry' ||
+                  row['resume_capability'] == 'resume'),
+          canRollback: row['resume_capability'] == 'rollback',
+          phase: row['phase'] as String?,
+          interruptionReason: row['interruption_reason'] as String?,
         ),
       );
     }
@@ -85,6 +92,26 @@ final class RecoveryRepository {
         );
       }
     }
+    final afterMissing = limit.clamp(1, 80) - result.length;
+    if (afterMissing > 0) {
+      final blocked = _database.database.select(
+        'SELECT id, last_opened_at, last_failure_code FROM documents '
+        'WHERE restore_blocked = 1 AND is_missing = 0 '
+        'ORDER BY last_opened_at DESC, id LIMIT ?',
+        [afterMissing],
+      );
+      for (final row in blocked) {
+        result.add(
+          RecoveryProblem(
+            id: row['id'] as String,
+            kind: RecoveryProblemKind.inaccessibleDocument,
+            code: 'document_restore_blocked',
+            createdAt: DateTime.parse(row['last_opened_at'] as String),
+            interruptionReason: row['last_failure_code'] as String?,
+          ),
+        );
+      }
+    }
     return List.unmodifiable(result);
   }
 
@@ -93,6 +120,11 @@ final class RecoveryRepository {
       "UPDATE operation_journal SET status = 'cancelled', updated_at = ? "
       'WHERE id = ? AND status IN (\'running\', \'interrupted\', \'failed\')',
       [DateTime.now().toUtc().toIso8601String(), id],
+    );
+    _database.database.execute(
+      'UPDATE documents SET restore_blocked = 0, last_failure_code = NULL '
+      'WHERE id = ?',
+      [id],
     );
   }
 

@@ -15,6 +15,8 @@ enum JournalStatus {
   failed,
 }
 
+enum JournalResumeCapability { none, retry, resume, rollback }
+
 final class JournalEntry {
   const JournalEntry({
     required this.id,
@@ -24,6 +26,10 @@ final class JournalEntry {
     required this.completedItems,
     required this.startedAt,
     required this.updatedAt,
+    this.phase = 'planned',
+    this.resumeCapability = JournalResumeCapability.none,
+    this.interruptionReason,
+    this.compatibilityHash,
     this.summary = const {},
     this.undo,
     this.errorCode,
@@ -34,6 +40,10 @@ final class JournalEntry {
   final JournalStatus status;
   final int totalItems;
   final int completedItems;
+  final String phase;
+  final JournalResumeCapability resumeCapability;
+  final String? interruptionReason;
+  final String? compatibilityHash;
   final Map<String, Object?> summary;
   final Map<String, Object?>? undo;
   final String? errorCode;
@@ -96,6 +106,9 @@ final class AutomationRepository {
     required String kind,
     required int totalItems,
     Map<String, Object?> summary = const {},
+    String phase = 'planned',
+    JournalResumeCapability resumeCapability = JournalResumeCapability.none,
+    String? compatibilityHash,
   }) {
     final now = DateTime.now().toUtc();
     final id = sha256
@@ -104,8 +117,9 @@ final class AutomationRepository {
     _database.database.execute(
       'INSERT INTO operation_journal('
       'id, operation_kind, status, summary_json, total_items, '
-      'completed_items, started_at, updated_at) '
-      'VALUES (?, ?, ?, ?, ?, 0, ?, ?)',
+      'completed_items, started_at, updated_at, phase, resume_capability, '
+      'compatibility_hash) '
+      'VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)',
       [
         id,
         kind,
@@ -114,6 +128,9 @@ final class AutomationRepository {
         totalItems.clamp(0, 100000),
         now.toIso8601String(),
         now.toIso8601String(),
+        phase,
+        resumeCapability.name,
+        compatibilityHash,
       ],
     );
     return journal(id)!;
@@ -125,6 +142,9 @@ final class AutomationRepository {
     int? completedItems,
     Map<String, Object?>? undo,
     String? errorCode,
+    String? phase,
+    String? interruptionReason,
+    JournalResumeCapability? resumeCapability,
   }) {
     _database.database.execute(
       '''
@@ -133,6 +153,9 @@ final class AutomationRepository {
         completed_items = COALESCE(?, completed_items),
         undo_json = COALESCE(?, undo_json),
         error_code = ?,
+        phase = COALESCE(?, phase),
+        interruption_reason = ?,
+        resume_capability = COALESCE(?, resume_capability),
         updated_at = ?
       WHERE id = ?
       ''',
@@ -141,6 +164,9 @@ final class AutomationRepository {
         completedItems,
         undo == null ? null : jsonEncode(undo),
         errorCode,
+        phase,
+        interruptionReason,
+        resumeCapability?.name,
         DateTime.now().toUtc().toIso8601String(),
         id,
       ],
@@ -165,7 +191,10 @@ final class AutomationRepository {
 
   void markRunningAsInterrupted() {
     _database.database.execute(
-      "UPDATE operation_journal SET status = 'interrupted', updated_at = ? "
+      "UPDATE operation_journal SET status = 'interrupted', "
+      "interruption_reason = 'process_interrupted', "
+      "resume_capability = CASE WHEN undo_json IS NULL THEN 'retry' "
+      "ELSE 'rollback' END, updated_at = ? "
       "WHERE status = 'running'",
       [DateTime.now().toUtc().toIso8601String()],
     );
@@ -200,6 +229,13 @@ final class AutomationRepository {
     ),
     totalItems: row['total_items'] as int,
     completedItems: row['completed_items'] as int,
+    phase: row['phase'] as String? ?? 'planned',
+    resumeCapability: JournalResumeCapability.values.firstWhere(
+      (item) => item.name == row['resume_capability'],
+      orElse: () => JournalResumeCapability.none,
+    ),
+    interruptionReason: row['interruption_reason'] as String?,
+    compatibilityHash: row['compatibility_hash'] as String?,
     summary: (jsonDecode(row['summary_json'] as String) as Map)
         .cast<String, Object?>(),
     undo: switch (row['undo_json'] as String?) {

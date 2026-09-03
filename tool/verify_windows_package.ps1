@@ -1,9 +1,9 @@
 [CmdletBinding()]
 param(
-    [string]$ReleaseDirectory = 'build/release/0.12.0+13',
-    [string]$ArchiveName = 'yamantaka-0.12.0+13-windows-x64.zip',
-    [string]$ExpectedVersion = '0.12.0',
-    [string]$ExpectedBuildNumber = '13'
+    [string]$ReleaseDirectory = 'build/release/0.13.0+14',
+    [string]$ArchiveName = 'yamantaka-0.13.0+14-windows-x64.zip',
+    [string]$ExpectedVersion = '0.13.0',
+    [string]$ExpectedBuildNumber = '14'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,6 +33,57 @@ if ($manifest.productVersion -ne $ExpectedVersion -or
 }
 if ($manifest.containsPdfFiles -ne $false) {
     throw 'Manifest must declare containsPdfFiles=false.'
+}
+$sbomPath = Join-Path $releaseRoot 'yamantaka/SBOM.cdx.json'
+if (-not (Test-Path -LiteralPath $sbomPath)) {
+    throw 'CycloneDX SBOM is missing from the packaged bundle.'
+}
+$sbom = Get-Content -Raw -Encoding UTF8 -LiteralPath $sbomPath | ConvertFrom-Json
+if ($sbom.bomFormat -ne 'CycloneDX' -or $sbom.specVersion -ne '1.5') {
+    throw 'Packaged SBOM is not CycloneDX 1.5.'
+}
+$sbomNames = @($sbom.components | ForEach-Object { $_.name })
+foreach ($component in @($sbom.components)) {
+    if ([string]::IsNullOrWhiteSpace([string]$component.version) -or
+        ([string]$component.version).StartsWith('unknown-', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "SBOM component has no resolved version: $($component.name)"
+    }
+    $componentLicenses = @($component.licenses)
+    if ($componentLicenses.Count -eq 0 -or
+        (($componentLicenses | ConvertTo-Json -Compress) -match 'NOASSERTION')) {
+        throw "SBOM component has no resolved license: $($component.name)"
+    }
+    $componentHash = @($component.hashes | Where-Object { $_.alg -eq 'SHA-256' }) |
+        Select-Object -First 1 -ExpandProperty content
+    if ([string]::IsNullOrWhiteSpace([string]$componentHash)) {
+        throw "SBOM component has no SHA-256: $($component.name)"
+    }
+    $source = @($component.properties | Where-Object { $_.name -eq 'yamantaka:source' }) |
+        Select-Object -First 1 -ExpandProperty value
+    if ([string]::IsNullOrWhiteSpace([string]$source)) {
+        throw "SBOM component has no source provenance: $($component.name)"
+    }
+    if ($component.type -eq 'file') {
+        $provenance = @($component.properties | Where-Object { $_.name -eq 'yamantaka:provenance' }) |
+            Select-Object -First 1 -ExpandProperty value
+        if ([string]::IsNullOrWhiteSpace([string]$provenance)) {
+            throw "Native SBOM component has no build provenance: $($component.name)"
+        }
+    }
+}
+foreach ($binary in $manifest.nativeBinaries) {
+    if ($sbomNames -notcontains $binary.path) {
+        throw "Native binary is absent from SBOM: $($binary.path)"
+    }
+    $component = @($sbom.components | Where-Object { $_.name -eq $binary.path }) |
+        Select-Object -First 1
+    $expectedHash = @($component.hashes | Where-Object { $_.alg -eq 'SHA-256' }) |
+        Select-Object -First 1 -ExpandProperty content
+    $binaryPath = Join-Path (Join-Path $releaseRoot 'yamantaka') $binary.path
+    $actualHash = (Get-FileHash -LiteralPath $binaryPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($expectedHash -ne $actualHash) {
+        throw "Native binary hash differs from SBOM: $($binary.path)"
+    }
 }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem

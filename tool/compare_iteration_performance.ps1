@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$BaselineDirectory = 'build/performance/0.12.0-baseline',
-    [string]$CurrentDirectory = 'build/performance/0.12.0-current',
-    [string]$OutputPath = 'build/performance/0.12.0-current/comparison-0.11-vs-0.12.json',
+    [string]$BaselineDirectory = 'build/performance/0.13.0-baseline-paired',
+    [string]$CurrentDirectory = 'build/performance/0.13.0-current',
+    [string]$OutputPath = 'build/performance/0.13.0-current/comparison-0.12-vs-0.13.json',
     [ValidateRange(0, 1)][double]$Tolerance = 0.10
 )
 
@@ -76,6 +76,38 @@ function Add-LowerIsBetterComparison {
         })
 }
 
+function Add-UpperBoundComparison {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][double[]]$Baseline,
+        [Parameter(Mandatory = $true)][double[]]$Current,
+        [Parameter(Mandatory = $true)][double]$Limit,
+        [Parameter(Mandatory = $true)][string]$Unit
+    )
+    $baselineMedian = Get-Median $Baseline
+    $currentMedian = Get-Median $Current
+    $samplesAboveLimit = @($Current | Where-Object { $_ -gt $Limit }).Count
+    $failed = $samplesAboveLimit -ne 0
+    $comparisons.Add([ordered]@{
+            metric = $Name
+            unit = $Unit
+            baselineSamples = $Baseline
+            currentSamples = $Current
+            baselineMedian = $baselineMedian
+            currentMedian = $currentMedian
+            baselineMinimum = ($Baseline | Measure-Object -Minimum).Minimum
+            baselineMaximum = ($Baseline | Measure-Object -Maximum).Maximum
+            currentMinimum = ($Current | Measure-Object -Minimum).Minimum
+            currentMaximum = ($Current | Measure-Object -Maximum).Maximum
+            deltaPercent = $null
+            limit = $Limit
+            currentSamplesAboveLimit = $samplesAboveLimit
+            medianRegression = $currentMedian -gt $Limit
+            reliableRegression = $failed
+            status = if ($failed) { 'fail' } else { 'pass' }
+        })
+}
+
 Add-LowerIsBetterComparison 'advanced.bulk_insert' @($baselineAdvanced | ForEach-Object { $_.bulk_insert_ms }) @($currentAdvanced | ForEach-Object { $_.bulk_insert_ms }) 'ms'
 foreach ($metric in @('global_search_us', 'collection_query_us', 'workspace_restore_us')) {
     foreach ($stat in @('median', 'p95')) {
@@ -102,9 +134,17 @@ foreach ($metric in @('heavy_open_median', 'heavy_open_p95', 'heavy_render_media
 foreach ($metric in @('library_p95', 'reader_p95')) {
     Add-LowerIsBetterComparison "native.frame_build.$metric" @($baselineNative | ForEach-Object { $_.frame_build_microseconds.$metric }) @($currentNative | ForEach-Object { $_.frame_build_microseconds.$metric }) 'us'
 }
-foreach ($metric in @('peak', 'after_return_minimum', 'heavy_close_growth')) {
+foreach ($metric in @('peak', 'after_return_minimum')) {
     Add-LowerIsBetterComparison "native.memory.$metric" @($baselineNative | ForEach-Object { $_.memory_bytes.$metric }) @($currentNative | ForEach-Object { $_.memory_bytes.$metric }) 'bytes'
 }
+# Growth after repeated close is signed: a collection in the baseline can make
+# its median negative, where a percentage comparison is mathematically invalid.
+# The native profile already defines the meaningful leak budget as 16 MiB, so
+# compare all five samples against that fixed cap instead.
+Add-UpperBoundComparison 'native.memory.heavy_close_growth' `
+    @($baselineNative | ForEach-Object { $_.memory_bytes.heavy_close_growth }) `
+    @($currentNative | ForEach-Object { $_.memory_bytes.heavy_close_growth }) `
+    (16MB) 'bytes'
 
 $invariants = [System.Collections.Generic.List[object]]::new()
 function Add-Invariant {
@@ -130,11 +170,13 @@ $report = [ordered]@{
     version = 1
     generatedAt = [DateTime]::UtcNow.ToString('o')
     host = [ordered]@{ operatingSystem = [System.Environment]::OSVersion.VersionString; processorCount = [Environment]::ProcessorCount }
-    baselineVersion = '0.11.0'
-    currentVersion = '0.12.0'
+    baselineVersion = '0.12.0'
+    currentVersion = '0.13.0'
+    baselineSeries = Split-Path $baselineRoot -Leaf
+    currentSeries = Split-Path $currentRoot -Leaf
     passes = 5
     tolerance = $Tolerance
-    reliabilityRule = 'A regression is reliable when the median exceeds the 0.11 median by more than the tolerance and at least four of five current samples exceed that limit. A median-only movement with three or fewer samples above the limit is retained as watch because the ranges overlap.'
+    reliabilityRule = 'A regression is reliable when the median exceeds the 0.12 median by more than the tolerance and at least four of five current samples exceed that limit. A median-only movement with three or fewer samples above the limit is retained as watch because the ranges overlap. Signed close-growth samples use the fixed 16 MiB leak budget instead of an invalid percentage around zero.'
     comparisons = @($comparisons)
     invariants = @($invariants)
     failedMetricCount = $failedMetrics.Count

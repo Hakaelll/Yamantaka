@@ -58,6 +58,7 @@ final class ReaderScreen extends StatefulWidget {
     this.onExportAnnotations,
     this.onViewportInteractionChanged,
     this.onCompare,
+    this.onFailureAction,
     this.initialFocusMode = false,
     this.onFocusModeChanged,
   });
@@ -92,6 +93,7 @@ final class ReaderScreen extends StatefulWidget {
   final Future<void> Function()? onExportAnnotations;
   final ValueChanged<bool>? onViewportInteractionChanged;
   final VoidCallback? onCompare;
+  final Future<void> Function(FailureAction action)? onFailureAction;
   final bool initialFocusMode;
   final ValueChanged<bool>? onFocusModeChanged;
 
@@ -302,11 +304,15 @@ final class _ReaderErrorState extends StatelessWidget {
     required this.title,
     required this.message,
     required this.onBack,
+    this.onRecovery,
+    this.recoveryLabel,
   });
 
   final String title;
   final String message;
   final VoidCallback onBack;
+  final VoidCallback? onRecovery;
+  final String? recoveryLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -315,10 +321,14 @@ final class _ReaderErrorState extends StatelessWidget {
         icon: Icons.error_outline_rounded,
         title: title,
         message: message,
-        action: onBack,
-        actionLabel: YamantakaLocalizations.of(
-          context,
-        ).get('reader.backToLibrary'),
+        action: onRecovery ?? onBack,
+        actionLabel:
+            recoveryLabel ??
+            YamantakaLocalizations.of(context).get('reader.backToLibrary'),
+        secondaryAction: onRecovery == null ? null : onBack,
+        secondaryActionLabel: onRecovery == null
+            ? null
+            : YamantakaLocalizations.of(context).get('reader.backToLibrary'),
         tone: AppStatusTone.error,
       ),
     );

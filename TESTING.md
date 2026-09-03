@@ -1,6 +1,6 @@
 # Pruebas
 
-Estado actualizado: 2026-08-27.
+Estado actualizado: 2026-09-02.
 
 Este documento describe únicamente evidencia reproducible del árbol actual. Se
 han retirado las tablas y capturas históricas que correspondían a lectores
@@ -102,7 +102,7 @@ abierto. La evidencia previa se conserva en `build/visual-evidence/v0.5.0/` y
 la de 0.6 se conserva en `build/visual-evidence/v0.6.0/`, la de 0.7 en
 `build/visual-evidence/v0.7.0/` y la de 0.8 en
 `build/visual-evidence/v0.8.0/`. La actual se escribe en
-`build/visual-evidence/v0.11.0/`; ninguna se versiona.
+`build/visual-evidence/v0.13.0/`; ninguna se versiona.
 
 La matriz 0.11 conserva la prueba geométrica del chrome y añade el navegador
 documental en los ocho tamaños, cerrados recientes, agrupación y selección
@@ -293,3 +293,46 @@ materializan 80 y no recorren archivos en la primera carga.
 La validación física declarada sigue limitada al monitor disponible 1920×1200,
 96 DPI/100 %, es-ES y alto contraste desactivado. Narrator, varios monitores y
 DPI 125/150/175/200 % no se infieren de widgets y quedan pendientes.
+
+## Verificación 0.13
+
+La suite completa alcanza 305 pruebas. `reader_widgets_test.dart` cubre aperturas
+solapadas y cierre durante la apertura nativa sin publicar estado ni retener el
+handle tardío. `document_service_error_test.dart` cubre rutas Unicode y rutas
+locales largas dentro del límite, pérdida de permisos tras descubrir el archivo
+y unidad desconectada sin filtrar la ruta. Las pruebas PDFium reales distinguen
+contraseña requerida, incorrecta y válida.
+
+`iteration_013_test.dart` construye fixtures con la secuencia real de cada
+esquema v1–v11, migra dos veces al actual y verifica identidad e integridad.
+También cubre snapshot sin rutas ni contraseñas, cuarentena tras fallo, estados
+tipados, journal con fase/capacidad/hash y consolidación con procedencia, aristas
+deduplicadas, ciclos eliminados y undo. `local_backup_service_test.dart` valida
+el formato v9, manifiesto, ensayo, instalación interrumpida y rollback
+transaccional ante una fila inválida.
+
+`iteration_013_visual_test.dart` comprueba semántica, acciones, seguridad del
+campo de contraseña y ausencia de overflow del diálogo de duplicados a texto
+200 %. La matriz completa contiene 179 PNG en 19 hojas, diez comparaciones
+0.12/0.13 y las superficies de contraseña, archivo ausente, restore, problemas
+y recuperación. Su evidencia reproducible se conserva en
+`build/visual-evidence/v0.13.0/` y `build/visual-review-013/`.
+
+La evidencia focal puede regenerarse con:
+
+    flutter test --no-pub --dart-define=YAMANTAKA_013_VISUAL_DIR=build/verification/visual/0.13 test/iteration_013_visual_test.dart
+
+Las capturas son de widgets, no validan Narrator, DPI físico ni varios
+monitores. Esas comprobaciones siguen pendientes.
+
+Rendimiento usa cinco procesos por benchmark avanzado, Biblioteca y perfil
+nativo para cada versión. El `HEAD` limpio 0.12 se reconstruyó y midió junto a
+0.13 tras detectar deriva de host; la serie histórica no se sobrescribe. El
+resultado canónico emparejado es `pass`: cero fallos, cero `watch`, cero
+invariantes rotos, máximo 80 documentos y cero handles/renders/páginas tras el
+cierre. Detalles y la comparación histórica fallida están en
+`docs/performance/0.13-watches.md`.
+
+El empaquetado genera `SBOM.cdx.json` sin red a partir de `pubspec.lock`, el
+package config y los binarios Release. `verify_windows_package.ps1` exige
+CycloneDX 1.5 y que cada `.exe`/`.dll` del manifiesto aparezca en el SBOM.

@@ -1,6 +1,6 @@
 # Privacidad local
 
-Yamantaka 0.12 no requiere cuenta ni red y no incorpora telemetría remota. Los
+Yamantaka 0.13 no requiere cuenta ni red y no incorpora telemetría remota. Los
 PDF originales nunca se suben, copian al backup, reescriben ni modifican por una
 regla. Las automatizaciones no aceptan scripts, comandos ni URLs.
 
@@ -14,3 +14,9 @@ Markdown/JSON de anotaciones y backups se crean únicamente mediante una acción
 explícita y en la ruta elegida por el usuario. Borrar diagnósticos o datos desde
 Ajustes no borra PDF. Las conexiones TCP/UDP se comprueban durante el smoke de
 ocho segundos del bundle local.
+
+Las contraseñas de PDF solo existen en la variable local del intento de
+apertura y se descartan inmediatamente. Los snapshots de recuperación guardan
+identificadores, huellas y cantidades, nunca contraseñas ni rutas. El backup no
+usa cifrado propio: para confidencialidad en reposo debe guardarse en un volumen
+del sistema cifrado o dentro de un archivo cifrado con una herramienta auditada.

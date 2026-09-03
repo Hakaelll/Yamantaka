@@ -8,6 +8,7 @@ import '../../../app/app_config.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/performance/progressive_open.dart';
+import '../../../core/platform/path_normalizer.dart';
 import '../../../core/platform/window_service.dart';
 import '../../../pdf_engine/cache/thumbnail_service.dart';
 import '../../../pdf_engine/models/pdf_models.dart';
@@ -26,6 +27,7 @@ import '../../search/application/search_controller.dart';
 import '../domain/reader_models.dart';
 import '../domain/reading_session.dart';
 import '../domain/text_selection.dart';
+import '../domain/document_lifecycle.dart';
 
 enum ReaderStatus { idle, loading, ready, failure }
 
@@ -115,11 +117,13 @@ final class ReaderController extends ChangeNotifier {
   final PdfViewController viewController;
 
   ReaderStatus status = ReaderStatus.idle;
+  DocumentLifecycleSnapshot lifecycle = const DocumentLifecycleSnapshot.empty();
   LibraryDocument? document;
   OpenedPdfDocument? openedDocument;
   DocumentPreferences? preferences;
   AppFailure? error;
   String? pendingPath;
+  String? failedDocumentId;
   List<PdfOutlineItem> outline = const [];
   final ValueNotifier<int> pageIndexListenable = ValueNotifier<int>(0);
   final ValueNotifier<ReaderDestinationCue?> destinationCue =
@@ -217,7 +221,11 @@ final class ReaderController extends ChangeNotifier {
     );
   }
 
-  Future<bool> openPath(String path, {String? password}) async {
+  Future<bool> openPath(
+    String path, {
+    String? password,
+    int passwordAttempt = 0,
+  }) async {
     final openGeneration = ++_openGeneration;
     openProgress = ProgressiveOpenState(
       phase: ProgressiveOpenPhase.nativeOpen,
@@ -225,27 +233,49 @@ final class ReaderController extends ChangeNotifier {
     );
     pendingPath = path;
     status = ReaderStatus.loading;
+    lifecycle = DocumentLifecycleSnapshot(
+      state: DocumentLifecycleState.opening,
+      generation: openGeneration,
+      passwordAttempt: passwordAttempt,
+    );
     error = null;
     notifyListeners();
     OpenedPdfDocument? newlyOpened;
+    String? candidateDocumentId = _documents
+        .byNormalizedPath(PathNormalizer.normalize(path))
+        ?.id;
     try {
       final inspected = await _documentService.inspect(path);
+      if (openGeneration != _openGeneration) return false;
       final current = document;
       if (current != null &&
           current.normalizedPath == inspected.normalizedPath &&
           current.fingerprint == inspected.fingerprint) {
         status = ReaderStatus.ready;
+        lifecycle = DocumentLifecycleSnapshot(
+          state: DocumentLifecycleState.ready,
+          generation: openGeneration,
+          documentId: current.id,
+        );
+        failedDocumentId = null;
         pendingPath = null;
         notifyListeners();
         return true;
       }
       final registered = _documents.byNormalizedPath(inspected.normalizedPath);
+      candidateDocumentId = registered?.id;
       var warm = registered == null
           ? null
           : _warmDocuments.remove(registered.id);
       if (warm != null && warm.document.fingerprint != inspected.fingerprint) {
         await _engine.closeDocument(warm.opened.documentId);
         warm = null;
+      }
+      if (openGeneration != _openGeneration) {
+        if (warm != null) {
+          await _engine.closeDocument(warm.opened.documentId);
+        }
+        return false;
       }
       final OpenedPdfDocument selectedOpened;
       final LibraryDocument libraryDocument;
@@ -260,6 +290,11 @@ final class ReaderController extends ChangeNotifier {
           inspected.path,
           password: password,
         );
+        if (openGeneration != _openGeneration) {
+          await _engine.closeDocument(newlyOpened.documentId);
+          newlyOpened = null;
+          return false;
+        }
         selectedOpened = newlyOpened;
         libraryDocument = _documentService.register(
           file: inspected,
@@ -302,6 +337,13 @@ final class ReaderController extends ChangeNotifier {
       );
       outline = const [];
       status = ReaderStatus.ready;
+      lifecycle = DocumentLifecycleSnapshot(
+        state: DocumentLifecycleState.ready,
+        generation: openGeneration,
+        documentId: libraryDocument.id,
+      );
+      _documents.clearOpenFailure(libraryDocument.id);
+      failedDocumentId = null;
       openProgress = ProgressiveOpenState(
         phase: ProgressiveOpenPhase.firstRender,
         generation: openGeneration,
@@ -329,6 +371,19 @@ final class ReaderController extends ChangeNotifier {
       }
       if (openGeneration != _openGeneration) return false;
       error = failure;
+      failedDocumentId = candidateDocumentId;
+      if (candidateDocumentId != null &&
+          failure.kind != FailureKind.passwordRequired &&
+          failure.kind != FailureKind.wrongPassword &&
+          failure.kind != FailureKind.cancelled) {
+        _documents.markOpenFailure(candidateDocumentId, failure.kind.name);
+      }
+      lifecycle = DocumentLifecycleSnapshot.failure(
+        generation: openGeneration,
+        failure: failure,
+        documentId: candidateDocumentId,
+        passwordAttempt: passwordAttempt,
+      );
       openProgress = ProgressiveOpenPolicy.failure(
         openProgress,
         failure.kind.name,
@@ -336,7 +391,8 @@ final class ReaderController extends ChangeNotifier {
       status = openedDocument == null
           ? ReaderStatus.failure
           : ReaderStatus.ready;
-      pendingPath = null;
+      // Keep only the in-memory retry target. Atomic session snapshots never
+      // persist it, so recovery cannot reopen a quarantined failure silently.
       notifyListeners();
       return false;
     } on Object catch (exception, stackTrace) {
@@ -350,11 +406,18 @@ final class ReaderController extends ChangeNotifier {
         'No se pudo abrir el documento.',
         debugMessage: exception.toString(),
       );
+      failedDocumentId = candidateDocumentId;
+      lifecycle = DocumentLifecycleSnapshot.failure(
+        generation: openGeneration,
+        failure: error!,
+        documentId: candidateDocumentId,
+        passwordAttempt: passwordAttempt,
+      );
       openProgress = ProgressiveOpenPolicy.failure(openProgress, 'unknown');
       status = openedDocument == null
           ? ReaderStatus.failure
           : ReaderStatus.ready;
-      pendingPath = null;
+      // Retained in memory for an explicit retry or password action only.
       notifyListeners();
       return false;
     }
@@ -419,11 +482,22 @@ final class ReaderController extends ChangeNotifier {
       );
     }
     _openGeneration++;
+    if (lifecycle.isOpening) {
+      lifecycle = DocumentLifecycleSnapshot(
+        state: DocumentLifecycleState.cancelled,
+        generation: _openGeneration,
+      );
+    }
     openProgress = ProgressiveOpenPolicy.cancel(openProgress);
     await _closeCurrent();
     await retainWarmDocuments(const {});
     status = ReaderStatus.idle;
+    lifecycle = DocumentLifecycleSnapshot(
+      state: DocumentLifecycleState.closed,
+      generation: _openGeneration,
+    );
     error = null;
+    failedDocumentId = null;
     pendingPath = null;
     notifyListeners();
   }
@@ -985,6 +1059,10 @@ final class ReaderController extends ChangeNotifier {
   @override
   void dispose() {
     _openGeneration++;
+    lifecycle = DocumentLifecycleSnapshot(
+      state: DocumentLifecycleState.closed,
+      generation: _openGeneration,
+    );
     openProgress = ProgressiveOpenPolicy.cancel(openProgress);
     viewController.removeListener(_onViewerStateChanged);
     _saveTimer?.cancel();

@@ -2,12 +2,15 @@
 
 import 'dart:math' as math;
 
+import 'package:crypto/crypto.dart';
+
 import '../../../storage/database/app_database.dart';
 import '../../../storage/repositories/document_repository.dart';
 import '../domain/duplicate_resolution.dart';
 import '../domain/library_document.dart';
 
 typedef DuplicatePreBackup = Future<String> Function();
+typedef DuplicateBackupRestore = Future<String> Function(String path);
 
 enum DuplicateResolutionAction { merge, keepBoth }
 
@@ -18,6 +21,7 @@ final class DuplicateMergeResult {
     required this.incomingDocumentId,
     required this.preBackupPath,
     required this.conflictFields,
+    required this.historyId,
   });
 
   final DuplicateResolutionAction action;
@@ -25,6 +29,7 @@ final class DuplicateMergeResult {
   final String incomingDocumentId;
   final String? preBackupPath;
   final List<String> conflictFields;
+  final String? historyId;
 
   bool get changedLibrary => action == DuplicateResolutionAction.merge;
 }
@@ -38,6 +43,16 @@ final class DuplicateMergeRequiresConfirmation implements Exception {
   String toString() => 'Duplicate merge requires confirmation: ${kind.name}.';
 }
 
+final class DuplicateMergeImpact {
+  const DuplicateMergeImpact({
+    required this.localRecords,
+    required this.conflictFields,
+  });
+
+  final int localRecords;
+  final List<String> conflictFields;
+}
+
 /// Merges only local records. The source PDF files are never opened for write,
 /// moved, renamed, or deleted by this service.
 final class DuplicateResolutionService {
@@ -45,18 +60,97 @@ final class DuplicateResolutionService {
     required AppDatabase database,
     required DocumentRepository documents,
     required DuplicatePreBackup createPreBackup,
+    DuplicateBackupRestore? restoreBackup,
   }) : _database = database,
        _documents = documents,
-       _createPreBackup = createPreBackup;
+       _createPreBackup = createPreBackup,
+       _restoreBackup = restoreBackup;
 
   final AppDatabase _database;
   final DocumentRepository _documents;
   final DuplicatePreBackup _createPreBackup;
+  final DuplicateBackupRestore? _restoreBackup;
 
   DuplicateEvidence classify(String existingId, String incomingId) {
     final existing = _required(existingId);
     final incoming = _required(incomingId);
     return DuplicateClassifier.classify(existing, incoming);
+  }
+
+  List<DuplicateCandidate> candidates({int limit = 80, int scanLimit = 5000}) {
+    final documents = _documents
+        .scan(limit: scanLimit.clamp(2, 100000))
+        .toList(growable: false);
+    final results = <DuplicateCandidate>[];
+    final seenPairs = <String>{};
+    void addPair(LibraryDocument left, LibraryDocument right) {
+      if (results.length >= limit.clamp(1, 200)) return;
+      final pair = [left.id, right.id]..sort();
+      if (!seenPairs.add(pair.join(':'))) return;
+      final evidence = DuplicateClassifier.classify(left, right);
+      if (evidence.kind == DuplicateMatchKind.none) return;
+      results.add(
+        DuplicateCandidate(existing: left, incoming: right, evidence: evidence),
+      );
+    }
+
+    final exactBuckets = <String, List<LibraryDocument>>{};
+    final probableBuckets = <String, List<LibraryDocument>>{};
+    for (final document in documents) {
+      exactBuckets.putIfAbsent(document.fingerprint, () => []).add(document);
+      final probableKey =
+          '${document.fileName.toLowerCase()}:${document.fileSize}';
+      probableBuckets.putIfAbsent(probableKey, () => []).add(document);
+    }
+    for (final bucket in exactBuckets.values.where(
+      (items) => items.length > 1,
+    )) {
+      for (var index = 1; index < bucket.length; index++) {
+        addPair(bucket.first, bucket[index]);
+      }
+    }
+    for (final bucket in probableBuckets.values.where(
+      (items) => items.length > 1,
+    )) {
+      for (var index = 1; index < bucket.length; index++) {
+        addPair(bucket.first, bucket[index]);
+      }
+    }
+    return List.unmodifiable(results);
+  }
+
+  DuplicateMergeImpact previewImpact(String existingId, String incomingId) {
+    final existing = _required(existingId);
+    final incoming = _required(incomingId);
+    final conflicts = MetadataMergePolicy.merge(existing, incoming).conflicts;
+    final db = _database.database;
+    int count(String table, String predicate, List<Object?> parameters) =>
+        db
+                .select(
+                  'SELECT COUNT(*) FROM $table WHERE $predicate',
+                  parameters,
+                )
+                .first
+                .columnAt(0)
+            as int;
+    final records =
+        1 +
+        count('bookmarks', 'document_id = ?', [incomingId]) +
+        count('reading_sessions', 'document_id = ?', [incomingId]) +
+        count('annotations', 'document_id = ?', [incomingId]) +
+        count('document_tags', 'document_id = ?', [incomingId]) +
+        count('collection_documents', 'document_id = ?', [incomingId]) +
+        count('workspace_tabs', 'document_id = ?', [incomingId]) +
+        count(
+          'document_relations',
+          'source_document_id = ? OR target_document_id = ?',
+          [incomingId, incomingId],
+        ) +
+        count('document_revision_members', 'document_id = ?', [incomingId]);
+    return DuplicateMergeImpact(
+      localRecords: records,
+      conflictFields: List.unmodifiable(conflicts),
+    );
   }
 
   Future<DuplicateMergeResult> resolve({
@@ -65,6 +159,7 @@ final class DuplicateResolutionService {
     required DuplicateResolutionAction action,
     bool confirmed = false,
     MetadataConflictChoice conflict = MetadataConflictChoice.nonEmptyExisting,
+    Map<String, MetadataConflictChoice>? conflictChoices,
   }) async {
     if (existingId == incomingId) {
       throw ArgumentError.value(
@@ -86,6 +181,7 @@ final class DuplicateResolutionService {
         incomingDocumentId: incomingId,
         preBackupPath: null,
         conflictFields: const [],
+        historyId: null,
       );
     }
     if (evidence.requiresConfirmation && !confirmed) {
@@ -95,12 +191,20 @@ final class DuplicateResolutionService {
     // The backup is deliberately completed before BEGIN IMMEDIATE. If it
     // fails, the database remains untouched and the user can retry safely.
     final preBackupPath = await _createPreBackup();
-    final mergedMetadata = MetadataMergePolicy.merge(
-      existing,
-      incoming,
-      conflict: conflict,
-    );
+    final mergedMetadata = conflictChoices == null
+        ? MetadataMergePolicy.merge(existing, incoming, conflict: conflict)
+        : MetadataMergePolicy.mergePerField(
+            existing,
+            incoming,
+            conflictChoices,
+          );
     final database = _database.database;
+    final historyId = sha256
+        .convert(
+          '$existingId:$incomingId:${DateTime.now().microsecondsSinceEpoch}'
+              .codeUnits,
+        )
+        .toString();
     database.execute('BEGIN IMMEDIATE');
     try {
       _mergeDocumentRow(existing, incoming, mergedMetadata);
@@ -111,9 +215,21 @@ final class DuplicateResolutionService {
       _mergeTags(existingId, incomingId);
       _mergeCollections(existingId, incomingId);
       _mergeWorkspaceTabs(existingId, incomingId);
+      _mergeRelations(existingId, incomingId);
+      _mergeRevisions(existingId, incomingId);
       _mergeCover(existingId, incomingId);
       _dropSearchEntries(existingId, incomingId);
       database.execute('DELETE FROM documents WHERE id = ?', [incomingId]);
+      final now = _date(DateTime.now());
+      database.execute(
+        '''
+        INSERT INTO duplicate_merge_history(
+          id, kept_document_id, incoming_document_id, backup_path, status,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'completed', ?, ?)
+        ''',
+        [historyId, existingId, incomingId, preBackupPath, now, now],
+      );
       database.execute('COMMIT');
     } catch (_) {
       database.execute('ROLLBACK');
@@ -125,7 +241,45 @@ final class DuplicateResolutionService {
       incomingDocumentId: incomingId,
       preBackupPath: preBackupPath,
       conflictFields: List.unmodifiable(mergedMetadata.conflicts),
+      historyId: historyId,
     );
+  }
+
+  Future<bool> undoMerge(String historyId) async {
+    final restore = _restoreBackup;
+    if (restore == null) return false;
+    final rows = _database.database.select(
+      'SELECT * FROM duplicate_merge_history '
+      "WHERE id = ? AND status = 'completed'",
+      [historyId],
+    );
+    if (rows.isEmpty) return false;
+    final row = rows.first;
+    final keptId = row['kept_document_id'] as String;
+    final incomingId = row['incoming_document_id'] as String;
+    final backupPath = row['backup_path'] as String;
+    final createdAt = row['created_at'] as String;
+    try {
+      await restore(backupPath);
+      final now = _date(DateTime.now());
+      _database.database.execute(
+        '''
+        INSERT OR REPLACE INTO duplicate_merge_history(
+          id, kept_document_id, incoming_document_id, backup_path, status,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'rolledBack', ?, ?)
+        ''',
+        [historyId, keptId, incomingId, backupPath, createdAt, now],
+      );
+      return true;
+    } on Object {
+      _database.database.execute(
+        "UPDATE duplicate_merge_history SET status = 'failed', updated_at = ? "
+        'WHERE id = ?',
+        [_date(DateTime.now()), historyId],
+      );
+      rethrow;
+    }
   }
 
   LibraryDocument _required(String id) =>
@@ -271,7 +425,16 @@ final class DuplicateResolutionService {
 
   void _mergeAnnotations(String existingId, String incomingId) {
     _database.database.execute(
-      'UPDATE annotations SET document_id = ? WHERE document_id = ?',
+      '''
+      UPDATE annotations SET
+        origin_document_id = COALESCE(origin_document_id, document_id),
+        origin_fingerprint = COALESCE(
+          origin_fingerprint,
+          document_fingerprint
+        ),
+        document_id = ?
+      WHERE document_id = ?
+      ''',
       [existingId, incomingId],
     );
   }
@@ -315,10 +478,12 @@ final class DuplicateResolutionService {
       '''
       INSERT OR IGNORE INTO workspace_tabs(
         id, workspace_id, document_id, sort_order, is_pinned, page_index,
-        zoom_level, page_layout, reading_mode, scroll_offset
+        zoom_level, page_layout, reading_mode, scroll_offset, queue_status,
+        blocking_reason, next_action
       )
       SELECT id, workspace_id, ?, sort_order, is_pinned, page_index,
-        zoom_level, page_layout, reading_mode, scroll_offset
+        zoom_level, page_layout, reading_mode, scroll_offset, queue_status,
+        blocking_reason, next_action
       FROM workspace_tabs WHERE document_id = ?
       ''',
       [existingId, incomingId],
@@ -340,6 +505,71 @@ final class DuplicateResolutionService {
     db.execute('DELETE FROM workspace_tabs WHERE document_id = ?', [
       incomingId,
     ]);
+  }
+
+  void _mergeRelations(String existingId, String incomingId) {
+    final db = _database.database;
+    final incomingRelations = db.select(
+      'SELECT * FROM document_relations '
+      'WHERE source_document_id = ? OR target_document_id = ?',
+      [incomingId, incomingId],
+    );
+    for (final relation in incomingRelations) {
+      db.execute('DELETE FROM document_relations WHERE id = ?', [
+        relation['id'],
+      ]);
+      final source = relation['source_document_id'] == incomingId
+          ? existingId
+          : relation['source_document_id'] as String;
+      final target = relation['target_document_id'] == incomingId
+          ? existingId
+          : relation['target_document_id'] as String;
+      // A direct edge between both duplicate records collapses to a self edge;
+      // an already-existing equivalent edge is intentionally de-duplicated.
+      if (source == target) continue;
+      db.execute(
+        '''
+        INSERT OR IGNORE INTO document_relations(
+          id, source_document_id, target_document_id, relation_type,
+          source_anchor_kind, source_anchor_id, target_anchor_kind,
+          target_anchor_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        [
+          relation['id'],
+          source,
+          target,
+          relation['relation_type'],
+          relation['source_anchor_kind'],
+          relation['source_anchor_id'],
+          relation['target_anchor_kind'],
+          relation['target_anchor_id'],
+          relation['created_at'],
+        ],
+      );
+    }
+  }
+
+  void _mergeRevisions(String existingId, String incomingId) {
+    final db = _database.database;
+    db.execute(
+      '''
+      INSERT OR IGNORE INTO document_revision_members(
+        group_id, document_id, added_at
+      )
+      SELECT group_id, ?, added_at FROM document_revision_members
+      WHERE document_id = ?
+      ''',
+      [existingId, incomingId],
+    );
+    db.execute('DELETE FROM document_revision_members WHERE document_id = ?', [
+      incomingId,
+    ]);
+    db.execute(
+      'UPDATE document_revision_groups SET current_document_id = ?, '
+      'updated_at = ? WHERE current_document_id = ?',
+      [existingId, _date(DateTime.now()), incomingId],
+    );
   }
 
   void _mergeCover(String existingId, String incomingId) {

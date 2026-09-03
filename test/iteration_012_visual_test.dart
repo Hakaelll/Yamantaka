@@ -53,7 +53,7 @@ void main() {
     ]);
   });
 
-  testWidgets('captures the 0.12 continuity and workflow surfaces', (
+  testWidgets('captures the 0.13 continuity and workflow surfaces', (
     tester,
   ) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_WORKFLOW_MATRIX_DIR');
@@ -340,7 +340,7 @@ void main() {
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-workflow-visual-matrix',
         'version': 1,
-        'productVersion': '0.12.0',
+        'productVersion': '0.13.0',
         'generatedAt': '2026-08-31T12:00:00Z',
         'cases': cases,
       }),

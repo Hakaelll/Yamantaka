@@ -87,7 +87,7 @@ movimiento reducido.
 
 ## Persistencia
 
-SQLite v8 guarda documentos, preferencias, marcadores, sesiones, anotaciones,
+SQLite v11 guarda documentos, preferencias, marcadores, sesiones, anotaciones,
 etiquetas, colecciones, workspaces, perfiles, enriquecimiento, relaciones de
 temas e índice FTS reconstruible. Las
 migraciones son incrementales, crean una copia pre-migración y se ejecutan en
@@ -142,9 +142,9 @@ acciones; persistencia, PDFium y SQL quedan fuera del widget.
 ## Copias, historial y recuperación
 
 `LocalBackupService` es el único límite de exportación/importación. Serializa
-un contenedor JSON `yamantaka-local-backup` versión 8 con ajustes y tablas
+un contenedor JSON `yamantaka-local-backup` versión 9 con ajustes y tablas
 privadas permitidas, pero nunca bytes PDF ni FTS reconstruible. También importa
-los formatos 1–6 con las tablas posteriores vacías y defaults seguros. La vista
+los formatos 1–8 con las tablas posteriores vacías y defaults seguros. La vista
 previa valida formato, versión,
 columnas, tipos y recuentos antes de mutar. La importación crea primero otra
 copia local y reemplaza las filas en una transacción, respetando el orden de
@@ -461,3 +461,45 @@ FTS5 añade una LRU de ocho consultas por un segundo. La clave contiene expresi�
 filtros, límite y offset; cualquier mutación de metadatos, páginas, anotaciones,
 marcadores u organización la invalida. El TTL limita la obsolescencia de flags
 externos y evita mantener un segundo índice en memoria.
+
+## Resiliencia documental y confianza local 0.13
+
+`DocumentLifecycleSnapshot` es el contrato observable de apertura. Cada intento
+recibe una generación y solo la vigente puede registrar metadatos o publicar un
+handle; reemplazar o cerrar invalida la generación y libera cualquier resultado
+nativo tardío. Los fallos conservan clase, acción posible e identidad candidata,
+pero la ruta de reintento permanece solo en memoria. Una apertura correcta limpia
+la cuarentena; contraseña requerida o incorrecta nunca la crea.
+
+El diálogo de contraseña es dueño de su controlador y lo destruye al cerrarse.
+El shell permite como máximo tres intentos, entrega la clave directamente al
+motor y la descarta después. Contraseñas, rutas fallidas y texto del documento no
+entran en SQLite, sesión atómica, journal, diagnóstico ni evidencia de
+rendimiento. El cierre de `AppServices` espera primero al controlador del lector
+y después dispone motor, base y servicios.
+
+La sesión recuperable guarda identidad, huella, número de páginas, fase y
+documento en cuarentena. Restaurar compara primero esos campos; una
+incompatibilidad vuelve a Biblioteca con una acción explícita. Los journals v11
+añaden fase, motivo de interrupción, capacidad real y hash de compatibilidad. La
+pantalla Problemas deriva sus acciones de ese contrato y nunca presenta una
+reanudación o rollback que no pueda ejecutar.
+
+El backup v9 contiene manifiesto, esquema y conteos por tabla. Su ensayo es de
+solo lectura y clasifica altas, reemplazos, eliminaciones y conflictos por
+identidad estable. La estrategia es sustituir un snapshot coherente completo,
+no resolver campos por última escritura: siempre crea un pre-backup, aplica todas
+las tablas en una transacción y conserva el estado anterior si cualquier fila
+falla. Los formatos anteriores compatibles reciben defaults seguros.
+
+La consolidación de duplicados opera solo sobre registros locales. Crea un
+pre-backup, mueve preferencias, sesiones, marcadores, anotaciones con procedencia,
+colecciones, espacios, relaciones y revisiones, colapsa aristas equivalentes y
+elimina ciclos propios. `duplicate_merge_history` enlaza la operación con la
+copia usada por undo; ningún flujo escribe, mueve o elimina los PDF.
+
+Las consultas interactivas siguen limitadas a 80 elementos y los recorridos de
+mantenimiento usan keyset y un techo de 100.000. Incluso las lecturas globales
+de repositorio poseen un límite duro. La búsqueda caliente evita reordenar su LRU
+cuando la clave ya es la más reciente, sin cambiar resultados ni retener texto
+adicional.

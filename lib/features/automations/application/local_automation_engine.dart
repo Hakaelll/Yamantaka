@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 import '../../../app/app_config.dart';
 import '../../../storage/repositories/automation_repository.dart';
 import '../../library/domain/library_document.dart';
@@ -140,7 +144,15 @@ final class LocalAutomationEngine {
     final journal = _repository.startJournal(
       kind: 'automation',
       totalItems: candidates.length,
-      summary: {'ruleId': rule.id, 'actions': rule.actions.length},
+      summary: {
+        'ruleId': rule.id,
+        'actions': rule.actions.length,
+        'scanned': scanned,
+        'matched': candidates.length,
+      },
+      phase: 'applying',
+      resumeCapability: JournalResumeCapability.retry,
+      compatibilityHash: compatibilityHash(rule),
     );
     final undo = <String, Object?>{};
     var completed = 0;
@@ -151,6 +163,10 @@ final class LocalAutomationEngine {
           status: JournalStatus.cancelled,
           completedItems: 0,
           errorCode: scanTimedOut ? 'time_limit_exceeded' : null,
+          phase: 'cancelled',
+          interruptionReason: scanTimedOut
+              ? 'time_limit_exceeded'
+              : 'cancelled_before_apply',
         );
         return AutomationApplyResult(
           journalId: journal.id,
@@ -180,6 +196,13 @@ final class LocalAutomationEngine {
             errorCode: rollbackOk
                 ? (timedOut ? 'time_limit_exceeded' : null)
                 : 'rollback_failed',
+            phase: rollbackOk ? 'rolled_back' : 'rollback_failed',
+            interruptionReason: timedOut
+                ? 'time_limit_exceeded'
+                : 'user_cancelled',
+            resumeCapability: rollbackOk
+                ? JournalResumeCapability.retry
+                : JournalResumeCapability.rollback,
           );
           return AutomationApplyResult(
             journalId: journal.id,
@@ -209,6 +232,8 @@ final class LocalAutomationEngine {
           status: JournalStatus.running,
           completedItems: completed,
           undo: undo,
+          phase: 'applying',
+          resumeCapability: JournalResumeCapability.rollback,
         );
         await Future<void>.delayed(Duration.zero);
       }
@@ -217,6 +242,8 @@ final class LocalAutomationEngine {
         status: JournalStatus.completed,
         completedItems: completed,
         undo: undo,
+        phase: 'completed',
+        resumeCapability: JournalResumeCapability.rollback,
       );
       return AutomationApplyResult(
         journalId: journal.id,
@@ -233,6 +260,11 @@ final class LocalAutomationEngine {
         completedItems: completed,
         undo: undo,
         errorCode: rollbackOk ? 'apply_failed' : 'rollback_failed',
+        phase: rollbackOk ? 'rolled_back_after_failure' : 'rollback_failed',
+        interruptionReason: 'apply_failed',
+        resumeCapability: rollbackOk
+            ? JournalResumeCapability.retry
+            : JournalResumeCapability.rollback,
       );
       rethrow;
     }
@@ -269,7 +301,21 @@ final class LocalAutomationEngine {
       journalId,
       status: JournalStatus.rolledBack,
       completedItems: journal.completedItems,
+      phase: 'rolled_back',
+      resumeCapability: JournalResumeCapability.none,
     );
     return true;
   }
+
+  static String compatibilityHash(LocalAutomationRule rule) => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode({
+            'id': rule.id,
+            'trigger': rule.trigger.toJson(),
+            'actions': rule.actions.map((action) => action.toJson()).toList(),
+          }),
+        ),
+      )
+      .toString();
 }

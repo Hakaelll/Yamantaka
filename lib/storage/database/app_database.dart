@@ -29,6 +29,26 @@ final class AppDatabase {
     return appDatabase;
   }
 
+  /// Builds a historical schema fixture using the real migration sequence.
+  /// This is intentionally in-memory and exists for migration compatibility
+  /// tests; production callers should use [open] or [inMemory].
+  static AppDatabase inMemoryAtVersion(AppLogger logger, int targetVersion) {
+    if (targetVersion < 1 || targetVersion > AppConfig.databaseVersion) {
+      throw RangeError.range(
+        targetVersion,
+        1,
+        AppConfig.databaseVersion,
+        'targetVersion',
+      );
+    }
+    final appDatabase = AppDatabase._(sqlite3.openInMemory(), logger);
+    appDatabase._configure();
+    appDatabase._migrate(targetVersion);
+    return appDatabase;
+  }
+
+  void migrateToCurrentForTesting() => _migrate();
+
   void _configure() {
     database
       ..execute('PRAGMA foreign_keys = ON')
@@ -51,16 +71,16 @@ final class AppDatabase {
     logger.info('Created a local pre-migration database backup.');
   }
 
-  void _migrate() {
+  void _migrate([int targetVersion = AppConfig.databaseVersion]) {
     final currentVersion =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (currentVersion > AppConfig.databaseVersion) {
+    if (currentVersion > targetVersion) {
       throw StateError(
         'Database version $currentVersion is newer than supported '
-        '${AppConfig.databaseVersion}.',
+        '$targetVersion.',
       );
     }
-    if (currentVersion == 0) {
+    if (currentVersion == 0 && targetVersion >= 1) {
       _transaction(() {
         database
           ..execute('''
@@ -157,7 +177,7 @@ final class AppDatabase {
     }
     final versionAfterBootstrap =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterBootstrap < 2) {
+    if (versionAfterBootstrap < 2 && targetVersion >= 2) {
       _transaction(() {
         database
           ..execute('''
@@ -313,7 +333,7 @@ final class AppDatabase {
     }
     final versionAfterCapabilities =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterCapabilities < 3) {
+    if (versionAfterCapabilities < 3 && targetVersion >= 3) {
       _transaction(() {
         database
           ..execute(
@@ -349,7 +369,7 @@ final class AppDatabase {
     }
     final versionAfterCovers =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterCovers < 4) {
+    if (versionAfterCovers < 4 && targetVersion >= 4) {
       _transaction(() {
         database
           ..execute(
@@ -378,7 +398,7 @@ final class AppDatabase {
     }
     final versionAfterIndexes =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterIndexes < 5) {
+    if (versionAfterIndexes < 5 && targetVersion >= 5) {
       _transaction(() {
         database
           ..execute('ALTER TABLE documents ADD COLUMN source_title TEXT')
@@ -399,7 +419,7 @@ final class AppDatabase {
     }
     final versionAfterMetadata =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterMetadata < 6) {
+    if (versionAfterMetadata < 6 && targetVersion >= 6) {
       _transaction(() {
         database
           ..execute('''
@@ -416,7 +436,7 @@ final class AppDatabase {
     }
     final versionAfterReaderLayout =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterReaderLayout < 7) {
+    if (versionAfterReaderLayout < 7 && targetVersion >= 7) {
       _transaction(() {
         database
           ..execute(
@@ -433,7 +453,7 @@ final class AppDatabase {
     }
     final versionAfterBookLayout =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterBookLayout < 8) {
+    if (versionAfterBookLayout < 8 && targetVersion >= 8) {
       _transaction(() {
         database
           ..execute('''
@@ -482,7 +502,7 @@ final class AppDatabase {
     }
     final versionAfterEnrichment =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterEnrichment < 9) {
+    if (versionAfterEnrichment < 9 && targetVersion >= 9) {
       _transaction(() {
         final columns = database
             .select('PRAGMA table_info(documents)')
@@ -526,7 +546,7 @@ final class AppDatabase {
     }
     final versionAfterValidation =
         database.select('PRAGMA user_version').first.columnAt(0) as int;
-    if (versionAfterValidation < 10) {
+    if (versionAfterValidation < 10 && targetVersion >= 10) {
       _transaction(() {
         final annotationColumns = database
             .select('PRAGMA table_info(annotations)')
@@ -689,6 +709,88 @@ final class AppDatabase {
       });
       logger.info('Migrated database schema to version 10.');
     }
+    final versionAfterContinuity =
+        database.select('PRAGMA user_version').first.columnAt(0) as int;
+    if (versionAfterContinuity < 11 && targetVersion >= 11) {
+      _transaction(() {
+        final documentColumns = database
+            .select('PRAGMA table_info(documents)')
+            .map((row) => row['name'] as String)
+            .toSet();
+        if (!documentColumns.contains('last_failure_code')) {
+          database.execute(
+            'ALTER TABLE documents ADD COLUMN last_failure_code TEXT',
+          );
+        }
+        if (!documentColumns.contains('restore_blocked')) {
+          database.execute(
+            'ALTER TABLE documents ADD COLUMN restore_blocked INTEGER NOT NULL '
+            'DEFAULT 0 CHECK(restore_blocked IN (0, 1))',
+          );
+        }
+        final annotationColumns = database
+            .select('PRAGMA table_info(annotations)')
+            .map((row) => row['name'] as String)
+            .toSet();
+        if (!annotationColumns.contains('origin_document_id')) {
+          database.execute(
+            'ALTER TABLE annotations ADD COLUMN origin_document_id TEXT',
+          );
+        }
+        if (!annotationColumns.contains('origin_fingerprint')) {
+          database.execute(
+            'ALTER TABLE annotations ADD COLUMN origin_fingerprint TEXT',
+          );
+        }
+        final journalColumns = database
+            .select('PRAGMA table_info(operation_journal)')
+            .map((row) => row['name'] as String)
+            .toSet();
+        if (!journalColumns.contains('phase')) {
+          database.execute(
+            "ALTER TABLE operation_journal ADD COLUMN phase TEXT NOT NULL "
+            "DEFAULT 'planned'",
+          );
+        }
+        if (!journalColumns.contains('interruption_reason')) {
+          database.execute(
+            'ALTER TABLE operation_journal ADD COLUMN interruption_reason TEXT',
+          );
+        }
+        if (!journalColumns.contains('resume_capability')) {
+          database.execute(
+            "ALTER TABLE operation_journal ADD COLUMN resume_capability TEXT "
+            "NOT NULL DEFAULT 'none' CHECK(resume_capability IN "
+            "('none', 'retry', 'resume', 'rollback'))",
+          );
+        }
+        if (!journalColumns.contains('compatibility_hash')) {
+          database.execute(
+            'ALTER TABLE operation_journal ADD COLUMN compatibility_hash TEXT',
+          );
+        }
+        database
+          ..execute('''
+            CREATE TABLE IF NOT EXISTS duplicate_merge_history (
+              id TEXT NOT NULL PRIMARY KEY,
+              kept_document_id TEXT NOT NULL,
+              incoming_document_id TEXT NOT NULL,
+              backup_path TEXT NOT NULL,
+              status TEXT NOT NULL CHECK(status IN (
+                'completed', 'rolledBack', 'failed'
+              )),
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            ) STRICT
+          ''')
+          ..execute(
+            'CREATE INDEX IF NOT EXISTS idx_duplicate_merge_history_status '
+            'ON duplicate_merge_history(status, updated_at DESC)',
+          )
+          ..execute('PRAGMA user_version = 11');
+      });
+      logger.info('Migrated database schema to version 11.');
+    }
   }
 
   void _transaction(void Function() operation) {
@@ -708,6 +810,7 @@ final class AppDatabase {
   void clearUserData() {
     _transaction(() {
       database
+        ..execute('DELETE FROM duplicate_merge_history')
         ..execute('DELETE FROM operation_journal')
         ..execute('DELETE FROM automation_rules')
         ..execute('DELETE FROM document_revision_members')
@@ -767,6 +870,7 @@ final class AppDatabase {
       'document_relations',
       'automation_rules',
       'operation_journal',
+      'duplicate_merge_history',
       'search_index_state',
     };
     if (!allowed.contains(table)) {

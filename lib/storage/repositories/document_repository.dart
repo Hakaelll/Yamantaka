@@ -39,9 +39,10 @@ final class DocumentRepository {
     return rows.map(_fromRow).toList(growable: false);
   }
 
-  List<LibraryDocument> all() {
+  List<LibraryDocument> all({int limit = 100000}) {
     final rows = _database.database.select(
-      '$_documentSelect ORDER BY d.last_opened_at DESC',
+      '$_documentSelect ORDER BY d.last_opened_at DESC LIMIT ?',
+      [limit.clamp(1, 100000)],
     );
     return rows.map(_fromRow).toList(growable: false);
   }
@@ -220,6 +221,34 @@ final class DocumentRepository {
       [fingerprint],
     );
     return rows.isEmpty ? null : _fromRow(rows.first);
+  }
+
+  void markOpenFailure(
+    String documentId,
+    String failureCode, {
+    bool blockAutomaticRestore = true,
+  }) {
+    _database.database.execute(
+      'UPDATE documents SET last_failure_code = ?, restore_blocked = ? '
+      'WHERE id = ?',
+      [failureCode, blockAutomaticRestore ? 1 : 0, documentId],
+    );
+  }
+
+  void clearOpenFailure(String documentId) {
+    _database.database.execute(
+      'UPDATE documents SET last_failure_code = NULL, restore_blocked = 0 '
+      'WHERE id = ?',
+      [documentId],
+    );
+  }
+
+  bool automaticRestoreBlocked(String documentId) {
+    final rows = _database.database.select(
+      'SELECT restore_blocked FROM documents WHERE id = ?',
+      [documentId],
+    );
+    return rows.isNotEmpty && (rows.first['restore_blocked'] as int) == 1;
   }
 
   void save(LibraryDocument document) {

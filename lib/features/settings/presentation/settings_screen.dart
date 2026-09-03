@@ -17,6 +17,7 @@ import '../../../storage/backup/local_backup_service.dart';
 import '../../reader/domain/reader_models.dart';
 import '../../diagnostics/presentation/diagnostics_dialog.dart';
 import '../../help/presentation/help_center_dialog.dart';
+import 'backup_restore_preview_dialog.dart';
 
 part 'settings_screen_components.dart';
 
@@ -892,35 +893,9 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     BuildContext context,
     BackupPreview preview,
   ) async {
-    final strings = YamantakaLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.inventory_2_outlined),
-        title: Text(strings.get('settings.importBackup')),
-        content: Text(
-          strings.get(
-            'backup.importPreview',
-            parameters: {
-              'version': preview.version,
-              'documents': preview.documentCount,
-              'bookmarks': preview.bookmarkCount,
-              'annotations': preview.annotationCount,
-              'sessions': preview.sessionCount,
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(strings.get('action.cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(strings.get('action.import')),
-          ),
-        ],
-      ),
+      builder: (context) => BackupRestorePreviewDialog(preview: preview),
     );
     return confirmed ?? false;
   }

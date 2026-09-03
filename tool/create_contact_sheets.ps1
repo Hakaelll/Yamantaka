@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$InputDirectory = 'build/visual-evidence/v0.12.0',
-    [string]$OutputDirectory = 'build/visual-review-012',
+    [string]$InputDirectory = 'build/visual-evidence/v0.13.0',
+    [string]$OutputDirectory = 'build/visual-review-013',
     [ValidateRange(1, 24)][int]$MaxPerSheet = 12
 )
 

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yamantaka/app/app_config.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
 import 'package:yamantaka/features/library/domain/document_enrichment.dart';
@@ -91,13 +93,21 @@ void main() {
       final backup = File('${directory.path}/backup.json');
       await service.exportTo(backup.path);
       final exported = await backup.readAsString();
-      expect((jsonDecode(exported) as Map<String, dynamic>)['version'], 8);
+      expect(
+        (jsonDecode(exported) as Map<String, dynamic>)['version'],
+        LocalBackupService.version,
+      );
       expect(exported, contains('"containsPdfFiles": false'));
       expect(exported, isNot(contains('%PDF-')));
       final preview = await service.preview(backup.path);
       expect(preview.documentCount, 1);
       expect(preview.bookmarkCount, 1);
       expect(preview.sessionCount, 1);
+      expect(preview.schemaVersion, AppConfig.databaseVersion);
+      expect(preview.documentReplacements, 1);
+      expect(preview.documentAdds, 0);
+      expect(preview.documentRemovals, 0);
+      expect(preview.identityConflicts, 0);
 
       documents.remove('doc-1');
       await settings.clear();
@@ -167,6 +177,104 @@ void main() {
     await expectLater(service.importFrom(invalid.path), throwsFormatException);
     expect(documents.byId('safe'), isNotNull);
   });
+
+  test('failed backup installation preserves the previous file', () async {
+    final harness = await _backupHarness('export-interruption');
+    addTearDown(harness.dispose);
+    final destination = File('${harness.directory.path}/backup.json');
+    await destination.writeAsString('previous-valid-bytes', flush: true);
+    await Directory('${destination.path}.previous').create();
+
+    await expectLater(
+      harness.service.exportTo(destination.path),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    expect(await destination.readAsString(), 'previous-valid-bytes');
+    expect(File('${destination.path}.part').existsSync(), isFalse);
+  });
+
+  test(
+    'restore rolls back when a valid manifest contains invalid data',
+    () async {
+      final harness = await _backupHarness('restore-interruption');
+      addTearDown(harness.dispose);
+      final documents = DocumentRepository(harness.database);
+      final now = DateTime.utc(2026, 9, 1);
+      documents.save(
+        LibraryDocument(
+          id: 'safe',
+          path: 'safe.pdf',
+          normalizedPath: 'safe.pdf',
+          fileName: 'safe.pdf',
+          pageCount: 2,
+          fileSize: 4,
+          fileModifiedAt: now,
+          addedAt: now,
+          lastOpenedAt: now,
+          fingerprint: 'safe',
+        ),
+      );
+      final backup = File('${harness.directory.path}/rollback.json');
+      await harness.service.exportTo(backup.path);
+      final payload =
+          jsonDecode(await backup.readAsString()) as Map<String, dynamic>;
+      final tables = payload['tables'] as Map<String, dynamic>;
+      final rows = (tables['documents'] as List).cast<Map<String, dynamic>>();
+      rows.single['page_count'] = -1;
+      final manifest = payload['manifest'] as Map<String, dynamic>;
+      final categories = (manifest['categories'] as List)
+          .cast<Map<String, dynamic>>();
+      final category = categories.singleWhere(
+        (item) => item['name'] == 'documents',
+      );
+      category['sha256'] = sha256
+          .convert(utf8.encode(const JsonEncoder().convert(rows)))
+          .toString();
+      await backup.writeAsString(jsonEncode(payload), flush: true);
+
+      await expectLater(
+        harness.service.importFrom(backup.path),
+        throwsA(anything),
+      );
+      expect(documents.byId('safe')?.pageCount, 2);
+      expect(harness.database.integrityCheck(), 'ok');
+    },
+  );
+}
+
+Future<_BackupHarness> _backupHarness(String name) async {
+  final directory = await Directory.systemTemp.createTemp('yamantaka-$name-');
+  final logger = AppLogger(minimumLevel: LogLevel.error);
+  final database = AppDatabase.inMemory(logger);
+  final settings = SettingsController(
+    AppSettingsRepository(_MemoryPreferencesStore()),
+    logger,
+  );
+  await settings.load();
+  final service = LocalBackupService(
+    database: database,
+    paths: AppPaths(
+      dataDirectory: directory,
+      cacheDirectory: directory,
+      thumbnailDirectory: directory,
+    ),
+    settings: settings,
+  );
+  return _BackupHarness(directory, database, service);
+}
+
+final class _BackupHarness {
+  const _BackupHarness(this.directory, this.database, this.service);
+
+  final Directory directory;
+  final AppDatabase database;
+  final LocalBackupService service;
+
+  Future<void> dispose() async {
+    database.close();
+    await directory.delete(recursive: true);
+  }
 }
 
 final class _MemoryPreferencesStore implements AppPreferencesStore {

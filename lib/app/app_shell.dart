@@ -366,6 +366,11 @@ final class _YamantakaAppState extends State<YamantakaApp>
         setState(() => _page = _AppPage.library);
         unawaited(_resumeInterruptedAutomation(problem.id));
       },
+      onRollback: (problem) {
+        setState(() => _page = _AppPage.library);
+        unawaited(_rollbackInterruptedAutomation(problem.id));
+      },
+      onReviewDuplicates: () => unawaited(_showDuplicateReview()),
     ),
   };
 
@@ -425,12 +430,51 @@ final class _YamantakaAppState extends State<YamantakaApp>
       widget.services.enrichment.setInteractionPaused(isActive);
     },
     onCompare: () => unawaited(_showComparison()),
+    onFailureAction: _handleReaderFailure,
     initialFocusMode: _readerFocusMode,
     onFocusModeChanged: (enabled) {
       _readerFocusMode = enabled;
       widget.services.workspaces.updateFocusMode(enabled);
     },
   );
+
+  Future<void> _handleReaderFailure(FailureAction action) async {
+    final reader = widget.services.reader;
+    switch (action) {
+      case FailureAction.retry:
+      case FailureAction.enterPassword:
+        final path = reader.pendingPath;
+        if (path == null || path.isEmpty) {
+          await _pickAndOpen();
+        } else {
+          await _openPath(path);
+        }
+        return;
+      case FailureAction.chooseAnotherFile:
+        final failedId = reader.failedDocumentId;
+        final failed = failedId == null
+            ? null
+            : widget.services.documents.byId(failedId);
+        if (failed != null && reader.error?.kind == FailureKind.fileNotFound) {
+          await _relocateDocument(failed);
+        } else {
+          await _pickAndOpen();
+        }
+        return;
+      case FailureAction.openDiagnostics:
+        final context = _navigatorKey.currentContext;
+        if (context == null || !context.mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (_) => DiagnosticsDialog(services: widget.services),
+        );
+        return;
+      case FailureAction.goBack:
+      case FailureAction.dismiss:
+        await _closeReader();
+        return;
+    }
+  }
 
   Future<void> _showComparison() async {
     final context = _navigatorKey.currentContext;
@@ -642,18 +686,46 @@ final class _YamantakaAppState extends State<YamantakaApp>
     );
   }
 
-  Future<void> _restoreWorkspace(WorkspaceSnapshot workspace) async {
+  Future<void> _restoreWorkspace(
+    WorkspaceSnapshot workspace, {
+    bool automatic = false,
+    String? expectedDocumentId,
+    String? expectedFingerprint,
+    int? expectedPageIndex,
+    int? expectedPageCount,
+  }) async {
     _readerFocusMode = workspace.focusMode;
     widget.services.workspaces.restore(workspace.id);
     final available = workspace.tabs
-        .where((tab) => !tab.isMissing && File(tab.path).existsSync())
+        .where(
+          (tab) =>
+              !tab.isMissing &&
+              File(tab.path).existsSync() &&
+              (!automatic ||
+                  !widget.services.documents.automaticRestoreBlocked(
+                    tab.documentId,
+                  )),
+        )
         .toList(growable: false);
     final missingCount = workspace.tabs.length - available.length;
     final active = available
         .where((tab) => tab.id == workspace.activeTabId)
         .firstOrNull;
     final target = active ?? available.firstOrNull;
-    if (target != null) await _activateTab(target);
+    if (target != null) {
+      if (automatic &&
+          expectedDocumentId == target.documentId &&
+          !await _matchesRecoveryIdentity(
+            target.path,
+            expectedFingerprint: expectedFingerprint,
+            expectedPageCount: expectedPageCount,
+          )) {
+        _showNotice(_strings.get('recovery.sessionUnavailable'));
+      } else {
+        await _activateTab(target);
+        await _restoreRecoveredPage(expectedDocumentId, expectedPageIndex);
+      }
+    }
     if (missingCount > 0) {
       _showNotice(
         _strings.get(
@@ -744,7 +816,12 @@ final class _YamantakaAppState extends State<YamantakaApp>
         .all()
         .where((item) => item.id == ruleId)
         .firstOrNull;
-    if (journal == null || rule == null) {
+    if (journal == null ||
+        rule == null ||
+        journal.resumeCapability == JournalResumeCapability.none ||
+        journal.resumeCapability == JournalResumeCapability.rollback ||
+        journal.compatibilityHash !=
+            LocalAutomationEngine.compatibilityHash(rule)) {
       _showNotice(_strings.get('problems.resumeUnavailable'));
       return;
     }
@@ -844,6 +921,101 @@ final class _YamantakaAppState extends State<YamantakaApp>
       ),
     );
     if (mounted) setState(() {});
+  }
+
+  Future<void> _rollbackInterruptedAutomation(String journalId) async {
+    try {
+      final rolledBack = await widget.services.automations.undo(
+        journalId,
+        _undoAutomationAction,
+      );
+      if (!rolledBack) {
+        _showNotice(_strings.get('problems.rollbackUnavailable'));
+        return;
+      }
+      widget.services.organization.reload();
+      widget.services.workspaces.reload();
+      await widget.services.library.reload();
+      _showNotice(_strings.get('problems.rollbackComplete'));
+      if (mounted) setState(() {});
+    } on Object {
+      _showNotice(_strings.get('problems.rollbackFailed'));
+    }
+  }
+
+  Future<void> _showDuplicateReview() async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    final candidates = widget.services.duplicateResolution.candidates();
+    final result = await showDialog<DuplicateReviewResult>(
+      context: context,
+      builder: (context) => DuplicateReviewDialog(
+        candidates: candidates,
+        impactFor: (candidate) => widget.services.duplicateResolution
+            .previewImpact(candidate.existing.id, candidate.incoming.id),
+      ),
+    );
+    if (result == null || !mounted || !context.mounted) return;
+    if (result.action == DuplicateResolutionAction.keepBoth) {
+      _showNotice(_strings.get('duplicates.keptBoth'));
+      return;
+    }
+    final activeId = widget.services.reader.document?.id;
+    if (activeId == result.candidate.existing.id ||
+        activeId == result.candidate.incoming.id) {
+      await widget.services.reader.closeDocument();
+    }
+    try {
+      final merged = await widget.services.duplicateResolution.resolve(
+        existingId: result.candidate.existing.id,
+        incomingId: result.candidate.incoming.id,
+        action: result.action,
+        confirmed: true,
+        conflictChoices: result.conflictChoices,
+      );
+      widget.services.organization.reload();
+      widget.services.workspaces.reload();
+      await widget.services.library.reload();
+      if (!context.mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            _strings.get(
+              'duplicates.merged',
+              parameters: {'count': merged.conflictFields.length},
+            ),
+          ),
+          action: merged.historyId == null
+              ? null
+              : SnackBarAction(
+                  label: _strings.get('action.undo'),
+                  onPressed: () =>
+                      unawaited(_undoDuplicateMerge(merged.historyId!)),
+                ),
+        ),
+      );
+    } on Object {
+      _showNotice(_strings.get('duplicates.mergeFailed'));
+    }
+  }
+
+  Future<void> _undoDuplicateMerge(String historyId) async {
+    try {
+      final undone = await widget.services.duplicateResolution.undoMerge(
+        historyId,
+      );
+      if (!undone) {
+        _showNotice(_strings.get('duplicates.undoUnavailable'));
+        return;
+      }
+      widget.services.organization.reload();
+      widget.services.workspaces.reload();
+      await widget.services.library.reload();
+      _showNotice(_strings.get('duplicates.undoComplete'));
+    } on Object {
+      _showNotice(_strings.get('duplicates.undoFailed'));
+    }
   }
 
   Future<void> _showGlobalAnnotations() async {
@@ -1248,22 +1420,32 @@ final class _YamantakaAppState extends State<YamantakaApp>
     bool registerTab = true,
   }) async {
     widget.services.startup.startIfAbsent(StartupPhase.firstPdf);
+    var passwordAttempt = 0;
     var opened = await widget.services.reader.openPath(path);
     if (!mounted) return;
-    final failure = widget.services.reader.error;
-    if (!opened &&
-        failure != null &&
-        (failure.kind == FailureKind.passwordRequired ||
-            failure.kind == FailureKind.wrongPassword)) {
+    while (!opened && passwordAttempt < AppConfig.maxPdfPasswordAttempts) {
+      final failure = widget.services.reader.error;
+      if (failure == null ||
+          (failure.kind != FailureKind.passwordRequired &&
+              failure.kind != FailureKind.wrongPassword)) {
+        break;
+      }
       final password = await _askForPassword(
         wrongPassword: failure.kind == FailureKind.wrongPassword,
       );
-      if (password != null && password.isNotEmpty) {
-        opened = await widget.services.reader.openPath(
-          path,
-          password: password,
-        );
-      }
+      if (password == null || password.isEmpty) break;
+      passwordAttempt++;
+      opened = await widget.services.reader.openPath(
+        path,
+        password: password,
+        passwordAttempt: passwordAttempt,
+      );
+      if (!mounted) return;
+    }
+    if (!opened &&
+        passwordAttempt >= AppConfig.maxPdfPasswordAttempts &&
+        widget.services.reader.error?.kind == FailureKind.wrongPassword) {
+      _showNotice(_strings.get('reader.passwordAttemptsExceeded'));
     }
     if (!mounted) return;
     if (opened) {
@@ -1379,12 +1561,18 @@ final class _YamantakaAppState extends State<YamantakaApp>
 
   void _persistAtomicSession({required bool clean}) {
     if (widget.services.safeMode) return;
+    final reader = widget.services.reader;
+    final document = reader.document;
     widget.services.recovery.saveSession(
       AtomicSessionSnapshot(
         workspaceId: widget.services.workspaces.activeWorkspaceId,
         activeDocumentId:
-            widget.services.reader.document?.id ??
-            widget.services.tabs.activeTab?.documentId,
+            document?.id ?? widget.services.tabs.activeTab?.documentId,
+        activeDocumentFingerprint: document?.fingerprint,
+        pageIndex: document == null ? null : reader.currentPageIndex,
+        pageCount: document?.pageCount,
+        quarantinedDocumentId: reader.failedDocumentId,
+        lifecycleState: reader.lifecycle.state.name,
         savedAt: DateTime.now().toUtc(),
         clean: clean,
       ),
@@ -1395,103 +1583,109 @@ final class _YamantakaAppState extends State<YamantakaApp>
     if (!mounted || widget.services.safeMode) return false;
     final snapshot = widget.services.recovery.session();
     if (snapshot == null || snapshot.clean) return false;
-    final action = await showDialog<_RecoveryStartupAction>(
+    final action = await showDialog<SessionRecoveryChoice>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.restore_page_outlined),
-        title: Text(_strings.get('recovery.sessionTitle')),
-        content: Text(_strings.get('recovery.sessionBody')),
-        actions: [
-          TextButton(
-            onPressed: () =>
-                Navigator.pop(context, _RecoveryStartupAction.startClean),
-            child: Text(_strings.get('recovery.startClean')),
-          ),
-          FilledButton.icon(
-            onPressed: () =>
-                Navigator.pop(context, _RecoveryStartupAction.restore),
-            icon: const Icon(Icons.restore_rounded, size: 18),
-            label: Text(_strings.get('recovery.restoreSession')),
-          ),
-        ],
-      ),
+      builder: (context) => const SessionRecoveryDialog(),
     );
-    if (action == _RecoveryStartupAction.startClean) {
+    if (action == SessionRecoveryChoice.startClean) {
       widget.services.recovery.discardSession();
       _restorationAttempted = true;
       return true;
     }
-    if (action != _RecoveryStartupAction.restore) return false;
+    if (action != SessionRecoveryChoice.restore) return false;
     _restorationAttempted = true;
     await _restoreAtomicSnapshot(snapshot);
     return true;
   }
 
   Future<void> _restoreAtomicSnapshot(AtomicSessionSnapshot snapshot) async {
+    if (snapshot.activeDocumentId != null &&
+        snapshot.activeDocumentId == snapshot.quarantinedDocumentId) {
+      _showNotice(_strings.get('recovery.sessionUnavailable'));
+      return;
+    }
     final workspace = widget.services.workspaces.workspaces
         .where((item) => item.id == snapshot.workspaceId)
         .firstOrNull;
     if (workspace != null) {
-      await _restoreWorkspace(workspace);
+      await _restoreWorkspace(
+        workspace,
+        automatic: true,
+        expectedDocumentId: snapshot.activeDocumentId,
+        expectedFingerprint: snapshot.activeDocumentFingerprint,
+        expectedPageIndex: snapshot.pageIndex,
+        expectedPageCount: snapshot.pageCount,
+      );
       return;
     }
     final document = widget.services.documents.byId(
       snapshot.activeDocumentId ?? '',
     );
     if (document != null &&
+        document.id != snapshot.quarantinedDocumentId &&
+        !widget.services.documents.automaticRestoreBlocked(document.id) &&
         !document.isMissing &&
-        File(document.path).existsSync()) {
+        File(document.path).existsSync() &&
+        await _matchesRecoveryIdentity(
+          document.path,
+          expectedFingerprint: snapshot.activeDocumentFingerprint,
+          expectedPageCount: snapshot.pageCount,
+        )) {
       await _openPath(document.path);
+      await _restoreRecoveredPage(document.id, snapshot.pageIndex);
       return;
     }
     _showNotice(_strings.get('recovery.sessionUnavailable'));
   }
 
+  Future<bool> _matchesRecoveryIdentity(
+    String path, {
+    String? expectedFingerprint,
+    int? expectedPageCount,
+  }) async {
+    if (expectedFingerprint == null && expectedPageCount == null) return true;
+    try {
+      final inspected = await widget.services.documentService.inspect(path);
+      if (expectedFingerprint != null &&
+          inspected.fingerprint != expectedFingerprint) {
+        return false;
+      }
+      final registered = widget.services.documents.byNormalizedPath(
+        inspected.normalizedPath,
+      );
+      return expectedPageCount == null ||
+          registered == null ||
+          registered.pageCount == expectedPageCount;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> _restoreRecoveredPage(
+    String? expectedDocumentId,
+    int? pageIndex,
+  ) async {
+    final reader = widget.services.reader;
+    if (pageIndex == null ||
+        reader.document?.id != expectedDocumentId ||
+        reader.pageCount == 0) {
+      return;
+    }
+    await reader.navigateTo(
+      pageIndex,
+      reason: NavigationReason.history,
+      label: _strings.get('recovery.restoreSession'),
+    );
+  }
+
   Future<String?> _askForPassword({required bool wrongPassword}) async {
     final context = _navigatorKey.currentContext;
     if (context == null) return null;
-    final textController = TextEditingController();
     final password = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.lock_outline_rounded),
-        title: Text(
-          _strings.get(
-            wrongPassword
-                ? 'failure.wrongPassword.title'
-                : 'failure.passwordRequired.title',
-          ),
-        ),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: TextField(
-            controller: textController,
-            autofocus: true,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: _strings.get('reader.password'),
-              errorText: wrongPassword
-                  ? _strings.get('reader.wrongPasswordRetry')
-                  : null,
-              helperText: _strings.get('reader.passwordNotStored'),
-            ),
-            onSubmitted: (value) => Navigator.pop(context, value),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(_strings.get('action.cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, textController.text),
-            child: Text(_strings.get('action.open')),
-          ),
-        ],
-      ),
+      builder: (context) => PasswordRequestDialog(wrongPassword: wrongPassword),
     );
-    textController.dispose();
     return password;
   }
 

@@ -849,3 +849,41 @@ La matriz 0.12 conserva los ocho tamaños y los estados oscuro, alto contraste,
 movimiento reducido y texto 130/150/200 %, y añade ocho capturas ejecutadas de
 continuidad, espacios, cola, comparación, anotaciones, relaciones, reglas y
 problemas. Los assets de marca permanecen byte a byte idénticos a HEAD.
+
+## 36. Resiliencia visible y decisiones reversibles — 0.13
+
+El estado de error del lector mantiene la misma jerarquía del estado vacío:
+icono, título, explicación y una acción primaria. La acción depende del fallo:
+reintentar para un error transitorio, localizar para un archivo ausente,
+introducir contraseña para un documento protegido y volver a Biblioteca como
+salida secundaria. Archivo ausente, acceso denegado, contraseña incorrecta, PDF
+dañado y fallo interno nunca comparten un mensaje genérico.
+
+La contraseña se solicita en un diálogo compacto y accesible. El campo es
+seguro, no ofrece sugerencias ni autocorrección y explica que la clave no se
+guarda. Un intento incorrecto conserva la tarea, muestra el error completo y
+permite corregirlo; a texto 200 % el contenido crece sin cortar acciones.
+
+Restaurar una copia presenta primero un resumen de solo lectura: versión,
+esquema, tamaño, entidades, altas, reemplazos, eliminaciones y conflictos. La
+misma superficie explica la estrategia de snapshot coherente, que no usa
+"última escritura gana", y la creación obligatoria de una copia previa. Solo
+después aparece la confirmación destructiva.
+
+La revisión de duplicados compara candidato conservado y entrante, enumera
+evidencias, impacto y conflictos y ofrece tres decisiones inequívocas: mantener
+ambos, cancelar o crear copia y consolidar. El botón de consolidación nombra la
+salvaguarda; deshacer vive en el historial de la operación, no como una promesa
+efímera del diálogo.
+
+Problemas sigue siendo una pantalla no modal. Cada entrada muestra fase y causa
+segura; reanudar, reintentar o deshacer aparece únicamente si el journal declara
+esa capacidad. Recuperar una sesión interrumpida es una elección binaria y
+explícita entre restaurar contexto verificado o empezar limpio.
+
+La matriz 0.13 conserva tamaños, claro/oscuro, alto contraste simulado,
+movimiento reducido y texto 130/150/200 %. Añade contraseña normal/incorrecta,
+archivo ausente, consolidación, ensayo de backup, problemas y recuperación de
+sesión, además de comparaciones ejecutadas 0.12/0.13. Narrator, varios monitores
+y escalas físicas distintas del host disponible permanecen como validación
+nativa separada.

@@ -23,6 +23,14 @@ final class BackupPreview {
     required this.bookmarkCount,
     required this.sessionCount,
     required this.annotationCount,
+    required this.schemaVersion,
+    required this.fileBytes,
+    required this.entityCount,
+    required this.documentAdds,
+    required this.documentReplacements,
+    required this.documentRemovals,
+    required this.identityConflicts,
+    required this.tableCounts,
   });
 
   final int version;
@@ -31,6 +39,24 @@ final class BackupPreview {
   final int bookmarkCount;
   final int sessionCount;
   final int annotationCount;
+  final int schemaVersion;
+  final int fileBytes;
+  final int entityCount;
+  final int documentAdds;
+  final int documentReplacements;
+  final int documentRemovals;
+  final int identityConflicts;
+  final Map<String, int> tableCounts;
+
+  bool get replacesExistingData =>
+      documentReplacements > 0 || documentRemovals > 0;
+}
+
+abstract final class BackupSecurityPolicy {
+  static const bool includesPdfFiles = false;
+  static const bool usesApplicationEncryption = false;
+  static const String encryptionDecision =
+      'No custom encryption: use an OS-encrypted volume or encrypted archive.';
 }
 
 final class LocalBackupService {
@@ -43,7 +69,7 @@ final class LocalBackupService {
        _settings = settings;
 
   static const format = 'yamantaka-local-backup';
-  static const version = 8;
+  static const version = 9;
   static const maxBackupBytes = 128 * 1024 * 1024;
 
   final AppDatabase _database;
@@ -87,6 +113,26 @@ final class LocalBackupService {
   Future<BackupPreview> preview(String path) async {
     final payload = await _readAndValidate(path);
     final tables = payload['tables']! as Map<String, dynamic>;
+    final incomingDocuments = (tables['documents']! as List)
+        .cast<Map<String, dynamic>>();
+    final currentDocuments = _database.database.select(
+      'SELECT id, fingerprint FROM documents',
+    );
+    final incomingById = {
+      for (final row in incomingDocuments) row['id'] as String: row,
+    };
+    final currentById = {
+      for (final row in currentDocuments)
+        row['id'] as String: row['fingerprint'] as String,
+    };
+    final incomingIds = incomingById.keys.toSet();
+    final currentIds = currentById.keys.toSet();
+    final sharedIds = incomingIds.intersection(currentIds);
+    final tableCounts = <String, int>{
+      for (final entry in tables.entries)
+        entry.key: (entry.value as List).length,
+    };
+    final manifest = payload['manifest'] as Map<String, dynamic>?;
     return BackupPreview(
       version: payload['version']! as int,
       exportedAt: DateTime.parse(payload['exportedAt']! as String),
@@ -94,6 +140,19 @@ final class LocalBackupService {
       bookmarkCount: (tables['bookmarks']! as List).length,
       sessionCount: (tables['reading_sessions']! as List).length,
       annotationCount: (tables['annotations']! as List).length,
+      schemaVersion: manifest?['schemaVersion'] as int? ?? 1,
+      fileBytes: await File(path).length(),
+      entityCount: tableCounts.values.fold(0, (total, count) => total + count),
+      documentAdds: incomingIds.difference(currentIds).length,
+      documentReplacements: sharedIds.length,
+      documentRemovals: currentIds.difference(incomingIds).length,
+      identityConflicts: sharedIds
+          .where(
+            (id) =>
+                incomingById[id]!['fingerprint'] as String != currentById[id],
+          )
+          .length,
+      tableCounts: Map.unmodifiable(tableCounts),
     );
   }
 
@@ -140,6 +199,7 @@ final class LocalBackupService {
   void _replaceTables(Map<String, dynamic> tables) {
     final database = _database.database;
     database
+      ..execute('DELETE FROM duplicate_merge_history')
       ..execute('DELETE FROM operation_journal')
       ..execute('DELETE FROM automation_rules')
       ..execute('DELETE FROM document_revision_members')
@@ -258,6 +318,11 @@ final class LocalBackupService {
       tables['operation_journal']! as List,
     );
     _restoreTable(
+      'duplicate_merge_history',
+      _duplicateMergeHistoryColumns,
+      tables['duplicate_merge_history']! as List,
+    );
+    _restoreTable(
       'app_metadata',
       _metadataColumns,
       tables['app_metadata']! as List,
@@ -306,6 +371,7 @@ final class LocalBackupService {
       'document_revision_members': _tableRows('document_revision_members'),
       'automation_rules': _tableRows('automation_rules'),
       'operation_journal': _tableRows('operation_journal'),
+      'duplicate_merge_history': _tableRows('duplicate_merge_history'),
       'app_metadata': _tableRows('app_metadata'),
     };
     final exportedAt = DateTime.now().toUtc();
@@ -402,6 +468,7 @@ final class LocalBackupService {
       'document_revision_members',
       'automation_rules',
       'operation_journal',
+      'duplicate_merge_history',
     ]) {
       tables.putIfAbsent(name, () => <Object?>[]);
     }
@@ -409,8 +476,10 @@ final class LocalBackupService {
     _validateTable(
       tables,
       'documents',
-      backupVersion >= 4
+      backupVersion >= 9
           ? _documentColumns
+          : backupVersion >= 4
+          ? _v8DocumentColumns
           : backupVersion >= 3
           ? _v3DocumentColumns
           : _legacyDocumentColumns,
@@ -428,7 +497,11 @@ final class LocalBackupService {
     _validateTable(
       tables,
       'annotations',
-      backupVersion >= 8 ? _annotationColumns : _v7AnnotationColumns,
+      backupVersion >= 9
+          ? _annotationColumns
+          : backupVersion >= 8
+          ? _v8AnnotationColumns
+          : _v7AnnotationColumns,
     );
     _validateTable(tables, 'tags', _tagColumns);
     _validateTable(tables, 'annotation_tags', _annotationTagColumns);
@@ -450,7 +523,16 @@ final class LocalBackupService {
     _validateTable(tables, 'document_revision_groups', _revisionGroupColumns);
     _validateTable(tables, 'document_revision_members', _revisionMemberColumns);
     _validateTable(tables, 'automation_rules', _automationRuleColumns);
-    _validateTable(tables, 'operation_journal', _journalColumns);
+    _validateTable(
+      tables,
+      'operation_journal',
+      backupVersion >= 9 ? _journalColumns : _v8JournalColumns,
+    );
+    _validateTable(
+      tables,
+      'duplicate_merge_history',
+      _duplicateMergeHistoryColumns,
+    );
     _validateTable(tables, 'app_metadata', _metadataColumns);
     if (decoded['settings'] is! Map<String, dynamic>) {
       throw const FormatException('La copia no contiene ajustes válidos.');
@@ -544,6 +626,8 @@ final class LocalBackupService {
           row[column] ??
               (table == 'documents' && column == 'is_favorite'
                   ? 0
+                  : table == 'documents' && column == 'restore_blocked'
+                  ? 0
                   : table == 'annotations' && column == 'review_state'
                   ? 'pending'
                   : table == 'workspaces' && column == 'query_json'
@@ -560,6 +644,11 @@ final class LocalBackupService {
                   ? 0
                   : table == 'workspace_tabs' && column == 'queue_status'
                   ? 'pending'
+                  : table == 'operation_journal' && column == 'phase'
+                  ? 'planned'
+                  : table == 'operation_journal' &&
+                        column == 'resume_capability'
+                  ? 'none'
                   : table == 'document_preferences' && column == 'cover_policy'
                   ? ReaderCoverPolicy.noCover.name
                   : table == 'document_preferences' && column == 'initial_side'
@@ -693,6 +782,12 @@ final class LocalBackupService {
 }
 
 const _documentColumns = <String>[
+  ..._v8DocumentColumns,
+  'last_failure_code',
+  'restore_blocked',
+];
+
+const _v8DocumentColumns = <String>[
   'id',
   'path',
   'normalized_path',
@@ -841,6 +936,12 @@ const _sessionColumns = <String>[
 const _metadataColumns = <String>['key', 'value', 'updated_at'];
 
 const _annotationColumns = <String>[
+  ..._v8AnnotationColumns,
+  'origin_document_id',
+  'origin_fingerprint',
+];
+
+const _v8AnnotationColumns = <String>[
   'id',
   'document_id',
   'page_index',
@@ -1009,6 +1110,14 @@ const _automationRuleColumns = <String>[
 ];
 
 const _journalColumns = <String>[
+  ..._v8JournalColumns,
+  'phase',
+  'interruption_reason',
+  'resume_capability',
+  'compatibility_hash',
+];
+
+const _v8JournalColumns = <String>[
   'id',
   'operation_kind',
   'status',
@@ -1018,5 +1127,15 @@ const _journalColumns = <String>[
   'undo_json',
   'error_code',
   'started_at',
+  'updated_at',
+];
+
+const _duplicateMergeHistoryColumns = <String>[
+  'id',
+  'kept_document_id',
+  'incoming_document_id',
+  'backup_path',
+  'status',
+  'created_at',
   'updated_at',
 ];

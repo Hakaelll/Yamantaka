@@ -119,6 +119,8 @@ final class YamantakaLocalizations {
       'action.create': 'Crear',
       'action.pause': 'Pausar',
       'action.resume': 'Reanudar',
+      'action.previous': 'Anterior',
+      'action.next': 'Siguiente',
       'action.continue': 'Continuar',
       'action.resumeReading': 'Retomar',
       'action.reread': 'Releer',
@@ -184,10 +186,21 @@ final class YamantakaLocalizations {
       'problems.operation_interrupted': 'Operación local interrumpida',
       'problems.operation_failed': 'Operación local fallida',
       'problems.document_inaccessible': 'Documento local inaccesible',
+      'problems.document_restore_blocked':
+          'Reapertura automática bloqueada tras un fallo',
       'problems.canResume': 'Puede revisarse y reanudarse de forma segura.',
+      'problems.canRollback':
+          'Hay cambios parciales reversibles; puedes deshacerlos.',
+      'problems.phase': 'Fase: {phase}',
       'problems.localOnly': 'El diagnóstico no contiene rutas ni contenido.',
       'problems.discard': 'Descartar aviso',
       'problems.resume': 'Reanudar tarea',
+      'problems.rollback': 'Deshacer cambios parciales',
+      'problems.rollbackUnavailable':
+          'No hay datos suficientes para deshacer esta operación.',
+      'problems.rollbackComplete': 'Los cambios parciales se han deshecho.',
+      'problems.rollbackFailed':
+          'No se pudieron deshacer todos los cambios; el aviso se conserva.',
       'problems.resumeUnavailable':
           'La regla original ya no está disponible; puedes descartar el aviso.',
       'problems.resumeTitle': '¿Reanudar la regla interrumpida?',
@@ -200,6 +213,32 @@ final class YamantakaLocalizations {
       'problems.checkIntegrity': 'Comprobar base de datos',
       'problems.integrityOk': 'La integridad de SQLite es correcta.',
       'problems.integrityFailed': 'SQLite ha informado de un problema.',
+      'duplicates.title': 'Duplicados locales',
+      'duplicates.review': 'Revisar duplicados',
+      'duplicates.empty':
+          'No se han encontrado duplicados exactos o probables.',
+      'duplicates.position': 'Candidato {current} de {total}',
+      'duplicates.evidence': 'Evidencias del duplicado',
+      'duplicates.evidenceSummary':
+          '{kind} · puntuación {score} · huella {fingerprint} · ruta {path} · nombre {name} · tamaño {size}',
+      'duplicates.keep': 'Registro que se conservará',
+      'duplicates.mergeFrom': 'Registro que se consolidará',
+      'duplicates.impact':
+          'Vista previa: se consolidarán {count} registros locales. Ningún PDF se elimina ni se modifica.',
+      'duplicates.conflict': 'Conflicto: {field}',
+      'duplicates.useExisting': 'Conservar valor existente',
+      'duplicates.useIncoming': 'Usar valor entrante',
+      'duplicates.keepBoth': 'Mantener ambos',
+      'duplicates.merge': 'Crear copia y consolidar',
+      'duplicates.keptBoth': 'Se conservarán ambos documentos.',
+      'duplicates.merged':
+          'Duplicados consolidados; se resolvieron {count} conflictos.',
+      'duplicates.mergeFailed':
+          'No se pudo consolidar. La base de datos no se modificó.',
+      'duplicates.undoUnavailable': 'La copia previa ya no está disponible.',
+      'duplicates.undoComplete': 'La consolidación se ha deshecho.',
+      'duplicates.undoFailed':
+          'No se pudo restaurar la copia previa de la consolidación.',
       'recovery.sessionTitle': 'Se encontró una sesión interrumpida',
       'recovery.sessionBody':
           'Yamantaka puede restaurar el espacio, las pestañas y el documento activo, o empezar con la Biblioteca limpia. Los PDF no se modificarán.',
@@ -610,9 +649,18 @@ final class YamantakaLocalizations {
       'reader.savedDocumentUnavailable':
           'Este documento guardado ya no está disponible.',
       'reader.password': 'Contraseña',
+      'reader.enterPassword': 'Introducir contraseña',
       'reader.wrongPasswordRetry':
           'La contraseña no es correcta. Inténtalo de nuevo.',
+      'reader.passwordAttemptsExceeded':
+          'Se alcanzó el límite de tres intentos. El PDF permanece cerrado.',
       'reader.passwordNotStored': 'La contraseña no se guarda.',
+      'backup.conflictStrategyTitle': 'Cómo se resolverán los datos',
+      'backup.conflictStrategy':
+          'La copia elegida es la fuente explícita: los documentos se '
+          'comparan por identidad y huella; el resto de entidades se restaura '
+          'como una instantánea coherente. No se aplica “última escritura '
+          'gana”. Antes de cambiar nada se crea una copia de seguridad local.',
       'reader.unavailableAtPath': 'No disponible en la ruta guardada',
       'reader.availableChanged': 'Disponible; cambió desde la última apertura',
       'reader.available': 'Disponible',
@@ -1101,10 +1149,14 @@ final class YamantakaLocalizations {
       'backup.importFailed':
           'No se pudo importar. Los datos actuales se conservaron.',
       'backup.importPreview':
-          'Versión {version} · {documents} documentos · {bookmarks} marcadores '
-          '· {annotations} anotaciones · {sessions} sesiones.\n\nSe '
-          'sustituirán los datos locales actuales. Antes se guardará una copia '
-          'de seguridad automática. Los PDF no se modifican.',
+          'Formato {version} · esquema {schema} · {bytes} bytes · {entities} '
+          'entidades.\n{documents} documentos, {bookmarks} marcadores, '
+          '{annotations} anotaciones y {sessions} sesiones.\n\nPlan de '
+          'restauración: {adds} altas, {replacements} reemplazos, {removals} '
+          'eliminaciones y {conflicts} conflictos de identidad.\n\nSe '
+          'sustituirán los datos locales actuales tras crear una copia '
+          'automática. Los PDF no se incluyen ni se modifican. La copia no usa '
+          'cifrado propio: guárdala en un volumen o archivo cifrado por el SO.',
       'count.sessions.one': '{count} sesión',
       'count.sessions.other': '{count} sesiones',
       'shortcut.actionReserved': 'Esta acción está reservada.',
@@ -1301,6 +1353,8 @@ final class YamantakaLocalizations {
       'action.create': 'Create',
       'action.pause': 'Pause',
       'action.resume': 'Resume',
+      'action.previous': 'Previous',
+      'action.next': 'Next',
       'action.continue': 'Continue',
       'action.resumeReading': 'Resume',
       'action.reread': 'Read again',
@@ -1364,10 +1418,21 @@ final class YamantakaLocalizations {
       'problems.operation_interrupted': 'Interrupted local operation',
       'problems.operation_failed': 'Failed local operation',
       'problems.document_inaccessible': 'Inaccessible local document',
+      'problems.document_restore_blocked':
+          'Automatic reopen blocked after a failure',
       'problems.canResume': 'It can be reviewed and resumed safely.',
+      'problems.canRollback':
+          'Partial changes are reversible; you can roll them back.',
+      'problems.phase': 'Phase: {phase}',
       'problems.localOnly': 'The diagnostic contains no paths or content.',
       'problems.discard': 'Discard notice',
       'problems.resume': 'Resume task',
+      'problems.rollback': 'Roll back partial changes',
+      'problems.rollbackUnavailable':
+          'There is not enough information to roll back this operation.',
+      'problems.rollbackComplete': 'The partial changes were rolled back.',
+      'problems.rollbackFailed':
+          'Not all changes could be rolled back; the notice was kept.',
       'problems.resumeUnavailable':
           'The original rule is no longer available; you can discard the notice.',
       'problems.resumeTitle': 'Resume the interrupted rule?',
@@ -1380,6 +1445,31 @@ final class YamantakaLocalizations {
       'problems.checkIntegrity': 'Check database',
       'problems.integrityOk': 'SQLite integrity is OK.',
       'problems.integrityFailed': 'SQLite reported an integrity problem.',
+      'duplicates.title': 'Local duplicates',
+      'duplicates.review': 'Review duplicates',
+      'duplicates.empty': 'No exact or probable duplicates were found.',
+      'duplicates.position': 'Candidate {current} of {total}',
+      'duplicates.evidence': 'Duplicate evidence',
+      'duplicates.evidenceSummary':
+          '{kind} · score {score} · fingerprint {fingerprint} · path {path} · name {name} · size {size}',
+      'duplicates.keep': 'Record to keep',
+      'duplicates.mergeFrom': 'Record to consolidate',
+      'duplicates.impact':
+          'Preview: {count} local records will be consolidated. No PDF is deleted or modified.',
+      'duplicates.conflict': 'Conflict: {field}',
+      'duplicates.useExisting': 'Keep existing value',
+      'duplicates.useIncoming': 'Use incoming value',
+      'duplicates.keepBoth': 'Keep both',
+      'duplicates.merge': 'Back up and consolidate',
+      'duplicates.keptBoth': 'Both documents will be kept.',
+      'duplicates.merged':
+          'Duplicates consolidated; {count} conflicts were resolved.',
+      'duplicates.mergeFailed':
+          'Could not consolidate. The database was not modified.',
+      'duplicates.undoUnavailable': 'The pre-merge backup is unavailable.',
+      'duplicates.undoComplete': 'The consolidation was rolled back.',
+      'duplicates.undoFailed':
+          'Could not restore the consolidation pre-backup.',
       'recovery.sessionTitle': 'An interrupted session was found',
       'recovery.sessionBody':
           'Yamantaka can restore its workspace, tabs, and active document, or start with a clean Library. PDFs will not be changed.',
@@ -1786,8 +1876,17 @@ final class YamantakaLocalizations {
       'reader.savedDocumentUnavailable':
           'This saved document is no longer available.',
       'reader.password': 'Password',
+      'reader.enterPassword': 'Enter password',
       'reader.wrongPasswordRetry': 'The password is incorrect. Try again.',
+      'reader.passwordAttemptsExceeded':
+          'The three-attempt limit was reached. The PDF remains closed.',
       'reader.passwordNotStored': 'The password is not stored.',
+      'backup.conflictStrategyTitle': 'How data will be resolved',
+      'backup.conflictStrategy':
+          'The selected backup is the explicit source: documents are compared '
+          'by identity and fingerprint, while other entities are restored as '
+          'one coherent snapshot. Last-write-wins is not used. A local safety '
+          'backup is created before anything changes.',
       'reader.unavailableAtPath': 'Unavailable at the saved path',
       'reader.availableChanged': 'Available; changed since last opened',
       'reader.available': 'Available',
@@ -2265,10 +2364,14 @@ final class YamantakaLocalizations {
       'backup.imported': 'Backup imported. Previous backup stored at {path}',
       'backup.importFailed': 'Import failed. Current data was preserved.',
       'backup.importPreview':
-          'Version {version} · {documents} documents · {bookmarks} bookmarks · '
-          '{annotations} annotations · {sessions} sessions.\n\nCurrent local '
-          'data will be replaced. An automatic backup will be stored first. '
-          'PDFs are not modified.',
+          'Format {version} · schema {schema} · {bytes} bytes · {entities} '
+          'entities.\n{documents} documents, {bookmarks} bookmarks, '
+          '{annotations} annotations, and {sessions} sessions.\n\nRestore '
+          'plan: {adds} additions, {replacements} replacements, {removals} '
+          'removals, and {conflicts} identity conflicts.\n\nCurrent local '
+          'data will be replaced after an automatic backup. PDFs are neither '
+          'included nor modified. The backup uses no custom encryption: store '
+          'it on an OS-encrypted volume or in an encrypted archive.',
       'count.sessions.one': '{count} session',
       'count.sessions.other': '{count} sessions',
       'shortcut.actionReserved': 'This action is reserved.',

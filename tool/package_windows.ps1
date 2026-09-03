@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = 'build/release/0.12.0+13',
-    [string]$Version = '0.12.0',
-    [string]$BuildNumber = '13',
+    [string]$OutputDirectory = 'build/release/0.13.0+14',
+    [string]$Version = '0.13.0',
+    [string]$BuildNumber = '14',
     [string]$FlutterExecutable,
     [string]$CertificateThumbprint,
     [string]$SignToolPath,
@@ -24,6 +24,8 @@ $toolStateRoot = Join-Path $root 'build/verification/tool-state'
 New-Item -ItemType Directory -Force -Path $toolStateRoot | Out-Null
 $env:APPDATA = $toolStateRoot
 $env:LOCALAPPDATA = $toolStateRoot
+$env:FLUTTER_SUPPRESS_ANALYTICS = 'true'
+$env:DART_SUPPRESS_ANALYTICS = 'true'
 $env:GIT_CONFIG_COUNT = '2'
 $env:GIT_CONFIG_KEY_0 = 'safe.directory'
 $env:GIT_CONFIG_VALUE_0 = $root.Replace('\', '/')
@@ -132,6 +134,16 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "Windows bundle signing failed with exit code $LASTEXITCODE."
         }
+    }
+    # Inventory hashes must describe the final bytes, after optional signing.
+    $dartExecutable = Join-Path $root '.flutter-sdk/bin/dart.bat'
+    if (-not (Test-Path -LiteralPath $dartExecutable)) {
+        throw "Local Dart executable not found for offline SBOM generation: $dartExecutable"
+    }
+    $sbomPath = Join-Path $bundle 'SBOM.cdx.json'
+    & $dartExecutable tool/create_sbom.dart $bundle $sbomPath "$Version+$BuildNumber"
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sbomPath)) {
+        throw "CycloneDX SBOM generation failed with exit code $LASTEXITCODE."
     }
     $signatureState = Get-YamantakaWindowsBundleSignatureState -BundlePath $bundle
     $signed = $signatureState.readyForNativeExecution
@@ -242,7 +254,8 @@ try {
     $evidenceSources = @(
         @{ source = 'build/verification/no-network.json'; destination = 'no-network.json' },
         @{ source = 'build/verification/verification-report.json'; destination = 'test-report.json' },
-        @{ source = 'build/performance/0.12.0-current/comparison-0.11-vs-0.12.json'; destination = 'performance-report.json' }
+        @{ source = 'build/performance/0.13.0-current/comparison-0.12-vs-0.13.json'; destination = 'performance-report.json' },
+        @{ source = 'build/performance/0.13.0-current/comparison-0.12-vs-0.13-historical.json'; destination = 'performance-historical-report.json' }
     )
     foreach ($evidence in $evidenceSources) {
         $evidenceSource = Join-Path $root $evidence.source

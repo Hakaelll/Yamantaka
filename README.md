@@ -7,10 +7,10 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Versión Flutter 0.12.0+13 revisada el 31 de agosto de 2026:
+Versión Flutter 0.13.0+14 revisada el 2 de septiembre de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 287 pruebas aprobadas;
+- flutter test --no-pub: 305 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local permanece receptivo durante un smoke de 8 s con un
@@ -18,17 +18,38 @@ Versión Flutter 0.12.0+13 revisada el 31 de agosto de 2026:
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
-El release local versionado se genera en `build/release/0.12.0+13/` e incluye el
+El release local versionado se genera en `build/release/0.13.0+14/` e incluye el
 ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt`, estado de firma,
-informe de pruebas, comparación de rendimiento y smoke sin red. Debe extraerse
-entero antes de probarlo.
+SBOM CycloneDX 1.5, informe de pruebas, comparación de rendimiento y smoke sin
+red. Debe extraerse entero antes de probarlo.
 
-El bundle 0.12 se valida contra su manifiesto después del último cambio. El smoke
+El bundle 0.13 se valida contra su manifiesto después del último cambio. El smoke
 sintético comprueba conexiones TCP/UDP y el inventario separa explícitamente los
 binarios sin firma; sigue siendo evidencia local, no un artefacto de distribución.
 
 La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
 vigente de pruebas en [TESTING.md](TESTING.md).
+
+## Resiliencia y confianza local 0.13
+
+- La apertura del documento tiene un ciclo de vida explícito y generacional;
+  una apertura obsoleta no publica estado y libera cualquier handle tardío.
+- Los PDF protegidos admiten tres intentos. La contraseña solo vive en memoria
+  durante cada intento y no entra en SQLite, snapshots, logs ni diagnósticos.
+- La recuperación valida identidad y páginas y pone en cuarentena el documento
+  que causó un fallo, evitando reabrirlo automáticamente en el siguiente inicio.
+- El backup v9 muestra un plan de altas, reemplazos, eliminaciones y conflictos
+  antes de escribir, conserva hashes y esquema, crea pre-backup y restaura en
+  transacción. No incluye PDF ni implementa criptografía propia.
+- La revisión de duplicados separa coincidencias exactas y probables, muestra
+  evidencias e impacto, resuelve cada conflicto, conserva procedencia de
+  anotaciones y permite deshacer mediante la copia previa. Nunca borra un PDF.
+- Los journals declaran fase, causa, compatibilidad y si una operación permite
+  reintentar, reanudar o deshacer; la pantalla Problemas solo ofrece acciones
+  respaldadas por datos suficientes.
+- SQLite v11 conserva migraciones idempotentes verificadas desde cada esquema
+  v1–v11. La evidencia visual cubre contraseña, archivo ausente, consolidación,
+  restore, problemas y recuperación, incluida la consolidación a texto 200 %.
 
 ## Continuidad y revisión 0.12
 
@@ -166,13 +187,15 @@ Atajos y recuperación se documentan en [docs/SHORTCUTS.md](docs/SHORTCUTS.md) y
 
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
-Las 172 capturas de las matrices 0.12 cubren Biblioteca, Lector, navegador,
-panel, Ajustes, paleta, búsqueda, menús, bienvenida e importación, con la base
-0.11 conservada bajo
-`build/visual-evidence/v0.11.0/` y la evidencia actual en
-`build/visual-evidence/v0.12.0/`. Incluye continuidad, espacios, cola,
-comparación, anotaciones, relaciones, reglas y problemas. La identidad del logo violeta se comprueba por
-hash; no se regenera ni se altera su geometría.
+La matriz actual 0.13 reúne 179 PNG en 19 hojas de contacto. Cubre Biblioteca,
+Lector, navegador, panel, Ajustes, paleta, búsqueda, menús, bienvenida e
+importación y añade contraseña normal/incorrecta, archivo ausente, consolidación
+a texto 200 %, ensayo de restore, problemas y recuperación de sesión. Las diez
+comparaciones 0.12/0.13 registran el hash de ambas fuentes. La base se conserva
+en `build/visual-evidence/v0.12.0/`, la actual en
+`build/visual-evidence/v0.13.0/` y la revisión completa en
+`build/visual-review-013/`. La identidad del logo violeta se comprueba por hash;
+no se regenera ni se altera su geometría.
 
 ## Requisitos
 

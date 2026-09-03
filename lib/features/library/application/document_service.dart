@@ -31,10 +31,40 @@ final class InspectedFile {
   final String fingerprint;
 }
 
+abstract interface class LocalDocumentFileAccess {
+  const LocalDocumentFileAccess();
+
+  Future<bool> exists(String path);
+  Future<FileStat> stat(String path);
+  Stream<List<int>> openRead(String path, int start, int end);
+  String absolutePath(String path);
+}
+
+final class DartLocalDocumentFileAccess implements LocalDocumentFileAccess {
+  const DartLocalDocumentFileAccess();
+
+  @override
+  Future<bool> exists(String path) => File(path).exists();
+
+  @override
+  Future<FileStat> stat(String path) => File(path).stat();
+
+  @override
+  Stream<List<int>> openRead(String path, int start, int end) =>
+      File(path).openRead(start, end);
+
+  @override
+  String absolutePath(String path) => File(path).absolute.path;
+}
+
 final class DocumentService {
-  const DocumentService(this._repository);
+  const DocumentService(
+    this._repository, {
+    this.fileAccess = const DartLocalDocumentFileAccess(),
+  });
 
   final DocumentRepository _repository;
+  final LocalDocumentFileAccess fileAccess;
 
   Future<InspectedFile> inspect(String inputPath) async {
     final path = LocalInputPolicy.boundedPath(inputPath);
@@ -44,15 +74,14 @@ final class DocumentService {
         'Selecciona un archivo PDF.',
       );
     }
-    final file = File(path);
     try {
-      if (!await file.exists()) {
+      if (!await fileAccess.exists(path)) {
         throw const AppFailure(
           FailureKind.fileNotFound,
           'El archivo ya no existe en esa ubicación.',
         );
       }
-      final stat = await file.stat();
+      final stat = await fileAccess.stat(path);
       if (stat.size == 0) {
         throw const AppFailure(
           FailureKind.emptyPdf,
@@ -60,14 +89,16 @@ final class DocumentService {
         );
       }
       final end = math.min(stat.size, 64 * 1024);
-      final partialDigest = await sha256.bind(file.openRead(0, end)).first;
+      final partialDigest = await sha256
+          .bind(fileAccess.openRead(path, 0, end))
+          .first;
       final fingerprint = sha256
           .convert(utf8.encode('${stat.size}:$partialDigest'))
           .toString();
       return InspectedFile(
-        path: file.absolute.path,
-        normalizedPath: PathNormalizer.normalize(file.path),
-        fileName: p.basename(file.path),
+        path: fileAccess.absolutePath(path),
+        normalizedPath: PathNormalizer.normalize(path),
+        fileName: p.basename(path),
         fileSize: stat.size,
         modifiedAt: stat.modified,
         fingerprint: fingerprint,
@@ -82,7 +113,9 @@ final class DocumentService {
         error.osError?.errorCode == 5
             ? 'No hay permiso para leer este archivo.'
             : 'No se pudo acceder al archivo.',
-        debugMessage: error.toString(),
+        debugMessage:
+            'Local file access failed with OS error '
+            '${error.osError?.errorCode ?? 'unknown'}.',
       );
     }
   }

@@ -51,6 +51,11 @@ Push-Location $repositoryRoot
 try {
     $env:APPDATA = $toolStateRoot
     $env:LOCALAPPDATA = $toolStateRoot
+    # The verification gate must remain offline. Suppress Flutter's optional
+    # analytics before invoking any tool command so a successful phase cannot
+    # be turned into a network-related failure while reporting telemetry.
+    $env:FLUTTER_SUPPRESS_ANALYTICS = 'true'
+    $env:DART_SUPPRESS_ANALYTICS = 'true'
     if (-not [string]::IsNullOrWhiteSpace($resolvedPubCache)) {
         $env:PUB_CACHE = $resolvedPubCache
     }

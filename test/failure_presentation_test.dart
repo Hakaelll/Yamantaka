@@ -31,4 +31,19 @@ void main() {
       isFalse,
     );
   });
+
+  test('resource and database failures offer the diagnostics center', () {
+    for (final kind in <FailureKind>[
+      FailureKind.databaseFailed,
+      FailureKind.outOfMemory,
+      FailureKind.unknown,
+    ]) {
+      expect(
+        FailurePresentations.forFailure(
+          AppFailure(kind, 'safe message'),
+        ).action,
+        FailureAction.openDiagnostics,
+      );
+    }
+  });
 }

@@ -159,10 +159,24 @@ final class _ReaderScreenState extends State<ReaderScreen> {
             widget.controller.error,
             strings: strings,
           );
+          final failureAction = presentation.action;
+          final recoveryLabel = switch (failureAction) {
+            FailureAction.retry => strings.get('action.retry'),
+            FailureAction.chooseAnotherFile => strings.get('library.locate'),
+            FailureAction.enterPassword => strings.get('reader.enterPassword'),
+            FailureAction.openDiagnostics => strings.get(
+              'settings.diagnostics',
+            ),
+            FailureAction.goBack || FailureAction.dismiss => null,
+          };
           return _ReaderErrorState(
             title: presentation.title,
             message: presentation.message,
             onBack: widget.onBack,
+            onRecovery: recoveryLabel == null || widget.onFailureAction == null
+                ? null
+                : () => unawaited(widget.onFailureAction!(failureAction)),
+            recoveryLabel: recoveryLabel,
           );
         }
         return CallbackShortcuts(

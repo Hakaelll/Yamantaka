@@ -51,9 +51,12 @@ final class AppStatusView extends StatelessWidget {
     this.action,
     this.actionLabel,
     this.actionKey,
+    this.secondaryAction,
+    this.secondaryActionLabel,
     this.tone = AppStatusTone.neutral,
     this.loading = false,
-  }) : assert((action == null) == (actionLabel == null));
+  }) : assert((action == null) == (actionLabel == null)),
+       assert((secondaryAction == null) == (secondaryActionLabel == null));
 
   final IconData icon;
   final String title;
@@ -61,6 +64,8 @@ final class AppStatusView extends StatelessWidget {
   final VoidCallback? action;
   final String? actionLabel;
   final Key? actionKey;
+  final VoidCallback? secondaryAction;
+  final String? secondaryActionLabel;
   final AppStatusTone tone;
   final bool loading;
 
@@ -120,10 +125,22 @@ final class AppStatusView extends StatelessWidget {
                       ],
                       if (action case final callback?) ...[
                         const SizedBox(height: AppSpacing.space24),
-                        FilledButton(
-                          key: actionKey,
-                          onPressed: callback,
-                          child: Text(actionLabel!),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: AppSpacing.space8,
+                          runSpacing: AppSpacing.space8,
+                          children: [
+                            FilledButton(
+                              key: actionKey,
+                              onPressed: callback,
+                              child: Text(actionLabel!),
+                            ),
+                            if (secondaryAction case final secondary?)
+                              TextButton(
+                                onPressed: secondary,
+                                child: Text(secondaryActionLabel!),
+                              ),
+                          ],
                         ),
                       ],
                     ],

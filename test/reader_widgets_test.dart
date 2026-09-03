@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -11,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/app/theme/app_tokens.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
 import 'package:yamantaka/core/errors/app_failure.dart';
+import 'package:yamantaka/core/errors/failure_presentation.dart';
 import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/core/platform/window_service.dart';
@@ -20,6 +22,7 @@ import 'package:yamantaka/features/bookmarks/application/bookmark_controller.dar
 import 'package:yamantaka/features/library/application/document_service.dart';
 import 'package:yamantaka/features/library/domain/library_document.dart';
 import 'package:yamantaka/features/reader/application/reader_controller.dart';
+import 'package:yamantaka/features/reader/domain/document_lifecycle.dart';
 import 'package:yamantaka/features/reader/domain/reader_models.dart';
 import 'package:yamantaka/features/reader/domain/text_selection.dart'
     as reader_selection;
@@ -30,6 +33,7 @@ import 'package:yamantaka/features/search/application/search_controller.dart'
     as app_search;
 import 'package:yamantaka/pdf_engine/cache/thumbnail_service.dart';
 import 'package:yamantaka/pdf_engine/models/pdf_models.dart';
+import 'package:yamantaka/pdf_engine/pdf_document_engine.dart';
 import 'package:yamantaka/pdf_engine/presentation/pdf_viewer_adapter.dart';
 import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/paths/app_paths.dart';
@@ -79,8 +83,74 @@ void main() {
     expect(normalized.initialSide, ReaderInitialSide.right);
   });
 
+  test('only the latest overlapping open publishes reader state', () async {
+    final engine = _ControlledOpenPdfEngine();
+    final harness = await _ReaderHarness.create(
+      ready: false,
+      engineOverride: engine,
+    );
+    final directory = Directory(
+      'build/test-reader-open-race-${DateTime.now().microsecondsSinceEpoch}',
+    )..createSync(recursive: true);
+    final first = File('${directory.path}/first.pdf')
+      ..writeAsBytesSync(const [0x25, 0x50, 0x44, 0x46, 0x31]);
+    final second = File('${directory.path}/second.pdf')
+      ..writeAsBytesSync(const [0x25, 0x50, 0x44, 0x46, 0x32, 0x32]);
+
+    try {
+      final firstOpen = harness.controller.openPath(first.absolute.path);
+      await engine.waitForRequest(first.absolute.path);
+      final secondOpen = harness.controller.openPath(second.absolute.path);
+      await engine.waitForRequest(second.absolute.path);
+
+      engine.complete(second.absolute.path, documentId: 'native-second');
+      expect(await secondOpen, isTrue);
+      engine.complete(first.absolute.path, documentId: 'native-first');
+      expect(await firstOpen, isFalse);
+
+      expect(harness.controller.document?.fileName, 'second.pdf');
+      expect(harness.controller.openedDocument?.documentId, 'native-second');
+      expect(harness.controller.lifecycle.state, DocumentLifecycleState.ready);
+      expect(engine.closedDocumentIds, contains('native-first'));
+      expect(engine.closedDocumentIds, isNot(contains('native-second')));
+    } finally {
+      await harness.dispose();
+      directory.deleteSync(recursive: true);
+    }
+  });
+
+  test('closing during native open cancels publication and handle', () async {
+    final engine = _ControlledOpenPdfEngine();
+    final harness = await _ReaderHarness.create(
+      ready: false,
+      engineOverride: engine,
+    );
+    final directory = Directory(
+      'build/test-reader-close-race-${DateTime.now().microsecondsSinceEpoch}',
+    )..createSync(recursive: true);
+    final file = File('${directory.path}/closing.pdf')
+      ..writeAsBytesSync(const [0x25, 0x50, 0x44, 0x46]);
+
+    try {
+      final opening = harness.controller.openPath(file.absolute.path);
+      await engine.waitForRequest(file.absolute.path);
+      await harness.controller.closeDocument();
+      engine.complete(file.absolute.path, documentId: 'native-cancelled');
+
+      expect(await opening, isFalse);
+      expect(harness.controller.document, isNull);
+      expect(harness.controller.openedDocument, isNull);
+      expect(harness.controller.lifecycle.state, DocumentLifecycleState.closed);
+      expect(engine.closedDocumentIds, contains('native-cancelled'));
+    } finally {
+      await harness.dispose();
+      directory.deleteSync(recursive: true);
+    }
+  });
+
   testWidgets('reader presents a recoverable error state', (tester) async {
     final harness = await _ReaderHarness.create(ready: false);
+    FailureAction? selectedAction;
     harness.controller
       ..status = ReaderStatus.failure
       ..error = const AppFailure(
@@ -88,7 +158,9 @@ void main() {
         'El PDF de prueba está dañado.',
       );
 
-    await tester.pumpWidget(_app(harness));
+    await tester.pumpWidget(
+      _app(harness, onFailureAction: (action) async => selectedAction = action),
+    );
 
     expect(find.text('El PDF no se puede abrir'), findsOneWidget);
     expect(
@@ -97,7 +169,10 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.text('Localizar'), findsOneWidget);
     expect(find.text('Volver a la biblioteca'), findsOneWidget);
+    await tester.tap(find.text('Localizar'));
+    expect(selectedAction, FailureAction.chooseAnotherFile);
     await tester.pumpWidget(const SizedBox.shrink());
     await harness.dispose();
   });
@@ -1511,6 +1586,7 @@ Widget _app(
   bool initialPanelOpen = false,
   String initialPanelSection = '',
   ValueChanged<double>? onPanelWidthChanged,
+  Future<void> Function(FailureAction action)? onFailureAction,
   ReadingDirection readingDirection = ReadingDirection.leftToRight,
   Locale? locale,
 }) => MaterialApp(
@@ -1536,6 +1612,7 @@ Widget _app(
     initialPanelOpen: initialPanelOpen,
     initialPanelSection: initialPanelSection,
     onPanelWidthChanged: onPanelWidthChanged,
+    onFailureAction: onFailureAction,
   ),
 );
 
@@ -1627,7 +1704,7 @@ final class _ReaderHarness {
   });
 
   final ReaderController controller;
-  final _FakePdfEngine engine;
+  final PdfDocumentEngine engine;
   final PdfViewController viewController;
   final AppDatabase database;
   final BookmarkController bookmarks;
@@ -1639,11 +1716,12 @@ final class _ReaderHarness {
   static Future<_ReaderHarness> create({
     required bool ready,
     int pageCount = 3,
+    PdfDocumentEngine? engineOverride,
   }) async {
     final logger = AppLogger(minimumLevel: LogLevel.error);
     final database = AppDatabase.inMemory(logger);
     final documents = DocumentRepository(database);
-    final engine = _FakePdfEngine();
+    final engine = engineOverride ?? _FakePdfEngine();
     final viewController = PdfViewController();
     final bookmarks = BookmarkController(BookmarkRepository(database));
     final annotations = AnnotationController(AnnotationRepository(database));
@@ -2073,6 +2151,44 @@ final class _CountingViewerAdapter implements PdfViewerAdapter {
   }) {
     buildCount++;
     return const ColoredBox(key: Key('test-pdf-viewer'), color: Colors.white);
+  }
+}
+
+final class _ControlledOpenPdfEngine extends StubPdfDocumentEngine {
+  final Map<String, Completer<void>> _requests = {};
+  final Map<String, Completer<OpenedPdfDocument>> _opens = {};
+  final List<String> closedDocumentIds = [];
+
+  Future<void> waitForRequest(String path) =>
+      (_requests[path] ??= Completer<void>()).future;
+
+  void complete(String path, {required String documentId}) {
+    final completer = _opens[path];
+    if (completer == null) {
+      throw StateError('No pending open request for $path.');
+    }
+    completer.complete(
+      OpenedPdfDocument(
+        documentId: documentId,
+        path: path,
+        pageCount: 2,
+        pageSizes: const [PdfPageSize(600, 800), PdfPageSize(600, 800)],
+        isEncrypted: false,
+      ),
+    );
+  }
+
+  @override
+  Future<OpenedPdfDocument> openDocument(String path, {String? password}) {
+    final completer = Completer<OpenedPdfDocument>();
+    _opens[path] = completer;
+    (_requests[path] ??= Completer<void>()).complete();
+    return completer.future;
+  }
+
+  @override
+  Future<void> closeDocument(String documentId) async {
+    closedDocumentIds.add(documentId);
   }
 }
 

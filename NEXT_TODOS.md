@@ -1,6 +1,6 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-08-31.
+Actualizado: 2026-09-02.
 
 Este documento es el backlog vivo posterior a la reconstrucción del lector. No
 es una colección de ideas sueltas: ordena trabajo de producto, funcionamiento,
@@ -31,6 +31,15 @@ Reglas:
 - Yamantaka sigue siendo local-first y sin red durante el uso normal.
 
 ## Punto de partida confirmado
+
+- [x] 0.13.0 formaliza apertura/cierre y recuperación, backup con ensayo,
+  consolidación reversible de duplicados, journals por fases, SQLite v11 y SBOM
+  CycloneDX, sin tocar PDF ni introducir red.
+- [x] La suite 0.13 alcanza 305 pruebas; la matriz reúne 179 PNG, 19 hojas y
+  diez comparaciones 0.12/0.13 revisadas sin overflow.
+- [x] Cinco pasadas avanzadas, de Biblioteca y nativas por versión terminan
+  `pass` en la serie emparejada, sin regresiones fiables, `watch` ni invariantes
+  rotos; la comparación histórica divergente se conserva aparte.
 
 - [x] 0.12.0 añade centro de continuidad, espacios completos y cola, modo Foco,
   comparación, revisión global de anotaciones, relaciones/revisiones, reglas
@@ -144,7 +153,7 @@ build verificable.
   Smart App Control en enforcement.
 - [ ] Confirmar que abrir, buscar, imprimir y cerrar un PDF no carga ninguna DLL
   sin firma que no aparezca en el manifiesto.
-- [ ] Añadir un inventario SBOM de dependencias nativas con versión, licencia,
+- [x] Añadir un inventario SBOM de dependencias nativas con versión, licencia,
   hash y procedencia.
 - [ ] Definir una política de caducidad: una Release no puede declararse lista si
   el certificado expira antes del horizonte mínimo acordado.
@@ -160,26 +169,33 @@ una firma válida y trazable.
 Objetivo P0/P1: ningún PDF válido debe dejar la aplicación atrapada y ningún PDF
 inválido debe comprometer la sesión.
 
-- [ ] Unificar en una máquina de estados explícita: vacío, abriendo, listo,
+- [x] Unificar en una máquina de estados explícita: vacío, abriendo, listo,
   recuperable, bloqueado por contraseña, dañado y cerrado.
-- [ ] Cancelar una apertura anterior cuando llega otra sin publicar estados
+- [x] Cancelar una apertura anterior cuando llega otra sin publicar estados
   tardíos del documento cancelado.
-- [ ] Diferenciar en la interfaz archivo ausente, acceso denegado, contraseña
+- [x] Diferenciar en la interfaz archivo ausente, acceso denegado, contraseña
   incorrecta, PDF dañado y fallo interno del motor.
-- [ ] Implementar contraseña de PDF con reintento acotado y sin persistirla.
-- [ ] Recuperar el último documento y posición solo después de verificar ruta,
+- [x] Implementar contraseña de PDF con reintento acotado y sin persistirla.
+- [x] Recuperar el último documento y posición solo después de verificar ruta,
   huella y número de páginas.
-- [ ] Probar cierres durante carga, render, búsqueda, indexado e impresión.
-- [ ] Garantizar que todos los handles de PDF, isolates, timers y streams se
-  liberan al cerrar una pestaña o la ventana.
-- [ ] Añadir recuperación tras cierre inesperado sin reabrir automáticamente un
+- [x] Probar aperturas solapadas y cierre durante la carga nativa, descartando el
+  resultado obsoleto y liberando el handle tardío.
+- [ ] Completar cierres concurrentes durante render, búsqueda, indexado e
+  impresión.
+- [x] Garantizar en cinco perfiles que documentos, renders y páginas cacheadas
+  quedan a cero tras cerrar.
+- [ ] Auditar además isolates, timers y streams al cerrar pestaña y ventana.
+- [x] Añadir recuperación tras cierre inesperado sin reabrir automáticamente un
   archivo que causó el fallo anterior.
-- [ ] Permitir volver a localizar un archivo movido conservando metadatos,
+- [x] Permitir volver a localizar un archivo movido conservando metadatos,
   progreso, marcadores y anotaciones cuando la huella coincide.
 - [ ] Añadir un modo seguro de solo lectura cuando la base de datos no pueda
   migrarse, con exportación de diagnóstico y copia de seguridad.
-- [ ] Probar rutas largas, Unicode, unidades externas, carpetas de red
-  desconectadas y cambios de permisos durante una sesión.
+- [x] Probar rutas Unicode y rutas locales largas dentro del límite de entrada.
+- [x] Simular pérdida de permisos tras descubrir un archivo y unidad
+  desconectada, con fallo tipado y ruta redactada.
+- [ ] Repetir unidades externas, carpetas de red y cambios de ACL en hardware
+  físico cuando esté disponible.
 
 Criterio de salida: cada error termina en una acción comprensible —reintentar,
 localizar, introducir contraseña, abrir diagnóstico o volver a biblioteca— y no
@@ -316,16 +332,16 @@ Objetivo P1: encontrar y recuperar documentos debe ser tan sólido como leerlos.
   fecha, tamaño y disponibilidad del archivo.
 - [ ] Diseñar un estado claro para archivo ausente con localizar, retirar de la
   biblioteca y ver información; nunca ofrecer abrir o revelar una ruta inválida.
-- [ ] Detectar duplicados por huella sin fusionar documentos distintos que solo
+- [x] Detectar duplicados por huella sin fusionar documentos distintos que solo
   comparten nombre.
-- [ ] Permitir combinar duplicados de forma transaccional conservando el dato
+- [x] Permitir combinar duplicados de forma transaccional conservando el dato
   más reciente de progreso, anotaciones y portada manual.
 - [ ] Regenerar portadas dañadas o antiguas de forma limitada y cancelable.
 - [ ] Añadir selección por teclado completa, menú contextual con Shift+F10 y
   orden espacial determinista.
 - [ ] Diseñar vistas vacía, cargando, sin resultados, error y recuperación con
   una acción principal inequívoca.
-- [ ] Probar 5 000, 25 000 y 100 000 registros con materialización acotada.
+- [x] Probar 5 000, 25 000 y 100 000 registros con materialización acotada.
 - [ ] Medir tiempo hasta primer contenido y estabilidad de layout durante la
   carga de portadas.
 - [ ] Añadir importación incremental de carpetas con resumen por archivo y
@@ -392,7 +408,7 @@ foco visible y sin pérdida de contexto.
 Objetivo P1/P2: mantener interacción fluida sin convertir la precarga en presión
 de memoria oculta.
 
-- [ ] Definir presupuestos medibles para arranque, apertura, primer render,
+- [x] Definir presupuestos medibles para arranque, apertura, primer render,
   cambio de página, búsqueda y cierre.
 - [ ] Medir percentiles p50/p95/p99 y conservar hardware, DPI y corpus junto al
   resultado.
@@ -409,7 +425,7 @@ de memoria oculta.
 - [ ] Pausar indexado y mantenimiento al minimizar, con reanudación justa.
 - [ ] Evitar escrituras de progreso por evento; agrupar y forzar flush seguro al
   cerrar.
-- [ ] Establecer umbrales que fallen CI solo ante regresiones estadísticamente
+- [x] Establecer umbrales que fallen CI solo ante regresiones estadísticamente
   relevantes, no por una única muestra ruidosa.
 
 Criterio de salida: los presupuestos quedan documentados y ninguna prueba de
@@ -454,18 +470,18 @@ enviar documentos ni actividad.
 
 - [ ] Documentar exactamente qué se guarda, dónde, durante cuánto tiempo y cómo
   se elimina.
-- [ ] Verificar que el uso normal abre cero conexiones TCP/UDP y no resuelve DNS.
+- [x] Verificar que el uso normal abre cero conexiones TCP/UDP y no resuelve DNS.
 - [ ] Repetir las pruebas de red locales sobre una build firmada para convertir
   la evidencia de desarrollo en evidencia de distribución.
 - [ ] Sanitizar logs: sin rutas completas salvo exportación explícita de
   diagnóstico y sin texto extraído de PDFs.
 - [ ] Añadir exportación de diagnóstico con vista previa de todos los datos que
   se incluirán.
-- [ ] Validar backup y restore con hashes, versión de esquema y restauración
+- [x] Validar backup y restore con hashes, versión de esquema y restauración
   transaccional.
-- [ ] Añadir copia de seguridad automática antes de cada migración destructiva.
+- [x] Añadir copia de seguridad automática antes de cada migración destructiva.
 - [ ] Probar rollback ante falta de espacio, interrupción y corrupción parcial.
-- [ ] Mantener documentos fuera del backup salvo selección explícita del usuario.
+- [x] Mantener documentos fuera del backup salvo selección explícita del usuario.
 - [ ] Auditar dependencias y binarios nativos por CVE, licencia y procedencia.
 - [ ] Establecer actualización de dependencias con ventana de observación y plan
   de reversión.
@@ -520,9 +536,9 @@ comprensibles y difíciles de falsear.
   cada evidencia visual.
 - [ ] Separar fallos del producto, toolchain, política del host y falta de
   credenciales en el reporte de verificación.
-- [ ] Ejecutar `git diff --check`, formato, análisis y pruebas antes del build
+- [x] Ejecutar `git diff --check`, formato, análisis y pruebas antes del build
   nativo para fallar pronto.
-- [ ] Añadir cobertura de migraciones desde cada versión de esquema soportada.
+- [x] Añadir cobertura de migraciones desde cada versión de esquema soportada.
 - [ ] Detectar imports, tokens, archivos, capturas y documentación sin referencias
   antes de cada release.
 - [ ] Mantener una única captura vigente por escenario estable; el resto debe ser
