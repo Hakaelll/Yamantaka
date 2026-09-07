@@ -97,10 +97,16 @@ final class AppStatusView extends StatelessWidget {
                         height: 40,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: toneColor.withValues(alpha: 0.10),
+                          color: toneColor.withValues(
+                            alpha: AppOpacity.toneSurface,
+                          ),
                           borderRadius: BorderRadius.circular(AppRadii.control),
                         ),
-                        child: Icon(icon, color: toneColor, size: 22),
+                        child: Icon(
+                          icon,
+                          color: toneColor,
+                          size: AppIconSizes.status,
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.space20),
                       Text(
@@ -120,7 +126,9 @@ final class AppStatusView extends StatelessWidget {
                         const SizedBox(height: AppSpacing.space20),
                         const SizedBox(
                           width: 180,
-                          child: LinearProgressIndicator(minHeight: 2),
+                          child: LinearProgressIndicator(
+                            minHeight: AppBorders.progress,
+                          ),
                         ),
                       ],
                       if (action case final callback?) ...[
@@ -210,14 +218,16 @@ final class AppStatusLabel extends StatelessWidget {
           vertical: AppSpacing.space4,
         ),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
+          color: color.withValues(alpha: AppOpacity.subtle),
+          border: Border.all(
+            color: color.withValues(alpha: AppOpacity.borderEmphasis),
+          ),
           borderRadius: BorderRadius.circular(AppRadii.indicator),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
+            Icon(icon, size: AppIconSizes.compact, color: color),
             const SizedBox(width: AppSpacing.space4),
             Flexible(
               child: Text(
@@ -261,27 +271,32 @@ final class AppMenuItemContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final foreground = destructive ? colors.danger : colors.textPrimary;
+    final stackedShortcut = MediaQuery.textScalerOf(context).scale(14) > 18;
     return Row(
       children: [
         SizedBox(
           width: 24,
           child: Icon(
             checked ? Icons.check_rounded : icon,
-            size: 17,
+            size: AppIconSizes.standard,
             color: foreground,
           ),
         ),
         const SizedBox(width: AppSpacing.space8),
         Expanded(
-          child: Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: foreground),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: foreground)),
+              if (stackedShortcut && shortcut != null)
+                AppShortcutHint(shortcut!),
+            ],
           ),
         ),
-        if (shortcut case final value?) ...[
+        if (!stackedShortcut && shortcut != null) ...[
           const SizedBox(width: AppSpacing.space20),
-          AppShortcutHint(value),
+          AppShortcutHint(shortcut!),
         ],
       ],
     );
@@ -317,7 +332,7 @@ final class AppDialogHeader extends StatelessWidget {
             border: Border.all(color: context.appColors.borderSubtle),
             borderRadius: BorderRadius.circular(AppRadii.control),
           ),
-          child: Icon(icon, size: 18),
+          child: Icon(icon, size: AppIconSizes.standard),
         ),
         const SizedBox(width: AppSpacing.space12),
         Expanded(
@@ -366,7 +381,11 @@ final class AppDangerZone extends StatelessWidget {
     final details = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.warning_amber_rounded, size: 20, color: danger),
+        Icon(
+          Icons.warning_amber_rounded,
+          size: AppIconSizes.large,
+          color: danger,
+        ),
         const SizedBox(width: AppSpacing.space12),
         Expanded(
           child: Column(
@@ -389,8 +408,10 @@ final class AppDangerZone extends StatelessWidget {
       builder: (context, constraints) => Container(
         padding: const EdgeInsets.all(AppSpacing.space16),
         decoration: BoxDecoration(
-          color: danger.withValues(alpha: 0.06),
-          border: Border.all(color: danger.withValues(alpha: 0.55)),
+          color: danger.withValues(alpha: AppOpacity.faint),
+          border: Border.all(
+            color: danger.withValues(alpha: AppOpacity.strongBorder),
+          ),
           borderRadius: BorderRadius.circular(AppRadii.panel),
         ),
         child: constraints.maxWidth < 520
@@ -410,6 +431,165 @@ final class AppDangerZone extends StatelessWidget {
                   child,
                 ],
               ),
+      ),
+    );
+  }
+}
+
+/// Shared adaptive shell for critical desktop dialogs.
+///
+/// [AlertDialog.scrollable] keeps the title and actions reachable at 200 %
+/// text scaling, while its overflow bar stacks actions when the viewport is
+/// narrow. Routes retain Flutter's Escape and focus-restoration behavior.
+final class AppDialogFrame extends StatelessWidget {
+  const AppDialogFrame({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.actions,
+    this.description,
+    this.content,
+    this.maxWidth = AppSizes.dialogMaxWidth,
+    this.semanticLabel,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? description;
+  final Widget? content;
+  final List<Widget> actions;
+  final double maxWidth;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    semanticLabel: semanticLabel ?? title,
+    insetPadding: const EdgeInsets.all(AppSpacing.space16),
+    titlePadding: const EdgeInsets.fromLTRB(
+      AppSpacing.space24,
+      AppSpacing.space24,
+      AppSpacing.space24,
+      AppSpacing.space12,
+    ),
+    contentPadding: content == null
+        ? EdgeInsets.zero
+        : const EdgeInsets.fromLTRB(
+            AppSpacing.space24,
+            AppSpacing.space4,
+            AppSpacing.space24,
+            AppSpacing.space16,
+          ),
+    actionsPadding: const EdgeInsets.fromLTRB(
+      AppSpacing.space16,
+      AppSpacing.space8,
+      AppSpacing.space16,
+      AppSpacing.space16,
+    ),
+    actionsOverflowButtonSpacing: AppSpacing.space8,
+    title: AppDialogHeader(icon: icon, title: title, description: description),
+    content: content == null
+        ? null
+        : ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: content,
+          ),
+    actions: actions,
+  );
+}
+
+/// Common language for long-running local work with a named phase, real
+/// progress when available, and a reachable cancellation action.
+final class AppOperationStatus extends StatelessWidget {
+  const AppOperationStatus({
+    super.key,
+    required this.label,
+    required this.phase,
+    this.value,
+    this.onCancel,
+    this.cancelLabel,
+    this.icon = Icons.sync_rounded,
+  }) : assert(value == null || (value >= 0 && value <= 1)),
+       assert((onCancel == null) == (cancelLabel == null));
+
+  final String label;
+  final String phase;
+  final double? value;
+  final VoidCallback? onCancel;
+  final String? cancelLabel;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final percent = value == null ? null : (value! * 100).round();
+    final semantics = StringBuffer('$label. $phase');
+    if (percent != null) semantics.write('. $percent %');
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: semantics.toString(),
+      value: percent == null ? null : '$percent %',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceSecondary,
+          border: Border.all(color: colors.borderSubtle),
+          borderRadius: BorderRadius.circular(AppRadii.panel),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.space16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: AppIconSizes.large),
+                  const SizedBox(width: AppSpacing.space12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: AppSpacing.space2),
+                        Text(
+                          phase,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (percent != null)
+                    Text(
+                      '$percent %',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontFeatures: AppTypeScale.tabularFigures,
+                      ),
+                    ),
+                  if (onCancel != null) ...[
+                    const SizedBox(width: AppSpacing.space8),
+                    TextButton.icon(
+                      onPressed: onCancel,
+                      icon: const Icon(
+                        Icons.stop_circle_outlined,
+                        size: AppIconSizes.standard,
+                      ),
+                      label: Text(cancelLabel!),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: AppSpacing.space12),
+              LinearProgressIndicator(
+                value: value,
+                minHeight: AppBorders.progress,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

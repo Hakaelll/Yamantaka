@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/application/library_controller.dart';
@@ -32,7 +34,7 @@ void main() {
     ]);
   });
 
-  testWidgets('captures the 0.13 library matrix', (tester) async {
+  testWidgets('captures the 0.15 library matrix', (tester) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_LIBRARY_MATRIX_DIR');
     if (outputRoot.isEmpty) return;
     final output = Directory(outputRoot)..createSync(recursive: true);
@@ -70,6 +72,8 @@ void main() {
       required String name,
       required Size size,
       bool empty = false,
+      bool rtl = false,
+      AppLanguage language = AppLanguage.spanish,
       bool list = false,
       bool selected = false,
       bool filtered = false,
@@ -97,6 +101,14 @@ void main() {
           child: MaterialApp(
             key: ValueKey('library-$name'),
             debugShowCheckedModeBanner: false,
+            locale: Locale(language.code),
+            supportedLocales: const [Locale('es'), Locale('en')],
+            localizationsDelegates: const [
+              YamantakaLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             theme: AppTheme.light(highContrast: highContrast),
             darkTheme: AppTheme.dark(highContrast: highContrast),
             themeMode: themeMode,
@@ -106,11 +118,19 @@ void main() {
                 disableAnimations: reduceMotion,
                 textScaler: TextScaler.linear(textScale),
               ),
-              child: child!,
+              child: Directionality(
+                textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+                child: child!,
+              ),
             ),
             home: empty
                 ? Theme(
-                    data: AppTheme.library(highContrast: highContrast),
+                    data: AppTheme.library(
+                      brightness: themeMode == ThemeMode.dark
+                          ? Brightness.dark
+                          : Brightness.light,
+                      highContrast: highContrast,
+                    ),
                     child: Scaffold(body: EmptyLibraryState(onOpen: () {})),
                   )
                 : LibraryScreen(
@@ -278,14 +298,25 @@ void main() {
       textScale: 2,
     );
 
+    await captureCase(
+      name: 'library-grid-640x480-text-200-widget',
+      size: const Size(640, 480),
+      textScale: 2,
+    );
+    await captureCase(
+      name: 'library-grid-1280x720-english-rtl-widget',
+      size: const Size(1280, 720),
+      language: AppLanguage.english,
+      rtl: true,
+    );
     File(
       '${output.path}${Platform.pathSeparator}matrix-report.json',
     ).writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-library-visual-matrix',
         'version': 1,
-        'productVersion': '0.13.0',
-        'generatedAt': '2026-08-26T12:00:00Z',
+        'productVersion': '0.15.0',
+        'generatedAt': DateTime.now().toUtc().toIso8601String(),
         'cases': cases,
       }),
       flush: true,

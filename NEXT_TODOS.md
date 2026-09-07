@@ -1,6 +1,40 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-09-02.
+Actualizado: 2026-09-07.
+
+## Cierre de la iteración editorial 0.15
+
+- [x] Biblioteca recompuesta con navegación, continuidad y catálogo estables.
+- [x] Tema global compartido y separado del lienzo PDF.
+- [x] Ajustes con vista previa ampliada y ancho de trabajo acotado.
+- [x] Navegador legible, filtros de anotaciones adaptativos y duplicados humanos.
+- [x] Revisión visual transversal y recorrido automatizado con PDFium real.
+- [x] Gate funcional integral final: 14 fases, 325 pruebas y cero omisiones.
+- [ ] Resolver dos regresiones de rendimiento p95 (Biblioteca y lector).
+- [ ] Obtener aceptación integral del paquete, incluido rendimiento.
+- [ ] Validación física de Narrator, varios monitores y escalas no disponibles.
+- [ ] Firma y distribución: requieren autorización; fuera de esta release local.
+
+La evidencia de cierre se centraliza en
+`docs/architecture/visual-iteration-0.15.md`.
+
+Continuación acotada: `docs/prompts/finish-visual-polish-0.15.md`.
+No reiniciar el rediseño ni repetir series sin hipótesis respaldada por trazas.
+
+Decisiones pendientes, en orden:
+
+1. **P1 — instrumentación de builds:** decidir si se amplía el alcance para
+   perfilar por widget la apertura de búsqueda. Beneficio: atribuir los p95 sin
+   más tanteos. Aceptación: traza con versión exacta de SDK, carga del host y
+   coste por subárbol antes de autorizar nuevos experimentos.
+2. **P2 — catálogo con 1–3 documentos:** evaluar si el inspector inferior tapa
+   contenido esencial de una portada real. Beneficio: mantener catálogo y
+   detalle visibles a la vez. Aceptación: 1280×720 y 640×480 al 200 %, claro y
+   oscuro, sin ocultar título, portada ni acciones y conservando teclado.
+3. **P2 — metadatos del benchmark:** registrar revisión de Flutter/Dart, modo de
+   compilación, fixtures, DPI y carga del equipo en cada serie. Beneficio:
+   separar regresión de deriva del host. Aceptación: comparador rechaza series
+   con metadatos incompatibles o incompletos sin alterar muestras.
 
 Este documento es el backlog vivo posterior a la reconstrucción del lector. No
 es una colección de ideas sueltas: ordena trabajo de producto, funcionamiento,
@@ -31,6 +65,17 @@ Reglas:
 - Yamantaka sigue siendo local-first y sin red durante el uso normal.
 
 ## Punto de partida confirmado
+
+- [x] 0.14.0 consolida tokens, diálogos críticos, estados operativos y ocho
+  categorías de Ajustes sin cambiar PDFium, SQLite v11 ni los límites de datos.
+- [x] La suite alcanza 314 pruebas y la matriz 0.14 reúne 185 PNG, 20 hojas y
+  diez comparaciones 0.13/0.14 con la marca byte-idéntica.
+- [ ] Repetir la inspección nativa con un capturador WGC fiable: el host actual
+  devuelve frames obsoletos o blancos aunque el árbol UIA sea único y correcto.
+- [x] Ejecutar el gate Windows completo a la escala física disponible: 14 fases
+  aprobadas, cero omitidas y matriz nativa confirmada a 120 DPI/125 %.
+- [ ] Validar 0.14 físicamente con Narrator, varios monitores, en-US, alto
+  contraste real y DPI 100/150/175/200 % cuando exista ese hardware.
 
 - [x] 0.13.0 formaliza apertura/cierre y recuperación, backup con ensayo,
   consolidación reversible de duplicados, journals por fases, SQLite v11 y SBOM

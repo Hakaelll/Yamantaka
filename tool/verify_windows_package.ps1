@@ -1,9 +1,12 @@
 [CmdletBinding()]
 param(
-    [string]$ReleaseDirectory = 'build/release/0.13.0+14',
-    [string]$ArchiveName = 'yamantaka-0.13.0+14-windows-x64.zip',
-    [string]$ExpectedVersion = '0.13.0',
-    [string]$ExpectedBuildNumber = '14'
+    [string]$ReleaseDirectory = 'build/release/0.15.0+16',
+    [string]$ArchiveName = 'yamantaka-0.15.0+16-windows-x64.zip',
+    [string]$ExpectedVersion = '0.15.0',
+    [string]$ExpectedBuildNumber = '16',
+    [int]$ExpectedVisualPngCount = 193,
+    [int]$ExpectedComparisonPngCount = 11,
+    [int]$ExpectedContactSheetCount = 21
 )
 
 $ErrorActionPreference = 'Stop'
@@ -162,7 +165,8 @@ $requiredReleaseFiles = @(
     'zip-no-network.json',
     'no-network.json',
     'test-report.json',
-    'performance-report.json'
+    'performance-report.json',
+    'visual-evidence-manifest.json'
 )
 $hashRows = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $releaseRoot 'SHA256SUMS.txt')
 $hashedNames = @{}
@@ -202,17 +206,58 @@ if (-not $zipSmoke.passed -or @($zipSmoke.connections).Count -ne 0 -or
 $testReport = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $releaseRoot 'test-report.json') |
     ConvertFrom-Json
 if ($testReport.status -ne 'passed' -or $testReport.skippedPhaseCount -ne 0 -or
+    @($testReport.phases).Count -ne 14 -or
     @($testReport.phases | Where-Object { $_.status -ne 'passed' }).Count -ne 0) {
     throw 'The packaged verification report is not a complete passing gate.'
+}
+$performance = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $releaseRoot 'performance-report.json') |
+    ConvertFrom-Json
+if ($performance.currentVersion -ne $ExpectedVersion -or $performance.passes -ne 5 -or
+    $performance.status -notin @('pass', 'pass-with-watch') -or
+    $performance.failedMetricCount -ne 0 -or $performance.failedInvariantCount -ne 0 -or
+    @($performance.comparisons).Count -ne 35 -or @($performance.invariants).Count -ne 9) {
+    throw 'The packaged performance report does not prove five passing series and healthy invariants.'
 }
 $signatureState = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $releaseRoot 'signature-state.json') |
     ConvertFrom-Json
 if ([bool]$manifest.signed -ne [bool]$signatureState.readyForNativeExecution) {
     throw 'Manifest and signature evidence disagree about signed state.'
 }
+$visualManifestPath = Join-Path $releaseRoot 'visual-evidence-manifest.json'
+$visualManifest = Get-Content -Raw -Encoding UTF8 -LiteralPath $visualManifestPath |
+    ConvertFrom-Json
+if ($visualManifest.format -ne 'yamantaka-visual-release-evidence' -or
+    $visualManifest.productVersion -ne $ExpectedVersion) {
+    throw 'Visual evidence manifest has an unexpected format or version.'
+}
+if ($visualManifest.evidencePngCount -ne $ExpectedVisualPngCount -or
+    $visualManifest.comparisonPngCount -ne $ExpectedComparisonPngCount -or
+    $visualManifest.contactSheetPngCount -ne $ExpectedContactSheetCount) {
+    throw "Unexpected visual evidence counts: originals=$($visualManifest.evidencePngCount), comparisons=$($visualManifest.comparisonPngCount), sheets=$($visualManifest.contactSheetPngCount)."
+}
+foreach ($file in @($visualManifest.files)) {
+    $relativePath = ([string]$file.path).Replace('/', '\')
+    if ($relativePath.StartsWith('\') -or $relativePath.Contains('..\') -or
+        $relativePath -match '^[A-Za-z]:') {
+        throw "Unsafe visual evidence path: $relativePath"
+    }
+    $visualPath = Join-Path $releaseRoot $relativePath
+    if (-not (Test-Path -LiteralPath $visualPath -PathType Leaf)) {
+        throw "Visual evidence file not found: $relativePath"
+    }
+    $visualFile = Get-Item -LiteralPath $visualPath
+    if ($visualFile.Length -ne [long]$file.bytes) {
+        throw "Visual evidence size mismatch: $relativePath"
+    }
+    $visualHash = (Get-FileHash -LiteralPath $visualPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($visualHash -ne [string]$file.sha256) {
+        throw "Visual evidence SHA-256 mismatch: $relativePath"
+    }
+}
 
 $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 Write-Host "Verified $($manifest.files.Count) package files against ZIP paths, sizes, and SHA-256."
 Write-Host 'Verified that the archive contains no PDF document or unsafe path.'
 Write-Host "Verified $($hashedNames.Count) release hashes and complete gate/smoke/signature evidence."
+Write-Host "Verified $($visualManifest.files.Count) visual evidence files, including $ExpectedVisualPngCount originals and $ExpectedContactSheetCount contact sheets."
 Write-Host "Archive SHA-256: $archiveHash"

@@ -1,5 +1,22 @@
 # Sistema de diseño de Yamantaka
 
+## Acabado editorial 0.15
+
+La interfaz comparte papel cálido (`#F7F6F2`), grafito (`#181A20`) y acento
+violeta (`#7055B5` / `#C4AFF4`). Biblioteca hereda la apariencia global; el
+color del lienzo PDF no decide el tema de barras y paneles. Tinta electrónica
+conserva su perfil estático de alto contraste.
+
+La Biblioteca separa navegación, continuidad y catálogo: rail desde 1100 px,
+menús equivalentes en compacto, una zona de lectura activa y portadas
+tipográficas alineadas. Los títulos no cambian la geometría al seleccionar.
+Ajustes limita su área de trabajo a 1600 px y amplía la muestra de página.
+Los controles mantienen targets de 40 px, foco visible y roles compartidos.
+
+La auditoría y las comparaciones se documentan en
+`docs/architecture/visual-iteration-0.15.md`; generar una captura no equivale
+a aprobarla y las simulaciones no sustituyen DPI físico ni Narrator.
+
 ## 1. Visión
 
 Yamantaka aplica minimalismo editorial contemporáneo a una herramienta de
@@ -887,3 +904,33 @@ archivo ausente, consolidación, ensayo de backup, problemas y recuperación de
 sesión, además de comparaciones ejecutadas 0.12/0.13. Narrator, varios monitores
 y escalas físicas distintas del host disponible permanecen como validación
 nativa separada.
+
+## 37. Coherencia visual y UX de escritorio — 0.14
+
+La jerarquía editorial se conserva: Biblioteca sigue siendo espacial, el lector
+mantiene el PDF como superficie dominante y la barra no adquiere controles
+permanentes nuevos. Los tokens compartidos fijan tamaños ópticos de icono,
+targets, bordes de foco, progreso, opacidades y curvas; densidad nunca reduce un
+target ni la tipografía esencial.
+
+Los diálogos críticos comparten icono contenido, título, explicación breve,
+contenido desplazable y acciones adaptativas. Contraseña separa la garantía de
+privacidad del error de validación. Restore distingue resumen, salvaguarda
+previa y estrategia de conflictos. Duplicados separa evidencia, registros e
+impacto, y nombra la copia reversible en su acción principal.
+
+El lenguaje de estados prolongados es fase + progreso + cancelación. Si no hay
+valor real se muestra progreso indeterminado; no se fabrica un porcentaje. El
+estado se anuncia como live region y la cancelación permanece junto a la fase,
+sin convertir una tarea local en modal opaco.
+
+Ajustes usa ocho intenciones, en este orden: Apariencia, Lectura,
+Accesibilidad, Biblioteca, Privacidad, Almacenamiento, Recuperación y
+Diagnóstico. En compacto son destinos navegables; en expandido forman cuatro
+grupos discretos. El rail crece de forma acotada con texto grande para evitar
+truncar etiquetas, mientras el contenido conserva scroll.
+
+La aceptación visual cubre 640×480, 800×600, 1280×720, 1600×900, 1920×1080,
+1920×1200, 2560×1440 y 3440×1440, además de oscuro, alto contraste simulado,
+movimiento reducido, ES/EN, RTL y texto 130/150/200 %. La matriz de widgets no
+sustituye Narrator, varios monitores ni escalas físicas distintas.

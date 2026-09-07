@@ -47,7 +47,7 @@ abstract final class AppSizes {
   static const double readerCompactTopBarHeight = 52;
   static const double libraryHeaderHeight = 76;
   static const double bottomControlHeight = 48;
-  static const double readerRestingDockHeight = 38;
+  static const double readerRestingDockHeight = 40;
   static const double readerPanelHeaderHeight = 52;
   static const double readerPanelRailWidth = 52;
   static const double sidePanelWidth = 344;
@@ -57,12 +57,15 @@ abstract final class AppSizes {
   static const double desktopControlExtent = 40;
   static const double touchControlExtent = 48;
   static const double dialogMaxWidth = 600;
+  static const double dialogCompactWidth = 480;
+  static const double dialogWideWidth = 680;
   static const double commandPaletteMaxHeight = 520;
   static const double readerEdgeNavigation = 64;
   static const double readerSpreadGutter = 2;
   static const double topRevealZone = 24;
   static const double readerPanelDefault = sidePanelWidth;
   static const double settingsNavigationWidth = 236;
+  static const double settingsNavigationMaxWidth = 320;
   static const double settingsPreviewWidth = 320;
   static const double settingsContentMaxWidth = 780;
   static const double settingsControlWidth = 240;
@@ -78,11 +81,45 @@ abstract final class AppSizes {
       compact ? readerCompactTopBarHeight : topBarHeight;
 }
 
+/// Optical icon sizes are independent from their interactive target.
+abstract final class AppIconSizes {
+  static const double compact = 14;
+  static const double small = 16;
+  static const double standard = 18;
+  static const double large = 20;
+  static const double status = 22;
+}
+
+/// Shared control heights. Text scaling may increase these minimums but never
+/// reduce the desktop or touch target.
+abstract final class AppControlHeights {
+  static const double dense = 34;
+  static const double desktop = AppSizes.desktopControlExtent;
+  static const double touch = AppSizes.touchControlExtent;
+  static const double row = AppSizes.commandPaletteRowHeight;
+}
+
+abstract final class AppBorders {
+  static const double hairline = 1;
+  static const double focus = 2;
+  static const double progress = 2;
+}
+
+abstract final class AppOpacity {
+  static const double faint = 0.06;
+  static const double subtle = 0.08;
+  static const double toneSurface = 0.10;
+  static const double borderEmphasis = 0.35;
+  static const double strongBorder = 0.55;
+  static const double hoverEmphasis = 0.65;
+  static const double floatingSurface = 0.96;
+}
+
 /// Editorial roles used by [AppTheme]. Feature widgets select a semantic text
 /// style instead of introducing local sizes. Essential information starts at
 /// 12 logical pixels; density never scales this typography down.
 abstract final class AppTypeScale {
-  static const double screenTitle = 24;
+  static const double screenTitle = 28;
   static const double sectionTitle = 19;
   static const double documentTitle = 17;
   static const double contextualHeading = 15;
@@ -101,7 +138,7 @@ abstract final class AppTypeScale {
 abstract final class AppRadii {
   static const double indicator = 2;
   static const double page = 3;
-  static const double control = 10;
+  static const double control = 8;
   static const double field = 10;
   static const double floating = 12;
   static const double panel = 12;
@@ -157,6 +194,12 @@ abstract final class AppMotion {
 
   static Duration whenAllowed(bool reduceMotion, Duration duration) =>
       reduceMotion ? instant : duration;
+}
+
+abstract final class AppCurves {
+  static const Curve feedback = Curves.easeOutCubic;
+  static const Curve standard = Curves.easeInOutCubic;
+  static const Curve panel = Curves.easeOutCubic;
 }
 
 @immutable
@@ -255,35 +298,35 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
   Color get overlayShadow => ambientShadow;
 
   static const light = AppColorTokens(
-    appBackground: Color(0xFFECEAE4),
-    surfacePrimary: Color(0xFFF4F2EC),
-    surfaceSecondary: Color(0xFFF0EEE8),
-    surfaceElevated: Color(0xFFF7F5EF),
-    surfaceSunken: Color(0xFFE2E0D8),
+    appBackground: Color(0xFFF7F6F2),
+    surfacePrimary: Color(0xFFFFFFFF),
+    surfaceSecondary: Color(0xFFF0EFEB),
+    surfaceElevated: Color(0xFFFFFFFF),
+    surfaceSunken: Color(0xFFE9E7E2),
     textPrimary: Color(0xFF1C1E1A),
     textSecondary: Color(0xFF5D6159),
-    textMuted: Color(0xFF8C8D87),
+    textMuted: Color(0xFF696B73),
     borderSubtle: Color(0xFFD5D2CA),
     borderStrong: Color(0xFFBBB8AF),
-    accentPrimary: Color(0xFF393B37),
-    accentHover: Color(0xFF2D2F2B),
-    accentPressed: Color(0xFF20211F),
-    accentSoft: Color(0xFFE4E3DE),
-    selectionBackground: Color(0xFFD8D7CF),
-    focusRing: Color(0xFF50594E),
+    accentPrimary: Color(0xFF7055B5),
+    accentHover: Color(0xFF60469F),
+    accentPressed: Color(0xFF51398B),
+    accentSoft: Color(0xFFECE6F7),
+    selectionBackground: Color(0xFFE9E1F5),
+    focusRing: Color(0xFF7055B5),
     danger: Color(0xFF9C4943),
     warning: Color(0xFF85652F),
     success: Color(0xFF4E7058),
     readerPageShadow: Color(0x2E000000),
     librarySelectionAccent: Color(0xFF7652BC),
     readerBackground: Color(0xFFE7E4DC),
-    libraryBackground: Color(0xFFEDEBE5),
-    settingsBackground: Color(0xFFF1EFE9),
-    surfaceFloating: Color(0xFFFBF9F3),
-    surfaceActive: Color(0xFFDCDAD3),
-    surfaceHover: Color(0xFFE4E2DB),
+    libraryBackground: Color(0xFFF7F6F2),
+    settingsBackground: Color(0xFFF7F6F2),
+    surfaceFloating: Color(0xFFFFFFFF),
+    surfaceActive: Color(0xFFE9E1F5),
+    surfaceHover: Color(0xFFEDEBE6),
     surfacePressed: Color(0xFFD3D1CA),
-    textTertiary: Color(0xFF777B72),
+    textTertiary: Color(0xFF696B73),
     textDisabled: Color(0xFF9B9E97),
     iconNormal: Color(0xFF62665E),
     iconActive: Color(0xFF20221E),
@@ -292,42 +335,42 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     paperWhite: Color(0xFFF8F7F2),
     ivory: Color(0xFFEDE7D8),
     nightBackground: Color(0xFF0B0D0B),
-    ambientShadow: Color(0x1F000000),
+    ambientShadow: Color(0x180F1420),
     pageShadow: Color(0x2E000000),
   );
 
   static const dark = AppColorTokens(
-    appBackground: Color(0xFF111310),
-    surfacePrimary: Color(0xFF181B17),
-    surfaceSecondary: Color(0xFF151815),
-    surfaceElevated: Color(0xFF1C1F1B),
-    surfaceSunken: Color(0xFF0B0C0A),
+    appBackground: Color(0xFF181A20),
+    surfacePrimary: Color(0xFF20232B),
+    surfaceSecondary: Color(0xFF1C1F26),
+    surfaceElevated: Color(0xFF292D36),
+    surfaceSunken: Color(0xFF14161C),
     textPrimary: Color(0xFFF0F1EB),
-    textSecondary: Color(0xFFB7BBB1),
-    textMuted: Color(0xFF777A72),
-    borderSubtle: Color(0xFF2B2F29),
-    borderStrong: Color(0xFF3B4038),
-    accentPrimary: Color(0xFFD0D1CA),
-    accentHover: Color(0xFFE0E1DA),
-    accentPressed: Color(0xFFF1F1EA),
-    accentSoft: Color(0xFF2B2D28),
-    selectionBackground: Color(0xFF2B2D28),
-    focusRing: Color(0xFFD8DED3),
+    textSecondary: Color(0xFFB9BEC9),
+    textMuted: Color(0xFF9A9FAE),
+    borderSubtle: Color(0xFF373B46),
+    borderStrong: Color(0xFF555B69),
+    accentPrimary: Color(0xFFC4AFF4),
+    accentHover: Color(0xFFD9C9FC),
+    accentPressed: Color(0xFFAF95E5),
+    accentSoft: Color(0xFF363044),
+    selectionBackground: Color(0xFF393148),
+    focusRing: Color(0xFFD9C9FC),
     danger: Color(0xFFD9847C),
     warning: Color(0xFFD0AD70),
     success: Color(0xFF8EB397),
     readerPageShadow: Color(0x85000000),
     librarySelectionAccent: Color(0xFFB58AFF),
     readerBackground: Color(0xFF141613),
-    libraryBackground: Color(0xFF10120F),
-    settingsBackground: Color(0xFF151714),
-    surfaceFloating: Color(0xFF232620),
-    surfaceActive: Color(0xFF30342D),
-    surfaceHover: Color(0xFF242720),
-    surfacePressed: Color(0xFF34382F),
-    textTertiary: Color(0xFF8F948A),
+    libraryBackground: Color(0xFF181A20),
+    settingsBackground: Color(0xFF181A20),
+    surfaceFloating: Color(0xFF292D36),
+    surfaceActive: Color(0xFF393148),
+    surfaceHover: Color(0xFF2C303A),
+    surfacePressed: Color(0xFF3A3E49),
+    textTertiary: Color(0xFFA5AAB8),
     textDisabled: Color(0xFF666B62),
-    iconNormal: Color(0xFFA9ADA4),
+    iconNormal: Color(0xFFB9BEC9),
     iconActive: Color(0xFFF3F4EE),
     iconDisabled: Color(0xFF5E635A),
     separatorExceptional: Color(0xFF3B4038),
@@ -338,51 +381,8 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
     pageShadow: Color(0x85000000),
   );
 
-  /// Monochrome palette reserved for Home/Library. Violet is deliberately
-  /// isolated in [librarySelectionAccent] and only identifies selected files.
-  /// Reader and Settings continue to use [light] and [dark].
-  static const library = AppColorTokens(
-    appBackground: Color(0xFF080808),
-    surfacePrimary: Color(0xFF0E0E0F),
-    surfaceSecondary: Color(0xFF131314),
-    surfaceElevated: Color(0xFF19191A),
-    surfaceSunken: Color(0xFF050505),
-    textPrimary: Color(0xFFF5F5F5),
-    textSecondary: Color(0xFFBDBDC1),
-    textMuted: Color(0xFF7B7B80),
-    borderSubtle: Color(0xFF262628),
-    borderStrong: Color(0xFF404043),
-    accentPrimary: Color(0xFFF5F5F5),
-    accentHover: Color(0xFFFFFFFF),
-    accentPressed: Color(0xFFD7D7DA),
-    accentSoft: Color(0xFF202022),
-    selectionBackground: Color(0xFF29292C),
-    focusRing: Color(0xFFFFFFFF),
-    danger: Color(0xFFE4E4E6),
-    warning: Color(0xFFBEBEC2),
-    success: Color(0xFFF5F5F5),
-    readerPageShadow: Color(0xB8000000),
-    librarySelectionAccent: Color(0xFFB58AFF),
-    readerBackground: Color(0xFF0E0E0F),
-    libraryBackground: Color(0xFF080808),
-    settingsBackground: Color(0xFF0E0E0F),
-    surfaceFloating: Color(0xF2141415),
-    surfaceActive: Color(0xFF2A2A2D),
-    surfaceHover: Color(0xFF1D1D1F),
-    surfacePressed: Color(0xFF323235),
-    textTertiary: Color(0xFF98989D),
-    textDisabled: Color(0xFF606065),
-    iconNormal: Color(0xFFBDBDC1),
-    iconActive: Color(0xFFF5F5F5),
-    iconDisabled: Color(0xFF5A5A5F),
-    separatorExceptional: Color(0xFF404043),
-    paperWhite: Color(0xFFF8F7F2),
-    ivory: Color(0xFFEDE7D8),
-    nightBackground: Color(0xFF020202),
-    ambientShadow: Color(0x8A000000),
-    pageShadow: Color(0xA8000000),
-  );
-
+  /// Compatibility alias; the library now uses the shared application theme.
+  static const library = dark;
   @override
   AppColorTokens copyWith({
     Color? appBackground,
@@ -469,7 +469,7 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
 
   @override
   AppColorTokens lerp(AppColorTokens? other, double t) {
-    if (other == null) return this;
+    if (other == null || identical(this, other)) return this;
     return AppColorTokens(
       appBackground: Color.lerp(appBackground, other.appBackground, t)!,
       surfacePrimary: Color.lerp(surfacePrimary, other.surfacePrimary, t)!,

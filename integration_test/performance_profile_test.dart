@@ -153,20 +153,37 @@ void main() {
     await tester.pumpAndSettle();
     final baselineRss = ProcessInfo.currentRss;
     final libraryDurations = <int>[];
+    const traceSteps = bool.fromEnvironment('YAMANTAKA_TRACE_LIBRARY_STEPS');
+    final stepFrames = <Map<String, Object>>[];
+    var phase = '';
+    if (traceSteps) {
+      binding.addPersistentFrameCallback((timestamp) {
+        if (phase.isNotEmpty) {
+          stepFrames.add({
+            'phase': phase,
+            'timestamp': timestamp.inMicroseconds,
+          });
+        }
+      });
+    }
     for (var run = 0; run < 5; run++) {
       await binding.watchPerformance(() async {
         final stopwatch = Stopwatch()..start();
+        if (traceSteps) phase = '$run:open-search';
         if (find.byKey(const Key('library-filter')).evaluate().isEmpty) {
           await tester.tap(find.byKey(const Key('library-search-button')));
           await tester.pump();
         }
+        if (traceSteps) phase = '$run:enter-query';
         await tester.enterText(
           find.byKey(const Key('library-filter')),
           'Fixture 3',
         );
         await tester.pump();
+        if (traceSteps) phase = '$run:close-search';
         await tester.tap(find.byKey(const Key('library-filter-clear')));
         await tester.pumpAndSettle();
+        if (traceSteps) phase = '$run:change-density';
         await tester.pumpWidget(
           libraryApp(
             run.isEven
@@ -175,10 +192,12 @@ void main() {
           ),
         );
         await tester.pump();
+        if (traceSteps) phase = '';
         stopwatch.stop();
         libraryDurations.add(stopwatch.elapsedMicroseconds);
       }, reportKey: 'library_run_$run');
     }
+    if (traceSteps) binding.reportData!['library_step_frames'] = stepFrames;
 
     final openDurations = <int>[];
     final heavyRenderDurations = <int>[];
@@ -360,6 +379,7 @@ void main() {
       'heavy_close_growth': heavyCloseGrowth,
     };
     binding.reportData!['interaction_microseconds'] = {
+      'library_samples': libraryDurations,
       'library_median': _percentile(libraryDurations, 0.50),
       'library_p95': _percentile(libraryDurations, 0.95),
       'reader_median': _percentile(readerDurations, 0.50),

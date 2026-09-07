@@ -125,25 +125,27 @@ final class ReaderTopBar extends StatelessWidget
                         onPressed: onBack,
                       ),
                       const SizedBox(width: AppSpacing.space8),
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: compact
-                              ? 148
-                              : expanded
-                              ? 360
-                              : 240,
-                        ),
-                        child: Tooltip(
-                          message: document.fileName,
-                          child: Text(
-                            document.effectiveTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(
-                                  color: colors.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                      Flexible(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: compact
+                                ? 148
+                                : expanded
+                                ? 360
+                                : 240,
+                          ),
+                          child: Tooltip(
+                            message: document.fileName,
+                            child: Text(
+                              document.effectiveTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: colors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
                           ),
                         ),
                       ),
@@ -180,14 +182,30 @@ final class ReaderTopBar extends StatelessWidget
                   bare: true,
                   padding: EdgeInsets.zero,
                   children: [
-                    YamaIconButton(
-                      semanticLabel: strings.get('command.search'),
-                      tooltip:
-                          '${strings.get('command.search')} (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides, strings: strings)})',
-                      icon: Icons.search_rounded,
-                      onPressed: onSearch,
-                      selected: activePanel == ReaderPanelSection.search,
-                    ),
+                    if (expanded &&
+                        MediaQuery.textScalerOf(context).scale(1) <= 1.3)
+                      Tooltip(
+                        message:
+                            '${strings.get('command.search')} (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides, strings: strings)})',
+                        child: TextButton.icon(
+                          key: const Key('reader-search-action'),
+                          onPressed: onSearch,
+                          icon: const Icon(
+                            Icons.search_rounded,
+                            size: AppIconSizes.standard,
+                          ),
+                          label: Text(strings.get('reader.search')),
+                        ),
+                      )
+                    else
+                      YamaIconButton(
+                        semanticLabel: strings.get('command.search'),
+                        tooltip:
+                            '${strings.get('command.search')} (${AppCommandRegistry.shortcutLabel(AppCommandId.search, shortcutOverrides, strings: strings)})',
+                        icon: Icons.search_rounded,
+                        onPressed: onSearch,
+                        selected: activePanel == ReaderPanelSection.search,
+                      ),
                     if (expanded && showPanelControls)
                       YamaIconButton(
                         semanticLabel: strings.get('reader.openThumbnails'),
@@ -245,7 +263,7 @@ final class ReaderTopBar extends StatelessWidget
                           ),
                         ],
                         icon: Icon(
-                          Icons.build_outlined,
+                          Icons.tune_rounded,
                           color: activePanel == null
                               ? colors.iconNormal
                               : colors.iconActive,
@@ -256,7 +274,7 @@ final class ReaderTopBar extends StatelessWidget
                         semanticLabel: strings.get('command.commandPalette'),
                         tooltip:
                             '${strings.get('command.commandPalette')} (${AppCommandRegistry.shortcutLabel(AppCommandId.commandPalette, shortcutOverrides, strings: strings)})',
-                        icon: Icons.keyboard_command_key_rounded,
+                        icon: Icons.keyboard_alt_outlined,
                         onPressed: onCommandPalette,
                       ),
                     PopupMenuButton<_ReaderMenuAction>(
@@ -308,7 +326,7 @@ final class ReaderTopBar extends StatelessWidget
                             value: _ReaderMenuAction.commandPalette,
                             height: 40,
                             child: _ReaderMenuItem(
-                              icon: Icons.keyboard_command_key_rounded,
+                              icon: Icons.keyboard_alt_outlined,
                               label: strings.get('command.commandPalette'),
                             ),
                           ),

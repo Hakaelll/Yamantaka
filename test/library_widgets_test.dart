@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
+import 'package:yamantaka/app/theme/app_density.dart';
+import 'package:yamantaka/features/library/presentation/artifact_library.dart';
 import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/library/application/library_controller.dart';
@@ -12,6 +14,57 @@ import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
 
 void main() {
+  testWidgets('editorial cover reuse still updates theme and metadata', (
+    tester,
+  ) async {
+    final document = _document(
+      id: 'stable-cover',
+      fileName: 'cover.pdf',
+      title: 'Portada inicial',
+      author: 'Autora',
+      openedAt: DateTime.utc(2026, 9, 7),
+    );
+    Future<void> show(ThemeData theme, LibraryDocument value) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Scaffold(
+            body: Center(
+              child: ArtifactDocument(
+                document: value,
+                width: 180,
+                selected: false,
+                selectionMode: false,
+                reduceMotion: true,
+                onSelect: () {},
+                onOpen: () {},
+                onHover: (_) {},
+                onMenu: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await show(AppTheme.light(), document);
+    final original = tester.widget<Text>(find.text('Portada inicial').first);
+    await show(AppTheme.light(density: AppInterfaceDensity.compact), document);
+    expect(
+      identical(
+        original,
+        tester.widget<Text>(find.text('Portada inicial').first),
+      ),
+      isTrue,
+    );
+    await show(AppTheme.dark(), document.copyWith(title: 'Título actualizado'));
+    expect(find.text('Portada inicial'), findsNothing);
+    final updated = tester.widget<Text>(find.text('Título actualizado').first);
+    expect(updated.style?.color, isNot(original.style?.color));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('empty library opens in Spanish and English', (tester) async {
     for (final language in AppLanguage.values) {
       await tester.pumpWidget(
@@ -306,7 +359,17 @@ void main() {
           final beta = tester.getCenter(
             find.byKey(const ValueKey('artifact-beta')),
           );
-          expect((alpha.dx + beta.dx) / 2, closeTo(width / 2, 4));
+          expect(
+            (alpha.dx + beta.dx) / 2,
+            closeTo(
+              (width +
+                      tester
+                          .getSize(find.byKey(const Key('library-navigation')))
+                          .width) /
+                  2,
+              4,
+            ),
+          );
         }
       }
 
@@ -319,15 +382,44 @@ void main() {
       expect(find.byKey(const Key('library-context-primary')), findsOneWidget);
       expect(find.text('Abrir'), findsOneWidget);
 
+      final coverBeforeOpeningSearch = tester.widget<ArtifactDocument>(
+        find.byKey(const ValueKey('artifact-alpha')),
+      );
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await tester.pump();
       expect(find.byKey(const Key('library-filter')), findsOneWidget);
+      expect(
+        identical(
+          coverBeforeOpeningSearch,
+          tester.widget<ArtifactDocument>(
+            find.byKey(const ValueKey('artifact-alpha')),
+          ),
+        ),
+        isTrue,
+        reason: 'Opening search rebuilds the overlay, not the catalog.',
+      );
       final field = tester.widget<EditableText>(find.byType(EditableText));
       expect(field.focusNode.hasFocus, isTrue);
 
+      await tester.pumpAndSettle();
+      final coverBeforeTyping = tester.widget<ArtifactDocument>(
+        find.byKey(const ValueKey('artifact-alpha')),
+      );
       await tester.enterText(find.byKey(const Key('library-filter')), 'ana');
+      await tester.pump();
+      expect(
+        identical(
+          coverBeforeTyping,
+          tester.widget<ArtifactDocument>(
+            find.byKey(const ValueKey('artifact-alpha')),
+          ),
+        ),
+        isTrue,
+        reason:
+            'Typing does not rebuild the catalog before SQL results arrive.',
+      );
       await tester.pump(const Duration(milliseconds: 220));
       await tester.pump();
       expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
@@ -509,7 +601,7 @@ void main() {
     expect(controller.scrollOffset, 42);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Alpha').first, warnIfMissed: false);
+    await tester.tap(find.byKey(const ValueKey('artifact-list-alpha')));
     await tester.pump();
     expect(controller.selectedDocumentId, 'alpha');
 
@@ -690,7 +782,14 @@ void main() {
       expect(find.text('Abrir documento'), findsNothing);
       expect(
         tester.getCenter(find.byKey(const ValueKey('artifact-actions'))).dx,
-        closeTo(550, 2),
+        closeTo(
+          (1100 +
+                  tester
+                      .getSize(find.byKey(const Key('library-navigation')))
+                      .width) /
+              2,
+          2,
+        ),
       );
       await tester.tap(find.byKey(const ValueKey('artifact-actions')));
       await tester.pump();

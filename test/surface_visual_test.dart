@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yamantaka/app/shortcuts/app_commands.dart';
+import 'package:yamantaka/app/theme/app_components.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/command_palette/presentation/command_palette.dart';
@@ -559,11 +560,10 @@ final class _MenuFixture extends StatelessWidget {
       itemBuilder: (context) => const [
         PopupMenuItem(
           value: 'open',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.file_open_outlined),
-            title: Text('Open document'),
-            trailing: Text('Ctrl+O'),
+          child: AppMenuItemContent(
+            icon: Icons.file_open_outlined,
+            label: 'Open document',
+            shortcut: 'Ctrl+O',
           ),
         ),
         CheckedPopupMenuItem(
@@ -574,10 +574,10 @@ final class _MenuFixture extends StatelessWidget {
         PopupMenuDivider(),
         PopupMenuItem(
           value: 'delete',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.delete_outline_rounded),
-            title: Text('Remove locally'),
+          child: AppMenuItemContent(
+            icon: Icons.delete_outline_rounded,
+            label: 'Remove locally',
+            destructive: true,
           ),
         ),
       ],

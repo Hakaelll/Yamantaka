@@ -108,7 +108,9 @@ final class ReaderBottomControls extends StatelessWidget {
             onPressed: onGoToPage,
             child: Text(
               controller.readingUnitIndicator(direction: readingDirection),
-              style: Theme.of(context).textTheme.labelMedium,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontFeatures: AppTypeScale.tabularFigures,
+              ),
             ),
           ),
         ),
@@ -137,7 +139,9 @@ final class ReaderBottomControls extends StatelessWidget {
           onPressed: () => controller.zoomBy(0.85),
         ),
         SizedBox(
-          width: compact ? 52 : 64,
+          width:
+              (compact ? 52 : 64) *
+              MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
           child: Tooltip(
             message: strings.get('reader.customZoom'),
             child: TextButton(
@@ -153,7 +157,9 @@ final class ReaderBottomControls extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 softWrap: false,
-                style: Theme.of(context).textTheme.labelMedium,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontFeatures: AppTypeScale.tabularFigures,
+                ),
               ),
             ),
           ),
@@ -275,7 +281,9 @@ final class ReaderBottomControls extends StatelessWidget {
     );
 
     final availableWidth = MediaQuery.sizeOf(context).width;
-    if (!compact && availableWidth >= 900) {
+    if (!compact &&
+        availableWidth >= 900 &&
+        MediaQuery.textScalerOf(context).scale(1) <= 1.3) {
       return Align(
         alignment: Alignment.bottomCenter,
         child: SizedBox(
@@ -304,11 +312,11 @@ final class ReaderBottomControls extends StatelessWidget {
                             Icon(
                               Icons.menu_book_outlined,
                               size: 16,
-                              color: context.appColors.textMuted,
+                              color: context.appColors.textSecondary,
                             ),
                             const SizedBox(width: AppSpacing.space6),
                             Text(
-                              layoutLabel.toUpperCase(),
+                              layoutLabel,
                               style: Theme.of(context).textTheme.labelSmall,
                             ),
                           ],
@@ -334,7 +342,9 @@ final class ReaderBottomControls extends StatelessWidget {
     return Align(
       alignment: Alignment.bottomCenter,
       child: SizedBox(
-        height: AppSizes.bottomControlHeight,
+        height: MediaQuery.textScalerOf(context).scale(1) > 1.3
+            ? null
+            : AppSizes.bottomControlHeight,
         child: YamaToolbarGroup(
           key: const Key('reader-active-dock'),
           label:
@@ -342,7 +352,22 @@ final class ReaderBottomControls extends StatelessWidget {
           flat: flat,
           radius: AppRadii.control,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space6),
-          children: [navigation, const YamaToolbarDivider(), zoom],
+          children: [
+            if (MediaQuery.textScalerOf(context).scale(1) > 1.3)
+              Flexible(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 12,
+                  runSpacing: 4,
+                  children: [navigation, zoom],
+                ),
+              )
+            else ...[
+              navigation,
+              const YamaToolbarDivider(),
+              zoom,
+            ],
+          ],
         ),
       ),
     );
@@ -462,7 +487,8 @@ final class _ReaderRestingDock extends StatelessWidget {
             onTap: onActivate,
             child: SizedBox(
               width: compact ? 236 : 336,
-              height: AppSizes.readerRestingDockHeight,
+              height: (MediaQuery.textScalerOf(context).scale(14) * 1.3 + 12)
+                  .clamp(AppSizes.readerRestingDockHeight, 100),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.space12,
@@ -488,7 +514,9 @@ final class _ReaderRestingDock extends StatelessWidget {
                     ],
                     Text(
                       position,
-                      style: Theme.of(context).textTheme.labelMedium,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontFeatures: AppTypeScale.tabularFigures,
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.space8),
                     Icon(

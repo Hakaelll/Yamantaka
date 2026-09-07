@@ -7,10 +7,14 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Versión Flutter 0.13.0+14 revisada el 2 de septiembre de 2026:
+Versión de Yamantaka 0.15.0+16 revisada el 7 de septiembre de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 305 pruebas aprobadas;
+- flutter test --no-pub: 325 pruebas aprobadas;
+- cierre local candidato: el gate final encontró una copia histórica defectuosa
+  dentro de build; 13 fases pasaron y el análisis falló. Tras apartar esa copia
+  sin borrarla, el análisis independiente pasó sin incidencias (164,1 s).
+  Se conserva el informe fallido original, sin convertirlo en un gate verde;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local permanece receptivo durante un smoke de 8 s con un
@@ -18,17 +22,49 @@ Versión Flutter 0.13.0+14 revisada el 2 de septiembre de 2026:
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
 
-El release local versionado se genera en `build/release/0.13.0+14/` e incluye el
+El release local versionado se genera en `build/release/0.15.0+16/` e incluye el
 ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt`, estado de firma,
-SBOM CycloneDX 1.5, informe de pruebas, comparación de rendimiento y smoke sin
-red. Debe extraerse entero antes de probarlo.
+SBOM CycloneDX 1.5, informe de pruebas, comparación de rendimiento, evidencia
+visual con su propio manifiesto y smoke sin red. Debe extraerse entero antes de
+probarlo.
 
-El bundle 0.13 se valida contra su manifiesto después del último cambio. El smoke
+No está plenamente aprobado: la comparación de rendimiento actual registra dos
+regresiones fiables (p95 de construcción de frames en Biblioteca y lector).
+Continuación acotada en `docs/prompts/finish-visual-polish-0.15.md`.
+
+El bundle 0.15 se valida contra su manifiesto después del último cambio. El smoke
 sintético comprueba conexiones TCP/UDP y el inventario separa explícitamente los
 binarios sin firma; sigue siendo evidencia local, no un artefacto de distribución.
 
 La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
 vigente de pruebas en [TESTING.md](TESTING.md).
+
+## Acabado editorial 0.15
+
+- Biblioteca adopta el tema global claro/oscuro, navegación lateral adaptativa,
+  búsqueda etiquetada y portadas tipográficas con retícula estable.
+- Continuar leyendo conserva una acción principal; la sesión reciente queda
+  plegada para dejar espacio al catálogo sin perder recuperación ni cola.
+- El lector separa el tema de sus controles del lienzo PDF y mejora navegación,
+  nombres de página, paneles y filtros de anotaciones con texto ampliado.
+- Ajustes ofrece una vista previa mayor y un ancho de trabajo contenido.
+- Menús redistribuyen atajos al 200 %; reglas y duplicados usan textos humanos.
+
+Decisiones y pruebas: [registro de la iteración](docs/architecture/visual-iteration-0.15.md).
+
+## Base de coherencia visual y UX 0.14
+
+- Iconos, targets, bordes, opacidades y curvas consumen tokens compartidos; los
+  breakpoints 680/1100 y el viewport de PDFium no cambian.
+- Contraseña, recuperación, restore, duplicados y operaciones largas comparten
+  cabecera, contenido desplazable, acciones adaptativas, fase, progreso y
+  cancelación accesible.
+- La explicación de contraseña en memoria permanece visible durante el error y
+  las acciones siguen alcanzables a 640×480 con texto al 200 %.
+- Ajustes se ordena por intención: Apariencia, Lectura, Accesibilidad,
+  Biblioteca, Privacidad, Almacenamiento, Recuperación y Diagnóstico.
+- La matriz ejecutada cubre estados de control, ES/EN, RTL, oscuro, alto
+  contraste, movimiento reducido, texto 130/150/200 % y ocho tamaños base.
 
 ## Resiliencia y confianza local 0.13
 
@@ -181,20 +217,22 @@ Atajos y recuperación se documentan en [docs/SHORTCUTS.md](docs/SHORTCUTS.md) y
 
 ## Referencia visual vigente
 
-![Modo Libro editorial 0.10 mantenido por prueba](docs/screenshots/windows-reader-editorial-v010.png)
+![Modo Libro editorial 0.15 mantenido por prueba](docs/screenshots/windows-reader-editorial-v015.png)
 
-![Navegador documental 0.11 mantenido por prueba](docs/screenshots/windows-document-navigator-v011.png)
+![Navegador documental 0.15 mantenido por prueba](docs/screenshots/windows-document-navigator-v015.png)
 
 Esta imagen se genera desde widgets ejecutados a 1600×900 y se compara en la
 suite. No es una captura nativa ni reutiliza estados de versiones anteriores.
-La matriz actual 0.13 reúne 179 PNG en 19 hojas de contacto. Cubre Biblioteca,
+La matriz actual 0.15 reúne 193 PNG en 21 hojas de contacto. Cubre Biblioteca,
 Lector, navegador, panel, Ajustes, paleta, búsqueda, menús, bienvenida e
 importación y añade contraseña normal/incorrecta, archivo ausente, consolidación
-a texto 200 %, ensayo de restore, problemas y recuperación de sesión. Las diez
-comparaciones 0.12/0.13 registran el hash de ambas fuentes. La base se conserva
-en `build/visual-evidence/v0.12.0/`, la actual en
-`build/visual-evidence/v0.13.0/` y la revisión completa en
-`build/visual-review-013/`. La identidad del logo violeta se comprueba por hash;
+a texto 200 %, ensayo de restore, problemas y recuperación de sesión. Las once
+comparaciones 0.14/0.15 registran el hash de ambas fuentes. La base se conserva
+en `build/visual-evidence/v0.14.0/`, la actual en
+`build/visual-evidence/v0.15.0/` y la revisión completa en
+`build/visual-review-015/`. Cinco PNG proceden del recorrido nativo de integración
+con PDFium real y datos aislados; tampoco certifican DPI físico ni Narrator.
+La identidad del logo violeta se comprueba por hash;
 no se regenera ni se altera su geometría.
 
 ## Requisitos
@@ -310,8 +348,9 @@ Captura de una ventana ya abierta, conservando sus bounds y enviando F11:
 - El build local actual no está firmado. Puede usarse para desarrollo desde el
   bundle completo bajo `build/`, pero distribuirlo sin advertencias requiere un
   certificado RSA confiable o un canal que firme el artefacto.
-- La validación manual de Narrador, varios monitores y cada DPI físico no se
-  sustituye por pruebas de widget.
+- El gate 0.15 registra 96 DPI/100 % comunicados al proceso; no es una
+  certificación física independiente. Narrator, varios monitores, en-US nativo,
+  alto contraste real y las escalas físicas no verificadas siguen pendientes.
 
 No se incluyen nube, cuentas, telemetría, IA, EPUB ni formatos distintos de
 PDF.

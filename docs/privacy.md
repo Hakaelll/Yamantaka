@@ -1,6 +1,6 @@
 # Privacidad local
 
-Yamantaka 0.13 no requiere cuenta ni red y no incorpora telemetría remota. Los
+Yamantaka 0.15 no requiere cuenta ni red y no incorpora telemetría remota. Los
 PDF originales nunca se suben, copian al backup, reescriben ni modifican por una
 regla. Las automatizaciones no aceptan scripts, comandos ni URLs.
 

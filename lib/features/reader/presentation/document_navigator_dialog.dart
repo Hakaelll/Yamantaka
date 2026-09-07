@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/i18n/app_localizations.dart';
+import '../../annotations/domain/annotation.dart';
 import '../../navigation/application/navigation_history_controller.dart';
 import '../application/reader_controller.dart';
 import '../domain/reader_models.dart';
@@ -113,7 +114,7 @@ final class _DocumentNavigatorDialogState
           kind: _NavigatorKind.thumbnails,
           pageIndex: pageIndex,
           title: strings.get(
-            'reader.pageNumber',
+            'reader.page',
             parameters: {'page': pageIndex + 1},
           ),
           detail: strings.get('reader.thumbnails'),
@@ -127,7 +128,7 @@ final class _DocumentNavigatorDialogState
           pageIndex: match.pageIndex,
           title: match.snippet,
           detail: strings.get(
-            'reader.pageNumber',
+            'reader.page',
             parameters: {'page': match.pageIndex + 1},
           ),
         ),
@@ -142,14 +143,15 @@ final class _DocumentNavigatorDialogState
               ? bookmark.label!
               : strings.get('reader.bookmarks'),
           detail: strings.get(
-            'reader.pageNumber',
+            'reader.page',
             parameters: {'page': bookmark.pageIndex + 1},
           ),
         ),
       );
     }
-    for (final annotation
-        in widget.controller.annotations?.annotations ?? const []) {
+    for (final PdfAnnotation annotation
+        in widget.controller.annotations?.annotations ??
+            const <PdfAnnotation>[]) {
       entries.add(
         _NavigatorEntry(
           kind: _NavigatorKind.annotations,
@@ -157,9 +159,9 @@ final class _DocumentNavigatorDialogState
           title:
               annotation.note ??
               annotation.selectedText ??
-              annotation.type.label,
+              strings.get('annotation.type.${annotation.type.name}'),
           detail:
-              '${annotation.type.label} · ${strings.get('reader.pageNumber', parameters: {'page': annotation.pageIndex + 1})}',
+              '${strings.get('annotation.type.${annotation.type.name}')} · ${strings.get('reader.page', parameters: {'page': annotation.pageIndex + 1})}',
         ),
       );
     }
@@ -171,7 +173,7 @@ final class _DocumentNavigatorDialogState
           pageIndex: location.pageIndex,
           title: location.label,
           detail: strings.get(
-            'reader.pageNumber',
+            'reader.page',
             parameters: {'page': location.pageIndex + 1},
           ),
         ),
@@ -185,7 +187,7 @@ final class _DocumentNavigatorDialogState
           pageIndex: position.pageIndex,
           title: '${strings.get('reader.temporaryPosition')} $slot',
           detail: strings.get(
-            'reader.pageNumber',
+            'reader.page',
             parameters: {'page': position.pageIndex + 1},
           ),
         ),
@@ -341,7 +343,7 @@ final class _DocumentNavigatorDialogState
                   ),
                 ),
                 SizedBox(
-                  height: 54,
+                  height: 30 + MediaQuery.textScalerOf(context).scale(24),
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -405,11 +407,18 @@ final class _DocumentNavigatorDialogState
           leading: Icon(_kindIcon(entry.kind)),
           title: Text(
             entry.title,
+            style: Theme.of(context).textTheme.bodyMedium,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: Text(entry.detail),
-          trailing: Text('${entry.pageIndex + 1}'),
+          subtitle: Text(
+            entry.detail,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          trailing: Text(
+            '${entry.pageIndex + 1}',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
           onTap: () => setState(() {
             _selectedIndex = index;
             if (compact) _compactDetail = true;
@@ -421,41 +430,49 @@ final class _DocumentNavigatorDialogState
   }
 
   Widget _preview(YamantakaLocalizations strings, _NavigatorEntry entry) =>
-      Padding(
-        padding: const EdgeInsets.all(AppSpacing.space24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(_kindIcon(entry.kind), size: 44),
-            const SizedBox(height: AppSpacing.space16),
-            Text(
-              entry.title,
-              textAlign: TextAlign.center,
-              maxLines: 5,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppSpacing.space8),
-            Text(entry.detail, textAlign: TextAlign.center),
-            const SizedBox(height: AppSpacing.space24),
-            FilledButton.icon(
-              key: const Key('document-navigator-open'),
-              onPressed: () => unawaited(_activate(entry)),
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: Text(
-                strings.get(
-                  'reader.goToPageNumber',
-                  parameters: {'page': entry.pageIndex + 1},
+      Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.space24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(_kindIcon(entry.kind), size: 44),
+                const SizedBox(height: AppSpacing.space16),
+                Text(
+                  entry.title,
+                  textAlign: TextAlign.center,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-              ),
+                const SizedBox(height: AppSpacing.space8),
+                Text(
+                  entry.detail,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: AppSpacing.space24),
+                FilledButton.icon(
+                  key: const Key('document-navigator-open'),
+                  onPressed: () => unawaited(_activate(entry)),
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: Text(
+                    strings.get(
+                      'reader.goToPageNumber',
+                      parameters: {'page': entry.pageIndex + 1},
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.space8),
+                Text(
+                  strings.get('reader.navigatorHistoryHint'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.space8),
-            Text(
-              strings.get('reader.navigatorHistoryHint'),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-          ],
+          ),
         ),
       );
 

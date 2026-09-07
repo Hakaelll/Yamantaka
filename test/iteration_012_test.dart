@@ -390,6 +390,8 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
+      await tester.tap(find.byType(ExpansionTile));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('continuity-continue')), findsOneWidget);
       expect(find.byKey(const Key('continuity-open-next')), findsOneWidget);
       await tester.ensureVisible(find.byKey(const Key('continuity-resume')));

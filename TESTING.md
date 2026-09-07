@@ -1,6 +1,58 @@
 # Pruebas
 
-Estado actualizado: 2026-09-02.
+Estado actualizado: 2026-09-07.
+
+## Iteración editorial 0.15
+
+La suite completa del cierre del 7 de septiembre pasa con 325 pruebas. El gate
+integral más reciente, ejecutado entre 11:43:55 y 11:46:45 UTC, pasa sus 14
+fases sin omisiones: formato de 242 archivos, análisis limpio, suite, corpus,
+benchmark de Biblioteca, build Windows Release, smoke offline, dos goldens y
+matriz nativa. El fallo histórico de análisis por una copia bajo build permanece
+documentado en el registro de iteración; no se retocó para simular este pase.
+Incluye contratos para menús ampliados, textos de reglas locales y sesión
+reciente compacta.
+
+La comparación de cinco pasadas actual NO pasa: dos métricas fallidas, una
+observación y cero invariantes fallidos. No confundir pruebas funcionales
+aprobadas con aceptación de rendimiento o validación integral del paquete.
+Dos experimentos exploratorios acotados se revirtieron al no mejorar la apertura
+de búsqueda. Sus perfiles se conservan en
+`build/performance/0.15.0-experiment-0-before-reader-theme.json`,
+`build/performance/0.15.0-experiment-1-reader-inherited-theme.json` y
+`build/performance/0.15.0-experiment-2-prewarmed-search.json`; no se ejecutó una
+nueva serie final sin una hipótesis prometedora.
+
+Las matrices actuales se generan en `build/visual-evidence/v0.15.0/` mediante
+las variables `YAMANTAKA_*_MATRIX_DIR` de los tests visuales. Las ocho familias
+de tests producen nueve grupos de superficies; no basta ejecutar la suite sin
+esas variables para regenerar la evidencia. Comparaciones y hojas se generan
+con `tool/create_visual_comparisons.ps1` y `tool/create_contact_sheets.ps1`.
+
+`tool/run_iteration_performance.ps1` ejecuta cinco pasadas de cada familia,
+incluido Flutter profile nativo, y compara con `build/performance/0.14.0-current`.
+No ejecutar cargas competidoras ni modificar el código durante una serie final.
+`tool/verify_windows_package.ps1` verifica inventario, tamaños, hashes, SBOM,
+gate, smoke y evidencia del ZIP local 0.15.0+16.
+El candidato regenerado pasa esas comprobaciones hasta el gate de rendimiento y
+se rechaza allí de forma intencional porque `performance-report.json` conserva
+dos regresiones fiables. No se considera una release aprobada.
+
+El recorrido de aplicación completa con PDFium real se ejecuta con:
+
+    flutter drive --driver=test_driver/professional_polish_driver.dart --target=integration_test/professional_polish_flow_test.dart -d windows --profile --no-pub --dart-define=YAMANTAKA_NATIVE_FLOW_DIR=build/visual-evidence/v0.15.0/native-flow
+
+En ejecución nativa, utiliza una ruta absoluta para el directorio de evidencia
+si el directorio de trabajo del runner no es la raíz del repositorio. El informe
+del driver queda en `build/verification/native-app-flow.json`. Comprueba un flujo
+con PDF de 12 páginas, restauración de página, tema global, Ctrl+F y hash del PDF
+sin cambios. No utiliza preferencias ni documentos personales. Las capturas son
+del árbol renderizado de integración, con geometría lógica fijada a 1280×720;
+no certifican DPI físico, Narrator ni el compositor de Windows.
+
+El registro de revisión y las limitaciones físicas están en
+`docs/architecture/visual-iteration-0.15.md`. Las secciones de iteraciones
+anteriores que siguen debajo son históricas y no certifican esta versión.
 
 Este documento describe únicamente evidencia reproducible del árbol actual. Se
 han retirado las tablas y capturas históricas que correspondían a lectores
@@ -336,3 +388,44 @@ cierre. Detalles y la comparación histórica fallida están en
 El empaquetado genera `SBOM.cdx.json` sin red a partir de `pubspec.lock`, el
 package config y los binarios Release. `verify_windows_package.ps1` exige
 CycloneDX 1.5 y que cada `.exe`/`.dll` del manifiesto aparezca en el SBOM.
+
+## Verificación 0.14
+
+La suite completa alcanza 314 pruebas. `iteration_014_test.dart` fija tokens,
+los ocho breakpoints, el orden y localización ES/EN de Ajustes, diálogo a
+640×480 con texto al 200 %, Escape, progreso determinado, cancelación,
+semántica, normal/hover/foco/seleccionado/deshabilitado, RTL, alto contraste y
+movimiento reducido. Los 305 contratos previos permanecen sin cambios.
+
+`iteration_014_visual_test.dart` añade estados focales de controles y operación,
+contraseña normal/incorrecta, recuperación y restore. Junto a Biblioteca,
+lector, Ajustes, búsqueda, paleta, diálogos, workflows y resiliencia produce 175
+capturas directas; las diez comparaciones 0.13/0.14 elevan el conjunto a 185 PNG
+en 20 hojas de contacto. Manifiestos y capturas incluyen SHA-256 y permanecen
+bajo `build/visual-evidence/v0.14.0/` y `build/visual-review-014/`.
+Las 20 hojas finales se inspeccionaron completas; no se aceptó la primera
+generación de Ajustes hasta corregir la truncación de su rail al 200 %.
+
+La evidencia focal se regenera con:
+
+    flutter test --no-pub --dart-define=YAMANTAKA_014_VISUAL_DIR=build/verification/visual/0.14 test/iteration_014_visual_test.dart
+
+Rendimiento conserva la regla de cinco procesos por familia y un umbral del
+10 % que solo falla cuando mediana y cuatro de cinco muestras coinciden. El
+timeout de comandos externos del gate pasa de 180 a 300 s; no cambia ninguna
+aserción, solo evita que un análisis limpio sea declarado fallido por el host.
+La serie final es `pass-with-watch`, sin regresiones fiables ni invariantes
+rotos; conserva cinco `watch` de Biblioteca con solo tres de cinco muestras por
+encima del límite. El diagnóstico y los valores están en
+`docs/performance/0.14-watches.md`.
+
+El gate Windows termina sus 14 fases en `passed`, sin omisiones. La matriz
+nativa detecta y confirma el monitor real del host a 120 DPI/125 % y ejecuta
+Biblioteca, Documento, Libro y Libro a pantalla completa a 1600×900. El smoke
+sin red dura ocho segundos, navega dos veces, cierra el proceso y observa cero
+conexiones.
+
+La captura WGC nativa de este host devuelve frames obsoletos en Biblioteca y
+blanco en lector, aunque UI Automation expone una única jerarquía correcta. Esas
+imágenes no se aprueban. Narrator, varios monitores, en-US, alto contraste real
+y DPI físicos 100/150/175/200 % siguen pendientes y no se infieren de widgets.

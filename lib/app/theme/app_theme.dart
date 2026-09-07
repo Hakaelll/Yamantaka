@@ -25,11 +25,14 @@ abstract final class AppTheme {
   );
 
   static ThemeData library({
+    Brightness brightness = Brightness.dark,
     AppInterfaceDensity density = AppInterfaceDensity.comfortable,
     bool highContrast = false,
   }) => _build(
-    brightness: Brightness.dark,
-    tokens: AppColorTokens.library,
+    brightness: brightness,
+    tokens: brightness == Brightness.dark
+        ? AppColorTokens.dark
+        : AppColorTokens.light,
     density: density,
     highContrast: highContrast,
   );
@@ -86,6 +89,7 @@ abstract final class AppTheme {
       onError: isDark ? tokens.appBackground : tokens.paperWhite,
       surface: tokens.surfacePrimary,
       onSurface: tokens.textPrimary,
+      onSurfaceVariant: tokens.textSecondary,
       surfaceContainerLowest: tokens.appBackground,
       surfaceContainerLow: tokens.surfaceSecondary,
       surfaceContainer: tokens.surfacePrimary,
@@ -196,7 +200,7 @@ abstract final class AppTheme {
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
     );
-    const iconShape = WidgetStatePropertyAll(CircleBorder());
+    final iconShape = controlShape;
 
     return base.copyWith(
       textTheme: textTheme,
@@ -233,7 +237,7 @@ abstract final class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: tokens.surfaceElevated,
         surfaceTintColor: Colors.transparent,
-        elevation: AppElevation.popup,
+        elevation: AppElevation.overlay,
         shadowColor: tokens.ambientShadow,
         shape: RoundedRectangleBorder(
           side: BorderSide(color: tokens.borderStrong),
@@ -260,13 +264,16 @@ abstract final class AppTheme {
         labelStyle: textTheme.bodyMedium?.copyWith(color: tokens.textSecondary),
         border: _inputBorder(tokens.borderStrong),
         enabledBorder: _inputBorder(tokens.borderSubtle),
-        focusedBorder: _inputBorder(tokens.focusRing, width: 2),
+        focusedBorder: _inputBorder(tokens.focusRing, width: AppBorders.focus),
         errorBorder: _inputBorder(tokens.danger),
-        focusedErrorBorder: _inputBorder(tokens.danger, width: 2),
+        focusedErrorBorder: _inputBorder(
+          tokens.danger,
+          width: AppBorders.focus,
+        ),
       ),
       focusColor: tokens.accentSoft,
-      hoverColor: tokens.accentSoft.withValues(alpha: 0.65),
-      splashFactory: InkRipple.splashFactory,
+      hoverColor: tokens.accentSoft.withValues(alpha: AppOpacity.hoverEmphasis),
+      splashFactory: NoSplash.splashFactory,
       tooltipTheme: TooltipThemeData(
         waitDuration: const Duration(milliseconds: 450),
         decoration: BoxDecoration(
@@ -279,7 +286,10 @@ abstract final class AppTheme {
         color: tokens.accentPrimary,
         linearTrackColor: tokens.surfaceSunken,
       ),
-      iconTheme: IconThemeData(color: tokens.textSecondary, size: 20),
+      iconTheme: IconThemeData(
+        color: tokens.textSecondary,
+        size: AppIconSizes.large,
+      ),
       iconButtonTheme: IconButtonThemeData(
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll(
@@ -333,11 +343,23 @@ abstract final class AppTheme {
             if (states.contains(WidgetState.hovered)) return tokens.accentHover;
             return tokens.accentPrimary;
           }),
-          foregroundColor: WidgetStatePropertyAll(
-            isDark ? tokens.appBackground : tokens.paperWhite,
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? tokens.textDisabled
+                : isDark
+                ? tokens.appBackground
+                : tokens.paperWhite,
           ),
           shape: controlShape,
-          side: focusSide,
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          side: WidgetStateProperty.resolveWith(
+            (states) => BorderSide(
+              color: states.contains(WidgetState.focused)
+                  ? tokens.textPrimary
+                  : Colors.transparent,
+              width: AppBorders.focus,
+            ),
+          ),
           textStyle: WidgetStatePropertyAll(textTheme.labelLarge),
         ),
       ),
@@ -350,7 +372,10 @@ abstract final class AppTheme {
           overlayColor: overlay,
           side: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.focused)) {
-              return BorderSide(color: tokens.focusRing, width: 2);
+              return BorderSide(
+                color: tokens.focusRing,
+                width: AppBorders.focus,
+              );
             }
             return BorderSide(color: tokens.borderStrong);
           }),
@@ -447,6 +472,7 @@ abstract final class AppTheme {
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
+        checkmarkColor: tokens.textPrimary,
         backgroundColor: tokens.surfaceSecondary,
         selectedColor: tokens.selectionBackground,
         disabledColor: tokens.surfaceSunken,
@@ -500,6 +526,8 @@ abstract final class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        showCloseIcon: true,
+        closeIconColor: tokens.appBackground,
         backgroundColor: tokens.textPrimary,
         contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: tokens.appBackground,

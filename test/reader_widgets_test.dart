@@ -488,7 +488,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('book reader matches the maintained editorial v0.10 baseline', (
+  testWidgets('book reader matches the maintained editorial v0.15 baseline', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1600, 900);
@@ -506,7 +506,7 @@ void main() {
     await expectLater(
       find.byType(ReaderScreen),
       matchesGoldenFile(
-        '../docs/screenshots/windows-reader-editorial-v010.png',
+        '../docs/screenshots/windows-reader-editorial-v015.png',
       ),
     );
 
@@ -514,7 +514,7 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('document navigator matches the maintained v0.11 baseline', (
+  testWidgets('document navigator matches the maintained v0.15 baseline', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1600, 900);
@@ -548,7 +548,7 @@ void main() {
     await expectLater(
       find.byKey(boundaryKey),
       matchesGoldenFile(
-        '../docs/screenshots/windows-document-navigator-v011.png',
+        '../docs/screenshots/windows-document-navigator-v015.png',
       ),
     );
 
@@ -1132,6 +1132,79 @@ void main() {
     },
   );
 
+  testWidgets('annotation filters remain reachable at 640x480 and 200% text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(640, 480);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true, pageCount: 8);
+    harness.annotations.create(pageIndex: 2, note: 'Nota legible');
+    await tester.pumpWidget(
+      _visualApp(
+        harness,
+        captureKey: const Key('notes-stress'),
+        themeMode: ThemeMode.light,
+        highContrast: false,
+        reduceMotion: true,
+        scenarioKey: 'notes-stress',
+        panelOpen: true,
+        panelSection: 'annotations',
+        textScale: 2,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(
+      find.byKey(const Key('reader-note-advanced-filters')),
+    );
+    await tester.tap(find.byKey(const Key('reader-note-advanced-filters')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('reader-note-filter-scroll')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
+  testWidgets(
+    'reader controls follow global theme independently of PDF canvas',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await _ReaderHarness.create(ready: true);
+      for (final mode in [ThemeMode.dark, ThemeMode.light]) {
+        harness.controller.setTheme(
+          mode == ThemeMode.dark ? ReaderTheme.ivory : ReaderTheme.dark,
+        );
+        await tester.pumpWidget(
+          _visualApp(
+            harness,
+            captureKey: const Key('theme-scope'),
+            themeMode: mode,
+            highContrast: false,
+            reduceMotion: true,
+            scenarioKey: mode.name,
+            panelOpen: true,
+            textScale: 1,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          Theme.of(
+            tester.element(find.byKey(const Key('reader-top-surface'))),
+          ).brightness,
+          mode == ThemeMode.dark ? Brightness.dark : Brightness.light,
+        );
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      await harness.dispose();
+    },
+  );
+
   testWidgets('a relevant key reveals hidden book controls and navigates', (
     tester,
   ) async {
@@ -1350,6 +1423,8 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
+      // Finish nested theme/control transitions before capturing evidence.
+      await tester.pumpAndSettle();
       if (navigatorOpen) {
         expect(
           find.byKey(const Key('document-navigator-filter')),

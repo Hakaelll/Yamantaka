@@ -12,10 +12,12 @@ final class OrganizationRepository {
 
   List<DocumentCollection> collections() {
     final rows = _database.database.select('''
-      SELECT c.*, COUNT(cd.document_id) AS document_count
+      SELECT c.*, (
+        SELECT COUNT(*)
+        FROM collection_documents cd
+        WHERE cd.collection_id = c.id
+      ) AS document_count
       FROM collections c
-      LEFT JOIN collection_documents cd ON cd.collection_id = c.id
-      GROUP BY c.id
       ORDER BY c.is_pinned DESC, c.sort_order, c.name COLLATE NOCASE
     ''');
     return rows

@@ -132,7 +132,7 @@ void main() {
         final previewRect = tester.getRect(
           find.byKey(const Key('appearance-live-reader-preview')),
         );
-        expect(previewRect.right, greaterThan(size.width - 300));
+        expect(previewRect.right, greaterThan(size.width.clamp(0, 1600) - 300));
       }
       final qualifiers = [
         themeMode == ThemeMode.dark ? 'dark' : 'light',

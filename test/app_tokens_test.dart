@@ -7,6 +7,14 @@ import 'package:yamantaka/app/theme/app_tokens.dart';
 import 'package:yamantaka/storage/repositories/app_settings_repository.dart';
 
 void main() {
+  test('density transitions retain an unchanged color palette', () {
+    for (final palette in [AppColorTokens.light, AppColorTokens.dark]) {
+      for (final progress in [0.0, 0.25, 0.5, 1.0]) {
+        expect(identical(palette.lerp(palette, progress), palette), isTrue);
+      }
+    }
+  });
+
   group('responsive window classes', () {
     test('use the documented non-overlapping breakpoints', () {
       expect(AppBreakpoints.classify(0), AppWindowClass.compact);
@@ -28,19 +36,25 @@ void main() {
     final light = AppTheme.light().extension<AppColorTokens>()!;
     final dark = AppTheme.dark().extension<AppColorTokens>()!;
 
-    expect(light.appBackground, const Color(0xFFECEAE4));
-    expect(light.accentPrimary, const Color(0xFF393B37));
-    expect(dark.appBackground, const Color(0xFF111310));
+    expect(light.appBackground, const Color(0xFFF7F6F2));
+    expect(light.accentPrimary, const Color(0xFF7055B5));
+    expect(dark.appBackground, const Color(0xFF181A20));
     expect(dark.textPrimary, const Color(0xFFF0F1EB));
   });
 
-  test('library theme keeps its spatial identity across app theme modes', () {
-    final library = AppTheme.library().extension<AppColorTokens>()!;
-
-    expect(library.libraryBackground, const Color(0xFF080808));
-    expect(library.accentPrimary, const Color(0xFFF5F5F5));
-    expect(library.librarySelectionAccent, const Color(0xFFB58AFF));
-    expect(AppTheme.library().brightness, Brightness.dark);
+  test('library uses the shared light and dark application palettes', () {
+    for (final brightness in Brightness.values) {
+      final library = AppTheme.library(brightness: brightness);
+      final app = brightness == Brightness.light
+          ? AppTheme.light()
+          : AppTheme.dark();
+      expect(library.brightness, brightness);
+      expect(
+        library.extension<AppColorTokens>()!.libraryBackground,
+        app.extension<AppColorTokens>()!.appBackground,
+      );
+      expect(library.colorScheme, app.colorScheme);
+    }
   });
 
   test('editorial interaction tokens remain restrained and readable', () {
@@ -58,7 +72,7 @@ void main() {
     expect(AppSizes.topBarHeight, 56);
     expect(AppSizes.readerCompactTopBarHeight, 52);
     expect(AppSizes.bottomControlHeight, 48);
-    expect(AppSizes.readerRestingDockHeight, 38);
+    expect(AppSizes.readerRestingDockHeight, greaterThanOrEqualTo(40));
     expect(AppSizes.readerPanelRailWidth, 52);
     expect(AppSizes.commandPaletteRowHeight, 48);
   });

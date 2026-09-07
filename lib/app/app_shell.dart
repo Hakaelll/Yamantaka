@@ -890,17 +890,18 @@ final class _YamantakaAppState extends State<YamantakaApp>
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.sync_rounded),
-        title: Text(_strings.get('problems.resuming')),
-        content: const LinearProgressIndicator(),
-        actions: [
-          TextButton.icon(
-            onPressed: cancellation.cancel,
-            icon: const Icon(Icons.stop_circle_outlined),
-            label: Text(_strings.get('action.cancel')),
-          ),
-        ],
+      builder: (context) => AppDialogFrame(
+        icon: Icons.sync_rounded,
+        title: _strings.get('problems.resuming'),
+        description: _strings.get('automation.localOnly'),
+        maxWidth: AppSizes.dialogCompactWidth,
+        actions: const [],
+        content: AppOperationStatus(
+          label: _strings.get('automation.title'),
+          phase: _strings.get('problems.resuming'),
+          onCancel: cancellation.cancel,
+          cancelLabel: _strings.get('action.cancel'),
+        ),
       ),
     );
     late final AutomationApplyResult result;

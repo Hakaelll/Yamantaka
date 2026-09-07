@@ -260,8 +260,8 @@ void main() {
     ).writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-global-search-widget-matrix',
-        'productVersion': '0.13.0',
-        'generatedAt': '2026-08-26T12:00:00Z',
+        'productVersion': '0.15.0',
+        'generatedAt': DateTime.now().toUtc().toIso8601String(),
         'cases': cases,
       }),
       flush: true,

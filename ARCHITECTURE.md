@@ -1,5 +1,21 @@
 # Arquitectura
 
+## Presentación editorial 0.15
+
+`library_navigation.dart` es una parte de Biblioteca que delega en sus filtros
+y recarga paginada existentes. No filtra en memoria una página parcial ni
+altera el máximo de 80 documentos materializados. El cálculo de navegación
+por teclado usa el ancho real del catálogo, descontando el rail.
+
+Biblioteca y el chrome del lector consumen el tema global. La configuración
+del lienzo permanece separada y no cambia ownership, cachés ni geometría de
+PDFium. Los filtros de anotaciones se redistribuyen en la cabecera, no mediante
+la reconstrucción del visor.
+
+Las elecciones visuales de consolidación se guardan por pareja de candidatos
+y campo; cambiar de candidato no aplica silenciosamente otra decisión.
+SQLite v11 y el servicio transaccional de consolidación no cambian.
+
 ## Límites
 
 Yamantaka usa módulos por función con cuatro responsabilidades pragmáticas:
@@ -503,3 +519,29 @@ mantenimiento usan keyset y un techo de 100.000. Incluso las lecturas globales
 de repositorio poseen un límite duro. La búsqueda caliente evita reordenar su LRU
 cuando la clave ya es la más reciente, sin cambiar resultados ni retener texto
 adicional.
+
+## Sistema visual y UX de escritorio 0.14
+
+La iteración no introduce nuevas capas de dominio ni cambia SQLite v11. Los
+tokens de presentación viven en `app_tokens.dart`; `AppDialogFrame` y
+`AppOperationStatus` concentran, respectivamente, la adaptación de diálogos y
+el anuncio de trabajo local prolongado. Los features aportan texto, fase,
+progreso y callbacks, pero no duplican medidas ni semántica.
+
+`AppDialogFrame` conserva el `DialogRoute` de Flutter: Escape, traversal de foco
+y restauración al invocador siguen en la plataforma. Su contenido es
+desplazable, las acciones usan `OverflowBar` y el ancho está acotado por tokens,
+de modo que 640×480 y texto al 200 % no ocultan la salida. El campo de
+contraseña continúa siendo propiedad efímera del diálogo y nunca cruza esta
+frontera de presentación.
+
+Las ocho secciones de Ajustes son una taxonomía de UI sobre los mismos campos y
+servicios. Recuperación agrupa sesión, historial y backup; Almacenamiento agrupa
+caché, tamaño y ubicación; Privacidad contiene el borrado local explícito. No
+hay migración de datos ni cambio de ownership. El rail puede crecer hasta 320 px
+con escalado de texto, sin cambiar los breakpoints 680/1100.
+
+El lector no consume el nuevo marco para su canvas: identidad del adaptador,
+ownership de handles, cachés, gestos y viewport permanecen intactos. La pasada
+visual compara las mismas escenas 0.13/0.14 y la de rendimiento usa cinco
+procesos avanzados, cinco de Biblioteca y cinco perfiles nativos por versión.

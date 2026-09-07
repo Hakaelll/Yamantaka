@@ -15,6 +15,7 @@ final class YamaIconButton extends StatelessWidget {
     this.tooltip,
     this.selected = false,
     this.badge,
+    this.statesController,
   });
 
   final IconData icon;
@@ -23,6 +24,7 @@ final class YamaIconButton extends StatelessWidget {
   final String? tooltip;
   final bool selected;
   final Widget? badge;
+  final WidgetStatesController? statesController;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +36,7 @@ final class YamaIconButton extends StatelessWidget {
       child: IconButton(
         tooltip: tooltip ?? semanticLabel,
         onPressed: onPressed,
+        statesController: statesController,
         style: ButtonStyle(
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           minimumSize: const WidgetStatePropertyAll(
@@ -61,15 +64,22 @@ final class YamaIconButton extends StatelessWidget {
           }),
           side: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.focused)) {
-              return BorderSide(color: colors.focusRing, width: 2);
+              return BorderSide(
+                color: colors.focusRing,
+                width: AppBorders.focus,
+              );
             }
             return BorderSide(
               color: selected ? colors.borderStrong : Colors.transparent,
             );
           }),
-          shape: const WidgetStatePropertyAll(CircleBorder()),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+          ),
         ),
-        icon: Icon(icon, size: 18),
+        icon: Icon(icon, size: AppIconSizes.standard),
       ),
     );
     if (badge == null) return button;
@@ -91,7 +101,7 @@ final class YamaToolbarGroup extends StatelessWidget {
     this.padding = const EdgeInsets.all(AppSpacing.space4),
     this.flat = false,
     this.mainAxisSize = MainAxisSize.min,
-    this.radius = AppRadii.capsule,
+    this.radius = AppRadii.floating,
     this.bare = false,
   });
 
@@ -117,7 +127,9 @@ final class YamaToolbarGroup extends StatelessWidget {
             decoration: BoxDecoration(
               color: flatSurface
                   ? colors.surfaceFloating
-                  : colors.surfaceFloating.withValues(alpha: 0.96),
+                  : colors.surfaceFloating.withValues(
+                      alpha: AppOpacity.floatingSurface,
+                    ),
               border: Border.all(color: colors.borderSubtle),
               borderRadius: BorderRadius.circular(radius),
               boxShadow: flatSurface
@@ -141,7 +153,7 @@ final class YamaToolbarGroup extends StatelessWidget {
 }
 
 final class YamaToolbarDivider extends StatelessWidget {
-  const YamaToolbarDivider({super.key, this.height = 24});
+  const YamaToolbarDivider({super.key, this.height = AppSpacing.space24});
 
   final double height;
 
@@ -152,8 +164,8 @@ final class YamaToolbarDivider extends StatelessWidget {
       child: SizedBox(
         height: height,
         child: VerticalDivider(
-          width: 1,
-          thickness: 1,
+          width: AppBorders.hairline,
+          thickness: AppBorders.hairline,
           color: context.appColors.borderSubtle,
         ),
       ),
@@ -254,8 +266,8 @@ final class _YamaSegmentButton<T> extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadii.capsule),
         child: AnimatedContainer(
           duration: duration,
-          curve: Curves.easeOutCubic,
-          constraints: const BoxConstraints(minHeight: 34),
+          curve: AppCurves.feedback,
+          constraints: const BoxConstraints(minHeight: AppControlHeights.dense),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.space12,
             vertical: AppSpacing.space6,
@@ -271,7 +283,7 @@ final class _YamaSegmentButton<T> extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (segment.icon != null) ...[
-                Icon(segment.icon, size: 16, color: foreground),
+                Icon(segment.icon, size: AppIconSizes.small, color: foreground),
                 const SizedBox(width: AppSpacing.space6),
               ],
               Text(

@@ -8,12 +8,18 @@ import '../database/app_database.dart';
 import 'document_repository.dart';
 
 final class WorkspaceRepository {
-  const WorkspaceRepository(this._database, DocumentRepository documents);
+  WorkspaceRepository(this._database, DocumentRepository documents);
 
   final AppDatabase _database;
+  List<WorkspaceSnapshot>? _cachedWorkspaces;
+  int? _cachedTotalChanges;
 
   List<WorkspaceSnapshot> all() {
     final db = _database.database;
+    final totalChanges =
+        db.select('SELECT total_changes() AS value').single['value'] as int;
+    final cached = _cachedWorkspaces;
+    if (cached != null && _cachedTotalChanges == totalChanges) return cached;
     final rows = db.select(
       'SELECT * FROM workspaces ORDER BY is_default DESC, updated_at DESC',
     );
@@ -56,7 +62,7 @@ final class WorkspaceRepository {
             ),
           );
     }
-    return rows
+    final workspaces = rows
         .map((row) {
           final id = row['id'] as String;
           final tabs = tabsByWorkspace[id] ?? const <DocumentTab>[];
@@ -89,6 +95,9 @@ final class WorkspaceRepository {
           );
         })
         .toList(growable: false);
+    _cachedWorkspaces = workspaces;
+    _cachedTotalChanges = totalChanges;
+    return workspaces;
   }
 
   WorkspaceSnapshot save({
@@ -380,11 +389,11 @@ final class WorkspaceRepository {
       final map = (jsonDecode(raw) as Map).cast<String, Object?>();
       return SplitViewState(
         enabled: map['enabled'] as bool? ?? false,
-        axis:
-            SplitAxis.values
-                .where((value) => value.name == map['axis'])
-                .firstOrNull ??
-            SplitAxis.vertical,
+        axis: _enumByName(
+          SplitAxis.values,
+          map['axis'] as String? ?? '',
+          SplitAxis.vertical,
+        ),
         ratio: (map['ratio'] as num?)?.toDouble() ?? 0.5,
         secondaryTabId: map['secondaryTabId'] as String?,
         syncPage: map['syncPage'] as bool? ?? false,
@@ -426,5 +435,10 @@ final class WorkspaceRepository {
     List<T> values,
     String name,
     T fallback,
-  ) => values.where((value) => value.name == name).firstOrNull ?? fallback;
+  ) {
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return fallback;
+  }
 }

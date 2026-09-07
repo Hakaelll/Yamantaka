@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_components.dart';
+import '../../../app/theme/app_tokens.dart';
 import '../../../core/i18n/app_localizations.dart';
 
 enum SessionRecoveryChoice { restore, startClean }
@@ -10,10 +12,11 @@ final class SessionRecoveryDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    return AlertDialog(
-      icon: const Icon(Icons.restore_page_outlined),
-      title: Text(strings.get('recovery.sessionTitle')),
-      content: Text(strings.get('recovery.sessionBody')),
+    return AppDialogFrame(
+      icon: Icons.restore_page_outlined,
+      title: strings.get('recovery.sessionTitle'),
+      description: strings.get('recovery.sessionBody'),
+      maxWidth: AppSizes.dialogCompactWidth,
       actions: [
         TextButton(
           onPressed: () =>
@@ -23,7 +26,7 @@ final class SessionRecoveryDialog extends StatelessWidget {
         FilledButton.icon(
           onPressed: () =>
               Navigator.pop(context, SessionRecoveryChoice.restore),
-          icon: const Icon(Icons.restore_rounded, size: 18),
+          icon: const Icon(Icons.restore_rounded, size: AppIconSizes.standard),
           label: Text(strings.get('recovery.restoreSession')),
         ),
       ],

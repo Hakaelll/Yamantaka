@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_components.dart';
+import '../../../app/theme/app_tokens.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../../../storage/backup/local_backup_service.dart';
 
@@ -12,45 +14,50 @@ final class BackupRestorePreviewDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    return AlertDialog(
-      icon: const Icon(Icons.inventory_2_outlined),
-      title: Text(strings.get('settings.importBackup')),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                strings.get(
-                  'backup.importPreview',
-                  parameters: {
-                    'version': preview.version,
-                    'documents': preview.documentCount,
-                    'bookmarks': preview.bookmarkCount,
-                    'annotations': preview.annotationCount,
-                    'sessions': preview.sessionCount,
-                    'schema': preview.schemaVersion,
-                    'entities': preview.entityCount,
-                    'bytes': preview.fileBytes,
-                    'adds': preview.documentAdds,
-                    'replacements': preview.documentReplacements,
-                    'removals': preview.documentRemovals,
-                    'conflicts': preview.identityConflicts,
-                  },
-                ),
+    return AppDialogFrame(
+      icon: Icons.inventory_2_outlined,
+      title: strings.get('settings.importBackup'),
+      description: strings.get('backup.previewDescription'),
+      maxWidth: AppSizes.dialogMaxWidth,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SelectionArea(
+            child: Text(
+              strings.get(
+                'backup.importPreview',
+                parameters: {
+                  'version': preview.version,
+                  'documents': preview.documentCount,
+                  'bookmarks': preview.bookmarkCount,
+                  'annotations': preview.annotationCount,
+                  'sessions': preview.sessionCount,
+                  'schema': preview.schemaVersion,
+                  'entities': preview.entityCount,
+                  'bytes': preview.fileBytes,
+                  'adds': preview.documentAdds,
+                  'replacements': preview.documentReplacements,
+                  'removals': preview.documentRemovals,
+                  'conflicts': preview.identityConflicts,
+                },
               ),
-              const SizedBox(height: 16),
-              Text(
-                strings.get('backup.conflictStrategyTitle'),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 6),
-              Text(strings.get('backup.conflictStrategy')),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: AppSpacing.space16),
+          AppStatusLabel(
+            icon: Icons.backup_outlined,
+            label: strings.get('backup.preBackupRequired'),
+            tone: AppStatusTone.warning,
+          ),
+          const SizedBox(height: AppSpacing.space16),
+          Text(
+            strings.get('backup.conflictStrategyTitle'),
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: AppSpacing.space6),
+          Text(strings.get('backup.conflictStrategy')),
+        ],
       ),
       actions: [
         TextButton(

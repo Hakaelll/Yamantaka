@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.15.0 — 2026-09-07 (acabado editorial profesional)
+
+- Unifica Biblioteca, lector y Ajustes en temas claro y oscuro compartidos,
+  separando la apariencia de la interfaz del fondo del documento.
+- Recompone Biblioteca con navegación lateral adaptativa, búsqueda etiquetada,
+  continuidad contenida, recientes secundarios y portadas tipográficas estables.
+- Mejora legibilidad del navegador y controles del lector; conserva filtros
+  de anotaciones alcanzables a 640×480 y texto al 200 %.
+- Amplía la vista previa de Ajustes y acota su composición ultrapanorámica.
+- Pliega la sesión reciente para despejar el catálogo y mantiene sus acciones
+  alcanzables con texto ampliado; corrige etiquetas y menús al 200 %.
+- Traduce evidencias de duplicados y aísla elecciones por candidato y campo.
+- Mantiene integridad documental, funcionamiento offline, SQLite v11 y marca.
+- La evidencia y el estado de validación se registran en
+  `docs/architecture/visual-iteration-0.15.md`; la release es solo local y sin firma.
+
+## 0.14.0 — 2026-09-03 (coherencia visual y UX de escritorio)
+
+- Consolida tamaños de icono, alturas de control, bordes, opacidades y curvas
+  en tokens compartidos, sin alterar breakpoints ni la geometría de PDFium.
+- Añade un marco adaptativo para diálogos críticos y un estado operativo común
+  con fase, progreso, live region y cancelación accesible.
+- Refina contraseña, recuperación de sesión, restore transaccional, duplicados
+  y reglas locales; la garantía de contraseña en memoria permanece visible
+  también tras un intento incorrecto y con texto al 200 %.
+- Reorganiza Ajustes en Apariencia, Lectura, Accesibilidad, Biblioteca,
+  Privacidad, Almacenamiento, Recuperación y Diagnóstico, en español e inglés.
+- Añade contratos de componentes, taxonomía, RTL, alto contraste, movimiento
+  reducido, teclado, semántica y los ocho tamaños de revisión; la suite alcanza
+  314 pruebas.
+- Genera 185 PNG ejecutados, 20 hojas de contacto y diez comparaciones 0.13/0.14
+  con hashes; la marca permanece byte-idéntica a su referencia.
+- La comparación de cinco series por familia termina `pass-with-watch`: cero
+  regresiones fiables, cinco observaciones ruidosas y nueve invariantes sanos;
+  cancela una recarga diferida, acelera snapshots y elimina ripple prolongado.
+- Eleva a 300 s el timeout externo del gate porque el análisis limpio supera de
+  forma reproducible los 180 s en este host.
+- Completa las 14 fases del gate Windows sin omisiones, incluido smoke con cero
+  conexiones y matriz nativa a los 120 DPI/125 % reales del monitor disponible.
+- Prepara el release local `0.14.0+15` sin commit, tag, push, firma ni
+  publicación.
+
 ## 0.13.0 — 2026-09-02 (resiliencia documental y confianza local)
 
 - Formaliza el ciclo de apertura con generación, cancelación y estados tipados;

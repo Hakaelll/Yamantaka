@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/i18n/app_localizations.dart';
 import '../../../storage/repositories/automation_repository.dart';
@@ -55,61 +56,88 @@ final class _AutomationManagerDialogState
         constraints: const BoxConstraints(maxWidth: 780, maxHeight: 680),
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.space16),
-              child: Row(
-                children: [
-                  const Icon(Icons.auto_awesome_motion_outlined),
-                  const SizedBox(width: AppSpacing.space8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          strings.get('automation.title'),
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        Text(
-                          strings.get('automation.localOnly'),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .45,
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.space16),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final header = AppDialogHeader(
+                        icon: Icons.auto_awesome_motion_outlined,
+                        title: strings.get('automation.title'),
+                        description: strings.get('automation.localOnly'),
+                      );
+                      final actions = Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FilledButton.tonalIcon(
+                            onPressed: _applying || _simulating
+                                ? null
+                                : _createRule,
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: Text(strings.get('automation.newRule')),
+                          ),
+                          const SizedBox(width: AppSpacing.space8),
+                          IconButton(
+                            tooltip: strings.get('action.close'),
+                            onPressed: _applying || _simulating
+                                ? null
+                                : () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      );
+                      if (constraints.maxWidth < 600 ||
+                          MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            header,
+                            const SizedBox(height: AppSpacing.space12),
+                            Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: actions,
+                            ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: header),
+                          actions,
+                        ],
+                      );
+                    },
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: _applying || _simulating ? null : _createRule,
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: Text(strings.get('automation.newRule')),
-                  ),
-                  const SizedBox(width: AppSpacing.space8),
-                  IconButton(
-                    tooltip: strings.get('action.close'),
-                    onPressed: _applying || _simulating
-                        ? null
-                        : () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
+                ),
               ),
             ),
-            if (_applying || _simulating) ...[
-              const LinearProgressIndicator(),
-              ListTile(
-                leading: const Icon(Icons.sync_rounded),
-                title: Text(
-                  strings.get(
+            if (_applying || _simulating)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.space16,
+                  0,
+                  AppSpacing.space16,
+                  AppSpacing.space12,
+                ),
+                child: AppOperationStatus(
+                  label: strings.get('automation.title'),
+                  phase: strings.get(
                     _simulating
                         ? 'automation.simulating'
                         : 'automation.applying',
                   ),
-                ),
-                trailing: TextButton.icon(
-                  onPressed: _cancellation?.cancel,
-                  icon: const Icon(Icons.stop_circle_outlined),
-                  label: Text(strings.get('action.cancel')),
+                  onCancel: _cancellation?.cancel,
+                  cancelLabel: _cancellation == null
+                      ? null
+                      : strings.get('action.cancel'),
                 ),
               ),
-            ] else if (_simulation != null)
+            if (!_applying && !_simulating && _simulation != null)
               ListTile(
                 leading: const Icon(Icons.science_outlined),
                 title: Text(
@@ -175,13 +203,14 @@ final class _AutomationManagerDialogState
                           ),
                           title: Text(rule.name),
                           subtitle: Text(
-                            rule.summary(
-                              english:
-                                  Localizations.localeOf(
-                                    context,
-                                  ).languageCode ==
-                                  'en',
-                            ),
+                            [
+                              '${strings.get('automation.trigger.${rule.trigger.kind.name}')} '
+                                      '${rule.trigger.value ?? ''}'
+                                  .trim(),
+                              for (final action in rule.actions)
+                                '${strings.get('automation.action.${action.kind.name}')}: '
+                                    '${action.value}',
+                            ].join(' · '),
                           ),
                           trailing: Wrap(
                             spacing: AppSpacing.space4,

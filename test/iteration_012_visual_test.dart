@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:yamantaka/app/theme/app_theme.dart';
+import 'package:yamantaka/core/i18n/app_localizations.dart';
 import 'package:yamantaka/core/logging/app_logger.dart';
 import 'package:yamantaka/features/annotations/domain/annotation.dart';
 import 'package:yamantaka/features/annotations/presentation/global_annotations_dialog.dart';
@@ -53,7 +55,7 @@ void main() {
     ]);
   });
 
-  testWidgets('captures the 0.13 continuity and workflow surfaces', (
+  testWidgets('captures the 0.15 continuity and workflow surfaces', (
     tester,
   ) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_WORKFLOW_MATRIX_DIR');
@@ -178,6 +180,14 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           debugShowCheckedModeBanner: false,
+          locale: const Locale('es'),
+          supportedLocales: const [Locale('es'), Locale('en')],
+          localizationsDelegates: const [
+            YamantakaLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: dark ? ThemeMode.dark : ThemeMode.light,
@@ -189,6 +199,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
     }
 
     Future<void> capture(String surface, String name) async {
@@ -232,6 +243,8 @@ void main() {
         hasRecentlyClosed: true,
       ),
     );
+    await tester.tap(find.byType(ExpansionTile));
+    await tester.pumpAndSettle();
     await capture('continuity', 'continuity-content-light');
 
     await pumpSurface(
@@ -340,8 +353,8 @@ void main() {
       const JsonEncoder.withIndent('  ').convert({
         'format': 'yamantaka-workflow-visual-matrix',
         'version': 1,
-        'productVersion': '0.13.0',
-        'generatedAt': '2026-08-31T12:00:00Z',
+        'productVersion': '0.15.0',
+        'generatedAt': DateTime.now().toUtc().toIso8601String(),
         'cases': cases,
       }),
       flush: true,

@@ -83,7 +83,9 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   final FocusNode _libraryFocusNode = FocusNode(debugLabel: 'artifact-library');
   final FocusNode _searchFocusNode = FocusNode(debugLabel: 'library-search');
   final ValueNotifier<String?> _hoveredDocumentId = ValueNotifier(null);
-  late bool _searchOpen;
+  late final ValueNotifier<bool> _searchOpen = ValueNotifier(
+    widget.controller.query.isNotEmpty,
+  );
   bool _selectionMode = false;
   _LibraryViewMode _viewMode = _LibraryViewMode.grid;
   final LibrarySelection _selection = LibrarySelection();
@@ -94,9 +96,8 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   @override
   void initState() {
     super.initState();
-    _searchOpen = widget.controller.query.isNotEmpty;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_searchOpen) {
+      if (_searchOpen.value) {
         _searchFocusNode.requestFocus();
       } else {
         _libraryFocusNode.requestFocus();
@@ -127,6 +128,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       ..dispose();
     _queryDebounce?.cancel();
     _searchController.dispose();
+    _searchOpen.dispose();
     _hoveredDocumentId.dispose();
     _libraryFocusNode.dispose();
     _searchFocusNode.dispose();
@@ -161,7 +163,21 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
           materializedCounts[LibraryReadingState.completed]!,
     };
     _selection.retain(widget.documents.map((document) => document.id));
+    final collectionLabel = widget.controller.selectedCollectionId != null
+        ? widget.collections
+                  .where(
+                    (item) => item.id == widget.controller.selectedCollectionId,
+                  )
+                  .firstOrNull
+                  ?.name ??
+              YamantakaLocalizations.of(context).get('library.collections')
+        : widget.controller.selectedSmartCollection == null
+        ? null
+        : YamantakaLocalizations.of(context).get(
+            'library.smartCollection.${widget.controller.selectedSmartCollection!.name}',
+          );
     final activeFilter =
+        collectionLabel != null ||
         widget.controller.query.isNotEmpty ||
         _readingState != LibraryReadingState.all ||
         _sortOrder != LibrarySortOrder.lastOpened ||
@@ -170,6 +186,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         widget.controller.selectedTopics.isNotEmpty ||
         widget.controller.grouping != LibraryGrouping.none;
     final activeFilterCount = <bool>[
+      collectionLabel != null,
       widget.controller.query.isNotEmpty,
       _readingState != LibraryReadingState.all,
       _sortOrder != LibrarySortOrder.lastOpened,
@@ -217,6 +234,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                   totalCount: widget.controller.totalDocuments,
                   query: widget.controller.query,
                   counts: fullCounts,
+                  collectionLabel: collectionLabel,
                   readingState: _readingState,
                   sortOrder: _sortOrder,
                   favoritesOnly: _favoritesOnly,
@@ -291,22 +309,26 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                 ),
               ],
             ),
-            if (_searchOpen)
-              Positioned(
-                top: AppSpacing.space12,
-                left: AppSpacing.space20,
-                right: AppSpacing.space20,
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: _SearchOverlay(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    resultCount: widget.controller.totalDocuments,
-                    onChanged: _updateQuery,
-                    onClose: _closeSearch,
-                  ),
-                ),
-              ),
+            ValueListenableBuilder<bool>(
+              valueListenable: _searchOpen,
+              builder: (context, open, _) => open
+                  ? Positioned(
+                      top: AppSpacing.space12,
+                      left: AppSpacing.space20,
+                      right: AppSpacing.space20,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: _SearchOverlay(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          resultCount: widget.controller.totalDocuments,
+                          onChanged: _updateQuery,
+                          onClose: _closeSearch,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             Positioned(
               left: AppSpacing.space20,
               right: AppSpacing.space20,
@@ -390,7 +412,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   }
 
   void _openSearch() {
-    if (!_searchOpen) setState(() => _searchOpen = true);
+    _searchOpen.value = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocusNode.requestFocus();
       _searchController.selection = TextSelection(
@@ -401,16 +423,19 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   }
 
   void _closeSearch() {
+    _queryDebounce?.cancel();
+    _queryDebounce = null;
     _searchController.clear();
     widget.controller.query = '';
-    setState(() => _searchOpen = false);
+    _searchOpen.value = false;
     unawaited(widget.controller.reload());
     _libraryFocusNode.requestFocus();
   }
 
   void _updateQuery(String value) {
     widget.controller.query = value;
-    setState(() {});
+    // TextField updates immediately; refresh the catalog only when the
+    // debounced SQL query publishes results, not for every keystroke.
     _queryDebounce?.cancel();
     _queryDebounce = Timer(AppMotion.searchDebounce, () {
       if (mounted) unawaited(widget.controller.reload());
@@ -418,7 +443,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   }
 
   void _handleEscape() {
-    if (_searchOpen) {
+    if (_searchOpen.value) {
       _closeSearch();
       return;
     }
@@ -757,10 +782,13 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     ArtifactNavigationDirection direction,
   ) {
     if (documents.isEmpty) return;
-    final width = MediaQuery.sizeOf(context).width;
+    final width =
+        (context.findRenderObject() as RenderBox?)?.size.width ??
+        MediaQuery.sizeOf(context).width;
     final metrics = LibraryArtifactLayout.metricsFor(
-      viewportWidth: width - AppSpacing.space40,
+      viewportWidth: width - AppSpacing.pagePadding(width) * 2,
       documentCount: documents.length,
+      compact: AppBreakpoints.classify(width) == AppWindowClass.compact,
     );
     final currentIndex = math.max(
       0,
@@ -780,7 +808,12 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
     if (_scrollController.hasClients && documents.length > 6) {
       final row = nextIndex ~/ columns;
       final offset =
-          row * (_viewMode == _LibraryViewMode.list ? 60 : metrics.cellExtent);
+          row *
+          (_viewMode == _LibraryViewMode.list
+              ? 60
+              : metrics.cellExtent +
+                    AppSpacing.space16 +
+                    38 * (MediaQuery.textScalerOf(context).scale(1) - 1));
       _scrollController.animateTo(
         offset.clamp(0, _scrollController.position.maxScrollExtent).toDouble(),
         duration: MediaQuery.disableAnimationsOf(context)
@@ -913,7 +946,11 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       case _FilterCommand.progress:
         widget.controller.sortOrder = 'progress';
       case _FilterCommand.reset:
+        _searchController.clear();
         widget.controller
+          ..query = ''
+          ..selectedCollectionId = null
+          ..selectedSmartCollection = null
           ..readingState = 'all'
           ..sortOrder = 'lastOpened'
           ..favoritesOnly = false
@@ -927,6 +964,9 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
 
   void _clearActiveFilter(_ActiveFilterKind filter) {
     switch (filter) {
+      case _ActiveFilterKind.collection:
+        widget.controller.selectedCollectionId = null;
+        widget.controller.selectedSmartCollection = null;
       case _ActiveFilterKind.query:
         _searchController.clear();
         widget.controller.query = '';

@@ -36,7 +36,7 @@ final class SettingsScreen extends StatefulWidget {
 }
 
 final class _SettingsScreenState extends State<SettingsScreen> {
-  _SettingsSectionId _selectedSection = _SettingsSectionId.appearance;
+  SettingsSectionId _selectedSection = SettingsSectionId.appearance;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -56,58 +56,67 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         return Scaffold(
           backgroundColor: context.appColors.settingsBackground,
           appBar: SettingsAppBar(onBack: widget.onBack),
-          body: Column(
-            children: [
-              _SettingsSearchField(
-                controller: _searchController,
-                query: _searchQuery,
-                onChanged: (value) => setState(() => _searchQuery = value),
-                onClear: () {
-                  _searchController.clear();
-                  setState(() => _searchQuery = '');
-                },
-              ),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final allSections = _buildSections(settings, strings);
-                    final sections = _filteredSections(allSections, strings);
-                    if (sections.isEmpty) {
-                      return AppStatusView(
-                        icon: Icons.search_off_rounded,
-                        title: strings.get('settings.searchNoResults'),
-                        message: strings.get(
-                          'settings.searchNoResults.description',
-                        ),
-                        action: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                        actionLabel: strings.get('action.clear'),
-                      );
-                    }
-                    final selected =
-                        sections.any(
-                          (section) => section.id == _selectedSection,
-                        )
-                        ? _selectedSection
-                        : sections.first.id;
-                    if (AppBreakpoints.classify(constraints.maxWidth) !=
-                        AppWindowClass.expanded) {
-                      return _CompactSettings(sections: sections);
-                    }
-                    return _DesktopSettings(
-                      sections: sections,
-                      settings: settings,
-                      selected: selected,
-                      onSelected: (section) {
-                        setState(() => _selectedSection = section);
+          body: Align(
+            alignment: AlignmentDirectional.topStart,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1600),
+              child: Column(
+                children: [
+                  _SettingsSearchField(
+                    controller: _searchController,
+                    query: _searchQuery,
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    onClear: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final allSections = _buildSections(settings, strings);
+                        final sections = _filteredSections(
+                          allSections,
+                          strings,
+                        );
+                        if (sections.isEmpty) {
+                          return AppStatusView(
+                            icon: Icons.search_off_rounded,
+                            title: strings.get('settings.searchNoResults'),
+                            message: strings.get(
+                              'settings.searchNoResults.description',
+                            ),
+                            action: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                            actionLabel: strings.get('action.clear'),
+                          );
+                        }
+                        final selected =
+                            sections.any(
+                              (section) => section.id == _selectedSection,
+                            )
+                            ? _selectedSection
+                            : sections.first.id;
+                        if (AppBreakpoints.classify(constraints.maxWidth) !=
+                            AppWindowClass.expanded) {
+                          return _CompactSettings(sections: sections);
+                        }
+                        return _DesktopSettings(
+                          sections: sections,
+                          settings: settings,
+                          selected: selected,
+                          onSelected: (section) {
+                            setState(() => _selectedSection = section);
+                          },
+                        );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
@@ -172,7 +181,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
   ) {
     final sections = [
       _SettingsSectionData(
-        id: _SettingsSectionId.appearance,
+        id: SettingsSectionId.appearance,
         description: strings.get('settings.appearance.description'),
         children: [
           _AppearancePreview(settings: settings),
@@ -222,78 +231,10 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) =>
                 _update(settings.copyWith(defaultReaderTheme: value)),
           ),
-          _SwitchSetting(
-            label: strings.get('settings.autoHideControls'),
-            description: strings.get('settings.autoHideControls.description'),
-            value: settings.autoHideControls,
-            onChanged: (value) =>
-                _update(settings.copyWith(autoHideControls: value)),
-          ),
-          _SwitchSetting(
-            label: strings.get('settings.showProgress'),
-            value: settings.showProgress,
-            onChanged: (value) =>
-                _update(settings.copyWith(showProgress: value)),
-          ),
-          _DropdownSetting(
-            label: strings.get('settings.motion'),
-            description: strings.get('settings.motion.description'),
-            value: settings.resolvedMotionPreference.name,
-            values: {
-              'full': strings.get('settings.value.motionFull'),
-              'reduced': strings.get('settings.value.motionReduced'),
-              'none': strings.get('settings.value.motionNone'),
-            },
-            onChanged: (value) {
-              final preference = AppMotionPreference.values.byName(value);
-              _update(
-                settings.copyWith(
-                  motionPreference: preference,
-                  reduceMotion: preference != AppMotionPreference.full,
-                  disableAnimations: preference == AppMotionPreference.none,
-                ),
-              );
-            },
-          ),
-          _DropdownSetting(
-            label: strings.get('settings.visualProfile'),
-            description: strings.get('settings.visualProfile.description'),
-            value: settings.visualProfile.name,
-            values: {
-              'standard': strings.get('settings.value.standard'),
-              'electronicInk': strings.get('settings.value.electronicInk'),
-            },
-            onChanged: (value) {
-              final profile = ReaderVisualProfile.values.byName(value);
-              _update(
-                settings.copyWith(
-                  visualProfile: profile,
-                  reduceMotion: profile == ReaderVisualProfile.electronicInk
-                      ? true
-                      : settings.reduceMotion,
-                  disableAnimations:
-                      profile == ReaderVisualProfile.electronicInk
-                      ? true
-                      : settings.disableAnimations,
-                  motionPreference: profile == ReaderVisualProfile.electronicInk
-                      ? AppMotionPreference.none
-                      : settings.motionPreference,
-                  defaultReaderTheme:
-                      profile == ReaderVisualProfile.electronicInk
-                      ? 'light'
-                      : settings.defaultReaderTheme,
-                  defaultPageLayout:
-                      profile == ReaderVisualProfile.electronicInk
-                      ? 'single'
-                      : settings.defaultPageLayout,
-                ),
-              );
-            },
-          ),
         ],
       ),
       _SettingsSectionData(
-        id: _SettingsSectionId.reading,
+        id: SettingsSectionId.reading,
         description: strings.get('settings.reading.description'),
         children: [
           _DropdownSetting(
@@ -375,12 +316,19 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
-        ],
-      ),
-      _SettingsSectionData(
-        id: _SettingsSectionId.readerBar,
-        description: strings.get('settings.readerBar.description'),
-        children: [
+          _SwitchSetting(
+            label: strings.get('settings.autoHideControls'),
+            description: strings.get('settings.autoHideControls.description'),
+            value: settings.autoHideControls,
+            onChanged: (value) =>
+                _update(settings.copyWith(autoHideControls: value)),
+          ),
+          _SwitchSetting(
+            label: strings.get('settings.showProgress'),
+            value: settings.showProgress,
+            onChanged: (value) =>
+                _update(settings.copyWith(showProgress: value)),
+          ),
           _SwitchSetting(
             label: strings.get('settings.showPanelControls'),
             description: strings.get('settings.showPanelControls.description'),
@@ -398,26 +346,67 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) =>
                 _update(settings.copyWith(readerPanelWidth: value)),
           ),
-          _SwitchSetting(
-            label: strings.get('settings.restoreSession'),
-            description: strings.get('settings.restoreSession.description'),
-            value: settings.restoreLastSession,
-            onChanged: (value) =>
-                _update(settings.copyWith(restoreLastSession: value)),
-          ),
-          _SwitchSetting(
-            label: strings.get('settings.startInLibrary'),
-            description: strings.get('settings.startInLibrary.description'),
-            value: settings.startInLibrary,
-            onChanged: (value) =>
-                _update(settings.copyWith(startInLibrary: value)),
-          ),
         ],
       ),
       _SettingsSectionData(
-        id: _SettingsSectionId.shortcuts,
-        description: strings.get('settings.shortcuts.description'),
+        id: SettingsSectionId.accessibility,
+        description: strings.get('settings.accessibility.description'),
         children: [
+          _DropdownSetting(
+            label: strings.get('settings.motion'),
+            description: strings.get('settings.motion.description'),
+            value: settings.resolvedMotionPreference.name,
+            values: {
+              'full': strings.get('settings.value.motionFull'),
+              'reduced': strings.get('settings.value.motionReduced'),
+              'none': strings.get('settings.value.motionNone'),
+            },
+            onChanged: (value) {
+              final preference = AppMotionPreference.values.byName(value);
+              _update(
+                settings.copyWith(
+                  motionPreference: preference,
+                  reduceMotion: preference != AppMotionPreference.full,
+                  disableAnimations: preference == AppMotionPreference.none,
+                ),
+              );
+            },
+          ),
+          _DropdownSetting(
+            label: strings.get('settings.visualProfile'),
+            description: strings.get('settings.visualProfile.description'),
+            value: settings.visualProfile.name,
+            values: {
+              'standard': strings.get('settings.value.standard'),
+              'electronicInk': strings.get('settings.value.electronicInk'),
+            },
+            onChanged: (value) {
+              final profile = ReaderVisualProfile.values.byName(value);
+              _update(
+                settings.copyWith(
+                  visualProfile: profile,
+                  reduceMotion: profile == ReaderVisualProfile.electronicInk
+                      ? true
+                      : settings.reduceMotion,
+                  disableAnimations:
+                      profile == ReaderVisualProfile.electronicInk
+                      ? true
+                      : settings.disableAnimations,
+                  motionPreference: profile == ReaderVisualProfile.electronicInk
+                      ? AppMotionPreference.none
+                      : settings.motionPreference,
+                  defaultReaderTheme:
+                      profile == ReaderVisualProfile.electronicInk
+                      ? 'light'
+                      : settings.defaultReaderTheme,
+                  defaultPageLayout:
+                      profile == ReaderVisualProfile.electronicInk
+                      ? 'single'
+                      : settings.defaultPageLayout,
+                ),
+              );
+            },
+          ),
           for (final id in AppCommandRegistry.configurableIds)
             _ShortcutSetting(
               commandId: id,
@@ -437,7 +426,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       _SettingsSectionData(
-        id: _SettingsSectionId.library,
+        id: SettingsSectionId.library,
         description: strings.get('settings.library.description'),
         children: [
           _SwitchSetting(
@@ -453,6 +442,30 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (value) =>
                 unawaited(_setCoverGeneration(settings, value)),
           ),
+        ],
+      ),
+      _SettingsSectionData(
+        id: SettingsSectionId.privacy,
+        description: strings.get('settings.privacy.description'),
+        children: [
+          _ActionSetting(
+            label: strings.get('settings.deleteAllData'),
+            description: strings.get('settings.deleteAllData.description'),
+            actionLabel: strings.get('action.delete'),
+            destructive: true,
+            onPressed: () => _confirmAndRun(
+              context,
+              title: strings.get('settings.deleteAllData.confirmTitle'),
+              body: strings.get('settings.deleteAllData.confirmBody'),
+              action: widget.services.deleteAllLocalData,
+            ),
+          ),
+        ],
+      ),
+      _SettingsSectionData(
+        id: SettingsSectionId.storage,
+        description: strings.get('settings.storage.description'),
+        children: [
           _DropdownSetting(
             label: strings.get('settings.maxCache'),
             value: '${settings.maxCacheMegabytes}',
@@ -475,24 +488,52 @@ final class _SettingsScreenState extends State<SettingsScreen> {
               strings.get('settings.clearCache.done'),
             ),
           ),
+          _StorageSummary(
+            service: widget.services.storage,
+            onClearRebuildable: () async {
+              await _runWithNotice(
+                context,
+                widget.services.clearCache,
+                strings.get('settings.rebuildableCleared'),
+              );
+              if (mounted) setState(() {});
+            },
+            onClearBackups: () async {
+              await _confirmAndRun(
+                context,
+                title: strings.get('settings.deleteBackups.confirmTitle'),
+                body: strings.get('settings.deleteBackups.confirmBody'),
+                action: widget.services.storage.clearBackups,
+              );
+              if (mounted) setState(() {});
+            },
+          ),
           _ActionSetting(
-            label: strings.get('settings.deleteHistory'),
-            description: strings.get('settings.deleteHistory.description'),
-            actionLabel: strings.get('action.delete'),
-            destructive: true,
-            onPressed: () => _confirmAndRun(
-              context,
-              title: strings.get('settings.deleteHistory.confirmTitle'),
-              body: strings.get('settings.deleteHistory.confirmBody'),
-              action: widget.services.deleteHistory,
-            ),
+            label: strings.get('settings.openDataLocation'),
+            description: widget.services.paths.dataDirectory.path,
+            actionLabel: strings.get('action.open'),
+            onPressed: widget.services.openDataLocation,
           ),
         ],
       ),
       _SettingsSectionData(
-        id: _SettingsSectionId.history,
-        description: strings.get('settings.history.description'),
+        id: SettingsSectionId.recovery,
+        description: strings.get('settings.recovery.description'),
         children: [
+          _SwitchSetting(
+            label: strings.get('settings.restoreSession'),
+            description: strings.get('settings.restoreSession.description'),
+            value: settings.restoreLastSession,
+            onChanged: (value) =>
+                _update(settings.copyWith(restoreLastSession: value)),
+          ),
+          _SwitchSetting(
+            label: strings.get('settings.startInLibrary'),
+            description: strings.get('settings.startInLibrary.description'),
+            value: settings.startInLibrary,
+            onChanged: (value) =>
+                _update(settings.copyWith(startInLibrary: value)),
+          ),
           _SwitchSetting(
             label: strings.get('settings.recordSessions'),
             description: strings.get('settings.recordSessions.description'),
@@ -520,32 +561,6 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             actionLabel: strings.get('settings.viewHistory.action'),
             onPressed: () => _showReadingHistory(context, settings),
           ),
-        ],
-      ),
-      _SettingsSectionData(
-        id: _SettingsSectionId.dataPrivacy,
-        description: strings.get('settings.dataPrivacy.description'),
-        children: [
-          _StorageSummary(
-            service: widget.services.storage,
-            onClearRebuildable: () async {
-              await _runWithNotice(
-                context,
-                widget.services.clearCache,
-                strings.get('settings.rebuildableCleared'),
-              );
-              if (mounted) setState(() {});
-            },
-            onClearBackups: () async {
-              await _confirmAndRun(
-                context,
-                title: strings.get('settings.deleteBackups.confirmTitle'),
-                body: strings.get('settings.deleteBackups.confirmBody'),
-                action: widget.services.storage.clearBackups,
-              );
-              if (mounted) setState(() {});
-            },
-          ),
           _ActionSetting(
             label: strings.get('settings.exportBackup'),
             description: strings.get('settings.exportBackup.description'),
@@ -559,28 +574,22 @@ final class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () => _importBackup(context),
           ),
           _ActionSetting(
-            label: strings.get('settings.openDataLocation'),
-            description: widget.services.paths.dataDirectory.path,
-            actionLabel: strings.get('action.open'),
-            onPressed: widget.services.openDataLocation,
-          ),
-          _ActionSetting(
-            label: strings.get('settings.deleteAllData'),
-            description: strings.get('settings.deleteAllData.description'),
+            label: strings.get('settings.deleteHistory'),
+            description: strings.get('settings.deleteHistory.description'),
             actionLabel: strings.get('action.delete'),
             destructive: true,
             onPressed: () => _confirmAndRun(
               context,
-              title: strings.get('settings.deleteAllData.confirmTitle'),
-              body: strings.get('settings.deleteAllData.confirmBody'),
-              action: widget.services.deleteAllLocalData,
+              title: strings.get('settings.deleteHistory.confirmTitle'),
+              body: strings.get('settings.deleteHistory.confirmBody'),
+              action: widget.services.deleteHistory,
             ),
           ),
         ],
       ),
       _SettingsSectionData(
-        id: _SettingsSectionId.advanced,
-        description: strings.get('settings.advanced.description'),
+        id: SettingsSectionId.diagnostics,
+        description: strings.get('settings.diagnosticsSection.description'),
         children: [
           _ActionSetting(
             label: strings.get('settings.diagnostics'),
@@ -614,61 +623,61 @@ final class _SettingsScreenState extends State<SettingsScreen> {
     ];
   }
 
-  bool _isResettableSection(_SettingsSectionId id) => switch (id) {
-    _SettingsSectionId.appearance ||
-    _SettingsSectionId.reading ||
-    _SettingsSectionId.readerBar ||
-    _SettingsSectionId.shortcuts ||
-    _SettingsSectionId.library ||
-    _SettingsSectionId.history => true,
-    _SettingsSectionId.dataPrivacy || _SettingsSectionId.advanced => false,
+  bool _isResettableSection(SettingsSectionId id) => switch (id) {
+    SettingsSectionId.appearance ||
+    SettingsSectionId.reading ||
+    SettingsSectionId.accessibility ||
+    SettingsSectionId.library ||
+    SettingsSectionId.recovery => true,
+    SettingsSectionId.privacy ||
+    SettingsSectionId.storage ||
+    SettingsSectionId.diagnostics => false,
   };
 
-  void _resetSection(_SettingsSectionId id, AppSettings settings) {
+  void _resetSection(SettingsSectionId id, AppSettings settings) {
     const defaults = AppSettings();
     final next = switch (id) {
-      _SettingsSectionId.appearance => settings.copyWith(
+      SettingsSectionId.appearance => settings.copyWith(
         darkMode: defaults.darkMode,
         defaultReaderTheme: defaults.defaultReaderTheme,
-        autoHideControls: defaults.autoHideControls,
-        showProgress: defaults.showProgress,
-        reduceMotion: defaults.reduceMotion,
-        disableAnimations: defaults.disableAnimations,
-        motionPreference: AppMotionPreference.full,
         interfaceDensity: defaults.interfaceDensity,
-        visualProfile: defaults.visualProfile,
         languageCode: defaults.languageCode,
       ),
-      _SettingsSectionId.reading => settings.copyWith(
+      SettingsSectionId.reading => settings.copyWith(
         defaultViewMode: defaults.defaultViewMode,
         defaultPageLayout: defaults.defaultPageLayout,
         defaultZoomMode: defaults.defaultZoomMode,
         readingDirection: defaults.readingDirection,
         defaultMargin: defaults.defaultMargin,
         restoreLastPosition: defaults.restoreLastPosition,
-      ),
-      _SettingsSectionId.readerBar => settings.copyWith(
+        autoHideControls: defaults.autoHideControls,
+        showProgress: defaults.showProgress,
         showReaderPanelControls: defaults.showReaderPanelControls,
         readerPanelWidth: defaults.readerPanelWidth,
+      ),
+      SettingsSectionId.accessibility => settings.copyWith(
+        reduceMotion: defaults.reduceMotion,
+        disableAnimations: defaults.disableAnimations,
+        motionPreference: AppMotionPreference.full,
+        visualProfile: defaults.visualProfile,
+        shortcutOverrides: defaults.shortcutOverrides,
+      ),
+      SettingsSectionId.library => settings.copyWith(
+        showRecents: defaults.showRecents,
+        generateCovers: defaults.generateCovers,
+        libraryReadingFilter: defaults.libraryReadingFilter,
+      ),
+      SettingsSectionId.recovery => settings.copyWith(
+        recordReadingSessions: defaults.recordReadingSessions,
+        readingHistoryLimit: defaults.readingHistoryLimit,
         restoreLastSession: defaults.restoreLastSession,
         startInLibrary: defaults.startInLibrary,
       ),
-      _SettingsSectionId.shortcuts => settings.copyWith(
-        shortcutOverrides: defaults.shortcutOverrides,
-      ),
-      _SettingsSectionId.library => settings.copyWith(
-        showRecents: defaults.showRecents,
-        generateCovers: defaults.generateCovers,
-        maxCacheMegabytes: defaults.maxCacheMegabytes,
-        libraryReadingFilter: defaults.libraryReadingFilter,
-      ),
-      _SettingsSectionId.history => settings.copyWith(
-        recordReadingSessions: defaults.recordReadingSessions,
-        readingHistoryLimit: defaults.readingHistoryLimit,
-      ),
-      _SettingsSectionId.dataPrivacy || _SettingsSectionId.advanced => settings,
+      SettingsSectionId.privacy ||
+      SettingsSectionId.storage ||
+      SettingsSectionId.diagnostics => settings,
     };
-    if (id == _SettingsSectionId.reading) {
+    if (id == SettingsSectionId.reading) {
       widget.services.readingProfiles
         ..setDefault('builtin-reading')
         ..apply('builtin-reading');

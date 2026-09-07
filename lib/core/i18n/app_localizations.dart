@@ -162,9 +162,9 @@ final class YamantakaLocalizations {
       'library.organizeMore': 'Organizar y más acciones',
       'library.collections': 'Colecciones',
       'library.workspaces': 'Espacios de trabajo',
-      'continuity.title': 'Continuidad',
+      'continuity.title': 'Sesión reciente',
       'continuity.description':
-          'Retoma la lectura, la cola y los espacios sin reconstruir el contexto.',
+          'Reanuda tu sesión o abre la siguiente lectura pendiente.',
       'continuity.empty': 'Empieza abriendo un PDF o creando un espacio.',
       'continuity.open': 'abiertos',
       'continuity.pinned': 'fijados',
@@ -174,7 +174,7 @@ final class YamantakaLocalizations {
       'continuity.continue': 'Continuar leyendo',
       'continuity.openNext': 'Abrir siguiente',
       'continuity.resume': 'Reanudar sesión',
-      'continuity.discard': 'Descartar contexto',
+      'continuity.discard': 'Descartar sesión guardada',
       'continuity.noNext': 'No hay otra lectura pendiente.',
       'continuity.noSession': 'No hay una sesión guardada para reanudar.',
       'continuity.discardTitle': '¿Descartar el contexto reciente?',
@@ -219,6 +219,17 @@ final class YamantakaLocalizations {
           'No se han encontrado duplicados exactos o probables.',
       'duplicates.position': 'Candidato {current} de {total}',
       'duplicates.evidence': 'Evidencias del duplicado',
+      'duplicates.kind.exactFingerprint': 'Contenido idéntico',
+      'duplicates.kind.samePath': 'Misma ubicación',
+      'duplicates.kind.probableMetadata': 'Posible duplicado',
+      'duplicates.kind.none': 'Sin coincidencia confirmada',
+      'duplicates.sameContent': 'El contenido de los archivos coincide',
+      'duplicates.sameLocation': 'Misma ubicación en disco',
+      'duplicates.sameName': 'Mismo nombre de archivo',
+      'duplicates.sameSize': 'Mismo tamaño',
+      'duplicates.field.title': 'Título',
+      'duplicates.field.author': 'Autor',
+      'duplicates.field.library_note': 'Nota de biblioteca',
       'duplicates.evidenceSummary':
           '{kind} · puntuación {score} · huella {fingerprint} · ruta {path} · nombre {name} · tamaño {size}',
       'duplicates.keep': 'Registro que se conservará',
@@ -737,7 +748,8 @@ final class YamantakaLocalizations {
       'reader.documentNavigator': 'Navegador del documento',
       'reader.navigatorFilter': 'Filtrar o buscar dentro del documento',
       'reader.navigatorEmpty': 'No hay destinos para este filtro.',
-      'reader.navigatorHistoryHint': 'Alt+← vuelve al punto de origen.',
+      'reader.navigatorHistoryHint':
+          'Alt + Flecha izquierda vuelve al punto de origen.',
       'reader.navigator.all': 'Todo',
       'reader.navigator.outline': 'Índice',
       'reader.navigator.thumbnails': 'Miniaturas',
@@ -751,6 +763,10 @@ final class YamantakaLocalizations {
       'library.fileMissing': 'Archivo no encontrado',
       'library.fileModified': 'Archivo modificado; revisa los destinos',
       'library.recentlyClosed': 'Cerrados recientemente',
+      'library.closedAtPage': 'Página {page}',
+      'library.navigation.tools': 'Herramientas',
+      'library.navigation.reading': 'En lectura',
+      'library.navigation.favorites': 'Favoritos',
       'library.localGoal': 'Meta local de lectura',
       'library.goalPages': 'páginas',
       'library.goalMinutes': 'minutos',
@@ -822,7 +838,8 @@ final class YamantakaLocalizations {
           'El almacén local de anotaciones no está conectado.',
       'reader.annotatePage': 'Anotar página {page}',
       'reader.exportAnnotations': 'Exportar anotaciones',
-      'reader.searchNotes': 'Buscar en notas',
+      'reader.searchNotes': 'Buscar notas',
+      'reader.moreNoteFilters': 'Tipo y color',
       'reader.noteFilter': 'Mostrar',
       'reader.noteFilter.all': 'Anotaciones y marcadores',
       'reader.noteFilter.annotations': 'Solo anotaciones',
@@ -932,11 +949,10 @@ final class YamantakaLocalizations {
       'settings.appearance.description':
           'Tema, controles y perfil de pantalla.',
       'settings.language.description':
-          'Aplica el catálogo castellano o inglés sin reiniciar.',
+          'Cambia el idioma de la interfaz sin reiniciar.',
       'settings.darkMode': 'Tema oscuro de la aplicación',
       'settings.darkMode.description':
-          'Afecta al lector y a los ajustes. La biblioteca conserva su entorno '
-          'oscuro y espacial.',
+          'Aplica el tema oscuro a la biblioteca, los controles y los ajustes.',
       'settings.density': 'Densidad de la interfaz',
       'settings.density.description':
           'Compacta muestra más contenido sin cambiar el tamaño del PDF.',
@@ -1028,6 +1044,16 @@ final class YamantakaLocalizations {
       'settings.viewHistory.action': 'Ver historial',
       'settings.dataPrivacy.description':
           'Datos locales, copias versionadas y privacidad.',
+      'settings.accessibility.description':
+          'Movimiento, contraste y teclado adaptados a tu forma de leer.',
+      'settings.privacy.description':
+          'Control explícito sobre los datos que permanecen en este equipo.',
+      'settings.storage.description':
+          'Uso de disco, cachés recreables y ubicación de los datos locales.',
+      'settings.recovery.description':
+          'Sesiones, historial y copias transaccionales para volver a un estado seguro.',
+      'settings.diagnosticsSection.description':
+          'Ayuda e integridad técnica sin telemetría ni datos del documento.',
       'settings.rebuildableCleared': 'Cachés recreables eliminadas.',
       'settings.deleteBackups.confirmTitle': '¿Eliminar copias locales?',
       'settings.deleteBackups.confirmBody':
@@ -1072,15 +1098,16 @@ final class YamantakaLocalizations {
           'Vista previa: interfaz {theme}, densidad {density}, lienzo {canvas}',
       'settings.preview': 'Vista previa',
       'settings.preview.description':
-          'Una muestra real del canvas, la página y el chrome del lector.',
+          'Comprueba cómo se verán la página, el fondo y los controles.',
       'settings.previewMode': 'Estado de la demostración',
       'settings.previewMode.resting': 'Reposo',
       'settings.previewMode.active': 'Activo',
       'settings.previewMode.panel': 'Panel abierto',
       'settings.previewMode.electronicInk': 'Tinta electrónica',
       'settings.navigationGroup.preferences': 'PREFERENCIAS',
-      'settings.navigationGroup.maintenance': 'MANTENIMIENTO',
-      'settings.navigationGroup.privacy': 'PRIVACIDAD',
+      'settings.navigationGroup.library': 'BIBLIOTECA',
+      'settings.navigationGroup.safety': 'CONTROL LOCAL',
+      'settings.navigationGroup.support': 'AYUDA',
       'settings.historyEntry': 'Páginas {start}–{end} · {duration}',
       'settings.deleteSession': 'Eliminar esta sesión',
       'settings.historyTitle': 'Historial de lectura',
@@ -1092,6 +1119,11 @@ final class YamantakaLocalizations {
           'No se pudo guardar el ajuste local. Inténtalo de nuevo.',
       'settings.section.appearance': 'Apariencia',
       'settings.section.reading': 'Lectura',
+      'settings.section.accessibility': 'Accesibilidad',
+      'settings.section.privacy': 'Privacidad',
+      'settings.section.storage': 'Almacenamiento',
+      'settings.section.recovery': 'Recuperación',
+      'settings.section.diagnostics': 'Diagnóstico',
       'settings.section.readerBar': 'Controles del lector',
       'settings.section.shortcuts': 'Atajos',
       'settings.section.library': 'Biblioteca',
@@ -1148,6 +1180,10 @@ final class YamantakaLocalizations {
       'backup.imported': 'Copia importada. Respaldo previo guardado en {path}',
       'backup.importFailed':
           'No se pudo importar. Los datos actuales se conservaron.',
+      'backup.previewDescription':
+          'Revisa los cambios antes de sustituir el estado local.',
+      'backup.preBackupRequired':
+          'Antes de restaurar se creará una copia automática y reversible.',
       'backup.importPreview':
           'Formato {version} · esquema {schema} · {bytes} bytes · {entities} '
           'entidades.\n{documents} documentos, {bookmarks} marcadores, '
@@ -1394,7 +1430,7 @@ final class YamantakaLocalizations {
       'library.organizeMore': 'Organize and more actions',
       'library.collections': 'Collections',
       'library.workspaces': 'Workspaces',
-      'continuity.title': 'Continuity',
+      'continuity.title': 'Recent session',
       'continuity.description':
           'Resume reading, queues, and workspaces without rebuilding context.',
       'continuity.empty': 'Start by opening a PDF or creating a workspace.',
@@ -1406,7 +1442,7 @@ final class YamantakaLocalizations {
       'continuity.continue': 'Continue reading',
       'continuity.openNext': 'Open next',
       'continuity.resume': 'Resume session',
-      'continuity.discard': 'Discard context',
+      'continuity.discard': 'Discard saved session',
       'continuity.noNext': 'There is no other pending reading.',
       'continuity.noSession': 'There is no saved session to resume.',
       'continuity.discardTitle': 'Discard recent context?',
@@ -1450,6 +1486,17 @@ final class YamantakaLocalizations {
       'duplicates.empty': 'No exact or probable duplicates were found.',
       'duplicates.position': 'Candidate {current} of {total}',
       'duplicates.evidence': 'Duplicate evidence',
+      'duplicates.kind.exactFingerprint': 'Identical content',
+      'duplicates.kind.samePath': 'Same location',
+      'duplicates.kind.probableMetadata': 'Possible duplicate',
+      'duplicates.kind.none': 'No confirmed match',
+      'duplicates.sameContent': 'The file contents match',
+      'duplicates.sameLocation': 'Same location on disk',
+      'duplicates.sameName': 'Same file name',
+      'duplicates.sameSize': 'Same size',
+      'duplicates.field.title': 'Title',
+      'duplicates.field.author': 'Author',
+      'duplicates.field.library_note': 'Library note',
       'duplicates.evidenceSummary':
           '{kind} · score {score} · fingerprint {fingerprint} · path {path} · name {name} · size {size}',
       'duplicates.keep': 'Record to keep',
@@ -1963,7 +2010,7 @@ final class YamantakaLocalizations {
       'reader.documentNavigator': 'Document navigator',
       'reader.navigatorFilter': 'Filter or search within this document',
       'reader.navigatorEmpty': 'No destinations match this filter.',
-      'reader.navigatorHistoryHint': 'Alt+← returns to the origin.',
+      'reader.navigatorHistoryHint': 'Alt + Left arrow returns to the origin.',
       'reader.navigator.all': 'All',
       'reader.navigator.outline': 'Outline',
       'reader.navigator.thumbnails': 'Thumbnails',
@@ -1977,6 +2024,10 @@ final class YamantakaLocalizations {
       'library.fileMissing': 'File not found',
       'library.fileModified': 'File changed; review destinations',
       'library.recentlyClosed': 'Recently closed',
+      'library.closedAtPage': 'Page {page}',
+      'library.navigation.tools': 'Tools',
+      'library.navigation.reading': 'Currently reading',
+      'library.navigation.favorites': 'Favorites',
       'library.localGoal': 'Local reading goal',
       'library.goalPages': 'pages',
       'library.goalMinutes': 'minutes',
@@ -2048,6 +2099,7 @@ final class YamantakaLocalizations {
       'reader.annotatePage': 'Annotate page {page}',
       'reader.exportAnnotations': 'Export annotations',
       'reader.searchNotes': 'Search notes',
+      'reader.moreNoteFilters': 'Type and color',
       'reader.noteFilter': 'Show',
       'reader.noteFilter.all': 'Annotations and bookmarks',
       'reader.noteFilter.annotations': 'Annotations only',
@@ -2159,14 +2211,13 @@ final class YamantakaLocalizations {
           'Apply the Spanish or English catalog without restarting.',
       'settings.darkMode': 'Dark application theme',
       'settings.darkMode.description':
-          'Affects the reader and settings. The library keeps its dark, '
-          'spacious environment.',
+          'Applies the dark theme to the library, controls, and settings.',
       'settings.density': 'Interface density',
       'settings.density.description':
           'Compact shows more content without changing the PDF size.',
       'settings.defaultReaderTheme': 'Default reading theme',
       'settings.defaultReaderTheme.description':
-          'Canvas color when opening a new document.',
+          'Reading background for new documents.',
       'settings.autoHideControls': 'Hide controls automatically',
       'settings.autoHideControls.description':
           'Keeps the document clear while reading.',
@@ -2247,6 +2298,16 @@ final class YamantakaLocalizations {
       'settings.viewHistory.action': 'View history',
       'settings.dataPrivacy.description':
           'Local data, versioned backups, and privacy.',
+      'settings.accessibility.description':
+          'Motion, contrast, and keyboard controls adapted to how you read.',
+      'settings.privacy.description':
+          'Explicit control over the data that remains on this computer.',
+      'settings.storage.description':
+          'Disk usage, rebuildable caches, and the local data location.',
+      'settings.recovery.description':
+          'Sessions, history, and transactional backups for returning to a safe state.',
+      'settings.diagnosticsSection.description':
+          'Help and technical integrity without telemetry or document data.',
       'settings.rebuildableCleared': 'Rebuildable caches cleared.',
       'settings.deleteBackups.confirmTitle': 'Delete local backups?',
       'settings.deleteBackups.confirmBody':
@@ -2291,15 +2352,16 @@ final class YamantakaLocalizations {
           'Preview: {theme} interface, {density} density, {canvas} canvas',
       'settings.preview': 'Preview',
       'settings.preview.description':
-          'A live sample of the reader canvas, page, and chrome.',
+          'See how the page, background, and controls will look.',
       'settings.previewMode': 'Demonstration state',
       'settings.previewMode.resting': 'Resting',
       'settings.previewMode.active': 'Active',
       'settings.previewMode.panel': 'Panel open',
       'settings.previewMode.electronicInk': 'Electronic ink',
       'settings.navigationGroup.preferences': 'PREFERENCES',
-      'settings.navigationGroup.maintenance': 'MAINTENANCE',
-      'settings.navigationGroup.privacy': 'PRIVACY',
+      'settings.navigationGroup.library': 'LIBRARY',
+      'settings.navigationGroup.safety': 'LOCAL CONTROL',
+      'settings.navigationGroup.support': 'SUPPORT',
       'settings.historyEntry': 'Pages {start}–{end} · {duration}',
       'settings.deleteSession': 'Delete this session',
       'settings.historyTitle': 'Reading history',
@@ -2310,6 +2372,11 @@ final class YamantakaLocalizations {
       'settings.saveFailed': 'The local setting could not be saved. Try again.',
       'settings.section.appearance': 'Appearance',
       'settings.section.reading': 'Reading',
+      'settings.section.accessibility': 'Accessibility',
+      'settings.section.privacy': 'Privacy',
+      'settings.section.storage': 'Storage',
+      'settings.section.recovery': 'Recovery',
+      'settings.section.diagnostics': 'Diagnostics',
       'settings.section.readerBar': 'Reader controls',
       'settings.section.shortcuts': 'Shortcuts',
       'settings.section.library': 'Library',
@@ -2363,6 +2430,10 @@ final class YamantakaLocalizations {
       'backup.exportFailed': 'Export failed: {error}',
       'backup.imported': 'Backup imported. Previous backup stored at {path}',
       'backup.importFailed': 'Import failed. Current data was preserved.',
+      'backup.previewDescription':
+          'Review the changes before replacing local state.',
+      'backup.preBackupRequired':
+          'An automatic, reversible backup will be created before restore.',
       'backup.importPreview':
           'Format {version} · schema {schema} · {bytes} bytes · {entities} '
           'entities.\n{documents} documents, {bookmarks} bookmarks, '

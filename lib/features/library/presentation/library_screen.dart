@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 
 import '../../../app/theme/app_components.dart';
 import '../../../app/theme/app_density.dart';
-import '../../../app/theme/app_theme.dart';
 import '../../../app/theme/app_tokens.dart';
 import '../../../core/errors/failure_presentation.dart';
 import '../../../core/i18n/app_localizations.dart';
@@ -23,6 +22,8 @@ import '../domain/library_selection.dart';
 import 'artifact_library.dart';
 
 export '../application/library_filter.dart';
+
+part 'library_navigation.dart';
 
 @visibleForTesting
 List<String> acceptedDroppedPdfPaths(Iterable<String> paths) {
@@ -172,385 +173,328 @@ final class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
     final compactHeader = MediaQuery.sizeOf(context).width < 820;
-    final libraryTheme = AppTheme.library(
-      density: context.appDensity.interfaceDensity,
-      highContrast: MediaQuery.highContrastOf(context),
-    );
-    return Theme(
-      data: libraryTheme,
-      child: Builder(
-        builder: (context) => CallbackShortcuts(
-          bindings: {
-            if (widget.onGlobalSearch != null)
-              const SingleActivator(
-                LogicalKeyboardKey.keyF,
-                control: true,
-                shift: true,
-              ): widget.onGlobalSearch!,
+    // Consume the application theme directly; no duplicate inherited theme.
+    return CallbackShortcuts(
+      bindings: {
+        if (widget.onGlobalSearch != null)
+          const SingleActivator(
+            LogicalKeyboardKey.keyF,
+            control: true,
+            shift: true,
+          ): widget.onGlobalSearch!,
+      },
+      child: Focus(
+        autofocus: true,
+        child: DropTarget(
+          onDragEntered: (_) => setState(() => _dragging = true),
+          onDragExited: (_) => setState(() => _dragging = false),
+          onDragDone: (details) {
+            setState(() => _dragging = false);
+            final pdfs = acceptedDroppedPdfPaths(
+              details.files.map((file) => file.path),
+            );
+            if (pdfs.isEmpty) return;
+            if (widget.onOpenPaths != null) {
+              widget.onOpenPaths!(pdfs);
+            } else {
+              widget.onOpenPath(pdfs.first);
+            }
           },
-          child: Focus(
-            autofocus: true,
-            child: DropTarget(
-              onDragEntered: (_) => setState(() => _dragging = true),
-              onDragExited: (_) => setState(() => _dragging = false),
-              onDragDone: (details) {
-                setState(() => _dragging = false);
-                final pdfs = acceptedDroppedPdfPaths(
-                  details.files.map((file) => file.path),
-                );
-                if (pdfs.isEmpty) return;
-                if (widget.onOpenPaths != null) {
-                  widget.onOpenPaths!(pdfs);
-                } else {
-                  widget.onOpenPath(pdfs.first);
-                }
-              },
-              child: Scaffold(
-                backgroundColor: context.appColors.libraryBackground,
-                appBar: AppBar(
-                  backgroundColor: context.appColors.libraryBackground,
-                  surfaceTintColor: Colors.transparent,
-                  shape: const Border(),
-                  toolbarHeight: AppSizes.libraryHeaderHeight,
-                  title: ListenableBuilder(
-                    listenable: Listenable.merge([
-                      widget.controller,
-                      if (widget.enrichment != null) widget.enrichment!,
-                      if (widget.fileValidation != null) widget.fileValidation!,
-                    ]),
-                    builder: (context, _) => Semantics(
-                      header: true,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 3,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: context.appColors.textPrimary,
-                              borderRadius: BorderRadius.circular(
-                                AppRadii.indicator,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.space12),
-                          Flexible(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  strings.get('library.localCollection'),
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: context.appColors.textMuted,
-                                        letterSpacing: 1.1,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                                const SizedBox(height: AppSpacing.space2),
-                                if (!compactHeader)
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        strings.libraryTitle,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.headlineSmall,
-                                      ),
-                                      const SizedBox(width: AppSpacing.space12),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: AppSpacing.space8,
-                                          vertical: AppSpacing.space2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color:
-                                                context.appColors.borderSubtle,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            AppRadii.control,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          widget
-                                                      .enrichment
-                                                      ?.progress
-                                                      .isRunning ==
-                                                  true
-                                              ? strings.get(
-                                                  'library.analyzing',
-                                                  parameters: {
-                                                    'current':
-                                                        widget
-                                                            .enrichment!
-                                                            .progress
-                                                            .completed +
-                                                        1,
-                                                    'total': widget
-                                                        .enrichment!
-                                                        .progress
-                                                        .total,
-                                                  },
-                                                )
-                                              : strings.count(
-                                                  'count.documents',
-                                                  widget
-                                                      .controller
-                                                      .libraryDocumentCount,
-                                                ),
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.labelMedium,
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                else
-                                  Text(
-                                    strings.count(
-                                      'count.documents',
-                                      widget.controller.libraryDocumentCount,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelSmall,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  actions: [
-                    if (widget.enrichment?.progress.isRunning == true)
-                      IconButton(
-                        tooltip: strings.get('library.cancelAnalysis'),
-                        onPressed: widget.enrichment!.cancel,
-                        icon: const Icon(Icons.stop_circle_outlined),
-                      ),
-                    if (widget.fileValidation?.progress.isRunning == true)
-                      IconButton(
-                        tooltip: strings.get('action.cancel'),
-                        onPressed: widget.fileValidation!.cancel,
-                        icon: const Icon(Icons.stop_circle_outlined),
-                      ),
-                    if (widget.safeMode)
-                      Tooltip(
-                        message: strings.get('library.safeMode'),
-                        child: const Padding(
-                          padding: EdgeInsets.all(AppSpacing.space12),
-                          child: Icon(Icons.health_and_safety_outlined),
-                        ),
-                      ),
-                    PopupMenuButton<_LibraryAppMenuAction>(
-                      tooltip: strings.get('library.organizeMore'),
-                      onSelected: (action) {
-                        switch (action) {
-                          case _LibraryAppMenuAction.collections:
-                            _showCollections();
-                          case _LibraryAppMenuAction.workspaces:
-                            widget.onWorkspaces?.call();
-                          case _LibraryAppMenuAction.importFolder:
-                            widget.onImportFolder?.call();
-                          case _LibraryAppMenuAction.recover:
-                            widget.onRecoverFolder?.call();
-                          case _LibraryAppMenuAction.globalSearch:
-                            widget.onGlobalSearch?.call();
-                          case _LibraryAppMenuAction.enrich:
-                            widget.enrichment?.analyzePending();
-                          case _LibraryAppMenuAction.reanalyze:
-                            unawaited(_reanalyzeLibrary());
-                          case _LibraryAppMenuAction.checkFiles:
-                            unawaited(_checkFiles());
-                          case _LibraryAppMenuAction.annotations:
-                            widget.onAnnotations?.call();
-                          case _LibraryAppMenuAction.automations:
-                            widget.onAutomations?.call();
-                          case _LibraryAppMenuAction.problems:
-                            widget.onProblems?.call();
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        if (widget.organization != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.collections,
-                            child: Text(strings.get('library.collections')),
-                          ),
-                        if (widget.onWorkspaces != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.workspaces,
-                            child: Text(strings.get('library.workspaces')),
-                          ),
-                        if (widget.onImportFolder != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.importFolder,
-                            child: Text(strings.get('library.importFolder')),
-                          ),
-                        if (widget.onRecoverFolder != null &&
-                            widget.controller.documents.any(
-                              (document) => document.isMissing,
-                            ))
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.recover,
-                            child: Text(strings.get('library.recoverMoved')),
-                          ),
-                        if (widget.onGlobalSearch != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.globalSearch,
-                            child: Text(strings.get('library.globalSearch')),
-                          ),
-                        if (widget.onAnnotations != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.annotations,
-                            child: Text(strings.get('annotations.globalTitle')),
-                          ),
-                        if (widget.onAutomations != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.automations,
-                            child: Text(strings.get('automation.title')),
-                          ),
-                        if (widget.onProblems != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.problems,
-                            child: Text(strings.get('problems.title')),
-                          ),
-                        if (widget.enrichment != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.enrich,
-                            child: Text(strings.get('library.analyzeMetadata')),
-                          ),
-                        if (widget.enrichment != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.reanalyze,
-                            child: Text(strings.get('library.reanalyze')),
-                          ),
-                        if (widget.fileValidation != null)
-                          PopupMenuItem(
-                            value: _LibraryAppMenuAction.checkFiles,
-                            child: Text(strings.libraryCheckFiles),
-                          ),
-                      ],
-                      icon: const Icon(Icons.more_horiz_rounded),
-                    ),
-                    if (compactHeader)
-                      Tooltip(
-                        message: '${strings.libraryOpenPdf} (Ctrl+O)',
-                        child: Semantics(
-                          button: true,
-                          label: strings.libraryOpenPdf,
-                          child: FilledButton(
-                            key: const Key('library-open-button'),
-                            onPressed: widget.onPickDocument,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.square(
-                                AppSizes.desktopControlExtent,
-                              ),
-                              padding: EdgeInsets.zero,
-                            ),
-                            child: const Icon(
-                              Icons.file_open_outlined,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      )
-                    else
-                      FilledButton.icon(
-                        key: const Key('library-open-button'),
-                        onPressed: widget.onPickDocument,
-                        icon: const Icon(Icons.file_open_outlined, size: 18),
-                        label: Text(strings.libraryOpenPdf),
-                      ),
-                    const SizedBox(width: AppSpacing.space4),
-                    IconButton(
-                      tooltip: strings.settingsTitle,
-                      onPressed: widget.onOpenSettings,
-                      icon: const Icon(Icons.tune_rounded),
-                    ),
-                    const SizedBox(width: AppSpacing.space8),
-                  ],
-                ),
-                body: Stack(
+          child: Scaffold(
+            backgroundColor: context.appColors.libraryBackground,
+            appBar: AppBar(
+              backgroundColor: context.appColors.libraryBackground,
+              surfaceTintColor: Colors.transparent,
+              shape: const Border(),
+              toolbarHeight: AppSizes.libraryHeaderHeight,
+              title: ListenableBuilder(
+                listenable: Listenable.merge([
+                  widget.controller,
+                  if (widget.enrichment != null) widget.enrichment!,
+                  if (widget.fileValidation != null) widget.fileValidation!,
+                ]),
+                builder: (context, _) => Row(
                   children: [
-                    ListenableBuilder(
-                      listenable: Listenable.merge([
-                        widget.controller,
-                        if (widget.organization != null) widget.organization!,
-                      ]),
-                      builder: (context, _) => _LibraryBody(
-                        controller: widget.controller,
-                        onOpenPath: widget.onOpenPath,
-                        onPickDocument: widget.onPickDocument,
-                        showRecents: widget.showRecents,
-                        readingState: _readingState,
-                        onReadingStateChanged: (value) {
-                          setState(() => _readingState = value);
-                          widget.onReadingFilterChanged?.call(value);
-                        },
-                        onBulkOperation: widget.onBulkOperation,
-                        onDocumentInfo: widget.onDocumentInfo,
-                        onRelocateDocument: widget.onRelocateDocument,
-                        onToggleFavorite: widget.onToggleFavorite,
-                        onChangeCover: widget.onChangeCover,
-                        onRevealDocument: widget.onRevealDocument,
-                        onRemoveDocument: widget.onRemoveDocument,
-                        onReanalyzeDocument: widget.enrichment == null
-                            ? null
-                            : (document) async {
-                                await widget.enrichment!.reanalyzeDocuments([
-                                  document,
-                                ]);
-                                await widget.controller.reload();
-                              },
-                        onDocumentVisible: widget.onDocumentVisible,
-                        onDocumentHidden: widget.onDocumentHidden,
-                        collections:
-                            widget.organization?.collections ?? const [],
-                        tags: widget.organization?.tags ?? const [],
-                        collectionMemberships:
-                            widget.organization?.collectionMemberships ??
-                            const {},
-                        tagMemberships:
-                            widget.organization?.tagMemberships ?? const {},
-                        recentlyClosed: widget.recentlyClosed,
-                        onRestoreClosed: widget.onRestoreClosed,
-                        onDismissClosed: widget.onDismissClosed,
-                        onReread: widget.onReread,
-                        onMarkFinished: widget.onMarkFinished,
-                        readingGoal: widget.readingGoal,
-                        onSetReadingGoal: widget.onSetReadingGoal,
-                        continuity: widget.continuity,
-                        onOpenNext: widget.onOpenNext,
-                        onResumeSession: widget.onResumeSession,
-                        onDiscardContext: widget.onDiscardContext,
-                        onProblems: widget.onProblems,
+                    Image.asset(
+                      'assets/branding/yamantaka-logo-purple.png',
+                      width: 36,
+                      height: 36,
+                      excludeFromSemantics: true,
+                    ),
+                    const SizedBox(width: AppSpacing.space12),
+                    Flexible(
+                      child: Text(
+                        strings.libraryTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
                     ),
-                    if (_dragging)
-                      Positioned.fill(
-                        child: ColoredBox(
-                          color: context.appColors.accentSoft.withValues(
-                            alpha: 0.92,
-                          ),
-                          child: Center(
-                            child: Semantics(
-                              liveRegion: true,
-                              label: strings.get('library.dropPdf'),
-                              child: _DropMessage(
-                                message: strings.get('library.dropPdf'),
-                              ),
-                            ),
-                          ),
+                    if (!compactHeader) ...[
+                      const SizedBox(width: AppSpacing.space12),
+                      Text(
+                        strings.count(
+                          'count.documents',
+                          widget.controller.libraryDocumentCount,
                         ),
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
+                    ],
                   ],
                 ),
               ),
+              actions: [
+                if (widget.showRecents && widget.recentlyClosed.isNotEmpty)
+                  RecentlyClosedStrip(
+                    entries: widget.recentlyClosed
+                        .take(8)
+                        .toList(growable: false),
+                    onRestore: widget.onRestoreClosed,
+                    onDismiss: widget.onDismissClosed,
+                  ),
+                if (widget.enrichment?.progress.isRunning == true)
+                  IconButton(
+                    tooltip: strings.get('library.cancelAnalysis'),
+                    onPressed: widget.enrichment!.cancel,
+                    icon: const Icon(Icons.stop_circle_outlined),
+                  ),
+                if (widget.fileValidation?.progress.isRunning == true)
+                  IconButton(
+                    tooltip: strings.get('action.cancel'),
+                    onPressed: widget.fileValidation!.cancel,
+                    icon: const Icon(Icons.stop_circle_outlined),
+                  ),
+                if (widget.safeMode)
+                  Tooltip(
+                    message: strings.get('library.safeMode'),
+                    child: const Padding(
+                      padding: EdgeInsets.all(AppSpacing.space12),
+                      child: Icon(Icons.health_and_safety_outlined),
+                    ),
+                  ),
+                PopupMenuButton<_LibraryAppMenuAction>(
+                  tooltip: strings.get('library.organizeMore'),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _LibraryAppMenuAction.collections:
+                        _showCollections();
+                      case _LibraryAppMenuAction.workspaces:
+                        widget.onWorkspaces?.call();
+                      case _LibraryAppMenuAction.importFolder:
+                        widget.onImportFolder?.call();
+                      case _LibraryAppMenuAction.recover:
+                        widget.onRecoverFolder?.call();
+                      case _LibraryAppMenuAction.globalSearch:
+                        widget.onGlobalSearch?.call();
+                      case _LibraryAppMenuAction.enrich:
+                        widget.enrichment?.analyzePending();
+                      case _LibraryAppMenuAction.reanalyze:
+                        unawaited(_reanalyzeLibrary());
+                      case _LibraryAppMenuAction.checkFiles:
+                        unawaited(_checkFiles());
+                      case _LibraryAppMenuAction.annotations:
+                        widget.onAnnotations?.call();
+                      case _LibraryAppMenuAction.automations:
+                        widget.onAutomations?.call();
+                      case _LibraryAppMenuAction.problems:
+                        widget.onProblems?.call();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (widget.organization != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.collections,
+                        child: Text(strings.get('library.collections')),
+                      ),
+                    if (widget.onWorkspaces != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.workspaces,
+                        child: Text(strings.get('library.workspaces')),
+                      ),
+                    if (widget.onImportFolder != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.importFolder,
+                        child: Text(strings.get('library.importFolder')),
+                      ),
+                    if (widget.onRecoverFolder != null &&
+                        widget.controller.documents.any(
+                          (document) => document.isMissing,
+                        ))
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.recover,
+                        child: Text(strings.get('library.recoverMoved')),
+                      ),
+                    if (widget.onGlobalSearch != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.globalSearch,
+                        child: Text(strings.get('library.globalSearch')),
+                      ),
+                    if (widget.onAnnotations != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.annotations,
+                        child: Text(strings.get('annotations.globalTitle')),
+                      ),
+                    if (widget.onAutomations != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.automations,
+                        child: Text(strings.get('automation.title')),
+                      ),
+                    if (widget.onProblems != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.problems,
+                        child: Text(strings.get('problems.title')),
+                      ),
+                    if (widget.enrichment != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.enrich,
+                        child: Text(strings.get('library.analyzeMetadata')),
+                      ),
+                    if (widget.enrichment != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.reanalyze,
+                        child: Text(strings.get('library.reanalyze')),
+                      ),
+                    if (widget.fileValidation != null)
+                      PopupMenuItem(
+                        value: _LibraryAppMenuAction.checkFiles,
+                        child: Text(strings.libraryCheckFiles),
+                      ),
+                  ],
+                  icon: const Icon(Icons.more_horiz_rounded),
+                ),
+                if (compactHeader)
+                  Tooltip(
+                    message: '${strings.libraryOpenPdf} (Ctrl+O)',
+                    child: Semantics(
+                      button: true,
+                      label: strings.libraryOpenPdf,
+                      child: FilledButton(
+                        key: const Key('library-open-button'),
+                        onPressed: widget.onPickDocument,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.square(
+                            AppSizes.desktopControlExtent,
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                        child: const Icon(Icons.file_open_outlined, size: 18),
+                      ),
+                    ),
+                  )
+                else
+                  FilledButton.icon(
+                    key: const Key('library-open-button'),
+                    onPressed: widget.onPickDocument,
+                    icon: const Icon(Icons.file_open_outlined, size: 18),
+                    label: Text(strings.libraryOpenPdf),
+                  ),
+                const SizedBox(width: AppSpacing.space4),
+                IconButton(
+                  tooltip: strings.settingsTitle,
+                  onPressed: widget.onOpenSettings,
+                  icon: const Icon(Icons.tune_rounded),
+                ),
+                const SizedBox(width: AppSpacing.space8),
+              ],
+            ),
+            body: Stack(
+              children: [
+                ListenableBuilder(
+                  listenable: Listenable.merge([
+                    widget.controller,
+                    if (widget.organization != null) widget.organization!,
+                  ]),
+                  builder: (context, _) => Row(
+                    children: [
+                      if (MediaQuery.sizeOf(context).width >= 1100)
+                        _LibraryNavigation(
+                          controller: widget.controller,
+                          collections:
+                              widget.organization?.collections ?? const [],
+                          onCollections: widget.organization == null
+                              ? null
+                              : _showCollections,
+                          onWorkspaces: widget.onWorkspaces,
+                          onGlobalSearch: widget.onGlobalSearch,
+                          onAnnotations: widget.onAnnotations,
+                          onProblems: widget.onProblems,
+                          onOpenSettings: widget.onOpenSettings,
+                          onReadingStateChanged: (value) {
+                            setState(() => _readingState = value);
+                            widget.onReadingFilterChanged?.call(value);
+                          },
+                        ),
+                      Expanded(
+                        child: _LibraryBody(
+                          controller: widget.controller,
+                          onOpenPath: widget.onOpenPath,
+                          onPickDocument: widget.onPickDocument,
+                          showRecents: widget.showRecents,
+                          readingState: _readingState,
+                          onReadingStateChanged: (value) {
+                            setState(() => _readingState = value);
+                            widget.onReadingFilterChanged?.call(value);
+                          },
+                          onBulkOperation: widget.onBulkOperation,
+                          onDocumentInfo: widget.onDocumentInfo,
+                          onRelocateDocument: widget.onRelocateDocument,
+                          onToggleFavorite: widget.onToggleFavorite,
+                          onChangeCover: widget.onChangeCover,
+                          onRevealDocument: widget.onRevealDocument,
+                          onRemoveDocument: widget.onRemoveDocument,
+                          onReanalyzeDocument: widget.enrichment == null
+                              ? null
+                              : (document) async {
+                                  await widget.enrichment!.reanalyzeDocuments([
+                                    document,
+                                  ]);
+                                  await widget.controller.reload();
+                                },
+                          onDocumentVisible: widget.onDocumentVisible,
+                          onDocumentHidden: widget.onDocumentHidden,
+                          collections:
+                              widget.organization?.collections ?? const [],
+                          tags: widget.organization?.tags ?? const [],
+                          collectionMemberships:
+                              widget.organization?.collectionMemberships ??
+                              const {},
+                          tagMemberships:
+                              widget.organization?.tagMemberships ?? const {},
+                          recentlyClosed: widget.recentlyClosed,
+                          onRestoreClosed: widget.onRestoreClosed,
+                          onDismissClosed: widget.onDismissClosed,
+                          onReread: widget.onReread,
+                          onMarkFinished: widget.onMarkFinished,
+                          readingGoal: widget.readingGoal,
+                          onSetReadingGoal: widget.onSetReadingGoal,
+                          continuity: widget.continuity,
+                          onOpenNext: widget.onOpenNext,
+                          onResumeSession: widget.onResumeSession,
+                          onDiscardContext: widget.onDiscardContext,
+                          onProblems: widget.onProblems,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_dragging)
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: context.appColors.accentSoft.withValues(
+                        alpha: 0.92,
+                      ),
+                      child: Center(
+                        child: Semantics(
+                          liveRegion: true,
+                          label: strings.get('library.dropPdf'),
+                          child: _DropMessage(
+                            message: strings.get('library.dropPdf'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -825,10 +769,10 @@ final class _LibraryBody extends StatelessWidget {
     final continueReading = controller.continueReading;
     return Column(
       children: [
-        if (showRecents)
+        if (showRecents && !continuity.isEmpty)
           ContinuityCenter(
             summary: continuity,
-            hasActiveReading: continueReading != null,
+            hasActiveReading: false,
             hasRecentlyClosed: recentlyClosed.isNotEmpty,
             onContinue: continueReading == null
                 ? null
@@ -855,12 +799,6 @@ final class _LibraryBody extends StatelessWidget {
             onSetGoal: onSetReadingGoal == null
                 ? null
                 : () => onSetReadingGoal!(continueReading),
-          ),
-        if (showRecents && recentlyClosed.isNotEmpty)
-          RecentlyClosedStrip(
-            entries: recentlyClosed.take(3).toList(growable: false),
-            onRestore: onRestoreClosed,
-            onDismiss: onDismissClosed,
           ),
         Expanded(
           child: controller.libraryDocumentCount == 0
@@ -954,133 +892,84 @@ final class ContinuityCenter extends StatelessWidget {
         ];
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.space16,
-          AppSpacing.space12,
-          AppSpacing.space16,
-          AppSpacing.space8,
+      child: ExpansionTile(
+        key: const PageStorageKey('library-session-details'),
+        leading: const Icon(Icons.history_rounded, size: 20),
+        title: Text(
+          strings.get('continuity.title'),
+          style: theme.textTheme.bodyMedium,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final heading = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      strings.get('continuity.title'),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    Text(
-                      summary.isEmpty
-                          ? strings.get('continuity.empty')
-                          : strings.get('continuity.description'),
-                      maxLines: constraints.maxWidth < 720 ? 3 : 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                );
-                final actions = Wrap(
-                  spacing: AppSpacing.space8,
-                  runSpacing: AppSpacing.space8,
-                  alignment: constraints.maxWidth < 720
-                      ? WrapAlignment.start
-                      : WrapAlignment.end,
-                  children: [
-                    if (hasActiveReading)
-                      FilledButton.tonalIcon(
-                        key: const Key('continuity-continue'),
-                        onPressed: onContinue,
-                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                        label: Text(strings.get('continuity.continue')),
-                      ),
-                    if (onOpenNext != null)
-                      OutlinedButton.icon(
-                        key: const Key('continuity-open-next'),
-                        onPressed: onOpenNext,
-                        icon: const Icon(Icons.skip_next_rounded, size: 18),
-                        label: Text(strings.get('continuity.openNext')),
-                      ),
-                    if (onResumeSession != null)
-                      TextButton.icon(
-                        key: const Key('continuity-resume'),
-                        onPressed: onResumeSession,
-                        icon: const Icon(Icons.restore_rounded, size: 18),
-                        label: Text(strings.get('continuity.resume')),
-                      ),
-                    if ((hasActiveReading || hasRecentlyClosed) &&
-                        onDiscardContext != null)
-                      IconButton(
-                        key: const Key('continuity-discard'),
-                        tooltip: strings.get('continuity.discard'),
-                        onPressed: onDiscardContext,
-                        icon: const Icon(Icons.layers_clear_outlined),
-                      ),
-                  ],
-                );
-                if (constraints.maxWidth < 720) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      heading,
-                      const SizedBox(height: AppSpacing.space8),
-                      actions,
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: heading),
-                    const SizedBox(width: AppSpacing.space12),
-                    Flexible(child: actions),
-                  ],
-                );
-              },
+        tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * .35,
             ),
-            const SizedBox(height: AppSpacing.space8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
+            child: SingleChildScrollView(
+              key: const PageStorageKey('library-session-scroll'),
+              primary: false,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final stat in stats)
-                    Padding(
-                      padding: const EdgeInsets.only(right: AppSpacing.space16),
-                      child: Semantics(
-                        button: stat.tap != null,
-                        label: '${stat.label}: ${stat.value}',
-                        child: InkWell(
-                          onTap: stat.tap,
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.space4,
-                              vertical: AppSpacing.space4,
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(stat.icon, size: 16),
-                                const SizedBox(width: AppSpacing.space4),
-                                Text(
-                                  '${stat.value} ${stat.label}',
-                                  style: theme.textTheme.labelMedium,
-                                ),
-                              ],
-                            ),
-                          ),
+                  Wrap(
+                    spacing: AppSpacing.space8,
+                    runSpacing: AppSpacing.space8,
+                    children: [
+                      if (hasActiveReading)
+                        FilledButton.tonalIcon(
+                          key: const Key('continuity-continue'),
+                          onPressed: onContinue,
+                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                          label: Text(strings.get('continuity.continue')),
                         ),
-                      ),
-                    ),
+                      if (onOpenNext != null)
+                        OutlinedButton.icon(
+                          key: const Key('continuity-open-next'),
+                          onPressed: onOpenNext,
+                          icon: const Icon(Icons.skip_next_rounded, size: 18),
+                          label: Text(strings.get('continuity.openNext')),
+                        ),
+                      if (onResumeSession != null)
+                        TextButton.icon(
+                          key: const Key('continuity-resume'),
+                          onPressed: onResumeSession,
+                          icon: const Icon(Icons.restore_rounded, size: 18),
+                          label: Text(strings.get('continuity.resume')),
+                        ),
+                      if ((hasActiveReading || hasRecentlyClosed) &&
+                          onDiscardContext != null)
+                        TextButton.icon(
+                          key: const Key('continuity-discard'),
+                          onPressed: onDiscardContext,
+                          icon: const Icon(
+                            Icons.layers_clear_outlined,
+                            size: 18,
+                          ),
+                          label: Text(strings.get('continuity.discard')),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.space8),
+                  Wrap(
+                    spacing: AppSpacing.space8,
+                    runSpacing: AppSpacing.space4,
+                    children: [
+                      for (final stat in stats.where((stat) => stat.value > 0))
+                        TextButton.icon(
+                          onPressed: stat.tap,
+                          icon: Icon(stat.icon, size: 16),
+                          label: Text('${stat.label}: ${stat.value}'),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1158,103 +1047,129 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
           }
           return KeyEventResult.ignored;
         },
-        child: GestureDetector(
-          onSecondaryTapDown: (details) =>
-              _showContextMenu(context, details.globalPosition),
-          child: Material(
-            color: context.appColors.surfaceSecondary,
-            child: InkWell(
-              key: const Key('continue-reading-strip'),
-              onTap: widget.onOpen,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.space20,
-                  AppSpacing.space8,
-                  AppSpacing.space12,
-                  AppSpacing.space8,
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final compact = constraints.maxWidth < 720;
-                    return Row(
-                      children: [
-                        Container(
-                          width: 3,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: context.appColors.focusRing,
-                            borderRadius: BorderRadius.circular(
-                              AppRadii.indicator,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: GestureDetector(
+            onSecondaryTapDown: (details) =>
+                _showContextMenu(context, details.globalPosition),
+            child: Material(
+              color: context.appColors.surfacePrimary,
+              borderRadius: BorderRadius.circular(AppRadii.panel),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadii.panel),
+                key: const Key('continue-reading-strip'),
+                onTap: widget.onOpen,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.space20,
+                    AppSpacing.space8,
+                    AppSpacing.space12,
+                    AppSpacing.space8,
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 720;
+                      final largeText =
+                          MediaQuery.textScalerOf(context).scale(1) > 1.5;
+                      return Row(
+                        children: [
+                          Container(
+                            width: 4,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: context.appColors.focusRing,
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.indicator,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.space12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                strings.get('library.continueReading'),
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(
-                                      color: context.appColors.textMuted,
-                                      fontWeight: FontWeight.w600,
+                          const SizedBox(width: AppSpacing.space12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  strings.get('library.continueReading'),
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: context.appColors.textMuted,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                                Text(
+                                  document.effectiveTitle,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                  maxLines: compact ? 1 : 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: AppSpacing.space8),
+                                SizedBox(
+                                  width: 240,
+                                  child: LinearProgressIndicator(
+                                    value: document.readingProgress,
+                                    minHeight: 3,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.space4),
+                                Text(
+                                  progress,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                if (widget.goal case final goal?)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: AppSpacing.space4,
                                     ),
-                              ),
-                              RichText(
-                                text: TextSpan(
-                                  text: document.effectiveTitle,
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (widget.goal case final goal?)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: AppSpacing.space4,
+                                    child: Text(
+                                      _goalLabel(strings, goal),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: context.appColors.textMuted,
+                                            fontFeatures: const [
+                                              FontFeature.tabularFigures(),
+                                            ],
+                                          ),
+                                    ),
                                   ),
-                                  child: Text(
-                                    _goalLabel(strings, goal),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: context.appColors.textMuted,
-                                          fontFeatures: const [
-                                            FontFeature.tabularFigures(),
-                                          ],
-                                        ),
-                                  ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        if (!compact) ...[
-                          const SizedBox(width: AppSpacing.space16),
-                          Text(
-                            '$progress · ${_relativeDate(document.lastOpenedAt, strings)}',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: context.appColors.textSecondary,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
-                                ),
+                          if (!compact && !largeText) ...[
+                            const SizedBox(width: AppSpacing.space16),
+                            Text(
+                              _relativeDate(document.lastOpenedAt, strings),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: context.appColors.textSecondary,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                            ),
+                          ],
+                          const SizedBox(width: AppSpacing.space12),
+                          FilledButton.icon(
+                            onPressed: widget.onOpen,
+                            icon: const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 18,
+                            ),
+                            label: Text(strings.get('action.resumeReading')),
                           ),
                         ],
-                        const SizedBox(width: AppSpacing.space12),
-                        FilledButton.icon(
-                          onPressed: widget.onOpen,
-                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                          label: Text(strings.get('action.resumeReading')),
-                        ),
-                      ],
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -1347,97 +1262,60 @@ final class RecentlyClosedStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1, 2);
-    final rowHeight = 54.0 + ((textScale - 1) * 32);
-    return Material(
-      color: context.appColors.surfacePrimary,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-            child: Text(
-              strings.get('library.recentlyClosed'),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: context.appColors.textMuted,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          SizedBox(
-            height: rowHeight,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: entries.length,
-              separatorBuilder: (_, _) => const VerticalDivider(width: 1),
-              itemBuilder: (context, index) {
-                final entry = entries[index];
-                final state = entry.isMissing
-                    ? strings.get('library.fileMissing')
-                    : entry.isModified
-                    ? strings.get('library.fileModified')
-                    : strings.get(
-                        'reader.pageNumber',
-                        parameters: {'page': entry.pageIndex + 1},
-                      );
-                return Semantics(
-                  button: true,
-                  label: '${entry.title}. $state',
-                  child: InkWell(
-                    key: ValueKey('recently-closed-${entry.documentId}'),
-                    onTap: onRestore == null ? null : () => onRestore!(entry),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      child: Padding(
+        padding: EdgeInsets.zero,
+        child: PopupMenuButton<RecentlyClosedDocument>(
+          key: const Key('library-recently-closed-menu'),
+          tooltip: strings.get('library.recentlyClosed'),
+          constraints: const BoxConstraints(minWidth: 280, maxWidth: 440),
+          onSelected: onRestore,
+          itemBuilder: (context) => [
+            for (final entry in entries)
+              PopupMenuItem(
+                key: ValueKey('recently-closed-${entry.documentId}'),
+                value: entry,
+                child: Row(
+                  children: [
+                    const Icon(Icons.restore_page_outlined, size: 20),
+                    const SizedBox(width: AppSpacing.space12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
+                          Text(
+                            entry.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
                             entry.isMissing
-                                ? Icons.link_off_rounded
-                                : Icons.restore_page_outlined,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 210),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Tooltip(
-                                  message: entry.title,
-                                  child: Text(
-                                    entry.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                ? strings.get('library.fileMissing')
+                                : strings.get(
+                                    'library.closedAtPage',
+                                    parameters: {'page': entry.pageIndex + 1},
                                   ),
-                                ),
-                                Text(
-                                  state,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.labelSmall,
-                                ),
-                              ],
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          if (onDismiss != null)
-                            IconButton(
-                              tooltip: strings.get('action.close'),
-                              onPressed: () => onDismiss!(entry),
-                              icon: const Icon(Icons.close_rounded, size: 16),
-                            ),
                         ],
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const Divider(height: 1),
-        ],
+                    if (onDismiss != null)
+                      IconButton(
+                        tooltip: strings.get('action.close'),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          onDismiss!(entry);
+                        },
+                      ),
+                  ],
+                ),
+              ),
+          ],
+          icon: const Icon(Icons.history_rounded, size: AppIconSizes.large),
+        ),
       ),
     );
   }

@@ -3,8 +3,8 @@ param(
     [string]$ExecutablePath = 'build/windows/x64/runner/Release/yamantaka.exe',
     [string]$OutputDirectory = 'build/verification/visual',
     [string]$FixturePdf = 'build/verification/corpus/normal.pdf',
-    [ValidateSet(100, 125, 150, 175, 200)]
-    [int]$HostScalePercent = 100,
+    [ValidateSet(0, 100, 125, 150, 175, 200)]
+    [int]$HostScalePercent = 0,
     [switch]$SkipLaunch,
     [switch]$ScaleConfirmed,
     [switch]$RequireSignature
@@ -13,6 +13,31 @@ param(
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
+
+$systemDpi = 96
+if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+    if (-not ('YamantakaDpiProbe' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System.Runtime.InteropServices;
+public static class YamantakaDpiProbe {
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForSystem();
+}
+'@
+    }
+    $systemDpi = [int][YamantakaDpiProbe]::GetDpiForSystem()
+}
+$detectedScalePercent = [int][Math]::Round(($systemDpi / 96.0) * 100)
+$supportedScales = @(100, 125, 150, 175, 200)
+if ($HostScalePercent -eq 0) {
+    if ($supportedScales -notcontains $detectedScalePercent) {
+        throw "Detected unsupported Windows scale: $detectedScalePercent% ($systemDpi DPI)."
+    }
+    $HostScalePercent = $detectedScalePercent
+}
+elseif ($ScaleConfirmed -and $HostScalePercent -ne $detectedScalePercent) {
+    throw "Confirmed scale $HostScalePercent% does not match Windows: $detectedScalePercent% ($systemDpi DPI)."
+}
 
 function Resolve-RepositoryPath {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -165,6 +190,7 @@ $report = [ordered]@{
     generatedAt = [DateTime]::UtcNow.ToString('o')
     executable = $executable
     hostScalePercent = $HostScalePercent
+    systemDpi = $systemDpi
     scaleConfirmed = [bool]$ScaleConfirmed
     requireSignature = [bool]$RequireSignature
     cases = @($evidence)

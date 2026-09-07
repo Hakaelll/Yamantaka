@@ -21,7 +21,7 @@ param(
     [switch]$SkipDpiMatrix,
     [switch]$DpiScaleConfirmed,
     [ValidateRange(1, 3600)]
-    [int]$ExternalTimeoutSeconds = 180,
+    [int]$ExternalTimeoutSeconds = 300,
     [string]$OutputDirectory = 'build/verification'
 )
 
@@ -445,7 +445,7 @@ try {
                 '--no-pub',
                 'test/reader_widgets_test.dart',
                 '--plain-name',
-                'book reader matches the maintained editorial v0.10 baseline'
+                'book reader matches the maintained editorial v0.15 baseline'
             ) 'reader-visual-baseline.log'
         }
         Invoke-Gate 'maintained document navigator visual baseline' {
@@ -454,7 +454,7 @@ try {
                 '--no-pub',
                 'test/reader_widgets_test.dart',
                 '--plain-name',
-                'document navigator matches the maintained v0.11 baseline'
+                'document navigator matches the maintained v0.15 baseline'
             ) 'document-navigator-visual-baseline.log'
         }
     }

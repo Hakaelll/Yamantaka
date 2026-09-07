@@ -1,10 +1,10 @@
 [CmdletBinding()]
 param(
-    [string]$BeforeDirectory = 'build/visual-evidence/v0.12.0',
-    [string]$AfterDirectory = 'build/visual-evidence/v0.13.0',
-    [string]$OutputDirectory = 'build/visual-evidence/v0.13.0/comparisons',
-    [string]$BeforeLabel = '0.12',
-    [string]$AfterLabel = '0.13'
+    [string]$BeforeDirectory = 'build/visual-evidence/v0.14.0',
+    [string]$AfterDirectory = 'build/visual-evidence/v0.15.0',
+    [string]$OutputDirectory = 'build/visual-evidence/v0.15.0/comparisons',
+    [string]$BeforeLabel = '0.14',
+    [string]$AfterLabel = '0.15'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,6 +34,7 @@ $cases = @(
     @{ name = 'reader-high-contrast'; path = 'reader/reader-document-1280x720-high-contrast-widget.png' },
     @{ name = 'reader-reduced-motion'; path = 'reader/reader-document-1280x720-reduced-motion-widget.png' },
     @{ name = 'settings-expanded'; path = 'settings/settings-1600x900-light-widget.png' },
+    @{ name = 'duplicates'; path = 'resilience/duplicate-review-200-percent.png' },
     @{ name = 'settings-dark'; path = 'settings/settings-1280x720-dark-widget.png' }
 )
 

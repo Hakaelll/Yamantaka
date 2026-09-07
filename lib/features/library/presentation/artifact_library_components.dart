@@ -17,6 +17,7 @@ Map<LibraryReadingState, int> _materializedReadingStateCounts(
 enum _LibraryViewMode { grid, list }
 
 enum _ActiveFilterKind {
+  collection,
   query,
   readingState,
   favorites,
@@ -31,6 +32,7 @@ final class _LibraryCommandBar extends StatelessWidget {
     required this.resultCount,
     required this.totalCount,
     required this.query,
+    this.collectionLabel,
     required this.counts,
     required this.readingState,
     required this.sortOrder,
@@ -54,6 +56,7 @@ final class _LibraryCommandBar extends StatelessWidget {
   final int resultCount;
   final int totalCount;
   final String query;
+  final String? collectionLabel;
   final Map<LibraryReadingState, int> counts;
   final LibraryReadingState readingState;
   final LibrarySortOrder sortOrder;
@@ -97,6 +100,16 @@ final class _LibraryCommandBar extends StatelessWidget {
             ),
           )
         : null;
+    final search = OutlinedButton.icon(
+      key: const Key('library-search-button'),
+      onPressed: onSearch,
+      icon: const Icon(Icons.search_rounded, size: 18),
+      label: Text(
+        query.isEmpty ? strings.librarySearch : query,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
     final tools = YamaToolbarGroup(
       label: strings.get('library.commandBar'),
       flat: MediaQuery.highContrastOf(context),
@@ -132,13 +145,6 @@ final class _LibraryCommandBar extends StatelessWidget {
           badge: selectedCount > 0
               ? Badge(label: Text('$selectedCount'))
               : null,
-        ),
-        YamaIconButton(
-          key: const Key('library-search-button'),
-          semanticLabel: strings.librarySearch,
-          tooltip: '${strings.librarySearch} (Ctrl+F)',
-          onPressed: onSearch,
-          icon: Icons.search_rounded,
         ),
         YamaIconButton(
           key: const Key('library-facet-button'),
@@ -218,7 +224,9 @@ final class _LibraryCommandBar extends StatelessWidget {
       builder: (context, constraints) {
         // Medium windows still need the two-row composition: the command bar
         // carries four 40 px tools plus a localized result summary.
-        final compact = constraints.maxWidth < 820;
+        final compact =
+            constraints.maxWidth < 1000 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3;
         final compactFilterContext = activeFilter
             ? Semantics(
                 label: strings.get(
@@ -250,9 +258,8 @@ final class _LibraryCommandBar extends StatelessWidget {
                   const SizedBox(height: AppSpacing.space8),
                   Row(
                     children: [
-                      if (selectedCount > 0)
-                        _LibrarySelectionCount(count: selectedCount),
-                      const Spacer(),
+                      Expanded(child: search),
+                      const SizedBox(width: AppSpacing.space12),
                       tools,
                     ],
                   ),
@@ -260,8 +267,10 @@ final class _LibraryCommandBar extends StatelessWidget {
               )
             : Row(
                 children: [
+                  Expanded(child: search),
+                  const SizedBox(width: AppSpacing.space16),
                   summary,
-                  const Spacer(),
+                  const SizedBox(width: AppSpacing.space16),
                   if (selectedCount > 0) ...[
                     _LibrarySelectionCount(count: selectedCount),
                     const SizedBox(width: AppSpacing.space8),
@@ -288,6 +297,7 @@ final class _LibraryCommandBar extends StatelessWidget {
                 const SizedBox(height: AppSpacing.space8),
                 _ActiveFilterStrip(
                   query: query,
+                  collectionLabel: collectionLabel,
                   readingState: readingState,
                   sortOrder: sortOrder,
                   favoritesOnly: favoritesOnly,
@@ -308,6 +318,7 @@ final class _LibraryCommandBar extends StatelessWidget {
 final class _ActiveFilterStrip extends StatelessWidget {
   const _ActiveFilterStrip({
     required this.query,
+    this.collectionLabel,
     required this.readingState,
     required this.sortOrder,
     required this.favoritesOnly,
@@ -318,6 +329,7 @@ final class _ActiveFilterStrip extends StatelessWidget {
   });
 
   final String query;
+  final String? collectionLabel;
   final LibraryReadingState readingState;
   final LibrarySortOrder sortOrder;
   final bool favoritesOnly;
@@ -344,6 +356,11 @@ final class _ActiveFilterStrip extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.space8),
+            if (collectionLabel != null)
+              _ActiveFilterChip(
+                label: collectionLabel!,
+                onDeleted: () => onClear(_ActiveFilterKind.collection),
+              ),
             if (query.isNotEmpty)
               _ActiveFilterChip(
                 label: '“$query”',
@@ -698,7 +715,10 @@ final class _ArtifactCanvas extends StatelessWidget {
                       itemCount: entry.value.length,
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: metrics.columns,
-                        mainAxisExtent: metrics.cellExtent,
+                        mainAxisExtent:
+                            metrics.cellExtent +
+                            38 *
+                                (MediaQuery.textScalerOf(context).scale(1) - 1),
                         mainAxisSpacing: AppSpacing.space16,
                         crossAxisSpacing: AppSpacing.space16,
                       ),
@@ -754,7 +774,11 @@ final class _ArtifactCanvas extends StatelessWidget {
                       for (final document in documents)
                         SizedBox(
                           width: metrics.artifactWidth,
-                          height: metrics.cellExtent,
+                          height:
+                              metrics.cellExtent +
+                              38 *
+                                  (MediaQuery.textScalerOf(context).scale(1) -
+                                      1),
                           child: Center(
                             child: _artifact(document, metrics.artifactWidth),
                           ),
@@ -780,7 +804,9 @@ final class _ArtifactCanvas extends StatelessWidget {
                 itemCount: documents.length,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: metrics.columns,
-                  mainAxisExtent: metrics.cellExtent,
+                  mainAxisExtent:
+                      metrics.cellExtent +
+                      38 * (MediaQuery.textScalerOf(context).scale(1) - 1),
                   mainAxisSpacing: AppSpacing.space16,
                   crossAxisSpacing: AppSpacing.space16,
                 ),
@@ -1401,12 +1427,10 @@ final class _ArtifactListCover extends StatelessWidget {
       ),
       child: path == null
           ? Center(
-              child: Text(
-                'PDF',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: context.appColors.textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Icon(
+                Icons.description_outlined,
+                size: 18,
+                color: context.appColors.textMuted,
               ),
             )
           : Image.file(
@@ -1481,32 +1505,8 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    final jitter = LibraryArtifactLayout.jitterFor(widget.document.id);
     final highContrast = MediaQuery.highContrastOf(context);
-    final applyJitter =
-        !widget.reduceMotion &&
-        !highContrast &&
-        !widget.selectionMode &&
-        !widget.selected;
-    final scale = widget.reduceMotion
-        ? 1.0
-        : widget.selected
-        ? AppSizes.artifactSelectedScale
-        : _hovered
-        ? AppSizes.artifactHoverScale
-        : jitter.scale;
-    final elevation = widget.selected
-        ? AppSizes.artifactSelectedLift
-        : _hovered
-        ? AppSizes.artifactHoverLift
-        : 0.0;
-    final aspectRatio =
-        widget.document.coverMetadata?.pageAspectRatio.clamp(0.25, 3.2) ??
-        0.704;
-    final height = widget.width / aspectRatio;
-    final maxHeight = widget.width * 1.42;
-    final fittedHeight = math.min(height, maxHeight);
-    final duration = widget.reduceMotion ? Duration.zero : AppMotion.standard;
+    final fittedHeight = widget.width * 1.42;
     final coverPath = artifactCoverPathFor(
       widget.document,
       selected: widget.selected,
@@ -1550,350 +1550,288 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
               onDoubleTap: widget.onOpen,
               onSecondaryTapDown: (details) =>
                   widget.onMenu(details.globalPosition),
-              child: Transform.translate(
-                offset: applyJitter
-                    ? Offset(jitter.offsetX, jitter.offsetY)
-                    : Offset.zero,
-                child: Transform.rotate(
-                  angle: applyJitter
-                      ? jitter.rotationDegrees * math.pi / 180
-                      : 0,
-                  child: AnimatedScale(
-                    duration: duration,
-                    curve: Curves.easeOutCubic,
-                    scale: scale,
-                    child: SizedBox(
-                      width: widget.width,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              if (_focused)
-                                Positioned.fill(
-                                  left: -3,
-                                  top: -3,
-                                  right: -3,
-                                  bottom: -3,
-                                  child: IgnorePointer(
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: context.appColors.focusRing,
-                                          width: 2,
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          AppRadii.page + 3,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              AnimatedContainer(
-                                // Grid reflow changes the cover dimensions. A
-                                // layout tween can temporarily exceed the new
-                                // cell when filters alter the column count.
-                                duration: Duration.zero,
-                                curve: Curves.easeOutCubic,
-                                transform: Matrix4.translationValues(
-                                  0,
-                                  -elevation,
-                                  0,
-                                ),
-                                width: widget.width,
-                                height: fittedHeight,
+              child: SizedBox(
+                width: widget.width,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        if (_focused)
+                          Positioned.fill(
+                            left: -3,
+                            top: -3,
+                            right: -3,
+                            bottom: -3,
+                            child: IgnorePointer(
+                              child: DecoratedBox(
                                 decoration: BoxDecoration(
-                                  color: context.appColors.surfaceSunken,
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadii.page,
-                                  ),
                                   border: Border.all(
-                                    color: widget.selected
-                                        ? context
-                                              .appColors
-                                              .librarySelectionAccent
-                                        : context.appColors.borderSubtle,
-                                    width: widget.selected ? 1.5 : 1,
+                                    color: context.appColors.focusRing,
+                                    width: 2,
                                   ),
-                                  boxShadow: widget.reduceMotion || highContrast
-                                      ? null
-                                      : [
-                                          if (widget.selected)
-                                            BoxShadow(
-                                              color: context
-                                                  .appColors
-                                                  .librarySelectionAccent
-                                                  .withValues(alpha: 0.24),
-                                              blurRadius:
-                                                  AppShadow.artifactGlowBlur,
-                                              spreadRadius:
-                                                  AppShadow.artifactGlowSpread,
-                                              offset: const Offset(0, 12),
-                                            ),
-                                          BoxShadow(
-                                            color: context
-                                                .appColors
-                                                .readerPageShadow
-                                                .withValues(
-                                                  alpha: widget.selected
-                                                      ? 0.72
-                                                      : 0.38,
-                                                ),
-                                            blurRadius: widget.selected
-                                                ? AppShadow.artifactSelectedBlur
-                                                : AppShadow.artifactRestBlur,
-                                            spreadRadius: widget.selected
-                                                ? 1
-                                                : 0,
-                                            offset: Offset(
-                                              0,
-                                              widget.selected
-                                                  ? AppShadow
-                                                        .artifactSelectedOffset
-                                                  : AppShadow
-                                                        .artifactRestOffset,
-                                            ),
-                                          ),
-                                        ],
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    AnimatedOpacity(
-                                      duration: duration,
-                                      opacity: widget.document.isMissing
-                                          ? 0.56
-                                          : 1,
-                                      child: coverPath == null
-                                          ? _ArtifactPlaceholder(
-                                              document: widget.document,
-                                            )
-                                          : ColorFiltered(
-                                              colorFilter: ColorFilter.matrix(
-                                                _saturationMatrix(1),
-                                              ),
-                                              child: Image.file(
-                                                File(coverPath),
-                                                fit: BoxFit.contain,
-                                                cacheWidth:
-                                                    (widget.width *
-                                                            MediaQuery.devicePixelRatioOf(
-                                                              context,
-                                                            ))
-                                                        .ceil(),
-                                                cacheHeight:
-                                                    (fittedHeight *
-                                                            MediaQuery.devicePixelRatioOf(
-                                                              context,
-                                                            ))
-                                                        .ceil(),
-                                                gaplessPlayback: true,
-                                                filterQuality:
-                                                    FilterQuality.low,
-                                                errorBuilder: (_, _, _) =>
-                                                    _ArtifactPlaceholder(
-                                                      document: widget.document,
-                                                      failed: true,
-                                                    ),
-                                              ),
-                                            ),
-                                    ),
-                                    if (widget.document.readingProgress > 0 &&
-                                        widget.document.readingProgress < 1)
-                                      Align(
-                                        alignment: Alignment.bottomCenter,
-                                        child: ColoredBox(
-                                          color: context.appColors.textMuted
-                                              .withValues(alpha: 0.28),
-                                          child: const SizedBox(
-                                            width: double.infinity,
-                                            height: 4,
-                                          ),
-                                        ),
-                                      ),
-                                    if (widget.document.readingProgress > 0 &&
-                                        widget.document.readingProgress < 1)
-                                      Align(
-                                        alignment: Alignment.bottomLeft,
-                                        child: FractionallySizedBox(
-                                          widthFactor:
-                                              widget.document.readingProgress,
-                                          child: ColoredBox(
-                                            color: widget.selected
-                                                ? context
-                                                      .appColors
-                                                      .librarySelectionAccent
-                                                : context
-                                                      .appColors
-                                                      .textSecondary,
-                                            child: const SizedBox(height: 4),
-                                          ),
-                                        ),
-                                      ),
-                                    if (widget.document.readingProgress >= 1)
-                                      Positioned(
-                                        right: AppSpacing.space8,
-                                        bottom: AppSpacing.space8,
-                                        child: Tooltip(
-                                          message: strings.get(
-                                            'library.finished',
-                                          ),
-                                          child: Container(
-                                            width: 12,
-                                            height: 12,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: context
-                                                    .appColors
-                                                    .textPrimary,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    if (widget.document.isFavorite)
-                                      Positioned(
-                                        right: AppSpacing.space6,
-                                        top: AppSpacing.space6,
-                                        child: Tooltip(
-                                          message: strings.get(
-                                            'library.favorite',
-                                          ),
-                                          child: Icon(
-                                            Icons.bookmark_rounded,
-                                            size: 17,
-                                            color:
-                                                context.appColors.textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                    if (!widget.selectionMode &&
-                                        widget.document.hasFileChanged)
-                                      Positioned(
-                                        left: AppSpacing.space6,
-                                        top: AppSpacing.space6,
-                                        child: _ArtifactStateMarker(
-                                          icon: Icons.sync_problem_rounded,
-                                          label: strings.get(
-                                            'library.fileChanged',
-                                          ),
-                                          tone: AppStatusTone.warning,
-                                        ),
-                                      )
-                                    else if (!widget.selectionMode &&
-                                        enrichmentStatus != null &&
-                                        enrichmentStatus !=
-                                            EnrichmentStatus.completed &&
-                                        enrichmentStatus !=
-                                            EnrichmentStatus.noText)
-                                      Positioned(
-                                        left: AppSpacing.space6,
-                                        top: AppSpacing.space6,
-                                        child: _ArtifactStateMarker(
-                                          icon: switch (enrichmentStatus) {
-                                            EnrichmentStatus.pending =>
-                                              Icons.hourglass_empty_rounded,
-                                            EnrichmentStatus.analyzing =>
-                                              Icons.sync_rounded,
-                                            EnrichmentStatus.review =>
-                                              Icons.fact_check_outlined,
-                                            EnrichmentStatus.failed =>
-                                              Icons.error_outline_rounded,
-                                            _ => Icons.info_outline_rounded,
-                                          },
-                                          label: switch (enrichmentStatus) {
-                                            EnrichmentStatus.pending =>
-                                              strings.get(
-                                                'library.analysisPending',
-                                              ),
-                                            EnrichmentStatus.analyzing =>
-                                              strings.get(
-                                                'library.analysisInProgress',
-                                              ),
-                                            EnrichmentStatus.review =>
-                                              strings.get(
-                                                'library.metadataNeedsReview',
-                                              ),
-                                            EnrichmentStatus.failed =>
-                                              strings.get(
-                                                'library.analysisFailed',
-                                              ),
-                                            _ => strings.get(
-                                              'library.analyzeMetadata',
-                                            ),
-                                          },
-                                          tone:
-                                              enrichmentStatus ==
-                                                  EnrichmentStatus.failed
-                                              ? AppStatusTone.error
-                                              : enrichmentStatus ==
-                                                    EnrichmentStatus.review
-                                              ? AppStatusTone.warning
-                                              : AppStatusTone.neutral,
-                                        ),
-                                      ),
-                                    if (widget.selectionMode && widget.selected)
-                                      Positioned(
-                                        left: AppSpacing.space8,
-                                        top: AppSpacing.space8,
-                                        child: DecoratedBox(
-                                          decoration: BoxDecoration(
-                                            color: context
-                                                .appColors
-                                                .surfacePrimary,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: context
-                                                  .appColors
-                                                  .librarySelectionAccent,
-                                            ),
-                                          ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(2),
-                                            child: Icon(
-                                              Icons.check_rounded,
-                                              size: 16,
-                                              color: context
-                                                  .appColors
-                                                  .librarySelectionAccent,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadii.page + 3,
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.space6),
-                          Tooltip(
-                            message: widget.document.effectiveTitle,
-                            child: Text(
-                              widget.document.effectiveTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    color: widget.selected
-                                        ? context
-                                              .appColors
-                                              .librarySelectionAccent
-                                        : context.appColors.textSecondary,
-                                    fontWeight: widget.selected
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                  ),
                             ),
                           ),
-                        ],
+                        Container(
+                          // Grid reflow changes the cover dimensions. A
+                          // layout tween can temporarily exceed the new
+                          // cell when filters alter the column count.
+                          width: widget.width,
+                          height: fittedHeight,
+                          decoration: BoxDecoration(
+                            color: context.appColors.surfaceSunken,
+                            borderRadius: BorderRadius.circular(AppRadii.page),
+                            border: Border.all(
+                              color: widget.selected
+                                  ? context.appColors.librarySelectionAccent
+                                  : _hovered
+                                  ? context.appColors.borderStrong
+                                  : context.appColors.borderSubtle,
+                              width: widget.selected ? 1.5 : 1,
+                            ),
+                            boxShadow: widget.reduceMotion || highContrast
+                                ? null
+                                : [
+                                    if (widget.selected)
+                                      BoxShadow(
+                                        color: context
+                                            .appColors
+                                            .librarySelectionAccent
+                                            .withValues(alpha: 0.10),
+                                        blurRadius: AppShadow.artifactGlowBlur,
+                                        spreadRadius:
+                                            AppShadow.artifactGlowSpread,
+                                        offset: const Offset(0, 12),
+                                      ),
+                                    BoxShadow(
+                                      color: context.appColors.readerPageShadow
+                                          .withValues(
+                                            alpha: widget.selected
+                                                ? 0.16
+                                                : 0.08,
+                                          ),
+                                      blurRadius: widget.selected
+                                          ? AppShadow.artifactSelectedBlur
+                                          : AppShadow.artifactRestBlur,
+                                      spreadRadius: widget.selected ? 1 : 0,
+                                      offset: Offset(
+                                        0,
+                                        widget.selected
+                                            ? AppShadow.artifactSelectedOffset
+                                            : AppShadow.artifactRestOffset,
+                                      ),
+                                    ),
+                                  ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              coverPath == null
+                                  ? _ArtifactPlaceholder(
+                                      document: widget.document,
+                                    )
+                                  : Image.file(
+                                      File(coverPath),
+                                      fit: BoxFit.contain,
+                                      cacheWidth:
+                                          (widget.width *
+                                                  MediaQuery.devicePixelRatioOf(
+                                                    context,
+                                                  ))
+                                              .ceil(),
+                                      cacheHeight:
+                                          (fittedHeight *
+                                                  MediaQuery.devicePixelRatioOf(
+                                                    context,
+                                                  ))
+                                              .ceil(),
+                                      gaplessPlayback: true,
+                                      filterQuality: FilterQuality.medium,
+                                      errorBuilder: (_, _, _) =>
+                                          _ArtifactPlaceholder(
+                                            document: widget.document,
+                                            failed: true,
+                                          ),
+                                    ),
+                              if (widget.document.readingProgress > 0 &&
+                                  widget.document.readingProgress < 1)
+                                Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: ColoredBox(
+                                    color: context.appColors.textMuted
+                                        .withValues(alpha: 0.28),
+                                    child: const SizedBox(
+                                      width: double.infinity,
+                                      height: 4,
+                                    ),
+                                  ),
+                                ),
+                              if (widget.document.readingProgress > 0 &&
+                                  widget.document.readingProgress < 1)
+                                Align(
+                                  alignment: Alignment.bottomLeft,
+                                  child: FractionallySizedBox(
+                                    widthFactor:
+                                        widget.document.readingProgress,
+                                    child: ColoredBox(
+                                      color: widget.selected
+                                          ? context
+                                                .appColors
+                                                .librarySelectionAccent
+                                          : context.appColors.textSecondary,
+                                      child: const SizedBox(height: 4),
+                                    ),
+                                  ),
+                                ),
+                              if (widget.document.readingProgress >= 1)
+                                Positioned(
+                                  right: AppSpacing.space8,
+                                  bottom: AppSpacing.space8,
+                                  child: Tooltip(
+                                    message: strings.get('library.finished'),
+                                    child: Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: context.appColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              if (widget.document.isFavorite)
+                                Positioned(
+                                  right: AppSpacing.space6,
+                                  top: AppSpacing.space6,
+                                  child: Tooltip(
+                                    message: strings.get('library.favorite'),
+                                    child: Icon(
+                                      Icons.bookmark_rounded,
+                                      size: 17,
+                                      color: context.appColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                              if (!widget.selectionMode &&
+                                  widget.document.hasFileChanged)
+                                Positioned(
+                                  left: AppSpacing.space6,
+                                  top: AppSpacing.space6,
+                                  child: _ArtifactStateMarker(
+                                    icon: Icons.sync_problem_rounded,
+                                    label: strings.get('library.fileChanged'),
+                                    tone: AppStatusTone.warning,
+                                  ),
+                                )
+                              else if (!widget.selectionMode &&
+                                  enrichmentStatus != null &&
+                                  enrichmentStatus !=
+                                      EnrichmentStatus.completed &&
+                                  enrichmentStatus != EnrichmentStatus.noText)
+                                Positioned(
+                                  left: AppSpacing.space6,
+                                  top: AppSpacing.space6,
+                                  child: _ArtifactStateMarker(
+                                    icon: switch (enrichmentStatus) {
+                                      EnrichmentStatus.pending =>
+                                        Icons.hourglass_empty_rounded,
+                                      EnrichmentStatus.analyzing =>
+                                        Icons.sync_rounded,
+                                      EnrichmentStatus.review =>
+                                        Icons.fact_check_outlined,
+                                      EnrichmentStatus.failed =>
+                                        Icons.error_outline_rounded,
+                                      _ => Icons.info_outline_rounded,
+                                    },
+                                    label: switch (enrichmentStatus) {
+                                      EnrichmentStatus.pending => strings.get(
+                                        'library.analysisPending',
+                                      ),
+                                      EnrichmentStatus.analyzing => strings.get(
+                                        'library.analysisInProgress',
+                                      ),
+                                      EnrichmentStatus.review => strings.get(
+                                        'library.metadataNeedsReview',
+                                      ),
+                                      EnrichmentStatus.failed => strings.get(
+                                        'library.analysisFailed',
+                                      ),
+                                      _ => strings.get(
+                                        'library.analyzeMetadata',
+                                      ),
+                                    },
+                                    tone:
+                                        enrichmentStatus ==
+                                            EnrichmentStatus.failed
+                                        ? AppStatusTone.error
+                                        : enrichmentStatus ==
+                                              EnrichmentStatus.review
+                                        ? AppStatusTone.warning
+                                        : AppStatusTone.neutral,
+                                  ),
+                                ),
+                              if (widget.selectionMode && widget.selected)
+                                Positioned(
+                                  left: AppSpacing.space8,
+                                  top: AppSpacing.space8,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: context.appColors.surfacePrimary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: context
+                                            .appColors
+                                            .librarySelectionAccent,
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(2),
+                                      child: Icon(
+                                        Icons.check_rounded,
+                                        size: 16,
+                                        color: context
+                                            .appColors
+                                            .librarySelectionAccent,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.space6),
+                    SizedBox(
+                      height: 38 * MediaQuery.textScalerOf(context).scale(1),
+                      child: Tooltip(
+                        message: widget.document.effectiveTitle,
+                        child: Text(
+                          widget.document.effectiveTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.start,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: widget.selected
+                                    ? context.appColors.librarySelectionAccent
+                                    : context.appColors.textPrimary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -1943,41 +1881,107 @@ final class _ArtifactStateMarker extends StatelessWidget {
   }
 }
 
-final class _ArtifactPlaceholder extends StatelessWidget {
+final class _ArtifactPlaceholder extends StatefulWidget {
   const _ArtifactPlaceholder({required this.document, this.failed = false});
 
   final LibraryDocument document;
   final bool failed;
 
   @override
+  State<_ArtifactPlaceholder> createState() => _ArtifactPlaceholderState();
+}
+
+final class _ArtifactPlaceholderState extends State<_ArtifactPlaceholder> {
+  Object? _appearance;
+  Widget? _content;
+
+  @override
   Widget build(BuildContext context) {
-    final label = document.effectiveTitle.trim();
-    final initial = label.isEmpty
-        ? 'PDF'
-        : label.characters.first.toUpperCase();
-    return ColoredBox(
-      color: context.appColors.surfaceSunken,
-      child: Center(
+    final document = widget.document;
+    final colors = context.appColors;
+    final strings = YamantakaLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final formatLabel = document.isMissing
+        ? strings.get('library.locate')
+        : 'PDF';
+    final appearance = (
+      document.effectiveTitle,
+      document.effectiveAuthor,
+      document.isMissing,
+      widget.failed,
+      colors,
+      textTheme,
+      textScaler,
+      formatLabel,
+    );
+    // Density changes outside the cover do not change its editorial content.
+    // Keep one subtree per mounted cover, not a document/global cache.
+    if (_appearance == appearance && _content != null) return _content!;
+    _appearance = appearance;
+    final largeText = textScaler.scale(1) > 1.4;
+    return _content = DecoratedBox(
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          colors.accentSoft.withValues(alpha: 0.55),
+          colors.surfacePrimary,
+        ),
+        border: BorderDirectional(
+          start: BorderSide(
+            color: colors.accentPrimary.withValues(alpha: 0.55),
+            width: 4,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.space12),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              failed || document.isMissing ? 'PDF' : initial,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: context.appColors.textMuted,
-                fontWeight: FontWeight.w400,
+            Icon(
+              document.isMissing
+                  ? Icons.link_off_rounded
+                  : widget.failed
+                  ? Icons.broken_image_outlined
+                  : Icons.description_outlined,
+              color: colors.accentPrimary,
+              size: AppIconSizes.large,
+            ),
+            const SizedBox(height: AppSpacing.space12),
+            Expanded(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  document.effectiveTitle,
+                  maxLines: largeText ? 2 : 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: colors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
-            if (failed || document.isMissing) ...[
+            if (!largeText && document.effectiveAuthor?.isNotEmpty == true) ...[
               const SizedBox(height: AppSpacing.space8),
-              Icon(
-                document.isMissing
-                    ? Icons.link_off_rounded
-                    : Icons.broken_image_outlined,
-                size: 18,
-                color: context.appColors.textMuted,
+              Text(
+                document.effectiveAuthor!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.textSecondary),
               ),
             ],
+            const SizedBox(height: AppSpacing.space8),
+            Text(
+              formatLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: colors.textSecondary),
+            ),
           ],
         ),
       ),
@@ -2602,35 +2606,6 @@ String _artifactSemanticLabel(
     'library.artifactNotStarted',
     parameters: {'title': title},
   );
-}
-
-List<double> _saturationMatrix(double saturation) {
-  final inverse = 1 - saturation;
-  final red = 0.213 * inverse;
-  final green = 0.715 * inverse;
-  final blue = 0.072 * inverse;
-  return <double>[
-    red + saturation,
-    green,
-    blue,
-    0,
-    0,
-    red,
-    green + saturation,
-    blue,
-    0,
-    0,
-    red,
-    green,
-    blue + saturation,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    0,
-  ];
 }
 
 String _relativeArtifactDate(DateTime value, YamantakaLocalizations strings) {

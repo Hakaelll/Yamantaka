@@ -75,36 +75,36 @@ final class _StorageSummary extends StatelessWidget {
   }
 }
 
-enum _SettingsSectionId {
+enum SettingsSectionId {
   appearance(Icons.contrast_rounded),
   reading(Icons.menu_book_outlined),
-  readerBar(Icons.space_dashboard_outlined),
-  shortcuts(Icons.keyboard_outlined),
+  accessibility(Icons.accessibility_new_rounded),
   library(Icons.library_books_outlined),
-  history(Icons.history_rounded),
-  dataPrivacy(Icons.shield_outlined),
-  advanced(Icons.health_and_safety_outlined);
+  privacy(Icons.shield_outlined),
+  storage(Icons.storage_outlined),
+  recovery(Icons.restore_page_outlined),
+  diagnostics(Icons.health_and_safety_outlined);
 
-  const _SettingsSectionId(this.icon);
+  const SettingsSectionId(this.icon);
 
   final IconData icon;
 
   String label(YamantakaLocalizations strings) =>
       strings.get('settings.section.$name');
 
-  _SettingsNavGroup get group => switch (this) {
-    _SettingsSectionId.appearance ||
-    _SettingsSectionId.reading ||
-    _SettingsSectionId.readerBar ||
-    _SettingsSectionId.shortcuts => _SettingsNavGroup.preferences,
-    _SettingsSectionId.library ||
-    _SettingsSectionId.history ||
-    _SettingsSectionId.advanced => _SettingsNavGroup.maintenance,
-    _SettingsSectionId.dataPrivacy => _SettingsNavGroup.privacy,
+  SettingsNavGroup get group => switch (this) {
+    SettingsSectionId.appearance ||
+    SettingsSectionId.reading ||
+    SettingsSectionId.accessibility => SettingsNavGroup.preferences,
+    SettingsSectionId.library => SettingsNavGroup.library,
+    SettingsSectionId.privacy ||
+    SettingsSectionId.storage ||
+    SettingsSectionId.recovery => SettingsNavGroup.safety,
+    SettingsSectionId.diagnostics => SettingsNavGroup.support,
   };
 }
 
-enum _SettingsNavGroup { preferences, maintenance, privacy }
+enum SettingsNavGroup { preferences, library, safety, support }
 
 final class _SettingsSectionData {
   const _SettingsSectionData({
@@ -114,7 +114,7 @@ final class _SettingsSectionData {
     this.onReset,
   });
 
-  final _SettingsSectionId id;
+  final SettingsSectionId id;
   final String description;
   final List<Widget> children;
   final VoidCallback? onReset;
@@ -185,95 +185,108 @@ final class _DesktopSettings extends StatelessWidget {
 
   final List<_SettingsSectionData> sections;
   final AppSettings settings;
-  final _SettingsSectionId selected;
-  final ValueChanged<_SettingsSectionId> onSelected;
+  final SettingsSectionId selected;
+  final ValueChanged<SettingsSectionId> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final selectedSection = sections.firstWhere(
       (section) => section.id == selected,
     );
-    final navigationSections = [...sections]
-      ..sort(
-        (left, right) => left.id.group.index.compareTo(right.id.group.index),
-      );
-    return Row(
-      children: [
-        Container(
-          width: AppSizes.settingsNavigationWidth,
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceSecondary,
-            border: Border(
-              right: BorderSide(color: context.appColors.borderSubtle),
-            ),
-          ),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.space16,
-              AppSpacing.space24,
-              AppSpacing.space16,
-              AppSpacing.space32,
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.space12,
-                ),
-                child: Text(
-                  YamantakaLocalizations.of(
-                    context,
-                  ).get('settings.localPreferences'),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: context.appColors.textMuted,
-                  ),
+    final navigationSections = sections;
+    final navigationWidth =
+        (AppSizes.settingsNavigationWidth *
+                MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.35))
+            .clamp(
+              AppSizes.settingsNavigationWidth,
+              AppSizes.settingsNavigationMaxWidth,
+            )
+            .toDouble();
+    return Align(
+      alignment: AlignmentDirectional.topStart,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1600),
+        child: Row(
+          children: [
+            Container(
+              width: navigationWidth,
+              decoration: BoxDecoration(
+                color: context.appColors.surfaceSecondary,
+                border: BorderDirectional(
+                  end: BorderSide(color: context.appColors.borderSubtle),
                 ),
               ),
-              const SizedBox(height: AppSpacing.space12),
-              for (
-                var index = 0;
-                index < navigationSections.length;
-                index++
-              ) ...[
-                if (index == 0 ||
-                    navigationSections[index - 1].id.group !=
-                        navigationSections[index].id.group)
-                  _SettingsNavGroupLabel(
-                    group: navigationSections[index].id.group,
-                  ),
-                _SettingsNavItem(
-                  section: navigationSections[index].id,
-                  selected: selected == navigationSections[index].id,
-                  onPressed: () => onSelected(navigationSections[index].id),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.space16,
+                  AppSpacing.space24,
+                  AppSpacing.space16,
+                  AppSpacing.space32,
                 ),
-              ],
-            ],
-          ),
-        ),
-        Expanded(
-          child: _SettingsSectionView(
-            section: selectedSection,
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.pagePadding(MediaQuery.sizeOf(context).width),
-              AppSpacing.space32,
-              AppSpacing.pagePadding(MediaQuery.sizeOf(context).width),
-              AppSpacing.space64,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.space12,
+                    ),
+                    child: Text(
+                      YamantakaLocalizations.of(
+                        context,
+                      ).get('settings.localPreferences'),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: context.appColors.textMuted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.space12),
+                  for (
+                    var index = 0;
+                    index < navigationSections.length;
+                    index++
+                  ) ...[
+                    if (index == 0 ||
+                        navigationSections[index - 1].id.group !=
+                            navigationSections[index].id.group)
+                      _SettingsNavGroupLabel(
+                        group: navigationSections[index].id.group,
+                      ),
+                    _SettingsNavItem(
+                      section: navigationSections[index].id,
+                      selected: selected == navigationSections[index].id,
+                      onPressed: () => onSelected(navigationSections[index].id),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-        ),
-        Container(
-          width: AppSizes.settingsPreviewWidth,
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceSecondary,
-            border: Border(
-              left: BorderSide(color: context.appColors.borderSubtle),
+            Expanded(
+              child: _SettingsSectionView(
+                section: selectedSection,
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.pagePadding(MediaQuery.sizeOf(context).width),
+                  AppSpacing.space32,
+                  AppSpacing.pagePadding(MediaQuery.sizeOf(context).width),
+                  AppSpacing.space64,
+                ),
+              ),
             ),
-          ),
-          child: ListView(
-            padding: const EdgeInsets.all(AppSpacing.space20),
-            children: [_AppearancePreview(settings: settings, inline: false)],
-          ),
+            Container(
+              width: AppSizes.settingsPreviewWidth,
+              decoration: BoxDecoration(
+                color: context.appColors.surfaceSecondary,
+                border: BorderDirectional(
+                  start: BorderSide(color: context.appColors.borderSubtle),
+                ),
+              ),
+              child: ListView(
+                padding: const EdgeInsets.all(AppSpacing.space20),
+                children: [
+                  _AppearancePreview(settings: settings, inline: false),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -300,7 +313,7 @@ final class _CompactSettingsNavigator extends StatefulWidget {
 
 final class _CompactSettingsNavigatorState
     extends State<_CompactSettingsNavigator> {
-  _SettingsSectionId? _selected;
+  SettingsSectionId? _selected;
 
   @override
   Widget build(BuildContext context) {
@@ -318,7 +331,10 @@ final class _CompactSettingsNavigatorState
         children: [
           TextButton.icon(
             onPressed: () => setState(() => _selected = null),
-            icon: const Icon(Icons.arrow_back_rounded, size: 18),
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              size: AppIconSizes.standard,
+            ),
             label: Text(strings.get('settings.allCategories')),
             style: TextButton.styleFrom(alignment: Alignment.centerLeft),
           ),
@@ -405,29 +421,35 @@ final class _SettingsSectionContent extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.space20),
-        AppStatusLabel(
-          icon: Icons.language_rounded,
-          label: YamantakaLocalizations.of(context).get('settings.globalScope'),
-        ),
-        if (section.onReset != null) ...[
-          const SizedBox(height: AppSpacing.space8),
-          TextButton.icon(
-            key: ValueKey('settings-reset-${section.id.name}'),
-            onPressed: section.onReset,
-            icon: const Icon(Icons.restart_alt_rounded, size: 18),
-            label: Text(
-              YamantakaLocalizations.of(context).get('settings.resetSection'),
-            ),
-          ),
-        ],
         const SizedBox(height: AppSpacing.space12),
+        Text(
+          YamantakaLocalizations.of(context).get('settings.globalScope'),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: context.appColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.space24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space4),
           child: Column(
             children: [for (final child in section.children) child],
           ),
         ),
+        const SizedBox(height: AppSpacing.space24),
+        if (section.onReset != null) ...[
+          const SizedBox(height: AppSpacing.space8),
+          TextButton.icon(
+            key: ValueKey('settings-reset-${section.id.name}'),
+            onPressed: section.onReset,
+            icon: const Icon(
+              Icons.restart_alt_rounded,
+              size: AppIconSizes.standard,
+            ),
+            label: Text(
+              YamantakaLocalizations.of(context).get('settings.resetSection'),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -440,7 +462,7 @@ final class _SettingsNavItem extends StatelessWidget {
     required this.onPressed,
   });
 
-  final _SettingsSectionId section;
+  final SettingsSectionId section;
   final bool selected;
   final VoidCallback onPressed;
 
@@ -466,9 +488,12 @@ final class _SettingsNavItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadii.control),
             onTap: onPressed,
             child: Container(
-              height: AppSizes.desktopControlExtent,
+              constraints: const BoxConstraints(
+                minHeight: AppSizes.desktopControlExtent,
+              ),
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.space12,
+                vertical: AppSpacing.space8,
               ),
               child: Row(
                 children: [
@@ -487,7 +512,11 @@ final class _SettingsNavItem extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.space8),
-                  Icon(section.icon, size: 18, color: foreground),
+                  Icon(
+                    section.icon,
+                    size: AppIconSizes.standard,
+                    color: foreground,
+                  ),
                   const SizedBox(width: AppSpacing.space12),
                   Expanded(
                     child: Text(
@@ -510,7 +539,7 @@ final class _SettingsNavItem extends StatelessWidget {
 final class _SettingsNavGroupLabel extends StatelessWidget {
   const _SettingsNavGroupLabel({required this.group});
 
-  final _SettingsNavGroup group;
+  final SettingsNavGroup group;
 
   @override
   Widget build(BuildContext context) {
@@ -714,6 +743,7 @@ final class _LiveReaderPreview extends StatelessWidget {
     return Container(
       key: const Key('appearance-live-reader-preview'),
       height: inlinePreviewHeight,
+      width: double.infinity,
       decoration: BoxDecoration(
         color: canvas,
         border: Border.all(
@@ -728,8 +758,8 @@ final class _LiveReaderPreview extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Container(
-            width: compact ? 78 : 88,
-            height: compact ? 106 : 116,
+            width: compact ? 132 : 144,
+            height: compact ? 174 : 190,
             padding: const EdgeInsets.all(AppSpacing.space12),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -747,9 +777,16 @@ final class _LiveReaderPreview extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(width: 34, height: 4, color: Colors.black87),
+                Text(
+                  'Yamantaka',
+                  textScaler: TextScaler.noScaling,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.space12),
-                for (final width in [52.0, 58.0, 44.0]) ...[
+                for (final width in [96.0, 108.0, 104.0, 80.0, 96.0, 68.0]) ...[
                   Container(width: width, height: 2, color: Colors.black38),
                   const SizedBox(height: AppSpacing.space4),
                 ],
@@ -869,7 +906,7 @@ final class _LiveReaderPreview extends StatelessWidget {
     );
   }
 
-  static const double inlinePreviewHeight = 188;
+  static const double inlinePreviewHeight = 248;
 }
 
 final class _PreviewLabel extends StatelessWidget {
@@ -965,6 +1002,7 @@ final class _DropdownSetting extends StatelessWidget {
       control: SizedBox(
         width: 224,
         child: DropdownButtonFormField<String>(
+          style: Theme.of(context).textTheme.bodyMedium,
           initialValue: value,
           isExpanded: true,
           decoration: const InputDecoration(
@@ -1069,6 +1107,7 @@ final class _ShortcutSetting extends StatelessWidget {
       control: SizedBox(
         width: 180,
         child: DropdownButtonFormField<String>(
+          style: Theme.of(context).textTheme.bodyMedium,
           initialValue: value,
           decoration: const InputDecoration(isDense: true),
           items: [

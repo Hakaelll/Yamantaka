@@ -772,8 +772,8 @@ final class _ReaderScreenState extends State<ReaderScreen> {
     if (_isElectronicInk) {
       return AppTheme.light(density: density, highContrast: highContrast);
     }
-    return switch (theme) {
-      ReaderTheme.dark || ReaderTheme.black => AppTheme.dark(
+    return switch (Theme.of(context).brightness) {
+      Brightness.dark => AppTheme.dark(
         density: density,
         highContrast: highContrast,
       ),

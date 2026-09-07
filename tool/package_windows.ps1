@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = 'build/release/0.13.0+14',
-    [string]$Version = '0.13.0',
-    [string]$BuildNumber = '14',
+    [string]$OutputDirectory = 'build/release/0.15.0+16',
+    [string]$Version = '0.15.0',
+    [string]$BuildNumber = '16',
     [string]$FlutterExecutable,
     [string]$CertificateThumbprint,
     [string]$SignToolPath,
@@ -17,6 +17,16 @@ $ErrorActionPreference = 'Stop'
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $PSScriptRoot 'windows_binary_trust.ps1')
 $outputRoot = [System.IO.Path]::GetFullPath((Join-Path $root $OutputDirectory))
+$releaseParent = [System.IO.Path]::GetFullPath((Join-Path $root 'build/release'))
+if (-not $outputRoot.StartsWith(
+        $releaseParent + [System.IO.Path]::DirectorySeparatorChar,
+        [StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw "Package output must remain in a named release below $releaseParent."
+}
+if ($Version -notmatch '^\d+\.\d+\.\d+$' -or $BuildNumber -notmatch '^\d+$') {
+    throw 'Version and build number must be numeric release identifiers.'
+}
 $bundle = Join-Path $outputRoot 'yamantaka'
 $failurePath = Join-Path $outputRoot 'release-failure.json'
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
@@ -254,8 +264,7 @@ try {
     $evidenceSources = @(
         @{ source = 'build/verification/no-network.json'; destination = 'no-network.json' },
         @{ source = 'build/verification/verification-report.json'; destination = 'test-report.json' },
-        @{ source = 'build/performance/0.13.0-current/comparison-0.12-vs-0.13.json'; destination = 'performance-report.json' },
-        @{ source = 'build/performance/0.13.0-current/comparison-0.12-vs-0.13-historical.json'; destination = 'performance-historical-report.json' }
+        @{ source = 'build/performance/0.15.0-current/comparison-0.14-vs-0.15.json'; destination = 'performance-report.json' }
     )
     foreach ($evidence in $evidenceSources) {
         $evidenceSource = Join-Path $root $evidence.source
@@ -268,6 +277,53 @@ try {
             Remove-Item -LiteralPath $evidenceDestination -Force
         }
     }
+    $visualEvidenceSource = Join-Path $root 'build/visual-evidence/v0.15.0'
+    $visualReviewSource = Join-Path $root 'build/visual-review-015'
+    $visualEvidenceDestination = Join-Path $outputRoot 'visual-evidence'
+    $visualReviewDestination = Join-Path $outputRoot 'visual-review'
+    foreach ($requiredVisualDirectory in @($visualEvidenceSource, $visualReviewSource)) {
+        if (-not (Test-Path -LiteralPath $requiredVisualDirectory -PathType Container)) {
+            throw "Required visual evidence directory not found: $requiredVisualDirectory"
+        }
+    }
+    foreach ($visualDestination in @($visualEvidenceDestination, $visualReviewDestination)) {
+        if (Test-Path -LiteralPath $visualDestination) {
+            Remove-Item -LiteralPath $visualDestination -Recurse -Force
+        }
+    }
+    Copy-Item -LiteralPath $visualEvidenceSource -Destination $visualEvidenceDestination -Recurse
+    Copy-Item -LiteralPath $visualReviewSource -Destination $visualReviewDestination -Recurse
+    $visualEvidenceFiles = @(
+        Get-ChildItem -LiteralPath $visualEvidenceDestination -File -Recurse
+        Get-ChildItem -LiteralPath $visualReviewDestination -File -Recurse
+    )
+    $visualManifest = [ordered]@{
+        format = 'yamantaka-visual-release-evidence'
+        version = 1
+        productVersion = $Version
+        generatedAt = [DateTime]::UtcNow.ToString('o')
+        evidencePngCount = @(
+            Get-ChildItem -LiteralPath $visualEvidenceDestination -File -Recurse -Filter '*.png'
+        ).Count
+        comparisonPngCount = @(
+            Get-ChildItem -LiteralPath (Join-Path $visualEvidenceDestination 'comparisons') -File -Filter '*.png'
+        ).Count
+        contactSheetPngCount = @(
+            Get-ChildItem -LiteralPath $visualReviewDestination -File -Filter '*.png'
+        ).Count
+        files = @(
+            $visualEvidenceFiles | ForEach-Object {
+                [ordered]@{
+                    path = $_.FullName.Substring($outputRoot.Length + 1).Replace('\', '/')
+                    bytes = $_.Length
+                    sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+                }
+            }
+        )
+    }
+    $visualManifestPath = Join-Path $outputRoot 'visual-evidence-manifest.json'
+    $visualManifest | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 $visualManifestPath
+    $releaseEvidence.Add($visualManifestPath)
     $hashesPath = Join-Path $outputRoot 'SHA256SUMS.txt'
     @($manifestPath, $archive) + @($releaseEvidence) | ForEach-Object {
         $hash = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()

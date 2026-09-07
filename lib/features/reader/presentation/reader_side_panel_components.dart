@@ -773,237 +773,329 @@ final class _AnnotationsPanelState extends State<_AnnotationsPanel> {
       listenable: Listenable.merge([annotations, widget.controller.bookmarks]),
       builder: (context, _) {
         final entries = _combinedEntries(annotations.annotations);
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.space12),
-              child: Column(
-                children: [
-                  Row(
+        return LayoutBuilder(
+          builder: (context, constraints) => Column(
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight * .65,
+                ),
+                child: SingleChildScrollView(
+                  key: const Key('reader-note-filter-scroll'),
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          key: const Key('annotation-add-page-note'),
-                          onPressed: () => _editAnnotation(),
-                          icon: const Icon(
-                            Icons.add_comment_outlined,
-                            size: 18,
-                          ),
-                          label: Text(
-                            strings.get(
-                              'reader.annotatePage',
-                              parameters: {
-                                'page': widget.controller.currentPageIndex + 1,
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.space12),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.tonalIcon(
+                                    key: const Key('annotation-add-page-note'),
+                                    onPressed: () => _editAnnotation(),
+                                    icon: const Icon(
+                                      Icons.add_comment_outlined,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      strings.get(
+                                        'reader.annotatePage',
+                                        parameters: {
+                                          'page':
+                                              widget
+                                                  .controller
+                                                  .currentPageIndex +
+                                              1,
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.space8),
+                                IconButton.outlined(
+                                  tooltip: strings.get(
+                                    'command.undoAnnotation',
+                                  ),
+                                  onPressed: annotations.canUndo
+                                      ? annotations.undo
+                                      : null,
+                                  icon: const Icon(Icons.undo_rounded),
+                                ),
+                                const SizedBox(width: AppSpacing.space4),
+                                IconButton.outlined(
+                                  tooltip: strings.get(
+                                    'command.redoAnnotation',
+                                  ),
+                                  onPressed: annotations.canRedo
+                                      ? annotations.redo
+                                      : null,
+                                  icon: const Icon(Icons.redo_rounded),
+                                ),
+                                if (widget.onExport != null) ...[
+                                  const SizedBox(width: AppSpacing.space8),
+                                  IconButton.outlined(
+                                    tooltip: strings.get(
+                                      'reader.exportAnnotations',
+                                    ),
+                                    onPressed: widget.onExport,
+                                    icon: const Icon(Icons.ios_share_outlined),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.space8),
+                            DropdownButtonFormField<_ReaderNoteFilter>(
+                              style: Theme.of(context).textTheme.bodyMedium,
+                              key: const Key('reader-note-kind-filter'),
+                              initialValue: _noteFilter,
+                              isExpanded: true,
+                              itemHeight: null,
+                              selectedItemBuilder: (context) => [
+                                for (final filter in _ReaderNoteFilter.values)
+                                  Text(
+                                    strings.get(switch (filter) {
+                                      _ReaderNoteFilter.all => 'reader.all',
+                                      _ReaderNoteFilter.annotations =>
+                                        'reader.annotations',
+                                      _ReaderNoteFilter.bookmarks =>
+                                        'reader.bookmarks',
+                                    }),
+                                    maxLines: 1,
+                                  ),
+                              ],
+                              decoration: InputDecoration(
+                                isDense: true,
+                                labelText: strings.get('reader.noteFilter'),
+                              ),
+                              items: [
+                                for (final filter in _ReaderNoteFilter.values)
+                                  DropdownMenuItem(
+                                    value: filter,
+                                    child: Text(
+                                      strings.get(
+                                        'reader.noteFilter.${filter.name}',
+                                      ),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() => _noteFilter = value);
+                                }
                               },
                             ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.space8),
-                      IconButton.outlined(
-                        tooltip: strings.get('command.undoAnnotation'),
-                        onPressed: annotations.canUndo
-                            ? annotations.undo
-                            : null,
-                        icon: const Icon(Icons.undo_rounded),
-                      ),
-                      const SizedBox(width: AppSpacing.space4),
-                      IconButton.outlined(
-                        tooltip: strings.get('command.redoAnnotation'),
-                        onPressed: annotations.canRedo
-                            ? annotations.redo
-                            : null,
-                        icon: const Icon(Icons.redo_rounded),
-                      ),
-                      if (widget.onExport != null) ...[
-                        const SizedBox(width: AppSpacing.space8),
-                        IconButton.outlined(
-                          tooltip: strings.get('reader.exportAnnotations'),
-                          onPressed: widget.onExport,
-                          icon: const Icon(Icons.ios_share_outlined),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  DropdownButtonFormField<_ReaderNoteFilter>(
-                    key: const Key('reader-note-kind-filter'),
-                    initialValue: _noteFilter,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      labelText: strings.get('reader.noteFilter'),
-                    ),
-                    items: [
-                      for (final filter in _ReaderNoteFilter.values)
-                        DropdownMenuItem(
-                          value: filter,
-                          child: Text(
-                            strings.get('reader.noteFilter.${filter.name}'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) setState(() => _noteFilter = value);
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  TextField(
-                    controller: _queryController,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                      labelText: strings.get('reader.searchNotes'),
-                    ),
-                    onChanged: (value) => annotations.setFilters(search: value),
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final stacked =
-                          MediaQuery.textScalerOf(context).scale(1) > 1.5;
-                      final fieldWidth = stacked
-                          ? constraints.maxWidth
-                          : (constraints.maxWidth - AppSpacing.space8) / 2;
-                      return Wrap(
-                        spacing: AppSpacing.space8,
-                        runSpacing: AppSpacing.space8,
-                        children: [
-                          SizedBox(
-                            width: fieldWidth,
-                            child: DropdownButtonFormField<AnnotationType?>(
-                              initialValue: annotations.typeFilter,
-                              isExpanded: true,
+                            const SizedBox(height: AppSpacing.space8),
+                            TextField(
+                              controller: _queryController,
                               decoration: InputDecoration(
                                 isDense: true,
-                                labelText: strings.get('reader.type'),
-                              ),
-                              items: [
-                                DropdownMenuItem(
-                                  value: null,
-                                  child: Text(
-                                    strings.get('reader.all'),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                prefixIcon: const Icon(
+                                  Icons.search_rounded,
+                                  size: 18,
                                 ),
-                                ...AnnotationType.values.map(
-                                  (type) => DropdownMenuItem(
-                                    value: type,
-                                    child: Text(
-                                      strings.get(
-                                        'annotation.type.${type.name}',
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
+                                labelText: strings.get('reader.searchNotes'),
+                              ),
+                              onChanged: (value) =>
+                                  annotations.setFilters(search: value),
+                            ),
+                            const SizedBox(height: AppSpacing.space8),
+                            ExpansionTile(
+                              key: const Key('reader-note-advanced-filters'),
+                              tilePadding: EdgeInsets.zero,
+                              childrenPadding: const EdgeInsets.only(
+                                bottom: AppSpacing.space8,
+                              ),
+                              initiallyExpanded:
+                                  annotations.typeFilter != null ||
+                                  annotations.colorFilter != null,
+                              title: Text(
+                                strings.get('reader.moreNoteFilters'),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              children: [
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final stacked =
+                                        MediaQuery.textScalerOf(
+                                          context,
+                                        ).scale(1) >
+                                        1.5;
+                                    final fieldWidth = stacked
+                                        ? constraints.maxWidth
+                                        : (constraints.maxWidth -
+                                                  AppSpacing.space8) /
+                                              2;
+                                    return Wrap(
+                                      spacing: AppSpacing.space8,
+                                      runSpacing: AppSpacing.space8,
+                                      children: [
+                                        SizedBox(
+                                          width: fieldWidth,
+                                          child:
+                                              DropdownButtonFormField<
+                                                AnnotationType?
+                                              >(
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodyMedium,
+                                                initialValue:
+                                                    annotations.typeFilter,
+                                                isExpanded: true,
+                                                decoration: InputDecoration(
+                                                  isDense: true,
+                                                  labelText: strings.get(
+                                                    'reader.type',
+                                                  ),
+                                                ),
+                                                items: [
+                                                  DropdownMenuItem(
+                                                    value: null,
+                                                    child: Text(
+                                                      strings.get('reader.all'),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  ...AnnotationType.values.map(
+                                                    (type) => DropdownMenuItem(
+                                                      value: type,
+                                                      child: Text(
+                                                        strings.get(
+                                                          'annotation.type.${type.name}',
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                                onChanged: (value) =>
+                                                    annotations.setFilters(
+                                                      type: value,
+                                                      clearType: value == null,
+                                                    ),
+                                              ),
+                                        ),
+                                        SizedBox(
+                                          width: fieldWidth,
+                                          child:
+                                              DropdownButtonFormField<
+                                                AnnotationColor?
+                                              >(
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodyMedium,
+                                                initialValue:
+                                                    annotations.colorFilter,
+                                                isExpanded: true,
+                                                decoration: InputDecoration(
+                                                  isDense: true,
+                                                  labelText: strings.get(
+                                                    'reader.color',
+                                                  ),
+                                                ),
+                                                items: [
+                                                  DropdownMenuItem(
+                                                    value: null,
+                                                    child: Text(
+                                                      strings.get('reader.all'),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  ...AnnotationColor.values.map(
+                                                    (color) => DropdownMenuItem(
+                                                      value: color,
+                                                      child: Text(
+                                                        strings.get(
+                                                          'annotation.color.${color.name}',
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                                onChanged: (value) =>
+                                                    annotations.setFilters(
+                                                      color: value,
+                                                      clearColor: value == null,
+                                                    ),
+                                              ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
                               ],
-                              onChanged: (value) => annotations.setFilters(
-                                type: value,
-                                clearType: value == null,
-                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (annotations.reviewRequiredCount > 0)
+                        MaterialBanner(
+                          content: Text(
+                            strings.count(
+                              'count.annotationsReview',
+                              annotations.reviewRequiredCount,
                             ),
                           ),
-                          SizedBox(
-                            width: fieldWidth,
-                            child: DropdownButtonFormField<AnnotationColor?>(
-                              initialValue: annotations.colorFilter,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                isDense: true,
-                                labelText: strings.get('reader.color'),
-                              ),
-                              items: [
-                                DropdownMenuItem(
-                                  value: null,
-                                  child: Text(
-                                    strings.get('reader.all'),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                ...AnnotationColor.values.map(
-                                  (color) => DropdownMenuItem(
-                                    value: color,
-                                    child: Text(
-                                      strings.get(
-                                        'annotation.color.${color.name}',
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              onChanged: (value) => annotations.setFilters(
-                                color: value,
-                                clearColor: value == null,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            if (annotations.reviewRequiredCount > 0)
-              MaterialBanner(
-                content: Text(
-                  strings.count(
-                    'count.annotationsReview',
-                    annotations.reviewRequiredCount,
+                          leading: const Icon(Icons.warning_amber_rounded),
+                          actions: const [SizedBox.shrink()],
+                        ),
+                    ],
                   ),
                 ),
-                leading: const Icon(Icons.warning_amber_rounded),
-                actions: const [SizedBox.shrink()],
               ),
-            const Divider(height: 1),
-            Expanded(
-              child: entries.isEmpty
-                  ? _PanelEmptyState(
-                      icon: Icons.speaker_notes_off_outlined,
-                      title: strings.get('reader.noNotes'),
-                      message: strings.get('reader.noNotes.description'),
-                    )
-                  : ListView.builder(
-                      key: const PageStorageKey('reader-notes'),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.space8,
-                      ),
-                      itemCount: entries.length,
-                      itemBuilder: (context, index) {
-                        final entry = entries[index];
-                        final bookmark = entry.bookmark;
-                        if (bookmark != null) {
-                          return _BookmarkTile(
-                            key: ValueKey(
-                              'reader-note-bookmark-${bookmark.id}',
-                            ),
-                            bookmark: bookmark,
-                            onOpen: () => widget.controller.navigateTo(
-                              bookmark.pageIndex,
-                              reason: NavigationReason.bookmark,
-                              focusDestination: true,
-                              label: strings.get(
-                                'reader.bookmarkOnPage',
-                                parameters: {'page': bookmark.pageIndex + 1},
+              const Divider(height: 1),
+              Expanded(
+                child: entries.isEmpty
+                    ? _PanelEmptyState(
+                        icon: Icons.speaker_notes_off_outlined,
+                        title: strings.get('reader.noNotes'),
+                        message: strings.get('reader.noNotes.description'),
+                      )
+                    : ListView.builder(
+                        key: const PageStorageKey('reader-notes'),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.space8,
+                        ),
+                        itemCount: entries.length,
+                        itemBuilder: (context, index) {
+                          final entry = entries[index];
+                          final bookmark = entry.bookmark;
+                          if (bookmark != null) {
+                            return _BookmarkTile(
+                              key: ValueKey(
+                                'reader-note-bookmark-${bookmark.id}',
                               ),
-                            ),
-                            onDelete: () =>
-                                widget.controller.bookmarks.remove(bookmark),
+                              bookmark: bookmark,
+                              onOpen: () => widget.controller.navigateTo(
+                                bookmark.pageIndex,
+                                reason: NavigationReason.bookmark,
+                                focusDestination: true,
+                                label: strings.get(
+                                  'reader.bookmarkOnPage',
+                                  parameters: {'page': bookmark.pageIndex + 1},
+                                ),
+                              ),
+                              onDelete: () =>
+                                  widget.controller.bookmarks.remove(bookmark),
+                            );
+                          }
+                          return _buildAnnotationTile(
+                            context,
+                            entry.annotation!,
+                            strings,
                           );
-                        }
-                        return _buildAnnotationTile(
-                          context,
-                          entry.annotation!,
-                          strings,
-                        );
-                      },
-                    ),
-            ),
-          ],
+                        },
+                      ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -1175,6 +1267,7 @@ final class _AnnotationsPanelState extends State<_AnnotationsPanel> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<AnnotationType>(
+                    style: Theme.of(context).textTheme.bodyMedium,
                     initialValue: type,
                     decoration: InputDecoration(
                       labelText: strings.get('reader.type'),
@@ -1197,6 +1290,7 @@ final class _AnnotationsPanelState extends State<_AnnotationsPanel> {
                   ),
                   const SizedBox(height: AppSpacing.space12),
                   DropdownButtonFormField<AnnotationColor>(
+                    style: Theme.of(context).textTheme.bodyMedium,
                     initialValue: color,
                     decoration: InputDecoration(
                       labelText: strings.get('reader.color'),

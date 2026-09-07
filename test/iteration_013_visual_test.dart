@@ -116,7 +116,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('captures the 0.13 document resilience surfaces', (tester) async {
+  testWidgets('captures the 0.15 document resilience surfaces', (tester) async {
     const outputRoot = String.fromEnvironment('YAMANTAKA_013_VISUAL_DIR');
     if (outputRoot.isEmpty) return;
     final output = Directory(outputRoot)..createSync(recursive: true);
@@ -264,8 +264,8 @@ void main() {
       const JsonEncoder.withIndent(' ').convert({
         'format': 'yamantaka-document-resilience-visual-matrix',
         'version': 1,
-        'productVersion': '0.13.0',
-        'generatedAt': '2026-09-01T12:00:00Z',
+        'productVersion': '0.15.0',
+        'generatedAt': DateTime.now().toUtc().toIso8601String(),
         'cases': evidence,
       }),
       flush: true,

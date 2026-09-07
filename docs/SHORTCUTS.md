@@ -1,4 +1,4 @@
-# Atajos de Yamantaka 0.13
+# Atajos de Yamantaka 0.14
 
 Los atajos se resuelven localmente y los personalizados se validan contra
 conflictos. Los campos de texto conservan las teclas de edición y no disparan
