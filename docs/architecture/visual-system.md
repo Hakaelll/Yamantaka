@@ -30,23 +30,40 @@ presión y foco combinan superficie, borde y semántica; el color no actúa solo
 
 ## Identidad de Biblioteca
 
-`AppTheme.library` utiliza `AppColorTokens.library` para mantener el fondo
-negro `#080808` y superficies en escala de grises tanto si la aplicación
-general está clara como oscura. `librarySelectionAccent` reserva el violeta
-`#B58AFF` para el archivo seleccionado; Lector y Ajustes conservan las paletas
-editoriales.
+`AppTheme.library` utiliza la paleta global de la aplicación. En modo oscuro,
+el fondo negro `#0B0B0B` y las superficies grises neutras sustituyen el matiz
+azul anterior; en claro se conserva el papel cálido. `librarySelectionAccent`
+reserva el violeta `#B58AFF` para el archivo seleccionado. Lector y Ajustes
+consumen la misma base neutral sin alterar los colores del PDF.
 
-No hay texturas, blur, vídeo ni movimiento ambiental. La profundidad procede
-de espacio negativo, escala breve, sombra acotada y un halo estático bajo la
-portada seleccionada.
+No hay texturas raster, blur, vídeo ni movimiento ambiental. La profundidad
+procede de espacio negativo, escala breve, sombra acotada, perspectiva del
+libro y un halo estático bajo la portada seleccionada. Las cubiertas de reserva
+usan seis familias vectoriales deterministas; las miniaturas reales ocupan la
+tapa completa y reciben el mismo lomo, canto de páginas y acabado superficial.
+El paralaje responde únicamente al puntero y vuelve a una tapa alineada a
+píxeles; así los bordes largos no sufren escalonado en Windows. Movimiento
+reducido lo convierte en volumen estático con duraciones cero. En oscuro y solo
+en ancho expandido, una filigrana raster de marca al 3,2 % ocupa el fondo; se
+omite con alto contraste o texto superior al 130 %.
+
+La selección abre un contexto flotante de máximo 880 px con miniatura del libro,
+metadatos, progreso y una acción primaria. La continuidad de sesiones no
+reserva una fila: vive en un menú con contador y acciones equivalentes.
 
 ## Chrome del lector y Libro
 
-La barra superior y la dock inferior son overlays: mostrarlas u ocultarlas no
+La barra superior se divide en dos cápsulas flotantes —documento y
+herramientas— y la dock inferior sigue siendo un overlay. Mostrarlas u ocultarlas no
 modifica las restricciones del visor. En compacto/medio el panel también es
 overlay con scrim; en expandido resta siempre su ancho y el visor se recentra
 en el área restante. Abrir, cambiar o redimensionar el panel no reconstruye el
-`RepaintBoundary` cacheado por configuración de documento.
+`RepaintBoundary` cacheado por configuración de documento. Cambiar de sección
+mantiene la superficie estable y cruza solo su contenido durante 120 ms.
+
+Los avisos usan una superficie flotante neutral de 420 px con borde y cierre
+vertical. Un aviso nuevo sustituye al anterior; los pasivos tienen duración
+acotada y las acciones conservan tiempo para deshacer.
 
 Biblioteca limita selección a escala 1,035, elevación 6 px y halo sin spread;
 el foco blanco de 2 px es independiente del borde violeta. Ajustes alinea sus

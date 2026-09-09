@@ -50,9 +50,14 @@ final class _PanelSectionBar extends StatelessWidget {
 }
 
 final class _PanelSectionRail extends StatelessWidget {
-  const _PanelSectionRail({required this.selected, required this.onSelected});
+  const _PanelSectionRail({
+    required this.selected,
+    required this.reduceMotion,
+    required this.onSelected,
+  });
 
   final ReaderPanelSection selected;
+  final bool reduceMotion;
   final ValueChanged<ReaderPanelSection> onSelected;
 
   @override
@@ -80,7 +85,8 @@ final class _PanelSectionRail extends StatelessWidget {
                     children: [
                       AnimatedPositioned(
                         duration: AppMotion.whenAllowed(
-                          MediaQuery.disableAnimationsOf(context),
+                          reduceMotion ||
+                              MediaQuery.disableAnimationsOf(context),
                           AppMotion.fast,
                         ),
                         left: 0,
@@ -136,9 +142,14 @@ IconData _panelSectionIcon(ReaderPanelSection section) => switch (section) {
 };
 
 final class _PanelResizeHandle extends StatefulWidget {
-  const _PanelResizeHandle({required this.width, required this.onWidthChanged});
+  const _PanelResizeHandle({
+    required this.width,
+    required this.reduceMotion,
+    required this.onWidthChanged,
+  });
 
   final double width;
+  final bool reduceMotion;
   final ValueChanged<double> onWidthChanged;
 
   @override
@@ -222,7 +233,8 @@ final class _PanelResizeHandleState extends State<_PanelResizeHandle> {
                   children: [
                     AnimatedContainer(
                       duration: AppMotion.whenAllowed(
-                        MediaQuery.disableAnimationsOf(context),
+                        widget.reduceMotion ||
+                            MediaQuery.disableAnimationsOf(context),
                         AppMotion.feedback,
                       ),
                       width: active ? 4 : 2,

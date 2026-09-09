@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -101,7 +102,7 @@ void main() {
       MaterialApp(home: EmptyLibraryState(onOpen: () => opened = true)),
     );
 
-    expect(find.text('Yamantaka'), findsOneWidget);
+    expect(find.text('Yamantaka'), findsNothing);
     expect(find.text('Tu archivo privado de lectura.'), findsOneWidget);
     expect(find.byKey(const Key('open-pdf-button')), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('open-pdf-button')));
@@ -359,17 +360,7 @@ void main() {
           final beta = tester.getCenter(
             find.byKey(const ValueKey('artifact-beta')),
           );
-          expect(
-            (alpha.dx + beta.dx) / 2,
-            closeTo(
-              (width +
-                      tester
-                          .getSize(find.byKey(const Key('library-navigation')))
-                          .width) /
-                  2,
-              4,
-            ),
-          );
+          expect((alpha.dx + beta.dx) / 2, closeTo(width / 2, 4));
         }
       }
 
@@ -378,6 +369,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('artifact-alpha')));
       await tester.pump(const Duration(milliseconds: 400));
       expect(controller.selectedDocumentId, 'alpha');
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
       expect(find.text('Alpha'), findsWidgets);
       expect(find.byKey(const Key('library-context-primary')), findsOneWidget);
       expect(find.text('Abrir'), findsOneWidget);
@@ -591,7 +583,9 @@ void main() {
     expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
     controller.scrollOffset = 42;
 
-    await tester.tap(find.byKey(const Key('library-list-view-button')));
+    await tester.tap(find.byKey(const Key('library-display-menu-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('library-display-list')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('artifact-alpha')), findsNothing);
     expect(find.byKey(const ValueKey('artifact-list-alpha')), findsOneWidget);
@@ -605,7 +599,9 @@ void main() {
     await tester.pump();
     expect(controller.selectedDocumentId, 'alpha');
 
-    await tester.tap(find.byKey(const Key('library-grid-view-button')));
+    await tester.tap(find.byKey(const Key('library-display-menu-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('library-display-grid')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('artifact-alpha')), findsOneWidget);
     expect(find.byKey(const ValueKey('artifact-list-alpha')), findsNothing);
@@ -717,7 +713,10 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.tap(find.byKey(const Key('library-selection-mode-button')));
+    await tester.tap(find.byKey(const Key('library-display-menu-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('library-display-selection')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('artifact-alpha')));
     await tester.tap(find.byKey(const ValueKey('artifact-beta')));
     await tester.pump(const Duration(milliseconds: 50));
@@ -782,19 +781,16 @@ void main() {
       expect(find.text('Abrir documento'), findsNothing);
       expect(
         tester.getCenter(find.byKey(const ValueKey('artifact-actions'))).dx,
-        closeTo(
-          (1100 +
-                  tester
-                      .getSize(find.byKey(const Key('library-navigation')))
-                      .width) /
-              2,
-          2,
-        ),
+        closeTo(1100 / 2, 2),
       );
       await tester.tap(find.byKey(const ValueKey('artifact-actions')));
       await tester.pump();
       expect(find.byKey(const Key('library-context-primary')), findsOneWidget);
       expect(find.byKey(const Key('library-context-favorite')), findsOneWidget);
+      expect(
+        find.byKey(ValueKey('library-context-cover-${document.id}')),
+        findsOneWidget,
+      );
       expect(find.text('Continuar'), findsOneWidget);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.f10);
@@ -879,6 +875,108 @@ void main() {
     expect(image.filterQuality, FilterQuality.low);
     expect(find.byType(RepaintBoundary), findsWidgets);
   });
+
+  testWidgets('artifact thumbnails are printed edge-to-edge on the book face', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final document = _document(
+      id: 'bound-cover',
+      fileName: 'cover.pdf',
+      openedAt: DateTime.utc(2026, 9, 9),
+      thumbnailPath: 'missing-cover.png',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: Center(
+            child: ArtifactDocument(
+              document: document,
+              width: 180,
+              selected: false,
+              selectionMode: false,
+              reduceMotion: true,
+              onSelect: () {},
+              onOpen: () {},
+              onHover: (_) {},
+              onMenu: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image));
+    final provider = image.image as ResizeImage;
+    expect(image.fit, BoxFit.cover);
+    expect(image.alignment, Alignment.topCenter);
+    expect(provider.width, 360);
+    expect(provider.height, 512);
+    expect(
+      find.byKey(const ValueKey('artifact-book-face-bound-cover')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'artifact rests pixel-aligned and follows the mouse only on cover',
+    (tester) async {
+      const id = 'cursor-cover';
+      final document = _document(
+        id: id,
+        fileName: 'cursor.pdf',
+        openedAt: DateTime.utc(2026, 9, 9),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark(),
+          home: Scaffold(
+            body: Center(
+              child: ArtifactDocument(
+                document: document,
+                width: 180,
+                selected: false,
+                selectionMode: false,
+                reduceMotion: false,
+                onSelect: () {},
+                onOpen: () {},
+                onHover: (_) {},
+                onMenu: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final transformFinder = find.byKey(
+        const ValueKey('artifact-book-transform-$id'),
+      );
+      Matrix4 matrix() => tester.widget<Transform>(transformFinder).transform;
+      expect(matrix().entry(0, 2), closeTo(0, 0.000001));
+      expect(matrix().entry(2, 0), closeTo(0, 0.000001));
+
+      final face = find.byKey(const ValueKey('artifact-book-face-$id'));
+      final rect = tester.getRect(face);
+      final mouse = await tester.createGesture(
+        kind: ui.PointerDeviceKind.mouse,
+      );
+      await mouse.addPointer(location: rect.center);
+      await mouse.moveTo(Offset(rect.left + 8, rect.top + 8));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 140));
+      expect(matrix().entry(0, 2).abs(), greaterThan(0.005));
+
+      await mouse.moveTo(Offset(rect.center.dx, rect.bottom + 10));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 180));
+      expect(matrix().entry(0, 2), closeTo(0, 0.000001));
+      await mouse.removePointer();
+    },
+  );
 }
 
 LibraryDocument _document({

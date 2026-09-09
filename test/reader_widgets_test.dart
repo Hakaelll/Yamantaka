@@ -1027,6 +1027,8 @@ void main() {
 
       await tester.tap(find.byTooltip('Miniaturas'));
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
       expect(find.byKey(const Key('pdf-search-field')), findsNothing);
       expect(adapter.buildCount, 1);
 

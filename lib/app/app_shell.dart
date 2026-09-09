@@ -261,6 +261,9 @@ final class _YamantakaAppState extends State<YamantakaApp>
       onPickDocument: _pickAndOpen,
       onOpenSettings: () => setState(() => _page = _AppPage.settings),
       showRecents: widget.services.settings.settings.showRecents,
+      reduceMotion:
+          widget.services.settings.settings.resolvedMotionPreference !=
+          AppMotionPreference.full,
       initialReadingFilter: LibraryReadingState.values.firstWhere(
         (value) =>
             value.name ==
@@ -2467,9 +2470,15 @@ final class _YamantakaAppState extends State<YamantakaApp>
   void _showNotice(String message) {
     final context = _navigatorKey.currentContext;
     if (context != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      final messenger = ScaffoldMessenger.of(context);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Semantics(liveRegion: true, child: Text(message)),
+            duration: const Duration(milliseconds: 2400),
+          ),
+        );
     }
   }
 

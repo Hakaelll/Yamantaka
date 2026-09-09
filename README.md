@@ -7,20 +7,52 @@ metadatos propios en el dispositivo.
 
 ## Estado verificado
 
-Versión de Yamantaka 0.15.0+16 revisada el 7 de septiembre de 2026:
+Versión de Yamantaka 0.15.0+16 revisada el 9 de septiembre de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 325 pruebas aprobadas;
-- cierre local candidato: el gate final encontró una copia histórica defectuosa
-  dentro de build; 13 fases pasaron y el análisis falló. Tras apartar esa copia
-  sin borrarla, el análisis independiente pasó sin incidencias (164,1 s).
-  Se conserva el informe fallido original, sin convertirlo en un gate verde;
+- flutter test --no-pub: 329 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
+- el gate actual aprueba 13 fases y falla solo la matriz nativa porque la escala
+  física 96 DPI/100 % no pudo confirmarse de forma independiente; sus cuatro
+  capturas se conservan como candidatas, no como certificación DPI;
 - PDFium y SQLite conservan cobertura automatizada con fixtures sintéticos;
 - el bundle Release local permanece receptivo durante un smoke de 8 s con un
   PDF sintético y no abre conexiones TCP/UDP; el harness lo cierra al terminar;
 - sus nueve binarios nativos siguen sin firma, por lo que esta evidencia local
   no convierte el bundle en un artefacto apto para distribución.
+
+La Biblioteca actual pone las portadas en primer plano: no muestra nombre, logo
+ni navegación lateral persistente, usa una retícula de cubiertas grandes y
+reúne vista, selección, facetas y rutas secundarias en menús accesibles. La
+franja para retomar lectura ocupa una sola fila. El tema oscuro global vuelve a
+negro y grises neutros; el violeta conserva las acciones y estados que requieren
+acento. El flujo PDFium real confirma que el PDF de prueba no cambia.
+
+La sesión reciente vive en un menú compacto de la barra. Al seleccionar un
+libro aparece un contexto flotante más corto con su miniatura, progreso y una
+sola acción principal. En oscuro, la marca se integra como filigrana de muy
+baja opacidad y se omite en compacto, alto contraste o texto ampliado.
+
+Las superficies seleccionadas también permanecen neutras: el violeta se limita
+a indicadores y acciones. Las tarjetas seleccionadas muestran una marca
+explícita y las filas enfocadas por teclado reciben un contorno completo.
+En Ajustes se elige entre animaciones completas, cortas y orientadas al estado,
+o movimiento reducido sin transiciones decorativas; la opción más restrictiva
+del sistema siempre prevalece.
+
+Las carátulas de reserva se representan como libros 3D vectoriales con lomo,
+canto de páginas y seis familias gráficas deterministas: órbita, cristal, cubo,
+monolito, cinta y estrella. Las carátulas reales se imprimen a sangre sobre el
+mismo volumen, con lomo y acabado de tapa, sin añadir activos ni dependencias al
+bundle. El puntero inclina y eleva brevemente el libro solo con animaciones
+completas; movimiento reducido conserva el volumen estático.
+En reposo la tapa queda alineada a píxeles y usa filtrado de alta calidad al
+inclinarse, evitando el escalonado de los bordes largos observado en Windows.
+
+El lector divide la barra superior en dos grupos flotantes sin retirar ninguna
+acción. Su panel permanece estable al cambiar entre miniaturas, índice,
+marcadores, anotaciones y búsqueda; solo transiciona el contenido. Los avisos
+globales son compactos, se sustituyen entre sí y los pasivos desaparecen solos.
 
 El release local versionado se genera en `build/release/0.15.0+16/` e incluye el
 ZIP completo, manifiesto con hash por archivo, `SHA256SUMS.txt`, estado de firma,
@@ -44,11 +76,15 @@ vigente de pruebas en [TESTING.md](TESTING.md).
 - Biblioteca adopta el tema global claro/oscuro, navegación lateral adaptativa,
   búsqueda etiquetada y portadas tipográficas con retícula estable.
 - Continuar leyendo conserva una acción principal; la sesión reciente queda
-  plegada para dejar espacio al catálogo sin perder recuperación ni cola.
+  en un menú discreto para dejar espacio al catálogo sin perder recuperación
+  ni cola.
 - El lector separa el tema de sus controles del lienzo PDF y mejora navegación,
   nombres de página, paneles y filtros de anotaciones con texto ampliado.
 - Ajustes ofrece una vista previa mayor y un ancho de trabajo contenido.
 - Menús redistribuyen atajos al 200 %; reglas y duplicados usan textos humanos.
+
+La simplificación posterior se documenta en
+[auditoría de Biblioteca](docs/architecture/library-simplification-audit.md).
 
 Decisiones y pruebas: [registro de la iteración](docs/architecture/visual-iteration-0.15.md).
 
@@ -178,9 +214,9 @@ Atajos y recuperación se documentan en [docs/SHORTCUTS.md](docs/SHORTCUTS.md) y
 - El lector muestra una previsualización rápida y la sustituye por la región
   nítida al estabilizar zoom/desplazamiento; en Continua solo agenda páginas
   visibles o próximas, incluso en documentos de miles de páginas.
-- Biblioteca siempre oscura y espacial, con una paleta monocromática,
-  selección violeta, foco blanco independiente del color y controles
-  superiores en cápsulas discretas.
+- Biblioteca comparte el tema global: papel cálido en claro y negro con grises
+  neutros en oscuro; mantiene selección violeta, foco independiente del color y
+  controles superiores discretos.
 - La selección abre un inspector contextual con estado icónico, progreso y
   `Abrir`, `Continuar`, `Releer` o `Localizar`; al filtrar conserva el documento
   o explica su exclusión.
@@ -348,9 +384,10 @@ Captura de una ventana ya abierta, conservando sus bounds y enviando F11:
 - El build local actual no está firmado. Puede usarse para desarrollo desde el
   bundle completo bajo `build/`, pero distribuirlo sin advertencias requiere un
   certificado RSA confiable o un canal que firme el artefacto.
-- El gate 0.15 registra 96 DPI/100 % comunicados al proceso; no es una
-  certificación física independiente. Narrator, varios monitores, en-US nativo,
-  alto contraste real y las escalas físicas no verificadas siguen pendientes.
+- El gate actual registra 96 DPI/100 % comunicados al proceso, pero falla la
+  aceptación de la matriz porque esa escala no tiene confirmación física
+  independiente. Narrator, varios monitores, en-US nativo, alto contraste real
+  y las escalas físicas no verificadas siguen pendientes.
 
 No se incluyen nube, cuentas, telemetría, IA, EPUB ni formatos distintos de
 PDF.

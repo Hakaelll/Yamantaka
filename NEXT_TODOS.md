@@ -1,6 +1,52 @@
 # NEXT_TODOS — hoja de ruta integral de Yamantaka
 
-Actualizado: 2026-09-07.
+Actualizado: 2026-09-09.
+
+## Simplificación de Biblioteca y tema oscuro neutro
+
+- [x] Convertir Biblioteca en una superficie `cover-first`: sin nombre, logo ni
+  rail persistente, con portadas de hasta 220 px como navegación principal.
+- [x] Ocultar vista, selección múltiple, facetas y rutas secundarias en menús
+  accesibles; búsqueda, filtros e importación permanecen visibles como iconos.
+- [x] Compactar `Continuar leyendo` en una sola fila para devolver altura al
+  catálogo sin perder título, progreso, apertura ni menú contextual.
+- [x] Exponer solo `Animaciones completas` y `Movimiento reducido`; el segundo
+  elimina transiciones decorativas y se combina con la preferencia del sistema.
+- [x] Convertir cada carátula en un libro 3D ligero: perspectiva, lomo, volumen y
+  cubierta procedural determinista sin imágenes ni dependencias adicionales.
+- [x] Diferenciar las cubiertas de reserva con seis composiciones vectoriales,
+  integrar miniaturas reales a sangre y añadir canto de páginas, acabado de
+  tapa y paralaje acotado que desaparece con movimiento reducido.
+- [x] Alinear la tapa a píxeles en reposo, aplicar filtrado de alta calidad al
+  transformarla y comprobar con PDFium real que desaparecen los dientes de
+  sierra de los bordes superior e inferior.
+- [x] Sustituir la banda de selección extensa por un contexto flotante con
+  miniatura-libro y mover la sesión reciente a un menú compacto.
+- [x] Dividir la barra del lector en grupos flotantes, estabilizar el panel al
+  cambiar de sección y compactar los avisos con desaparición automática.
+
+- [x] Retirar el recuento duplicado de la cabecera y el ornamento sin función
+  del resumen del catálogo.
+- [x] Evitar que un único documento abra el inspector sin una selección
+  explícita.
+- [x] Eliminar accesos repetidos en ancho expandido; Anotaciones y Problemas
+  siguen disponibles en el menú secundario.
+- [x] Sustituir el matiz azul del tema oscuro por negro y grises neutros sin
+  modificar los píxeles del PDF ni el acento violeta funcional.
+- [x] Validar análisis, 329 pruebas, build Release, smoke sin red, flujo PDFium
+  real y matrices visuales claro/oscuro, compacto/expandido y texto al 200 %.
+- [ ] **P1 — rendimiento:** resolver los p95 ya conocidos de Biblioteca
+  (6986 frente a 4672 µs) y lector (8078 frente a 6760 µs). Aceptación: cinco
+  pasadas comparables sin regresiones fiables ni invariantes rotos.
+- [ ] **P2 — DPI y accesibilidad física:** ejecutar 100/125/150/175/200 %,
+  Narrator y varios monitores en hardware real. Aceptación: matriz completa con
+  escala confirmada, sin overflow, pérdida de foco ni restauración incorrecta.
+- [ ] **P3 — distribución:** firmar el bundle completo solo con certificado y
+  autorización expresa. Aceptación: inventario Authenticode válido y gate de
+  distribución aprobado; compilar localmente no cumple este punto.
+
+Auditoría, decisiones y evidencia:
+`docs/architecture/library-simplification-audit.md`.
 
 ## Cierre de la iteración editorial 0.15
 
@@ -9,7 +55,7 @@ Actualizado: 2026-09-07.
 - [x] Ajustes con vista previa ampliada y ancho de trabajo acotado.
 - [x] Navegador legible, filtros de anotaciones adaptativos y duplicados humanos.
 - [x] Revisión visual transversal y recorrido automatizado con PDFium real.
-- [x] Gate funcional integral final: 14 fases, 325 pruebas y cero omisiones.
+- [x] Gate histórico de la iteración: 14 fases, 325 pruebas y cero omisiones.
 - [ ] Resolver dos regresiones de rendimiento p95 (Biblioteca y lector).
 - [ ] Obtener aceptación integral del paquete, incluido rendimiento.
 - [ ] Validación física de Narrator, varios monitores y escalas no disponibles.

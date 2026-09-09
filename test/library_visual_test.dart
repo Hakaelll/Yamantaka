@@ -161,7 +161,9 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 250));
       if (list) {
-        await tester.tap(find.byKey(const Key('library-list-view-button')));
+        await tester.tap(find.byKey(const Key('library-display-menu-button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('library-display-list')));
         await tester.pumpAndSettle();
       }
       if (selected) {

@@ -45,7 +45,7 @@ abstract final class AppSpacing {
 abstract final class AppSizes {
   static const double topBarHeight = 56;
   static const double readerCompactTopBarHeight = 52;
-  static const double libraryHeaderHeight = 76;
+  static const double libraryHeaderHeight = 56;
   static const double bottomControlHeight = 48;
   static const double readerRestingDockHeight = 40;
   static const double readerPanelHeaderHeight = 52;
@@ -138,6 +138,7 @@ abstract final class AppTypeScale {
 abstract final class AppRadii {
   static const double indicator = 2;
   static const double page = 3;
+  static const double artifactCover = 8;
   static const double control = 8;
   static const double field = 10;
   static const double floating = 12;
@@ -340,40 +341,40 @@ final class AppColorTokens extends ThemeExtension<AppColorTokens> {
   );
 
   static const dark = AppColorTokens(
-    appBackground: Color(0xFF181A20),
-    surfacePrimary: Color(0xFF20232B),
-    surfaceSecondary: Color(0xFF1C1F26),
-    surfaceElevated: Color(0xFF292D36),
-    surfaceSunken: Color(0xFF14161C),
-    textPrimary: Color(0xFFF0F1EB),
-    textSecondary: Color(0xFFB9BEC9),
-    textMuted: Color(0xFF9A9FAE),
-    borderSubtle: Color(0xFF373B46),
-    borderStrong: Color(0xFF555B69),
+    appBackground: Color(0xFF0B0B0B),
+    surfacePrimary: Color(0xFF171717),
+    surfaceSecondary: Color(0xFF121212),
+    surfaceElevated: Color(0xFF232323),
+    surfaceSunken: Color(0xFF070707),
+    textPrimary: Color(0xFFF2F2EF),
+    textSecondary: Color(0xFFC2C2BD),
+    textMuted: Color(0xFFA0A09A),
+    borderSubtle: Color(0xFF343434),
+    borderStrong: Color(0xFF575757),
     accentPrimary: Color(0xFFC4AFF4),
     accentHover: Color(0xFFD9C9FC),
     accentPressed: Color(0xFFAF95E5),
-    accentSoft: Color(0xFF363044),
-    selectionBackground: Color(0xFF393148),
+    accentSoft: Color(0xFF252525),
+    selectionBackground: Color(0xFF292929),
     focusRing: Color(0xFFD9C9FC),
     danger: Color(0xFFD9847C),
     warning: Color(0xFFD0AD70),
     success: Color(0xFF8EB397),
     readerPageShadow: Color(0x85000000),
     librarySelectionAccent: Color(0xFFB58AFF),
-    readerBackground: Color(0xFF141613),
-    libraryBackground: Color(0xFF181A20),
-    settingsBackground: Color(0xFF181A20),
-    surfaceFloating: Color(0xFF292D36),
-    surfaceActive: Color(0xFF393148),
-    surfaceHover: Color(0xFF2C303A),
-    surfacePressed: Color(0xFF3A3E49),
-    textTertiary: Color(0xFFA5AAB8),
-    textDisabled: Color(0xFF666B62),
-    iconNormal: Color(0xFFB9BEC9),
-    iconActive: Color(0xFFF3F4EE),
-    iconDisabled: Color(0xFF5E635A),
-    separatorExceptional: Color(0xFF3B4038),
+    readerBackground: Color(0xFF101010),
+    libraryBackground: Color(0xFF0B0B0B),
+    settingsBackground: Color(0xFF0B0B0B),
+    surfaceFloating: Color(0xFF232323),
+    surfaceActive: Color(0xFF292929),
+    surfaceHover: Color(0xFF2B2B2B),
+    surfacePressed: Color(0xFF3A3A3A),
+    textTertiary: Color(0xFFAAAAA4),
+    textDisabled: Color(0xFF6B6B67),
+    iconNormal: Color(0xFFC2C2BD),
+    iconActive: Color(0xFFF4F4F0),
+    iconDisabled: Color(0xFF686864),
+    separatorExceptional: Color(0xFF3C3C38),
     paperWhite: Color(0xFFF8F7F2),
     ivory: Color(0xFFEDE7D8),
     nightBackground: Color(0xFF0B0D0B),

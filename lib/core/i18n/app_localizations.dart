@@ -965,8 +965,8 @@ final class YamantakaLocalizations {
       'settings.showProgress': 'Mostrar barra de progreso',
       'settings.motion': 'Movimiento',
       'settings.motion.description':
-          'Completo, reducido o sin animaciones. Se respeta la opción más '
-          'restrictiva del sistema.',
+          'Animaciones completas o movimiento reducido sin transiciones '
+          'decorativas. Se respeta la opción más restrictiva del sistema.',
       'settings.visualProfile': 'Perfil visual',
       'settings.visualProfile.description':
           'Tinta electrónica fuerza alto contraste, una página y cero '
@@ -1138,8 +1138,8 @@ final class YamantakaLocalizations {
       'settings.value.gray': 'Gris',
       'settings.value.dark': 'Oscuro',
       'settings.value.black': 'Negro',
-      'settings.value.motionFull': 'Completo',
-      'settings.value.motionReduced': 'Reducido',
+      'settings.value.motionFull': 'Animaciones completas',
+      'settings.value.motionReduced': 'Movimiento reducido',
       'settings.value.motionNone': 'Sin animaciones',
       'settings.value.standard': 'Estándar',
       'settings.value.electronicInk': 'Tinta electrónica',
@@ -2224,8 +2224,8 @@ final class YamantakaLocalizations {
       'settings.showProgress': 'Show progress bar',
       'settings.motion': 'Motion',
       'settings.motion.description':
-          'Full, reduced, or no animations. The most restrictive system '
-          'setting is respected.',
+          'Full animations or reduced motion without decorative transitions. '
+          'The most restrictive system setting is respected.',
       'settings.visualProfile': 'Visual profile',
       'settings.visualProfile.description':
           'Electronic ink enforces high contrast, one page, and no motion.',
@@ -2391,8 +2391,8 @@ final class YamantakaLocalizations {
       'settings.value.gray': 'Gray',
       'settings.value.dark': 'Dark',
       'settings.value.black': 'Black',
-      'settings.value.motionFull': 'Full',
-      'settings.value.motionReduced': 'Reduced',
+      'settings.value.motionFull': 'Full animations',
+      'settings.value.motionReduced': 'Reduced motion',
       'settings.value.motionNone': 'No animations',
       'settings.value.standard': 'Standard',
       'settings.value.electronicInk': 'Electronic ink',

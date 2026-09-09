@@ -298,9 +298,10 @@ void main() {
       sizeName: '1280x720',
       size: const Size(1280, 720),
       interaction: () async {
-        await tester.tap(
-          find.byKey(const Key('library-selection-mode-button')),
-        );
+        await tester.tap(find.byKey(const Key('library-display-menu-button')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('library-display-selection')));
+        await tester.pumpAndSettle();
         await tester.pump();
         await tester.tap(find.byKey(const ValueKey('artifact-matrix-0')));
         await tester.tap(find.byKey(const ValueKey('artifact-matrix-1')));

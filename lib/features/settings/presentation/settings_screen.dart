@@ -355,11 +355,12 @@ final class _SettingsScreenState extends State<SettingsScreen> {
           _DropdownSetting(
             label: strings.get('settings.motion'),
             description: strings.get('settings.motion.description'),
-            value: settings.resolvedMotionPreference.name,
+            value: settings.resolvedMotionPreference == AppMotionPreference.full
+                ? AppMotionPreference.full.name
+                : AppMotionPreference.reduced.name,
             values: {
               'full': strings.get('settings.value.motionFull'),
               'reduced': strings.get('settings.value.motionReduced'),
-              'none': strings.get('settings.value.motionNone'),
             },
             onChanged: (value) {
               final preference = AppMotionPreference.values.byName(value);
@@ -367,7 +368,7 @@ final class _SettingsScreenState extends State<SettingsScreen> {
                 settings.copyWith(
                   motionPreference: preference,
                   reduceMotion: preference != AppMotionPreference.full,
-                  disableAnimations: preference == AppMotionPreference.none,
+                  disableAnimations: preference != AppMotionPreference.full,
                 ),
               );
             },

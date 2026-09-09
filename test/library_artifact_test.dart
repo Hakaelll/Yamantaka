@@ -245,7 +245,7 @@ void main() {
       }
     });
 
-    test('uses additional columns for common 16:9 and 2K desktop widths', () {
+    test('keeps covers prominent on common 16:9 and 2K desktop widths', () {
       final fullHd = LibraryArtifactLayout.metricsFor(
         viewportWidth: 1840,
         documentCount: 100,
@@ -255,10 +255,10 @@ void main() {
         documentCount: 100,
       );
 
-      expect(fullHd.columns, 8);
-      expect(twoK.columns, 10);
-      expect(fullHd.artifactWidth, lessThanOrEqualTo(184));
-      expect(twoK.artifactWidth, lessThanOrEqualTo(184));
+      expect(fullHd.columns, 6);
+      expect(twoK.columns, 8);
+      expect(fullHd.artifactWidth, 220);
+      expect(twoK.artifactWidth, 220);
     });
 
     test('keyboard navigation follows the predictable visual grid', () {
@@ -312,31 +312,35 @@ void main() {
     expect(documentLabel(emptyTitle), 'notes.pdf');
   });
 
-  test('selection and scroll context survive library reloads', () async {
-    final database = AppDatabase.inMemory(
-      AppLogger(minimumLevel: LogLevel.error),
-    );
-    addTearDown(database.close);
-    final repository = DocumentRepository(database)..save(_document());
-    final controller = LibraryController(
-      repository,
-      AppLogger(minimumLevel: LogLevel.error),
-    );
-    addTearDown(controller.dispose);
+  test(
+    'explicit selection and scroll context survive library reloads',
+    () async {
+      final database = AppDatabase.inMemory(
+        AppLogger(minimumLevel: LogLevel.error),
+      );
+      addTearDown(database.close);
+      final repository = DocumentRepository(database)..save(_document());
+      final controller = LibraryController(
+        repository,
+        AppLogger(minimumLevel: LogLevel.error),
+      );
+      addTearDown(controller.dispose);
 
-    await controller.load();
-    expect(controller.selectedDocumentId, 'book');
-    controller
-      ..scrollOffset = 248
-      ..query = 'book'
-      ..favoritesOnly = true;
-    await controller.load();
+      await controller.load();
+      expect(controller.selectedDocumentId, isNull);
+      controller
+        ..selectDocument('book')
+        ..scrollOffset = 248
+        ..query = 'book'
+        ..favoritesOnly = true;
+      await controller.load();
 
-    expect(controller.selectedDocumentId, 'book');
-    expect(controller.scrollOffset, 248);
-    expect(controller.query, 'book');
-    expect(controller.favoritesOnly, isTrue);
-  });
+      expect(controller.selectedDocumentId, 'book');
+      expect(controller.scrollOffset, 248);
+      expect(controller.query, 'book');
+      expect(controller.favoritesOnly, isTrue);
+    },
+  );
 }
 
 CoverCandidateMetrics _metrics({

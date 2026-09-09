@@ -136,7 +136,9 @@ void main() {
       await waitFor(() => find.byType(LibraryScreen).evaluate().isNotEmpty);
       expect(services.library.totalDocuments, 1);
       await capture('library-populated-light');
-      await tester.tap(find.byTooltip('Ajustes').first);
+      await tester.tap(find.byTooltip('Organizar y más acciones'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ajustes'));
       await waitFor(() => find.byType(SettingsScreen).evaluate().isNotEmpty);
       await capture('settings-light');
       await tester.tap(find.byType(Switch).first);
@@ -158,7 +160,7 @@ void main() {
         Brightness.dark,
       );
       await capture('library-populated-dark');
-      await tester.tap(find.text('Retomar').first);
+      await tester.tap(find.byKey(const Key('continue-reading-strip')));
       await waitFor(
         () =>
             services.reader.status == ReaderStatus.ready &&

@@ -23,8 +23,6 @@ import 'artifact_library.dart';
 
 export '../application/library_filter.dart';
 
-part 'library_navigation.dart';
-
 @visibleForTesting
 List<String> acceptedDroppedPdfPaths(Iterable<String> paths) {
   final accepted = <String>[];
@@ -67,6 +65,7 @@ final class LibraryScreen extends StatefulWidget {
     required this.onPickDocument,
     required this.onOpenSettings,
     required this.showRecents,
+    this.reduceMotion = false,
     this.initialReadingFilter = LibraryReadingState.all,
     this.onReadingFilterChanged,
     this.onBulkOperation,
@@ -108,6 +107,7 @@ final class LibraryScreen extends StatefulWidget {
   final Future<void> Function() onPickDocument;
   final VoidCallback onOpenSettings;
   final bool showRecents;
+  final bool reduceMotion;
   final LibraryReadingState initialReadingFilter;
   final ValueChanged<LibraryReadingState>? onReadingFilterChanged;
   final BulkOperationHandler? onBulkOperation;
@@ -172,7 +172,6 @@ final class _LibraryScreenState extends State<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    final compactHeader = MediaQuery.sizeOf(context).width < 820;
     // Consume the application theme directly; no duplicate inherited theme.
     return CallbackShortcuts(
       bindings: {
@@ -207,43 +206,28 @@ final class _LibraryScreenState extends State<LibraryScreen> {
               surfaceTintColor: Colors.transparent,
               shape: const Border(),
               toolbarHeight: AppSizes.libraryHeaderHeight,
-              title: ListenableBuilder(
-                listenable: Listenable.merge([
-                  widget.controller,
-                  if (widget.enrichment != null) widget.enrichment!,
-                  if (widget.fileValidation != null) widget.fileValidation!,
-                ]),
-                builder: (context, _) => Row(
-                  children: [
-                    Image.asset(
-                      'assets/branding/yamantaka-logo-purple.png',
-                      width: 36,
-                      height: 36,
-                      excludeFromSemantics: true,
-                    ),
-                    const SizedBox(width: AppSpacing.space12),
-                    Flexible(
-                      child: Text(
-                        strings.libraryTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    if (!compactHeader) ...[
-                      const SizedBox(width: AppSpacing.space12),
-                      Text(
-                        strings.count(
-                          'count.documents',
-                          widget.controller.libraryDocumentCount,
-                        ),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ],
-                ),
+              titleSpacing: 0,
+              title: Semantics(
+                header: true,
+                label: strings.libraryTitle,
+                child: const SizedBox.shrink(),
               ),
               actions: [
+                if (widget.showRecents && !widget.continuity.isEmpty)
+                  ContinuityCenter(
+                    summary: widget.continuity,
+                    hasActiveReading: widget.controller.continueReading != null,
+                    hasRecentlyClosed: widget.recentlyClosed.isNotEmpty,
+                    onContinue: widget.controller.continueReading == null
+                        ? null
+                        : () => widget.onOpenPath(
+                            widget.controller.continueReading!.path,
+                          ),
+                    onOpenNext: widget.onOpenNext,
+                    onResumeSession: widget.onResumeSession,
+                    onDiscardContext: widget.onDiscardContext,
+                    onProblems: widget.onProblems,
+                  ),
                 if (widget.showRecents && widget.recentlyClosed.isNotEmpty)
                   RecentlyClosedStrip(
                     entries: widget.recentlyClosed
@@ -298,6 +282,8 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                         widget.onAutomations?.call();
                       case _LibraryAppMenuAction.problems:
                         widget.onProblems?.call();
+                      case _LibraryAppMenuAction.settings:
+                        widget.onOpenSettings();
                     }
                   },
                   itemBuilder: (context) => [
@@ -359,40 +345,31 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                         value: _LibraryAppMenuAction.checkFiles,
                         child: Text(strings.libraryCheckFiles),
                       ),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: _LibraryAppMenuAction.settings,
+                      child: Text(strings.settingsTitle),
+                    ),
                   ],
                   icon: const Icon(Icons.more_horiz_rounded),
                 ),
-                if (compactHeader)
-                  Tooltip(
-                    message: '${strings.libraryOpenPdf} (Ctrl+O)',
-                    child: Semantics(
-                      button: true,
-                      label: strings.libraryOpenPdf,
-                      child: FilledButton(
-                        key: const Key('library-open-button'),
-                        onPressed: widget.onPickDocument,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.square(
-                            AppSizes.desktopControlExtent,
-                          ),
-                          padding: EdgeInsets.zero,
+                Tooltip(
+                  message: '${strings.libraryOpenPdf} (Ctrl+O)',
+                  child: Semantics(
+                    button: true,
+                    label: strings.libraryOpenPdf,
+                    child: FilledButton(
+                      key: const Key('library-open-button'),
+                      onPressed: widget.onPickDocument,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.square(
+                          AppSizes.desktopControlExtent,
                         ),
-                        child: const Icon(Icons.file_open_outlined, size: 18),
+                        padding: EdgeInsets.zero,
                       ),
+                      child: const Icon(Icons.file_open_outlined, size: 18),
                     ),
-                  )
-                else
-                  FilledButton.icon(
-                    key: const Key('library-open-button'),
-                    onPressed: widget.onPickDocument,
-                    icon: const Icon(Icons.file_open_outlined, size: 18),
-                    label: Text(strings.libraryOpenPdf),
                   ),
-                const SizedBox(width: AppSpacing.space4),
-                IconButton(
-                  tooltip: strings.settingsTitle,
-                  onPressed: widget.onOpenSettings,
-                  icon: const Icon(Icons.tune_rounded),
                 ),
                 const SizedBox(width: AppSpacing.space8),
               ],
@@ -404,77 +381,47 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                     widget.controller,
                     if (widget.organization != null) widget.organization!,
                   ]),
-                  builder: (context, _) => Row(
-                    children: [
-                      if (MediaQuery.sizeOf(context).width >= 1100)
-                        _LibraryNavigation(
-                          controller: widget.controller,
-                          collections:
-                              widget.organization?.collections ?? const [],
-                          onCollections: widget.organization == null
-                              ? null
-                              : _showCollections,
-                          onWorkspaces: widget.onWorkspaces,
-                          onGlobalSearch: widget.onGlobalSearch,
-                          onAnnotations: widget.onAnnotations,
-                          onProblems: widget.onProblems,
-                          onOpenSettings: widget.onOpenSettings,
-                          onReadingStateChanged: (value) {
-                            setState(() => _readingState = value);
-                            widget.onReadingFilterChanged?.call(value);
+                  builder: (context, _) => _LibraryBody(
+                    controller: widget.controller,
+                    onOpenPath: widget.onOpenPath,
+                    onPickDocument: widget.onPickDocument,
+                    showRecents: widget.showRecents,
+                    reduceMotion: widget.reduceMotion,
+                    readingState: _readingState,
+                    onReadingStateChanged: (value) {
+                      setState(() => _readingState = value);
+                      widget.onReadingFilterChanged?.call(value);
+                    },
+                    onBulkOperation: widget.onBulkOperation,
+                    onDocumentInfo: widget.onDocumentInfo,
+                    onRelocateDocument: widget.onRelocateDocument,
+                    onToggleFavorite: widget.onToggleFavorite,
+                    onChangeCover: widget.onChangeCover,
+                    onRevealDocument: widget.onRevealDocument,
+                    onRemoveDocument: widget.onRemoveDocument,
+                    onReanalyzeDocument: widget.enrichment == null
+                        ? null
+                        : (document) async {
+                            await widget.enrichment!.reanalyzeDocuments([
+                              document,
+                            ]);
+                            await widget.controller.reload();
                           },
-                        ),
-                      Expanded(
-                        child: _LibraryBody(
-                          controller: widget.controller,
-                          onOpenPath: widget.onOpenPath,
-                          onPickDocument: widget.onPickDocument,
-                          showRecents: widget.showRecents,
-                          readingState: _readingState,
-                          onReadingStateChanged: (value) {
-                            setState(() => _readingState = value);
-                            widget.onReadingFilterChanged?.call(value);
-                          },
-                          onBulkOperation: widget.onBulkOperation,
-                          onDocumentInfo: widget.onDocumentInfo,
-                          onRelocateDocument: widget.onRelocateDocument,
-                          onToggleFavorite: widget.onToggleFavorite,
-                          onChangeCover: widget.onChangeCover,
-                          onRevealDocument: widget.onRevealDocument,
-                          onRemoveDocument: widget.onRemoveDocument,
-                          onReanalyzeDocument: widget.enrichment == null
-                              ? null
-                              : (document) async {
-                                  await widget.enrichment!.reanalyzeDocuments([
-                                    document,
-                                  ]);
-                                  await widget.controller.reload();
-                                },
-                          onDocumentVisible: widget.onDocumentVisible,
-                          onDocumentHidden: widget.onDocumentHidden,
-                          collections:
-                              widget.organization?.collections ?? const [],
-                          tags: widget.organization?.tags ?? const [],
-                          collectionMemberships:
-                              widget.organization?.collectionMemberships ??
-                              const {},
-                          tagMemberships:
-                              widget.organization?.tagMemberships ?? const {},
-                          recentlyClosed: widget.recentlyClosed,
-                          onRestoreClosed: widget.onRestoreClosed,
-                          onDismissClosed: widget.onDismissClosed,
-                          onReread: widget.onReread,
-                          onMarkFinished: widget.onMarkFinished,
-                          readingGoal: widget.readingGoal,
-                          onSetReadingGoal: widget.onSetReadingGoal,
-                          continuity: widget.continuity,
-                          onOpenNext: widget.onOpenNext,
-                          onResumeSession: widget.onResumeSession,
-                          onDiscardContext: widget.onDiscardContext,
-                          onProblems: widget.onProblems,
-                        ),
-                      ),
-                    ],
+                    onDocumentVisible: widget.onDocumentVisible,
+                    onDocumentHidden: widget.onDocumentHidden,
+                    collections: widget.organization?.collections ?? const [],
+                    tags: widget.organization?.tags ?? const [],
+                    collectionMemberships:
+                        widget.organization?.collectionMemberships ?? const {},
+                    tagMemberships:
+                        widget.organization?.tagMemberships ?? const {},
+                    recentlyClosed: widget.recentlyClosed,
+                    onRestoreClosed: widget.onRestoreClosed,
+                    onDismissClosed: widget.onDismissClosed,
+                    onReread: widget.onReread,
+                    onMarkFinished: widget.onMarkFinished,
+                    readingGoal: widget.readingGoal,
+                    onSetReadingGoal: widget.onSetReadingGoal,
                   ),
                 ),
                 if (_dragging)
@@ -677,6 +624,7 @@ final class _LibraryBody extends StatelessWidget {
     required this.onOpenPath,
     required this.onPickDocument,
     required this.showRecents,
+    required this.reduceMotion,
     required this.readingState,
     required this.onReadingStateChanged,
     this.onBulkOperation,
@@ -700,17 +648,13 @@ final class _LibraryBody extends StatelessWidget {
     this.onMarkFinished,
     this.readingGoal,
     this.onSetReadingGoal,
-    this.continuity = const ContinuitySummary(),
-    this.onOpenNext,
-    this.onResumeSession,
-    this.onDiscardContext,
-    this.onProblems,
   });
 
   final LibraryController controller;
   final Future<void> Function(String path) onOpenPath;
   final Future<void> Function() onPickDocument;
   final bool showRecents;
+  final bool reduceMotion;
   final LibraryReadingState readingState;
   final ValueChanged<LibraryReadingState> onReadingStateChanged;
   final BulkOperationHandler? onBulkOperation;
@@ -734,11 +678,6 @@ final class _LibraryBody extends StatelessWidget {
   final Future<void> Function(LibraryDocument document)? onMarkFinished;
   final ReadingGoal? readingGoal;
   final ValueChanged<LibraryDocument>? onSetReadingGoal;
-  final ContinuitySummary continuity;
-  final VoidCallback? onOpenNext;
-  final VoidCallback? onResumeSession;
-  final VoidCallback? onDiscardContext;
-  final VoidCallback? onProblems;
 
   @override
   Widget build(BuildContext context) {
@@ -769,19 +708,6 @@ final class _LibraryBody extends StatelessWidget {
     final continueReading = controller.continueReading;
     return Column(
       children: [
-        if (showRecents && !continuity.isEmpty)
-          ContinuityCenter(
-            summary: continuity,
-            hasActiveReading: false,
-            hasRecentlyClosed: recentlyClosed.isNotEmpty,
-            onContinue: continueReading == null
-                ? null
-                : () => onOpenPath(continueReading.path),
-            onOpenNext: onOpenNext,
-            onResumeSession: onResumeSession,
-            onDiscardContext: onDiscardContext,
-            onProblems: onProblems,
-          ),
         if (showRecents && continueReading != null)
           ContinueReadingStrip(
             document: continueReading,
@@ -810,6 +736,7 @@ final class _LibraryBody extends StatelessWidget {
                   onPickDocument: onPickDocument,
                   initialReadingState: readingState,
                   onReadingStateChanged: onReadingStateChanged,
+                  reduceMotion: reduceMotion,
                   onBulkOperation: onBulkOperation,
                   collections: collections,
                   tags: tags,
@@ -856,124 +783,113 @@ final class ContinuityCenter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    final theme = Theme.of(context);
-    final stats =
-        <({IconData icon, String label, int value, VoidCallback? tap})>[
-          (
-            icon: Icons.tab_outlined,
-            label: strings.get('continuity.open'),
-            value: summary.openDocuments,
-            tap: onResumeSession,
-          ),
-          (
-            icon: Icons.push_pin_outlined,
-            label: strings.get('continuity.pinned'),
-            value: summary.pinnedDocuments,
-            tap: onResumeSession,
-          ),
-          (
-            icon: Icons.schedule_outlined,
-            label: strings.get('continuity.pending'),
-            value: summary.pendingReadings,
-            tap: onOpenNext,
-          ),
-          (
-            icon: Icons.space_dashboard_outlined,
-            label: strings.get('continuity.workspaces'),
-            value: summary.workspaceCount,
-            tap: onResumeSession,
-          ),
-          (
-            icon: Icons.report_problem_outlined,
-            label: strings.get('continuity.problems'),
-            value: summary.problemCount,
-            tap: onProblems,
-          ),
-        ];
-    return Material(
-      color: theme.colorScheme.surfaceContainerLow,
-      child: ExpansionTile(
-        key: const PageStorageKey('library-session-details'),
-        leading: const Icon(Icons.history_rounded, size: 20),
-        title: Text(
-          strings.get('continuity.title'),
-          style: theme.textTheme.bodyMedium,
-        ),
-        tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
-        shape: const Border(),
-        collapsedShape: const Border(),
-        children: [
-          ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * .35,
+    final resumeDetails = <String>[
+      if (summary.openDocuments > 0)
+        '${strings.get('continuity.open')}: ${summary.openDocuments}',
+      if (summary.pinnedDocuments > 0)
+        '${strings.get('continuity.pinned')}: ${summary.pinnedDocuments}',
+      if (summary.workspaceCount > 0)
+        '${strings.get('continuity.workspaces')}: ${summary.workspaceCount}',
+    ].join(' · ');
+    final activityCount =
+        summary.openDocuments +
+        summary.pendingReadings +
+        summary.workspaceCount +
+        summary.problemCount;
+    return PopupMenuButton<_ContinuityAction>(
+      key: const Key('continuity-menu-button'),
+      tooltip: strings.get('continuity.title'),
+      constraints: const BoxConstraints(minWidth: 260, maxWidth: 360),
+      onSelected: (action) {
+        switch (action) {
+          case _ContinuityAction.continueReading:
+            onContinue?.call();
+          case _ContinuityAction.openNext:
+            onOpenNext?.call();
+          case _ContinuityAction.resume:
+            onResumeSession?.call();
+          case _ContinuityAction.problems:
+            onProblems?.call();
+          case _ContinuityAction.discard:
+            onDiscardContext?.call();
+        }
+      },
+      itemBuilder: (context) => [
+        if (hasActiveReading && onContinue != null)
+          PopupMenuItem(
+            key: const Key('continuity-continue'),
+            value: _ContinuityAction.continueReading,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.play_arrow_rounded),
+              title: Text(strings.get('continuity.continue')),
             ),
-            child: SingleChildScrollView(
-              key: const PageStorageKey('library-session-scroll'),
-              primary: false,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Wrap(
-                    spacing: AppSpacing.space8,
-                    runSpacing: AppSpacing.space8,
-                    children: [
-                      if (hasActiveReading)
-                        FilledButton.tonalIcon(
-                          key: const Key('continuity-continue'),
-                          onPressed: onContinue,
-                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                          label: Text(strings.get('continuity.continue')),
-                        ),
-                      if (onOpenNext != null)
-                        OutlinedButton.icon(
-                          key: const Key('continuity-open-next'),
-                          onPressed: onOpenNext,
-                          icon: const Icon(Icons.skip_next_rounded, size: 18),
-                          label: Text(strings.get('continuity.openNext')),
-                        ),
-                      if (onResumeSession != null)
-                        TextButton.icon(
-                          key: const Key('continuity-resume'),
-                          onPressed: onResumeSession,
-                          icon: const Icon(Icons.restore_rounded, size: 18),
-                          label: Text(strings.get('continuity.resume')),
-                        ),
-                      if ((hasActiveReading || hasRecentlyClosed) &&
-                          onDiscardContext != null)
-                        TextButton.icon(
-                          key: const Key('continuity-discard'),
-                          onPressed: onDiscardContext,
-                          icon: const Icon(
-                            Icons.layers_clear_outlined,
-                            size: 18,
-                          ),
-                          label: Text(strings.get('continuity.discard')),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  Wrap(
-                    spacing: AppSpacing.space8,
-                    runSpacing: AppSpacing.space4,
-                    children: [
-                      for (final stat in stats.where((stat) => stat.value > 0))
-                        TextButton.icon(
-                          onPressed: stat.tap,
-                          icon: Icon(stat.icon, size: 16),
-                          label: Text('${stat.label}: ${stat.value}'),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
+          ),
+        if (onResumeSession != null)
+          PopupMenuItem(
+            key: const Key('continuity-resume'),
+            value: _ContinuityAction.resume,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.restore_rounded),
+              title: Text(strings.get('continuity.resume')),
+              subtitle: resumeDetails.isEmpty
+                  ? null
+                  : Text(
+                      resumeDetails,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+            ),
+          ),
+        if (onOpenNext != null)
+          PopupMenuItem(
+            key: const Key('continuity-open-next'),
+            value: _ContinuityAction.openNext,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.skip_next_rounded),
+              title: Text(strings.get('continuity.openNext')),
+              trailing: summary.pendingReadings > 0
+                  ? Badge(label: Text('${summary.pendingReadings}'))
+                  : null,
+            ),
+          ),
+        if (summary.problemCount > 0 && onProblems != null)
+          PopupMenuItem(
+            key: const Key('continuity-problems'),
+            value: _ContinuityAction.problems,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.report_problem_outlined),
+              title: Text(strings.get('continuity.problems')),
+              trailing: Badge(label: Text('${summary.problemCount}')),
+            ),
+          ),
+        if ((hasActiveReading || hasRecentlyClosed) &&
+            onDiscardContext != null) ...[
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            key: const Key('continuity-discard'),
+            value: _ContinuityAction.discard,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.layers_clear_outlined),
+              title: Text(strings.get('continuity.discard')),
             ),
           ),
         ],
+      ],
+      icon: Badge(
+        isLabelVisible: activityCount > 0,
+        label: Text(activityCount > 99 ? '99+' : '$activityCount'),
+        child: const Icon(Icons.layers_outlined),
       ),
     );
   }
 }
+
+enum _ContinuityAction { continueReading, openNext, resume, problems, discard }
 
 final class ContinueReadingStrip extends StatefulWidget {
   const ContinueReadingStrip({
@@ -1048,7 +964,7 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
           return KeyEventResult.ignored;
         },
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
           child: GestureDetector(
             onSecondaryTapDown: (details) =>
                 _showContextMenu(context, details.globalPosition),
@@ -1061,21 +977,18 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
                 onTap: widget.onOpen,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.space20,
+                    AppSpacing.space16,
+                    AppSpacing.space6,
                     AppSpacing.space8,
-                    AppSpacing.space12,
-                    AppSpacing.space8,
+                    AppSpacing.space6,
                   ),
                   child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final compact = constraints.maxWidth < 720;
-                      final largeText =
-                          MediaQuery.textScalerOf(context).scale(1) > 1.5;
+                    builder: (context, _) {
                       return Row(
                         children: [
                           Container(
                             width: 4,
-                            height: 64,
+                            height: 44,
                             decoration: BoxDecoration(
                               color: context.appColors.focusRing,
                               borderRadius: BorderRadius.circular(
@@ -1090,36 +1003,35 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  strings.get('library.continueReading'),
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(
-                                        color: context.appColors.textMuted,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                                Text(
                                   document.effectiveTitle,
                                   style: Theme.of(
                                     context,
                                   ).textTheme.titleMedium,
-                                  maxLines: compact ? 1 : 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: AppSpacing.space8),
-                                SizedBox(
-                                  width: 240,
-                                  child: LinearProgressIndicator(
-                                    value: document.readingProgress,
-                                    minHeight: 3,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.space4),
-                                Text(
-                                  progress,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                                const SizedBox(height: AppSpacing.space4),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        progress,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      ),
+                                    ),
+                                    const SizedBox(width: AppSpacing.space12),
+                                    Expanded(
+                                      child: LinearProgressIndicator(
+                                        value: document.readingProgress,
+                                        minHeight: 3,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 if (widget.goal case final goal?)
                                   Padding(
@@ -1144,27 +1056,16 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
                               ],
                             ),
                           ),
-                          if (!compact && !largeText) ...[
-                            const SizedBox(width: AppSpacing.space16),
-                            Text(
-                              _relativeDate(document.lastOpenedAt, strings),
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: context.appColors.textSecondary,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
-                            ),
-                          ],
                           const SizedBox(width: AppSpacing.space12),
-                          FilledButton.icon(
-                            onPressed: widget.onOpen,
-                            icon: const Icon(
-                              Icons.play_arrow_rounded,
-                              size: 18,
+                          Tooltip(
+                            message: strings.get('action.resumeReading'),
+                            child: IconButton.filled(
+                              onPressed: widget.onOpen,
+                              icon: const Icon(
+                                Icons.play_arrow_rounded,
+                                size: 20,
+                              ),
                             ),
-                            label: Text(strings.get('action.resumeReading')),
                           ),
                         ],
                       );
@@ -1338,22 +1239,6 @@ final class EmptyLibraryState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset(
-                'assets/branding/yamantaka-logo-purple.png',
-                width: 96,
-                height: 96,
-                filterQuality: FilterQuality.high,
-                semanticLabel: 'Yamantaka',
-              ),
-              const SizedBox(height: AppSpacing.space20),
-              Text(
-                'Yamantaka',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.4,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.space6),
               Text(
                 strings.get('library.emptyTagline'),
                 textAlign: TextAlign.center,
@@ -1654,4 +1539,5 @@ enum _LibraryAppMenuAction {
   annotations,
   automations,
   problems,
+  settings,
 }

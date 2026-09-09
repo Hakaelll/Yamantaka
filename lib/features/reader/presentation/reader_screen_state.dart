@@ -556,7 +556,10 @@ final class _ReaderScreenState extends State<ReaderScreen> {
               right: 0,
               width: panelWidth,
               child: TweenAnimationBuilder<double>(
-                key: ValueKey(_panel),
+                // The panel itself must stay mounted while its section
+                // changes. Keying this transition by the active section made
+                // the whole surface leave and re-enter the viewport.
+                key: const Key('reader-panel-motion'),
                 duration: AppMotion.whenAllowed(
                   widget.reduceMotion ||
                       _isElectronicInk ||
@@ -583,6 +586,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
                     onSectionChanged: _showPanel,
                     flatChrome:
                         _isElectronicInk || MediaQuery.highContrastOf(context),
+                    reduceMotion: widget.reduceMotion || _isElectronicInk,
                     onClose: _closePanel,
                     onWidthChanged: _resizePanel,
                     onExportAnnotations: widget.onExportAnnotations,

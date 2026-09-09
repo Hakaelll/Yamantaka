@@ -38,8 +38,11 @@ void main() {
 
     expect(light.appBackground, const Color(0xFFF7F6F2));
     expect(light.accentPrimary, const Color(0xFF7055B5));
-    expect(dark.appBackground, const Color(0xFF181A20));
-    expect(dark.textPrimary, const Color(0xFFF0F1EB));
+    expect(dark.appBackground, const Color(0xFF0B0B0B));
+    expect(dark.surfacePrimary, const Color(0xFF171717));
+    expect(dark.selectionBackground, const Color(0xFF292929));
+    expect(dark.surfaceActive, const Color(0xFF292929));
+    expect(dark.textPrimary, const Color(0xFFF2F2EF));
   });
 
   test('library uses the shared light and dark application palettes', () {

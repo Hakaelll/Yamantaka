@@ -36,6 +36,7 @@ final class ReaderSidePanel extends StatefulWidget {
     this.allowPin = false,
     this.onPinnedChanged,
     this.flatChrome = false,
+    this.reduceMotion = false,
     this.onExportAnnotations,
   });
 
@@ -51,6 +52,7 @@ final class ReaderSidePanel extends StatefulWidget {
   final bool allowPin;
   final ValueChanged<bool>? onPinnedChanged;
   final bool flatChrome;
+  final bool reduceMotion;
   final Future<void> Function()? onExportAnnotations;
 
   @override
@@ -76,6 +78,10 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
     final title = _title(strings);
+    final transitionDuration = AppMotion.whenAllowed(
+      widget.reduceMotion || MediaQuery.disableAnimationsOf(context),
+      AppMotion.fast,
+    );
     return Semantics(
       container: true,
       label: strings.get('reader.panel', parameters: {'title': title}),
@@ -131,10 +137,16 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                           ),
                           const SizedBox(width: AppSpacing.space8),
                           Expanded(
-                            child: Text(
-                              title,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            child: AnimatedSwitcher(
+                              duration: transitionDuration,
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              child: Text(
+                                title,
+                                key: ValueKey('reader-panel-title-$title'),
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ),
                           if (widget.allowPin)
@@ -170,10 +182,17 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                               children: [
                                 _PanelSectionRail(
                                   selected: widget.section,
+                                  reduceMotion: widget.reduceMotion,
                                   onSelected: widget.onSectionChanged,
                                 ),
                                 const VerticalDivider(width: 1),
-                                Expanded(child: _content()),
+                                Expanded(
+                                  child: _AnimatedPanelContent(
+                                    section: widget.section,
+                                    duration: transitionDuration,
+                                    child: _content(),
+                                  ),
+                                ),
                               ],
                             )
                           : Column(
@@ -183,7 +202,13 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                                   onSelected: widget.onSectionChanged,
                                 ),
                                 const Divider(height: 1),
-                                Expanded(child: _content()),
+                                Expanded(
+                                  child: _AnimatedPanelContent(
+                                    section: widget.section,
+                                    duration: transitionDuration,
+                                    child: _content(),
+                                  ),
+                                ),
                               ],
                             ),
                     ),
@@ -195,6 +220,7 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
                   bottom: 0,
                   child: _PanelResizeHandle(
                     width: widget.width,
+                    reduceMotion: widget.reduceMotion,
                     onWidthChanged: widget.onWidthChanged,
                   ),
                 ),
@@ -233,4 +259,44 @@ final class _ReaderSidePanelState extends State<ReaderSidePanel> {
       textController: _searchTextController,
     ),
   };
+}
+
+final class _AnimatedPanelContent extends StatelessWidget {
+  const _AnimatedPanelContent({
+    required this.section,
+    required this.duration,
+    required this.child,
+  });
+
+  final ReaderPanelSection section;
+  final Duration duration;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ClipRect(
+    child: AnimatedSwitcher(
+      duration: duration,
+      reverseDuration: duration,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        fit: StackFit.expand,
+        children: [...previousChildren, ?currentChild],
+      ),
+      transitionBuilder: (child, animation) {
+        final offset = Tween<Offset>(
+          begin: const Offset(0.025, 0),
+          end: Offset.zero,
+        ).animate(animation);
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(position: offset, child: child),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey('reader-panel-content-${section.name}'),
+        child: child,
+      ),
+    ),
+  );
 }

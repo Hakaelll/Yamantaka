@@ -74,13 +74,17 @@ abstract final class LibraryArtifactLayout {
       );
     }
     if (documentCount <= 6) {
-      final desiredColumns = documentCount <= 3 ? documentCount : 3;
+      final desiredColumns = compact
+          ? math.min(documentCount, 2)
+          : documentCount <= 3
+          ? documentCount
+          : 3;
       final columns = math.min(
         desiredColumns,
         math.max(1, ((usableWidth + 16) / 188).floor()),
       );
       final slotWidth = (usableWidth - gridGap * (columns - 1)) / columns;
-      final width = math.min(172.0, slotWidth * 0.78);
+      final width = math.min(220.0, slotWidth * 0.84);
       return ArtifactGridMetrics(
         columns: columns,
         artifactWidth: width,
@@ -90,16 +94,16 @@ abstract final class LibraryArtifactLayout {
       );
     }
     final targetCellWidth = switch (usableWidth) {
-      < 680 => 176.0,
-      < 1600 => 204.0,
-      < 2200 => 220.0,
-      _ => 236.0,
+      < 680 => 220.0,
+      < 1600 => 260.0,
+      < 2200 => 280.0,
+      _ => 300.0,
     };
     final maximumColumns = switch (usableWidth) {
-      < 680 => 4,
-      < 1600 => 7,
-      < 2200 => 8,
-      _ => 10,
+      < 680 => 3,
+      < 1600 => 5,
+      < 2200 => 6,
+      _ => 8,
     };
     final minimumColumns = usableWidth < 188 ? 1 : 2;
     final columns = (usableWidth / targetCellWidth).floor().clamp(
@@ -107,7 +111,7 @@ abstract final class LibraryArtifactLayout {
       maximumColumns,
     );
     final cellWidth = (usableWidth - gridGap * (columns - 1)) / columns;
-    final width = math.min(184.0, cellWidth * 0.72);
+    final width = math.min(220.0, cellWidth * 0.84);
     return ArtifactGridMetrics(
       columns: columns,
       artifactWidth: width,

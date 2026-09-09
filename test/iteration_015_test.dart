@@ -17,77 +17,94 @@ import 'package:yamantaka/storage/database/app_database.dart';
 import 'package:yamantaka/storage/repositories/document_repository.dart';
 
 void main() {
-  testWidgets(
-    'desktop navigation delegates to SQL and reset clears every scope',
-    (tester) async {
-      tester.view.physicalSize = const Size(1280, 720);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final database = AppDatabase.inMemory(
-        AppLogger(minimumLevel: LogLevel.error),
-      );
-      final repository = DocumentRepository(database);
-      repository.save(_document('reading', progress: .4));
-      repository.save(_document('favorite', favorite: true));
-      repository.save(_document('finished', progress: 1));
-      final controller = LibraryController(
-        repository,
-        AppLogger(minimumLevel: LogLevel.error),
-      );
-      await controller.load();
-      await tester.pumpWidget(
-        _app(
-          LibraryScreen(
-            controller: controller,
-            onOpenPath: (_) async {},
-            onPickDocument: () async {},
-            onOpenSettings: () {},
-            showRecents: false,
-          ),
+  testWidgets('minimal library keeps navigation and reset actions on demand', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    final repository = DocumentRepository(database);
+    repository.save(_document('reading', progress: .4));
+    repository.save(_document('favorite', favorite: true));
+    repository.save(_document('finished', progress: 1));
+    final controller = LibraryController(
+      repository,
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    var openedSettings = false;
+    await controller.load();
+    await tester.pumpWidget(
+      _app(
+        LibraryScreen(
+          controller: controller,
+          onOpenPath: (_) async {},
+          onPickDocument: () async {},
+          onOpenSettings: () => openedSettings = true,
+          onAnnotations: () {},
+          onProblems: () {},
+          showRecents: false,
         ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('library-navigation')), findsOneWidget);
-      expect(
-        Theme.of(
-          tester.element(find.byKey(const Key('library-navigation'))),
-        ).brightness,
-        Brightness.light,
-      );
-      for (final entry in {
-        'reading': 'reading',
-        'favorites': 'favorite',
-        'completed': 'finished',
-      }.entries) {
-        await tester.tap(find.byKey(ValueKey('library-nav-${entry.key}')));
-        await tester.pumpAndSettle();
-        expect(controller.documents.map((d) => d.id), [entry.value]);
-      }
-      await tester.tap(find.byKey(const Key('library-nav-all')));
-      await tester.pumpAndSettle();
-      expect(controller.documents.length, 3);
-      controller.query = 'reading';
-      controller.selectedSmartCollection = SmartCollection.inProgress;
-      await controller.reload();
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('library-reset-filters-button')));
-      await tester.pumpAndSettle();
-      expect(controller.query, isEmpty);
-      expect(controller.selectedSmartCollection, isNull);
-      expect(controller.documents.length, 3);
-      await tester.tap(find.byKey(const Key('library-search-button')));
-      await tester.pumpAndSettle();
-      expect(find.byType(TextField), findsOneWidget);
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(find.byType(TextField), findsNothing);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-      controller.dispose();
-      database.close();
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('library-navigation')), findsNothing);
+    expect(find.byTooltip('Ajustes'), findsNothing);
+    expect(find.text('Biblioteca'), findsNothing);
+    expect(find.text('3 documentos'), findsNothing);
+    expect(find.text('Revisión de anotaciones'), findsNothing);
+    expect(find.text('Problemas y recuperación'), findsNothing);
+    await tester.tap(find.byTooltip('Organizar y más acciones'));
+    await tester.pumpAndSettle();
+    expect(find.text('Revisión de anotaciones'), findsOneWidget);
+    expect(find.text('Problemas y recuperación'), findsOneWidget);
+    expect(find.text('Ajustes'), findsOneWidget);
+    await tester.tap(find.text('Ajustes'));
+    await tester.pumpAndSettle();
+    expect(openedSettings, isTrue);
+    expect(controller.documents.length, 3);
+    controller.query = 'reading';
+    controller.selectedSmartCollection = SmartCollection.inProgress;
+    await controller.reload();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('library-reset-filters-button')));
+    await tester.pumpAndSettle();
+    expect(controller.query, isEmpty);
+    expect(controller.selectedSmartCollection, isNull);
+    expect(controller.documents.length, 3);
+    await tester.tap(find.byKey(const Key('library-search-button')));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    database.close();
+  });
+
+  test('a single document waits for an explicit selection', () async {
+    final database = AppDatabase.inMemory(
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    addTearDown(database.close);
+    final repository = DocumentRepository(database)
+      ..save(_document('only-document'));
+    final controller = LibraryController(
+      repository,
+      AppLogger(minimumLevel: LogLevel.error),
+    );
+    addTearDown(controller.dispose);
+
+    await controller.load();
+
+    expect(controller.documents, hasLength(1));
+    expect(controller.selectedDocumentId, isNull);
+  });
 
   testWidgets('duplicate decisions remain attached to their own pair', (
     tester,

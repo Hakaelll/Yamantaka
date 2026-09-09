@@ -46,7 +46,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SnackBar), findsNothing);
     expect(undone, isFalse);
+    expect(AppTheme.light().snackBarTheme.width, 420);
+    expect(AppTheme.light().snackBarTheme.behavior, SnackBarBehavior.floating);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('passive notices disappear without interaction', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Guardado'),
+                  duration: Duration(milliseconds: 800),
+                ),
+              ),
+              child: const Text('Mostrar'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Mostrar'));
+    await tester.pump();
+    expect(find.byType(SnackBar), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 900));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(SnackBar), findsNothing);
   });
 
   testWidgets('session details stay secondary until explicitly expanded', (
@@ -77,10 +107,10 @@ void main() {
       lessThanOrEqualTo(56),
     );
     expect(find.byKey(const Key('continuity-resume')), findsNothing);
-    await tester.tap(find.byType(ExpansionTile));
+    await tester.tap(find.byKey(const Key('continuity-menu-button')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('continuity-resume')), findsOneWidget);
-    expect(find.text('pendientes: 1'), findsOneWidget);
+    expect(find.byKey(const Key('continuity-open-next')), findsOneWidget);
     expect(find.text('1 pendientes'), findsNothing);
     expect(tester.takeException(), isNull);
   });

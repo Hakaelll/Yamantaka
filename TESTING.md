@@ -1,6 +1,91 @@
 # Pruebas
 
-Estado actualizado: 2026-09-07.
+Estado actualizado: 2026-09-09.
+
+## Pase de simplificación de Biblioteca
+
+La revisión actual pasa `flutter analyze --no-pub`, las 329 pruebas de
+`flutter test --no-pub` y `flutter build windows --release --no-pub`. El flujo
+nativo con PDFium real también pasa: abre un PDF sintético de 12 páginas,
+recorre Biblioteca, Lector y Ajustes en claro y oscuro, restaura la página 2 y
+confirma que el PDF termina byte-idéntico. No usa datos personales y declara
+`physicalDpiValidation: false`.
+
+La evidencia visual regenerada queda en
+`build/visual-evidence/library-simplification-after/`; incluye Biblioteca,
+Lector, Ajustes, flujo nativo y once comparaciones con 0.15. Se revisaron los
+estados claro/oscuro, 640×480, 1280×720, cuadrícula/lista, selección, panel y
+texto al 200 % sin detectar overflow ni pérdida de una función esencial.
+
+La mejora posterior de visibilidad se regenera en
+`build/visual-evidence/visibility-pass/`. Sus matrices de Biblioteca, Ajustes y
+Lector y las once comparaciones `simplified`/`visibility` confirman superficies
+oscuras neutras, selección con marca explícita y foco de lista con contorno
+completo. Tras ese cambio vuelven a pasar el análisis, las 326 pruebas y la
+build Windows Release.
+
+La revisión `cover-first` se regenera en
+`build/visual-evidence/cover-first-library/`. Verifica la Biblioteca sin marca
+ni rail persistente, portadas de hasta 220 px, continuidad compacta, controles
+bajo demanda y los modos `Animaciones completas` / `Movimiento reducido`. La
+matriz incluye claro, oscuro negro, 640×480, texto al 200 %, alto contraste,
+movimiento reducido, selección y lista. Las pruebas focalizadas y la build
+Windows Release pasan. El flujo nativo actualizado con PDFium real también
+pasa y deja el PDF sintético byte-idéntico. El gate final aprueba 13 de 14 fases
+sin omisiones y falla únicamente al no poder confirmar físicamente 96 DPI/100 %;
+la verificación integral se mantiene sujeta a las mismas limitaciones físicas,
+de firma y de rendimiento documentadas debajo.
+
+La iteración de cubiertas 3D se conserva en
+`build/visual-evidence/three-dimensional-covers/library/`. Sus casos verifican
+las seis cubiertas procedurales, perspectiva y volumen, selección, claro/negro,
+alto contraste, movimiento reducido y texto al 200 %. La implementación es
+vectorial y no incorpora activos externos al paquete. El análisis, las 326
+pruebas y la build Release pasan; el paquete de prueba mide 18,77 MiB y supera
+el smoke de ocho segundos sin conexiones de red.
+
+El refinamiento posterior se genera en
+`build/visual-evidence/procedural-cover-families/library/`. Sustituye la
+plantilla repetida de icono central por seis familias visuales, añade un canto
+de páginas dibujado, integra las miniaturas reales a sangre y reserva el
+paralaje y el brillo para `Animaciones completas`. La matriz visual focalizada
+incluye claro, oscuro negro, selección, 640×480, alto contraste, movimiento
+reducido y texto al 200 %; el contrato de miniatura comprueba además recorte de
+tapa, alineación superior y decodificación limitada al tamaño físico. Tras el
+refinamiento pasan análisis, 327 pruebas, Release y el flujo PDFium real con el
+PDF byte-idéntico. El ZIP de prueba de 21 entradas mide 18,79 MiB, un 0,078 %
+más que la primera versión 3D, y supera el smoke de ocho segundos sin red.
+
+El pulido final se regenera en
+`build/visual-evidence/library-polish-final/`. La matriz de Biblioteca verifica
+23 casos y la del lector 34: claro/oscuro, selección, 640×480, texto 200 %, alto
+contraste, movimiento reducido y panel superpuesto/acoplado. El flujo nativo
+PDFium pasa y `native-flow.json` declara `pdfUnchanged: true`; su captura
+`library-populated-dark.png` confirma con una miniatura real que la tapa queda
+horizontal y sin el escalonado de la antigua rotación permanente. Dos contratos
+nuevos fijan reposo/respuesta al ratón y desaparición de avisos pasivos. La barra
+del lector conserva targets de 40 px y el cambio de sección no reintroduce el
+panel completo.
+
+El gate agregado pasa 13 fases y falla únicamente `native resolution and DPI
+matrix`: produjo cuatro capturas nativas a 1600×900 y 96 DPI/100 %, pero el host
+no permitió confirmar físicamente esa escala (`scaleConfirmed: false`). No se
+usó `-DpiScaleConfirmed` para fabricar esa evidencia. Por tanto, el árbol actual
+no es un candidato publicable. El smoke de ocho segundos pasa sin conexiones de
+red y el benchmark de catálogo pasa hasta 100 000 documentos, materializando 80
+por página y sin datos personales.
+
+Esta pasada no ejecutó nuevos experimentos de rendimiento. Continúan vigentes
+las dos regresiones fiables de 0.15: p95 de construcción de frames de Biblioteca
+6986 frente a 4672 µs (+49,53 %) y lector 8078 frente a 6760 µs (+19,50 %).
+Tampoco acredita Narrator, varios monitores, escalas físicas adicionales ni
+firma Authenticode.
+
+Auditoría y decisiones: `docs/architecture/library-simplification-audit.md`.
+Informes: `build/verification/verification-report.json`,
+`build/verification/native-app-flow.json`,
+`build/verification/dpi-matrix/matrix-report.json` y
+`build/verification/performance/library-benchmark.json`.
 
 ## Iteración editorial 0.15
 

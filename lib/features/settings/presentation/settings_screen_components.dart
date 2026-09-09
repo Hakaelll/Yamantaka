@@ -663,11 +663,7 @@ final class _AppearancePreviewState extends State<_AppearancePreview> {
                 ),
                 _PreviewLabel(
                   label: strings.get(
-                    'settings.value.${widget.settings.resolvedMotionPreference.name == 'full'
-                        ? 'motionFull'
-                        : widget.settings.resolvedMotionPreference.name == 'reduced'
-                        ? 'motionReduced'
-                        : 'motionNone'}',
+                    'settings.value.${widget.settings.resolvedMotionPreference.name == 'full' ? 'motionFull' : 'motionReduced'}',
                   ),
                 ),
               ],

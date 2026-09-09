@@ -390,17 +390,14 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byType(ExpansionTile));
+      await tester.tap(find.byKey(const Key('continuity-menu-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('continuity-continue')), findsOneWidget);
       expect(find.byKey(const Key('continuity-open-next')), findsOneWidget);
+      expect(find.byKey(const Key('continuity-problems')), findsOneWidget);
       await tester.ensureVisible(find.byKey(const Key('continuity-resume')));
       await tester.tap(find.byKey(const Key('continuity-resume')));
       expect(resumed, isTrue);
-      final semantics = tester.getSemantics(
-        find.textContaining('problemas').last,
-      );
-      expect(semantics.label, contains('problemas'));
     });
 
     testWidgets('comparison closes only its secondary document handle', (

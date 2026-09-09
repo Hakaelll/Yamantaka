@@ -83,31 +83,24 @@ final class ReaderTopBar extends StatelessWidget
       return SizedBox(height: AppSizes.readerTopBarHeight(compact: compact));
     }
     final colors = context.appColors;
-    final veilColor = canvasColor ?? colors.readerBackground;
     return DecoratedBox(
       key: const Key('reader-top-surface'),
-      decoration: BoxDecoration(
-        color: veilColor.withValues(alpha: flatChrome ? 1 : 0.92),
-      ),
+      decoration: const BoxDecoration(color: Colors.transparent),
       child: SizedBox(
         height: AppSizes.readerTopBarHeight(compact: compact),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            compact ? AppSpacing.space8 : AppSpacing.space12,
-            AppSpacing.space8,
-            compact ? AppSpacing.space8 : AppSpacing.space12,
-            0,
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? AppSpacing.space8 : AppSpacing.space12,
+            vertical: compact ? AppSpacing.space6 : AppSpacing.space8,
           ),
           child: YamaToolbarGroup(
             key: const Key('reader-unified-top-bar'),
             label: strings.get('reader.tools'),
             flat: flatChrome,
+            bare: true,
             mainAxisSize: MainAxisSize.max,
             radius: AppRadii.control,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.space4,
-              vertical: AppSpacing.space2,
-            ),
+            padding: EdgeInsets.zero,
             children: [
               Expanded(
                 child: Align(
@@ -115,8 +108,10 @@ final class ReaderTopBar extends StatelessWidget
                   child: YamaToolbarGroup(
                     label: strings.get('reader.currentDocument'),
                     flat: flatChrome,
-                    bare: true,
-                    padding: EdgeInsets.zero,
+                    radius: AppRadii.capsule,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.space4,
+                    ),
                     children: [
                       YamaIconButton(
                         semanticLabel: strings.get('reader.backToLibrary'),
@@ -124,7 +119,19 @@ final class ReaderTopBar extends StatelessWidget
                         icon: Icons.arrow_back_rounded,
                         onPressed: onBack,
                       ),
-                      const SizedBox(width: AppSpacing.space8),
+                      Container(
+                        width: 2,
+                        height: 18,
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.space8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colors.accentPrimary,
+                          borderRadius: BorderRadius.circular(
+                            AppRadii.indicator,
+                          ),
+                        ),
+                      ),
                       Flexible(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
@@ -173,14 +180,16 @@ final class ReaderTopBar extends StatelessWidget
                   ),
                 ),
               ),
-              const YamaToolbarDivider(height: 24),
+              const SizedBox(width: AppSpacing.space8),
               Align(
                 alignment: Alignment.centerRight,
                 child: YamaToolbarGroup(
                   label: strings.get('reader.tools'),
                   flat: flatChrome,
-                  bare: true,
-                  padding: EdgeInsets.zero,
+                  radius: AppRadii.capsule,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.space4,
+                  ),
                   children: [
                     if (expanded &&
                         MediaQuery.textScalerOf(context).scale(1) <= 1.3)

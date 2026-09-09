@@ -243,7 +243,7 @@ void main() {
         hasRecentlyClosed: true,
       ),
     );
-    await tester.tap(find.byType(ExpansionTile));
+    await tester.tap(find.byKey(const Key('continuity-menu-button')));
     await tester.pumpAndSettle();
     await capture('continuity', 'continuity-content-light');
 

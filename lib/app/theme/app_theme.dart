@@ -527,14 +527,19 @@ abstract final class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         showCloseIcon: true,
-        closeIconColor: tokens.appBackground,
-        backgroundColor: tokens.textPrimary,
+        width: 420,
+        elevation: AppElevation.raised,
+        closeIconColor: tokens.textSecondary,
+        backgroundColor: tokens.surfaceFloating,
+        actionTextColor: tokens.accentPrimary,
         contentTextStyle: textTheme.bodyMedium?.copyWith(
-          color: tokens.appBackground,
+          color: tokens.textPrimary,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.field),
+          side: BorderSide(color: tokens.borderStrong),
+          borderRadius: BorderRadius.circular(AppRadii.capsule),
         ),
+        dismissDirection: DismissDirection.down,
       ),
       sliderTheme: base.sliderTheme.copyWith(
         activeTrackColor: tokens.accentPrimary,

@@ -104,9 +104,6 @@ final class LibraryController extends ChangeNotifier {
           _repository.byId(selectedDocumentId!) == null) {
         selectDocument(null);
       }
-      if (selectedDocumentId == null && documents.length == 1) {
-        selectDocument(documents.single.id);
-      }
     } on Object catch (exception, stackTrace) {
       _logger.error('Library load failed.', exception, stackTrace);
       error = AppFailure(

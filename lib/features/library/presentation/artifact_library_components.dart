@@ -27,6 +27,8 @@ enum _ActiveFilterKind {
   grouping,
 }
 
+enum _LibraryDisplayCommand { grid, list, selection, facets }
+
 final class _LibraryCommandBar extends StatelessWidget {
   const _LibraryCommandBar({
     required this.resultCount,
@@ -79,84 +81,19 @@ final class _LibraryCommandBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    final summary = _LibraryCollectionSummary(
-      resultCount: resultCount,
-      totalCount: totalCount,
-      filtered: query.isNotEmpty || activeFilter,
-    );
-    final expandedFilterContext = activeFilter
-        ? TextButton.icon(
-            key: const Key('library-reset-filters-button'),
-            onPressed: () => onFilter(_FilterCommand.reset),
-            icon: Badge(
-              label: Text('$activeFilterCount'),
-              child: const Icon(Icons.filter_alt_off_outlined, size: 18),
-            ),
-            label: Text(
-              strings.get(
-                'library.filtersApplied',
-                parameters: {'count': activeFilterCount},
-              ),
-            ),
-          )
-        : null;
-    final search = OutlinedButton.icon(
+    final search = IconButton(
       key: const Key('library-search-button'),
+      tooltip: query.isEmpty ? strings.librarySearch : query,
       onPressed: onSearch,
       icon: const Icon(Icons.search_rounded, size: 18),
-      label: Text(
-        query.isEmpty ? strings.librarySearch : query,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
     );
     final tools = YamaToolbarGroup(
       label: strings.get('library.commandBar'),
       flat: MediaQuery.highContrastOf(context),
+      bare: true,
+      padding: EdgeInsets.zero,
       children: [
-        YamaIconButton(
-          key: const Key('library-grid-view-button'),
-          semanticLabel: strings.get('library.view.grid'),
-          selected: viewMode == _LibraryViewMode.grid,
-          onPressed: () => onViewModeChanged(_LibraryViewMode.grid),
-          icon: Icons.grid_view_rounded,
-        ),
-        YamaIconButton(
-          key: const Key('library-list-view-button'),
-          semanticLabel: strings.get('library.view.list'),
-          selected: viewMode == _LibraryViewMode.list,
-          onPressed: () => onViewModeChanged(_LibraryViewMode.list),
-          icon: Icons.view_list_rounded,
-        ),
-        const YamaToolbarDivider(),
-        YamaIconButton(
-          key: const Key('library-selection-mode-button'),
-          semanticLabel: selectionMode
-              ? strings.get('library.exitSelectionMode')
-              : strings.get('library.selectMultiple'),
-          tooltip: selectionMode
-              ? strings.get('library.exitSelectionMode')
-              : strings.get('library.selectMultiple'),
-          selected: selectionMode,
-          onPressed: onToggleSelectionMode,
-          icon: selectionMode
-              ? Icons.check_box_outlined
-              : Icons.checklist_rounded,
-          badge: selectedCount > 0
-              ? Badge(label: Text('$selectedCount'))
-              : null,
-        ),
-        YamaIconButton(
-          key: const Key('library-facet-button'),
-          semanticLabel: strings.get('library.filterAuthorsTopics'),
-          tooltip: strings.get('library.authorsTopicsGrouping'),
-          onPressed: onFacets,
-          selected:
-              selectedAuthorCount > 0 ||
-              selectedTopicCount > 0 ||
-              grouping != LibraryGrouping.none,
-          icon: Icons.account_tree_outlined,
-        ),
+        search,
         PopupMenuButton<_FilterCommand>(
           key: const Key('library-filter-button'),
           tooltip: strings.get('library.filterSort'),
@@ -218,81 +155,97 @@ final class _LibraryCommandBar extends StatelessWidget {
             ],
           ],
         ),
+        PopupMenuButton<_LibraryDisplayCommand>(
+          key: const Key('library-display-menu-button'),
+          tooltip: strings.get('library.commandBar'),
+          onSelected: (command) {
+            switch (command) {
+              case _LibraryDisplayCommand.grid:
+                onViewModeChanged(_LibraryViewMode.grid);
+              case _LibraryDisplayCommand.list:
+                onViewModeChanged(_LibraryViewMode.list);
+              case _LibraryDisplayCommand.selection:
+                onToggleSelectionMode();
+              case _LibraryDisplayCommand.facets:
+                onFacets();
+            }
+          },
+          icon: Badge(
+            isLabelVisible: selectedCount > 0,
+            label: Text('$selectedCount'),
+            child: const Icon(Icons.more_vert_rounded),
+          ),
+          itemBuilder: (context) => [
+            CheckedPopupMenuItem(
+              key: const Key('library-display-grid'),
+              value: _LibraryDisplayCommand.grid,
+              checked: viewMode == _LibraryViewMode.grid,
+              child: Text(strings.get('library.view.grid')),
+            ),
+            CheckedPopupMenuItem(
+              key: const Key('library-display-list'),
+              value: _LibraryDisplayCommand.list,
+              checked: viewMode == _LibraryViewMode.list,
+              child: Text(strings.get('library.view.list')),
+            ),
+            const PopupMenuDivider(),
+            CheckedPopupMenuItem(
+              key: const Key('library-display-selection'),
+              value: _LibraryDisplayCommand.selection,
+              checked: selectionMode,
+              child: Text(
+                selectionMode
+                    ? strings.get('library.exitSelectionMode')
+                    : strings.get('library.selectMultiple'),
+              ),
+            ),
+            PopupMenuItem(
+              key: const Key('library-display-facets'),
+              value: _LibraryDisplayCommand.facets,
+              child: Text(strings.get('library.authorsTopicsGrouping')),
+            ),
+          ],
+        ),
       ],
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Medium windows still need the two-row composition: the command bar
-        // carries four 40 px tools plus a localized result summary.
-        final compact =
-            constraints.maxWidth < 1000 ||
-            MediaQuery.textScalerOf(context).scale(1) > 1.3;
-        final compactFilterContext = activeFilter
-            ? Semantics(
-                label: strings.get(
-                  'library.filtersApplied',
-                  parameters: {'count': activeFilterCount},
-                ),
-                button: true,
-                child: IconButton(
-                  key: const Key('library-reset-filters-button'),
-                  tooltip: strings.get('library.resetFilters'),
-                  onPressed: () => onFilter(_FilterCommand.reset),
-                  icon: Badge(
-                    label: Text('$activeFilterCount'),
-                    child: const Icon(Icons.filter_alt_off_outlined),
-                  ),
-                ),
-              )
-            : null;
-        final commandRow = compact
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: summary),
-                      ?compactFilterContext,
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.space8),
-                  Row(
-                    children: [
-                      Expanded(child: search),
-                      const SizedBox(width: AppSpacing.space12),
-                      tools,
-                    ],
-                  ),
-                ],
-              )
-            : Row(
-                children: [
-                  Expanded(child: search),
-                  const SizedBox(width: AppSpacing.space16),
-                  summary,
-                  const SizedBox(width: AppSpacing.space16),
-                  if (selectedCount > 0) ...[
-                    _LibrarySelectionCount(count: selectedCount),
-                    const SizedBox(width: AppSpacing.space8),
-                  ],
-                  if (expandedFilterContext != null) ...[
-                    expandedFilterContext,
-                    const SizedBox(width: AppSpacing.space8),
-                  ],
-                  tools,
-                ],
-              );
         return Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.space20,
-            AppSpacing.space12,
+            AppSpacing.space6,
             AppSpacing.space20,
-            AppSpacing.space8,
+            0,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              commandRow,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Semantics(
+                    liveRegion: query.isNotEmpty || activeFilter,
+                    label: strings.count(
+                      resultCount == totalCount
+                          ? 'count.documents'
+                          : 'count.results',
+                      resultCount,
+                    ),
+                    child: const SizedBox.shrink(),
+                  ),
+                  if (activeFilter)
+                    IconButton(
+                      key: const Key('library-reset-filters-button'),
+                      tooltip: strings.get('library.resetFilters'),
+                      onPressed: () => onFilter(_FilterCommand.reset),
+                      icon: Badge(
+                        label: Text('$activeFilterCount'),
+                        child: const Icon(Icons.filter_alt_off_outlined),
+                      ),
+                    ),
+                  tools,
+                ],
+              ),
               if (activeFilter) ...[
                 const SizedBox(height: AppSpacing.space8),
                 _ActiveFilterStrip(
@@ -427,81 +380,6 @@ final class _ActiveFilterChip extends StatelessWidget {
       visualDensity: VisualDensity.compact,
     ),
   );
-}
-
-final class _LibraryCollectionSummary extends StatelessWidget {
-  const _LibraryCollectionSummary({
-    required this.resultCount,
-    required this.totalCount,
-    required this.filtered,
-  });
-
-  final int resultCount;
-  final int totalCount;
-  final bool filtered;
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = YamantakaLocalizations.of(context);
-    final label = filtered
-        ? strings.get(
-            'library.resultOfTotal',
-            parameters: {'result': resultCount, 'total': totalCount},
-          )
-        : strings.count('count.documents', totalCount);
-    return Semantics(
-      liveRegion: filtered,
-      label: label,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              border: Border.all(color: context.appColors.borderSubtle),
-              borderRadius: BorderRadius.circular(AppRadii.control),
-            ),
-            child: Icon(
-              filtered
-                  ? Icons.filter_list_rounded
-                  : Icons.auto_stories_outlined,
-              size: 16,
-              color: context.appColors.textSecondary,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.space8),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: context.appColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _LibrarySelectionCount extends StatelessWidget {
-  const _LibrarySelectionCount({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = YamantakaLocalizations.of(context);
-    return Semantics(
-      liveRegion: true,
-      label: strings.count('count.documentsSelected', count),
-      child: Text(
-        strings.count('count.selected', count),
-        style: Theme.of(context).textTheme.labelMedium,
-      ),
-    );
-  }
 }
 
 final class _BulkActionBar extends StatelessWidget {
@@ -725,7 +603,11 @@ final class _ArtifactCanvas extends StatelessWidget {
                       itemBuilder: (context, index) {
                         final document = entry.value[index];
                         return Center(
-                          child: _artifact(document, metrics.artifactWidth),
+                          child: _artifact(
+                            document,
+                            metrics.artifactWidth,
+                            entranceIndex: index,
+                          ),
                         );
                       },
                     ),
@@ -771,7 +653,7 @@ final class _ArtifactCanvas extends StatelessWidget {
                     ),
                     runSpacing: AppSpacing.space24,
                     children: [
-                      for (final document in documents)
+                      for (final (index, document) in documents.indexed)
                         SizedBox(
                           width: metrics.artifactWidth,
                           height:
@@ -780,7 +662,11 @@ final class _ArtifactCanvas extends StatelessWidget {
                                   (MediaQuery.textScalerOf(context).scale(1) -
                                       1),
                           child: Center(
-                            child: _artifact(document, metrics.artifactWidth),
+                            child: _artifact(
+                              document,
+                              metrics.artifactWidth,
+                              entranceIndex: index,
+                            ),
                           ),
                         ),
                     ],
@@ -813,7 +699,11 @@ final class _ArtifactCanvas extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final document = documents[index];
                   return Center(
-                    child: _artifact(document, metrics.artifactWidth),
+                    child: _artifact(
+                      document,
+                      metrics.artifactWidth,
+                      entranceIndex: index,
+                    ),
                   );
                 },
               ),
@@ -824,7 +714,11 @@ final class _ArtifactCanvas extends StatelessWidget {
     );
   }
 
-  Widget _artifact(LibraryDocument document, double width) {
+  Widget _artifact(
+    LibraryDocument document,
+    double width, {
+    int entranceIndex = 0,
+  }) {
     Widget buildArtifact(bool selected) => ArtifactDocument(
       key: ValueKey('artifact-${document.id}'),
       document: document,
@@ -832,6 +726,7 @@ final class _ArtifactCanvas extends StatelessWidget {
       selected: selected,
       selectionMode: selectionMode,
       reduceMotion: reduceMotion,
+      entranceIndex: entranceIndex,
       onSelect: () => onSelect(document),
       onOpen: () => onOpen(document),
       onHover: (hovered) => onHover(hovered ? document.id : null),
@@ -1273,17 +1168,20 @@ final class _ArtifactListRowState extends State<_ArtifactListRow> {
                 ),
                 decoration: BoxDecoration(
                   color: background,
-                  border: Border(
-                    left: BorderSide(
-                      color: _focused
-                          ? colors.focusRing
-                          : widget.selected
-                          ? colors.librarySelectionAccent
-                          : Colors.transparent,
-                      width: 2,
-                    ),
-                    bottom: BorderSide(color: colors.borderSubtle),
-                  ),
+                  border: _focused
+                      ? Border.all(color: colors.focusRing, width: 2)
+                      : Border(
+                          left: BorderSide(
+                            color: widget.selected
+                                ? colors.librarySelectionAccent
+                                : Colors.transparent,
+                            width: 2,
+                          ),
+                          bottom: BorderSide(color: colors.borderSubtle),
+                        ),
+                  borderRadius: _focused
+                      ? BorderRadius.circular(AppRadii.control)
+                      : null,
                 ),
                 child: Row(
                   children: [
@@ -1461,6 +1359,7 @@ final class ArtifactDocument extends StatefulWidget {
     required this.onOpen,
     required this.onHover,
     required this.onMenu,
+    this.entranceIndex = 0,
     this.onVisible,
     this.onHidden,
   });
@@ -1474,6 +1373,7 @@ final class ArtifactDocument extends StatefulWidget {
   final VoidCallback onOpen;
   final ValueChanged<bool> onHover;
   final ValueChanged<Offset> onMenu;
+  final int entranceIndex;
   final VoidCallback? onVisible;
   final VoidCallback? onHidden;
 
@@ -1484,7 +1384,10 @@ final class ArtifactDocument extends StatefulWidget {
 final class _ArtifactDocumentState extends State<ArtifactDocument> {
   bool _hovered = false;
   bool _focused = false;
+  bool _entered = false;
   bool _reportedVisible = false;
+  Offset _pointerTilt = Offset.zero;
+  Timer? _entranceTimer;
 
   @override
   void initState() {
@@ -1493,11 +1396,22 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
       if (!mounted) return;
       _reportedVisible = true;
       widget.onVisible?.call();
+      if (widget.reduceMotion) {
+        setState(() => _entered = true);
+        return;
+      }
+      final delay = Duration(
+        milliseconds: math.min(widget.entranceIndex, 7) * 18,
+      );
+      _entranceTimer = Timer(delay, () {
+        if (mounted) setState(() => _entered = true);
+      });
     });
   }
 
   @override
   void dispose() {
+    _entranceTimer?.cancel();
     if (_reportedVisible) widget.onHidden?.call();
     super.dispose();
   }
@@ -1512,6 +1426,43 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
       selected: widget.selected,
     );
     final enrichmentStatus = widget.document.enrichment?.status;
+    final motionDisabled = widget.reduceMotion || highContrast;
+    final emphasized = widget.selected || _hovered || _focused;
+    final scale = motionDisabled
+        ? 1.0
+        : widget.selected
+        ? AppSizes.artifactSelectedScale
+        : emphasized
+        ? AppSizes.artifactHoverScale
+        : 1.0;
+    final lift = motionDisabled
+        ? 0.0
+        : widget.selected
+        ? AppSizes.artifactSelectedLift
+        : emphasized
+        ? AppSizes.artifactHoverLift
+        : 0.0;
+    final animatedScale = _entered || motionDisabled ? scale : 0.985;
+    // Keep the cover pixel-aligned at rest. A permanent Y rotation makes the
+    // long top and bottom edges land on fractional pixels, which is visibly
+    // stair-stepped by the Windows rasterizer. Depth remains in the spine,
+    // page block and shadow; perspective is revealed during pointer movement.
+    final bookAngle = highContrast || motionDisabled
+        ? 0.0
+        : !_entered
+        ? -0.035
+        : 0.0;
+    final transform = Matrix4.identity()
+      ..setEntry(3, 2, 0.0012)
+      ..translateByDouble(0, _entered || motionDisabled ? -lift : 8, 0, 1)
+      ..rotateX(motionDisabled ? 0 : -_pointerTilt.dy * 0.025)
+      ..rotateY(bookAngle + (motionDisabled ? 0 : _pointerTilt.dx * 0.038))
+      ..scaleByDouble(animatedScale, animatedScale, 1, 1);
+    final transformDuration = motionDisabled
+        ? AppMotion.instant
+        : _hovered
+        ? AppMotion.fast
+        : AppMotion.standard;
 
     return Semantics(
       button: true,
@@ -1540,8 +1491,28 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
             setState(() => _hovered = true);
             widget.onHover(true);
           },
+          onHover: (event) {
+            if (motionDisabled) return;
+            if (event.localPosition.dy > fittedHeight) {
+              if (_pointerTilt != Offset.zero) {
+                setState(() => _pointerTilt = Offset.zero);
+              }
+              return;
+            }
+            final next = Offset(
+              ((event.localPosition.dx / widget.width) - 0.5).clamp(-0.5, 0.5) *
+                  2,
+              ((event.localPosition.dy / fittedHeight) - 0.5).clamp(-0.5, 0.5) *
+                  2,
+            );
+            if ((next - _pointerTilt).distance < 0.08) return;
+            setState(() => _pointerTilt = next);
+          },
           onExit: (_) {
-            setState(() => _hovered = false);
+            setState(() {
+              _hovered = false;
+              _pointerTilt = Offset.zero;
+            });
             widget.onHover(false);
           },
           child: Listener(
@@ -1573,264 +1544,310 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                                     width: 2,
                                   ),
                                   borderRadius: BorderRadius.circular(
-                                    AppRadii.page + 3,
+                                    AppRadii.artifactCover + 3,
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        Container(
-                          // Grid reflow changes the cover dimensions. A
-                          // layout tween can temporarily exceed the new
-                          // cell when filters alter the column count.
-                          width: widget.width,
-                          height: fittedHeight,
-                          decoration: BoxDecoration(
-                            color: context.appColors.surfaceSunken,
-                            borderRadius: BorderRadius.circular(AppRadii.page),
-                            border: Border.all(
-                              color: widget.selected
-                                  ? context.appColors.librarySelectionAccent
-                                  : _hovered
-                                  ? context.appColors.borderStrong
-                                  : context.appColors.borderSubtle,
-                              width: widget.selected ? 1.5 : 1,
+                        if (!highContrast)
+                          Positioned.fill(
+                            left: 7,
+                            top: 8,
+                            right: -5,
+                            bottom: -5,
+                            child: IgnorePointer(
+                              child: _ArtifactBookPageBlock(
+                                duration: transformDuration,
+                                transform: Matrix4.copy(transform),
+                              ),
                             ),
-                            boxShadow: widget.reduceMotion || highContrast
-                                ? null
-                                : [
-                                    if (widget.selected)
+                          ),
+                        _ArtifactTransform(
+                          transformKey: ValueKey(
+                            'artifact-book-transform-${widget.document.id}',
+                          ),
+                          duration: transformDuration,
+                          transform: transform,
+                          child: AnimatedContainer(
+                            key: ValueKey(
+                              'artifact-book-face-${widget.document.id}',
+                            ),
+                            // Grid reflow changes the cover dimensions. A
+                            // layout tween can temporarily exceed the new
+                            // cell when filters alter the column count.
+                            duration: motionDisabled
+                                ? AppMotion.instant
+                                : AppMotion.standard,
+                            curve: Curves.easeOutCubic,
+                            width: widget.width,
+                            height: fittedHeight,
+                            decoration: BoxDecoration(
+                              color: context.appColors.surfaceSunken,
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.artifactCover,
+                              ),
+                              border: Border.all(
+                                color: widget.selected
+                                    ? context.appColors.librarySelectionAccent
+                                    : _hovered
+                                    ? context.appColors.borderStrong
+                                    : context.appColors.borderSubtle,
+                                width: widget.selected ? 1.5 : 1,
+                              ),
+                              boxShadow: motionDisabled
+                                  ? null
+                                  : [
+                                      if (widget.selected)
+                                        BoxShadow(
+                                          color: context
+                                              .appColors
+                                              .librarySelectionAccent
+                                              .withValues(alpha: 0.10),
+                                          blurRadius:
+                                              AppShadow.artifactGlowBlur,
+                                          spreadRadius:
+                                              AppShadow.artifactGlowSpread,
+                                          offset: const Offset(0, 12),
+                                        ),
                                       BoxShadow(
                                         color: context
                                             .appColors
-                                            .librarySelectionAccent
-                                            .withValues(alpha: 0.10),
-                                        blurRadius: AppShadow.artifactGlowBlur,
-                                        spreadRadius:
-                                            AppShadow.artifactGlowSpread,
-                                        offset: const Offset(0, 12),
+                                            .readerPageShadow
+                                            .withValues(
+                                              alpha: widget.selected
+                                                  ? 0.16
+                                                  : 0.08,
+                                            ),
+                                        blurRadius: widget.selected
+                                            ? AppShadow.artifactSelectedBlur
+                                            : AppShadow.artifactRestBlur,
+                                        spreadRadius: widget.selected ? 1 : 0,
+                                        offset: Offset(
+                                          0,
+                                          widget.selected
+                                              ? AppShadow.artifactSelectedOffset
+                                              : AppShadow.artifactRestOffset,
+                                        ),
                                       ),
-                                    BoxShadow(
-                                      color: context.appColors.readerPageShadow
-                                          .withValues(
-                                            alpha: widget.selected
-                                                ? 0.16
-                                                : 0.08,
-                                          ),
-                                      blurRadius: widget.selected
-                                          ? AppShadow.artifactSelectedBlur
-                                          : AppShadow.artifactRestBlur,
-                                      spreadRadius: widget.selected ? 1 : 0,
-                                      offset: Offset(
-                                        0,
-                                        widget.selected
-                                            ? AppShadow.artifactSelectedOffset
-                                            : AppShadow.artifactRestOffset,
+                                    ],
+                            ),
+                            clipBehavior: Clip.antiAliasWithSaveLayer,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                coverPath == null
+                                    ? _ArtifactPlaceholder(
+                                        document: widget.document,
+                                        active: emphasized,
+                                        reduceMotion: motionDisabled,
+                                      )
+                                    : _ArtifactCoverImage(
+                                        path: coverPath,
+                                        cacheWidth:
+                                            (widget.width *
+                                                    MediaQuery.devicePixelRatioOf(
+                                                      context,
+                                                    ))
+                                                .ceil(),
+                                        cacheHeight:
+                                            (fittedHeight *
+                                                    MediaQuery.devicePixelRatioOf(
+                                                      context,
+                                                    ))
+                                                .ceil(),
+                                        error: _ArtifactPlaceholder(
+                                          document: widget.document,
+                                          failed: true,
+                                          active: emphasized,
+                                          reduceMotion: motionDisabled,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              coverPath == null
-                                  ? _ArtifactPlaceholder(
-                                      document: widget.document,
-                                    )
-                                  : Image.file(
-                                      File(coverPath),
-                                      fit: BoxFit.contain,
-                                      cacheWidth:
-                                          (widget.width *
-                                                  MediaQuery.devicePixelRatioOf(
-                                                    context,
-                                                  ))
-                                              .ceil(),
-                                      cacheHeight:
-                                          (fittedHeight *
-                                                  MediaQuery.devicePixelRatioOf(
-                                                    context,
-                                                  ))
-                                              .ceil(),
-                                      gaplessPlayback: true,
-                                      filterQuality: FilterQuality.medium,
-                                      errorBuilder: (_, _, _) =>
-                                          _ArtifactPlaceholder(
-                                            document: widget.document,
-                                            failed: true,
-                                          ),
-                                    ),
-                              if (widget.document.readingProgress > 0 &&
-                                  widget.document.readingProgress < 1)
-                                Align(
-                                  alignment: Alignment.bottomCenter,
-                                  child: ColoredBox(
-                                    color: context.appColors.textMuted
-                                        .withValues(alpha: 0.28),
-                                    child: const SizedBox(
-                                      width: double.infinity,
-                                      height: 4,
-                                    ),
+                                if (!highContrast)
+                                  _ArtifactFrontFinish(
+                                    active: emphasized,
+                                    reduceMotion: motionDisabled,
                                   ),
-                                ),
-                              if (widget.document.readingProgress > 0 &&
-                                  widget.document.readingProgress < 1)
-                                Align(
-                                  alignment: Alignment.bottomLeft,
-                                  child: FractionallySizedBox(
-                                    widthFactor:
-                                        widget.document.readingProgress,
+                                if (widget.document.readingProgress > 0 &&
+                                    widget.document.readingProgress < 1)
+                                  Align(
+                                    alignment: Alignment.bottomCenter,
                                     child: ColoredBox(
-                                      color: widget.selected
-                                          ? context
-                                                .appColors
-                                                .librarySelectionAccent
-                                          : context.appColors.textSecondary,
-                                      child: const SizedBox(height: 4),
+                                      color: context.appColors.textMuted
+                                          .withValues(alpha: 0.28),
+                                      child: const SizedBox(
+                                        width: double.infinity,
+                                        height: 4,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              if (widget.document.readingProgress >= 1)
-                                Positioned(
-                                  right: AppSpacing.space8,
-                                  bottom: AppSpacing.space8,
-                                  child: Tooltip(
-                                    message: strings.get('library.finished'),
-                                    child: Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: context.appColors.textPrimary,
+                                if (widget.document.readingProgress > 0 &&
+                                    widget.document.readingProgress < 1)
+                                  Align(
+                                    alignment: Alignment.bottomLeft,
+                                    child: FractionallySizedBox(
+                                      widthFactor:
+                                          widget.document.readingProgress,
+                                      child: ColoredBox(
+                                        color: widget.selected
+                                            ? context
+                                                  .appColors
+                                                  .librarySelectionAccent
+                                            : context.appColors.textSecondary,
+                                        child: const SizedBox(height: 4),
+                                      ),
+                                    ),
+                                  ),
+                                if (widget.document.readingProgress >= 1)
+                                  Positioned(
+                                    right: AppSpacing.space8,
+                                    bottom: AppSpacing.space8,
+                                    child: Tooltip(
+                                      message: strings.get('library.finished'),
+                                      child: Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color:
+                                                context.appColors.textPrimary,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              if (widget.document.isFavorite)
-                                Positioned(
-                                  right: AppSpacing.space6,
-                                  top: AppSpacing.space6,
-                                  child: Tooltip(
-                                    message: strings.get('library.favorite'),
-                                    child: Icon(
-                                      Icons.bookmark_rounded,
-                                      size: 17,
-                                      color: context.appColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              if (!widget.selectionMode &&
-                                  widget.document.hasFileChanged)
-                                Positioned(
-                                  left: AppSpacing.space6,
-                                  top: AppSpacing.space6,
-                                  child: _ArtifactStateMarker(
-                                    icon: Icons.sync_problem_rounded,
-                                    label: strings.get('library.fileChanged'),
-                                    tone: AppStatusTone.warning,
-                                  ),
-                                )
-                              else if (!widget.selectionMode &&
-                                  enrichmentStatus != null &&
-                                  enrichmentStatus !=
-                                      EnrichmentStatus.completed &&
-                                  enrichmentStatus != EnrichmentStatus.noText)
-                                Positioned(
-                                  left: AppSpacing.space6,
-                                  top: AppSpacing.space6,
-                                  child: _ArtifactStateMarker(
-                                    icon: switch (enrichmentStatus) {
-                                      EnrichmentStatus.pending =>
-                                        Icons.hourglass_empty_rounded,
-                                      EnrichmentStatus.analyzing =>
-                                        Icons.sync_rounded,
-                                      EnrichmentStatus.review =>
-                                        Icons.fact_check_outlined,
-                                      EnrichmentStatus.failed =>
-                                        Icons.error_outline_rounded,
-                                      _ => Icons.info_outline_rounded,
-                                    },
-                                    label: switch (enrichmentStatus) {
-                                      EnrichmentStatus.pending => strings.get(
-                                        'library.analysisPending',
-                                      ),
-                                      EnrichmentStatus.analyzing => strings.get(
-                                        'library.analysisInProgress',
-                                      ),
-                                      EnrichmentStatus.review => strings.get(
-                                        'library.metadataNeedsReview',
-                                      ),
-                                      EnrichmentStatus.failed => strings.get(
-                                        'library.analysisFailed',
-                                      ),
-                                      _ => strings.get(
-                                        'library.analyzeMetadata',
-                                      ),
-                                    },
-                                    tone:
-                                        enrichmentStatus ==
-                                            EnrichmentStatus.failed
-                                        ? AppStatusTone.error
-                                        : enrichmentStatus ==
-                                              EnrichmentStatus.review
-                                        ? AppStatusTone.warning
-                                        : AppStatusTone.neutral,
-                                  ),
-                                ),
-                              if (widget.selectionMode && widget.selected)
-                                Positioned(
-                                  left: AppSpacing.space8,
-                                  top: AppSpacing.space8,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: context.appColors.surfacePrimary,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: context
-                                            .appColors
-                                            .librarySelectionAccent,
-                                      ),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(2),
+                                if (widget.document.isFavorite)
+                                  Positioned(
+                                    right: AppSpacing.space6,
+                                    top: widget.selected
+                                        ? 40
+                                        : AppSpacing.space6,
+                                    child: Tooltip(
+                                      message: strings.get('library.favorite'),
                                       child: Icon(
-                                        Icons.check_rounded,
-                                        size: 16,
-                                        color: context
-                                            .appColors
-                                            .librarySelectionAccent,
+                                        Icons.bookmark_rounded,
+                                        size: 17,
+                                        color: context.appColors.textPrimary,
                                       ),
                                     ),
                                   ),
-                                ),
-                            ],
+                                if (!widget.selectionMode &&
+                                    widget.document.hasFileChanged)
+                                  Positioned(
+                                    left: AppSpacing.space6,
+                                    top: AppSpacing.space6,
+                                    child: _ArtifactStateMarker(
+                                      icon: Icons.sync_problem_rounded,
+                                      label: strings.get('library.fileChanged'),
+                                      tone: AppStatusTone.warning,
+                                    ),
+                                  )
+                                else if (!widget.selectionMode &&
+                                    enrichmentStatus != null &&
+                                    enrichmentStatus !=
+                                        EnrichmentStatus.completed &&
+                                    enrichmentStatus != EnrichmentStatus.noText)
+                                  Positioned(
+                                    left: AppSpacing.space6,
+                                    top: AppSpacing.space6,
+                                    child: _ArtifactStateMarker(
+                                      icon: switch (enrichmentStatus) {
+                                        EnrichmentStatus.pending =>
+                                          Icons.hourglass_empty_rounded,
+                                        EnrichmentStatus.analyzing =>
+                                          Icons.sync_rounded,
+                                        EnrichmentStatus.review =>
+                                          Icons.fact_check_outlined,
+                                        EnrichmentStatus.failed =>
+                                          Icons.error_outline_rounded,
+                                        _ => Icons.info_outline_rounded,
+                                      },
+                                      label: switch (enrichmentStatus) {
+                                        EnrichmentStatus.pending => strings.get(
+                                          'library.analysisPending',
+                                        ),
+                                        EnrichmentStatus.analyzing =>
+                                          strings.get(
+                                            'library.analysisInProgress',
+                                          ),
+                                        EnrichmentStatus.review => strings.get(
+                                          'library.metadataNeedsReview',
+                                        ),
+                                        EnrichmentStatus.failed => strings.get(
+                                          'library.analysisFailed',
+                                        ),
+                                        _ => strings.get(
+                                          'library.analyzeMetadata',
+                                        ),
+                                      },
+                                      tone:
+                                          enrichmentStatus ==
+                                              EnrichmentStatus.failed
+                                          ? AppStatusTone.error
+                                          : enrichmentStatus ==
+                                                EnrichmentStatus.review
+                                          ? AppStatusTone.warning
+                                          : AppStatusTone.neutral,
+                                    ),
+                                  ),
+                                if (widget.selected)
+                                  Positioned(
+                                    right: AppSpacing.space8,
+                                    top: AppSpacing.space8,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: context.appColors.surfacePrimary,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: context
+                                              .appColors
+                                              .librarySelectionAccent,
+                                        ),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(2),
+                                        child: Icon(
+                                          Icons.check_rounded,
+                                          size: 16,
+                                          color: context
+                                              .appColors
+                                              .librarySelectionAccent,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.space6),
-                    SizedBox(
-                      height: 38 * MediaQuery.textScalerOf(context).scale(1),
-                      child: Tooltip(
-                        message: widget.document.effectiveTitle,
-                        child: Text(
-                          widget.document.effectiveTitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.start,
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(
-                                color: widget.selected
-                                    ? context.appColors.librarySelectionAccent
-                                    : context.appColors.textPrimary,
-                                fontWeight: FontWeight.w500,
-                              ),
+                    if (coverPath == null)
+                      SizedBox(
+                        height: 38 * MediaQuery.textScalerOf(context).scale(1),
+                      )
+                    else
+                      SizedBox(
+                        height: 38 * MediaQuery.textScalerOf(context).scale(1),
+                        child: Tooltip(
+                          message: widget.document.effectiveTitle,
+                          child: Text(
+                            widget.document.effectiveTitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.start,
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: context.appColors.textPrimary,
+                                  fontWeight: widget.selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                ),
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -1881,10 +1898,231 @@ final class _ArtifactStateMarker extends StatelessWidget {
   }
 }
 
+final class _ArtifactTransform extends StatelessWidget {
+  const _ArtifactTransform({
+    required this.duration,
+    required this.transform,
+    required this.child,
+    this.transformKey,
+  });
+
+  final Duration duration;
+  final Matrix4 transform;
+  final Widget child;
+  final Key? transformKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<Matrix4>(
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      tween: Matrix4Tween(end: transform),
+      builder: (context, value, child) => Transform(
+        key: transformKey,
+        transform: value,
+        alignment: Alignment.center,
+        filterQuality: FilterQuality.high,
+        child: child,
+      ),
+      child: child,
+    );
+  }
+}
+
+final class _ArtifactBookPageBlock extends StatelessWidget {
+  const _ArtifactBookPageBlock({
+    required this.duration,
+    required this.transform,
+  });
+
+  final Duration duration;
+  final Matrix4 transform;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final paper = dark ? const Color(0xFF9B998F) : const Color(0xFFE7E3D6);
+    final paperShadow = dark
+        ? const Color(0xFF55554F)
+        : const Color(0xFFB5B1A5);
+    return _ArtifactTransform(
+      duration: duration,
+      transform: transform,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [paper, Color.lerp(paper, paperShadow, 0.72)!],
+          ),
+          borderRadius: BorderRadius.circular(AppRadii.artifactCover),
+          border: Border.all(color: paperShadow.withValues(alpha: 0.86)),
+        ),
+        clipBehavior: Clip.antiAliasWithSaveLayer,
+        child: CustomPaint(
+          painter: _ArtifactPageEdgesPainter(
+            lineColor: paperShadow.withValues(alpha: dark ? 0.58 : 0.42),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _ArtifactPageEdgesPainter extends CustomPainter {
+  const _ArtifactPageEdgesPainter({required this.lineColor});
+
+  final Color lineColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = lineColor
+      ..strokeWidth = 0.65;
+    for (var y = 4.0; y < size.height; y += 4.0) {
+      final inset = (y.round() % 12 == 0) ? 0.0 : 1.5;
+      canvas.drawLine(Offset(inset, y), Offset(size.width - inset, y), paint);
+    }
+    final edge = Paint()
+      ..color = lineColor.withValues(alpha: 0.85)
+      ..strokeWidth = 1.2;
+    canvas.drawLine(
+      Offset(size.width - 2, 3),
+      Offset(size.width - 2, size.height - 3),
+      edge,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ArtifactPageEdgesPainter oldDelegate) =>
+      lineColor != oldDelegate.lineColor;
+}
+
+final class _ArtifactCoverImage extends StatelessWidget {
+  const _ArtifactCoverImage({
+    required this.path,
+    required this.cacheWidth,
+    required this.cacheHeight,
+    required this.error,
+  });
+
+  final String path;
+  final int cacheWidth;
+  final int cacheHeight;
+  final Widget error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.file(
+          File(path),
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          cacheWidth: cacheWidth,
+          cacheHeight: cacheHeight,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, _, _) => error,
+        ),
+        IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                stops: const [0, 0.035, 0.10, 1],
+                colors: [
+                  Colors.black.withValues(alpha: 0.32),
+                  Colors.black.withValues(alpha: 0.10),
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.04),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+final class _ArtifactFrontFinish extends StatelessWidget {
+  const _ArtifactFrontFinish({
+    required this.active,
+    required this.reduceMotion,
+  });
+
+  final bool active;
+  final bool reduceMotion;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: 9,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.28),
+                    Colors.white.withValues(alpha: 0.08),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          AnimatedOpacity(
+            duration: reduceMotion ? AppMotion.instant : AppMotion.panel,
+            curve: Curves.easeOutCubic,
+            opacity: active ? 0.16 : 0.07,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  stops: const [0, 0.30, 0.48, 1],
+                  colors: [
+                    Colors.white,
+                    Colors.transparent,
+                    Colors.transparent,
+                    Colors.black,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.topCenter,
+            child: Container(
+              height: 1,
+              margin: const EdgeInsets.only(left: 8),
+              color: Colors.white.withValues(alpha: 0.20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 final class _ArtifactPlaceholder extends StatefulWidget {
-  const _ArtifactPlaceholder({required this.document, this.failed = false});
+  const _ArtifactPlaceholder({
+    required this.document,
+    required this.active,
+    required this.reduceMotion,
+    this.failed = false,
+  });
 
   final LibraryDocument document;
+  final bool active;
+  final bool reduceMotion;
   final bool failed;
 
   @override
@@ -1902,91 +2140,858 @@ final class _ArtifactPlaceholderState extends State<_ArtifactPlaceholder> {
     final strings = YamantakaLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     final textScaler = MediaQuery.textScalerOf(context);
+    final highContrast = MediaQuery.highContrastOf(context);
     final formatLabel = document.isMissing
         ? strings.get('library.locate')
         : 'PDF';
+    final seed = _artifactVisualSeed(document.id);
+    final palette = highContrast
+        ? _ArtifactCoverPalette.highContrast(colors)
+        : _ArtifactCoverPalette.forSeed(
+            seed,
+            darkMode: Theme.of(context).brightness == Brightness.dark,
+          );
     final appearance = (
+      document.id,
       document.effectiveTitle,
       document.effectiveAuthor,
+      document.pageCount,
       document.isMissing,
       widget.failed,
       colors,
       textTheme,
       textScaler,
+      highContrast,
       formatLabel,
+      widget.active,
+      widget.reduceMotion,
     );
     // Density changes outside the cover do not change its editorial content.
     // Keep one subtree per mounted cover, not a document/global cache.
     if (_appearance == appearance && _content != null) return _content!;
     _appearance = appearance;
     final largeText = textScaler.scale(1) > 1.4;
-    return _content = DecoratedBox(
-      decoration: BoxDecoration(
-        color: Color.alphaBlend(
-          colors.accentSoft.withValues(alpha: 0.55),
-          colors.surfacePrimary,
-        ),
-        border: BorderDirectional(
-          start: BorderSide(
-            color: colors.accentPrimary.withValues(alpha: 0.55),
-            width: 4,
+    final fallbackIcon = document.isMissing
+        ? Icons.link_off_rounded
+        : widget.failed
+        ? Icons.broken_image_outlined
+        : null;
+    return _content = RepaintBoundary(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [palette.background, palette.backgroundEnd],
+          ),
+          border: BorderDirectional(
+            start: BorderSide(color: palette.accent, width: 6),
           ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.space12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Icon(
-              document.isMissing
-                  ? Icons.link_off_rounded
-                  : widget.failed
-                  ? Icons.broken_image_outlined
-                  : Icons.description_outlined,
-              color: colors.accentPrimary,
-              size: AppIconSizes.large,
-            ),
-            const SizedBox(height: AppSpacing.space12),
-            Expanded(
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  document.effectiveTitle,
-                  maxLines: largeText ? 2 : 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
+            ExcludeSemantics(
+              child: CustomPaint(
+                painter: _ArtifactCoverPatternPainter(
+                  seed: seed,
+                  color: palette.pattern,
                 ),
               ),
             ),
-            if (!largeText && document.effectiveAuthor?.isNotEmpty == true) ...[
-              const SizedBox(height: AppSpacing.space8),
-              Text(
-                document.effectiveAuthor!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: colors.textSecondary),
+            if (!highContrast)
+              _ArtifactCoverSheen(
+                active: widget.active,
+                reduceMotion: widget.reduceMotion,
+                color: palette.accent,
               ),
-            ],
-            const SizedBox(height: AppSpacing.space8),
-            Text(
-              formatLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.labelSmall?.copyWith(color: colors.textSecondary),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.space16,
+                AppSpacing.space12,
+                AppSpacing.space12,
+                AppSpacing.space16,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        formatLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: palette.inkMuted,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.layers_outlined,
+                        size: AppIconSizes.compact,
+                        color: palette.inkMuted,
+                      ),
+                      const SizedBox(width: AppSpacing.space4),
+                      Text(
+                        '${document.pageCount}',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: palette.inkMuted,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.space24),
+                    ],
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: ExcludeSemantics(
+                        child: _ArtifactCoverObject(
+                          variant: seed % 6,
+                          palette: palette,
+                          active: widget.active,
+                          reduceMotion: widget.reduceMotion,
+                          highContrast: highContrast,
+                          compact: largeText,
+                          fallbackIcon: fallbackIcon,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    document.effectiveTitle,
+                    maxLines: largeText ? 2 : 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: palette.ink,
+                      fontWeight: FontWeight.w700,
+                      height: 1.08,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  if (!largeText &&
+                      document.effectiveAuthor?.isNotEmpty == true) ...[
+                    const SizedBox(height: AppSpacing.space8),
+                    Text(
+                      document.effectiveAuthor!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: palette.inkMuted,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+final class _ArtifactCoverSheen extends StatelessWidget {
+  const _ArtifactCoverSheen({
+    required this.active,
+    required this.reduceMotion,
+    required this.color,
+  });
+
+  final bool active;
+  final bool reduceMotion;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedAlign(
+        duration: reduceMotion ? AppMotion.instant : AppMotion.panel,
+        curve: Curves.easeOutCubic,
+        alignment: active
+            ? const Alignment(1.7, -0.8)
+            : const Alignment(-1.7, 0.8),
+        child: Transform.rotate(
+          angle: -0.34,
+          child: Container(
+            width: 28,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  color.withValues(alpha: active ? 0.16 : 0.05),
+                  Colors.white.withValues(alpha: active ? 0.13 : 0.03),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _ArtifactCoverObject extends StatelessWidget {
+  const _ArtifactCoverObject({
+    required this.variant,
+    required this.palette,
+    required this.active,
+    required this.reduceMotion,
+    required this.highContrast,
+    required this.compact,
+    this.fallbackIcon,
+  });
+
+  final int variant;
+  final _ArtifactCoverPalette palette;
+  final bool active;
+  final bool reduceMotion;
+  final bool highContrast;
+  final bool compact;
+  final IconData? fallbackIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = reduceMotion ? AppMotion.instant : AppMotion.panel;
+    final objectSize = compact ? 66.0 : 96.0;
+    final turns = ((variant % 3) - 1) * 0.006;
+    return AnimatedSlide(
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      offset: active && !reduceMotion ? const Offset(0, -0.055) : Offset.zero,
+      child: AnimatedScale(
+        duration: duration,
+        curve: Curves.easeOutBack,
+        scale: active && !reduceMotion ? 1.075 : 1,
+        child: AnimatedRotation(
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          turns: active && !reduceMotion ? -turns : turns,
+          child: SizedBox.square(
+            dimension: objectSize,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CustomPaint(
+                  painter: fallbackIcon == null
+                      ? _ArtifactCoverObjectPainter(
+                          variant: variant,
+                          palette: palette,
+                          highContrast: highContrast,
+                        )
+                      : _ArtifactUnavailableObjectPainter(
+                          palette: palette,
+                          highContrast: highContrast,
+                        ),
+                ),
+                if (fallbackIcon != null)
+                  Center(
+                    child: Icon(
+                      fallbackIcon,
+                      size: compact ? 26 : 34,
+                      color: highContrast ? palette.background : palette.ink,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _ArtifactUnavailableObjectPainter extends CustomPainter {
+  const _ArtifactUnavailableObjectPainter({
+    required this.palette,
+    required this.highContrast,
+  });
+
+  final _ArtifactCoverPalette palette;
+  final bool highContrast;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ink = highContrast ? palette.ink : palette.emblem;
+    final shadow = highContrast
+        ? palette.ink
+        : Color.lerp(palette.emblem, Colors.black, 0.52)!;
+    final rear = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width * 0.24,
+        size.height * 0.18,
+        size.width * 0.58,
+        size.height * 0.65,
+      ),
+      const Radius.circular(8),
+    );
+    final front = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width * 0.16,
+        size.height * 0.10,
+        size.width * 0.58,
+        size.height * 0.65,
+      ),
+      const Radius.circular(8),
+    );
+    canvas.drawShadow(Path()..addRRect(rear), Colors.black, 8, false);
+    canvas.drawRRect(rear, Paint()..color = shadow);
+    canvas.drawRRect(front, Paint()..color = ink);
+    final edge = Paint()
+      ..color = palette.accent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawRRect(front, edge);
+    final tear = Path()
+      ..moveTo(size.width * 0.50, size.height * 0.10)
+      ..lineTo(size.width * 0.58, size.height * 0.22)
+      ..lineTo(size.width * 0.51, size.height * 0.31)
+      ..lineTo(size.width * 0.58, size.height * 0.42);
+    canvas.drawPath(
+      tear,
+      Paint()
+        ..color = palette.background
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ArtifactUnavailableObjectPainter oldDelegate) =>
+      palette != oldDelegate.palette ||
+      highContrast != oldDelegate.highContrast;
+}
+
+final class _ArtifactCoverObjectPainter extends CustomPainter {
+  const _ArtifactCoverObjectPainter({
+    required this.variant,
+    required this.palette,
+    required this.highContrast,
+  });
+
+  final int variant;
+  final _ArtifactCoverPalette palette;
+  final bool highContrast;
+
+  Color get _light => Color.lerp(palette.emblem, Colors.white, 0.42)!;
+  Color get _mid => palette.emblem;
+  Color get _dark => Color.lerp(palette.emblem, Colors.black, 0.46)!;
+
+  Paint _paint(
+    Color color, {
+    PaintingStyle style = PaintingStyle.fill,
+    double width = 1,
+  }) => Paint()
+    ..color = highContrast ? palette.ink : color
+    ..style = style
+    ..strokeWidth = width
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = Offset.zero & size;
+    if (!highContrast) {
+      final shadowPath = Path()
+        ..addOval(
+          Rect.fromCenter(
+            center: Offset(size.width * 0.5, size.height * 0.76),
+            width: size.width * 0.68,
+            height: size.height * 0.18,
+          ),
+        );
+      canvas.drawShadow(shadowPath, Colors.black, 10, false);
+    }
+    switch (variant % 6) {
+      case 0:
+        _paintOrbital(canvas, bounds);
+      case 1:
+        _paintCrystal(canvas, bounds);
+      case 2:
+        _paintCube(canvas, bounds);
+      case 3:
+        _paintMonolith(canvas, bounds);
+      case 4:
+        _paintRibbon(canvas, bounds);
+      default:
+        _paintStar(canvas, bounds);
+    }
+  }
+
+  void _paintOrbital(Canvas canvas, Rect r) {
+    final c = r.center;
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(-0.22);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: r.width * 0.94,
+        height: r.height * 0.38,
+      ),
+      _paint(palette.accent, style: PaintingStyle.stroke, width: 3.2),
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: r.width * 0.54,
+        height: r.height * 0.92,
+      ),
+      _paint(_light, style: PaintingStyle.stroke, width: 1.5),
+    );
+    final sphere = Rect.fromCircle(center: Offset.zero, radius: r.width * 0.24);
+    canvas.drawOval(
+      sphere,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.4, -0.45),
+          colors: [_light, _mid, _dark],
+        ).createShader(sphere),
+    );
+    canvas.drawCircle(
+      Offset(r.width * 0.42, 0),
+      r.width * 0.055,
+      _paint(_light),
+    );
+    canvas.restore();
+  }
+
+  void _paintCrystal(Canvas canvas, Rect r) {
+    final top = Offset(r.width * 0.52, r.height * 0.05);
+    final left = Offset(r.width * 0.16, r.height * 0.50);
+    final bottom = Offset(r.width * 0.48, r.height * 0.94);
+    final right = Offset(r.width * 0.84, r.height * 0.43);
+    final center = Offset(r.width * 0.52, r.height * 0.47);
+    final outline = Path()..addPolygon([top, right, bottom, left], true);
+    canvas.drawShadow(outline, Colors.black, 8, false);
+    canvas.drawPath(
+      Path()..addPolygon([top, left, center], true),
+      _paint(_mid),
+    );
+    canvas.drawPath(
+      Path()..addPolygon([top, center, right], true),
+      _paint(_light),
+    );
+    canvas.drawPath(
+      Path()..addPolygon([left, bottom, center], true),
+      _paint(_dark),
+    );
+    canvas.drawPath(
+      Path()..addPolygon([center, bottom, right], true),
+      _paint(palette.accent),
+    );
+    canvas.drawPath(
+      outline,
+      _paint(
+        palette.ink.withValues(alpha: 0.5),
+        style: PaintingStyle.stroke,
+        width: 1.4,
+      ),
+    );
+  }
+
+  void _paintCube(Canvas canvas, Rect r) {
+    final top = Offset(r.width * 0.5, r.height * 0.12);
+    final leftTop = Offset(r.width * 0.14, r.height * 0.33);
+    final rightTop = Offset(r.width * 0.86, r.height * 0.33);
+    final center = Offset(r.width * 0.5, r.height * 0.55);
+    final leftBottom = Offset(r.width * 0.14, r.height * 0.72);
+    final rightBottom = Offset(r.width * 0.86, r.height * 0.72);
+    final bottom = Offset(r.width * 0.5, r.height * 0.94);
+    final outline = Path()
+      ..addPolygon([
+        top,
+        rightTop,
+        rightBottom,
+        bottom,
+        leftBottom,
+        leftTop,
+      ], true);
+    canvas.drawShadow(outline, Colors.black, 9, false);
+    canvas.drawPath(
+      Path()..addPolygon([top, rightTop, center, leftTop], true),
+      _paint(_light),
+    );
+    canvas.drawPath(
+      Path()..addPolygon([leftTop, center, bottom, leftBottom], true),
+      _paint(_mid),
+    );
+    canvas.drawPath(
+      Path()..addPolygon([center, rightTop, rightBottom, bottom], true),
+      _paint(_dark),
+    );
+    canvas.drawPath(
+      outline,
+      _paint(palette.accent, style: PaintingStyle.stroke, width: 1.2),
+    );
+  }
+
+  void _paintMonolith(Canvas canvas, Rect r) {
+    final plates = <({Rect rect, Color color})>[
+      (
+        rect: Rect.fromLTWH(
+          r.width * 0.10,
+          r.height * 0.66,
+          r.width * 0.80,
+          r.height * 0.18,
+        ),
+        color: _dark,
+      ),
+      (
+        rect: Rect.fromLTWH(
+          r.width * 0.18,
+          r.height * 0.47,
+          r.width * 0.68,
+          r.height * 0.20,
+        ),
+        color: _mid,
+      ),
+      (
+        rect: Rect.fromLTWH(
+          r.width * 0.27,
+          r.height * 0.24,
+          r.width * 0.54,
+          r.height * 0.24,
+        ),
+        color: _light,
+      ),
+      (
+        rect: Rect.fromLTWH(
+          r.width * 0.39,
+          r.height * 0.08,
+          r.width * 0.34,
+          r.height * 0.17,
+        ),
+        color: palette.accent,
+      ),
+    ];
+    for (final plate in plates) {
+      final rr = RRect.fromRectAndRadius(
+        plate.rect,
+        Radius.circular(r.width * 0.055),
+      );
+      canvas.drawShadow(Path()..addRRect(rr), Colors.black, 6, false);
+      canvas.drawRRect(rr, _paint(plate.color));
+      canvas.drawLine(
+        plate.rect.topLeft + Offset(r.width * 0.05, r.height * 0.035),
+        plate.rect.topRight - Offset(r.width * 0.05, -r.height * 0.035),
+        _paint(
+          Colors.white.withValues(alpha: 0.38),
+          style: PaintingStyle.stroke,
+          width: 1,
+        ),
+      );
+    }
+  }
+
+  void _paintRibbon(Canvas canvas, Rect r) {
+    final shadow = Path()
+      ..moveTo(r.width * 0.19, r.height * 0.72)
+      ..cubicTo(
+        r.width * 0.16,
+        r.height * 0.18,
+        r.width * 0.78,
+        r.height * 0.08,
+        r.width * 0.79,
+        r.height * 0.56,
+      )
+      ..cubicTo(
+        r.width * 0.80,
+        r.height * 0.90,
+        r.width * 0.35,
+        r.height * 0.94,
+        r.width * 0.31,
+        r.height * 0.55,
+      );
+    canvas.drawPath(
+      shadow,
+      _paint(
+        Colors.black.withValues(alpha: 0.42),
+        style: PaintingStyle.stroke,
+        width: r.width * 0.26,
+      ),
+    );
+    final ribbonPaint = Paint()
+      ..shader = LinearGradient(colors: [_light, _mid, _dark]).createShader(r)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = r.width * 0.20
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(
+      shadow,
+      highContrast
+          ? _paint(
+              palette.ink,
+              style: PaintingStyle.stroke,
+              width: r.width * 0.20,
+            )
+          : ribbonPaint,
+    );
+    canvas.drawPath(
+      shadow,
+      _paint(palette.accent, style: PaintingStyle.stroke, width: 1.4),
+    );
+  }
+
+  void _paintStar(Canvas canvas, Rect r) {
+    final c = r.center;
+    final points = <Offset>[];
+    for (var i = 0; i < 16; i++) {
+      final radius = (i.isEven ? 0.43 : 0.19) * r.width;
+      final angle = -math.pi / 2 + i * math.pi / 8;
+      points.add(c + Offset(math.cos(angle), math.sin(angle)) * radius);
+    }
+    final star = Path()..addPolygon(points, true);
+    canvas.drawShadow(star, Colors.black, 10, false);
+    canvas.drawPath(star, _paint(_mid));
+    for (var i = 0; i < 16; i += 2) {
+      final triangle = Path()
+        ..addPolygon([c, points[i], points[(i + 2) % 16]], true);
+      canvas.drawPath(triangle, _paint(i % 4 == 0 ? _light : _dark));
+    }
+    canvas.drawCircle(c, r.width * 0.10, _paint(palette.accent));
+    canvas.drawPath(
+      star,
+      _paint(
+        palette.ink.withValues(alpha: 0.45),
+        style: PaintingStyle.stroke,
+        width: 1.2,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ArtifactCoverObjectPainter oldDelegate) =>
+      variant != oldDelegate.variant ||
+      palette != oldDelegate.palette ||
+      highContrast != oldDelegate.highContrast;
+}
+
+int _artifactVisualSeed(String value) {
+  var hash = 0x811c9dc5;
+  for (final codeUnit in value.codeUnits) {
+    hash ^= codeUnit;
+    hash = (hash * 0x01000193) & 0x7fffffff;
+  }
+  return hash;
+}
+
+final class _ArtifactCoverPalette {
+  const _ArtifactCoverPalette({
+    required this.background,
+    required this.backgroundEnd,
+    required this.accent,
+    required this.emblem,
+    required this.ink,
+    required this.inkMuted,
+    required this.pattern,
+  });
+
+  final Color background;
+  final Color backgroundEnd;
+  final Color accent;
+  final Color emblem;
+  final Color ink;
+  final Color inkMuted;
+  final Color pattern;
+
+  static _ArtifactCoverPalette forSeed(int seed, {required bool darkMode}) {
+    final base = _artifactCoverPalettes[seed % _artifactCoverPalettes.length];
+    if (!darkMode) return base;
+    return _ArtifactCoverPalette(
+      background: Color.lerp(base.background, Colors.black, 0.10)!,
+      backgroundEnd: Color.lerp(base.backgroundEnd, Colors.black, 0.05)!,
+      accent: base.accent,
+      emblem: base.emblem,
+      ink: Colors.white,
+      inkMuted: Color.lerp(base.inkMuted, Colors.white, 0.10)!,
+      pattern: base.pattern,
+    );
+  }
+
+  factory _ArtifactCoverPalette.highContrast(AppColorTokens colors) =>
+      _ArtifactCoverPalette(
+        background: colors.surfacePrimary,
+        backgroundEnd: colors.surfacePrimary,
+        accent: colors.textPrimary,
+        emblem: colors.surfacePrimary,
+        ink: colors.textPrimary,
+        inkMuted: colors.textSecondary,
+        pattern: Colors.transparent,
+      );
+}
+
+const _artifactCoverPalettes = <_ArtifactCoverPalette>[
+  _ArtifactCoverPalette(
+    background: Color(0xFF211637),
+    backgroundEnd: Color(0xFF4E3877),
+    accent: Color(0xFFD0BBFF),
+    emblem: Color(0xFF8066B4),
+    ink: Color(0xFFF8F4FF),
+    inkMuted: Color(0xFFD9CEE9),
+    pattern: Color(0x244F3976),
+  ),
+  _ArtifactCoverPalette(
+    background: Color(0xFF351B2B),
+    backgroundEnd: Color(0xFF74405C),
+    accent: Color(0xFFFFC2D8),
+    emblem: Color(0xFFA85C7A),
+    ink: Color(0xFFFFF5F8),
+    inkMuted: Color(0xFFE9CDD7),
+    pattern: Color(0x245D2944),
+  ),
+  _ArtifactCoverPalette(
+    background: Color(0xFF103233),
+    backgroundEnd: Color(0xFF286967),
+    accent: Color(0xFF9DEBE0),
+    emblem: Color(0xFF3F8D86),
+    ink: Color(0xFFF1FFFC),
+    inkMuted: Color(0xFFC6E5E0),
+    pattern: Color(0x24336F6B),
+  ),
+  _ArtifactCoverPalette(
+    background: Color(0xFF17243D),
+    backgroundEnd: Color(0xFF3D5A8B),
+    accent: Color(0xFFBFD3FF),
+    emblem: Color(0xFF5E7DB4),
+    ink: Color(0xFFF5F8FF),
+    inkMuted: Color(0xFFCFD9ED),
+    pattern: Color(0x24384F77),
+  ),
+  _ArtifactCoverPalette(
+    background: Color(0xFF3A2812),
+    backgroundEnd: Color(0xFF765322),
+    accent: Color(0xFFFFD990),
+    emblem: Color(0xFFA97931),
+    ink: Color(0xFFFFF9EC),
+    inkMuted: Color(0xFFE8D8B7),
+    pattern: Color(0x245C401C),
+  ),
+  _ArtifactCoverPalette(
+    background: Color(0xFF1B2D29),
+    backgroundEnd: Color(0xFF49695B),
+    accent: Color(0xFFBDE7CD),
+    emblem: Color(0xFF678D7A),
+    ink: Color(0xFFF3FFF7),
+    inkMuted: Color(0xFFCEE2D5),
+    pattern: Color(0x243D594E),
+  ),
+];
+
+final class _ArtifactCoverPatternPainter extends CustomPainter {
+  const _ArtifactCoverPatternPainter({required this.seed, required this.color});
+
+  final int seed;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (color.a == 0) return;
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    final fill = Paint()
+      ..color = color.withValues(alpha: math.min(0.18, color.a * 1.8))
+      ..style = PaintingStyle.fill;
+    final phase = (seed % 19) / 19;
+    switch (seed % 6) {
+      case 0:
+        final center = Offset(size.width * 0.72, size.height * 0.28);
+        for (final radius in [0.13, 0.27, 0.43, 0.61]) {
+          canvas.drawCircle(center, size.width * radius, stroke);
+        }
+        canvas.drawCircle(
+          Offset(size.width * 0.20, size.height * 0.59),
+          size.width * 0.045,
+          fill,
+        );
+      case 1:
+        final gap = math.max(19.0, size.width / 6);
+        for (var x = -size.height; x < size.width + size.height; x += gap) {
+          canvas.drawLine(
+            Offset(x + phase * gap, size.height),
+            Offset(x + size.height * 0.58, 0),
+            stroke,
+          );
+        }
+        for (var y = 0.0; y < size.height; y += gap) {
+          canvas.drawLine(
+            Offset.zero.translate(0, y),
+            Offset(size.width, y),
+            stroke,
+          );
+        }
+      case 2:
+        final cell = size.width / 4;
+        for (var row = -1; row < 8; row++) {
+          for (var col = -1; col < 5; col++) {
+            final cx = col * cell + (row.isOdd ? cell / 2 : 0);
+            final cy = row * cell * 0.48;
+            final diamond = Path()
+              ..addPolygon([
+                Offset(cx, cy - cell * 0.24),
+                Offset(cx + cell * 0.48, cy),
+                Offset(cx, cy + cell * 0.24),
+                Offset(cx - cell * 0.48, cy),
+              ], true);
+            canvas.drawPath(diamond, row.isEven && col.isEven ? fill : stroke);
+          }
+        }
+      case 3:
+        for (var i = 0; i < 7; i++) {
+          final inset = size.width * (0.05 + i * 0.055);
+          final top = size.height * (0.08 + i * 0.055);
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(
+                inset,
+                top,
+                size.width - inset * 2,
+                size.height * 0.62,
+              ),
+              Radius.circular(5.0 + i),
+            ),
+            i.isEven ? stroke : fill,
+          );
+        }
+      case 4:
+        final wave = Path()..moveTo(-size.width * 0.2, size.height * 0.18);
+        for (var i = 0; i < 5; i++) {
+          final y = size.height * (0.18 + i * 0.16);
+          wave
+            ..moveTo(-size.width * 0.2, y)
+            ..cubicTo(
+              size.width * 0.20,
+              y - size.height * 0.16,
+              size.width * 0.76,
+              y + size.height * 0.16,
+              size.width * 1.2,
+              y - size.height * 0.02,
+            );
+        }
+        canvas.drawPath(wave, stroke..strokeWidth = 2.2);
+      default:
+        final center = Offset(size.width * 0.52, size.height * 0.34);
+        for (var i = 0; i < 18; i++) {
+          final angle = i * math.pi * 2 / 18 + phase;
+          final inner = size.width * (0.10 + (i % 3) * 0.035);
+          final outer = size.width * (0.48 + (i % 4) * 0.045);
+          canvas.drawLine(
+            center + Offset(math.cos(angle), math.sin(angle)) * inner,
+            center + Offset(math.cos(angle), math.sin(angle)) * outer,
+            stroke,
+          );
+        }
+        canvas.drawCircle(center, size.width * 0.085, fill);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ArtifactCoverPatternPainter oldDelegate) =>
+      seed != oldDelegate.seed || color != oldDelegate.color;
 }
 
 final class DocumentInfoOverlay extends StatelessWidget {
@@ -2037,94 +3042,118 @@ final class DocumentInfoOverlay extends StatelessWidget {
     final content = ConstrainedBox(
       constraints: BoxConstraints(
         maxWidth: compact
-            ? 620
+            ? 560
             : medium
-            ? 880
-            : 1040,
+            ? 720
+            : 880,
       ),
       child: Material(
         color: Colors.transparent,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceFloating,
-            border: Border.all(color: context.appColors.borderSubtle),
-            borderRadius: BorderRadius.circular(
-              compact ? AppRadii.panel : AppRadii.floating,
-            ),
-            boxShadow: MediaQuery.highContrastOf(context)
-                ? null
-                : [
-                    BoxShadow(
-                      color: context.appColors.ambientShadow,
-                      blurRadius: AppShadow.floatingControlBlur,
-                      offset: const Offset(0, AppShadow.floatingControlOffset),
-                    ),
-                  ],
-          ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.space20,
-              AppSpacing.space12,
-              interactive ? AppSpacing.space12 : AppSpacing.space20,
-              AppSpacing.space12,
-            ),
-            child: compact
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _DocumentContextSummary(document: document),
-                      const SizedBox(height: AppSpacing.space12),
-                      _DocumentProgressColumn(
-                        document: document,
-                        progressLine: progressLine,
-                      ),
-                      if (interactive) ...[
-                        const SizedBox(height: AppSpacing.space12),
-                        _DocumentContextActions(
-                          document: document,
-                          onPrimary: onPrimary,
-                          onToggleFavorite: onToggleFavorite,
-                          onShowInfo: onShowInfo,
-                          onDismiss: onDismiss,
-                        ),
-                      ],
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: _DocumentContextSummary(document: document),
-                      ),
-                      const SizedBox(width: AppSpacing.space20),
-                      SizedBox(
-                        width: medium ? 156 : 190,
-                        child: _DocumentProgressColumn(
-                          document: document,
-                          progressLine: progressLine,
-                        ),
-                      ),
-                      if (interactive) ...[
-                        const SizedBox(width: AppSpacing.space20),
-                        SizedBox(
-                          height: 48,
-                          child: VerticalDivider(
-                            width: 1,
-                            color: context.appColors.borderSubtle,
+        child: Stack(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: context.appColors.surfaceFloating,
+                border: Border.all(color: context.appColors.borderSubtle),
+                borderRadius: BorderRadius.circular(AppRadii.floating),
+                boxShadow: MediaQuery.highContrastOf(context)
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: context.appColors.ambientShadow,
+                          blurRadius: AppShadow.floatingControlBlur,
+                          offset: const Offset(
+                            0,
+                            AppShadow.floatingControlOffset,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.space12),
-                        _DocumentContextActions(
-                          document: document,
-                          onPrimary: onPrimary,
-                          onToggleFavorite: onToggleFavorite,
-                          onShowInfo: onShowInfo,
-                          onDismiss: onDismiss,
-                        ),
                       ],
-                    ],
+              ),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.space16,
+                  AppSpacing.space12,
+                  interactive ? AppSpacing.space12 : AppSpacing.space16,
+                  AppSpacing.space12,
+                ),
+                child: compact
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              _DocumentContextCover(document: document),
+                              const SizedBox(width: AppSpacing.space12),
+                              Expanded(
+                                child: _DocumentContextSummary(
+                                  document: document,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.space12),
+                          _DocumentProgressColumn(
+                            document: document,
+                            progressLine: progressLine,
+                          ),
+                          if (interactive) ...[
+                            const SizedBox(height: AppSpacing.space8),
+                            _DocumentContextActions(
+                              document: document,
+                              onPrimary: onPrimary,
+                              onToggleFavorite: onToggleFavorite,
+                              onShowInfo: onShowInfo,
+                              onDismiss: onDismiss,
+                            ),
+                          ],
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          _DocumentContextCover(document: document),
+                          const SizedBox(width: AppSpacing.space12),
+                          Expanded(
+                            child: _DocumentContextSummary(document: document),
+                          ),
+                          const SizedBox(width: AppSpacing.space16),
+                          SizedBox(
+                            width: medium ? 142 : 164,
+                            child: _DocumentProgressColumn(
+                              document: document,
+                              progressLine: progressLine,
+                            ),
+                          ),
+                          if (interactive) ...[
+                            const SizedBox(width: AppSpacing.space12),
+                            _DocumentContextActions(
+                              document: document,
+                              onPrimary: onPrimary,
+                              onToggleFavorite: onToggleFavorite,
+                              onShowInfo: onShowInfo,
+                              onDismiss: onDismiss,
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
+            ),
+            PositionedDirectional(
+              start: 0,
+              top: AppSpacing.space16,
+              bottom: AppSpacing.space16,
+              child: IgnorePointer(
+                child: Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: context.appColors.librarySelectionAccent,
+                    borderRadius: BorderRadius.circular(AppRadii.indicator),
                   ),
-          ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2138,6 +3167,116 @@ final class DocumentInfoOverlay extends StatelessWidget {
       ),
       onDismissed: (_) => onDismiss!(),
       child: content,
+    );
+  }
+}
+
+final class _DocumentContextCover extends StatelessWidget {
+  const _DocumentContextCover({required this.document});
+
+  final LibraryDocument document;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = artifactCoverPathFor(document, selected: true);
+    final fallback = _DocumentContextCoverFallback(document: document);
+    return ExcludeSemantics(
+      child: SizedBox(
+        key: ValueKey('library-context-cover-${document.id}'),
+        width: 52,
+        height: 68,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: 4,
+              top: 3,
+              right: -3,
+              bottom: -3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: context.appColors.surfaceSecondary,
+                  border: Border.all(color: context.appColors.borderStrong),
+                  borderRadius: BorderRadius.circular(AppRadii.artifactCover),
+                  boxShadow: MediaQuery.highContrastOf(context)
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: context.appColors.ambientShadow,
+                            blurRadius: 4,
+                            offset: const Offset(1, 2),
+                          ),
+                        ],
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadii.artifactCover),
+                clipBehavior: Clip.antiAliasWithSaveLayer,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: context.appColors.surfaceSunken,
+                    border: Border.all(
+                      color: context.appColors.librarySelectionAccent,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadii.artifactCover),
+                  ),
+                  child: path == null
+                      ? fallback
+                      : Image.file(
+                          File(path),
+                          fit: BoxFit.cover,
+                          filterQuality: FilterQuality.high,
+                          errorBuilder: (_, _, _) => fallback,
+                        ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 4,
+              top: 2,
+              bottom: 2,
+              child: Container(
+                width: 2,
+                color: Colors.black.withValues(alpha: 0.14),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+final class _DocumentContextCoverFallback extends StatelessWidget {
+  const _DocumentContextCoverFallback({required this.document});
+
+  final LibraryDocument document;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = context.appColors.librarySelectionAccent;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            context.appColors.surfaceElevated,
+            Color.alphaBlend(
+              accent.withValues(alpha: 0.22),
+              context.appColors.surfaceSunken,
+            ),
+          ],
+        ),
+      ),
+      child: CustomPaint(
+        painter: _ArtifactCoverPatternPainter(
+          seed: document.id.hashCode,
+          color: accent.withValues(alpha: 0.58),
+        ),
+      ),
     );
   }
 }

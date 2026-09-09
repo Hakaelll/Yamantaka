@@ -31,6 +31,7 @@ final class ArtifactLibraryView extends StatefulWidget {
     required this.onPickDocument,
     required this.initialReadingState,
     required this.onReadingStateChanged,
+    this.reduceMotion = false,
     this.onBulkOperation,
     this.collections = const [],
     this.tags = const [],
@@ -53,6 +54,7 @@ final class ArtifactLibraryView extends StatefulWidget {
   final Future<void> Function() onPickDocument;
   final LibraryReadingState initialReadingState;
   final ValueChanged<LibraryReadingState> onReadingStateChanged;
+  final bool reduceMotion;
   final BulkOperationHandler? onBulkOperation;
   final List<DocumentCollection> collections;
   final List<DocumentTag> tags;
@@ -138,6 +140,7 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
   @override
   Widget build(BuildContext context) {
     final reduceMotion =
+        widget.reduceMotion ||
         MediaQuery.disableAnimationsOf(context) ||
         MediaQuery.highContrastOf(context);
     // Documents are already searched, filtered, sorted and paged by SQLite.
@@ -195,6 +198,11 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
       widget.controller.selectedTopics.isNotEmpty,
       widget.controller.grouping != LibraryGrouping.none,
     ].where((active) => active).length;
+    final showLibraryWatermark =
+        Theme.of(context).brightness == Brightness.dark &&
+        !MediaQuery.highContrastOf(context) &&
+        context.windowClass == AppWindowClass.expanded &&
+        MediaQuery.textScalerOf(context).scale(1) <= 1.3;
 
     return CallbackShortcuts(
       bindings: {
@@ -227,6 +235,27 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
         autofocus: true,
         child: Stack(
           children: [
+            if (showLibraryWatermark)
+              PositionedDirectional(
+                end: -92,
+                bottom: -132,
+                child: IgnorePointer(
+                  child: ExcludeSemantics(
+                    child: Opacity(
+                      opacity: 0.032,
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/branding/yamantaka-logo-purple.png',
+                          width: 520,
+                          height: 520,
+                          fit: BoxFit.cover,
+                          filterQuality: FilterQuality.medium,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Column(
               children: [
                 _LibraryCommandBar(
@@ -366,6 +395,19 @@ final class _ArtifactLibraryViewState extends State<ArtifactLibraryView> {
                               reduceMotion,
                               AppMotion.inspector,
                             ),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.08),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                ),
                             child: DocumentInfoOverlay(
                               key: ValueKey(
                                 'library-context-${describedDocument.id}',
