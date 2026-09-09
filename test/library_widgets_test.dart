@@ -930,21 +930,27 @@ void main() {
         fileName: 'cursor.pdf',
         openedAt: DateTime.utc(2026, 9, 9),
       );
+      final reduceMotion = ValueNotifier(false);
+      addTearDown(reduceMotion.dispose);
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark(),
           home: Scaffold(
             body: Center(
-              child: ArtifactDocument(
-                document: document,
-                width: 180,
-                selected: false,
-                selectionMode: false,
-                reduceMotion: false,
-                onSelect: () {},
-                onOpen: () {},
-                onHover: (_) {},
-                onMenu: (_) {},
+              child: ValueListenableBuilder<bool>(
+                valueListenable: reduceMotion,
+                builder: (context, motionReduced, _) => ArtifactDocument(
+                  key: const ValueKey('cursor-artifact'),
+                  document: document,
+                  width: 180,
+                  selected: false,
+                  selectionMode: false,
+                  reduceMotion: motionReduced,
+                  onSelect: () {},
+                  onOpen: () {},
+                  onHover: (_) {},
+                  onMenu: (_) {},
+                ),
               ),
             ),
           ),
@@ -956,8 +962,17 @@ void main() {
         const ValueKey('artifact-book-transform-$id'),
       );
       Matrix4 matrix() => tester.widget<Transform>(transformFinder).transform;
+      Alignment lightCenter() {
+        final finish = tester.widget<DecoratedBox>(
+          find.byKey(const ValueKey('artifact-pointer-light-$id')),
+        );
+        final gradient = (finish.decoration as BoxDecoration).gradient!;
+        return (gradient as RadialGradient).center as Alignment;
+      }
+
       expect(matrix().entry(0, 2), closeTo(0, 0.000001));
       expect(matrix().entry(2, 0), closeTo(0, 0.000001));
+      expect(lightCenter(), const Alignment(-0.58, -0.62));
 
       final face = find.byKey(const ValueKey('artifact-book-face-$id'));
       final rect = tester.getRect(face);
@@ -965,15 +980,40 @@ void main() {
         kind: ui.PointerDeviceKind.mouse,
       );
       await mouse.addPointer(location: rect.center);
-      await mouse.moveTo(Offset(rect.left + 8, rect.top + 8));
+      await mouse.moveTo(Offset(rect.center.dx + 45, rect.center.dy));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 140));
-      expect(matrix().entry(0, 2).abs(), greaterThan(0.005));
+      await tester.pumpAndSettle();
+      final middleTilt = matrix().entry(0, 2).abs();
+      expect(middleTilt, greaterThan(0.015));
+      final middleLight = lightCenter();
+      expect(middleLight.x, greaterThan(-0.58));
+
+      await mouse.moveTo(Offset(rect.right - 8, rect.center.dy));
+      await tester.pump();
+      await tester.pumpAndSettle();
+      final edgeTilt = matrix().entry(0, 2).abs();
+      expect(edgeTilt, greaterThan(middleTilt * 1.6));
+      expect(lightCenter().x, greaterThan(middleLight.x));
+
+      await mouse.moveTo(Offset(rect.center.dx, rect.top + 8));
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(matrix().entry(1, 2).abs(), greaterThan(0.03));
+      expect(lightCenter().y, lessThan(-0.62));
 
       await mouse.moveTo(Offset(rect.center.dx, rect.bottom + 10));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 180));
+      await tester.pumpAndSettle();
       expect(matrix().entry(0, 2), closeTo(0, 0.000001));
+      expect(matrix().entry(1, 2), closeTo(0, 0.000001));
+
+      reduceMotion.value = true;
+      await tester.pump();
+      await mouse.moveTo(Offset(rect.right - 8, rect.top + 8));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(matrix().entry(0, 2), closeTo(0, 0.000001));
+      expect(matrix().entry(1, 2), closeTo(0, 0.000001));
+      expect(lightCenter(), const Alignment(-0.58, -0.62));
       await mouse.removePointer();
     },
   );

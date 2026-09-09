@@ -79,6 +79,7 @@ void main() {
       bool filtered = false,
       bool highContrast = false,
       bool reduceMotion = false,
+      bool hovered = false,
       ThemeMode themeMode = ThemeMode.light,
       double textScale = 1,
       LibraryGrouping grouping = LibraryGrouping.none,
@@ -173,6 +174,21 @@ void main() {
         await tester.tap(find.byKey(key), warnIfMissed: false);
         await tester.pump(const Duration(milliseconds: 250));
       }
+      TestGesture? hoverPointer;
+      if (hovered) {
+        final face = find.byKey(
+          const ValueKey('artifact-book-face-document-0'),
+        );
+        final rect = tester.getRect(face);
+        hoverPointer = await tester.createGesture(
+          kind: ui.PointerDeviceKind.mouse,
+        );
+        await hoverPointer.addPointer(location: rect.center);
+        await hoverPointer.moveTo(
+          Offset(rect.right - 12, rect.top + rect.height * 0.28),
+        );
+        await tester.pumpAndSettle();
+      }
       expect(tester.takeException(), isNull, reason: name);
       final path = '${output.path}${Platform.pathSeparator}$name.png';
       final boundary = tester.renderObject<RenderRepaintBoundary>(
@@ -197,12 +213,14 @@ void main() {
         'filtered': filtered,
         'highContrast': highContrast,
         'reducedMotion': reduceMotion,
+        'hovered': hovered,
         'theme': themeMode.name,
         'textScale': textScale,
         'grouping': grouping.name,
         'source': 'flutter-widget-test',
         'path': path,
       });
+      await hoverPointer?.removePointer();
     }
 
     await captureCase(
@@ -270,6 +288,12 @@ void main() {
       name: 'library-many-1280x720-dark-widget',
       size: const Size(1280, 720),
       themeMode: ThemeMode.dark,
+    );
+    await captureCase(
+      name: 'library-hovered-1280x720-dark-widget',
+      size: const Size(1280, 720),
+      themeMode: ThemeMode.dark,
+      hovered: true,
     );
     await captureCase(
       name: 'library-many-1280x720-high-contrast-widget',

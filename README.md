@@ -10,7 +10,7 @@ metadatos propios en el dispositivo.
 Versión de Yamantaka 0.15.0+16 revisada el 9 de septiembre de 2026:
 
 - flutter analyze --no-pub: aprobado sin incidencias;
-- flutter test --no-pub: 329 pruebas aprobadas;
+- flutter test --no-pub: 330 pruebas aprobadas;
 - flutter build windows --release --no-pub: aprobado, incluido el runner C++;
 - el gate actual aprueba 13 fases y falla solo la matriz nativa porque la escala
   física 96 DPI/100 % no pudo confirmarse de forma independiente; sus cuatro
@@ -44,13 +44,18 @@ Las carátulas de reserva se representan como libros 3D vectoriales con lomo,
 canto de páginas y seis familias gráficas deterministas: órbita, cristal, cubo,
 monolito, cinta y estrella. Las carátulas reales se imprimen a sangre sobre el
 mismo volumen, con lomo y acabado de tapa, sin añadir activos ni dependencias al
-bundle. El puntero inclina y eleva brevemente el libro solo con animaciones
-completas; movimiento reducido conserva el volumen estático.
-En reposo la tapa queda alineada a píxeles y usa filtrado de alta calidad al
-inclinarse, evitando el escalonado de los bordes largos observado en Windows.
+bundle. El puntero inclina y eleva el libro con una respuesta amortiguada en
+dos ejes: el centro ofrece resistencia y los bordes producen un gesto más
+marcado solo con animaciones completas; movimiento reducido conserva el
+volumen estático. La luz mate de la tapa acompaña esa misma respuesta física,
+de forma tenue y sin añadir otra animación independiente. En reposo la tapa
+queda alineada a píxeles y usa filtrado de alta calidad al inclinarse, evitando
+el escalonado de los bordes largos observado en Windows.
 
 El lector divide la barra superior en dos grupos flotantes sin retirar ninguna
-acción. Su panel permanece estable al cambiar entre miniaturas, índice,
+acción. La cápsula del documento reserva un mínimo legible, crece con el título
+y se detiene antes de invadir las herramientas. Su panel permanece estable al
+cambiar entre miniaturas, índice,
 marcadores, anotaciones y búsqueda; solo transiciona el contenido. Los avisos
 globales son compactos, se sustituyen entre sí y los pasivos desaparecen solos.
 
@@ -67,6 +72,13 @@ Continuación acotada en `docs/prompts/finish-visual-polish-0.15.md`.
 El bundle 0.15 se valida contra su manifiesto después del último cambio. El smoke
 sintético comprueba conexiones TCP/UDP y el inventario separa explícitamente los
 binarios sin firma; sigue siendo evidencia local, no un artefacto de distribución.
+
+La compilación de prueba más reciente está en
+`build/tryouts/yamantaka-0.15.0+16-library-physics-final-windows-x64.zip`:
+19.720.813 bytes, 20 archivos y SHA-256
+`2ECF1EBE46AE269BA26F93525696A22B427AF6DCEEA1AB23653AC46CE064848F`.
+El smoke se ejecutó sobre ese ZIP después de extraerlo, con dos avances de
+página y cero conexiones observadas.
 
 La hoja de ruta integral está en [NEXT_TODOS.md](NEXT_TODOS.md) y la estrategia
 vigente de pruebas en [TESTING.md](TESTING.md).

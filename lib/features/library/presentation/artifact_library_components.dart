@@ -1381,17 +1381,27 @@ final class ArtifactDocument extends StatefulWidget {
   State<ArtifactDocument> createState() => _ArtifactDocumentState();
 }
 
-final class _ArtifactDocumentState extends State<ArtifactDocument> {
+final class _ArtifactDocumentState extends State<ArtifactDocument>
+    with SingleTickerProviderStateMixin {
   bool _hovered = false;
   bool _focused = false;
   bool _entered = false;
   bool _reportedVisible = false;
   Offset _pointerTilt = Offset.zero;
+  Offset _pointerTarget = Offset.zero;
+  Offset _pointerVelocity = Offset.zero;
+  late final Ticker _pointerTicker;
+  Duration? _lastPointerTick;
   Timer? _entranceTimer;
+
+  static const double _pointerMass = 1.15;
+  static const double _pointerStiffness = 190;
+  static const double _pointerDamping = 24;
 
   @override
   void initState() {
     super.initState();
+    _pointerTicker = createTicker(_tickPointerMotion);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _reportedVisible = true;
@@ -1410,10 +1420,79 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
   }
 
   @override
+  void didUpdateWidget(covariant ArtifactDocument oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.reduceMotion && !oldWidget.reduceMotion) {
+      _resetPointerMotion();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.reduceMotion || MediaQuery.highContrastOf(context)) {
+      _resetPointerMotion();
+    }
+  }
+
+  @override
   void dispose() {
     _entranceTimer?.cancel();
+    _pointerTicker.dispose();
     if (_reportedVisible) widget.onHidden?.call();
     super.dispose();
+  }
+
+  void _setPointerTarget(Offset target) {
+    if ((target - _pointerTarget).distance < 0.025) return;
+    _pointerTarget = target;
+    if (!_pointerTicker.isActive) {
+      _lastPointerTick = null;
+      _pointerTicker.start();
+    }
+  }
+
+  void _resetPointerMotion() {
+    _pointerTicker.stop();
+    _lastPointerTick = null;
+    _pointerTarget = Offset.zero;
+    _pointerTilt = Offset.zero;
+    _pointerVelocity = Offset.zero;
+  }
+
+  void _tickPointerMotion(Duration elapsed) {
+    final previous = _lastPointerTick;
+    _lastPointerTick = elapsed;
+    if (previous == null) return;
+    final seconds = math.min(
+      (elapsed - previous).inMicroseconds / Duration.microsecondsPerSecond,
+      1 / 30,
+    );
+    final displacement = _pointerTarget - _pointerTilt;
+    final acceleration =
+        displacement * (_pointerStiffness / _pointerMass) -
+        _pointerVelocity * (_pointerDamping / _pointerMass);
+    _pointerVelocity += acceleration * seconds;
+    _pointerTilt += _pointerVelocity * seconds;
+    _pointerTilt = Offset(
+      _pointerTilt.dx.clamp(-1.08, 1.08),
+      _pointerTilt.dy.clamp(-1.08, 1.08),
+    );
+    final settled =
+        (_pointerTarget - _pointerTilt).distance < 0.001 &&
+        _pointerVelocity.distance < 0.01;
+    if (settled) {
+      _pointerTilt = _pointerTarget;
+      _pointerVelocity = Offset.zero;
+      _pointerTicker.stop();
+      _lastPointerTick = null;
+    }
+    if (mounted) setState(() {});
+  }
+
+  double _weightedAxis(double value) {
+    final magnitude = value.abs().clamp(0.0, 1.0);
+    return value.sign * math.pow(magnitude, 1.28).toDouble();
   }
 
   @override
@@ -1452,12 +1531,20 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
         : !_entered
         ? -0.035
         : 0.0;
-    final transform = Matrix4.identity()
-      ..setEntry(3, 2, 0.0012)
+    final baseTransform = Matrix4.identity()
       ..translateByDouble(0, _entered || motionDisabled ? -lift : 8, 0, 1)
-      ..rotateX(motionDisabled ? 0 : -_pointerTilt.dy * 0.025)
-      ..rotateY(bookAngle + (motionDisabled ? 0 : _pointerTilt.dx * 0.038))
+      ..rotateY(bookAngle)
       ..scaleByDouble(animatedScale, animatedScale, 1, 1);
+    final pointerTransform = Matrix4.identity()
+      ..setEntry(3, 2, 0.00135)
+      ..translateByDouble(
+        motionDisabled ? 0 : _pointerTilt.dx * 1.25,
+        motionDisabled ? 0 : _pointerTilt.dy * 0.7,
+        0,
+        1,
+      )
+      ..rotateX(motionDisabled ? 0 : -_pointerTilt.dy * 0.052)
+      ..rotateY(motionDisabled ? 0 : _pointerTilt.dx * 0.074);
     final transformDuration = motionDisabled
         ? AppMotion.instant
         : _hovered
@@ -1494,25 +1581,29 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
           onHover: (event) {
             if (motionDisabled) return;
             if (event.localPosition.dy > fittedHeight) {
-              if (_pointerTilt != Offset.zero) {
-                setState(() => _pointerTilt = Offset.zero);
-              }
+              _setPointerTarget(Offset.zero);
               return;
             }
-            final next = Offset(
+            final normalized = Offset(
               ((event.localPosition.dx / widget.width) - 0.5).clamp(-0.5, 0.5) *
                   2,
               ((event.localPosition.dy / fittedHeight) - 0.5).clamp(-0.5, 0.5) *
                   2,
             );
-            if ((next - _pointerTilt).distance < 0.08) return;
-            setState(() => _pointerTilt = next);
+            _setPointerTarget(
+              Offset(
+                _weightedAxis(normalized.dx),
+                _weightedAxis(normalized.dy),
+              ),
+            );
           },
           onExit: (_) {
-            setState(() {
-              _hovered = false;
-              _pointerTilt = Offset.zero;
-            });
+            setState(() => _hovered = false);
+            if (motionDisabled) {
+              _resetPointerMotion();
+            } else {
+              _setPointerTarget(Offset.zero);
+            }
             widget.onHover(false);
           },
           child: Listener(
@@ -1559,265 +1650,288 @@ final class _ArtifactDocumentState extends State<ArtifactDocument> {
                             child: IgnorePointer(
                               child: _ArtifactBookPageBlock(
                                 duration: transformDuration,
-                                transform: Matrix4.copy(transform),
+                                transform: Matrix4.copy(baseTransform),
+                                pointerTransform: Matrix4.copy(
+                                  pointerTransform,
+                                ),
                               ),
                             ),
                           ),
                         _ArtifactTransform(
-                          transformKey: ValueKey(
-                            'artifact-book-transform-${widget.document.id}',
-                          ),
                           duration: transformDuration,
-                          transform: transform,
-                          child: AnimatedContainer(
-                            key: ValueKey(
-                              'artifact-book-face-${widget.document.id}',
+                          transform: baseTransform,
+                          child: _ArtifactTransform(
+                            transformKey: ValueKey(
+                              'artifact-book-transform-${widget.document.id}',
                             ),
-                            // Grid reflow changes the cover dimensions. A
-                            // layout tween can temporarily exceed the new
-                            // cell when filters alter the column count.
-                            duration: motionDisabled
-                                ? AppMotion.instant
-                                : AppMotion.standard,
-                            curve: Curves.easeOutCubic,
-                            width: widget.width,
-                            height: fittedHeight,
-                            decoration: BoxDecoration(
-                              color: context.appColors.surfaceSunken,
-                              borderRadius: BorderRadius.circular(
-                                AppRadii.artifactCover,
+                            duration: AppMotion.instant,
+                            transform: pointerTransform,
+                            child: AnimatedContainer(
+                              key: ValueKey(
+                                'artifact-book-face-${widget.document.id}',
                               ),
-                              border: Border.all(
-                                color: widget.selected
-                                    ? context.appColors.librarySelectionAccent
-                                    : _hovered
-                                    ? context.appColors.borderStrong
-                                    : context.appColors.borderSubtle,
-                                width: widget.selected ? 1.5 : 1,
-                              ),
-                              boxShadow: motionDisabled
-                                  ? null
-                                  : [
-                                      if (widget.selected)
+                              // Grid reflow changes the cover dimensions. A
+                              // layout tween can temporarily exceed the new
+                              // cell when filters alter the column count.
+                              duration: motionDisabled
+                                  ? AppMotion.instant
+                                  : AppMotion.standard,
+                              curve: Curves.easeOutCubic,
+                              width: widget.width,
+                              height: fittedHeight,
+                              decoration: BoxDecoration(
+                                color: context.appColors.surfaceSunken,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.artifactCover,
+                                ),
+                                border: Border.all(
+                                  color: widget.selected
+                                      ? context.appColors.librarySelectionAccent
+                                      : _hovered
+                                      ? context.appColors.borderStrong
+                                      : context.appColors.borderSubtle,
+                                  width: widget.selected ? 1.5 : 1,
+                                ),
+                                boxShadow: motionDisabled
+                                    ? null
+                                    : [
+                                        if (widget.selected)
+                                          BoxShadow(
+                                            color: context
+                                                .appColors
+                                                .librarySelectionAccent
+                                                .withValues(alpha: 0.10),
+                                            blurRadius:
+                                                AppShadow.artifactGlowBlur,
+                                            spreadRadius:
+                                                AppShadow.artifactGlowSpread,
+                                            offset: const Offset(0, 12),
+                                          ),
                                         BoxShadow(
                                           color: context
                                               .appColors
-                                              .librarySelectionAccent
-                                              .withValues(alpha: 0.10),
-                                          blurRadius:
-                                              AppShadow.artifactGlowBlur,
-                                          spreadRadius:
-                                              AppShadow.artifactGlowSpread,
-                                          offset: const Offset(0, 12),
+                                              .readerPageShadow
+                                              .withValues(
+                                                alpha: widget.selected
+                                                    ? 0.16
+                                                    : 0.08,
+                                              ),
+                                          blurRadius: widget.selected
+                                              ? AppShadow.artifactSelectedBlur
+                                              : AppShadow.artifactRestBlur,
+                                          spreadRadius: widget.selected ? 1 : 0,
+                                          offset: Offset(
+                                            0,
+                                            widget.selected
+                                                ? AppShadow
+                                                      .artifactSelectedOffset
+                                                : AppShadow.artifactRestOffset,
+                                          ),
                                         ),
-                                      BoxShadow(
-                                        color: context
-                                            .appColors
-                                            .readerPageShadow
-                                            .withValues(
-                                              alpha: widget.selected
-                                                  ? 0.16
-                                                  : 0.08,
-                                            ),
-                                        blurRadius: widget.selected
-                                            ? AppShadow.artifactSelectedBlur
-                                            : AppShadow.artifactRestBlur,
-                                        spreadRadius: widget.selected ? 1 : 0,
-                                        offset: Offset(
-                                          0,
-                                          widget.selected
-                                              ? AppShadow.artifactSelectedOffset
-                                              : AppShadow.artifactRestOffset,
-                                        ),
-                                      ),
-                                    ],
-                            ),
-                            clipBehavior: Clip.antiAliasWithSaveLayer,
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                coverPath == null
-                                    ? _ArtifactPlaceholder(
-                                        document: widget.document,
-                                        active: emphasized,
-                                        reduceMotion: motionDisabled,
-                                      )
-                                    : _ArtifactCoverImage(
-                                        path: coverPath,
-                                        cacheWidth:
-                                            (widget.width *
-                                                    MediaQuery.devicePixelRatioOf(
-                                                      context,
-                                                    ))
-                                                .ceil(),
-                                        cacheHeight:
-                                            (fittedHeight *
-                                                    MediaQuery.devicePixelRatioOf(
-                                                      context,
-                                                    ))
-                                                .ceil(),
-                                        error: _ArtifactPlaceholder(
+                                      ],
+                              ),
+                              clipBehavior: Clip.antiAliasWithSaveLayer,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  coverPath == null
+                                      ? _ArtifactPlaceholder(
                                           document: widget.document,
-                                          failed: true,
                                           active: emphasized,
                                           reduceMotion: motionDisabled,
+                                        )
+                                      : _ArtifactCoverImage(
+                                          path: coverPath,
+                                          cacheWidth:
+                                              (widget.width *
+                                                      MediaQuery.devicePixelRatioOf(
+                                                        context,
+                                                      ))
+                                                  .ceil(),
+                                          cacheHeight:
+                                              (fittedHeight *
+                                                      MediaQuery.devicePixelRatioOf(
+                                                        context,
+                                                      ))
+                                                  .ceil(),
+                                          error: _ArtifactPlaceholder(
+                                            document: widget.document,
+                                            failed: true,
+                                            active: emphasized,
+                                            reduceMotion: motionDisabled,
+                                          ),
+                                        ),
+                                  if (!highContrast)
+                                    _ArtifactFrontFinish(
+                                      documentId: widget.document.id,
+                                      active: emphasized,
+                                      reduceMotion: motionDisabled,
+                                      pointerTilt: motionDisabled
+                                          ? Offset.zero
+                                          : _pointerTilt,
+                                    ),
+                                  if (widget.document.readingProgress > 0 &&
+                                      widget.document.readingProgress < 1)
+                                    Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: ColoredBox(
+                                        color: context.appColors.textMuted
+                                            .withValues(alpha: 0.28),
+                                        child: const SizedBox(
+                                          width: double.infinity,
+                                          height: 4,
                                         ),
                                       ),
-                                if (!highContrast)
-                                  _ArtifactFrontFinish(
-                                    active: emphasized,
-                                    reduceMotion: motionDisabled,
-                                  ),
-                                if (widget.document.readingProgress > 0 &&
-                                    widget.document.readingProgress < 1)
-                                  Align(
-                                    alignment: Alignment.bottomCenter,
-                                    child: ColoredBox(
-                                      color: context.appColors.textMuted
-                                          .withValues(alpha: 0.28),
-                                      child: const SizedBox(
-                                        width: double.infinity,
-                                        height: 4,
+                                    ),
+                                  if (widget.document.readingProgress > 0 &&
+                                      widget.document.readingProgress < 1)
+                                    Align(
+                                      alignment: Alignment.bottomLeft,
+                                      child: FractionallySizedBox(
+                                        widthFactor:
+                                            widget.document.readingProgress,
+                                        child: ColoredBox(
+                                          color: widget.selected
+                                              ? context
+                                                    .appColors
+                                                    .librarySelectionAccent
+                                              : context.appColors.textSecondary,
+                                          child: const SizedBox(height: 4),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                if (widget.document.readingProgress > 0 &&
-                                    widget.document.readingProgress < 1)
-                                  Align(
-                                    alignment: Alignment.bottomLeft,
-                                    child: FractionallySizedBox(
-                                      widthFactor:
-                                          widget.document.readingProgress,
-                                      child: ColoredBox(
-                                        color: widget.selected
-                                            ? context
-                                                  .appColors
-                                                  .librarySelectionAccent
-                                            : context.appColors.textSecondary,
-                                        child: const SizedBox(height: 4),
+                                  if (widget.document.readingProgress >= 1)
+                                    Positioned(
+                                      right: AppSpacing.space8,
+                                      bottom: AppSpacing.space8,
+                                      child: Tooltip(
+                                        message: strings.get(
+                                          'library.finished',
+                                        ),
+                                        child: Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color:
+                                                  context.appColors.textPrimary,
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                if (widget.document.readingProgress >= 1)
-                                  Positioned(
-                                    right: AppSpacing.space8,
-                                    bottom: AppSpacing.space8,
-                                    child: Tooltip(
-                                      message: strings.get('library.finished'),
-                                      child: Container(
-                                        width: 12,
-                                        height: 12,
+                                  if (widget.document.isFavorite)
+                                    Positioned(
+                                      right: AppSpacing.space6,
+                                      top: widget.selected
+                                          ? 40
+                                          : AppSpacing.space6,
+                                      child: Tooltip(
+                                        message: strings.get(
+                                          'library.favorite',
+                                        ),
+                                        child: Icon(
+                                          Icons.bookmark_rounded,
+                                          size: 17,
+                                          color: context.appColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  if (!widget.selectionMode &&
+                                      widget.document.hasFileChanged)
+                                    Positioned(
+                                      left: AppSpacing.space6,
+                                      top: AppSpacing.space6,
+                                      child: _ArtifactStateMarker(
+                                        icon: Icons.sync_problem_rounded,
+                                        label: strings.get(
+                                          'library.fileChanged',
+                                        ),
+                                        tone: AppStatusTone.warning,
+                                      ),
+                                    )
+                                  else if (!widget.selectionMode &&
+                                      enrichmentStatus != null &&
+                                      enrichmentStatus !=
+                                          EnrichmentStatus.completed &&
+                                      enrichmentStatus !=
+                                          EnrichmentStatus.noText)
+                                    Positioned(
+                                      left: AppSpacing.space6,
+                                      top: AppSpacing.space6,
+                                      child: _ArtifactStateMarker(
+                                        icon: switch (enrichmentStatus) {
+                                          EnrichmentStatus.pending =>
+                                            Icons.hourglass_empty_rounded,
+                                          EnrichmentStatus.analyzing =>
+                                            Icons.sync_rounded,
+                                          EnrichmentStatus.review =>
+                                            Icons.fact_check_outlined,
+                                          EnrichmentStatus.failed =>
+                                            Icons.error_outline_rounded,
+                                          _ => Icons.info_outline_rounded,
+                                        },
+                                        label: switch (enrichmentStatus) {
+                                          EnrichmentStatus.pending =>
+                                            strings.get(
+                                              'library.analysisPending',
+                                            ),
+                                          EnrichmentStatus.analyzing =>
+                                            strings.get(
+                                              'library.analysisInProgress',
+                                            ),
+                                          EnrichmentStatus.review =>
+                                            strings.get(
+                                              'library.metadataNeedsReview',
+                                            ),
+                                          EnrichmentStatus.failed =>
+                                            strings.get(
+                                              'library.analysisFailed',
+                                            ),
+                                          _ => strings.get(
+                                            'library.analyzeMetadata',
+                                          ),
+                                        },
+                                        tone:
+                                            enrichmentStatus ==
+                                                EnrichmentStatus.failed
+                                            ? AppStatusTone.error
+                                            : enrichmentStatus ==
+                                                  EnrichmentStatus.review
+                                            ? AppStatusTone.warning
+                                            : AppStatusTone.neutral,
+                                      ),
+                                    ),
+                                  if (widget.selected)
+                                    Positioned(
+                                      right: AppSpacing.space8,
+                                      top: AppSpacing.space8,
+                                      child: DecoratedBox(
                                         decoration: BoxDecoration(
+                                          color:
+                                              context.appColors.surfacePrimary,
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color:
-                                                context.appColors.textPrimary,
+                                            color: context
+                                                .appColors
+                                                .librarySelectionAccent,
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(2),
+                                          child: Icon(
+                                            Icons.check_rounded,
+                                            size: 16,
+                                            color: context
+                                                .appColors
+                                                .librarySelectionAccent,
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                if (widget.document.isFavorite)
-                                  Positioned(
-                                    right: AppSpacing.space6,
-                                    top: widget.selected
-                                        ? 40
-                                        : AppSpacing.space6,
-                                    child: Tooltip(
-                                      message: strings.get('library.favorite'),
-                                      child: Icon(
-                                        Icons.bookmark_rounded,
-                                        size: 17,
-                                        color: context.appColors.textPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                if (!widget.selectionMode &&
-                                    widget.document.hasFileChanged)
-                                  Positioned(
-                                    left: AppSpacing.space6,
-                                    top: AppSpacing.space6,
-                                    child: _ArtifactStateMarker(
-                                      icon: Icons.sync_problem_rounded,
-                                      label: strings.get('library.fileChanged'),
-                                      tone: AppStatusTone.warning,
-                                    ),
-                                  )
-                                else if (!widget.selectionMode &&
-                                    enrichmentStatus != null &&
-                                    enrichmentStatus !=
-                                        EnrichmentStatus.completed &&
-                                    enrichmentStatus != EnrichmentStatus.noText)
-                                  Positioned(
-                                    left: AppSpacing.space6,
-                                    top: AppSpacing.space6,
-                                    child: _ArtifactStateMarker(
-                                      icon: switch (enrichmentStatus) {
-                                        EnrichmentStatus.pending =>
-                                          Icons.hourglass_empty_rounded,
-                                        EnrichmentStatus.analyzing =>
-                                          Icons.sync_rounded,
-                                        EnrichmentStatus.review =>
-                                          Icons.fact_check_outlined,
-                                        EnrichmentStatus.failed =>
-                                          Icons.error_outline_rounded,
-                                        _ => Icons.info_outline_rounded,
-                                      },
-                                      label: switch (enrichmentStatus) {
-                                        EnrichmentStatus.pending => strings.get(
-                                          'library.analysisPending',
-                                        ),
-                                        EnrichmentStatus.analyzing =>
-                                          strings.get(
-                                            'library.analysisInProgress',
-                                          ),
-                                        EnrichmentStatus.review => strings.get(
-                                          'library.metadataNeedsReview',
-                                        ),
-                                        EnrichmentStatus.failed => strings.get(
-                                          'library.analysisFailed',
-                                        ),
-                                        _ => strings.get(
-                                          'library.analyzeMetadata',
-                                        ),
-                                      },
-                                      tone:
-                                          enrichmentStatus ==
-                                              EnrichmentStatus.failed
-                                          ? AppStatusTone.error
-                                          : enrichmentStatus ==
-                                                EnrichmentStatus.review
-                                          ? AppStatusTone.warning
-                                          : AppStatusTone.neutral,
-                                    ),
-                                  ),
-                                if (widget.selected)
-                                  Positioned(
-                                    right: AppSpacing.space8,
-                                    top: AppSpacing.space8,
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: context.appColors.surfacePrimary,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: context
-                                              .appColors
-                                              .librarySelectionAccent,
-                                        ),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(2),
-                                        child: Icon(
-                                          Icons.check_rounded,
-                                          size: 16,
-                                          color: context
-                                              .appColors
-                                              .librarySelectionAccent,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -1933,10 +2047,12 @@ final class _ArtifactBookPageBlock extends StatelessWidget {
   const _ArtifactBookPageBlock({
     required this.duration,
     required this.transform,
+    required this.pointerTransform,
   });
 
   final Duration duration;
   final Matrix4 transform;
+  final Matrix4 pointerTransform;
 
   @override
   Widget build(BuildContext context) {
@@ -1948,20 +2064,24 @@ final class _ArtifactBookPageBlock extends StatelessWidget {
     return _ArtifactTransform(
       duration: duration,
       transform: transform,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [paper, Color.lerp(paper, paperShadow, 0.72)!],
+      child: _ArtifactTransform(
+        duration: AppMotion.instant,
+        transform: pointerTransform,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [paper, Color.lerp(paper, paperShadow, 0.72)!],
+            ),
+            borderRadius: BorderRadius.circular(AppRadii.artifactCover),
+            border: Border.all(color: paperShadow.withValues(alpha: 0.86)),
           ),
-          borderRadius: BorderRadius.circular(AppRadii.artifactCover),
-          border: Border.all(color: paperShadow.withValues(alpha: 0.86)),
-        ),
-        clipBehavior: Clip.antiAliasWithSaveLayer,
-        child: CustomPaint(
-          painter: _ArtifactPageEdgesPainter(
-            lineColor: paperShadow.withValues(alpha: dark ? 0.58 : 0.42),
+          clipBehavior: Clip.antiAliasWithSaveLayer,
+          child: CustomPaint(
+            painter: _ArtifactPageEdgesPainter(
+              lineColor: paperShadow.withValues(alpha: dark ? 0.58 : 0.42),
+            ),
           ),
         ),
       ),
@@ -2050,15 +2170,23 @@ final class _ArtifactCoverImage extends StatelessWidget {
 
 final class _ArtifactFrontFinish extends StatelessWidget {
   const _ArtifactFrontFinish({
+    required this.documentId,
     required this.active,
     required this.reduceMotion,
+    required this.pointerTilt,
   });
 
+  final String documentId;
   final bool active;
   final bool reduceMotion;
+  final Offset pointerTilt;
 
   @override
   Widget build(BuildContext context) {
+    final lightCenter = Alignment(
+      -0.58 + pointerTilt.dx * 0.48,
+      -0.62 + pointerTilt.dy * 0.38,
+    );
     return IgnorePointer(
       child: Stack(
         fit: StackFit.expand,
@@ -2095,6 +2223,21 @@ final class _ArtifactFrontFinish extends StatelessWidget {
                     Colors.black,
                   ],
                 ),
+              ),
+            ),
+          ),
+          DecoratedBox(
+            key: ValueKey('artifact-pointer-light-$documentId'),
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: lightCenter,
+                radius: 1.08,
+                colors: [
+                  Colors.white.withValues(alpha: active ? 0.065 : 0.018),
+                  Colors.white.withValues(alpha: active ? 0.018 : 0.006),
+                  Colors.transparent,
+                ],
+                stops: const [0, 0.42, 1],
               ),
             ),
           ),

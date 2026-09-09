@@ -42,10 +42,15 @@ libro y un halo estático bajo la portada seleccionada. Las cubiertas de reserva
 usan seis familias vectoriales deterministas; las miniaturas reales ocupan la
 tapa completa y reciben el mismo lomo, canto de páginas y acabado superficial.
 El paralaje responde únicamente al puntero y vuelve a una tapa alineada a
-píxeles; así los bordes largos no sufren escalonado en Windows. Movimiento
-reducido lo convierte en volumen estático con duraciones cero. En oscuro y solo
-en ancho expandido, una filigrana raster de marca al 3,2 % ocupa el fondo; se
-omite con alto contraste o texto superior al 130 %.
+píxeles; así los bordes largos no sufren escalonado en Windows. La portada
+activa aplica una respuesta amortiguada en dos ejes: el centro ofrece más
+resistencia y los extremos generan mayor inclinación y un desplazamiento breve.
+Tapa y canto comparten la transformación para conservar la sensación de peso;
+un gradiente radial de opacidad limitada desplaza su centro con la misma señal
+y sugiere un acabado mate sin introducir otro controlador. Movimiento reducido
+lo convierte en volumen y luz estáticos con duraciones cero. En
+oscuro y solo en ancho expandido, una filigrana raster de marca al 3,2 % ocupa
+el fondo; se omite con alto contraste o texto superior al 130 %.
 
 La selección abre un contexto flotante de máximo 880 px con miniatura del libro,
 metadatos, progreso y una acción primaria. La continuidad de sesiones no
@@ -54,10 +59,12 @@ reserva una fila: vive en un menú con contador y acciones equivalentes.
 ## Chrome del lector y Libro
 
 La barra superior se divide en dos cápsulas flotantes —documento y
-herramientas— y la dock inferior sigue siendo un overlay. Mostrarlas u ocultarlas no
-modifica las restricciones del visor. En compacto/medio el panel también es
-overlay con scrim; en expandido resta siempre su ancho y el visor se recentra
-en el área restante. Abrir, cambiar o redimensionar el panel no reconstruye el
+herramientas—. La primera reserva un ancho estable y adaptable para que los
+títulos reales no colapsen alrededor de la flecha; la dock inferior sigue
+siendo un overlay. Mostrarlas u ocultarlas no modifica las restricciones del
+visor. En compacto/medio el panel también es overlay con scrim; en expandido
+resta siempre su ancho y el visor se recentra en el área restante. Abrir,
+cambiar o redimensionar el panel no reconstruye el
 `RepaintBoundary` cacheado por configuración de documento. Cambiar de sección
 mantiene la superficie estable y cruza solo su contenido durante 120 ms.
 

@@ -177,6 +177,35 @@ void main() {
     await harness.dispose();
   });
 
+  testWidgets('reader gives long document titles a stable readable width', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _ReaderHarness.create(ready: true);
+    const title = 'Historia política contemporánea de los Andes';
+    harness.controller.document = harness.controller.document!.copyWith(
+      title: title,
+    );
+
+    await tester.pumpWidget(_app(harness));
+    await tester.pump();
+
+    final identityWidth = tester
+        .getSize(find.byKey(const Key('reader-document-identity')))
+        .width;
+    expect(identityWidth, greaterThan(360));
+    expect(identityWidth, lessThanOrEqualTo(440));
+    final paragraph = tester.renderObject<RenderParagraph>(find.text(title));
+    expect(paragraph.didExceedMaxLines, isFalse);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await harness.dispose();
+  });
+
   testWidgets('reader shows navigation, progress, panels and six themes', (
     tester,
   ) async {

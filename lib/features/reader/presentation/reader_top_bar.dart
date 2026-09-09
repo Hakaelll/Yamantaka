@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../app/shortcuts/app_commands.dart';
@@ -83,6 +85,14 @@ final class ReaderTopBar extends StatelessWidget
       return SizedBox(height: AppSizes.readerTopBarHeight(compact: compact));
     }
     final colors = context.appColors;
+    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+      color: colors.textPrimary,
+      fontWeight: FontWeight.w600,
+    );
+    final canGoBack =
+        !compact && controller.navigationHistory?.canGoBack == true;
+    final canGoForward =
+        !compact && controller.navigationHistory?.canGoForward == true;
     return DecoratedBox(
       key: const Key('reader-top-surface'),
       decoration: const BoxDecoration(color: Colors.transparent),
@@ -103,81 +113,122 @@ final class ReaderTopBar extends StatelessWidget
             padding: EdgeInsets.zero,
             children: [
               Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: YamaToolbarGroup(
-                    label: strings.get('reader.currentDocument'),
-                    flat: flatChrome,
-                    radius: AppRadii.capsule,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.space4,
-                    ),
-                    children: [
-                      YamaIconButton(
-                        semanticLabel: strings.get('reader.backToLibrary'),
-                        tooltip: strings.get('reader.backToLibrary'),
-                        icon: Icons.arrow_back_rounded,
-                        onPressed: onBack,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Give the document identity a stable reading measure.
+                    // A shrink-wrapped capsule looked tidy with short file
+                    // names, but made real book titles almost immediately
+                    // collapse into an ellipsis.
+                    final minimumWidth = compact ? 232.0 : 264.0;
+                    final maximumWidth = compact
+                        ? 320.0
+                        : expanded
+                        ? 440.0
+                        : 360.0;
+                    final titlePainter = TextPainter(
+                      text: TextSpan(
+                        text: document.effectiveTitle,
+                        style: titleStyle,
                       ),
-                      Container(
-                        width: 2,
-                        height: 18,
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.space8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.accentPrimary,
-                          borderRadius: BorderRadius.circular(
-                            AppRadii.indicator,
+                      maxLines: 1,
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context),
+                    )..layout();
+                    final measuredTitleWidth = titlePainter.width;
+                    titlePainter.dispose();
+                    final fixedChromeWidth =
+                        AppSizes.desktopControlExtent +
+                        2 +
+                        AppSpacing.space16 +
+                        AppSpacing.space8 +
+                        (canGoBack ? AppSizes.desktopControlExtent : 0) +
+                        (canGoForward ? AppSizes.desktopControlExtent : 0) +
+                        AppSpacing.space20;
+                    final boundedMaximum = math.min(
+                      maximumWidth,
+                      constraints.maxWidth,
+                    );
+                    final boundedMinimum = math.min(
+                      minimumWidth,
+                      boundedMaximum,
+                    );
+                    final groupWidth = (measuredTitleWidth + fixedChromeWidth)
+                        .clamp(boundedMinimum, boundedMaximum)
+                        .toDouble();
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        key: const Key('reader-document-identity'),
+                        width: groupWidth,
+                        child: YamaToolbarGroup(
+                          label: strings.get('reader.currentDocument'),
+                          flat: flatChrome,
+                          mainAxisSize: MainAxisSize.max,
+                          radius: AppRadii.capsule,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.space4,
                           ),
-                        ),
-                      ),
-                      Flexible(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: compact
-                                ? 148
-                                : expanded
-                                ? 360
-                                : 240,
-                          ),
-                          child: Tooltip(
-                            message: document.fileName,
-                            child: Text(
-                              document.effectiveTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(
-                                    color: colors.textPrimary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          children: [
+                            YamaIconButton(
+                              semanticLabel: strings.get(
+                                'reader.backToLibrary',
+                              ),
+                              tooltip: strings.get('reader.backToLibrary'),
+                              icon: Icons.arrow_back_rounded,
+                              onPressed: onBack,
                             ),
-                          ),
+                            Container(
+                              width: 2,
+                              height: 18,
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.space8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colors.accentPrimary,
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.indicator,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Tooltip(
+                                message:
+                                    document.effectiveTitle == document.fileName
+                                    ? document.fileName
+                                    : '${document.effectiveTitle}\n${document.fileName}',
+                                child: Text(
+                                  document.effectiveTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: titleStyle,
+                                ),
+                              ),
+                            ),
+                            if (canGoBack)
+                              YamaIconButton(
+                                semanticLabel: strings.get(
+                                  'command.navigationBack',
+                                ),
+                                tooltip:
+                                    '${strings.get('command.navigationBack')} (Alt+←)',
+                                icon: Icons.undo_rounded,
+                                onPressed: controller.historyBack,
+                              ),
+                            if (canGoForward)
+                              YamaIconButton(
+                                semanticLabel: strings.get(
+                                  'command.navigationForward',
+                                ),
+                                tooltip:
+                                    '${strings.get('command.navigationForward')} (Alt+→)',
+                                icon: Icons.redo_rounded,
+                                onPressed: controller.historyForward,
+                              ),
+                          ],
                         ),
                       ),
-                      if (!compact &&
-                          controller.navigationHistory?.canGoBack == true)
-                        YamaIconButton(
-                          semanticLabel: strings.get('command.navigationBack'),
-                          tooltip:
-                              '${strings.get('command.navigationBack')} (Alt+←)',
-                          icon: Icons.undo_rounded,
-                          onPressed: controller.historyBack,
-                        ),
-                      if (!compact &&
-                          controller.navigationHistory?.canGoForward == true)
-                        YamaIconButton(
-                          semanticLabel: strings.get(
-                            'command.navigationForward',
-                          ),
-                          tooltip:
-                              '${strings.get('command.navigationForward')} (Alt+→)',
-                          icon: Icons.redo_rounded,
-                          onPressed: controller.historyForward,
-                        ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: AppSpacing.space8),

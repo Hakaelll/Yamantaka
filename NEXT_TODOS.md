@@ -24,6 +24,9 @@ Actualizado: 2026-09-09.
   miniatura-libro y mover la sesión reciente a un menú compacto.
 - [x] Dividir la barra del lector en grupos flotantes, estabilizar el panel al
   cambiar de sección y compactar los avisos con desaparición automática.
+- [x] Hacer adaptable la cápsula del título y dar a cada portada una respuesta
+  amortiguada cuyo peso, inclinación y luz superficial dependan de la posición
+  del cursor, con retorno neutro y alternativa estática en movimiento reducido.
 
 - [x] Retirar el recuento duplicado de la cabecera y el ornamento sin función
   del resumen del catálogo.
@@ -33,7 +36,7 @@ Actualizado: 2026-09-09.
   siguen disponibles en el menú secundario.
 - [x] Sustituir el matiz azul del tema oscuro por negro y grises neutros sin
   modificar los píxeles del PDF ni el acento violeta funcional.
-- [x] Validar análisis, 329 pruebas, build Release, smoke sin red, flujo PDFium
+- [x] Validar análisis, 330 pruebas, build Release, smoke sin red, flujo PDFium
   real y matrices visuales claro/oscuro, compacto/expandido y texto al 200 %.
 - [ ] **P1 — rendimiento:** resolver los p95 ya conocidos de Biblioteca
   (6986 frente a 4672 µs) y lector (8078 frente a 6760 µs). Aceptación: cinco

@@ -4,7 +4,7 @@ Estado actualizado: 2026-09-09.
 
 ## Pase de simplificación de Biblioteca
 
-La revisión actual pasa `flutter analyze --no-pub`, las 329 pruebas de
+La revisión actual pasa `flutter analyze --no-pub`, las 330 pruebas de
 `flutter test --no-pub` y `flutter build windows --release --no-pub`. El flujo
 nativo con PDFium real también pasa: abre un PDF sintético de 12 páginas,
 recorre Biblioteca, Lector y Ajustes en claro y oscuro, restaura la página 2 y
@@ -67,6 +67,20 @@ nuevos fijan reposo/respuesta al ratón y desaparición de avisos pasivos. La ba
 del lector conserva targets de 40 px y el cambio de sección no reintroduce el
 panel completo.
 
+El ajuste final de título y movimiento queda en
+`build/visual-evidence/reader-title-and-weight-adaptive/` y
+`build/visual-evidence/library-physics-final/`. Verifica que la cápsula del
+documento crezca entre 232 y 440 px según ventana y título, sin elipsis para un
+título de longitud media. El contrato del artefacto comprueba además que la
+inclinación aumenta en los extremos, conserva inercia amortiguada, desplaza de
+forma solidaria la luz mate de la tapa y vuelve a una matriz neutra fuera de
+ella; movimiento reducido mantiene matriz y luz estáticas. Pasan análisis, 330
+pruebas, Release y el flujo nativo PDFium. Su `native-flow.json` declara
+`pdfUnchanged: true`, página 2 restaurada y ausencia de datos personales. El ZIP
+exacto de prueba contiene 20 archivos, mide 19.720.813 bytes y tiene SHA-256
+`2ECF1EBE46AE269BA26F93525696A22B427AF6DCEEA1AB23653AC46CE064848F`.
+Su smoke de ocho segundos navega dos veces sin abrir conexiones de red.
+
 El gate agregado pasa 13 fases y falla únicamente `native resolution and DPI
 matrix`: produjo cuatro capturas nativas a 1600×900 y 96 DPI/100 %, pero el host
 no permitió confirmar físicamente esa escala (`scaleConfirmed: false`). No se
@@ -84,6 +98,7 @@ firma Authenticode.
 Auditoría y decisiones: `docs/architecture/library-simplification-audit.md`.
 Informes: `build/verification/verification-report.json`,
 `build/verification/native-app-flow.json`,
+`build/verification/library-physics-final-zip-no-network.json`,
 `build/verification/dpi-matrix/matrix-report.json` y
 `build/verification/performance/library-benchmark.json`.
 
