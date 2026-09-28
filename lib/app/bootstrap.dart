@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import '../core/logging/app_logger.dart';
 import '../core/performance/startup_timeline.dart';
 import '../core/platform/single_instance_protocol.dart';
+import '../core/platform/window_service.dart';
 import '../features/settings/application/settings_controller.dart';
 import '../storage/paths/app_paths.dart';
 import '../storage/repositories/app_settings_repository.dart';
@@ -46,13 +47,14 @@ Future<void> bootstrap(List<String> arguments) async {
       minimumSize: Size(640, 480),
       center: presentation.normalPosition == null,
       title: AppConfig.productName,
-      backgroundColor: const Color(0xFFF4F3EF),
+      backgroundColor: Colors.black,
     );
     await windowManager.waitUntilReadyToShow(options, () async {
       if (presentation.normalPosition != null) {
         await windowManager.setPosition(presentation.normalPosition!);
       }
       if (presentation.maximized) await windowManager.maximize();
+      await DesktopWindowService().setFullScreen(presentation.fullScreen);
       await windowManager.show();
       await windowManager.focus();
     });
@@ -66,6 +68,9 @@ Future<void> bootstrap(List<String> arguments) async {
     startupTimeline: startup,
   );
   servicesSpan.end();
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    services.reader.isFullScreen = await DesktopWindowService().isFullScreen();
+  }
   final initialPaths = initialPdfPaths(arguments);
   bootstrapSpan.end();
   logger.info(
@@ -81,11 +86,13 @@ final class InitialWindowPresentation {
     required this.normalSize,
     required this.normalPosition,
     required this.maximized,
+    this.fullScreen = true,
   });
 
   final Size normalSize;
   final Offset? normalPosition;
   final bool maximized;
+  final bool fullScreen;
 }
 
 InitialWindowPresentation resolveInitialWindowPresentation(

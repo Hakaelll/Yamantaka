@@ -35,6 +35,7 @@ void main() {
     );
 
     expect(presentation.maximized, isTrue);
+    expect(presentation.fullScreen, isTrue);
     expect(presentation.normalSize.width, 2400);
     expect(presentation.normalSize.height, 480);
     expect(presentation.normalPosition?.dx, 120);

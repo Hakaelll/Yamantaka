@@ -185,10 +185,10 @@ abstract final class AppTheme {
     });
     final overlay = WidgetStateProperty.resolveWith<Color?>((states) {
       if (states.contains(WidgetState.pressed)) {
-        return tokens.accentPressed.withValues(alpha: 0.14);
+        return tokens.textPrimary.withValues(alpha: 0.12);
       }
       if (states.contains(WidgetState.hovered)) {
-        return tokens.accentHover.withValues(alpha: 0.10);
+        return tokens.textPrimary.withValues(alpha: 0.06);
       }
       if (states.contains(WidgetState.focused)) {
         return tokens.accentSoft.withValues(alpha: 0.8);
@@ -317,7 +317,7 @@ abstract final class AppTheme {
           minimumSize: const WidgetStatePropertyAll(
             Size(40, AppSizes.desktopControlExtent),
           ),
-          foregroundColor: WidgetStatePropertyAll(tokens.accentPrimary),
+          foregroundColor: WidgetStatePropertyAll(tokens.textPrimary),
           overlayColor: overlay,
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
@@ -547,6 +547,8 @@ abstract final class AppTheme {
         thumbColor: tokens.accentPrimary,
         overlayColor: tokens.accentSoft,
         trackHeight: 3,
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -568,7 +570,7 @@ abstract final class AppTheme {
           minimumSize: const WidgetStatePropertyAll(Size(38, 34)),
           backgroundColor: WidgetStateProperty.resolveWith(
             (states) => states.contains(WidgetState.selected)
-                ? tokens.accentSoft
+                ? tokens.surfaceActive
                 : Colors.transparent,
           ),
           foregroundColor: WidgetStateProperty.resolveWith(
@@ -579,7 +581,7 @@ abstract final class AppTheme {
           side: WidgetStatePropertyAll(BorderSide(color: tokens.borderSubtle)),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.capsule),
+              borderRadius: BorderRadius.circular(AppRadii.control),
             ),
           ),
         ),

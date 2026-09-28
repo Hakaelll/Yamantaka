@@ -261,7 +261,8 @@ Atajos y recuperación se documentan en [docs/SHORTCUTS.md](docs/SHORTCUTS.md) y
 - Ajustes usa master-detail agrupado, búsqueda de preferencias, reset por
   sección y una previsualización viva persistente del canvas, la página y el
   chrome, alternable entre reposo, activo, panel y e-ink.
-- La ventana se abre maximizada y conserva su geometría normal para restaurarla.
+- La ventana se abre en pantalla completa y conserva su geometría normal para
+  restaurarla. F11 alterna el modo; Biblioteca incluye un botón equivalente.
 
 ## Referencia visual vigente
 

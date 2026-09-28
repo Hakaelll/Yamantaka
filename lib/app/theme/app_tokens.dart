@@ -139,9 +139,9 @@ abstract final class AppRadii {
   static const double indicator = 2;
   static const double page = 3;
   static const double artifactCover = 8;
-  static const double control = 8;
-  static const double field = 10;
-  static const double floating = 12;
+  static const double control = 5;
+  static const double field = 6;
+  static const double floating = 8;
   static const double panel = 12;
   static const double dialog = 14;
   static const double touchSurface = 12;

@@ -212,7 +212,7 @@ final class YamaSegmentedControl<T> extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.surfaceSecondary,
           border: Border.all(color: colors.borderSubtle),
-          borderRadius: BorderRadius.circular(AppRadii.capsule),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.space4),
@@ -263,7 +263,7 @@ final class _YamaSegmentButton<T> extends StatelessWidget {
       label: segment.label,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(AppRadii.capsule),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         child: AnimatedContainer(
           duration: duration,
           curve: AppCurves.feedback,
@@ -274,7 +274,7 @@ final class _YamaSegmentButton<T> extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: selected ? colors.surfaceActive : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppRadii.capsule),
+            borderRadius: BorderRadius.circular(AppRadii.control),
             border: Border.all(
               color: selected ? colors.borderStrong : Colors.transparent,
             ),

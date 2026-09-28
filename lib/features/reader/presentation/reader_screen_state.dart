@@ -41,6 +41,7 @@ final class _ReaderScreenState extends State<ReaderScreen> {
       autoHide: widget.controlsAutoHide ?? true,
       reduceMotion: widget.reduceMotion,
     );
+    _chromeCoordinator.setFullscreen(widget.controller.isFullScreen);
     _controlsVisible = widget.initialChromeVisible;
     _immersive = widget.initialFocusMode;
     if (_immersive) {

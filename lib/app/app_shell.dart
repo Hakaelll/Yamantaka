@@ -197,6 +197,12 @@ final class _YamantakaAppState extends State<YamantakaApp>
               : AppMotion.standard,
           home: CallbackShortcuts(
             bindings: {
+              for (final choice in AppCommandRegistry.shortcutChoices)
+                if (choice.token ==
+                    AppCommandRegistry.resolvedTokens(
+                      settings.shortcutOverrides,
+                    )[AppCommandId.fullScreen])
+                  choice.activator: () => unawaited(_toggleWindowFullScreen()),
               ...AppCommandRegistry.applicationShortcuts(
                 openDocument: () => unawaited(_pickAndOpen()),
                 overrides: settings.shortcutOverrides,
@@ -256,6 +262,8 @@ final class _YamantakaAppState extends State<YamantakaApp>
 
   Widget _buildPage(BuildContext context) => switch (_page) {
     _AppPage.library => LibraryScreen(
+      onToggleFullScreen: () => unawaited(_toggleWindowFullScreen()),
+      isFullScreen: widget.services.reader.isFullScreen,
       controller: widget.services.library,
       onOpenPath: _openPath,
       onPickDocument: _pickAndOpen,
@@ -2488,6 +2496,20 @@ final class _YamantakaAppState extends State<YamantakaApp>
       const Duration(milliseconds: 500),
       () => unawaited(_saveWindowBounds()),
     );
+  }
+
+  Future<void> _toggleWindowFullScreen() async {
+    try {
+      await widget.services.reader.toggleFullScreen();
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        _navigatorKey.currentContext ?? context,
+      ).showSnackBar(
+        SnackBar(content: Text(_strings.get('reader.enterFullScreenFailed'))),
+      );
+    }
   }
 
   Future<void> _saveWindowBounds() async {

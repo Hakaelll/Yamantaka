@@ -64,6 +64,8 @@ final class LibraryScreen extends StatefulWidget {
     required this.onOpenPath,
     required this.onPickDocument,
     required this.onOpenSettings,
+    this.onToggleFullScreen,
+    this.isFullScreen = false,
     required this.showRecents,
     this.reduceMotion = false,
     this.initialReadingFilter = LibraryReadingState.all,
@@ -106,6 +108,8 @@ final class LibraryScreen extends StatefulWidget {
   final Future<void> Function(String path) onOpenPath;
   final Future<void> Function() onPickDocument;
   final VoidCallback onOpenSettings;
+  final VoidCallback? onToggleFullScreen;
+  final bool isFullScreen;
   final bool showRecents;
   final bool reduceMotion;
   final LibraryReadingState initialReadingFilter;
@@ -213,6 +217,21 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                 child: const SizedBox.shrink(),
               ),
               actions: [
+                if (widget.onToggleFullScreen != null)
+                  IconButton(
+                    key: const Key('library-fullscreen-button'),
+                    tooltip: strings.get(
+                      widget.isFullScreen
+                          ? 'reader.exitFullScreen'
+                          : 'command.fullScreen',
+                    ),
+                    onPressed: widget.onToggleFullScreen,
+                    icon: Icon(
+                      widget.isFullScreen
+                          ? Icons.fullscreen_exit
+                          : Icons.fullscreen,
+                    ),
+                  ),
                 if (widget.showRecents && !widget.continuity.isEmpty)
                   ContinuityCenter(
                     summary: widget.continuity,
@@ -365,9 +384,20 @@ final class _LibraryScreenState extends State<LibraryScreen> {
                         minimumSize: const Size.square(
                           AppSizes.desktopControlExtent,
                         ),
-                        padding: EdgeInsets.zero,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                       ),
-                      child: const Icon(Icons.file_open_outlined, size: 18),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.add, size: 18),
+                          if (MediaQuery.sizeOf(context).width >= 900 &&
+                              MediaQuery.textScalerOf(context).scale(14) <=
+                                  21) ...[
+                            const SizedBox(width: 8),
+                            Text(strings.libraryOpenPdf),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1059,11 +1089,26 @@ final class _ContinueReadingStripState extends State<ContinueReadingStrip> {
                           const SizedBox(width: AppSpacing.space12),
                           Tooltip(
                             message: strings.get('action.resumeReading'),
-                            child: IconButton.filled(
+                            child: FilledButton(
                               onPressed: widget.onOpen,
-                              icon: const Icon(
-                                Icons.play_arrow_rounded,
-                                size: 20,
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (MediaQuery.sizeOf(context).width >= 900 &&
+                                      MediaQuery.textScalerOf(
+                                            context,
+                                          ).scale(14) <=
+                                          21) ...[
+                                    Text(strings.get('action.resumeReading')),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  const Icon(Icons.arrow_forward, size: 18),
+                                ],
                               ),
                             ),
                           ),

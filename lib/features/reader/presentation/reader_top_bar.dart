@@ -164,7 +164,7 @@ final class ReaderTopBar extends StatelessWidget
                           label: strings.get('reader.currentDocument'),
                           flat: flatChrome,
                           mainAxisSize: MainAxisSize.max,
-                          radius: AppRadii.capsule,
+                          radius: AppRadii.control,
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.space4,
                           ),
@@ -237,7 +237,7 @@ final class ReaderTopBar extends StatelessWidget
                 child: YamaToolbarGroup(
                   label: strings.get('reader.tools'),
                   flat: flatChrome,
-                  radius: AppRadii.capsule,
+                  radius: AppRadii.control,
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.space4,
                   ),

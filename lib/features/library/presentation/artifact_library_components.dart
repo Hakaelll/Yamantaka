@@ -81,12 +81,29 @@ final class _LibraryCommandBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = YamantakaLocalizations.of(context);
-    final search = IconButton(
-      key: const Key('library-search-button'),
-      tooltip: query.isEmpty ? strings.librarySearch : query,
-      onPressed: onSearch,
-      icon: const Icon(Icons.search_rounded, size: 18),
-    );
+    final expanded =
+        MediaQuery.sizeOf(context).width >= 900 &&
+        MediaQuery.textScalerOf(context).scale(14) <= 21;
+    final search = expanded
+        ? OutlinedButton.icon(
+            key: const Key('library-search-button'),
+            onPressed: onSearch,
+            icon: const Icon(Icons.search, size: 18),
+            label: SizedBox(
+              width: 180,
+              child: Text(
+                query.isEmpty ? strings.librarySearch : query,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+        : IconButton(
+            key: const Key('library-search-button'),
+            tooltip: query.isEmpty ? strings.librarySearch : query,
+            onPressed: onSearch,
+            icon: const Icon(Icons.search_rounded, size: 18),
+          );
     final tools = YamaToolbarGroup(
       label: strings.get('library.commandBar'),
       flat: MediaQuery.highContrastOf(context),
@@ -94,16 +111,19 @@ final class _LibraryCommandBar extends StatelessWidget {
       padding: EdgeInsets.zero,
       children: [
         search,
+        const SizedBox(width: 8),
         PopupMenuButton<_FilterCommand>(
           key: const Key('library-filter-button'),
           tooltip: strings.get('library.filterSort'),
           onSelected: onFilter,
-          icon: Badge(
-            isLabelVisible: activeFilter,
-            smallSize: 6,
-            backgroundColor: context.appColors.textSecondary,
-            child: const Icon(Icons.tune_rounded),
-          ),
+          icon: expanded
+              ? null
+              : Badge(
+                  isLabelVisible: activeFilter,
+                  smallSize: 6,
+                  backgroundColor: context.appColors.textSecondary,
+                  child: const Icon(Icons.tune_rounded),
+                ),
           itemBuilder: (context) => [
             PopupMenuItem(
               enabled: false,
@@ -154,7 +174,43 @@ final class _LibraryCommandBar extends StatelessWidget {
               ),
             ],
           ],
+          child: expanded
+              ? _LibraryMenuLabel(
+                  icon: Icons.tune,
+                  label: strings.get('library.filterSort'),
+                  active: activeFilter,
+                )
+              : null,
         ),
+        if (expanded) ...[
+          const YamaToolbarDivider(),
+          YamaIconButton(
+            key: const Key('library-view-grid-button'),
+            icon: Icons.grid_view_outlined,
+            semanticLabel: strings.get('library.view.grid'),
+            selected: viewMode == _LibraryViewMode.grid,
+            onPressed: () => onViewModeChanged(_LibraryViewMode.grid),
+          ),
+          YamaIconButton(
+            key: const Key('library-view-list-button'),
+            icon: Icons.view_list_outlined,
+            semanticLabel: strings.get('library.view.list'),
+            selected: viewMode == _LibraryViewMode.list,
+            onPressed: () => onViewModeChanged(_LibraryViewMode.list),
+          ),
+          const YamaToolbarDivider(),
+          YamaIconButton(
+            key: const Key('library-selection-button'),
+            icon: Icons.checklist,
+            semanticLabel: strings.get(
+              selectionMode
+                  ? 'library.exitSelectionMode'
+                  : 'library.selectMultiple',
+            ),
+            selected: selectionMode,
+            onPressed: onToggleSelectionMode,
+          ),
+        ],
         PopupMenuButton<_LibraryDisplayCommand>(
           key: const Key('library-display-menu-button'),
           tooltip: strings.get('library.commandBar'),
@@ -173,7 +229,7 @@ final class _LibraryCommandBar extends StatelessWidget {
           icon: Badge(
             isLabelVisible: selectedCount > 0,
             label: Text('$selectedCount'),
-            child: const Icon(Icons.more_vert_rounded),
+            child: const Icon(Icons.more_horiz),
           ),
           itemBuilder: (context) => [
             CheckedPopupMenuItem(
@@ -233,6 +289,20 @@ final class _LibraryCommandBar extends StatelessWidget {
                     ),
                     child: const SizedBox.shrink(),
                   ),
+                  if (expanded)
+                    Expanded(
+                      child: Text(
+                        strings.count(
+                          resultCount == totalCount
+                              ? 'count.documents'
+                              : 'count.results',
+                          resultCount,
+                        ),
+                        style: Theme.of(context).textTheme.labelMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   if (activeFilter)
                     IconButton(
                       key: const Key('library-reset-filters-button'),
@@ -266,6 +336,45 @@ final class _LibraryCommandBar extends StatelessWidget {
       },
     );
   }
+}
+
+/// A named desktop menu trigger with the same keyboard and menu behavior as
+/// PopupMenuButton; compact layouts keep its icon-only equivalent.
+final class _LibraryMenuLabel extends StatelessWidget {
+  const _LibraryMenuLabel({
+    required this.icon,
+    required this.label,
+    this.active = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 40),
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    decoration: BoxDecoration(
+      color: active ? context.appColors.surfaceActive : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.control),
+      border: Border.all(
+        color: active
+            ? context.appColors.borderStrong
+            : context.appColors.borderSubtle,
+      ),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 8),
+        Text(label, style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(width: 8),
+        const Icon(Icons.expand_more, size: 16),
+      ],
+    ),
+  );
 }
 
 final class _ActiveFilterStrip extends StatelessWidget {

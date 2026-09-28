@@ -54,7 +54,17 @@ void main() {
     expect(find.byKey(const Key('library-navigation')), findsNothing);
     expect(find.byTooltip('Ajustes'), findsNothing);
     expect(find.text('Biblioteca'), findsNothing);
-    expect(find.text('3 documentos'), findsNothing);
+    expect(find.text('3 documentos'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('library-view-list-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('library-view-grid-button')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('library-view-grid-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('library-selection-button')));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Salir del modo de selección'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('library-selection-button')));
+    await tester.pumpAndSettle();
     expect(find.text('Revisión de anotaciones'), findsNothing);
     expect(find.text('Problemas y recuperación'), findsNothing);
     await tester.tap(find.byTooltip('Organizar y más acciones'));
