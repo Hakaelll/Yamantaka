@@ -1,0 +1,19 @@
+-- Synthetic populated source for the historical Flutter schema.
+INSERT INTO documents (id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,last_page_index,reading_progress,fingerprint,title_override,source_title,is_favorite) VALUES ('original','C:/文献/ensayo.pdf','c:/文献/ensayo.pdf','ensayo.pdf','Investigación – مرحبا 文献','Ana García',7,900,'2026-10-08T12:00:00Z','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z',2,0.4,'legacy','Mi título manual','Título extraído',1);
+INSERT INTO documents (id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,last_page_index,reading_progress,fingerprint,title_override,source_title,is_favorite) VALUES ('incoming','C:/文献/revision.pdf','c:/文献/revision.pdf','revision.pdf','Investigación – مرحبا 文献','Ana García',7,900,'2026-10-08T12:00:00Z','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z',2,0.4,'incoming','Mi título manual','Título extraído',1);
+INSERT INTO document_preferences (document_id,view_mode,reading_theme,zoom_mode,zoom_level,page_layout,updated_at) VALUES ('original','book','ivory','fitWidth',1.25,'spread','2026-10-08T12:00:00Z');
+INSERT INTO bookmarks (id,document_id,page_index,label,created_at,updated_at) VALUES ('bookmark','original',2,'A/B','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z');
+INSERT INTO reading_sessions (id,document_id,started_at,ended_at,start_page,end_page,active_seconds) VALUES ('session','original','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z',1,2,240);
+INSERT INTO annotations (id,document_id,page_index,type,color,note,selected_text,rects_json,document_fingerprint,created_at,updated_at) VALUES ('annotation','original',2,'highlight','#c5adff','Revisar argumento','مرحبا 文献','[{"left":0.1,"top":0.2,"width":0.3,"height":0.05}]','legacy','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z');
+INSERT INTO tags (id,name,normalized_name,color,created_at,updated_at) VALUES ('tag','Estudio','estudio','#c5adff','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z');
+INSERT INTO annotation_tags (annotation_id,tag_id) VALUES ('annotation','tag');
+INSERT INTO document_tags (document_id,tag_id) VALUES ('original','tag');
+INSERT INTO collections (id,name,normalized_name,is_pinned,created_at,updated_at) VALUES ('collection','Biblioteca personal','biblioteca personal',1,'2026-10-08T12:00:00Z','2026-10-08T12:00:00Z');
+INSERT INTO collection_documents (collection_id,document_id,added_at) VALUES ('collection','original','2026-10-08T12:00:00Z');
+INSERT INTO reading_profiles (id,name,settings_json,created_at,updated_at) VALUES ('profile','Estudio','{"readingDirection":"rtl","zoom":1.25}','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z');
+INSERT INTO workspaces (id,name,active_tab_id,collection_id,created_at,updated_at) VALUES ('workspace','Lectura personal','tab','collection','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z');
+INSERT INTO workspace_tabs (id,workspace_id,document_id,sort_order,is_pinned,page_index,zoom_level,page_layout,reading_mode) VALUES ('tab','workspace','original',0,1,2,1.25,'spread','book');
+INSERT INTO app_metadata (key,value,updated_at) VALUES ('activeWorkspaceId','workspace','2026-10-08T12:00:00Z');
+INSERT INTO library_search(document_id,page_index,kind,title,body,tags) VALUES('original',2,'page','Título','مرحبا 文献','estudio');
+INSERT INTO search_index_state(document_id,fingerprint,status,indexed_pages,updated_at) VALUES('original','legacy','completed',7,'2026-10-08T12:00:00Z');
+INSERT INTO document_covers(document_id,source_page_index,small_thumbnail_path,large_thumbnail_path,generated_at,source_modified_at,confidence,selection_mode,algorithm_version,crop_mode,page_aspect_ratio) VALUES('original',2,'C:/synthetic/small.png','C:/synthetic/large.png','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z',0.8,'manual',1,'contain',0.75);

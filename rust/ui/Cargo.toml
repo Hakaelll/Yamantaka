@@ -1,0 +1,22 @@
+[package]
+name = "yamantaka"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+[[bin]]
+name = "yamantaka-rust"
+path = "src/main.rs"
+[dependencies]
+yamantaka-domain.workspace = true
+yamantaka-application.workspace = true
+yamantaka-storage.workspace = true
+yamantaka-pdf.workspace = true
+yamantaka-windows.workspace = true
+eframe.workspace = true
+serde_json.workspace = true
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
+[dev-dependencies]
+pollster = "=0.4.0"
+[lints]
+workspace = true

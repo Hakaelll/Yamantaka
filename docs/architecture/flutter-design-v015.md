@@ -1,0 +1,936 @@
+# Sistema de diseño de Yamantaka
+
+## Acabado editorial 0.15
+
+La interfaz comparte papel cálido (`#F7F6F2`), grafito (`#181A20`) y acento
+violeta (`#7055B5` / `#C4AFF4`). Biblioteca hereda la apariencia global; el
+color del lienzo PDF no decide el tema de barras y paneles. Tinta electrónica
+conserva su perfil estático de alto contraste.
+
+La Biblioteca separa navegación, continuidad y catálogo: rail desde 1100 px,
+menús equivalentes en compacto, una zona de lectura activa y portadas
+tipográficas alineadas. Los títulos no cambian la geometría al seleccionar.
+Ajustes limita su área de trabajo a 1600 px y amplía la muestra de página.
+Los controles mantienen targets de 40 px, foco visible y roles compartidos.
+
+La auditoría y las comparaciones se documentan en
+`docs/architecture/visual-iteration-0.15.md`; generar una captura no equivale
+a aprobarla y las simulaciones no sustituyen DPI físico ni Narrator.
+
+## 1. Visión
+
+Yamantaka aplica minimalismo editorial contemporáneo a una herramienta de
+escritorio. No debe llamar la atención sobre sí misma: debe facilitar que la
+persona entre rápidamente en el documento y permanezca en él.
+
+La interfaz se construye mediante proporción, alineación, contraste y ritmo.
+Los elementos aparecen cuando son necesarios y se retiran cuando dejan de
+aportar valor. El minimalismo no consiste en eliminar información esencial,
+sino en presentarla de forma progresiva, contextual y silenciosa.
+
+El resultado combina:
+
+- la calma de un lector de libros;
+- la precisión de una herramienta profesional;
+- la eficiencia de una utilidad nativa;
+- la claridad de una publicación editorial;
+- una interfaz que desaparece durante la lectura.
+
+## 2. Principios de diseño
+
+### El documento primero
+
+El PDF recibe la mayor superficie y el mayor contraste. Ningún encabezado,
+panel o estado decorativo debe competir con la página.
+
+### Divulgación progresiva
+
+Las funciones avanzadas viven en paneles, menús o la paleta de comandos. Solo
+las acciones frecuentes permanecen visibles.
+
+### Densidad calmada
+
+La aplicación puede mostrar metadatos útiles sin convertir cada elemento en
+una tarjeta. Separadores, ritmo vertical y alineación sustituyen a cajas
+innecesarias.
+
+### Precisión táctil y visual
+
+Un icono puede medir 18 px y conservar un área interactiva de 40 px en
+escritorio o 48 px en táctil. Discreción visual no significa objetivos
+pequeños.
+
+### Continuidad
+
+Abrir controles, cambiar de página o mostrar un panel no desplaza
+innecesariamente el documento. Las dimensiones reservadas y los placeholders
+evitan saltos.
+
+### Familiaridad sin imitación
+
+Los patrones deben resultar comprensibles para quien ya conoce un lector PDF,
+sin copiar Acrobat, un navegador ni una plantilla Material.
+
+### Rendimiento perceptible
+
+Cada acción recibe feedback inmediato. Si una operación continúa, el estado
+explica qué ocurre y permite cancelarla cuando corresponde.
+
+## 3. Personalidad visual
+
+Yamantaka es sobria, cálida, precisa y silenciosa. La biblioteca recuerda a un
+índice editorial; el modo documento, a una herramienta nativa; el modo libro,
+a una mesa despejada.
+
+Debe sentirse moderna sin:
+
+- modas de cristal o desenfoque;
+- gradientes decorativos;
+- sombras profundas;
+- logotipos dominantes;
+- radios exagerados;
+- animaciones elásticas;
+- saturación alta.
+
+## 4. Jerarquía de información
+
+Orden de atención:
+
+1. Página o documento que se va a abrir.
+2. Acción primaria contextual: continuar, abrir, buscar o recuperar.
+3. Estado de lectura: página, progreso, selección.
+4. Navegación secundaria y herramientas.
+5. Metadatos y explicaciones.
+
+La jerarquía se expresa primero con tamaño, peso, alineación y espacio. El
+acento se reserva para foco, selección, progreso y acciones primarias.
+
+## 5. Sistema de tokens
+
+Los tokens viven en `lib/app/theme/app_tokens.dart` y los colores semánticos en
+una `ThemeExtension`. Los widgets consumen nombres semánticos, no valores
+hexadecimales ni números arbitrarios.
+
+### Colores semánticos
+
+```text
+appBackground
+surfacePrimary
+surfaceSecondary
+surfaceElevated
+surfaceSunken
+readerCanvas
+textPrimary
+textSecondary
+textMuted
+borderSubtle
+borderStrong
+accentPrimary
+accentHover
+accentPressed
+accentSoft
+selectionBackground
+focusRing
+danger
+warning
+success
+readerPageShadow
+```
+
+### Espaciado
+
+```text
+space2  = 2
+space4  = 4
+space6  = 6
+space8  = 8
+space12 = 12
+space16 = 16
+space20 = 20
+space24 = 24
+space28 = 28
+space32 = 32
+space40 = 40
+space48 = 48
+space64 = 64
+```
+
+### Tamaños
+
+```text
+topBarHeight            = 64
+libraryHeaderHeight      = 84
+bottomControlHeight      = 48
+sidePanelWidth           = 344
+compactSidePanelWidth    = 360
+desktopControlExtent     = 40
+touchControlExtent       = 48
+dialogMaxWidth           = 600
+commandPaletteMaxHeight  = 520
+commandPaletteExpandedWidth = 780
+settingsNavigationWidth  = 236
+settingsPreviewWidth     = 320
+contentMaxWidth          = 1000
+readerMinimumPageWidth   = 340
+readerMaximumPageWidth   = 920
+readerEdgeNavigation     = 64
+readerSpreadGutter       = 2
+```
+
+### Movimiento
+
+```text
+motionInstant          = 0 ms
+motionFeedback         = 80 ms
+motionFast             = 120 ms
+motionStandard         = 160 ms
+motionPanel            = 200 ms
+motionDialog           = 200 ms
+motionInspector        = 160 ms
+motionControlsAutoHide = 3 s
+```
+
+Con movimiento reducido, las transiciones espaciales usan `motionInstant`.
+
+## 6. Color
+
+### Tema claro
+
+| Token | Valor |
+| --- | --- |
+| `appBackground` | `#F1F0EC` |
+| `surfacePrimary` | `#F8F7F4` |
+| `surfaceSecondary` | `#F4F2ED` |
+| `surfaceElevated` | `#FDFCFA` |
+| `surfaceSunken` | `#EAE8E2` |
+| `textPrimary` | `#20211F` |
+| `textSecondary` | `#62635E` |
+| `textMuted` | `#85857E` |
+| `borderSubtle` | `#DAD8D1` |
+| `borderStrong` | `#C3C0B7` |
+| `accentPrimary` | `#655D4C` |
+| `accentHover` | `#574F40` |
+| `accentPressed` | `#484236` |
+| `accentSoft` | `#E7E2D7` |
+| `selectionBackground` | `#E7E2D7` |
+| `danger` | `#A23F38` |
+| `warning` | `#8A6428` |
+| `success` | `#4F7058` |
+| `focusRing` | `#756B55` |
+| `readerPageShadow` | `#24000000` (ARGB) |
+
+### Tema oscuro
+
+| Token | Valor |
+| --- | --- |
+| `appBackground` | `#171816` |
+| `surfacePrimary` | `#1E1F1D` |
+| `surfaceSecondary` | `#222320` |
+| `surfaceElevated` | `#272825` |
+| `surfaceSunken` | `#121311` |
+| `textPrimary` | `#ECECE7` |
+| `textSecondary` | `#B5B5AE` |
+| `textMuted` | `#85867F` |
+| `borderSubtle` | `#343631` |
+| `borderStrong` | `#4A4C46` |
+| `accentPrimary` | `#B5AA8E` |
+| `accentHover` | `#C4B99C` |
+| `accentPressed` | `#D2C6A8` |
+| `accentSoft` | `#343127` |
+| `selectionBackground` | `#343127` |
+| `danger` | `#DF8077` |
+| `warning` | `#D4AA69` |
+| `success` | `#8BB293` |
+| `focusRing` | `#C6B998` |
+| `readerPageShadow` | `#52000000` (ARGB) |
+
+El acento nunca ocupa grandes superficies. El negro puro se reserva para el
+entorno de lectura Negro.
+
+### Biblioteca espacial
+
+Inicio y Biblioteca usan una paleta oscura estable e independiente del tema
+editorial: fondo `#080808`, superficies negras y grises, texto `#F5F5F5` y
+controles monocromáticos. El violeta `#B58AFF` se reserva para borde, progreso
+y halo del archivo seleccionado; el foco permanece blanco e independiente del
+color. El concepto evoca profundidad sin texturas ni animación continua.
+
+### Entornos de lectura
+
+| Tema | Canvas |
+| --- | --- |
+| Claro | `#F3F3F1` |
+| Marfil | `#EAE5D8` |
+| Sepia | `#D8CAB2` |
+| Gris | `#B9BAB6` |
+| Oscuro | `#222320` |
+| Negro | `#000000` |
+
+El PDF no se filtra ni se modifica. La sombra de página es muy sutil en fondos
+claros, mínima en gris, inexistente en oscuro/negro y desactivada en tinta
+electrónica.
+
+## 7. Tipografía
+
+Windows usa `Segoe UI Variable`, con `Segoe UI` y la fuente del sistema como
+alternativas. No se empaquetan fuentes.
+
+| Uso | Tamaño | Peso | Altura |
+| --- | ---: | ---: | ---: |
+| Metadato secundario | 12 | 400 | 1,35 |
+| Etiqueta auxiliar/atajo | 12 | 500 | 1,35 |
+| Cifra y progreso | 12 | 500, tabular | 1,30 |
+| Control/interfaz | 14 | 500 | 1,35 |
+| Encabezado contextual | 15 | 600 | 1,30 |
+| Título de documento | 17 | 600 | 1,30 |
+| Título de sección | 19 | 600 | 1,25 |
+| Título de pantalla | 24 | 600 | 1,20 |
+| Mensaje principal | 28 | 600 | 1,15 |
+
+No se usa información esencial inferior a 12 px. Páginas, porcentajes y atajos emplean
+números tabulares. Los títulos largos usan elipsis y ofrecen el nombre completo
+en tooltip o semántica.
+
+## 8. Espaciado y densidad
+
+La cuadrícula base es 4 px y admite 2/6 px para precisión. Escritorio usa
+objetivos de 40 × 40; táctil, 48 × 48.
+
+- Compacto: padding horizontal 20 px.
+- Medio: padding horizontal 28 px.
+- Expandido: padding horizontal 32–40 px.
+- Filas editoriales: 64–76 px según contenido.
+- Separación entre secciones: 32–40 px.
+- Separación entre página y canvas: proporcional, nunca menor de 12 px.
+
+La interfaz es compacta, no apretada. No se usan márgenes propios de una
+landing page ni grandes huecos sin una función de ritmo.
+
+Los perfiles de escritorio de referencia son 1920x1080, 1920x1200 y 2560x1440;
+el panel lateral se resta del viewport antes de calcular la geometria del PDF.
+El PDF conserva escala legible y el espacio horizontal sobrante se mantiene
+equilibrado, sin estirar la pagina para llenar un monitor ultrawide.
+
+La preferencia de densidad tiene dos variantes tipadas:
+
+- cómoda: filas recientes con 12 px verticales, ajustes con 16 px y secciones
+  separadas 40 px;
+- compacta: filas recientes con 8 px verticales, ajustes con 10 px y secciones
+  separadas 28 px.
+
+Ambas conservan objetivos esenciales de al menos 40 px en escritorio. La
+densidad modifica chrome y ritmo, nunca escala tipografía ni zoom del PDF.
+
+## 9. Forma, bordes y elevación
+
+Radios:
+
+- 2 px: selección o indicador;
+- 3 px: página PDF o portada;
+- 10 px: control discreto;
+- 12 px: campo;
+- 16 px: superficie flotante;
+- 18 px: panel;
+- 20 px: diálogo;
+- cápsula: selector segmentado, dock y grupo de herramientas.
+
+Los bordes son de 1 px y bajo contraste; selección y foco aumentan contraste.
+No hay bordes dobles. Solo menús, paleta y diálogos emplean elevación, en dos
+niveles como máximo. Las sombras de página son contenidas y no separan todos
+los elementos.
+
+## 10. Iconografía
+
+Se usa exclusivamente la familia Material Symbols incluida por Flutter, con
+preferencia por variantes `outlined`/`rounded` de trazo. Tamaño visual de
+16–20 px dentro de áreas mayores.
+
+Todo icono sin texto incluye:
+
+- tooltip;
+- etiqueta semántica;
+- estado de foco;
+- nombre accesible.
+
+Un estado activo añade fondo suave y, cuando procede, un indicador de forma;
+no depende solo del color.
+
+## 11. Movimiento
+
+- Feedback de hover/presión: 80 ms.
+- Controles contextuales: 120 ms.
+- Cambio estándar: 160 ms.
+- Panel o diálogo: 180–220 ms.
+- Ninguna animación decorativa supera 250 ms.
+
+Se animan opacidad, desplazamientos pequeños y paneles. No se anima
+decorativamente la página, el zoom, el progreso, sombras grandes ni
+desenfoques. Las curvas no rebotan ni hacen overshoot.
+
+## 12. Estructura de ventana
+
+```text
+Chrome nativo
+Barra contextual compacta
+Área principal
+Panel lateral opcional
+Progreso discreto
+Capas temporales
+```
+
+No todas las superficies aparecen a la vez. La barra mide 64 px y puede
+ocultarse/revelarse en cualquier modo mediante el mismo comando persistido.
+
+## 13. Biblioteca
+
+Jerarquía:
+
+```text
+Barra discreta: Biblioteca + contador | Más | Abrir PDF | Ajustes
+Comando local flotante: Buscar | Selección | Filtrar/ordenar
+Espacio de artefactos virtualizado
+Información tipográfica de selección/hover/foco
+```
+
+La portada es el objeto. No existe una tarjeta con título permanente: la página
+respeta su proporción, usa radio mínimo, sombra difusa y un jitter estable de
+posición/giro. Selección eleva 6 px, escala 3,5 % y proyecta un halo violeta
+acotado; hover eleva 2 px y escala 1,5 %. Los no seleccionados reducen
+saturación/opacidad sin desaparecer. Progreso es una línea de 4 px con pista
+gris tenue; el relleno es
+blanco/gris salvo en la selección, donde pasa a violeta. Terminado usa un
+anillo y favorito un marcador.
+
+Uno a seis documentos forman una constelación centrada con espacio negativo.
+Desde siete se usa una cuadrícula invisible con variaciones controladas y
+scroll vertical. `SliverGrid.builder` recicla objetos en bibliotecas grandes.
+La semilla usa el ID estable: cargar portada, filtrar o reiniciar no mueve la
+composición.
+
+Un clic selecciona, doble clic/Enter abre y el menú contextual reúne abrir,
+favorito, portada, información, revelar y retirar. Flechas navegan por la
+geometría; Inicio/Fin saltan a extremos, Suprimir confirma retirada y Escape
+cierra overlay o selección. El foco tiene contorno propio y no depende de
+sombra/color.
+
+`Ctrl+F` abre un campo flotante con foco y contador; Escape lo cierra y restaura
+la colección. Estado, favorito y orden viven en un popover compacto; autores y
+temas forman facetas combinables con recuentos completos. Agrupar por autor crea
+secciones dinámicas y coloca Autor desconocido al final. Colecciones,
+workspaces, importación, recuperación y búsqueda global están bajo “Más”.
+
+Cada portada solicita una decodificación ajustada a caja física/DPR, usa la
+miniatura pequeña a distancia y la grande al seleccionar. El placeholder es una
+placa neutra con inicial o estado de error. Título, autor, progreso y fecha solo
+aparecen para selección, hover o foco en un bloque tipográfico ligero.
+
+En escritorio se validan dos familias de proporcion: 16:9 y 16:10. En 1920x1080
+la cuadricula de muchos documentos llega a ocho columnas; en 2560x1440 puede
+llegar a diez. Los slots horizontales y la altura de fila son independientes,
+por lo que una ventana compacta no fuerza una portada de 240 px ni produce
+overflow. Todas las imagenes solicitan cacheWidth/cacheHeight ajustados a DPR.
+
+El estado vacío contiene mensaje corto, explicación local-first y una sola
+acción principal. Un archivo ausente reduce contraste y anuncia “Localizar”; un
+error de portada mantiene geometría. El color nunca es el único indicador.
+
+## 14. Lector
+
+El canvas y las páginas permanecen estables cuando aparecen controles o
+resultados. Abrir un panel no reconstruye el visor: en expandido recalcula su
+área útil y recentra la página; en compacto/medio el panel se superpone. La
+página usa márgenes proporcionales y un fondo plano, sin texturas.
+
+La barra superior superpuesta se reparte en tres grupos flotantes y prioriza
+por clase de ventana:
+
+```text
+Volver | Título flexible | Buscar | Panel opcional | Paleta | Más
+```
+
+La navegación y zoom viven en un control inferior contextual, atajos y paleta.
+Una página, Dos páginas y Continua viven en la paleta `Ctrl+K`, no como selector
+permanente de la barra.
+El progreso es una línea de 2 px. En compacto se ocultan acciones menos
+frecuentes dentro de un único “Más”, sin eliminarlas. Los grupos de modo y
+panel pueden ocultarse como unidades; su elección es local y persistente. Un
+estado activo añade fondo/forma y semántica, no solo otro color. Tooltips,
+menús y paleta presentan el atajo resuelto.
+
+## 15. Modo documento
+
+Prioriza precisión, búsqueda, miniaturas, índice, página, zoom y ajuste. Puede
+mostrar más densidad que el modo libro, pero el PDF sigue dominando.
+
+La vista continua usa placeholders de altura estable, separaciones
+consistentes y render bajo demanda. Cambiar zoom no debe perder la página
+actual.
+
+## 16. Modo libro
+
+Prioriza página, márgenes, ritmo, progreso y continuidad. La barra y controles
+se ocultan sin cambiar el layout.
+
+Una página se centra y adapta por anchura o altura. Dos páginas permanecen en
+Libro incluso con una ventana estrecha, reduciendo margen y escala de forma
+determinista. El pliego respeta:
+
+- portada individual;
+- pares e impares;
+- LTR/RTL;
+- canal central de 2 px y sombras interiores simétricas;
+- páginas de distinto tamaño, última hoja sin pareja y portada individual.
+
+Las zonas laterales miden 64 px, son visualmente transparentes, ofrecen
+feedback discreto, no invaden el centro y respetan RTL.
+
+## 17. Panel lateral
+
+Ancho inicial: 344 px; límites: 288–480 px. En compacto se acota además al 88 %
+del viewport.
+
+Muestra una sola sección: miniaturas, índice, marcadores, anotaciones o
+búsqueda. Tiene encabezado compacto, selector interno de sección, cierre
+visible, contenido desplazable y selección clara.
+En compacto/medio aparece como superposición con scrim; en expandido ocupa una
+columna propia, resta siempre su ancho al visor y recentra la página. Fijar
+mantiene el estado persistente, pero no altera este contrato geométrico. Un
+divisor de 10 px admite ratón,
+flechas y semántica de valor. El ancho se guarda con debounce; solo se monta la
+sección activa y las miniaturas visibles reutilizan su futuro/scroll. Escape lo
+cierra y restaura el foco.
+
+## 18. Paleta de comandos
+
+La paleta conserva el minimalismo al concentrar acciones poco frecuentes.
+Ancho de 520–600 px y altura máxima de 520 px.
+
+Incluye campo de búsqueda, etiqueta de grupo, comandos, hasta ocho documentos
+recientes, selección por teclado, atajos visibles y estado vacío. La misma
+consulta busca título, autor y archivo sin persistirse. Arriba/abajo cambia
+selección; Enter ejecuta; Escape cierra. Los resultados son filas densas, no
+tarjetas, y la selección combina fondo suave e indicador.
+
+## 19. Ajustes
+
+En escritorio, una navegación lateral pequeña cambia entre Apariencia,
+Lectura, Barra del lector, Atajos, Biblioteca, Historial, Copias locales y
+Privacidad. En compacto, las secciones se apilan.
+
+Cada ajuste es una fila sencilla con etiqueta, descripción corta, separador y
+control; la sección no se encierra en una tarjeta. El contenido usa un ancho
+máximo legible y, en escritorio, los controles se alinean en una columna de
+240 px; en compacto vuelven al flujo apilado.
+Los cambios reversibles se aplican inmediatamente. Las acciones destructivas
+exigen confirmación proporcional. Apariencia incluye una previsualización
+pequeña de tema, densidad, canvas y perfil e-ink. No se encierra cada sección
+en una tarjeta.
+
+La ficha del documento es un diálogo de datos en dos columnas, ruta
+seleccionable y acciones jerarquizadas. “Retirar” y “Reiniciar” confirman;
+“Retirar” declara que el PDF no se borra. Historial y copias son superficies
+secundarias: agrupan sin gráficos y presentan recuentos/vista previa antes de
+una mutación.
+
+## 20. Estados de interfaz
+
+Todo estado importante combina icono o forma, título breve, explicación y
+acción cuando existe recuperación:
+
+- biblioteca inicial: “Cargando biblioteca…”;
+- PDF: “Abriendo documento…”;
+- render: placeholder estable;
+- búsqueda: progreso cancelable;
+- sin resultados/sin texto: explicación y siguiente acción;
+- ausente: localizar o retirar;
+- cambiado: revisar/abrir como versión actual;
+- portada fallida: icono específico, sin cambiar geometría;
+- error: reintentar/volver;
+- contraseña: campo enfocado y error contextual;
+- marcador/caché/restauración: snackbar breve.
+
+No se usan spinners indefinidos sin texto ni diálogos para confirmaciones
+triviales.
+
+## 21. Diseño adaptable
+
+Breakpoints únicos:
+
+```text
+Compacto:  < 680 px
+Medio:     680–1099 px
+Expandido: >= 1100 px
+```
+
+La política no depende solo del ancho total. Resta el panel visible, considera
+la relación de aspecto y exige 340 px por página antes de activar vista
+enfrentada. La política vive en una función probada, no dispersa en widgets.
+
+## 22. Entrada táctil
+
+Ninguna función esencial depende de hover. El dominio expone avanzar,
+retroceder, zoom, controles y marcador sin conocer teclado, ratón o gesto.
+
+En superficies táctiles:
+
+- objetivos de 48 × 48;
+- controles inferiores;
+- gestos sin conflicto con selección;
+- una página en vertical;
+- enfrentadas solo en horizontal y con ancho legible.
+
+## 23. Tinta electrónica
+
+El perfil `electronicInk` aplica:
+
+- fondo blanco;
+- página única;
+- animaciones desactivadas;
+- sin sombras, transparencias ni desenfoque;
+- controles de alto contraste;
+- navegación por página;
+- sin continuo por defecto.
+
+Refresco completo configurable, botones físicos, contraste y modos
+calidad/velocidad permanecen pendientes hasta disponer de dispositivo o
+emulador apropiado. No se simula hardware no validado.
+
+## 24. Accesibilidad
+
+Objetivo mínimo: WCAG AA en controles.
+
+- recorrido completo por teclado y orden lógico;
+- foco inequívoco de 2 px con separación visual;
+- texto escalable y sin cortes;
+- iconos etiquetados;
+- estados no dependientes solo del color;
+- objetivos táctiles;
+- movimiento reducido;
+- contraste alto;
+- semántica para página, progreso y acciones.
+
+La matriz incluye 100 %, 125 %, 150 % y 200 % de escalado, texto aumentado,
+tema oscuro y foco por teclado. Solo se marca validada cuando exista evidencia
+nativa.
+
+## 25. Reglas de implementación
+
+- Centralizar tokens y políticas responsive.
+- No usar colores hexadecimales en widgets salvo canvas PDF documentado.
+- No repetir radios, duraciones o espacios arbitrarios.
+- No usar `Card` para cada agrupación.
+- Adaptar la apariencia Material cuando no encaje.
+- Mantener comportamientos nativos que ayuden a comprender.
+- No sacrificar semántica por componentes personalizados.
+- Evitar reconstrucciones costosas, blur y transparencias grandes.
+- No añadir paquetes visuales.
+- Mantener presentación desacoplada de PDFium y SQLite.
+- Documentar toda excepción al sistema de tokens.
+
+## 26. Antipatrones
+
+Quedan prohibidos:
+
+- tarjetas para cada documento o tarjetas anidadas;
+- botones con gradientes;
+- barras superiores altas;
+- logotipos permanentes grandes;
+- sombras profundas;
+- radios excesivos o cápsulas generalizadas;
+- cristal, blur o fondos con textura;
+- rebotes u overshoot;
+- familias de iconos inconsistentes;
+- texto auxiliar inferior a 11 px;
+- información duplicada;
+- botones sin jerarquía;
+- acento en grandes superficies;
+- acciones esenciales solo en hover;
+- layouts de landing page;
+- grandes vacíos sin intención;
+- spinner sin contexto;
+- diálogos para acciones frecuentes;
+- decoración que reste espacio al PDF.
+
+## 27. Criterios de revisión visual
+
+Antes de cerrar una tarea visual:
+
+- [ ] El PDF o documento principal domina.
+- [ ] La acción primaria se identifica sin explorar menús.
+- [ ] No hay overflow, texto cortado ni objetivos inaccesibles.
+- [ ] Compacto, medio y expandido tienen una composición deliberada.
+- [ ] Tema claro y oscuro conservan contraste y jerarquía.
+- [ ] Los seis canvas de lectura mantienen legibilidad.
+- [ ] El foco se ve y el recorrido de teclado es lógico.
+- [ ] Escape cierra la superficie superior.
+- [ ] Movimiento reducido elimina desplazamientos.
+- [ ] Carga, vacío, error, ausente y sin resultados explican el estado.
+- [ ] No aparecen tarjetas, sombras, radios ni acentos sin función.
+- [ ] Las capturas corresponden a código ejecutado.
+- [ ] Análisis, pruebas e integración no presentan regresiones.
+
+## 28. Superficies de tercera generación
+
+- El lector no presenta una segunda franja de pestañas. Abrir otro PDF vive en
+  el menú compacto y en `Ctrl+O`; biblioteca, recientes y espacios recuperan
+  documentos sin restar altura ni desplazar el centro del PDF.
+- Al cambiar el ancho de ventana o acoplar el panel, el visor conserva el zoom
+  elegido y vuelve a centrar el documento dentro del área útil.
+- Menús, paneles, ajustes, diálogos, scrollbars, chips y controles comparten
+  superficies, bordes, radios y estados semánticos del tema global.
+- Anotaciones reutiliza el panel lateral único. La acción primaria es “Anotar
+  página”; búsqueda y filtros permanecen encima de una lista virtualizada.
+- Colecciones se eligen en una hoja ligera y la biblioteca conserva la misma
+  jerarquía de “continuar” y “recientes”; filtrar no crea otra pantalla.
+- Diagnóstico y workspaces son diálogos de gestión, no dashboards permanentes.
+- Safe mode se expresa con un indicador sobrio y texto accionable, nunca con
+  bloqueo o borrado automático.
+- Split no se muestra hasta que existan dos lectores reales y medidos; el
+  breakpoint técnico por sí solo no constituye una función visual.
+
+La referencia vigente `windows-reader-editorial-v07.png` se genera desde una
+prueba de widgets a 1600×900 y fija Libro con tema Marfil, grupos flotantes,
+pliego enfrentado y dock inferior. Las
+capturas generacionales se retiraron porque ya no representaban el producto.
+Narrador, varios monitores y DPI físico siguen requiriendo validación nativa.
+
+## 29. Sala de lectura digital — 0.6
+
+La selección de Biblioteca tiene dos capas: la portada conserva el acento
+violeta y un inspector anclado aporta título, autor, estado, última lectura y
+siguiente acción. En expandido es una banda horizontal; en medio una franja
+compacta; en compacto una superficie inferior descartable. Su aparición no
+recalcula el jitter y su salida dura 160 ms o cero con movimiento reducido.
+
+El lector distingue reposo y actividad. El reposo conserva una dock de 40 px
+con progreso, posición y affordance de expansión; la actividad revela los
+grupos completos. Ambas son overlays sobre la misma geometría del visor. En
+expandido, el panel usa un rail vertical de 52 px; en compacto/medio mantiene
+los cinco accesos en la cabecera.
+
+Ajustes reserva en expandido 320 px para una muestra persistente. La muestra
+reutiliza controles del producto, refleja canvas, papel, chrome y progreso, y
+responde a las preferencias sin abrir PDFium. En compacto vive dentro de
+Apariencia y no introduce desplazamiento horizontal.
+
+## 30. Retícula editorial de escritorio — 0.7
+
+Biblioteca convierte cabecera, contador, contexto de filtros e inspector en una
+secuencia editorial. El inspector separa identidad, estado y progreso y decide
+la acción primaria por disponibilidad y avance. Archivo modificado, análisis y
+revisión usan forma e icono además de color.
+
+El lector une navegación y herramientas en una sola banda con divisores. En
+expandido la navegación permanece geométricamente centrada; barra, dock y panel
+siguen fuera de la clave del visor. El rail acoplado usa una línea vertical y el
+divisor distingue reposo, hover, foco y arrastre.
+
+Ajustes agrupa preferencias, mantenimiento y privacidad, subordina las acciones
+destructivas y reserva 320 px a una preview manipulable. La paleta añade iconos
+por acción y una explicación lateral en expandido sin convertir filas en
+tarjetas. Los tres niveles de elevación siguen siendo plano, overlay y diálogo.
+
+## 31. Archivo privado y lectura de precisión — 0.8
+
+Biblioteca ofrece dos lecturas del mismo modelo efímero. La cuadrícula conserva
+reconocimiento visual y añade un título estable debajo de cada portada; la lista
+densa prioriza comparación de identidad, estado, progreso y fecha. Con texto al
+150 % desaparecen las columnas auxiliares y su información esencial pasa a una
+tercera línea semántica. Cambiar de vista no persiste una preferencia nueva ni
+abre el PDF. Los filtros activos son visibles y eliminables por grupo.
+
+El estado vacío no funciona como landing page: muestra el símbolo, `Yamantaka`,
+“Tu archivo privado de lectura.” y `Abrir PDF`. El bitmap violeta conserva cada
+coordenada, borde, relieve y variación de luminancia de la marca azul original;
+la transformación reproducible usa `#B58AFF` como croma y no aplica generación,
+recorte, warp ni remaquetación.
+
+El lector rebaja radios y separa contexto de estado: la dock nombra Una página,
+Dos páginas o Continua, mientras el selector de tema solo se activa al abrirse.
+La búsqueda global usa master-detail en expanded; metadatos separa detectado y
+local, permite restaurar por campo y señala cambios sin guardar. Menús y
+diálogos comparten icono, etiqueta, atajo, encabezado y tratamiento destructivo.
+Ninguno de estos cambios modifica el contenido del PDF ni la clave del visor.
+
+## 32. Lector compacto de precisión — 0.9
+
+La barra superior ocupa 56 px en escritorio y 52 px en compacto. Dentro de esa
+huella deja 8 px sobre una superficie de radio 10 px: controles de 40 px e
+iconos de 18 px se alinean con un divisor de 24 px. El nombre real del documento
+recibe el espacio restante y las acciones secundarias salen del flujo antes de
+comprimirlo. La dock activa mide 48 px y la señal de reposo 38 px.
+
+El panel usa cabecera y rail de 52 px. La página conserva el dominio visual con
+márgenes efectivos de 12, 16, 24 o 32 px según el lado corto, sombra de 7 px y
+desplazamiento de 1 px. Ese margen se resuelve dentro del adaptador a partir de
+sus constraints; la configuración estable que identifica al visor sigue siendo
+la preferencia del documento, nunca el tamaño de la ventana.
+
+Biblioteca reduce su cabecera a 76 px y sus filas normales a 52 px; a más de
+130 % de texto crecen desde 64 px y reagrupan estado y progreso. Cuadrícula y
+lista comparten selección, filtros, foco y offset de scroll. El cambio usa solo
+opacidad durante 120 ms y se vuelve instantáneo con movimiento reducido.
+
+Búsqueda, paleta y menús convergen en filas de 48 px. Ajustes usa filas de 52 px
+en densidad cómoda y 44 px en compacta, siempre con controles de al menos 40 px.
+Paneles y diálogos limitan sus radios a 12/14 px y reservan la cápsula para
+estado o segmentación.
+
+## 33. Continuidad y orientación — 0.10
+
+Biblioteca abre con una única franja editorial de Continuar leyendo solo cuando
+hay avance mayor que cero y menor que cien por cien. La franja no replica la
+portada ni crea otra tarjeta: usa indicador vertical, título truncado, página,
+total, porcentaje, fecha relativa y un único botón Retomar. Enter y menú
+contextual ofrecen el mismo resultado.
+
+El conmutador de documentos es un diálogo compacto alineado sobre el lector.
+Muestra título, página, porcentaje y estado suspendido/modificado; Ctrl+Tab,
+Ctrl+Shift+Tab, flechas, Enter y Escape forman un ciclo completo sin introducir
+una tira permanente que reste alto al PDF.
+
+El indicador normal sigue siendo compacto. Al activarlo, el editor acepta
+página, porcentaje, primera/última, scrubber e historial y valida dentro del
+campo. La búsqueda global añade chips horizontales operables por teclado,
+ordena por relevancia y usa recencia solo para desempatar; los marcadores usan
+el mismo vocabulario que anotaciones, páginas, colecciones y etiquetas.
+
+El panel de Anotaciones reúne notas y marcadores bajo un filtro combinado,
+ordena por página y conserva acciones de edición, borrado, undo/redo y
+exportación. Activar un resultado muestra durante 1,4 s un foco de 2 px y una
+etiqueta semántica sobre el visor, sin superponer color a los píxeles del PDF.
+
+Ajustes conserva master-detail y preview, pero añade una búsqueda superior que
+salta directamente a categorías coincidentes. Cada sección declara alcance
+global y ofrece su propio reset antes de cualquier zona destructiva. Ninguna de
+estas superficies añade gradientes, tarjetas anidadas, sombra ornamental o
+radio superior al contrato 0.9.
+
+## 34. Navegación documental y continuidad — 0.11
+
+`Ctrl+J` abre una única superficie temporal para índice, miniaturas, búsqueda,
+marcadores, anotaciones, historial y posiciones A/B. En ancho expandido usa
+lista y detalle simultáneos; en compacto conserva una sola columna y un retorno
+explícito. El origen permanece recuperable con `Alt+←`. El navegador no cambia
+zoom, layout ni chrome, y no forma parte de la identidad del visor.
+
+Las sesiones cerradas recientemente se muestran como una banda secundaria,
+limitada y descartable. El lector nombra la acción irreversible de abandonar la
+vista como `Cerrar sesión y conservar contexto`; Continuar restaura página,
+zoom, layout, modo, tema, scroll y panel. Releer y Terminado nunca compiten como
+acciones primarias simultáneas. Las metas por páginas o minutos son texto e
+indicador discreto, sin rachas, premios, avisos ni color celebratorio.
+
+La selección real de texto abre una barra compacta ligada al contenido con
+resaltar, subrayar, tachar y cerrar. La previsualización de la anotación conserva
+texto legible para tecnologías de asistencia. Si no hay geometría fiable, el
+producto explica que guardará una nota de página; no dibuja rectángulos
+aproximados sobre el PDF.
+
+Biblioteca agrupa por autor, colección, etiqueta o estado con cabeceras
+plegables y recuento. Plegar conserva selección y scroll. Los filtros activos
+explican por qué un resultado desapareció y ofrecen restablecimiento. Las
+portadas visibles ganan prioridad y las que salen del viewport cancelan trabajo
+recreable, evitando que una biblioteca grande parezca ocupada fuera de lo que
+el usuario puede ver.
+
+La matriz visual 0.11 añade el navegador y la importación de carpetas a los ocho
+tamaños base, además de oscuro, alto contraste, movimiento reducido y texto
+130/150/200 %. La marca, su geometría y su violeta permanecen byte a byte
+idénticos; ningún refinamiento de esta iteración autoriza a reinterpretarla.
+
+## 35. Centro documental y revisión — 0.12
+
+Continuidad es una cabecera editorial, no un dashboard: título, frase breve,
+cinco recuentos funcionales y como máximo tres acciones textuales. Se pliega en
+columna bajo 720 px, mantiene Biblioteca como contenido principal y puede
+ocultarse desde Ajustes.
+
+Espacios usa una lista plegable y la cola aparece solo al expandir el activo.
+Cada fila reserva dos controles de 44×44 para reordenar, título/siguiente acción
+y un selector de estado. La alternativa Ctrl+↑/↓ usa el mismo comando. No hay
+color celebratorio; Bloqueado se explica por texto y no solo por tono.
+
+Comparación ocupa pantalla completa, divide el lienzo con una línea física y
+conserva controles comunes arriba. Vincular página y zoom son chips de estado;
+intercambio y diferencias manuales son acciones discretas. Cada lado mantiene
+su propio indicador, slider y zoom sin superponer controles al documento.
+
+Revisión de anotaciones, Relaciones y Reglas comparten encabezado, filtros
+compactos y contenido lineal. Las operaciones masivas aparecen al seleccionar;
+simular siempre precede a aplicar. Problemas es una pantalla navegable, no un
+diálogo bloqueante. Todos los estados tienen texto ES/EN, foco visible y acciones
+de 44 px; movimiento reducido evita transiciones espaciales.
+
+La matriz 0.12 conserva los ocho tamaños y los estados oscuro, alto contraste,
+movimiento reducido y texto 130/150/200 %, y añade ocho capturas ejecutadas de
+continuidad, espacios, cola, comparación, anotaciones, relaciones, reglas y
+problemas. Los assets de marca permanecen byte a byte idénticos a HEAD.
+
+## 36. Resiliencia visible y decisiones reversibles — 0.13
+
+El estado de error del lector mantiene la misma jerarquía del estado vacío:
+icono, título, explicación y una acción primaria. La acción depende del fallo:
+reintentar para un error transitorio, localizar para un archivo ausente,
+introducir contraseña para un documento protegido y volver a Biblioteca como
+salida secundaria. Archivo ausente, acceso denegado, contraseña incorrecta, PDF
+dañado y fallo interno nunca comparten un mensaje genérico.
+
+La contraseña se solicita en un diálogo compacto y accesible. El campo es
+seguro, no ofrece sugerencias ni autocorrección y explica que la clave no se
+guarda. Un intento incorrecto conserva la tarea, muestra el error completo y
+permite corregirlo; a texto 200 % el contenido crece sin cortar acciones.
+
+Restaurar una copia presenta primero un resumen de solo lectura: versión,
+esquema, tamaño, entidades, altas, reemplazos, eliminaciones y conflictos. La
+misma superficie explica la estrategia de snapshot coherente, que no usa
+"última escritura gana", y la creación obligatoria de una copia previa. Solo
+después aparece la confirmación destructiva.
+
+La revisión de duplicados compara candidato conservado y entrante, enumera
+evidencias, impacto y conflictos y ofrece tres decisiones inequívocas: mantener
+ambos, cancelar o crear copia y consolidar. El botón de consolidación nombra la
+salvaguarda; deshacer vive en el historial de la operación, no como una promesa
+efímera del diálogo.
+
+Problemas sigue siendo una pantalla no modal. Cada entrada muestra fase y causa
+segura; reanudar, reintentar o deshacer aparece únicamente si el journal declara
+esa capacidad. Recuperar una sesión interrumpida es una elección binaria y
+explícita entre restaurar contexto verificado o empezar limpio.
+
+La matriz 0.13 conserva tamaños, claro/oscuro, alto contraste simulado,
+movimiento reducido y texto 130/150/200 %. Añade contraseña normal/incorrecta,
+archivo ausente, consolidación, ensayo de backup, problemas y recuperación de
+sesión, además de comparaciones ejecutadas 0.12/0.13. Narrator, varios monitores
+y escalas físicas distintas del host disponible permanecen como validación
+nativa separada.
+
+## 37. Coherencia visual y UX de escritorio — 0.14
+
+La jerarquía editorial se conserva: Biblioteca sigue siendo espacial, el lector
+mantiene el PDF como superficie dominante y la barra no adquiere controles
+permanentes nuevos. Los tokens compartidos fijan tamaños ópticos de icono,
+targets, bordes de foco, progreso, opacidades y curvas; densidad nunca reduce un
+target ni la tipografía esencial.
+
+Los diálogos críticos comparten icono contenido, título, explicación breve,
+contenido desplazable y acciones adaptativas. Contraseña separa la garantía de
+privacidad del error de validación. Restore distingue resumen, salvaguarda
+previa y estrategia de conflictos. Duplicados separa evidencia, registros e
+impacto, y nombra la copia reversible en su acción principal.
+
+El lenguaje de estados prolongados es fase + progreso + cancelación. Si no hay
+valor real se muestra progreso indeterminado; no se fabrica un porcentaje. El
+estado se anuncia como live region y la cancelación permanece junto a la fase,
+sin convertir una tarea local en modal opaco.
+
+Ajustes usa ocho intenciones, en este orden: Apariencia, Lectura,
+Accesibilidad, Biblioteca, Privacidad, Almacenamiento, Recuperación y
+Diagnóstico. En compacto son destinos navegables; en expandido forman cuatro
+grupos discretos. El rail crece de forma acotada con texto grande para evitar
+truncar etiquetas, mientras el contenido conserva scroll.
+
+La aceptación visual cubre 640×480, 800×600, 1280×720, 1600×900, 1920×1080,
+1920×1200, 2560×1440 y 3440×1440, además de oscuro, alto contraste simulado,
+movimiento reducido, ES/EN, RTL y texto 130/150/200 %. La matriz de widgets no
+sustituye Narrator, varios monitores ni escalas físicas distintas.

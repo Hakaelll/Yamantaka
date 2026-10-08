@@ -1,0 +1,104 @@
+{
+  "synthetic": true,
+  "viewport": [
+    0.0,
+    0.0,
+    320.0,
+    240.0
+  ],
+  "pixelsPerPoint": 2.5,
+  "controls": [
+    {
+      "label": "Library",
+      "rect": [
+        18.0,
+        8.0,
+        58.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Previous page",
+      "rect": [
+        60.0,
+        8.0,
+        100.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Next page",
+      "rect": [
+        168.0,
+        8.0,
+        208.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reading options",
+      "rect": [
+        210.0,
+        8.0,
+        250.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Page text",
+      "rect": [
+        252.0,
+        8.0,
+        292.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "trackedMemory": {
+    "total": 485640,
+    "pages": 485640,
+    "tiles": 0,
+    "text": 0,
+    "other": 0,
+    "cpu": 242820,
+    "gpu": 242820,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."
+}

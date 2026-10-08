@@ -1,0 +1,76 @@
+{
+  "synthetic": true,
+  "viewport": [
+    0.0,
+    0.0,
+    320.0,
+    240.0
+  ],
+  "pixelsPerPoint": 2.5,
+  "controls": [
+    {
+      "label": "Library",
+      "rect": [
+        52.0,
+        4.0,
+        92.0,
+        44.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Add PDFs",
+      "rect": [
+        102.0,
+        4.0,
+        142.0,
+        44.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Settings",
+      "rect": [
+        152.0,
+        4.0,
+        192.0,
+        44.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Appearance",
+      "rect": [
+        97.0625,
+        70.0,
+        198.6875,
+        110.0
+      ],
+      "clip": [
+        0.0,
+        58.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    }
+  ]
+}

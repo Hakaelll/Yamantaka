@@ -1,4 +1,7 @@
 # Miscellaneous
+/target/
+/.impeccable/review/
+/.impeccable/mocks/
 *.class
 *.log
 *.pyc

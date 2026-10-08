@@ -1,0 +1,63 @@
+# Rust rewrite acceptance matrix
+
+Status at 2026-10-09: **in progress, not a replacement release**. Flutter checkpoint
+`c773acf` remains intact. Do not remove Flutter or publish a stable Rust release
+until every mandatory row has executed evidence. A native gallery/reader section
+is insufficient to satisfy the supplied specification.
+
+`Verified` means a named current Rust test ran. `Partial` means real Rust behavior
+exists but the complete capability has not passed. `Pending` is not implemented
+or has no acceptance evidence. The existing Flutter implementation has now passed
+330 tests and analysis on this host; see `docs/validation/flutter-baseline-2026-10-08.md`.
+That baseline does not establish paired UI/GPU performance or a Flutter window capture.
+
+| Capability | Connected Flutter reference | Rust behavior / evidence | Status |
+|---|---|---|---|
+| Domain/use cases/storage/PDF/Windows/UI separation | `lib/app/app_services.dart`, repositories, controllers | six Cargo crates; native worker; typed commands/events | Partial |
+| Installed and portable paths/preferences | `lib/storage/paths/app_paths.dart`, `app_settings_repository.dart`, Windows Runner.rc, installed path_provider_windows 2.3.0 | `%APPDATA%/io.yamantaka/Yamantaka`; Flutter portable DB beside executable, preferences still roaming; independent `io.yamantaka.rust` and `.yamantaka-rust-portable` | Partial |
+| Schemas v1–v11 | `lib/storage/database/app_database.dart` | committed literal SQL, atomic migration, existing-column guards; `compatibility.rs::all_eleven_historical_schemas_preserve_ids_relationships_and_preferences` | Verified |
+| Closed-Flutter independent WAL capture | same plus AppPaths/shared_preferences | SQLite backup API, staged directory, repeated fail-closed process probe; per-table original-column digests; verified idempotent retry receipt; WAL/cancellation tests | Partial: UI preview/confirmation and full native migration flow pending |
+| Manual metadata and cover decisions | `document_repository.dart`, `document_covers` schema | overrides prioritized in queries; cover page/selection persisted while cache paths cleared | Partial: regenerate cover images and verify all relations/journals |
+| JSON backups v1–v9/v9 export | `local_backup_service.dart` | exact extracted columns/defaults, constraints, SHA category hashes, isolated restore preview, safety directory; all 23 tables populated and every historical column compared on round trip | Partial: real historical executable exports and UI pending |
+| Restore interruption/rollback | same | durable restore journal; pre-restore original retained; interruption test | Partial: process-kill fault injection and user recovery UI pending |
+| Fingerprint/exact duplicates | `document_service.dart`, `duplicate_resolution_service.dart` | original size:partial-digest SHA256; full cancellable SHA256 before exact equality; collision fixture | Partial: auxiliary hash persistence/background scheduling/review UI |
+| Native PDFium, two hot docs, explicit release | `pdf_document_engine.dart`, pdfrx adapter | bundled 7881 + pdfium-render 0.9.4; one owning worker, close/join; textual/vector/scanned/password/damaged/rotated/mixed/5000-page tests | Verified for these fixtures |
+| Render scheduling/dedup/cancellation | PDF cache/tile planners and job coordinator | nonblocking consumer tickets, epoch invalidation, priority promotion, independent cancellation, fairness, inspection in batches of 16; actor reservations of 128 ordinary actions plus 128 close actions; SQL remains responsive during blocked PDF work; shutdown with undrained terminal results tested | Partial: visible-document pinning against import/indexing, broad late-result stress, live text accounting and coalescing remain |
+| Preview/refinement/tiles/virtualization/device recovery | `pdf_tile_planner.dart`, `prefetch_planner.dart`, viewport adapter | log-time mixed-page offsets; keep previous visible texture; native tile buffers vs whole renders across rotations/edges, SHA assertions; DX12/OpenGL screenshots | Partial: continuous UI now uses cached geometry and visible page slots; halo composition, progressive refinement and device-loss recovery pending |
+| Open picker/multi-drop/args/second activation | document service, import queue, activation channel | native picker/drop/args; actual second-process Unicode activation, mutex release and isolated portable identity tests | Partial: fullscreen/geometry integration, durable resumable import, folders, missing/relocalize/watch permissions |
+| Catalog grid/list/search/favorite/paging | `library_screen.dart`, artifact library, `library_query.dart` | async repository commands, escaped search, favorites, grid/list, 80-row paging, lower inspector; six sorts/directions and reading/missing filters; repository author/topic/tag/collection predicates; nine query tests | Partial: remaining filter UI, groups, multiselection/bulk, collection/tag/smart-view management |
+| 3D cover volumes and physics | `artifact_library_components.dart` | connected boards/page block/spine; projected font meshes; six families; original spring/axis/angular constants; rest/reduced-motion tests; scored visual fixes resolved | Partial: real automatic/manual cover textures and broader interaction acceptance |
+| Metadata extraction/proposals/reanalysis | enrichment/editor controllers and local metadata docs | PDF title/author extraction and permanent override query precedence | Partial: review/proposal/reanalysis UI |
+| Reader modes/layout/LTR/RTL/pairing/zoom/rotation/margins/environments/e-ink | `reader_controller.dart`, reader models, reading profiles | lossless per-document preference adapter with eight SQLite tests; six paper environments, fit/zoom, rotation and margins; cached single/facing/continuous geometry, canonical Book pairing, LTR/RTL global setting, per-page retained textures | Partial: full interaction acceptance, scroll-context persistence, e-ink and auto-hide remain |
+| Canonical navigation/index/thumbnail/search/history/A-B/links/bookmarks | navigation/reader/search/bookmark controllers | bounded branch-aware ReaderNavigation, finite normalized anchors, LTR/RTL spread/cover model and O(log n) continuous geometry; UI history and A/B commands use the canonical model | Partial: persisted per-tab contexts, full navigator/search/links/bookmarks and layout UI |
+| Selection and all annotations/global review/export | `annotation_controller.dart`, text_selection, export service, global dialog | original tables preserved by capture | Pending |
+| Progress/sessions/goals/recents/closed/restoration | reading-session repo, reader session state | positions/progress persisted on navigation | Partial: full continuity and restoration |
+| Workspaces/reorderable queue/focus/comparison/sync | workspace controllers/dialogs, `split_sync.dart` | historical rows preserved | Pending |
+| Relations/backlinks/revisions/automation simulate/confirm/cancel/journal/undo | relations/automation controller + UI dialogs | historical rows preserved | Pending |
+| Opt-in FTS5/resume/filter/relevance/previews/exclusion/index management | global_search_repository, index controller/dialog | FTS5 repositories with ten executed tests: opt-in access, exclusions, resumable cursor, transactional revision, Unicode filters/ranking/snippets and auxiliary entries; nonblocking controller compiles | Partial: controller tests, actor/settings/search UI and active-reader slot protection pending |
+| ES/EN/shortcuts/help/privacy/cleanup/diagnostics/safe mode/quarantine | settings/help/recovery/diagnostics controllers | ES/EN surfaces; four settings categories, selectable real theme previews; local themes/reduced motion/text-size and catalogue preferences | Partial: remaining settings/trust flows, shortcut editing and language coverage |
+| Windows clipboard/Explorer/F11/Unicode/geometry/DPI/monitor changes | window service + geometry + single-instance protocol | native text clipboard, Explorer, F11, Unicode paths | Partial: physical multi-monitor/DPI/Narrator and geometry restore |
+| Unicode and bidi composition | localization/reader text | local Segoe fallback; egui 0.36 font shaping dependency | Pending: explicit bidi/RTL test and dedicated shaping where required |
+| Idle repaint/memory/device limits | memory governor/performance monitor | spring stops at rest; RAII CPU PDF buffers and native wgpu payload/staging; readback and fenced-retirement test on Intel Iris Xe; historical scoped 63-test resource run and pixel-identical reader regression captures; current workspace run has 99 passing tests | Partial: tracked live text/Glow/UI atlas, device recovery and complete resource/idle/interaction traces |
+| Original PDFs unchanged/offline smoke | input policy + verify_no_network | original hash assertions in real PDFium suite | Partial: running application network smoke |
+| 5k/25k/100k catalogs and comparative p50/p95 | `tool/benchmark_library.dart`, iteration perf tools | five Release passes/1,000 query samples per size; latest worst query+count p95 24.782 ms for 100k; raw stage2 report under docs/validation; Flutter 330-test baseline executed | Partial: facet/sort stress and paired Flutter/Rust UI/GPU/PDF/CPU/memory/startup/closure traces pending |
+| Real light/dark ES/EN/200%/reduced/critical-flow screenshots | visual tests + native matrix scripts | sixteen native synthetic stage2 captures, source/executable hashes and actual custom-control bounds; all eight named visual fixes plus compact-reader correction independently resolved, scoped disposition ship | Partial: complete critical flows, physical accessibility and full-parity visual acceptance pending |
+| Physical DPI100/125/150/175/200/Narrator/multi-monitor | TESTING.md, accessibility docs | no physical certification claimed | Pending |
+| Full Windows Release bundle/manifest/hashes/licenses/SBOM/instructions/results | package_windows.ps1 | pinned Cargo/toolchain and PDFium fetch hashes | Pending: final parity gate and release |
+
+## Excluded claims
+
+Printing: `docs/adr/ADR-0002-printing.md` is a contract/proposal. Secondary reader
+windows: registry/contracts do not establish a complete flow. OCR is not a complete
+connected feature. Backup encryption: `docs/adr/ADR-0003-backup-encryption.md` is
+a design proposal. Do not claim these as completed because types exist.
+
+## Current reproducible section
+
+Run `tool/fetch_rust_pdfium.ps1`, then use the bundled Python runtime for
+`tool/create_rust_pdf_fixtures.py` (reportlab/Pillow/pypdf), followed by
+`cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
+`cargo test --workspace` and `cargo run -p yamantaka -- --demo`.
+Use `--opengl` for the verified alternative compositor. Default is DX12; probing
+the default all-backend set caused an access violation on this host and is not
+used. `--demo` never opens the personal store; its filenames/content are synthetic.

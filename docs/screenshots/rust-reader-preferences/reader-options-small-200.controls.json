@@ -1,0 +1,312 @@
+{
+  "synthetic": true,
+  "viewport": [
+    0.0,
+    0.0,
+    320.0,
+    240.0
+  ],
+  "pixelsPerPoint": 2.5,
+  "controls": [
+    {
+      "label": "Library",
+      "rect": [
+        18.0,
+        8.0,
+        58.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Previous page",
+      "rect": [
+        60.0,
+        8.0,
+        100.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Next page",
+      "rect": [
+        168.0,
+        8.0,
+        208.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reading options",
+      "rect": [
+        210.0,
+        8.0,
+        250.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reading",
+      "rect": [
+        7.0,
+        63.0,
+        85.21875,
+        103.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Layout",
+      "rect": [
+        95.21875,
+        63.0,
+        164.5625,
+        103.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Positions",
+      "rect": [
+        174.5625,
+        63.0,
+        257.625,
+        103.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Whole page",
+      "rect": [
+        7.1875,
+        156.375,
+        109.84375,
+        196.375
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Page width",
+      "rect": [
+        7.1875,
+        206.375,
+        103.5,
+        246.375
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom out",
+      "rect": [
+        7.1875,
+        299.5625,
+        47.1875,
+        339.5625
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom in",
+      "rect": [
+        120.46875,
+        299.5625,
+        160.46875,
+        339.5625
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Light",
+      "rect": [
+        7.1875,
+        349.5625,
+        129.1875,
+        397.5625
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Ivory",
+      "rect": [
+        139.1875,
+        349.5625,
+        261.1875,
+        397.5625
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Sepia",
+      "rect": [
+        7.1875,
+        407.5625,
+        129.1875,
+        455.5625
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Gray",
+      "rect": [
+        139.1875,
+        407.5625,
+        261.1875,
+        455.5625
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Dark",
+      "rect": [
+        7.1875,
+        465.5625,
+        129.1875,
+        513.5625
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Black",
+      "rect": [
+        139.1875,
+        465.5625,
+        261.1875,
+        513.5625
+      ],
+      "clip": [
+        0.0,
+        129.0,
+        320.0,
+        212.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Page text",
+      "rect": [
+        252.0,
+        8.0,
+        292.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "trackedMemory": {
+    "total": 302400,
+    "pages": 302400,
+    "tiles": 0,
+    "text": 0,
+    "other": 0,
+    "cpu": 151200,
+    "gpu": 151200,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."
+}

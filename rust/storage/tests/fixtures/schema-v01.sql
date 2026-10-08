@@ -1,0 +1,7 @@
+-- Synthetic populated source for the historical Flutter schema.
+INSERT INTO documents (id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,last_page_index,reading_progress,fingerprint) VALUES ('original','C:/文献/ensayo.pdf','c:/文献/ensayo.pdf','ensayo.pdf','Investigación – مرحبا 文献','Ana García',7,900,'2026-10-08T12:00:00Z','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z',2,0.4,'legacy');
+INSERT INTO documents (id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,last_page_index,reading_progress,fingerprint) VALUES ('incoming','C:/文献/revision.pdf','c:/文献/revision.pdf','revision.pdf','Investigación – مرحبا 文献','Ana García',7,900,'2026-10-08T12:00:00Z','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z',2,0.4,'incoming');
+INSERT INTO document_preferences (document_id,view_mode,reading_theme,zoom_mode,zoom_level,page_layout,updated_at) VALUES ('original','book','ivory','fitWidth',1.25,'spread','2026-10-08T12:00:00Z');
+INSERT INTO bookmarks (id,document_id,page_index,label,created_at,updated_at) VALUES ('bookmark','original',2,'A/B','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z');
+INSERT INTO reading_sessions (id,document_id,started_at,ended_at,start_page,end_page,active_seconds) VALUES ('session','original','2026-10-08T12:00:00Z','2026-10-08T12:00:00Z',1,2,240);
+INSERT INTO app_metadata (key,value,updated_at) VALUES ('activeWorkspaceId','workspace','2026-10-08T12:00:00Z');

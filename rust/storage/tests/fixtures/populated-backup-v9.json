@@ -1,0 +1,329 @@
+{
+  "format": "yamantaka-local-backup",
+  "version": 9,
+  "containsPdfFiles": false,
+  "exportedAt": "2026-10-08T12:00:00Z",
+  "settings": {
+    "darkMode": true,
+    "languageCode": "es",
+    "custom": {
+      "unicode": "مرحبا 文献"
+    }
+  },
+  "tables": {
+    "documents": [
+      {
+        "id": "original",
+        "path": "C:/文献/ensayo.pdf",
+        "normalized_path": "c:/文献/ensayo.pdf",
+        "file_name": "ensayo.pdf",
+        "title": "Investigación – مرحبا 文献",
+        "author": "Ana García",
+        "page_count": 7,
+        "file_size": 900,
+        "file_modified_at": "2026-10-08T12:00:00Z",
+        "added_at": "2026-10-08T12:00:00Z",
+        "last_opened_at": "2026-10-08T12:00:00Z",
+        "last_page_index": 2,
+        "reading_progress": 0.4,
+        "preferred_view_mode": "document",
+        "preferred_theme": "ivory",
+        "is_missing": 0,
+        "fingerprint": "legacy",
+        "thumbnail_path": null,
+        "is_favorite": 1,
+        "source_title": "Título extraído",
+        "source_author": null,
+        "title_override": "Mi título manual",
+        "author_override": null,
+        "last_failure_code": null,
+        "restore_blocked": 0
+      },
+      {
+        "id": "incoming",
+        "path": "C:/文献/revision.pdf",
+        "normalized_path": "c:/文献/revision.pdf",
+        "file_name": "revision.pdf",
+        "title": "Investigación – مرحبا 文献",
+        "author": "Ana García",
+        "page_count": 7,
+        "file_size": 900,
+        "file_modified_at": "2026-10-08T12:00:00Z",
+        "added_at": "2026-10-08T12:00:00Z",
+        "last_opened_at": "2026-10-08T12:00:00Z",
+        "last_page_index": 2,
+        "reading_progress": 0.4,
+        "preferred_view_mode": "document",
+        "preferred_theme": "ivory",
+        "is_missing": 0,
+        "fingerprint": "incoming",
+        "thumbnail_path": null,
+        "is_favorite": 1,
+        "source_title": "Título extraído",
+        "source_author": null,
+        "title_override": "Mi título manual",
+        "author_override": null,
+        "last_failure_code": null,
+        "restore_blocked": 0
+      }
+    ],
+    "document_enrichment": [
+      {
+        "document_id": "original",
+        "fingerprint": "legacy",
+        "analyzer_version": 1,
+        "status": "review",
+        "suggested_title": "Propuesta",
+        "suggested_author": null,
+        "title_confidence": 0.85,
+        "author_confidence": null,
+        "topics_manual": 1,
+        "analyzed_at": null,
+        "error_code": null
+      }
+    ],
+    "document_topics": [
+      {
+        "document_id": "original",
+        "topic_key": "philosophy",
+        "confidence": 0.8,
+        "origin": "manual",
+        "analyzer_version": 1,
+        "fingerprint": "legacy",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "document_preferences": [
+      {
+        "document_id": "original",
+        "view_mode": "book",
+        "reading_theme": "ivory",
+        "zoom_mode": "fitWidth",
+        "zoom_level": 1.25,
+        "page_layout": "spread",
+        "cover_policy": "hasCover",
+        "initial_side": "right",
+        "page_rotation": 0,
+        "horizontal_margin": 32.0,
+        "vertical_margin": 24.0,
+        "controls_auto_hide": 1,
+        "scroll_offset": 0.0,
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "document_notes": [
+      {
+        "document_id": "original",
+        "note": "Nota de estudio 文献",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "bookmarks": [
+      {
+        "id": "bookmark",
+        "document_id": "original",
+        "page_index": 2,
+        "label": "A/B",
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "reading_sessions": [
+      {
+        "id": "session",
+        "document_id": "original",
+        "started_at": "2026-10-08T12:00:00Z",
+        "ended_at": "2026-10-08T12:00:00Z",
+        "start_page": 1,
+        "end_page": 2,
+        "active_seconds": 240
+      }
+    ],
+    "annotations": [
+      {
+        "id": "annotation",
+        "document_id": "original",
+        "page_index": 2,
+        "type": "highlight",
+        "color": "#c5adff",
+        "note": "Revisar argumento",
+        "selected_text": "مرحبا 文献",
+        "context_before": null,
+        "context_after": null,
+        "rects_json": "[{\"left\":0.1,\"top\":0.2,\"width\":0.3,\"height\":0.05}]",
+        "page_rotation": 0,
+        "document_fingerprint": "legacy",
+        "status": "attached",
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z",
+        "review_state": "accepted",
+        "origin_document_id": "incoming",
+        "origin_fingerprint": "incoming"
+      }
+    ],
+    "tags": [
+      {
+        "id": "tag",
+        "name": "Estudio",
+        "normalized_name": "estudio",
+        "color": "#c5adff",
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "annotation_tags": [
+      {
+        "annotation_id": "annotation",
+        "tag_id": "tag"
+      }
+    ],
+    "document_tags": [
+      {
+        "document_id": "original",
+        "tag_id": "tag"
+      }
+    ],
+    "collections": [
+      {
+        "id": "collection",
+        "name": "Biblioteca personal",
+        "normalized_name": "biblioteca personal",
+        "icon": "folder",
+        "sort_order": 0,
+        "is_pinned": 1,
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "collection_documents": [
+      {
+        "collection_id": "collection",
+        "document_id": "original",
+        "added_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "reading_profiles": [
+      {
+        "id": "profile",
+        "name": "Estudio",
+        "is_builtin": 0,
+        "settings_json": "{\"readingDirection\":\"rtl\",\"zoom\":1.25}",
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "workspaces": [
+      {
+        "id": "workspace",
+        "name": "Lectura personal",
+        "is_default": 0,
+        "active_tab_id": "tab",
+        "panel_section": null,
+        "panel_width": 320.0,
+        "split_json": null,
+        "collection_id": "collection",
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z",
+        "query_json": "{\"tagIds\":[\"tag\"]}",
+        "grouping": "none",
+        "sort_mode": "lastOpened",
+        "density": "comfortable",
+        "visible_columns_json": "[\"document\",\"status\",\"progress\"]",
+        "focus_mode": 1
+      }
+    ],
+    "workspace_tabs": [
+      {
+        "id": "tab",
+        "workspace_id": "workspace",
+        "document_id": "original",
+        "sort_order": 0,
+        "is_pinned": 1,
+        "page_index": 2,
+        "zoom_level": 1.25,
+        "page_layout": "spread",
+        "reading_mode": "book",
+        "scroll_offset": 0.0,
+        "queue_status": "inReview",
+        "blocking_reason": null,
+        "next_action": "Ver anotación"
+      }
+    ],
+    "document_relations": [
+      {
+        "id": "relation",
+        "source_document_id": "original",
+        "target_document_id": "incoming",
+        "relation_type": "sourceOf",
+        "source_anchor_kind": "annotation",
+        "source_anchor_id": "annotation",
+        "target_anchor_kind": null,
+        "target_anchor_id": null,
+        "created_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "document_revision_groups": [
+      {
+        "id": "revision",
+        "name": "Revisión de ensayo",
+        "current_document_id": "incoming",
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "document_revision_members": [
+      {
+        "group_id": "revision",
+        "document_id": "original",
+        "added_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "automation_rules": [
+      {
+        "id": "rule",
+        "name": "Etiquetar estudio",
+        "enabled": 1,
+        "trigger_json": "{\"kind\":\"manual\"}",
+        "actions_json": "[{\"kind\":\"addTag\",\"tagId\":\"tag\"}]",
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "operation_journal": [
+      {
+        "id": "operation",
+        "operation_kind": "automation",
+        "status": "completed",
+        "summary_json": "{\"ruleId\":\"rule\"}",
+        "total_items": 1,
+        "completed_items": 1,
+        "undo_json": "{\"documentId\":\"original\"}",
+        "error_code": null,
+        "started_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z",
+        "phase": "completed",
+        "interruption_reason": null,
+        "resume_capability": "rollback",
+        "compatibility_hash": "fixture"
+      }
+    ],
+    "duplicate_merge_history": [
+      {
+        "id": "merge",
+        "kept_document_id": "original",
+        "incoming_document_id": "incoming",
+        "backup_path": "C:/synthetic/merge.json",
+        "status": "completed",
+        "created_at": "2026-10-08T12:00:00Z",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ],
+    "app_metadata": [
+      {
+        "key": "activeWorkspaceId",
+        "value": "workspace",
+        "updated_at": "2026-10-08T12:00:00Z"
+      }
+    ]
+  }
+}

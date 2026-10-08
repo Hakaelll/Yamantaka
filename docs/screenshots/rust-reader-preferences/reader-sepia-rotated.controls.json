@@ -1,0 +1,152 @@
+{
+  "synthetic": true,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Library",
+      "rect": [
+        18.0,
+        8.0,
+        111.84375,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Previous page",
+      "rect": [
+        471.84375,
+        8.0,
+        511.84375,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Next page",
+      "rect": [
+        635.375,
+        8.0,
+        675.375,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom out",
+      "rect": [
+        693.375,
+        8.0,
+        733.375,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom in",
+      "rect": [
+        799.5625,
+        8.0,
+        839.5625,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Fit page",
+      "rect": [
+        849.5625,
+        8.0,
+        889.5625,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Text",
+      "rect": [
+        1345.53125,
+        8.0,
+        1422.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reading options",
+      "rect": [
+        1295.53125,
+        8.0,
+        1335.53125,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "trackedMemory": {
+    "total": 15740400,
+    "pages": 15740400,
+    "tiles": 0,
+    "text": 0,
+    "other": 0,
+    "cpu": 10275600,
+    "gpu": 5464800,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."
+}

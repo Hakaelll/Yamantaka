@@ -1,0 +1,40 @@
+[workspace]
+members = ["rust/domain", "rust/application", "rust/storage", "rust/pdf", "rust/windows", "rust/ui"]
+resolver = "2"
+
+[workspace.package]
+version = "0.16.0-alpha.1"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[workspace.dependencies]
+yamantaka-domain = { path = "rust/domain" }
+yamantaka-application = { path = "rust/application" }
+yamantaka-storage = { path = "rust/storage" }
+yamantaka-pdf = { path = "rust/pdf" }
+yamantaka-windows = { path = "rust/windows" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.151", features = ["preserve_order"] }
+thiserror = "=2.0.21"
+rusqlite = { version = "=0.40.2", features = ["bundled", "backup", "serde_json"] }
+sha2 = "=0.10.9"
+tempfile = "=3.27.0"
+chrono = { version = "=0.4.45", default-features = false, features = ["clock", "serde"] }
+uuid = { version = "=1.26.1", features = ["v4"] }
+crossbeam-channel = "=0.5.17"
+pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881", "thread_safe", "image_025"] }
+eframe = { version = "=0.36.2", default-features = false, features = ["default_fonts", "wgpu", "glow", "accesskit"] }
+rfd = "=0.15.4"
+windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp", "Win32_Security", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Com"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = "warn"

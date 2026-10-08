@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "capturedAtUtc": "2026-10-08T23:45:56.6619937Z",
+  "synthetic": true,
+  "executableSha256": "3D93629577DDA377ED21042DC108D591B6DD03C8A194DAE6D88189587BC71346",
+  "cargoLockSha256": "2F740713093B38D5BD42BAE6DA114AAEBDAA999C647263B42CF5C6E37907AB12",
+  "sources": [
+    {
+      "path": "rust/ui/src/app.rs",
+      "sha256": "A835B0CFAACC4120218B5F89416239B61E54B24A4F53296259E64976DB4E39AB"
+    },
+    {
+      "path": "rust/ui/src/app/compact.rs",
+      "sha256": "7CE810D2102B465BBF3CCDF09F4A9A6EB38E48BFDD54230A4A82F448B6557552"
+    },
+    {
+      "path": "rust/ui/src/app/details.rs",
+      "sha256": "94E22B2E6AC62C5D2F22CF33D3FA1AEFC9619B20E6D9FC6B20ABBA3ABC61F991"
+    },
+    {
+      "path": "rust/ui/src/app/list.rs",
+      "sha256": "47BD4302BCAAB57A59EC94420AD74C0E1340B89F087C52D99660F41BF5991E04"
+    },
+    {
+      "path": "rust/ui/src/app/navigation.rs",
+      "sha256": "1704D5EC69053D4205CD1B46EC8900C720A8928F054772FC876A1054AB78F32A"
+    },
+    {
+      "path": "rust/ui/src/app/reader_controls.rs",
+      "sha256": "537CCAD6E3090CF987112B923B88EC22AB87643B70B53605164A335AFAC66ADF"
+    },
+    {
+      "path": "rust/ui/src/app/reader_options.rs",
+      "sha256": "3117CBE16CC8A99D85A9C0A9A50068289644C008C7851AB0936B199049F122AB"
+    },
+    {
+      "path": "rust/ui/src/app/reader_viewport.rs",
+      "sha256": "413208D6AC283AC1455572D6FBC7AE1CD9F6A86C23239B5602ABD8BEA34CC3E0"
+    },
+    {
+      "path": "rust/ui/src/app/settings.rs",
+      "sha256": "8EB5748013EAC861AFA5B45B5BEACC6F9288B5EAF1734313C247EC2A66CC3F74"
+    },
+    {
+      "path": "rust/ui/src/book.rs",
+      "sha256": "5B262F48654EC52608A7F10DC60D1E3398C39AF41D1B2D1CFB4BFA194A3B6413"
+    },
+    {
+      "path": "rust/ui/src/main.rs",
+      "sha256": "5AA1DA1676BC38A8A60CBA277B78C08CF467359F8CED99FE91C70B1BD5AF67B9"
+    },
+    {
+      "path": "rust/ui/src/page_presenter.rs",
+      "sha256": "66A2EA244079B22459549B1E6803593A00F5E4C3E91132CC23E4A994B7E4EF26"
+    },
+    {
+      "path": "rust/ui/src/theme.rs",
+      "sha256": "61707BB0F9474AABF66D5708B85E044E369B56D7E56CFD6547BC907ED1AD3BEF"
+    }
+  ],
+  "captures": [
+    {
+      "name": "reader-dark",
+      "args": [
+        "--demo",
+        "--reader"
+      ],
+      "image": "reader-dark.png",
+      "imageSha256": "5B875DEA746547A930AA579C5470C5A19DE35A85633F42CC095D2A5D6EC3D4C7",
+      "controls": "reader-dark.controls.json",
+      "controlsSha256": "40BF624DE9FDF7BF10B1AE1808D249E344DD4E7EBD35C5AEE572573F11B49766",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "publishedImageSha256": "AB9D3876ADCD02956D0030F3A62014EAE4C62DE354B4A655AB892D90204839C4"
+    },
+    {
+      "name": "reader-facing",
+      "args": [
+        "--demo",
+        "--reader",
+        "--facing"
+      ],
+      "image": "reader-facing.png",
+      "imageSha256": "2C17475EBE8CCC90E4D5A24CCCFDD1480936DE34FAEC3217894A6C18A81B22B0",
+      "controls": "reader-facing.controls.json",
+      "controlsSha256": "3BF51008864E30B31F4B2BFC190B4E1C09BD317F84C61295612D7B48DA01D3EC",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "publishedImageSha256": "E2AAC31772A8811B5B73B627A5A3C943827A0032B77E3A044F58324211C3619E"
+    },
+    {
+      "name": "reader-continuous",
+      "args": [
+        "--demo",
+        "--reader",
+        "--continuous"
+      ],
+      "image": "reader-continuous.png",
+      "imageSha256": "737375813E20086BC37315981B4CD84A99245767433BCDC4DCC54534EA9F8D4A",
+      "controls": "reader-continuous.controls.json",
+      "controlsSha256": "37876FFDADFB9BFAF8821A6CE8B44BFCD59257BB58DCBCE8F875DA2CA7AA5AE7",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "publishedImageSha256": "8486EE00D224FFB79319193F2F102297B96218DDA148928A6FA0A7D760254ED5"
+    },
+    {
+      "name": "reader-layout-options",
+      "args": [
+        "--demo",
+        "--reader",
+        "--reader-options",
+        "--layout-options"
+      ],
+      "image": "reader-layout-options.png",
+      "imageSha256": "DBB4DCDBB660846AA9BE25258358D2C7D1C2520C17325939C397E85E6567BA56",
+      "controls": "reader-layout-options.controls.json",
+      "controlsSha256": "CB5B98B9EFAAABDE53B1B37B11172C25B6D16DF375E6E36CD303C7FB6D8A10CD",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "publishedImageSha256": "56E5CDC1F090B0DC12B5FB868007D55322357B7056E60F5581448F3372F5E26C"
+    },
+    {
+      "name": "reader-options",
+      "args": [
+        "--demo",
+        "--reader",
+        "--reader-options"
+      ],
+      "image": "reader-options.png",
+      "imageSha256": "ECC3094BD0CEFDA67749B3EB29056514E24F07E8FBDC2B4FAF82A475CE53F5E0",
+      "controls": "reader-options.controls.json",
+      "controlsSha256": "ADBBB4012232CE719DD7103103CE750C27EB137BDCCBD74EC534379EBD350826",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "publishedImageSha256": "5C7B9B2491F89018D3D71C1224F15C56976CDC7660003133AEF2484EA0B52A53"
+    },
+    {
+      "name": "reader-sepia-rotated",
+      "args": [
+        "--demo",
+        "--reader",
+        "--reader-theme=sepia",
+        "--rotation=90"
+      ],
+      "image": "reader-sepia-rotated.png",
+      "imageSha256": "7D16B98CDE09F9F57DDDB144A262BB08DD595759EB23569A916E50C877BD5530",
+      "controls": "reader-sepia-rotated.controls.json",
+      "controlsSha256": "1AFE78490B2CA80922C5FD04F03642F1A13007594F768788B1A8ECB0BCEFE152",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "publishedImageSha256": "9BE2E0EEF666D2BCF06DBC7381840A0133B6079EEEA71F366CC42076059316E3"
+    },
+    {
+      "name": "reader-fit-width",
+      "args": [
+        "--demo",
+        "--reader",
+        "--fit-width"
+      ],
+      "image": "reader-fit-width.png",
+      "imageSha256": "0FE023D3FAAEC232595DF27ACE6269BC77CF08869FB3BD234F2BB2E4130330E2",
+      "controls": "reader-fit-width.controls.json",
+      "controlsSha256": "3B62443681733D9EC205E15D73B8AFE656FDE32DB67A6C614381F84E4A59233E",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "publishedImageSha256": "6A7A7748EABCCD84B4CAFC13115625D4A25720D2989172A7873E130648BA78EF"
+    },
+    {
+      "name": "reader-options-small-200",
+      "args": [
+        "--demo",
+        "--reader",
+        "--reader-options",
+        "--size=640x480",
+        "--text-scale=2"
+      ],
+      "image": "reader-options-small-200.png",
+      "imageSha256": "8485B1368552EF22A89F3EA254708587181ADD93A1B4F5852C4C7A6DCB0D7E27",
+      "controls": "reader-options-small-200.controls.json",
+      "controlsSha256": "44704956B0006A8BB11BDD5018938AD89B0C932175D42484D9F1761539C10D1D",
+      "viewport": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "pixelsPerPoint": 2.5,
+      "exitCode": 0,
+      "publishedImageSha256": "5B8F5B2E3E65470A222A27F7C95AFB2485119D07052A102563FE09AEA3A15B9B"
+    },
+    {
+      "name": "reader-small-200",
+      "args": [
+        "--demo",
+        "--reader",
+        "--size=640x480",
+        "--text-scale=2"
+      ],
+      "image": "reader-small-200.png",
+      "imageSha256": "EF3EC963423F0261F962A00332E858499246E58E0238EBEE92662040B3EB6F59",
+      "controls": "reader-small-200.controls.json",
+      "controlsSha256": "A7172BC6CD18A4A0C3C0371E6683E145F7580945309B4B5B810BC04017A3EF68",
+      "viewport": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "pixelsPerPoint": 2.5,
+      "exitCode": 0,
+      "publishedImageSha256": "DEC783F0325818D7CF4E219FA7510EA8B7C1827C5BCC0776EA0018047B9BC5F4"
+    }
+  ],
+  "scope": "Native synthetic screenshots and custom-control bounds. Text zoom is not physical monitor DPI certification; no Narrator or multi-monitor acceptance is implied."
+}

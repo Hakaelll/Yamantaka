@@ -1,0 +1,2031 @@
+{
+  "1": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  },
+  "2": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  },
+  "3": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path",
+      "is_favorite"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  },
+  "4": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path",
+      "is_favorite",
+      "source_title",
+      "source_author",
+      "title_override",
+      "author_override"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  },
+  "5": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path",
+      "is_favorite",
+      "source_title",
+      "source_author",
+      "title_override",
+      "author_override"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  },
+  "6": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path",
+      "is_favorite",
+      "source_title",
+      "source_author",
+      "title_override",
+      "author_override"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "cover_policy",
+      "initial_side",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  },
+  "7": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path",
+      "is_favorite",
+      "source_title",
+      "source_author",
+      "title_override",
+      "author_override"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "cover_policy",
+      "initial_side",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  },
+  "8": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path",
+      "is_favorite",
+      "source_title",
+      "source_author",
+      "title_override",
+      "author_override"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "cover_policy",
+      "initial_side",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at",
+      "review_state"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at",
+      "query_json",
+      "grouping",
+      "sort_mode",
+      "density",
+      "visible_columns_json",
+      "focus_mode"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset",
+      "queue_status",
+      "blocking_reason",
+      "next_action"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  },
+  "9": {
+    "documents": [
+      "id",
+      "path",
+      "normalized_path",
+      "file_name",
+      "title",
+      "author",
+      "page_count",
+      "file_size",
+      "file_modified_at",
+      "added_at",
+      "last_opened_at",
+      "last_page_index",
+      "reading_progress",
+      "preferred_view_mode",
+      "preferred_theme",
+      "is_missing",
+      "fingerprint",
+      "thumbnail_path",
+      "is_favorite",
+      "source_title",
+      "source_author",
+      "title_override",
+      "author_override",
+      "last_failure_code",
+      "restore_blocked"
+    ],
+    "document_enrichment": [
+      "document_id",
+      "fingerprint",
+      "analyzer_version",
+      "status",
+      "suggested_title",
+      "suggested_author",
+      "title_confidence",
+      "author_confidence",
+      "topics_manual",
+      "analyzed_at",
+      "error_code"
+    ],
+    "document_topics": [
+      "document_id",
+      "topic_key",
+      "confidence",
+      "origin",
+      "analyzer_version",
+      "fingerprint",
+      "updated_at"
+    ],
+    "document_preferences": [
+      "document_id",
+      "view_mode",
+      "reading_theme",
+      "zoom_mode",
+      "zoom_level",
+      "page_layout",
+      "cover_policy",
+      "initial_side",
+      "page_rotation",
+      "horizontal_margin",
+      "vertical_margin",
+      "controls_auto_hide",
+      "scroll_offset",
+      "updated_at"
+    ],
+    "document_notes": [
+      "document_id",
+      "note",
+      "updated_at"
+    ],
+    "bookmarks": [
+      "id",
+      "document_id",
+      "page_index",
+      "label",
+      "created_at",
+      "updated_at"
+    ],
+    "reading_sessions": [
+      "id",
+      "document_id",
+      "started_at",
+      "ended_at",
+      "start_page",
+      "end_page",
+      "active_seconds"
+    ],
+    "annotations": [
+      "id",
+      "document_id",
+      "page_index",
+      "type",
+      "color",
+      "note",
+      "selected_text",
+      "context_before",
+      "context_after",
+      "rects_json",
+      "page_rotation",
+      "document_fingerprint",
+      "status",
+      "created_at",
+      "updated_at",
+      "review_state",
+      "origin_document_id",
+      "origin_fingerprint"
+    ],
+    "tags": [
+      "id",
+      "name",
+      "normalized_name",
+      "color",
+      "created_at",
+      "updated_at"
+    ],
+    "annotation_tags": [
+      "annotation_id",
+      "tag_id"
+    ],
+    "document_tags": [
+      "document_id",
+      "tag_id"
+    ],
+    "collections": [
+      "id",
+      "name",
+      "normalized_name",
+      "icon",
+      "sort_order",
+      "is_pinned",
+      "created_at",
+      "updated_at"
+    ],
+    "collection_documents": [
+      "collection_id",
+      "document_id",
+      "added_at"
+    ],
+    "reading_profiles": [
+      "id",
+      "name",
+      "is_builtin",
+      "settings_json",
+      "created_at",
+      "updated_at"
+    ],
+    "workspaces": [
+      "id",
+      "name",
+      "is_default",
+      "active_tab_id",
+      "panel_section",
+      "panel_width",
+      "split_json",
+      "collection_id",
+      "created_at",
+      "updated_at",
+      "query_json",
+      "grouping",
+      "sort_mode",
+      "density",
+      "visible_columns_json",
+      "focus_mode"
+    ],
+    "workspace_tabs": [
+      "id",
+      "workspace_id",
+      "document_id",
+      "sort_order",
+      "is_pinned",
+      "page_index",
+      "zoom_level",
+      "page_layout",
+      "reading_mode",
+      "scroll_offset",
+      "queue_status",
+      "blocking_reason",
+      "next_action"
+    ],
+    "document_relations": [
+      "id",
+      "source_document_id",
+      "target_document_id",
+      "relation_type",
+      "source_anchor_kind",
+      "source_anchor_id",
+      "target_anchor_kind",
+      "target_anchor_id",
+      "created_at"
+    ],
+    "document_revision_groups": [
+      "id",
+      "name",
+      "current_document_id",
+      "created_at",
+      "updated_at"
+    ],
+    "document_revision_members": [
+      "group_id",
+      "document_id",
+      "added_at"
+    ],
+    "automation_rules": [
+      "id",
+      "name",
+      "enabled",
+      "trigger_json",
+      "actions_json",
+      "created_at",
+      "updated_at"
+    ],
+    "operation_journal": [
+      "id",
+      "operation_kind",
+      "status",
+      "summary_json",
+      "total_items",
+      "completed_items",
+      "undo_json",
+      "error_code",
+      "started_at",
+      "updated_at",
+      "phase",
+      "interruption_reason",
+      "resume_capability",
+      "compatibility_hash"
+    ],
+    "duplicate_merge_history": [
+      "id",
+      "kept_document_id",
+      "incoming_document_id",
+      "backup_path",
+      "status",
+      "created_at",
+      "updated_at"
+    ],
+    "app_metadata": [
+      "key",
+      "value",
+      "updated_at"
+    ]
+  }
+}

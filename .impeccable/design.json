@@ -1,0 +1,722 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-08T22:43:19.6769425Z",
+  "title": "Design System: Yamantaka",
+  "extensions": {
+    "colorMeta": {
+      "dark-accent": {
+        "role": "primary",
+        "tonalRamp": [
+          "oklch(15% 0.11782 298.16)",
+          "oklch(26.43% 0.11782 298.16)",
+          "oklch(37.86% 0.11782 298.16)",
+          "oklch(49.29% 0.11782 298.16)",
+          "oklch(60.71% 0.11782 298.16)",
+          "oklch(72.14% 0.11782 298.16)",
+          "oklch(83.57% 0.11782 298.16)",
+          "oklch(95% 0.11782 298.16)"
+        ],
+        "displayName": "Soft violet"
+      },
+      "light-accent": {
+        "role": "primary",
+        "tonalRamp": [
+          "oklch(15% 0.14688 295.43)",
+          "oklch(26.43% 0.14688 295.43)",
+          "oklch(37.86% 0.14688 295.43)",
+          "oklch(49.29% 0.14688 295.43)",
+          "oklch(60.71% 0.14688 295.43)",
+          "oklch(72.14% 0.14688 295.43)",
+          "oklch(83.57% 0.14688 295.43)",
+          "oklch(95% 0.14688 295.43)"
+        ],
+        "displayName": "Study violet"
+      },
+      "dark-canvas": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.00445 264.45)",
+          "oklch(26.43% 0.00445 264.45)",
+          "oklch(37.86% 0.00445 264.45)",
+          "oklch(49.29% 0.00445 264.45)",
+          "oklch(60.71% 0.00445 264.45)",
+          "oklch(72.14% 0.00445 264.45)",
+          "oklch(83.57% 0.00445 264.45)",
+          "oklch(95% 0.00445 264.45)"
+        ],
+        "displayName": "Graphite room"
+      },
+      "dark-surface": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.00614 271.11)",
+          "oklch(26.43% 0.00614 271.11)",
+          "oklch(37.86% 0.00614 271.11)",
+          "oklch(49.29% 0.00614 271.11)",
+          "oklch(60.71% 0.00614 271.11)",
+          "oklch(72.14% 0.00614 271.11)",
+          "oklch(83.57% 0.00614 271.11)",
+          "oklch(95% 0.00614 271.11)"
+        ],
+        "displayName": "Graphite surface"
+      },
+      "dark-raised": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.00768 274.64)",
+          "oklch(26.43% 0.00768 274.64)",
+          "oklch(37.86% 0.00768 274.64)",
+          "oklch(49.29% 0.00768 274.64)",
+          "oklch(60.71% 0.00768 274.64)",
+          "oklch(72.14% 0.00768 274.64)",
+          "oklch(83.57% 0.00768 274.64)",
+          "oklch(95% 0.00768 274.64)"
+        ],
+        "displayName": "Raised graphite"
+      },
+      "dark-ink": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.00701 88.64)",
+          "oklch(26.43% 0.00701 88.64)",
+          "oklch(37.86% 0.00701 88.64)",
+          "oklch(49.29% 0.00701 88.64)",
+          "oklch(60.71% 0.00701 88.64)",
+          "oklch(72.14% 0.00701 88.64)",
+          "oklch(83.57% 0.00701 88.64)",
+          "oklch(95% 0.00701 88.64)"
+        ],
+        "displayName": "Ivory ink"
+      },
+      "dark-secondary": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.01149 280.4)",
+          "oklch(26.43% 0.01149 280.4)",
+          "oklch(37.86% 0.01149 280.4)",
+          "oklch(49.29% 0.01149 280.4)",
+          "oklch(60.71% 0.01149 280.4)",
+          "oklch(72.14% 0.01149 280.4)",
+          "oklch(83.57% 0.01149 280.4)",
+          "oklch(95% 0.01149 280.4)"
+        ],
+        "displayName": "Quiet grey"
+      },
+      "dark-line": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.01067 278.25)",
+          "oklch(26.43% 0.01067 278.25)",
+          "oklch(37.86% 0.01067 278.25)",
+          "oklch(49.29% 0.01067 278.25)",
+          "oklch(60.71% 0.01067 278.25)",
+          "oklch(72.14% 0.01067 278.25)",
+          "oklch(83.57% 0.01067 278.25)",
+          "oklch(95% 0.01067 278.25)"
+        ],
+        "displayName": "Graphite rule"
+      },
+      "light-canvas": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.00823 91.48)",
+          "oklch(26.43% 0.00823 91.48)",
+          "oklch(37.86% 0.00823 91.48)",
+          "oklch(49.29% 0.00823 91.48)",
+          "oklch(60.71% 0.00823 91.48)",
+          "oklch(72.14% 0.00823 91.48)",
+          "oklch(83.57% 0.00823 91.48)",
+          "oklch(95% 0.00823 91.48)"
+        ],
+        "displayName": "Warm paper"
+      },
+      "light-surface": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.00693 88.64)",
+          "oklch(26.43% 0.00693 88.64)",
+          "oklch(37.86% 0.00693 88.64)",
+          "oklch(49.29% 0.00693 88.64)",
+          "oklch(60.71% 0.00693 88.64)",
+          "oklch(72.14% 0.00693 88.64)",
+          "oklch(83.57% 0.00693 88.64)",
+          "oklch(95% 0.00693 88.64)"
+        ],
+        "displayName": "Ivory surface"
+      },
+      "light-raised": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.01118 89.73)",
+          "oklch(26.43% 0.01118 89.73)",
+          "oklch(37.86% 0.01118 89.73)",
+          "oklch(49.29% 0.01118 89.73)",
+          "oklch(60.71% 0.01118 89.73)",
+          "oklch(72.14% 0.01118 89.73)",
+          "oklch(83.57% 0.01118 89.73)",
+          "oklch(95% 0.01118 89.73)"
+        ],
+        "displayName": "Pressed paper"
+      },
+      "light-ink": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.0095 276.71)",
+          "oklch(26.43% 0.0095 276.71)",
+          "oklch(37.86% 0.0095 276.71)",
+          "oklch(49.29% 0.0095 276.71)",
+          "oklch(60.71% 0.0095 276.71)",
+          "oklch(72.14% 0.0095 276.71)",
+          "oklch(83.57% 0.0095 276.71)",
+          "oklch(95% 0.0095 276.71)"
+        ],
+        "displayName": "Charcoal ink"
+      },
+      "light-secondary": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.01411 285.88)",
+          "oklch(26.43% 0.01411 285.88)",
+          "oklch(37.86% 0.01411 285.88)",
+          "oklch(49.29% 0.01411 285.88)",
+          "oklch(60.71% 0.01411 285.88)",
+          "oklch(72.14% 0.01411 285.88)",
+          "oklch(83.57% 0.01411 285.88)",
+          "oklch(95% 0.01411 285.88)"
+        ],
+        "displayName": "Warm grey"
+      },
+      "light-line": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.01305 86.84)",
+          "oklch(26.43% 0.01305 86.84)",
+          "oklch(37.86% 0.01305 86.84)",
+          "oklch(49.29% 0.01305 86.84)",
+          "oklch(60.71% 0.01305 86.84)",
+          "oklch(72.14% 0.01305 86.84)",
+          "oklch(83.57% 0.01305 86.84)",
+          "oklch(95% 0.01305 86.84)"
+        ],
+        "displayName": "Paper rule"
+      },
+      "dark-primary-ink": {
+        "role": "primary",
+        "tonalRamp": [
+          "oklch(15% 0.03415 299.6)",
+          "oklch(26.43% 0.03415 299.6)",
+          "oklch(37.86% 0.03415 299.6)",
+          "oklch(49.29% 0.03415 299.6)",
+          "oklch(60.71% 0.03415 299.6)",
+          "oklch(72.14% 0.03415 299.6)",
+          "oklch(83.57% 0.03415 299.6)",
+          "oklch(95% 0.03415 299.6)"
+        ],
+        "displayName": "Deep plum action ink"
+      },
+      "light-primary-ink": {
+        "role": "primary",
+        "tonalRamp": [
+          "oklch(15% 0 89.88)",
+          "oklch(26.43% 0 89.88)",
+          "oklch(37.86% 0 89.88)",
+          "oklch(49.29% 0 89.88)",
+          "oklch(60.71% 0 89.88)",
+          "oklch(72.14% 0 89.88)",
+          "oklch(83.57% 0 89.88)",
+          "oklch(95% 0 89.88)"
+        ],
+        "displayName": "White action ink"
+      },
+      "jacket-slate": {
+        "role": "secondary",
+        "tonalRamp": [
+          "oklch(15% 0.04208 251.63)",
+          "oklch(26.43% 0.04208 251.63)",
+          "oklch(37.86% 0.04208 251.63)",
+          "oklch(49.29% 0.04208 251.63)",
+          "oklch(60.71% 0.04208 251.63)",
+          "oklch(72.14% 0.04208 251.63)",
+          "oklch(83.57% 0.04208 251.63)",
+          "oklch(95% 0.04208 251.63)"
+        ],
+        "displayName": "Slate jacket"
+      },
+      "jacket-plum": {
+        "role": "secondary",
+        "tonalRamp": [
+          "oklch(15% 0.05617 1.24)",
+          "oklch(26.43% 0.05617 1.24)",
+          "oklch(37.86% 0.05617 1.24)",
+          "oklch(49.29% 0.05617 1.24)",
+          "oklch(60.71% 0.05617 1.24)",
+          "oklch(72.14% 0.05617 1.24)",
+          "oklch(83.57% 0.05617 1.24)",
+          "oklch(95% 0.05617 1.24)"
+        ],
+        "displayName": "Plum jacket"
+      },
+      "jacket-forest": {
+        "role": "secondary",
+        "tonalRamp": [
+          "oklch(15% 0.04001 162.78)",
+          "oklch(26.43% 0.04001 162.78)",
+          "oklch(37.86% 0.04001 162.78)",
+          "oklch(49.29% 0.04001 162.78)",
+          "oklch(60.71% 0.04001 162.78)",
+          "oklch(72.14% 0.04001 162.78)",
+          "oklch(83.57% 0.04001 162.78)",
+          "oklch(95% 0.04001 162.78)"
+        ],
+        "displayName": "Forest jacket"
+      },
+      "jacket-umber": {
+        "role": "secondary",
+        "tonalRamp": [
+          "oklch(15% 0.07953 58.45)",
+          "oklch(26.43% 0.07953 58.45)",
+          "oklch(37.86% 0.07953 58.45)",
+          "oklch(49.29% 0.07953 58.45)",
+          "oklch(60.71% 0.07953 58.45)",
+          "oklch(72.14% 0.07953 58.45)",
+          "oklch(83.57% 0.07953 58.45)",
+          "oklch(95% 0.07953 58.45)"
+        ],
+        "displayName": "Umber jacket"
+      },
+      "jacket-indigo": {
+        "role": "secondary",
+        "tonalRamp": [
+          "oklch(15% 0.05284 297.28)",
+          "oklch(26.43% 0.05284 297.28)",
+          "oklch(37.86% 0.05284 297.28)",
+          "oklch(49.29% 0.05284 297.28)",
+          "oklch(60.71% 0.05284 297.28)",
+          "oklch(72.14% 0.05284 297.28)",
+          "oklch(83.57% 0.05284 297.28)",
+          "oklch(95% 0.05284 297.28)"
+        ],
+        "displayName": "Indigo jacket"
+      },
+      "jacket-teal": {
+        "role": "secondary",
+        "tonalRamp": [
+          "oklch(15% 0.04607 201.76)",
+          "oklch(26.43% 0.04607 201.76)",
+          "oklch(37.86% 0.04607 201.76)",
+          "oklch(49.29% 0.04607 201.76)",
+          "oklch(60.71% 0.04607 201.76)",
+          "oklch(72.14% 0.04607 201.76)",
+          "oklch(83.57% 0.04607 201.76)",
+          "oklch(95% 0.04607 201.76)"
+        ],
+        "displayName": "Teal jacket"
+      },
+      "jacket-ink": {
+        "role": "secondary",
+        "tonalRamp": [
+          "oklch(15% 0.02194 83.26)",
+          "oklch(26.43% 0.02194 83.26)",
+          "oklch(37.86% 0.02194 83.26)",
+          "oklch(49.29% 0.02194 83.26)",
+          "oklch(60.71% 0.02194 83.26)",
+          "oklch(72.14% 0.02194 83.26)",
+          "oklch(83.57% 0.02194 83.26)",
+          "oklch(95% 0.02194 83.26)"
+        ],
+        "displayName": "Jacket ivory"
+      },
+      "jacket-foil": {
+        "role": "secondary",
+        "tonalRamp": [
+          "oklch(15% 0.07772 78.01)",
+          "oklch(26.43% 0.07772 78.01)",
+          "oklch(37.86% 0.07772 78.01)",
+          "oklch(49.29% 0.07772 78.01)",
+          "oklch(60.71% 0.07772 78.01)",
+          "oklch(72.14% 0.07772 78.01)",
+          "oklch(83.57% 0.07772 78.01)",
+          "oklch(95% 0.07772 78.01)"
+        ],
+        "displayName": "Jacket foil"
+      },
+      "paper-top": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.02262 89.81)",
+          "oklch(26.43% 0.02262 89.81)",
+          "oklch(37.86% 0.02262 89.81)",
+          "oklch(49.29% 0.02262 89.81)",
+          "oklch(60.71% 0.02262 89.81)",
+          "oklch(72.14% 0.02262 89.81)",
+          "oklch(83.57% 0.02262 89.81)",
+          "oklch(95% 0.02262 89.81)"
+        ],
+        "displayName": "Paper top"
+      },
+      "paper-edge": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.02338 87.17)",
+          "oklch(26.43% 0.02338 87.17)",
+          "oklch(37.86% 0.02338 87.17)",
+          "oklch(49.29% 0.02338 87.17)",
+          "oklch(60.71% 0.02338 87.17)",
+          "oklch(72.14% 0.02338 87.17)",
+          "oklch(83.57% 0.02338 87.17)",
+          "oklch(95% 0.02338 87.17)"
+        ],
+        "displayName": "Paper edge"
+      },
+      "paper-bottom": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.02084 87.54)",
+          "oklch(26.43% 0.02084 87.54)",
+          "oklch(37.86% 0.02084 87.54)",
+          "oklch(49.29% 0.02084 87.54)",
+          "oklch(60.71% 0.02084 87.54)",
+          "oklch(72.14% 0.02084 87.54)",
+          "oklch(83.57% 0.02084 87.54)",
+          "oklch(95% 0.02084 87.54)"
+        ],
+        "displayName": "Paper bottom"
+      },
+      "paper-rule": {
+        "role": "neutral",
+        "tonalRamp": [
+          "oklch(15% 0.02275 88.77)",
+          "oklch(26.43% 0.02275 88.77)",
+          "oklch(37.86% 0.02275 88.77)",
+          "oklch(49.29% 0.02275 88.77)",
+          "oklch(60.71% 0.02275 88.77)",
+          "oklch(72.14% 0.02275 88.77)",
+          "oklch(83.57% 0.02275 88.77)",
+          "oklch(95% 0.02275 88.77)"
+        ],
+        "displayName": "Paper edge rule"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Native heading",
+        "purpose": "Shared native Heading style."
+      },
+      "display": {
+        "displayName": "Library display",
+        "purpose": "Native Segoe library heading; explicit user brief."
+      },
+      "title": {
+        "displayName": "Reader context",
+        "purpose": "Reader document title."
+      },
+      "label": {
+        "displayName": "Control label",
+        "purpose": "Custom and native control labels."
+      },
+      "editorial": {
+        "displayName": "Editorial document face",
+        "purpose": "Bundled Source Serif 4 Display Regular in continuity, inspection and jacket families 1, 2, 4."
+      },
+      "display-compact": {
+        "displayName": "Compact display",
+        "purpose": "Compact library heading."
+      },
+      "body": {
+        "displayName": "Catalogue body",
+        "purpose": "Stable titles and interface context."
+      },
+      "jacket": {
+        "displayName": "Bold jacket",
+        "purpose": "Local Segoe UI Bold in families 0, 3, 5."
+      },
+      "small": {
+        "displayName": "Quiet context",
+        "purpose": "Author and secondary information."
+      },
+      "cover-meta": {
+        "displayName": "Page and progress context",
+        "purpose": "Catalogue page/progress summaries."
+      }
+    },
+    "shadows": [
+      {
+        "value": "6px 10px 22px rgba(0,0,0,0.4314)",
+        "purpose": "Resting native book shadow; logical-point CSS translation.",
+        "name": "book-contact-dark"
+      },
+      {
+        "value": "6px 10px 22px rgba(0,0,0,0.2549)",
+        "purpose": "Resting native book shadow on warm paper.",
+        "name": "book-contact-light"
+      },
+      {
+        "value": "2px 4px 6px rgba(0,0,0,0.3137)",
+        "purpose": "Resting tight native contact shadow; decreases alpha as lift increases.",
+        "name": "book-tight-contact"
+      }
+    ],
+    "motion": [
+      {
+        "value": "stiffness 190; damping 24; mass 1.15; dt clamp 0.001–0.032 seconds",
+        "purpose": "Bounded pointer-driven native tilt, not CSS easing.",
+        "name": "cover-tilt-spring"
+      },
+      {
+        "value": "stiffness 210; damping 29; lift clamp 0–1.05",
+        "purpose": "Interruptible cover-only emphasis; resting state settles.",
+        "name": "cover-lift-spring"
+      },
+      {
+        "value": "140ms; ease 1-(1-t)^3",
+        "purpose": "Native hover interpolation; immediate for reduced motion or keyboard focus.",
+        "name": "control-hover"
+      },
+      {
+        "value": "180ms; ease 1-2^(-10*t), with t>=1 -> 1",
+        "purpose": "Theme-choice selection interpolation; zero duration for reduced motion or focus.",
+        "name": "theme-selection"
+      },
+      {
+        "value": "tilt, velocity and lift zero; immediate state changes; native scroll animation disabled",
+        "purpose": "Retains static connected volume, selection and focus.",
+        "name": "reduced-motion"
+      }
+    ],
+    "breakpoints": [
+      {
+        "value": "650 logical points",
+        "purpose": "Below this content height, reduced chrome and smaller covers.",
+        "name": "compact-library-height"
+      },
+      {
+        "value": "420 logical points",
+        "purpose": "Complete library body scrolls below this height.",
+        "name": "small-page-height"
+      },
+      {
+        "value": "420 logical points",
+        "purpose": "Zoom-adjusted width selects jacket/title rows, filter menu and compact reader controls; cramped settings uses category menu.",
+        "name": "constrained-content-width"
+      },
+      {
+        "value": "540 logical points",
+        "purpose": "Utility controls consolidate to semantic vector buttons.",
+        "name": "utility-icon-width"
+      },
+      {
+        "value": "760 logical points",
+        "purpose": "Available row width switches list columns to stacked rows.",
+        "name": "list-wide"
+      },
+      {
+        "value": "850 logical points",
+        "purpose": "Available settings content width selects side category navigation.",
+        "name": "settings-side-navigation"
+      }
+    ],
+    "nativeGeometry": {
+      "continuityMiniatureWidth": 42,
+      "fontTransform": "Every tessellated jacket vertex, including the font atlas, uses the same rigid projection.",
+      "restRotationRadians": [
+        -0.08,
+        -0.26
+      ],
+      "perspectiveDistance": 850,
+      "materialShading": "back gamma0.55; spine0.48; strip0.72; directional lighting clamp(0.12+tilt.x*0.04,0.07,0.16); lower vertices gamma0.76/0.86; artwork gamma0.78",
+      "depth": "(width * 0.095).clamp(12,26)",
+      "pointerRotationFactors": [
+        -0.052,
+        0.074
+      ],
+      "lift": "tilt.length()*4 + lift*7",
+      "source": "rust/ui/src/book.rs",
+      "scale": "1 + lift*0.018",
+      "coverAllocation": "[width, width * 1.34 + 78]",
+      "pointerResponse": "signed power 1.28",
+      "familyRegions": "Distinct nonoverlapping title/art/optional author regions; serif families 1,2,4; bold families0,3,5.",
+      "keyboardFocus": "2-point outline rect.shrink(2), radius6",
+      "compactRowMiniatureWidth": 76,
+      "miniatureAllocation": "[width, width * 1.34 + 8]",
+      "titlelessThreshold": "width <=60",
+      "selection": "1.5-point accent outline book.expand(4), radius6; 5-point dot",
+      "listMiniatureWidth": 54,
+      "shadow": "broad offset [6,10+lift*9], blur 22+lift*10, alpha dark110/light65; tight [2,4], blur6, alpha80*(1-lift*0.5); native integer casts"
+    },
+    "previewPolicy": {
+      "units": "Frontmatter px serializes native logical points at text scale1.0; DPI and text zoom determine physical pixels.",
+      "tonalRamps": "Synthesized OKLCH display strips only, not implemented native tokens or approved replacement colors.",
+      "componentStates": "Illustrative browser states; native Rust remains authoritative. Static book sample does not certify physical motion.",
+      "implementation": "Native Windows egui/eframe. Every sidecar snippet is an illustrative self-contained panel translation, never shipping CSS or a native screenshot."
+    },
+    "evidence": {
+      "directionSeed": {
+        "rawHandComplete": false,
+        "seed": "26a7630f",
+        "challengerAdopted": false,
+        "source": "api",
+        "groundedCandidate": 7,
+        "pool": "c3b204a1eed6",
+        "world": "Gallery study room",
+        "challengerQualityBoardReviewed": false
+      },
+      "sources": [
+        "rust/ui/src/theme.rs",
+        "rust/ui/src/book.rs",
+        "rust/ui/src/app.rs",
+        "rust/ui/src/main.rs",
+        "rust/ui/src/app/details.rs",
+        "rust/ui/src/app/list.rs",
+        "rust/ui/src/app/settings.rs",
+        "rust/ui/src/app/compact.rs",
+        "rust/ui/src/app/navigation.rs",
+        "rust/ui/src/app/reader_controls.rs",
+        "PRODUCT.md",
+        "docs/architecture/rust-visual-contract.md",
+        "docs/architecture/rust-visual-seed.md"
+      ],
+      "detector": "No web detector evaluates the native section.",
+      "captures": [
+        "build/rust-visual/stage2/library-dark.png",
+        "build/rust-visual/stage2/library-light.png",
+        "build/rust-visual/stage2/library-details.png",
+        "build/rust-visual/stage2/library-list.png",
+        "build/rust-visual/stage2/library-small-200.png",
+        "build/rust-visual/stage2/settings-light.png",
+        "build/rust-visual/stage2/settings-small-200.png",
+        "build/rust-visual/stage2/reader-dark.png",
+        "build/rust-visual/stage2/reader-small-200.png"
+      ],
+      "reviewScope": "Initial independent stage2 review: fix. Subsequent bounded confirmation: all eight named corrections and compact-reader regression resolved, remaining clear, disposition ship. Scope is those corrections only; no whole-interface/rewrite, fullQUALITYBAR, physical DPI or Narrator approval.",
+      "limitations": [
+        "Synthetic catalogue and PDF fixture do not establish functional parity.",
+        "Narrator, physical DPI and multiple monitors require their own evidence.",
+        "The full language/text/layout matrix is not certified by these captures.",
+        "Full QUALITY BAR challenger/card ceiling not claimed; no approved visual comp.",
+        "Recorded seed evidence is not the complete raw hand; one challenger was lost in truncated output."
+      ],
+      "legacyReference": "docs/architecture/flutter-design-v015.md"
+    }
+  },
+  "components": [
+    {
+      "html": "<button class=\"ds-primary\"><svg class=\"ds-vector\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M8 3v10M3 8h10\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>Add PDFs</button>",
+      "description": "Illustrative panel translation of the native custom control; the actual product uses painter vectors and logical-point geometry.",
+      "kind": "button",
+      "name": "Primary vector control · graphite",
+      "refersTo": "button-primary-dark",
+      "css": ".ds-primary { display:inline-flex; align-items:center; gap:12px; height:40px; min-width:40px; padding:0 14px; border:0; border-radius:8px; font:14px \"Segoe UI Variable\", \"Segoe UI\", sans-serif; background:#BDA3F5; color:#191324; cursor:pointer; transition:background .14s cubic-bezier(0,0,.58,1); } .ds-primary:hover { background:color-mix(in srgb,#BDA3F5 90%,#EFEDE8); } .ds-primary:focus-visible { outline:2px solid #BDA3F5; outline-offset:-3px; } .ds-primary:active { transform:translateY(1px); } @media(prefers-reduced-motion:reduce) { .ds-primary { transition:none; } }"
+    },
+    {
+      "html": "<button class=\"ds-primary-light\">Continue reading</button>",
+      "description": "Illustrative panel translation of the paired light-theme primary state.",
+      "kind": "button",
+      "name": "Primary vector control · warm paper",
+      "refersTo": "button-primary-light",
+      "css": ".ds-primary-light { height:40px; min-width:40px; padding:0 14px; border:0; border-radius:8px; font:14px \"Segoe UI Variable\", \"Segoe UI\", sans-serif; background:#6748A7; color:white; cursor:pointer; } .ds-primary-light:hover { background:color-mix(in srgb,#6748A7 90%,#212227); } .ds-primary-light:focus-visible { outline:2px solid #6748A7; outline-offset:-3px; } .ds-primary-light:active { transform:translateY(1px); }"
+    },
+    {
+      "html": "<button class=\"ds-quiet\">Explorer</button>",
+      "description": "Illustrative panel translation of the transparent native secondary control, raised hover, separate focus and one-point press.",
+      "kind": "button",
+      "name": "Quiet control",
+      "refersTo": "button-secondary-dark",
+      "css": ".ds-quiet { height:40px; min-width:40px; padding:0 14px; border:0; border-radius:8px; background:transparent; color:#A7A8B0; font:14px \"Segoe UI Variable\", \"Segoe UI\", sans-serif; cursor:pointer; } .ds-quiet:hover { background:#202125; color:#EFEDE8; } .ds-quiet:focus-visible { outline:2px solid #BDA3F5; outline-offset:-3px; } .ds-quiet:active { transform:translateY(1px); }"
+    },
+    {
+      "html": "<label class=\"ds-search-wrap\"><svg class=\"ds-search-vector\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle cx=\"6.5\" cy=\"6.5\" r=\"5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"m10 10 4 4\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg><input class=\"ds-search\" aria-label=\"Search title or author\" placeholder=\"Search title or author\"></label>",
+      "description": "Illustrative panel field; native TextEdit requests 40-point height, uses a drawn search vector and 36-point horizontal inset.",
+      "kind": "input",
+      "name": "Title/author search",
+      "refersTo": "search-dark",
+      "css": ".ds-search-wrap { display:inline-block; position:relative; width:320px; max-width:100%; color:#A7A8B0; } .ds-search-vector { position:absolute; left:10px; top:12px; } .ds-search { width:calc(100% - 74px); min-height:20px; padding:10px 36px; font:15px \"Segoe UI Variable\", \"Segoe UI\", sans-serif; color:#EFEDE8; background:#16171A; border:1px solid color-mix(in srgb,#323339 50%,#A7A8B0); border-radius:7px; } .ds-search::placeholder { color:#A7A8B0; } .ds-search:hover { border-color:#A7A8B0; } .ds-search:focus-visible { outline:1.5px solid #BDA3F5; outline-offset:0; }"
+    },
+    {
+      "html": "<nav class=\"ds-nav\" aria-label=\"Application\"><button class=\"ds-nav-item ds-nav-selected\" aria-current=\"page\">Library</button><button class=\"ds-nav-item\">Settings</button></nav>",
+      "description": "Illustrative panel translation: selected raised fill and violet underline are separate from the focus outline. Icon-only adaptations keep semantic labels.",
+      "kind": "nav",
+      "name": "Application navigation",
+      "refersTo": "navigation-dark",
+      "css": ".ds-nav { display:flex; gap:10px; background:#16171A; } .ds-nav-item { position:relative; height:40px; min-width:40px; padding:0 14px; border:0; border-radius:8px; font:14px \"Segoe UI Variable\", \"Segoe UI\", sans-serif; background:transparent; color:#A7A8B0; cursor:pointer; } .ds-nav-selected { background:#202125; color:#EFEDE8; } .ds-nav-selected::after { content:\"\"; position:absolute; bottom:4px; left:12px; right:12px; height:1.5px; background:#BDA3F5; } .ds-nav-item:hover { background:#202125; color:#EFEDE8; } .ds-nav-item:focus-visible { outline:2px solid #BDA3F5; outline-offset:-3px; } .ds-nav-item:active { transform:translateY(1px); }"
+    },
+    {
+      "html": "<button class=\"ds-chip\" aria-pressed=\"true\">Favorites</button>",
+      "description": "Illustrative translation of native selectable labels, distinct from custom vector controls.",
+      "kind": "chip",
+      "name": "Native selectable filter",
+      "refersTo": "chip-dark-selected",
+      "css": ".ds-chip { min-height:40px; padding:9px 14px; border:1.5px solid #BDA3F5; border-radius:7px; background:#202125; color:#EFEDE8; font:14px \"Segoe UI Variable\", \"Segoe UI\", sans-serif; cursor:pointer; } .ds-chip:hover { background:#202125; } .ds-chip:focus-visible { outline:2px solid #BDA3F5; outline-offset:2px; } .ds-chip:active { border-color:#BDA3F5; }"
+    },
+    {
+      "html": "<button class=\"ds-choice\" role=\"radio\" aria-checked=\"true\"><span class=\"ds-choice-diagram\" aria-hidden=\"true\"><span class=\"ds-choice-jackets\"></span><span class=\"ds-choice-page\"></span></span><span class=\"ds-choice-title\">Warm paper</span><span class=\"ds-choice-detail\">The clarity of paper.</span></button>",
+      "description": "Illustrative radio-style native theme choice; its diagram is not a screenshot. Native choice height depends on wrapped label/detail galleys and cramped composition.",
+      "kind": "card",
+      "name": "Theme choice · warm paper",
+      "refersTo": "theme-choice-light",
+      "css": ".ds-choice { display:flex; flex-direction:column; gap:8px; width:260px; padding:12px 16px; border:2px solid #6748A7; border-radius:10px; background:#FFFDF8; color:#212227; text-align:left; cursor:pointer; font:16px \"Segoe UI Variable\", \"Segoe UI\", sans-serif; } .ds-choice-diagram { display:flex; align-items:center; justify-content:space-around; width:100%; height:104px; border-radius:5px; background:#F7F5EF; } .ds-choice-jackets { width:72px; height:47px; background:linear-gradient(90deg,#2B3D51 30%,transparent 30% 35%,#532E39 35% 65%,transparent 65% 70%,#2C473A 70%); } .ds-choice-page { width:60px; height:72px; background:#F4EFE2; border:8px solid #EBE8E0; } .ds-choice-detail { color:#64646D; font-size:13px; } .ds-choice:hover { background:#EBE8E0; } .ds-choice:focus-visible { outline:2px solid #6748A7; outline-offset:3px; } .ds-choice:active { border-color:#6748A7; }"
+    },
+    {
+      "html": "<button class=\"ds-book\" aria-label=\"The Architecture of Thought, two pages\"><span class=\"ds-book-jacket\"><svg class=\"ds-book-art\" viewBox=\"0 0 100 100\" aria-hidden=\"true\"><circle cx=\"44\" cy=\"50\" r=\"32\"/><circle cx=\"48\" cy=\"50\" r=\"32\"/><circle cx=\"52\" cy=\"50\" r=\"32\"/><circle cx=\"56\" cy=\"50\" r=\"32\"/></svg><span class=\"ds-book-title\">The Architecture<br>of Thought</span></span><span class=\"ds-book-caption\">The Architecture of Thought</span><span class=\"ds-book-meta\">2 pages · 50%</span></button>",
+      "description": "Static illustrative material study, not a native screenshot or a substitute for native rigid projection, connected page mesh, title/art regions, font-atlas transform or spring validation.",
+      "kind": "custom",
+      "name": "Physical book material",
+      "refersTo": "cover-slate",
+      "css": ".ds-book { display:flex; flex-direction:column; gap:10px; width:228px; padding:10px; border:0; background:transparent; color:#EFEDE8; text-align:left; cursor:pointer; font:15px \"Segoe UI Variable\", \"Segoe UI\", sans-serif; } .ds-book-jacket { display:flex; flex-direction:column; justify-content:space-around; padding:22px; height:250px; background:linear-gradient(120deg,#425165,#2B3D51 55%,#21303F); color:#E6DECF; border-left:9px solid #203047; border-right:3px solid #C6BFAF; box-shadow:6px 10px 22px rgba(0,0,0,.4314),2px 4px 6px rgba(0,0,0,.3137); } .ds-book-art { width:100%; height:120px; fill:none; stroke:#C9A875; stroke-width:.85; } .ds-book-title { font:700 21px \"Segoe UI\",sans-serif; } .ds-book-meta { font-size:12px; color:#A7A8B0; } .ds-book:hover .ds-book-jacket { border-right-color:#D9D3C3; } .ds-book:focus-visible { outline:2px solid #BDA3F5; outline-offset:0; border-radius:6px; } .ds-book:active .ds-book-jacket { outline:1.5px solid #BDA3F5; }"
+    }
+  ],
+  "narrative": {
+    "rules": [
+      {
+        "section": "colors",
+        "name": "Functional Violet",
+        "body": "Use the accent for primary actions, selection and focus; preserve neutral surfaces around the collection."
+      },
+      {
+        "section": "typography",
+        "name": "Two Voices",
+        "body": "Segoe carries the interface; editorial type identifies documents. Keep catalogue labels independent of the projected jacket lettering."
+      },
+      {
+        "section": "layout",
+        "name": "Stable Collection",
+        "body": "Inspection opens below the library; preserve gallery width rather than shifting its columns sideways."
+      },
+      {
+        "section": "elevation",
+        "name": "One Rigid Book",
+        "body": "Cover artwork, jacket lettering, spine and page edges belong to one connected volume; pointer motion never tilts the catalogue labels or surrounding UI."
+      },
+      {
+        "section": "components",
+        "name": "Independent States",
+        "body": "Selection, keyboard focus and hover motion are separate signals. Reduced motion retains the static volume and both state treatments."
+      }
+    ],
+    "overview": "A personal collection supplies the identity. Matte book volumes, visible paper edges and family-specific jacket lettering make books recognizable, while graphite surfaces, ivory text and functional violet keep the interface calm and precise. Light mode changes the room to warm paper without changing the collection's authored colors.\n\nBeauty comes from physical coherence and clear hierarchy: connected book geometry, lettering attached to the cover plane, stable catalogue titles, and restrained native controls. Segoe UI Variable is the explicitly required Windows interface face. Locally bundled Source Serif 4 Display accompanies document titles and three jacket families. The exact existing Yamantaka logo remains the brand asset.",
+    "keyCharacteristics": [
+      "Physical cover volumes with independent, readable catalogue labels.",
+      "Neutral graphite or warm paper; violet for action, selection and focus.",
+      "Local Segoe interface type paired with editorial document lettering.",
+      "Drawn vector controls with separate focus, pressed and selected states.",
+      "Cover-only pointer motion with an equivalent static reduced-motion state."
+    ],
+    "northStar": "Gallery study room",
+    "dos": [
+      "Do use the paired native palette for the active theme.",
+      "Do keep jacket lettering, artwork and edges attached to the same cover geometry.",
+      "Do preserve readable catalogue titles and semantic labels for vector actions.",
+      "Do distinguish selection, keyboard focus and pointer motion.",
+      "Do preserve the existing logo geometry and the local font fallback order.",
+      "Do adapt to logical width after text zoom, keeping constrained layouts scrollable.",
+      "Do record executed evidence and acceptance scope before claiming a section complete."
+    ],
+    "donts": [
+      "Don't add a permanent library sidebar.",
+      "Don't make essential actions depend on pointer hover.",
+      "Don't turn violet into a large decorative surface.",
+      "Don't replace the physical books with generic flat cards.",
+      "Don't treat panel HTML/CSS examples or settings diagrams as native screenshots.",
+      "Don't claim whole-rewrite, Narrator, physical-DPI or full QUALITY BAR approval from these captures."
+    ]
+  }
+}
