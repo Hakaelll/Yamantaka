@@ -1,6 +1,7 @@
 mod bookmarks;
 mod compact;
 mod details;
+mod find;
 mod list;
 mod navigation;
 mod open_intent;
@@ -104,6 +105,9 @@ pub struct YamantakaApp {
     reader_scale: f32,
     panel: bool,
     reader_panel_tab: outline::ReaderPanelTab,
+    find: find::FindState,
+    find_preview_step: Option<bool>,
+    pub find_preview_closed: bool,
     outline: outline::OutlineState,
     thumbnails: thumbnails::ThumbnailState,
     thumbnail_preview_page: Option<u32>,
@@ -252,6 +256,9 @@ impl YamantakaApp {
             reader_scale: 1.0,
             panel: false,
             reader_panel_tab: outline::ReaderPanelTab::Bookmarks,
+            find: Default::default(),
+            find_preview_step: None,
+            find_preview_closed: false,
             outline: Default::default(),
             thumbnails: Default::default(),
             thumbnail_preview_page: None,
@@ -419,6 +426,7 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        self.find.stop();
         self.thumbnails.clear();
         self.open_intent.leave_destination();
         self.password = None;
@@ -426,6 +434,9 @@ impl YamantakaApp {
     }
     fn open(&mut self, document: Document) {
         self.thumbnails.clear();
+        let preview = self.find.take_preview();
+        self.find = Default::default();
+        self.find.restore_preview(preview);
         self.outline_destination = None;
         self.outline = Default::default();
         self.password = None;
@@ -1344,7 +1355,7 @@ impl YamantakaApp {
                             )
                             .clicked()
                             {
-                                self.panel = !self.panel;
+                                self.toggle_reader_panel();
                             }
                             let response = theme::icon_button(
                                 ui,
@@ -1467,10 +1478,13 @@ impl App for YamantakaApp {
                     }
                     self.loading = false;
                 }
-                Update::PageMatches(..)
-                | Update::PageFindFailed(..)
-                | Update::DocumentMatches(..)
-                | Update::DocumentFindFailed(..) => {}
+                Update::DocumentMatches(id, batch, cancel) => {
+                    self.accept_find(&id, &cancel, Ok(batch))
+                }
+                Update::DocumentFindFailed(id, error, cancel) => {
+                    self.accept_find(&id, &cancel, Err(error.to_string()))
+                }
+                Update::PageMatches(..) | Update::PageFindFailed(..) => {}
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::Text(id, page, text, cancel) => {
                     if !cancel.is_cancelled()
@@ -1664,6 +1678,17 @@ impl App for YamantakaApp {
         }) {
             self.show_search();
         }
+        if matches!(self.surface, Surface::Reader) && self.password.is_none() {
+            if ctx.input_mut(|input| input.consume_key(egui::Modifiers::CTRL, egui::Key::F)) {
+                self.show_find();
+            }
+            if ctx.input_mut(|input| input.consume_key(egui::Modifiers::SHIFT, egui::Key::F3)) {
+                self.step_find(false);
+            } else if ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::F3))
+            {
+                self.step_find(true);
+            }
+        }
         if ctx.input(|i| i.key_pressed(egui::Key::F11)) {
             let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
             ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
@@ -1767,11 +1792,12 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = !self.documents.is_empty()
-                    && (!self.panel
+                    && ((!self.panel && self.reader_panel_tab != outline::ReaderPanelTab::Find)
                         || match self.reader_panel_tab {
                             outline::ReaderPanelTab::Bookmarks => self.bookmarks.ready(),
                             outline::ReaderPanelTab::Outline => self.outline.ready(),
                             outline::ReaderPanelTab::Thumbnails => self.thumbnails.ready(),
+                            outline::ReaderPanelTab::Find => self.find.ready(),
                             outline::ReaderPanelTab::Text => true,
                         })
                     && self.outline_destination.is_none()
@@ -1844,6 +1870,7 @@ impl App for YamantakaApp {
                     let record=serde_json::json!({"synthetic":self.demo,"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),
+                        "documentFind":self.find.capture_summary(),
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
                     let bytes=serde_json::to_vec_pretty(&record).map_err(|error|image::ImageError::IoError(std::io::Error::other(error)))?;
@@ -1861,6 +1888,7 @@ impl App for YamantakaApp {
         }
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        self.find = Default::default();
         self.cancel.cancel();
         self.query_cancel.cancel();
         self.reader_preferences_cancel.cancel();

@@ -36,7 +36,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let protected = args.iter().any(|arg| arg == "--protected");
     let reader = protected
         || args.iter().any(|arg| {
-            arg == "--reader" || arg == "--bookmarks" || arg == "--outline" || arg == "--thumbnails"
+            arg == "--reader"
+                || arg == "--bookmarks"
+                || arg == "--outline"
+                || arg == "--thumbnails"
+                || arg == "--find"
         });
     let light = args.iter().any(|arg| arg == "--light");
     let tilt = args.iter().any(|arg| arg == "--tilt");
@@ -69,7 +73,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 "../../build/rust-fixtures/5000-pages.pdf"
             } else if args
                 .iter()
-                .any(|arg| arg == "--outline" || arg == "--thumbnails")
+                .any(|arg| arg == "--outline" || arg == "--thumbnails" || arg == "--find")
             {
                 "../../build/rust-fixtures/outline.pdf"
             } else {
@@ -93,7 +97,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let title = if index == 0
                 && args
                     .iter()
-                    .any(|arg| arg == "--outline" || arg == "--thumbnails")
+                    .any(|arg| arg == "--outline" || arg == "--thumbnails" || arg == "--find")
             {
                 "The art of attention"
             } else {
@@ -267,6 +271,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--details"),
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
+                if args.iter().any(|arg| arg == "--find") {
+                    app.find_preview_closed = args.iter().any(|arg| arg == "--find-closed");
+                    app.preview_find(if args.iter().any(|arg| arg == "--find-previous") {
+                        Some(false)
+                    } else if args.iter().any(|arg| arg == "--find-next") {
+                        Some(true)
+                    } else {
+                        None
+                    });
+                }
                 if args.iter().any(|arg| arg == "--bookmarks") {
                     app.preview_bookmarks();
                 }

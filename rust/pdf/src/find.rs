@@ -106,7 +106,19 @@ pub(crate) fn read(
                 rectangles.push(MatchRectangle::new(min, max)?);
             }
             if snippet.is_empty() {
-                snippet = segment.text().chars().take(160).collect();
+                let context = text.inside_rect(PdfRect::new(
+                    PdfPoints::new(bottom as f32 - 2.0),
+                    PdfPoints::new(left as f32 - 180.0),
+                    PdfPoints::new(top as f32 + 2.0),
+                    PdfPoints::new(right as f32 + 240.0),
+                ));
+                snippet = context
+                    .split_whitespace()
+                    .flat_map(|word| word.chars().chain(std::iter::once(' ')))
+                    .take(160)
+                    .collect::<String>()
+                    .trim_end()
+                    .to_owned();
             }
         }
         if snippet.is_empty() {

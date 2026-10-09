@@ -6,6 +6,7 @@ use yamantaka_domain::outline::PdfOutline;
 pub(super) enum ReaderPanelTab {
     Outline,
     Thumbnails,
+    Find,
     Bookmarks,
     Text,
 }

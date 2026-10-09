@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='find-dark'; args=@('--find') },
+    @{ name='find-light-es'; args=@('--find','--light','--es') },
+    @{ name='find-small-200'; args=@('--find','--size=640x480','--text-scale=2') },
+    @{ name='find-closed-wrap'; args=@('--find','--find-previous','--find-closed') },
+    @{ name='find-next'; args=@('--find','--find-next') },
+    @{ name='find-previous-wrap'; args=@('--find','--find-previous') },
+    @{ name='find-rotated'; args=@('--find','--rotation=90') },
     @{ name='thumbnails-dark'; args=@('--thumbnails') },
     @{ name='thumbnails-jump'; args=@('--thumbnails','--thumbnail-page=1') },
     @{ name='thumbnails-rotated'; args=@('--thumbnails','--rotation=90') },

@@ -534,3 +534,185 @@ fn document_scan_uses_real_pdfium_for_study_matches_and_five_thousand_pages() {
         assert_eq!(std::fs::read(&path).unwrap(), original);
     }
 }
+
+#[test]
+fn previous_document_batches_keep_only_last_eighty_and_stop_at_exclusive_cursor() {
+    use yamantaka_application::document_find::{FindCursor, FindRequest};
+    for boundary in [
+        None,
+        Some(FindCursor {
+            page: 1,
+            ordinal: 90,
+        }),
+        Some(FindCursor {
+            page: 1,
+            ordinal: 80,
+        }),
+        Some(FindCursor {
+            page: 0,
+            ordinal: 20,
+        }),
+    ] {
+        let governor = MemoryGovernor::default();
+        let (entered, wait) = bounded(1);
+        let reply = Arc::new(Mutex::new(None));
+        let runtime = Runtime::start(
+            Database::in_memory_at(11).unwrap(),
+            HeldFind {
+                entered,
+                reply: reply.clone(),
+            },
+            || {},
+        )
+        .unwrap();
+        let cancel = Cancellation::default();
+        runtime
+            .submit(Action::FindDocument(
+                FindRequest::previous(
+                    "reader".into(),
+                    PdfFindQuery::new("match", false, false).unwrap(),
+                    3,
+                    boundary,
+                    cancel.clone(),
+                )
+                .unwrap(),
+            ))
+            .unwrap();
+        for (page, offset, count, next) in [
+            (0, 0, 60, None),
+            (1, 0, 80, Some(80)),
+            (1, 80, 20, None),
+            (2, 0, 5, None),
+        ] {
+            let (_, requested, _, ordinal, token) =
+                wait.recv_timeout(Duration::from_secs(2)).unwrap();
+            assert_eq!((requested, ordinal), (page, offset));
+            assert!(token.same_request(&cancel));
+            reply
+                .lock()
+                .unwrap()
+                .take()
+                .unwrap()
+                .send(Ok(page_result(&governor, page, offset, count, next)))
+                .unwrap();
+            if boundary.is_some_and(|end| page == end.page && offset + count >= end.ordinal) {
+                break;
+            }
+        }
+        let batch = match runtime
+            .updates
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap()
+        {
+            Update::DocumentMatches(_, batch, _) => batch,
+            _ => panic!("expected previous batch"),
+        };
+        let mut expected: Vec<_> = (0..60)
+            .map(|n| (0, n))
+            .chain((0..100).map(|n| (1, n)))
+            .chain((0..5).map(|n| (2, n)))
+            .filter(|(p, n)| boundary.is_none_or(|end| (*p, *n) < (end.page, end.ordinal)))
+            .collect();
+        if expected.len() > 80 {
+            expected.drain(..expected.len() - 80);
+        }
+        assert_eq!(
+            batch
+                .matches()
+                .map(|(p, m)| (p, m.ordinal))
+                .collect::<Vec<_>>(),
+            expected
+        );
+        assert_eq!(
+            batch.start,
+            expected.first().map(|(page, ordinal)| FindCursor {
+                page: *page,
+                ordinal: *ordinal
+            })
+        );
+        assert_eq!(batch.next, boundary);
+        assert_eq!(batch.scanned_pages, boundary.map_or(3, |end| end.page));
+        drop(batch);
+        assert_eq!(governor.usage().text, 0);
+        assert!(wait.try_recv().is_err());
+    }
+}
+
+#[test]
+fn previous_native_search_wraps_to_last_study_match_and_excludes_current_one() {
+    use yamantaka_application::document_find::{FindCursor, FindRequest};
+    use yamantaka_pdf::{MemoryLimits, PdfWorker};
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let governor = MemoryGovernor::default();
+    let engine = PdfWorker::start_with_governor(
+        &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
+        MemoryLimits::default(),
+        governor.clone(),
+    )
+    .unwrap();
+    let info = engine
+        .open(
+            "study".into(),
+            root.join("build/rust-fixtures/outline.pdf"),
+            None,
+            Cancellation::default(),
+        )
+        .unwrap();
+    let runtime =
+        Runtime::start(Database::in_memory_at(11).unwrap(), engine.clone(), || {}).unwrap();
+    let query = PdfFindQuery::new("reading", false, false).unwrap();
+    runtime
+        .submit(Action::FindDocument(
+            FindRequest::previous(
+                "study".into(),
+                query.clone(),
+                info.pages.len() as u32,
+                None,
+                Cancellation::default(),
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+    let batch = match runtime
+        .updates
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap()
+    {
+        Update::DocumentMatches(_, batch, _) => batch,
+        _ => panic!("expected wrapped native batch"),
+    };
+    let expected: Vec<_> = batch.matches().map(|(p, m)| (p, m.ordinal)).collect();
+    assert_eq!(expected.last().unwrap().0, 2);
+    let (page, ordinal) = *expected.last().unwrap();
+    drop(batch);
+    runtime
+        .submit(Action::FindDocument(
+            FindRequest::previous(
+                "study".into(),
+                query,
+                info.pages.len() as u32,
+                Some(FindCursor { page, ordinal }),
+                Cancellation::default(),
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+    match runtime
+        .updates
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap()
+    {
+        Update::DocumentMatches(_, batch, _) => {
+            assert_eq!(
+                batch
+                    .matches()
+                    .map(|(p, m)| (p, m.ordinal))
+                    .collect::<Vec<_>>(),
+                expected[..expected.len() - 1]
+            );
+        }
+        _ => panic!("expected preceding native matches"),
+    }
+    engine.close("study".into()).unwrap();
+    assert_eq!(governor.usage().text, 0);
+}

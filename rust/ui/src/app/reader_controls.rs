@@ -87,7 +87,7 @@ impl YamantakaApp {
                     )
                     .clicked()
                     {
-                        self.panel = !self.panel;
+                        self.toggle_reader_panel();
                     }
                 });
             });

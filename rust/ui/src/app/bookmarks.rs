@@ -158,6 +158,7 @@ impl YamantakaApp {
     }
 
     fn reader_panel_content(&mut self, ui: &mut egui::Ui, info: &PdfInfo, p: Palette) {
+        let previous_tab = self.reader_panel_tab;
         let compact = ui.ctx().content_rect().width() < 620.0;
         let tabs = [
             (outline::ReaderPanelTab::Outline, "Índice", "Contents"),
@@ -167,6 +168,7 @@ impl YamantakaApp {
                 "Marcadores",
                 "Bookmarks",
             ),
+            (outline::ReaderPanelTab::Find, "Buscar", "Find"),
             (outline::ReaderPanelTab::Text, "Texto", "Text"),
         ];
         if compact {
@@ -201,10 +203,18 @@ impl YamantakaApp {
                 .clicked()
                 {
                     self.panel = false;
+                    self.find.stop();
                 }
             });
         }
+        if previous_tab != self.reader_panel_tab {
+            self.find.stop();
+        }
         ui.add_space(if compact { 8.0 } else { 18.0 });
+        if self.reader_panel_tab == outline::ReaderPanelTab::Find {
+            self.find_panel_content(ui, info, p);
+            return;
+        }
         if self.reader_panel_tab == outline::ReaderPanelTab::Text {
             ui.heading(self.tr("Texto de la página", "Page text"));
             if theme::navigation(ui, self.tr("Copiar texto", "Copy text"), false, p).clicked() {
