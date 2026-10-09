@@ -43,6 +43,13 @@ pub enum Action {
     Navigate(String, u32),
     Text(String, u32, Cancellation),
     Outline(String, Cancellation),
+    FindPage(
+        String,
+        u32,
+        yamantaka_domain::pdf_find::PdfFindQuery,
+        u32,
+        Cancellation,
+    ),
     Close(String),
     Shutdown,
 }
@@ -78,6 +85,12 @@ pub enum Update {
         Cancellation,
     ),
     OutlineFailed(String, Failure, Cancellation),
+    PageMatches(
+        String,
+        Arc<yamantaka_domain::pdf_find::PdfPageMatches>,
+        Cancellation,
+    ),
+    PageFindFailed(String, Failure, Cancellation),
     Imported(usize, Cancellation),
     ReaderPreferences(String, Option<ReaderPreferences>, Cancellation),
     Committed(String, WriteKind),
@@ -137,6 +150,11 @@ enum Pending {
         PdfTicket<Arc<yamantaka_domain::outline::PdfOutline>>,
         Permit,
     ),
+    FindPage(
+        String,
+        PdfTicket<Arc<yamantaka_domain::pdf_find::PdfPageMatches>>,
+        Permit,
+    ),
     Close(String, PdfTicket<()>, Permit),
     ImportOpen(PathBuf, String, PdfTicket<PdfInfo>, ImportState),
     ImportClose(PathBuf, PdfInfo, PdfTicket<()>, ImportState),
@@ -156,6 +174,9 @@ impl Pending {
             Self::Outline(_, ticket, _) => {
                 select.recv(ticket.readiness());
             }
+            Self::FindPage(_, ticket, _) => {
+                select.recv(ticket.readiness());
+            }
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
@@ -167,6 +188,7 @@ impl Pending {
             Self::Render(ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
             Self::Outline(_, ticket, _) => ticket.is_ready(),
+            Self::FindPage(_, ticket, _) => ticket.is_ready(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => ticket.is_ready(),
         }
     }
@@ -178,6 +200,7 @@ impl Pending {
             Self::Render(ticket, _) => ticket.cancellation.cancel(),
             Self::Text(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::Outline(_, ticket, _) => ticket.cancellation.cancel(),
+            Self::FindPage(_, ticket, _) => ticket.cancellation.cancel(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
@@ -568,6 +591,12 @@ impl Runtime {
                                         }
                                     }
                                 }
+                                Action::FindPage(id, page, query, offset, cancel) => {
+                                    match engine.try_find_page(id.clone(), page, query, offset, cancel.clone()) {
+                                        Ok(ticket) => pending.push(Pending::FindPage(id, ticket, permit)),
+                                        Err(error) => emit(&events, &notify, Update::PageFindFailed(id, error, cancel), permit),
+                                    }
+                                }
                                 Action::Text(id, page, cancel) => {
                                     match engine.try_text(id.clone(), page, cancel.clone()) {
                                         Ok(ticket) => {
@@ -673,6 +702,13 @@ impl Runtime {
                                 match ticket.wait().and_then(|outline| { cancel.check()?; Ok(outline) }) {
                                     Ok(outline) => emit(&events, &notify, Update::Outline(id, outline, cancel), permit),
                                     Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
+                                }
+                            }
+                            Pending::FindPage(id, ticket, permit) => {
+                                let cancel = ticket.cancellation.clone();
+                                match ticket.wait().and_then(|matches| { cancel.check()?; Ok(matches) }) {
+                                    Ok(matches) => emit(&events, &notify, Update::PageMatches(id, matches, cancel), permit),
+                                    Err(error) => emit(&events, &notify, Update::PageFindFailed(id, error, cancel), permit),
                                 }
                             }
                             Pending::Close(id, ticket, permit) => match ticket.wait() {

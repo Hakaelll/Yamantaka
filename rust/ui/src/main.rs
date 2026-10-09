@@ -58,6 +58,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         // or interfere with a demonstration window the user is reviewing.
         if capture.is_some() {
             store = store.join("captures").join(std::process::id().to_string());
+        } else if args.iter().any(|arg| arg == "--demo-window") {
+            store = store.join("previews").join(std::process::id().to_string());
         }
         let mut db = Database::in_memory_at(11)?;
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

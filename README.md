@@ -85,7 +85,10 @@ python ./tool/create_rust_pdf_fixtures.py
 ./target/debug/yamantaka-rust.exe --demo
 ./target/debug/yamantaka-rust.exe --demo --light
 ./target/debug/yamantaka-rust.exe --demo --reader
+./target/debug/yamantaka-rust.exe --demo --demo-window
 ```
+
+`--demo-window` opens an independent synthetic preview while an existing demo remains open.
 
 The demo uses an in-memory database and synthetic documents. It does not open the personal library. It currently depends on the repository's generated fixtures and is a development tool.
 
@@ -143,6 +146,7 @@ Current evidence is documented separately so dates and scopes remain explicit:
 - [Bookmark persistence validation](docs/validation/rust-bookmark-repository-2026-10-09.md): legacy identity, transactional edits, pagination and responsive actor commands. The [connected bookmark panel validation](docs/validation/rust-bookmark-ui-2026-10-09.md) covers reader integration and current limits.
 - [Bookmark search validation](docs/validation/rust-bookmark-search-2026-10-09.md): atomic updates, consent, exclusion and search results during native work.
 - [Canonical reader anchor validation](docs/validation/rust-reader-anchors-2026-10-09.md): horizontal pan, rotation, history and A/B marks share a two-dimensional position. Interactive acceptance and persisted scroll contexts remain pending.
+- [Native PDF page-search foundation](docs/validation/rust-pdf-find-runtime-2026-10-09.md): bounded Unicode matches, normalized geometry, cancellation and actor responsiveness. The reader search interface and document-wide coordination remain pending.
 - [Reader thumbnail validation](docs/validation/rust-thumbnails-2026-10-09.md): prioritized previews, independent cancellation, native presentation and navigation to page 5,000.
 - [Native contents-panel validation](docs/validation/rust-outline-ui-2026-10-09.md): chapter hierarchy, bounded presentation, destination jumps and PDFium binding reuse.
 - [Shared page geometry validation](docs/validation/rust-page-geometry-2026-10-09.md): crop and rotation coordinates travel with each page size, with shared memory ownership and viewport-to-PDF conversion.
