@@ -4390,6 +4390,7 @@ dependencies = [
  "image",
  "pollster 0.4.0",
  "serde_json",
+ "unicode-segmentation",
  "yamantaka-application",
  "yamantaka-domain",
  "yamantaka-pdf",

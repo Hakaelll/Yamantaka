@@ -1,4 +1,5 @@
 use super::*;
+mod keyboard;
 use std::collections::BTreeMap;
 use yamantaka_domain::{
     Failure, Result,
@@ -130,9 +131,10 @@ impl SelectionState {
 }
 
 impl YamantakaApp {
-    pub fn preview_selection(&mut self) {
+    pub fn preview_selection(&mut self, keyboard: bool) {
         if self.demo && self.capture.is_some() {
             self.selection_preview = SelectionPreview::Waiting;
+            self.selection_keyboard_preview = keyboard;
         }
     }
     pub(super) fn toggle_text_selection(&mut self) {
@@ -210,23 +212,7 @@ impl YamantakaApp {
             }
         });
         let modal = self.password.is_some() || self.links.confirmation_open();
-        if !modal && !ui.ctx().egui_wants_keyboard_input() {
-            copy |= ui.input_mut(|input| {
-                let copied = input
-                    .events
-                    .iter()
-                    .any(|event| matches!(event, egui::Event::Copy));
-                if copied {
-                    input
-                        .events
-                        .retain(|event| !matches!(event, egui::Event::Copy));
-                }
-                copied
-            });
-            if ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
-                self.selection.gesture = SelectionGesture::default();
-            }
-        }
+        copy |= self.selection.edit_commands(ui.ctx(), modal);
         if copy {
             match self.selection.copy(&self.governor) {
                 Ok(text) => ui.ctx().copy_text(text.text().into()),
@@ -317,9 +303,18 @@ impl YamantakaApp {
             paper,
             rotation,
             egui::Id::new(("select-pdf-text", document, page)),
-            self.tr("Seleccionar texto del PDF", "Select PDF text"),
+            self.tr("Seleccionar texto del PDF. Mayús+flechas amplía la selección; Ctrl+A selecciona la página; Ctrl+C copia el pasaje.", "Select PDF text. Shift+arrows extends the selection; Ctrl+A selects the page; Ctrl+C copies the passage."),
             &mut self.selection.gesture,
         );
+        if ui.memory(|memory| memory.has_focus(egui::Id::new(("select-pdf-text", document, page))))
+        {
+            ui.painter().rect_stroke(
+                paper,
+                0,
+                egui::Stroke::new(1.0, palette.accent),
+                egui::StrokeKind::Inside,
+            );
+        }
         if let Some(range) = self.selection.range()
             && let Ok(Some(selected)) = range.page(payload)
         {
@@ -343,10 +338,19 @@ pub(super) enum SelectionPreview {
     Press(egui::Pos2, egui::Pos2),
     Drag(egui::Pos2),
     Release(egui::Pos2),
+    KeyboardHome,
+    KeyboardExtend,
     Complete,
 }
 impl SelectionPreview {
-    pub(super) fn input(&mut self, input: &mut egui::RawInput) {
+    pub(super) fn input(&mut self, input: &mut egui::RawInput, keyboard: bool) {
+        let key = |key, modifiers| egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        };
         let button = |pos, pressed| egui::Event::PointerButton {
             pos,
             button: egui::PointerButton::Primary,
@@ -368,6 +372,22 @@ impl SelectionPreview {
             }
             Self::Release(end) => {
                 input.events.push(button(end, false));
+                if keyboard {
+                    Self::KeyboardHome
+                } else {
+                    Self::Complete
+                }
+            }
+            Self::KeyboardHome => {
+                input
+                    .events
+                    .push(key(egui::Key::Home, egui::Modifiers::CTRL));
+                Self::KeyboardExtend
+            }
+            Self::KeyboardExtend => {
+                input
+                    .events
+                    .push(key(egui::Key::ArrowRight, egui::Modifiers::SHIFT));
                 Self::Complete
             }
             other => other,
@@ -405,6 +425,16 @@ fn selection_input(
     let response = ui.interact(paper, id, egui::Sense::click_and_drag());
     response
         .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Image, ui.is_enabled(), label));
+    if response.clicked() || response.drag_started() {
+        response.request_focus();
+    }
+    if response.clicked()
+        && let Some(point) = response.interact_pointer_pos()
+        && let Some(index) = caret_at(payload, paper, rotation, point)
+        && let Ok(position) = SelectionPosition::new(payload.page(), index)
+    {
+        *gesture = SelectionGesture::Selected(position, position);
+    }
     let down = ui.input(|input| input.pointer.primary_down());
     if !down && let SelectionGesture::Dragging(anchor, extent) = *gesture {
         *gesture = SelectionGesture::Selected(anchor, extent);
@@ -425,7 +455,9 @@ fn selection_input(
     {
         *gesture = SelectionGesture::Dragging(anchor, extent);
     }
-    response.on_hover_cursor(egui::CursorIcon::Text);
+    response
+        .on_hover_cursor(egui::CursorIcon::Text)
+        .on_hover_text(label);
 }
 
 fn caret_at(

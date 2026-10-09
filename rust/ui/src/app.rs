@@ -127,6 +127,7 @@ pub struct YamantakaApp {
     text: text::TextState,
     selection: selection::SelectionState,
     selection_preview: selection::SelectionPreview,
+    selection_keyboard_preview: bool,
     reader_pages: HashMap<u32, ReaderPage>,
     reader_layout: Option<Arc<ReaderLayout>>,
     reader_scroll_anchor: bool,
@@ -281,6 +282,7 @@ impl YamantakaApp {
             text: Default::default(),
             selection: Default::default(),
             selection_preview: Default::default(),
+            selection_keyboard_preview: false,
             reader_pages: HashMap::new(),
             reader_layout: None,
             reader_scroll_anchor: true,
@@ -1401,7 +1403,8 @@ impl YamantakaApp {
 impl App for YamantakaApp {
     fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
         if self.demo && self.capture.is_some() {
-            self.selection_preview.input(input);
+            self.selection_preview
+                .input(input, self.selection_keyboard_preview);
         }
         if self.demo
             && self.capture.is_some()
@@ -1732,6 +1735,10 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
+        self.selection.keyboard_input(
+            &ctx,
+            self.password.is_some() || self.links.confirmation_open(),
+        );
         for shortcut in shortcuts::read(
             &ctx,
             self.password.is_some() || self.links.confirmation_open(),

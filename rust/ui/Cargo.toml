@@ -15,6 +15,7 @@ yamantaka-pdf.workspace = true
 yamantaka-windows.workspace = true
 eframe.workspace = true
 serde_json.workspace = true
+unicode-segmentation.workspace = true
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
 [dev-dependencies]
 pollster = "=0.4.0"
