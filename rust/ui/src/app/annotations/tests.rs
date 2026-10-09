@@ -61,21 +61,30 @@ fn execute(db: &mut Database, request: AnnotationRequest) -> AnnotationReply {
             document_id,
             mutation,
         } => {
-            let AnnotationMutation::CreateBatch {
-                batch,
-                confirm_page_note,
-                tags,
-            } = mutation
-            else {
-                panic!("create fixture")
+            let change = match &mutation {
+                AnnotationMutation::Create {
+                    draft,
+                    confirm_page_note,
+                    tags,
+                } => AnnotationChange::Create {
+                    draft,
+                    confirm_page_note: *confirm_page_note,
+                    tags,
+                },
+                AnnotationMutation::CreateBatch {
+                    batch,
+                    confirm_page_note,
+                    tags,
+                } => AnnotationChange::CreateBatch {
+                    batch,
+                    confirm_page_note: *confirm_page_note,
+                    tags,
+                },
+                _ => panic!("create fixture"),
             };
             db.change_annotation(
                 &document_id,
-                AnnotationChange::CreateBatch {
-                    batch: &batch,
-                    confirm_page_note,
-                    tags: &tags,
-                },
+                change,
                 &request.query,
                 yamantaka_domain::search::IndexAccess::Disabled,
                 &request.governor,
@@ -274,6 +283,46 @@ fn editor_saves_a_frozen_multi_page_passage_with_per_page_fallback() {
         AnnotationKind::PageComment
     );
     assert!(page.entries()[1].data().values.rects.is_empty());
+    drop(state);
+    assert_eq!(governor.usage().text, 0);
+}
+
+#[test]
+fn page_note_editor_saves_without_a_text_snapshot_and_rejects_blank_notes() {
+    let governor = MemoryGovernor::default();
+    let mut db = database();
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    state.editor = Some(AnnotationEditor {
+        source: EditorSource::PageNote {
+            page: 0,
+            fingerprint: "fa".into(),
+            rotation: PageRotation::Deg270,
+        },
+        kind: AnnotationKind::PageComment,
+        color: AnnotationColor::Blue,
+        note: "  ".into(),
+        review: AnnotationReviewState::Pending,
+        confirmed: false,
+    });
+    assert!(!state.fallback());
+    assert_eq!(state.editor.as_ref().unwrap().passage(), "");
+    assert!(state.mutation(&governor).is_err());
+    state.editor.as_mut().unwrap().note = "  Étude de cette page  ".into();
+    let change = state.mutation(&governor).unwrap();
+    let request = state.request(&governor, Some(change), 0).unwrap();
+    state.accept(execute(&mut db, request));
+    assert!(state.saved && state.editor.is_none());
+    let values = &state.page.as_ref().unwrap().entries()[0].data().values;
+    assert_eq!(values.kind, AnnotationKind::PageComment);
+    assert_eq!(values.page_rotation, 270);
+    assert_eq!(values.note.as_deref(), Some("Étude de cette page"));
+    assert!(
+        values.selected_text.is_none()
+            && values.context_before.is_none()
+            && values.context_after.is_none()
+            && values.rects.is_empty()
+    );
     drop(state);
     assert_eq!(governor.usage().text, 0);
 }

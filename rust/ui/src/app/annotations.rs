@@ -13,6 +13,11 @@ mod panel;
 mod tests;
 
 pub(super) enum EditorSource {
+    PageNote {
+        page: u32,
+        fingerprint: String,
+        rotation: PageRotation,
+    },
     Selection {
         snapshot: TextSelectionSnapshot,
         fingerprint: String,
@@ -48,6 +53,7 @@ impl AnnotationEditor {
                 .as_deref()
                 .unwrap_or(""),
             EditorSource::Selection { snapshot, .. } => snapshot.text(),
+            EditorSource::PageNote { .. } => "",
         }
     }
 }
@@ -167,6 +173,36 @@ impl AnnotationState {
                 review: editor.review,
             });
         }
+        if let EditorSource::PageNote {
+            page,
+            fingerprint,
+            rotation,
+        } = &editor.source
+        {
+            let document = self
+                .document
+                .as_deref()
+                .ok_or_else(|| Failure::Invalid("Annotation document is unavailable".into()))?;
+            if editor.note.trim().is_empty() {
+                return Err(Failure::Invalid("Write a note before saving".into()));
+            }
+            let draft = AnnotationDraft::page_note(
+                AnnotationSource {
+                    document_id: document,
+                    fingerprint,
+                    rotation: *rotation,
+                },
+                *page,
+                editor.color,
+                Some(&editor.note),
+                governor,
+            )?;
+            return Ok(AnnotationMutation::Create {
+                draft: Arc::new(draft),
+                confirm_page_note: false,
+                tags: Vec::new(),
+            });
+        }
         let EditorSource::Selection {
             snapshot,
             fingerprint,
@@ -240,6 +276,39 @@ impl Drop for AnnotationState {
     }
 }
 impl YamantakaApp {
+    pub(super) fn begin_page_note(&mut self) {
+        let Some((document, info)) = &self.active else {
+            return;
+        };
+        if self.page as usize >= info.pages.len() {
+            return;
+        }
+        self.annotations.bind(&document.id);
+        self.annotations.editor = Some(AnnotationEditor {
+            source: EditorSource::PageNote {
+                page: self.page,
+                fingerprint: document.fingerprint.clone(),
+                rotation: self
+                    .reader_preferences
+                    .as_ref()
+                    .map_or(PageRotation::Deg0, |prefs| prefs.page_rotation),
+            },
+            kind: AnnotationKind::PageComment,
+            color: AnnotationColor::Violet,
+            note: String::new(),
+            review: AnnotationReviewState::Pending,
+            confirmed: false,
+        });
+        self.annotations.error = None;
+        self.panel = true;
+        self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+    }
+    pub fn preview_page_note(&mut self, save: bool) {
+        if self.demo && self.capture.is_some() {
+            self.annotation_preview = if save { 5 } else { 4 };
+        }
+    }
+
     pub fn preview_annotations(&mut self, save: bool, multi: bool) {
         if self.demo && self.capture.is_some() {
             self.preview_selection(false);
@@ -253,6 +322,12 @@ impl YamantakaApp {
     pub(super) fn apply_annotation_preview(&mut self) {
         if self.annotation_preview == 0 {
             return;
+        }
+        if matches!(self.annotation_preview, 4 | 5) && self.annotations.editor.is_none() {
+            self.begin_page_note();
+            if let Some(editor) = &mut self.annotations.editor {
+                editor.note = "An observation from this scanned page.".into();
+            }
         }
         if matches!(self.annotation_preview, 1 | 2)
             && self.annotations.editor.is_none()
@@ -268,9 +343,9 @@ impl YamantakaApp {
             }
         }
         if self.annotations.editor.is_some() && self.annotations.pending.is_none() {
-            if self.annotation_preview == 1 {
+            if matches!(self.annotation_preview, 1 | 4) {
                 self.annotation_preview = 0;
-            } else if self.annotation_preview == 2 {
+            } else if matches!(self.annotation_preview, 2 | 5) {
                 match self.annotations.mutation(&self.governor) {
                     Ok(change) => {
                         self.annotation_command(Some(change), 0);

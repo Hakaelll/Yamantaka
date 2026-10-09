@@ -283,6 +283,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--details"),
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
+                if args.iter().any(|arg| arg == "--page-note") {
+                    app.preview_page_note(args.iter().any(|arg| arg == "--annotation-save"));
+                }
                 if args.iter().any(|arg| arg == "--annotations") {
                     app.preview_annotations(
                         args.iter().any(|arg| arg == "--annotation-save"),

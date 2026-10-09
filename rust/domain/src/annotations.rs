@@ -137,6 +137,46 @@ impl AnnotationDraft {
     pub fn placement(&self) -> AnnotationPlacement {
         self.placement
     }
+    pub fn page_note(
+        source: AnnotationSource<'_>,
+        page: u32,
+        color: AnnotationColor,
+        note: Option<&str>,
+        governor: &MemoryGovernor,
+    ) -> Result<Self> {
+        validate_source_note(&source, note)?;
+        let note = note.map(str::trim).filter(|note| !note.is_empty());
+        let bytes = source
+            .document_id
+            .len()
+            .checked_add(source.fingerprint.len())
+            .and_then(|bytes| bytes.checked_add(note.map_or(0, str::len)))
+            .and_then(|bytes| bytes.checked_add(std::mem::size_of::<Self>()))
+            .ok_or(Failure::MemoryBudget)?;
+        let lease = governor
+            .try_reserve_one(Cost::new(
+                MemoryCategory::Text,
+                MemoryRepresentation::Cpu,
+                bytes,
+            ))
+            .map_err(|_| Failure::MemoryBudget)?;
+        let values = AnnotationDraftValues {
+            document_id: copy(source.document_id)?,
+            page_index: page,
+            kind: AnnotationKind::PageComment,
+            color,
+            note: note.map(copy).transpose()?,
+            selected_text: None,
+            context_before: None,
+            context_after: None,
+            rects: Vec::new(),
+            page_rotation: source.rotation.degrees(),
+            document_fingerprint: copy(source.fingerprint)?,
+            status: AttachmentStatus::Attached,
+            review_state: AnnotationReviewState::Pending,
+        };
+        Self::from_reserved(values, AnnotationPlacement::Attached, lease)
+    }
     pub fn from_selection(
         source: AnnotationSource<'_>,
         selected: &SelectedPage<'_>,
@@ -145,20 +185,7 @@ impl AnnotationDraft {
         note: Option<&str>,
         governor: &MemoryGovernor,
     ) -> Result<Self> {
-        if source.document_id.is_empty()
-            || source.fingerprint.is_empty()
-            || source.document_id.len() > 4096
-            || source.fingerprint.len() > 4096
-        {
-            return Err(Failure::Invalid(
-                "Annotation source identity is invalid".into(),
-            ));
-        }
-        if note.is_some_and(|text| text.encode_utf16().count() > MAX_ANNOTATION_NOTE_UTF16) {
-            return Err(Failure::Invalid(
-                "Annotation note exceeds 4000 UTF-16 units".into(),
-            ));
-        }
+        validate_source_note(&source, note)?;
         let coverage = selected.geometry_coverage();
         let meaningful = selected.ink_regions().all(|region| {
             region.max()[0] - region.min()[0] > 0.0001 && region.max()[1] - region.min()[1] > 0.0001
@@ -201,7 +228,7 @@ impl AnnotationDraft {
             .and_then(|value| value.checked_add(source.fingerprint.len()))
             .and_then(|value| value.checked_add(std::mem::size_of::<Self>()))
             .ok_or(Failure::MemoryBudget)?;
-        let mut lease = governor
+        let lease = governor
             .try_reserve_one(Cost::new(
                 MemoryCategory::Text,
                 MemoryRepresentation::Cpu,
@@ -232,6 +259,13 @@ impl AnnotationDraft {
             status: AttachmentStatus::Attached,
             review_state: AnnotationReviewState::Pending,
         };
+        Self::from_reserved(values, placement, lease)
+    }
+    fn from_reserved(
+        values: AnnotationDraftValues,
+        placement: AnnotationPlacement,
+        mut lease: ByteLease,
+    ) -> Result<Self> {
         let actual = values
             .rects
             .capacity()
@@ -259,6 +293,23 @@ impl AnnotationDraft {
             _lease: lease,
         })
     }
+}
+fn validate_source_note(source: &AnnotationSource<'_>, note: Option<&str>) -> Result<()> {
+    if source.document_id.is_empty()
+        || source.fingerprint.is_empty()
+        || source.document_id.len() > 4096
+        || source.fingerprint.len() > 4096
+    {
+        return Err(Failure::Invalid(
+            "Annotation source identity is invalid".into(),
+        ));
+    }
+    if note.is_some_and(|text| text.encode_utf16().count() > MAX_ANNOTATION_NOTE_UTF16) {
+        return Err(Failure::Invalid(
+            "Annotation note exceeds 4000 UTF-16 units".into(),
+        ));
+    }
+    Ok(())
 }
 fn copy(text: &str) -> Result<String> {
     let mut value = String::new();
@@ -419,3 +470,6 @@ mod tests {
         assert_eq!(selected.text(), " é📖 ");
     }
 }
+
+#[cfg(test)]
+mod page_note_tests;

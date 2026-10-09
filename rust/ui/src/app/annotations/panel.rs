@@ -111,6 +111,10 @@ impl YamantakaApp {
                     ui.label(if english {format!("{} pages. Your note applies to each selected passage.",snapshot.pages().len())} else {format!("{} páginas. Tu nota se aplica a cada pasaje seleccionado.",snapshot.pages().len())});
                     ui.add_space(8.0);
                 }
+                if let EditorSource::PageNote {page,..}=&editor.source {
+                    ui.label(if english {format!("Page {}. This note does not require selectable text.",u64::from(*page)+1)} else {format!("Página {}. Esta nota no necesita texto seleccionable.",u64::from(*page)+1)});
+                    ui.add_space(8.0);
+                }
                 let passage=editor.passage();
                 if !passage.is_empty() {
                     egui::Frame::new().fill(p.raised).inner_margin(12).corner_radius(8).show(ui,|ui| {
@@ -119,7 +123,7 @@ impl YamantakaApp {
                     ui.add_space(14.0);
                 }
                 let kinds=[AnnotationKind::Highlight,AnnotationKind::Underline,AnnotationKind::Strikeout,AnnotationKind::TextNote,AnnotationKind::PageMarker,AnnotationKind::PageComment];
-                let geometry=editor.stored().is_none_or(|record|!record.values.rects.is_empty());
+                let geometry=!matches!(&editor.source,EditorSource::PageNote {..}) && editor.stored().is_none_or(|record|!record.values.rects.is_empty());
                 ui.horizontal_wrapped(|ui| {
                     let label=ui.label(if english {"Mark"} else {"Marca"});
                     let response=egui::ComboBox::from_id_salt("annotation-kind").selected_text(kind_label(editor.kind,english)).show_ui(ui,|ui| {
@@ -158,7 +162,10 @@ impl YamantakaApp {
             });
             ui.add_space(12.0);
             let valid = self.annotations.editor.as_ref().is_some_and(|editor| {
-                editor.note.encode_utf16().count() <= 4000 && (!fallback || editor.confirmed)
+                editor.note.encode_utf16().count() <= 4000
+                    && (!fallback || editor.confirmed)
+                    && (!matches!(&editor.source, EditorSource::PageNote { .. })
+                        || !editor.note.trim().is_empty())
             });
             ui.horizontal_wrapped(|ui| {
                 if ui
@@ -186,6 +193,21 @@ impl YamantakaApp {
                 }
             });
         } else {
+            let caption = format!(
+                "{} {}",
+                self.tr("Añadir nota a la página", "Add note to page"),
+                u64::from(self.page) + 1
+            );
+            if ui
+                .add_enabled_ui(!busy, |ui| {
+                    theme::control(ui, &caption, Some(theme::Icon::Add), false, true, p)
+                })
+                .inner
+                .clicked()
+            {
+                self.begin_page_note();
+            }
+            ui.add_space(8.0);
             if ui
                 .add_enabled_ui(!busy, |ui| {
                     theme::navigation(

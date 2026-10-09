@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='page-note-scanned-editor'; args=@('--reader','--page-note','--find-scanned') },
+    @{ name='page-note-scanned-saved-es'; args=@('--reader','--page-note','--find-scanned','--annotation-save','--light','--es') },
     @{ name='annotation-multi-editor'; args=@('--reader','--annotations','--annotation-multi') },
     @{ name='annotation-multi-saved-es'; args=@('--reader','--annotations','--annotation-multi','--annotation-save','--light','--es') },
     @{ name='annotation-editor-dark'; args=@('--reader','--annotations') },

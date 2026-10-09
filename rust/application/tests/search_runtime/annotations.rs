@@ -399,3 +399,59 @@ fn annotation_batch_command_keeps_both_page_records_and_releases_shared_drafts()
     drop(runtime);
     assert_eq!(governor.usage().text, 0);
 }
+
+#[test]
+fn page_note_actor_saves_and_indexes_the_note_without_text_extraction() {
+    let (runtime, native, _) = setup();
+    let governor = MemoryGovernor::default();
+    runtime
+        .submit(Action::Index(IndexCommand::Enable(true)))
+        .unwrap();
+    committed(&runtime, WriteKind::Index);
+    let draft = Arc::new(
+        AnnotationDraft::page_note(
+            AnnotationSource {
+                document_id: "a",
+                fingerprint: "fa",
+                rotation: PageRotation::Deg0,
+            },
+            2,
+            AnnotationColor::Yellow,
+            Some("Scanned study observation"),
+            &governor,
+        )
+        .unwrap(),
+    );
+    let saved = change(
+        &runtime,
+        &governor,
+        AnnotationMutation::Create {
+            draft: draft.clone(),
+            confirm_page_note: false,
+            tags: vec![],
+        },
+    );
+    assert_eq!(saved.total, 1);
+    let values = &saved.entries()[0].data().values;
+    assert_eq!(values.kind, AnnotationKind::PageComment);
+    assert!(values.rects.is_empty() && values.selected_text.is_none());
+    runtime
+        .submit(Action::Search(
+            SearchQuery {
+                text: "observation".into(),
+                kinds: vec![yamantaka_domain::search::SearchKind::Annotation],
+                ..Default::default()
+            },
+            Cancellation::default(),
+        ))
+        .unwrap();
+    assert!(
+        matches!(update(&runtime),Update::Search(results,_) if results.len()==1 && results[0].page==Some(2))
+    );
+    assert!(native.try_recv().is_err());
+    assert_eq!(Arc::strong_count(&draft), 1);
+    drop(saved);
+    drop(draft);
+    drop(runtime);
+    assert_eq!(governor.usage().text, 0);
+}
