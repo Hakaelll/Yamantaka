@@ -2,12 +2,14 @@ mod bookmarks;
 mod compact;
 mod details;
 mod find;
+mod links;
 mod list;
 mod navigation;
 mod open_intent;
 mod outline;
 mod password;
 mod reader_controls;
+mod reader_destination;
 mod reader_options;
 mod reader_viewport;
 mod render_updates;
@@ -106,13 +108,14 @@ pub struct YamantakaApp {
     panel: bool,
     reader_panel_tab: outline::ReaderPanelTab,
     find: find::FindState,
+    links: links::LinkState,
     find_preview_step: Option<bool>,
     pub find_preview_closed: bool,
     outline: outline::OutlineState,
     thumbnails: thumbnails::ThumbnailState,
     thumbnail_preview_page: Option<u32>,
     outline_preview_target: Option<usize>,
-    outline_destination: Option<(
+    reader_destination: Option<(
         String,
         yamantaka_domain::pdf_destination::NavigationDestination,
     )>,
@@ -260,13 +263,14 @@ impl YamantakaApp {
             panel: false,
             reader_panel_tab: outline::ReaderPanelTab::Bookmarks,
             find: Default::default(),
+            links: Default::default(),
             find_preview_step: None,
             find_preview_closed: false,
             outline: Default::default(),
             thumbnails: Default::default(),
             thumbnail_preview_page: None,
             outline_preview_target: None,
-            outline_destination: None,
+            reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
             panel_text: String::new(),
             panel_requested: None,
@@ -429,6 +433,7 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        self.links.clear();
         self.find.stop();
         self.thumbnails.clear();
         self.open_intent.leave_destination();
@@ -436,11 +441,12 @@ impl YamantakaApp {
         self.surface = surface;
     }
     fn open(&mut self, document: Document) {
+        self.links.clear();
         self.thumbnails.clear();
         let preview = self.find.take_preview();
         self.find = Default::default();
         self.find.restore_preview(preview);
-        self.outline_destination = None;
+        self.reader_destination = None;
         self.outline = Default::default();
         self.password = None;
         self.password_attempted = false;
@@ -1487,10 +1493,14 @@ impl App for YamantakaApp {
                 Update::DocumentFindFailed(id, error, cancel) => {
                     self.accept_find(&id, &cancel, Err(error.to_string()))
                 }
-                Update::PageMatches(..)
-                | Update::PageFindFailed(..)
-                | Update::PageLinks(..)
-                | Update::PageLinksFailed(..) => {}
+                Update::PageMatches(..) | Update::PageFindFailed(..) => {}
+                Update::PageLinks(id, payload, cancel) => {
+                    self.links.accept(&id, payload.page(), &cancel, Ok(payload));
+                }
+                Update::PageLinksFailed(id, page, error, cancel) => {
+                    self.links
+                        .accept(&id, page, &cancel, Err(error.to_string()));
+                }
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::Text(id, page, text, cancel) => {
                     if !cancel.is_cancelled()
@@ -1806,7 +1816,7 @@ impl App for YamantakaApp {
                             outline::ReaderPanelTab::Find => self.find.ready(),
                             outline::ReaderPanelTab::Text => true,
                         })
-                    && self.outline_destination.is_none()
+                    && self.reader_destination.is_none()
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
                     && !self.loading
@@ -1894,6 +1904,7 @@ impl App for YamantakaApp {
         }
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        self.links.clear();
         self.find = Default::default();
         self.cancel.cancel();
         self.query_cancel.cancel();

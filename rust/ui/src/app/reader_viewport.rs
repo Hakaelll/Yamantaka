@@ -64,7 +64,7 @@ impl YamantakaApp {
             f64::from(viewport.x.max(1.0)),
             f64::from(viewport.y.max(1.0)),
         ];
-        self.apply_outline_destination(document, info, viewport_size);
+        self.apply_reader_destination(document, info, viewport_size);
         let (Some(layout), Some(preferences), Some(navigation)) = (
             self.reader_layout.clone(),
             self.reader_preferences.clone(),
@@ -129,6 +129,8 @@ impl YamantakaApp {
                 }
                 keep
             });
+            let link_pages: Vec<u32> = frame.pages.iter().map(|visible| visible.page).collect();
+            self.request_visible_links(&document.id, &link_pages);
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
             let preview_budget =
@@ -222,6 +224,14 @@ impl YamantakaApp {
                     );
                 }
                 self.paint_find_matches(ui, visible.page, paper, layout.rotation(), p);
+                self.reader_link_regions(
+                    ui,
+                    &document.id,
+                    visible.page,
+                    paper,
+                    layout.rotation(),
+                    p,
+                );
             }
             self.loading = !self.render_retry
                 && self
@@ -255,4 +265,20 @@ impl YamantakaApp {
             self.panel_requested = None;
         }
     }
+}
+
+pub(super) fn page_region(
+    paper: egui::Rect,
+    rotation: yamantaka_domain::reader_preferences::PageRotation,
+    bounds: yamantaka_domain::pdf_geometry::NormalizedPageRect,
+) -> egui::Rect {
+    let bounds = bounds.rotated(rotation);
+    let position = |point: [f64; 2]| {
+        paper.min
+            + egui::vec2(
+                point[0] as f32 * paper.width(),
+                point[1] as f32 * paper.height(),
+            )
+    };
+    egui::Rect::from_min_max(position(bounds.min()), position(bounds.max()))
 }

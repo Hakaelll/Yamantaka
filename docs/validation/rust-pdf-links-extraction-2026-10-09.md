@@ -26,8 +26,14 @@ PageLinks commands now travel through the existing bounded actor queue and async
 
 Two application tests exercise five completion paths with a deliberately held native ticket: success, late cancellation, wrong-page payload, native error and disconnected response. A real in-memory SQLite library query completes while the native ticket is held. Each completion produces one terminal event and releases payload memory after consumption. A separate shutdown case proves dropping the actor cancels and detaches a held ticket without waiting for its native response.
 
-The UI currently consumes these event variants without activating links. They are ready for the visible-page link controller; this does not constitute clickable-reader acceptance.
+## Visible reader controller
+
+The reader requests links for up to 16 intersecting pages and retains only those pages. Leaving a page, changing the document, leaving the reader or shutting down cancels pending consumers and drops retained payloads. Current document, page and cancellation identity must match before the controller accepts a result. Failures expose an explicit retry control rather than repeatedly submitting work each frame.
+
+Internal regions are interactive native egui links with destination-page labels, pointer feedback, keyboard focus and a focus outline. Separate regions retain their gaps. The existing destination resolver is now a reader module shared by outline selection and link activation. Search highlights and link regions share the same normalized-to-paper transform, including user rotation.
+
+Four UI state tests cover stale/cancelled replies, page removal, payload release, successful and failed completion, document changes, the 16-page limit and cancellation on drop. Existing search rotation tests exercise the shared presentation transform. Native pointer/keyboard captures and full clickable-reader acceptance have not yet been executed for this checkpoint.
 
 ## Remaining acceptance
 
-This checkpoint implements extraction, not clickable reader navigation. Visible-page lifecycle, pointer and keyboard activation, external URI policy and confirmation, navigation history, real interaction captures and broader performance/accessibility acceptance remain pending. No release or full rewrite completion is claimed.
+Internal reader controls are implemented but still require native pointer and keyboard acceptance captures. The 16-page admission cap also needs acceptance with very small continuous zoom; pages beyond that cap do not currently load link controls. External URI policy and confirmation, navigation-history interaction evidence and broader performance/accessibility acceptance remain pending. No release or full rewrite completion is claimed.

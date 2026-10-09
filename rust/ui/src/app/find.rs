@@ -1,6 +1,7 @@
 use super::*;
 use yamantaka_application::document_find::{FindBatch, FindCursor, FindProgress, FindRequest};
 use yamantaka_domain::pdf_find::{DocumentTextPresence, PdfFindQuery};
+#[cfg(test)]
 use yamantaka_domain::pdf_geometry::NormalizedPageRect;
 
 #[derive(Clone, Copy)]
@@ -545,7 +546,7 @@ impl YamantakaApp {
                 continue;
             }
             for bounds in &item.rectangles {
-                let rect = match_rect(paper, rotation, *bounds);
+                let rect = reader_viewport::page_region(paper, rotation, *bounds);
                 let active = *selected == Some(index);
                 ui.painter().rect_filled(
                     rect,
@@ -567,21 +568,6 @@ impl YamantakaApp {
 fn submit_on_enter(ui: &egui::Ui, response: &egui::Response) -> bool {
     (response.has_focus() || response.lost_focus())
         && ui.input(|input| input.key_pressed(egui::Key::Enter))
-}
-fn match_rect(
-    paper: egui::Rect,
-    rotation: yamantaka_domain::reader_preferences::PageRotation,
-    bounds: NormalizedPageRect,
-) -> egui::Rect {
-    let bounds = bounds.rotated(rotation);
-    let position = |point: [f64; 2]| {
-        paper.min
-            + egui::vec2(
-                point[0] as f32 * paper.width(),
-                point[1] as f32 * paper.height(),
-            )
-    };
-    egui::Rect::from_min_max(position(bounds.min()), position(bounds.max()))
 }
 
 #[cfg(test)]
@@ -697,7 +683,7 @@ mod tests {
             (PageRotation::Deg180, [150.0, 260.0, 190.0, 340.0]),
             (PageRotation::Deg270, [50.0, 300.0, 90.0, 380.0]),
         ] {
-            let rect = match_rect(
+            let rect = reader_viewport::page_region(
                 paper,
                 rotation,
                 NormalizedPageRect::new([0.1, 0.2], [0.3, 0.4]).unwrap(),
