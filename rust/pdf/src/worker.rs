@@ -58,7 +58,7 @@ enum Request {
         id: String,
         epoch: u64,
         path: PathBuf,
-        password: Option<String>,
+        password: Option<yamantaka_domain::PdfPassword>,
         cancel: Cancellation,
         reply: Reply<PdfInfo>,
     },
@@ -339,7 +339,7 @@ impl AsyncPdfEngine for PdfWorker {
         &self,
         id: String,
         path: PathBuf,
-        password: Option<String>,
+        password: Option<yamantaka_domain::PdfPassword>,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         let (reply, mut ticket) = self.reply(0, cancel.clone(), false)?;
@@ -396,7 +396,7 @@ impl PdfEngine for PdfWorker {
         &self,
         id: String,
         path: PathBuf,
-        password: Option<String>,
+        password: Option<yamantaka_domain::PdfPassword>,
         cancel: Cancellation,
     ) -> Result<PdfInfo> {
         self.try_open(id, path, password, cancel)?.wait()
@@ -575,9 +575,14 @@ fn run(
                         tiles.retain(|key: &RenderKey| key.document_id != old);
                         text.retain(|key: &(String, u32)| key.0 != old);
                     }
-                    let document = pdfium
-                        .load_pdf_from_file(&path, password.as_deref())
-                        .map_err(pdf_failure)?;
+                    let opened = pdfium.load_pdf_from_file(
+                        &path,
+                        password.as_ref().map(yamantaka_domain::PdfPassword::expose),
+                    );
+                    // Release our credential immediately after the FFI call,
+                    // before metadata inspection or any terminal event.
+                    drop(password);
+                    let document = opened.map_err(pdf_failure)?;
                     let info = PdfInfo {
                         page_sizes: Vec::with_capacity(document.pages().len() as usize),
                         title: document

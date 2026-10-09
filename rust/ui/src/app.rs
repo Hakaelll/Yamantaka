@@ -3,6 +3,7 @@ mod details;
 mod list;
 mod navigation;
 mod open_intent;
+mod password;
 mod reader_controls;
 mod reader_options;
 mod reader_viewport;
@@ -63,6 +64,10 @@ impl PageImage {
 pub struct YamantakaApp {
     search: search::SearchState,
     open_intent: open_intent::OpenIntent,
+    password: Option<password::PasswordChallenge>,
+    password_attempted: bool,
+    preview_password_action: Option<&'static str>,
+    preview_password_target: Option<&'static str>,
     runtime: Runtime,
     preferences: Preferences,
     store: PathBuf,
@@ -195,6 +200,10 @@ impl YamantakaApp {
                     .unwrap_or(false),
             ),
             open_intent: open_intent::OpenIntent::default(),
+            password: None,
+            password_attempted: false,
+            preview_password_action: None,
+            preview_password_target: None,
             runtime,
             preferences,
             store,
@@ -351,6 +360,7 @@ impl YamantakaApp {
     }
     pub fn import(&mut self, paths: Vec<PathBuf>) {
         self.open_intent.leave_destination();
+        self.password = None;
         self.cancel.cancel();
         self.cancel = Cancellation::default();
         self.loading = true;
@@ -383,9 +393,12 @@ impl YamantakaApp {
     }
     fn show_surface(&mut self, surface: Surface) {
         self.open_intent.leave_destination();
+        self.password = None;
         self.surface = surface;
     }
     fn open(&mut self, document: Document) {
+        self.password = None;
+        self.password_attempted = false;
         self.open_intent.begin_open();
         self.reader_preferences_cancel.cancel();
         self.reader_preferences_cancel = Cancellation::default();
@@ -398,7 +411,7 @@ impl YamantakaApp {
         self.reader_layout = None;
         self.reset_render_request();
         self.generation += 1;
-        self.send(Action::Open(document, self.cancel.clone()));
+        self.send(Action::Open(document, None, self.cancel.clone()));
     }
     fn navigate(&mut self, page: u32) {
         if self
@@ -1454,6 +1467,34 @@ impl App for YamantakaApp {
                     self.loading = false;
                     self.refresh();
                 }
+                Update::OpenFailed(document, error, cancel) => {
+                    if cancel.is_cancelled() {
+                        continue;
+                    }
+                    self.loading = false;
+                    self.reader_preferences_loading = false;
+                    if matches!(error, yamantaka_domain::Failure::PasswordRequired)
+                        && self.open_intent.wants_reader()
+                    {
+                        if let Some(action @ ("wrong" | "unlock")) =
+                            self.preview_password_action.take()
+                        {
+                            let value = if action == "unlock" {
+                                "fixture-password"
+                            } else {
+                                "synthetic incorrect credential"
+                            };
+                            self.retry_password(*document, value.into());
+                            continue;
+                        }
+                        self.password = Some(password::PasswordChallenge::new(
+                            *document,
+                            self.password_attempted,
+                        ));
+                    } else if !matches!(error, yamantaka_domain::Failure::Cancelled) {
+                        self.error = Some(error.to_string());
+                    }
+                }
                 Update::Failed(error, cancel) => {
                     if cancel.is_some_and(|token| token.is_cancelled()) {
                         continue;
@@ -1591,7 +1632,10 @@ impl App for YamantakaApp {
             let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
             ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
         }
-        if matches!(self.surface, Surface::Reader) && !ctx.egui_wants_keyboard_input() {
+        if self.password.is_none()
+            && matches!(self.surface, Surface::Reader)
+            && !ctx.egui_wants_keyboard_input()
+        {
             if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
                 self.step_reader(true);
             }
@@ -1683,10 +1727,16 @@ impl App for YamantakaApp {
                     });
             });
         });
+        self.password_dialog(&ctx);
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = !self.documents.is_empty()
                     && !self.loading
+                    && match self.preview_password_target {
+                        Some("unlock") => matches!(self.surface, Surface::Reader),
+                        Some(_) => self.password.is_some(),
+                        None => true,
+                    }
                     && (!self.search.preview_open_page
                         || matches!(self.surface, Surface::Reader) && self.page == 1)
                     && (!self.search.preview_excluded

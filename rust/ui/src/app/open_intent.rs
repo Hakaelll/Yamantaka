@@ -41,6 +41,10 @@ impl OpenIntent {
         self.pending_page = Some((id, page));
     }
 
+    pub fn wants_reader(&self) -> bool {
+        self.reveal_reader
+    }
+
     pub fn finish_open(&mut self, id: &str) -> (Option<u32>, bool) {
         let page = if self
             .pending_page

@@ -2,7 +2,9 @@
 pub mod memory;
 
 use serde::{Deserialize, Serialize};
+pub mod password;
 pub mod pdf_ticket;
+pub use password::PdfPassword;
 pub mod reader;
 pub mod reader_layout;
 pub mod reader_preferences;
@@ -296,7 +298,7 @@ pub trait PdfEngine {
         &self,
         id: String,
         path: PathBuf,
-        password: Option<String>,
+        password: Option<crate::PdfPassword>,
         cancel: Cancellation,
     ) -> Result<PdfInfo>;
     fn render(

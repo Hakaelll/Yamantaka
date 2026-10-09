@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='password-dark'; args=@('--protected') },
+    @{ name='password-light-es'; args=@('--protected','--light','--es') },
+    @{ name='password-small-200'; args=@('--protected','--size=640x480','--text-scale=2') },
+    @{ name='password-rejected'; args=@('--protected','--password-wrong') },
+    @{ name='password-unlocked'; args=@('--protected','--password-unlock') },
     @{ name='search-dark'; args=@('--search') },
     @{ name='search-open-page'; args=@('--search','--search-open-page') },
     @{ name='search-excluded'; args=@('--search','--search-excluded') },

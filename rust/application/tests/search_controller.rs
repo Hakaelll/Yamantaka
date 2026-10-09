@@ -48,7 +48,13 @@ impl Engine {
     }
 }
 impl PdfEngine for Engine {
-    fn open(&self, _: String, _: PathBuf, _: Option<String>, _: Cancellation) -> Result<PdfInfo> {
+    fn open(
+        &self,
+        _: String,
+        _: PathBuf,
+        _: Option<yamantaka_domain::PdfPassword>,
+        _: Cancellation,
+    ) -> Result<PdfInfo> {
         panic!("controller must not wait for native open")
     }
     fn render(&self, _: RenderKey, _: Priority, _: Cancellation) -> Result<Arc<RenderedPage>> {
@@ -69,7 +75,7 @@ impl AsyncPdfEngine for Engine {
         &self,
         _: String,
         _: PathBuf,
-        _: Option<String>,
+        _: Option<yamantaka_domain::PdfPassword>,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         let (sender, ticket) = PdfTicket::channel(1, 1, cancel.clone());

@@ -22,7 +22,13 @@ enum Native {
 }
 struct Engine(Sender<Native>);
 impl PdfEngine for Engine {
-    fn open(&self, _: String, _: PathBuf, _: Option<String>, _: Cancellation) -> Result<PdfInfo> {
+    fn open(
+        &self,
+        _: String,
+        _: PathBuf,
+        _: Option<yamantaka_domain::PdfPassword>,
+        _: Cancellation,
+    ) -> Result<PdfInfo> {
         panic!("actor must not wait for open")
     }
     fn render(&self, _: RenderKey, _: Priority, _: Cancellation) -> Result<Arc<RenderedPage>> {
@@ -43,7 +49,7 @@ impl AsyncPdfEngine for Engine {
         &self,
         id: String,
         _: PathBuf,
-        _: Option<String>,
+        _: Option<yamantaka_domain::PdfPassword>,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         let (send, ticket) = PdfTicket::channel(1, 1, cancel.clone());
@@ -320,7 +326,7 @@ fn foreground_open_waits_for_index_close_and_indexing_resumes_without_late_text(
         panic!("expected second page")
     };
     runtime
-        .submit(Action::Open(reader(), Cancellation::default()))
+        .submit(Action::Open(reader(), None, Cancellation::default()))
         .unwrap();
     query_barrier(&runtime);
     assert!(cancel.is_cancelled());

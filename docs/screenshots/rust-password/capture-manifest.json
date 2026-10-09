@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "capturedAtUtc": "2026-10-09T00:49:21.0175941Z",
+  "synthetic": true,
+  "executableSha256": "2745F2F2C6D1709D9AA27A248B5A55197C2E77DA657A74F6276C05FF52BED9B4",
+  "cargoLockSha256": "B8A2CF8AFA78BD9D9F3E40F84B1C3B12A1B8AC5549B7CC59B0403CA3311B5903",
+  "sources": [
+    {
+      "path": "rust/ui/src/app.rs",
+      "sha256": "821D1A174D832CB94586B9796A45B9BF1FBED24D7180FF3E3D59C47890EFCDDA",
+      "gitBlobSha256": "821D1A174D832CB94586B9796A45B9BF1FBED24D7180FF3E3D59C47890EFCDDA",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/app/compact.rs",
+      "sha256": "7CE810D2102B465BBF3CCDF09F4A9A6EB38E48BFDD54230A4A82F448B6557552",
+      "gitBlobSha256": "7CE810D2102B465BBF3CCDF09F4A9A6EB38E48BFDD54230A4A82F448B6557552",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/app/details.rs",
+      "sha256": "94E22B2E6AC62C5D2F22CF33D3FA1AEFC9619B20E6D9FC6B20ABBA3ABC61F991",
+      "gitBlobSha256": "94E22B2E6AC62C5D2F22CF33D3FA1AEFC9619B20E6D9FC6B20ABBA3ABC61F991",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/app/list.rs",
+      "sha256": "47BD4302BCAAB57A59EC94420AD74C0E1340B89F087C52D99660F41BF5991E04",
+      "gitBlobSha256": "47BD4302BCAAB57A59EC94420AD74C0E1340B89F087C52D99660F41BF5991E04",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/app/navigation.rs",
+      "sha256": "1704D5EC69053D4205CD1B46EC8900C720A8928F054772FC876A1054AB78F32A",
+      "gitBlobSha256": "0BABA19900A20C1BF00E2475C7584EB69A393634EE5FE278C00ACEE97FE03EC8",
+      "gitLineEndingNormalizationOnly": true
+    },
+    {
+      "path": "rust/ui/src/app/open_intent.rs",
+      "sha256": "D0D5E479576435EF9F4E749FC21D23B3A45B3AFE7B41EC1DE1AE7915AB27C6E1",
+      "gitBlobSha256": "D16C03C3336B742F5CDC18B9189D162D89C3F85B2CA1918839941CE95CA69AB1",
+      "gitLineEndingNormalizationOnly": true
+    },
+    {
+      "path": "rust/ui/src/app/password.rs",
+      "sha256": "88C90BA5FAD47112C0CE06B9C60DBD5FC661463775A635C0F8843343F3DBCE7C",
+      "gitBlobSha256": "88C90BA5FAD47112C0CE06B9C60DBD5FC661463775A635C0F8843343F3DBCE7C",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/app/reader_controls.rs",
+      "sha256": "EC95AB3B02EF086A0BC07E9A053ED60EA685336814A74860806F975D4A6528E5",
+      "gitBlobSha256": "8E7C7A810FE5A85C4E9006176E13B1BE0258C79C2BA0E706121567785E363BC0",
+      "gitLineEndingNormalizationOnly": true
+    },
+    {
+      "path": "rust/ui/src/app/reader_options.rs",
+      "sha256": "3117CBE16CC8A99D85A9C0A9A50068289644C008C7851AB0936B199049F122AB",
+      "gitBlobSha256": "3117CBE16CC8A99D85A9C0A9A50068289644C008C7851AB0936B199049F122AB",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/app/reader_viewport.rs",
+      "sha256": "413208D6AC283AC1455572D6FBC7AE1CD9F6A86C23239B5602ABD8BEA34CC3E0",
+      "gitBlobSha256": "413208D6AC283AC1455572D6FBC7AE1CD9F6A86C23239B5602ABD8BEA34CC3E0",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/app/search.rs",
+      "sha256": "FA6F51F3BA97C568F1710B5FCEA0A5D05E0D009E07F549345CB1B558967EA9CB",
+      "gitBlobSha256": "FA6F51F3BA97C568F1710B5FCEA0A5D05E0D009E07F549345CB1B558967EA9CB",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/app/settings.rs",
+      "sha256": "12BE484375C934C28B8BFEE9246BE851BB5514F766CFF49367CF5BDB9219405F",
+      "gitBlobSha256": "12BE484375C934C28B8BFEE9246BE851BB5514F766CFF49367CF5BDB9219405F",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/book.rs",
+      "sha256": "5B262F48654EC52608A7F10DC60D1E3398C39AF41D1B2D1CFB4BFA194A3B6413",
+      "gitBlobSha256": "60F8E73C99A877398A1BD246679805B7C7EC1910E22192C58A075F5594C9ECFC",
+      "gitLineEndingNormalizationOnly": true
+    },
+    {
+      "path": "rust/ui/src/main.rs",
+      "sha256": "4EE82DADE53597CCEEB4A206674F4EC6C256AC2FB086C4706558C54A530B4CC2",
+      "gitBlobSha256": "4EE82DADE53597CCEEB4A206674F4EC6C256AC2FB086C4706558C54A530B4CC2",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/page_presenter.rs",
+      "sha256": "66A2EA244079B22459549B1E6803593A00F5E4C3E91132CC23E4A994B7E4EF26",
+      "gitBlobSha256": "66A2EA244079B22459549B1E6803593A00F5E4C3E91132CC23E4A994B7E4EF26",
+      "gitLineEndingNormalizationOnly": false
+    },
+    {
+      "path": "rust/ui/src/theme.rs",
+      "sha256": "C3B4F03A8F6B2AD36F20F465CBDE7BCE71985B9630A6CFE873686D8A12853F06",
+      "gitBlobSha256": "C3B4F03A8F6B2AD36F20F465CBDE7BCE71985B9630A6CFE873686D8A12853F06",
+      "gitLineEndingNormalizationOnly": false
+    }
+  ],
+  "captures": [
+    {
+      "name": "password-dark",
+      "args": [
+        "--demo",
+        "--protected"
+      ],
+      "image": "password-dark.png",
+      "imageSha256": "AF08BEA5E8C6A87420065D70959758737DE3884701AEA36BAC5269CD57BAE84B",
+      "controls": "password-dark.controls.json",
+      "controlsSha256": "F091A15796BD36B7883AD68A6522FFCB2153BA0FB8B00BEBA6D76FBFF26BB8D5",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "origin": "password-dark.origin.txt",
+      "originSha256": "6B04638720019477E3386602F58D654BAB6B54577F384906453F0FEE29AF89C4"
+    },
+    {
+      "name": "password-light-es",
+      "args": [
+        "--demo",
+        "--protected",
+        "--light",
+        "--es"
+      ],
+      "image": "password-light-es.png",
+      "imageSha256": "0C21C2733BE3A95B4D3CC058B8BC87C640297305BA665A2CC9A1B15F0CDB02F5",
+      "controls": "password-light-es.controls.json",
+      "controlsSha256": "9849277A6525AC92C9335126E596D2E0D0E9135CF5F4A0E1622A41A929146C9E",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "origin": "password-light-es.origin.txt",
+      "originSha256": "39A2024E294D98A05A7836CFC5A3DB10365B40B866838B2C28EE0197B491A080"
+    },
+    {
+      "name": "password-small-200",
+      "args": [
+        "--demo",
+        "--protected",
+        "--size=640x480",
+        "--text-scale=2"
+      ],
+      "image": "password-small-200.png",
+      "imageSha256": "52A21DE19EEF77C0FF7CCE10466FD629937E1678B4E1566DD082FC12C0334769",
+      "controls": "password-small-200.controls.json",
+      "controlsSha256": "0A10EB8B1173CA9D39FEA61101F8546D3B62658046EDC6280D3CD7EF24D6776C",
+      "viewport": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "pixelsPerPoint": 2.5,
+      "exitCode": 0,
+      "origin": "password-small-200.origin.txt",
+      "originSha256": "4C77C5FABE005EA5FD89013BB2A8DBA6B91CF3716095B799DD9FB5996677823B"
+    },
+    {
+      "name": "password-rejected",
+      "args": [
+        "--demo",
+        "--protected",
+        "--password-wrong"
+      ],
+      "image": "password-rejected.png",
+      "imageSha256": "E33F074EF59D402256005D9DD84CCE5D05067283C066011A1A9B1AB41A37BC7B",
+      "controls": "password-rejected.controls.json",
+      "controlsSha256": "F091A15796BD36B7883AD68A6522FFCB2153BA0FB8B00BEBA6D76FBFF26BB8D5",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "origin": "password-rejected.origin.txt",
+      "originSha256": "B7E2316EF168D0A0C99B02A605000C36D3199604E3EFC257EDE5335132131924"
+    },
+    {
+      "name": "password-unlocked",
+      "args": [
+        "--demo",
+        "--protected",
+        "--password-unlock"
+      ],
+      "image": "password-unlocked.png",
+      "imageSha256": "80C08E2FB37977B0BBBC72D648BB33E93C77FA8416A1A971C41AB481913A94C2",
+      "controls": "password-unlocked.controls.json",
+      "controlsSha256": "40BF624DE9FDF7BF10B1AE1808D249E344DD4E7EBD35C5AEE572573F11B49766",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "origin": "password-unlocked.origin.txt",
+      "originSha256": "FB601AF102BC2411DC529687C6820215DAB3121107EEBBE4328C0519F07B45A6"
+    }
+  ],
+  "scope": "Native synthetic screenshots and custom-control bounds. Text zoom is not physical monitor DPI certification; no Narrator or multi-monitor acceptance is implied.",
+  "sourceHashPolicy": "sha256 identifies exact captured working-tree bytes; gitBlobSha256 identifies the reviewed Git index blob. Differences were verified to consist only of CRLF/LF normalization."
+}

@@ -29,7 +29,11 @@ pub enum Action {
     Favorite(String, bool),
     LoadReaderPreferences(String, Cancellation),
     SaveReaderPreferences(String, ReaderPreferences),
-    Open(Document, Cancellation),
+    Open(
+        Document,
+        Option<yamantaka_domain::PdfPassword>,
+        Cancellation,
+    ),
     Import(Vec<PathBuf>, Cancellation),
     Render(RenderKey, Cancellation),
     Navigate(String, u32),
@@ -58,6 +62,7 @@ pub enum Update {
     IndexStatistics(IndexStats),
     Library(Vec<Document>, u64, Cancellation),
     Opened(Box<Document>, PdfInfo, Cancellation),
+    OpenFailed(Box<Document>, Failure, Cancellation),
     Page(Arc<RenderedPage>, Cancellation, u64, u64),
     Text(String, u32, String, Cancellation),
     Imported(usize, Cancellation),
@@ -450,13 +455,13 @@ impl Runtime {
                                 }
                                 // The current UI has one visible reader. Replace its
                                 // pin before admission so imports cannot evict it.
-                                Action::Open(document, cancel) => match engine
+                                Action::Open(document, password, cancel) => match engine
                                     .set_visible_documents(std::slice::from_ref(&document.id))
                                     .and_then(|()| {
                                         engine.try_open(
                                             document.id.clone(),
                                             document.path.clone(),
-                                            None,
+                                            password,
                                             cancel.clone(),
                                         )
                                     }) {
@@ -464,9 +469,12 @@ impl Runtime {
                                         visible = vec![document.id.clone()];
                                         pending.push(Pending::Open(document, ticket, permit));
                                     }
-                                    Err(error) => {
-                                        failed(&events, &notify, error, Some(cancel), permit)
-                                    }
+                                    Err(error) => emit(
+                                        &events,
+                                        &notify,
+                                        Update::OpenFailed(Box::new(document), error, cancel),
+                                        permit,
+                                    ),
                                 },
                                 Action::Render(key, cancel) => {
                                     match engine.try_render(key, Priority::Visible, cancel.clone())
@@ -526,9 +534,12 @@ impl Runtime {
                                         Update::Opened(Box::new(document), info, cancel),
                                         permit,
                                     ),
-                                    Err(error) => {
-                                        failed(&events, &notify, error, Some(cancel), permit)
-                                    }
+                                    Err(error) => emit(
+                                        &events,
+                                        &notify,
+                                        Update::OpenFailed(Box::new(document), error, cancel),
+                                        permit,
+                                    ),
                                 }
                             }
                             Pending::Render(ticket, permit) => {
@@ -875,7 +886,7 @@ mod tests {
             &self,
             _: String,
             _: PathBuf,
-            _: Option<String>,
+            _: Option<yamantaka_domain::PdfPassword>,
             _: Cancellation,
         ) -> Result<PdfInfo> {
             Ok(PdfInfo {
@@ -903,7 +914,7 @@ mod tests {
             &self,
             id: String,
             path: PathBuf,
-            password: Option<String>,
+            password: Option<yamantaka_domain::PdfPassword>,
             cancel: Cancellation,
         ) -> Result<PdfTicket<PdfInfo>> {
             let result = self.open(id, path, password, cancel.clone());
@@ -1051,7 +1062,7 @@ mod tests {
             &self,
             id: String,
             path: PathBuf,
-            password: Option<String>,
+            password: Option<yamantaka_domain::PdfPassword>,
             cancel: Cancellation,
         ) -> Result<PdfInfo> {
             Engine.open(id, path, password, cancel)
@@ -1074,7 +1085,7 @@ mod tests {
             &self,
             id: String,
             path: PathBuf,
-            password: Option<String>,
+            password: Option<yamantaka_domain::PdfPassword>,
             cancel: Cancellation,
         ) -> Result<PdfTicket<PdfInfo>> {
             Engine.try_open(id, path, password, cancel)

@@ -68,7 +68,7 @@ pub trait AsyncPdfEngine: PdfEngine {
         &self,
         id: String,
         path: PathBuf,
-        password: Option<String>,
+        password: Option<crate::PdfPassword>,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>>;
     fn try_render(

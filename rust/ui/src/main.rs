@@ -33,7 +33,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let demo = args.iter().any(|arg| arg == "--demo");
     let settings = args.iter().any(|arg| arg == "--settings");
-    let reader = args.iter().any(|arg| arg == "--reader");
+    let protected = args.iter().any(|arg| arg == "--protected");
+    let reader = protected || args.iter().any(|arg| arg == "--reader");
     let light = args.iter().any(|arg| arg == "--light");
     let tilt = args.iter().any(|arg| arg == "--tilt");
     let capture = args.iter().find_map(|arg| {
@@ -57,7 +58,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         let mut db = Database::in_memory_at(11)?;
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../build/rust-fixtures/textual.pdf")
+            .join(if protected {
+                "../../build/rust-fixtures/protected.pdf"
+            } else {
+                "../../build/rust-fixtures/textual.pdf"
+            })
             .canonicalize()?;
         let names = [
             ("On the Nature of Things", "Lucretius"),
@@ -241,6 +246,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--list-states") {
                     app.preview_list_states();
                 }
+            }
+            if demo && protected {
+                app.preview_password(if args.iter().any(|arg| arg == "--password-unlock") {
+                    "unlock"
+                } else if args.iter().any(|arg| arg == "--password-wrong") {
+                    "wrong"
+                } else {
+                    "prompt"
+                });
             }
             if demo && reader {
                 app.preview_reader();
