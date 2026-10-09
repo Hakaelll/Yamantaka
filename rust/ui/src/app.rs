@@ -1457,6 +1457,8 @@ impl App for YamantakaApp {
                     self.loading = false;
                 }
                 Update::Committed(_, _) => {}
+                // No UI action submits global search until its surface is connected.
+                Update::Search(_, _) | Update::IndexStatistics(_) => {}
                 Update::ReaderPreferences(id, preferences, cancel) => {
                     if cancel.is_cancelled()
                         || !self.active.as_ref().is_some_and(|(doc, _)| doc.id == id)

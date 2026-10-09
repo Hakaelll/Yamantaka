@@ -1,5 +1,10 @@
 use crossbeam_channel::{Select, Sender};
-use std::{cell::RefCell, collections::VecDeque, path::PathBuf, sync::Arc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::VecDeque,
+    path::PathBuf,
+    sync::Arc,
+};
 use yamantaka_application::search_index::{IndexCommand, IndexPhase, SearchIndexController};
 use yamantaka_domain::{
     Cancellation, Failure, PdfEngine, PdfInfo, Priority, RenderKey, RenderedPage, Result,
@@ -12,10 +17,12 @@ type TextReply = (u32, Cancellation, Sender<Result<String>>);
 
 #[derive(Default)]
 struct Engine {
-    opens: RefCell<VecDeque<Sender<Result<PdfInfo>>>>,
+    opens: RefCell<VecDeque<(Cancellation, Sender<Result<PdfInfo>>)>>,
     texts: RefCell<VecDeque<TextReply>>,
     closed: RefCell<Vec<String>>,
     requested_pages: RefCell<Vec<u32>>,
+    defer_close: Cell<bool>,
+    closes: RefCell<VecDeque<Sender<Result<()>>>>,
 }
 impl Engine {
     fn open_result(&self, result: Result<PdfInfo>) {
@@ -23,6 +30,7 @@ impl Engine {
             .borrow_mut()
             .pop_front()
             .unwrap()
+            .1
             .send(result)
             .unwrap();
     }
@@ -64,8 +72,8 @@ impl AsyncPdfEngine for Engine {
         _: Option<String>,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
-        let (sender, ticket) = PdfTicket::channel(1, 1, cancel);
-        self.opens.borrow_mut().push_back(sender);
+        let (sender, ticket) = PdfTicket::channel(1, 1, cancel.clone());
+        self.opens.borrow_mut().push_back((cancel, sender));
         Ok(ticket)
     }
     fn try_render(
@@ -85,7 +93,11 @@ impl AsyncPdfEngine for Engine {
     fn try_close(&self, id: String) -> Result<PdfTicket<()>> {
         self.closed.borrow_mut().push(id);
         let (sender, ticket) = PdfTicket::channel(3, 1, Cancellation::default());
-        sender.send(Ok(())).unwrap();
+        if self.defer_close.get() {
+            self.closes.borrow_mut().push_back(sender);
+        } else {
+            sender.send(Ok(())).unwrap();
+        }
         Ok(ticket)
     }
 }
@@ -126,6 +138,79 @@ fn search(db: &Database, text: &str) -> usize {
     )
     .unwrap()
     .len()
+}
+
+#[test]
+fn yielding_discards_late_text_and_waits_for_close_before_resuming_the_same_cursor() {
+    let mut db = library();
+    let e = Engine::default();
+    let mut c = SearchIndexController::default();
+    start(&mut c, &mut db);
+    step(&mut c, &mut db, &e);
+    e.opened();
+    step(&mut c, &mut db, &e);
+    step(&mut c, &mut db, &e);
+    e.text_result("Committed astronomy");
+    step(&mut c, &mut db, &e);
+    step(&mut c, &mut db, &e);
+    e.defer_close.set(true);
+    c.set_slot_available(false);
+    let id = c.native_document_id().unwrap().to_owned();
+    assert_eq!(c.progress().phase, IndexPhase::Paused);
+    assert!(!c.needs_step());
+    // Regrant before the old reply arrives. The cancelled ticket stays cancelled.
+    c.set_slot_available(true);
+    assert!(e.text_result("Obsolete astronomy").is_cancelled());
+    step(&mut c, &mut db, &e);
+    assert_eq!(c.native_document_id(), Some(id.as_str()));
+    assert!(!c.needs_step());
+    assert!(!c.step(&mut db, &e).unwrap());
+    assert!(e.opens.borrow().is_empty());
+    assert_eq!(db.index_state("a").unwrap().unwrap().indexed_pages, 1);
+    assert_eq!(search(&db, "Obsolete"), 0);
+    e.closes
+        .borrow_mut()
+        .pop_front()
+        .unwrap()
+        .send(Ok(()))
+        .unwrap();
+    step(&mut c, &mut db, &e);
+    assert!(c.native_document_id().is_none());
+    e.defer_close.set(false);
+    finish(&mut c, &mut db, &e);
+    assert_eq!(*e.requested_pages.borrow(), vec![0, 1, 1, 2]);
+    assert_eq!(c.progress().completed_documents, 1);
+    assert_eq!(c.progress().failed_documents, 0);
+    assert_eq!(search(&db, "Committed"), 1);
+}
+
+#[test]
+fn unavailable_slot_yields_pending_open_and_regrant_does_not_override_manual_pause() {
+    let mut db = library();
+    let e = Engine::default();
+    let mut c = SearchIndexController::default();
+    c.set_slot_available(false);
+    start(&mut c, &mut db);
+    assert!(!c.step(&mut db, &e).unwrap());
+    assert!(db.index_state("a").unwrap().is_none());
+    c.set_slot_available(true);
+    step(&mut c, &mut db, &e);
+    c.set_slot_available(false);
+    assert!(e.opens.borrow().front().unwrap().0.is_cancelled());
+    e.opened();
+    step(&mut c, &mut db, &e);
+    step(&mut c, &mut db, &e);
+    assert!(c.native_document_id().is_none());
+    assert!(!c.needs_step());
+    assert!(e.requested_pages.borrow().is_empty());
+    c.command(IndexCommand::Pause(true), &mut db).unwrap();
+    c.set_slot_available(true);
+    assert_eq!(c.progress().phase, IndexPhase::Paused);
+    assert!(!c.step(&mut db, &e).unwrap());
+    c.command(IndexCommand::Pause(false), &mut db).unwrap();
+    finish(&mut c, &mut db, &e);
+    assert_eq!(*e.requested_pages.borrow(), vec![0, 1, 2]);
+    assert_eq!(c.progress().failed_documents, 0);
 }
 
 #[test]

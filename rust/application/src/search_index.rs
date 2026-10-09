@@ -1,6 +1,7 @@
 //! Incremental indexing state machine for the existing actor. Every step is
 //! nonblocking with respect to PDFium. Reserve one native document slot before
-//! stepping; a reader with both hot slots occupied must pause this controller.
+//! stepping; use `set_slot_available(false)` to yield its native handle before
+//! another reader or importer takes that slot.
 use crossbeam_channel::{Select, TryRecvError};
 use std::collections::VecDeque;
 use yamantaka_domain::{
@@ -59,6 +60,7 @@ pub enum IndexCommand {
 struct Active {
     session: IndexSession,
     native_id: String,
+    cancel: Cancellation,
 }
 enum Pending {
     Open(PdfTicket<PdfInfo>),
@@ -81,6 +83,7 @@ pub struct SearchIndexController {
     manual_paused: bool,
     background_paused: bool,
     interaction_paused: bool,
+    slot_paused: bool,
     run: Option<Run>,
 }
 impl SearchIndexController {
@@ -94,11 +97,34 @@ impl SearchIndexController {
             None
         }
     }
+    /// Stop native admission and release the active handle at the next ready
+    /// boundary. Durable progress and the run's candidate order are retained.
+    /// Regranting a slot cannot revive an already cancelled native ticket.
+    pub fn set_slot_available(&mut self, available: bool) {
+        if self.slot_paused == !available {
+            return;
+        }
+        self.slot_paused = !available;
+        if !available && let Some(active) = self.run.as_ref().and_then(|run| run.active.as_ref()) {
+            active.cancel.cancel();
+        }
+        if self.run.is_some() {
+            self.phase();
+        }
+    }
+    /// Includes a pending close: the caller must not reuse this native slot
+    /// until the close reply has been consumed.
+    pub fn native_document_id(&self) -> Option<&str> {
+        self.run
+            .as_ref()
+            .and_then(|run| run.active.as_ref())
+            .map(|active| active.native_id.as_str())
+    }
     pub fn statistics<R: SearchRepository>(&self, repository: &R) -> Result<IndexStats> {
         repository.index_stats()
     }
     fn paused(&self) -> bool {
-        self.manual_paused || self.background_paused || self.interaction_paused
+        self.manual_paused || self.background_paused || self.interaction_paused || self.slot_paused
     }
     fn phase(&mut self) {
         self.progress.phase = if let Some(run) = &self.run {
@@ -119,6 +145,9 @@ impl SearchIndexController {
     fn cancel(&mut self) {
         if let Some(run) = &self.run {
             run.cancel.cancel();
+            if let Some(active) = &run.active {
+                active.cancel.cancel();
+            }
         }
         self.phase();
     }
@@ -158,14 +187,15 @@ impl SearchIndexController {
                     ));
                 }
                 let cancel = Cancellation::default();
-                if rebuild {
-                    repository.clear_index(&cancel)?;
-                }
-                self.progress.generation = self
+                let generation = self
                     .progress
                     .generation
                     .checked_add(1)
                     .ok_or_else(|| Failure::Invalid("Index generation overflow".into()))?;
+                if rebuild {
+                    repository.clear_index(&cancel)?;
+                }
+                self.progress.generation = generation;
                 self.progress.completed_documents = 0;
                 self.progress.failed_documents = 0;
                 self.progress.current_page = 0;
@@ -217,7 +247,14 @@ impl SearchIndexController {
             Some(Pending::Open(t)) => t.is_ready(),
             Some(Pending::Text(_, t)) => t.is_ready(),
             Some(Pending::Close(t)) => t.is_ready(),
-            None => run.cancel.is_cancelled() || !self.paused(),
+            None => {
+                run.cancel.is_cancelled()
+                    || run
+                        .active
+                        .as_ref()
+                        .is_some_and(|active| active.cancel.is_cancelled())
+                    || !self.paused()
+            }
         })
     }
     fn record_failure<R: SearchRepository>(
@@ -288,7 +325,7 @@ impl SearchIndexController {
             match pending {
                 Pending::Open(ticket) => {
                     let result = ticket_result(&ticket);
-                    if self.run.as_ref().unwrap().cancel.is_cancelled() {
+                    if self.native_cancelled() {
                         self.close(engine)?;
                         return Ok(true);
                     }
@@ -313,7 +350,7 @@ impl SearchIndexController {
                 }
                 Pending::Text(page, ticket) => {
                     let result = ticket_result(&ticket);
-                    if self.run.as_ref().unwrap().cancel.is_cancelled() {
+                    if self.native_cancelled() {
                         self.close(engine)?;
                         return Ok(true);
                     }
@@ -343,7 +380,13 @@ impl SearchIndexController {
                 }
                 Pending::Close(ticket) => {
                     let result = ticket_result(&ticket);
-                    self.run.as_mut().unwrap().active = None;
+                    let run = self.run.as_mut().unwrap();
+                    if let Some(active) = run.active.take()
+                        && active.cancel.is_cancelled()
+                        && !run.cancel.is_cancelled()
+                    {
+                        run.candidates.push_front(active.session.document_id);
+                    }
                     self.progress.current_document = None;
                     self.dirty = true;
                     if let Err(error) = result {
@@ -363,6 +406,10 @@ impl SearchIndexController {
             }
             return Ok(true);
         }
+        if self.native_cancelled() {
+            self.close(engine)?;
+            return Ok(true);
+        }
         if self.paused() {
             return Ok(false);
         }
@@ -376,7 +423,7 @@ impl SearchIndexController {
                 self.close(engine)?;
             } else {
                 let page = active.session.cursor;
-                match engine.try_text(active.native_id.clone(), page, run.cancel.clone()) {
+                match engine.try_text(active.native_id.clone(), page, active.cancel.clone()) {
                     Ok(ticket) => run.pending = Some(Pending::Text(page, ticket)),
                     Err(error) => {
                         self.record_failure(repository, &error)?;
@@ -414,11 +461,13 @@ impl SearchIndexController {
         self.progress.current_page = session.cursor;
         self.progress.total_pages = session.page_count;
         self.dirty = true;
+        let native_cancel = Cancellation::default();
         run.active = Some(Active {
             session,
             native_id: native_id.clone(),
+            cancel: native_cancel.clone(),
         });
-        match engine.try_open(native_id, document.path, None, run.cancel.clone()) {
+        match engine.try_open(native_id, document.path, None, native_cancel) {
             Ok(ticket) => run.pending = Some(Pending::Open(ticket)),
             Err(error) => {
                 self.record_failure(repository, &error)?;
@@ -431,7 +480,17 @@ impl SearchIndexController {
     /// the actor's shutdown tickets. Never drop the engine before that join.
     pub fn shutdown<E: AsyncPdfEngine>(&mut self, engine: &E) -> Result<Option<PdfTicket<()>>> {
         self.cancel();
-        let Some(mut run) = self.run.take() else {
+        let run = self.run.take();
+        self.progress.phase = if self.progress.enabled {
+            IndexPhase::Cancelled
+        } else {
+            IndexPhase::Disabled
+        };
+        self.progress.current_document = None;
+        self.progress.current_page = 0;
+        self.progress.total_pages = 0;
+        self.dirty = true;
+        let Some(mut run) = run else {
             return Ok(None);
         };
         if let Some(Pending::Close(ticket)) = run.pending.take() {
@@ -442,11 +501,40 @@ impl SearchIndexController {
             .map(|active| engine.try_close(active.native_id))
             .transpose()
     }
+    /// Stop a failed run without retrying a failing repository or admission in
+    /// a tight loop. The caller retains and consumes the returned close ticket.
+    pub fn abort<E: AsyncPdfEngine>(
+        &mut self,
+        error: &Failure,
+        engine: &E,
+    ) -> Result<Option<PdfTicket<()>>> {
+        self.progress.failed_documents += 1;
+        self.progress.last_error_code = Some(match error {
+            Failure::Storage(_) => "storage",
+            Failure::Invalid(_) => "sourceChanged",
+            Failure::PasswordRequired => "passwordRequired",
+            Failure::Cancelled => "cancelled",
+            _ => "pdf",
+        });
+        self.shutdown(engine)
+    }
+    fn native_cancelled(&self) -> bool {
+        self.run.as_ref().is_some_and(|run| {
+            run.cancel.is_cancelled()
+                || run
+                    .active
+                    .as_ref()
+                    .is_some_and(|active| active.cancel.is_cancelled())
+        })
+    }
 }
 impl Drop for SearchIndexController {
     fn drop(&mut self) {
         if let Some(run) = &self.run {
             run.cancel.cancel();
+            if let Some(active) = &run.active {
+                active.cancel.cancel();
+            }
         }
     }
 }

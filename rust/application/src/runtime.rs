@@ -1,8 +1,10 @@
+use crate::search_index::{IndexCommand, IndexProgress, SearchIndexController};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Select, Sender, TryRecvError, bounded};
 use std::{
+    collections::VecDeque,
     path::PathBuf,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
     thread::{self, JoinHandle},
@@ -10,12 +12,17 @@ use std::{
 };
 use yamantaka_domain::pdf_ticket::{AsyncPdfEngine, PdfTicket};
 use yamantaka_domain::reader_preferences::ReaderPreferences;
+use yamantaka_domain::search::{IndexStats, SearchQuery, SearchRepository, SearchResult};
 use yamantaka_domain::{
     Cancellation, Document, Failure, LibraryQuery, LibraryRepository, NewDocument, PdfInfo,
     Priority, RenderKey, RenderedPage, Result,
 };
 
 pub enum Action {
+    Search(SearchQuery, Cancellation),
+    Index(IndexCommand),
+    IndexStatistics,
+    VisibleDocuments(Vec<String>),
     Query(LibraryQuery, Cancellation),
     Favorite(String, bool),
     LoadReaderPreferences(String, Cancellation),
@@ -30,12 +37,16 @@ pub enum Action {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WriteKind {
+    Index,
+    VisibleDocuments,
     Favorite,
     Position,
     Close,
     ReaderPreferences,
 }
 pub enum Update {
+    Search(Vec<SearchResult>, Cancellation),
+    IndexStatistics(IndexStats),
     Library(Vec<Document>, u64, Cancellation),
     Opened(Box<Document>, PdfInfo, Cancellation),
     Page(Arc<RenderedPage>, Cancellation, u64, u64),
@@ -76,6 +87,7 @@ impl UpdateReceiver {
     }
 }
 pub struct Runtime {
+    index_progress: Arc<Mutex<IndexProgress>>,
     sender: Sender<Command>,
     shutdown: Sender<()>,
     outstanding: Arc<AtomicUsize>,
@@ -187,7 +199,10 @@ fn advance_import<E: AsyncPdfEngine>(
     }
 }
 impl Runtime {
-    pub fn start<R: LibraryRepository + Send + 'static, E: AsyncPdfEngine + Send + 'static>(
+    pub fn start<
+        R: LibraryRepository + SearchRepository + Send + 'static,
+        E: AsyncPdfEngine + Send + 'static,
+    >(
         mut repository: R,
         engine: E,
         notify: impl Fn() + Send + 'static,
@@ -195,143 +210,249 @@ impl Runtime {
         let (sender, commands) = bounded::<Command>(CAPACITY * 2);
         let (events, updates) = bounded(CAPACITY * 2);
         let (shutdown, stop) = bounded(1);
+        let index_progress = Arc::new(Mutex::new(IndexProgress::default()));
+        let progress_snapshot = index_progress.clone();
         let handle = thread::Builder::new()
             .name("yamantaka-use-cases".into())
             .spawn(move || {
                 let mut pending: Vec<Pending> = Vec::new();
                 let mut import_sequence = 0;
+                let mut indexer = SearchIndexController::default();
+                let mut index_cleanup: Option<PdfTicket<()>> = None;
+                let mut deferred: VecDeque<Command> = VecDeque::new();
+                let mut visible: Vec<String> = Vec::new();
                 loop {
                     if stop.try_recv().is_ok() {
                         break;
                     }
-                    if let Ok(Command { action, permit }) = commands.try_recv() {
-                        match action {
-                            Action::Shutdown => break,
-                            Action::Query(query, cancel) => {
-                                let result = (|| {
-                                    cancel.check()?;
-                                    let documents = repository.query(&query)?;
-                                    let count = repository.count(&query)?;
-                                    cancel.check()?;
-                                    Ok(Update::Library(documents, count, cancel.clone()))
-                                })();
-                                match result {
-                                    Ok(update) => emit(&events, &notify, update, permit),
-                                    Err(error) => {
-                                        failed(&events, &notify, error, Some(cancel), permit)
+                    let index_busy =
+                        indexer.native_document_id().is_some() || index_cleanup.is_some();
+                    let command = if !index_busy && !deferred.is_empty() {
+                        deferred.pop_front()
+                    } else {
+                        commands.try_recv().ok()
+                    };
+                    if let Some(Command { action, permit }) = command {
+                        if index_busy
+                            && matches!(
+                                &action,
+                                Action::Open(..)
+                                    | Action::Import(..)
+                                    | Action::VisibleDocuments(..)
+                            )
+                        {
+                            indexer.set_slot_available(false);
+                            deferred.push_back(Command { action, permit });
+                        } else {
+                            match action {
+                                Action::Shutdown => break,
+                                Action::Index(command) => {
+                                    let result = if index_cleanup.is_some()
+                                        && matches!(&command, IndexCommand::Start { .. })
+                                    {
+                                        Err(Failure::Invalid(
+                                            "The previous index document is still closing".into(),
+                                        ))
+                                    } else {
+                                        indexer.command(command, &mut repository)
+                                    };
+                                    match result {
+                                        Ok(()) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::Committed(String::new(), WriteKind::Index),
+                                            permit,
+                                        ),
+                                        Err(error) => failed(&events, &notify, error, None, permit),
                                     }
                                 }
-                            }
-                            Action::LoadReaderPreferences(id, cancel) => {
-                                let result = (|| {
-                                    cancel.check()?;
-                                    let prefs = repository.get_reader_preferences(&id)?;
-                                    cancel.check()?;
-                                    Ok(prefs)
-                                })();
-                                match result {
-                                    Ok(prefs) => emit(
-                                        &events,
-                                        &notify,
-                                        Update::ReaderPreferences(id, prefs, cancel),
-                                        permit,
-                                    ),
-                                    Err(error) => {
-                                        failed(&events, &notify, error, Some(cancel), permit)
+                                Action::Search(query, cancel) => {
+                                    let result = cancel
+                                        .check()
+                                        .and_then(|()| {
+                                            if indexer.progress().enabled {
+                                                repository.search(&query, &cancel)
+                                            } else {
+                                                Err(Failure::Invalid(
+                                                    "Global indexing is disabled".into(),
+                                                ))
+                                            }
+                                        })
+                                        .and_then(|results| {
+                                            cancel.check()?;
+                                            Ok(results)
+                                        });
+                                    match result {
+                                        Ok(results) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::Search(results, cancel),
+                                            permit,
+                                        ),
+                                        Err(error) => {
+                                            failed(&events, &notify, error, Some(cancel), permit)
+                                        }
                                     }
                                 }
-                            }
-                            Action::SaveReaderPreferences(id, prefs) => {
-                                let result = if prefs.document_id != id {
-                                    Err(Failure::Invalid(
-                                        "Reader preferences belong to another document".into(),
-                                    ))
-                                } else {
-                                    prefs.validate().and_then(|()| {
-                                        repository.save_reader_preferences(&id, &prefs)
-                                    })
-                                };
-                                match result {
-                                    Ok(()) => emit(
+                                Action::IndexStatistics => match repository.index_stats() {
+                                    Ok(stats) => emit(
                                         &events,
                                         &notify,
-                                        Update::Committed(id, WriteKind::ReaderPreferences),
+                                        Update::IndexStatistics(stats),
                                         permit,
                                     ),
                                     Err(error) => failed(&events, &notify, error, None, permit),
+                                },
+                                Action::VisibleDocuments(ids) => {
+                                    match engine.set_visible_documents(&ids) {
+                                        Ok(()) => {
+                                            visible = ids;
+                                            emit(
+                                                &events,
+                                                &notify,
+                                                Update::Committed(
+                                                    String::new(),
+                                                    WriteKind::VisibleDocuments,
+                                                ),
+                                                permit,
+                                            );
+                                        }
+                                        Err(error) => failed(&events, &notify, error, None, permit),
+                                    }
                                 }
-                            }
-                            Action::Favorite(id, value) => {
-                                match repository.set_favorite(&id, value) {
-                                    Ok(()) => emit(
-                                        &events,
-                                        &notify,
-                                        Update::Committed(id, WriteKind::Favorite),
-                                        permit,
-                                    ),
+                                Action::Query(query, cancel) => {
+                                    let result = (|| {
+                                        cancel.check()?;
+                                        let documents = repository.query(&query)?;
+                                        let count = repository.count(&query)?;
+                                        cancel.check()?;
+                                        Ok(Update::Library(documents, count, cancel.clone()))
+                                    })();
+                                    match result {
+                                        Ok(update) => emit(&events, &notify, update, permit),
+                                        Err(error) => {
+                                            failed(&events, &notify, error, Some(cancel), permit)
+                                        }
+                                    }
+                                }
+                                Action::LoadReaderPreferences(id, cancel) => {
+                                    let result = (|| {
+                                        cancel.check()?;
+                                        let prefs = repository.get_reader_preferences(&id)?;
+                                        cancel.check()?;
+                                        Ok(prefs)
+                                    })();
+                                    match result {
+                                        Ok(prefs) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::ReaderPreferences(id, prefs, cancel),
+                                            permit,
+                                        ),
+                                        Err(error) => {
+                                            failed(&events, &notify, error, Some(cancel), permit)
+                                        }
+                                    }
+                                }
+                                Action::SaveReaderPreferences(id, prefs) => {
+                                    let result = if prefs.document_id != id {
+                                        Err(Failure::Invalid(
+                                            "Reader preferences belong to another document".into(),
+                                        ))
+                                    } else {
+                                        prefs.validate().and_then(|()| {
+                                            repository.save_reader_preferences(&id, &prefs)
+                                        })
+                                    };
+                                    match result {
+                                        Ok(()) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::Committed(id, WriteKind::ReaderPreferences),
+                                            permit,
+                                        ),
+                                        Err(error) => failed(&events, &notify, error, None, permit),
+                                    }
+                                }
+                                Action::Favorite(id, value) => {
+                                    match repository.set_favorite(&id, value) {
+                                        Ok(()) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::Committed(id, WriteKind::Favorite),
+                                            permit,
+                                        ),
+                                        Err(error) => failed(&events, &notify, error, None, permit),
+                                    }
+                                }
+                                Action::Navigate(id, page) => {
+                                    match repository.save_position(&id, page) {
+                                        Ok(()) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::Committed(id, WriteKind::Position),
+                                            permit,
+                                        ),
+                                        Err(error) => failed(&events, &notify, error, None, permit),
+                                    }
+                                }
+                                // The current UI has one visible reader. Replace its
+                                // pin before admission so imports cannot evict it.
+                                Action::Open(document, cancel) => match engine
+                                    .set_visible_documents(std::slice::from_ref(&document.id))
+                                    .and_then(|()| {
+                                        engine.try_open(
+                                            document.id.clone(),
+                                            document.path.clone(),
+                                            None,
+                                            cancel.clone(),
+                                        )
+                                    }) {
+                                    Ok(ticket) => {
+                                        visible = vec![document.id.clone()];
+                                        pending.push(Pending::Open(document, ticket, permit));
+                                    }
+                                    Err(error) => {
+                                        failed(&events, &notify, error, Some(cancel), permit)
+                                    }
+                                },
+                                Action::Render(key, cancel) => {
+                                    match engine.try_render(key, Priority::Visible, cancel.clone())
+                                    {
+                                        Ok(ticket) => pending.push(Pending::Render(ticket, permit)),
+                                        Err(error) => {
+                                            failed(&events, &notify, error, Some(cancel), permit)
+                                        }
+                                    }
+                                }
+                                Action::Text(id, page, cancel) => {
+                                    match engine.try_text(id.clone(), page, cancel.clone()) {
+                                        Ok(ticket) => {
+                                            pending.push(Pending::Text(id, page, ticket, permit))
+                                        }
+                                        Err(error) => {
+                                            failed(&events, &notify, error, Some(cancel), permit)
+                                        }
+                                    }
+                                }
+                                Action::Close(id) => match engine.try_close(id.clone()) {
+                                    Ok(ticket) => pending.push(Pending::Close(id, ticket, permit)),
                                     Err(error) => failed(&events, &notify, error, None, permit),
-                                }
-                            }
-                            Action::Navigate(id, page) => match repository.save_position(&id, page)
-                            {
-                                Ok(()) => emit(
+                                },
+                                Action::Import(paths, cancel) => advance_import(
+                                    &engine,
+                                    ImportState {
+                                        paths: paths.into(),
+                                        count: 0,
+                                        cancel,
+                                        permit,
+                                    },
+                                    &mut pending,
                                     &events,
                                     &notify,
-                                    Update::Committed(id, WriteKind::Position),
-                                    permit,
+                                    &mut import_sequence,
                                 ),
-                                Err(error) => failed(&events, &notify, error, None, permit),
-                            },
-                            // The current UI has one visible reader. Replace its
-                            // pin before admission so imports cannot evict it.
-                            Action::Open(document, cancel) => match engine
-                                .set_visible_documents(std::slice::from_ref(&document.id))
-                                .and_then(|()| {
-                                    engine.try_open(
-                                        document.id.clone(),
-                                        document.path.clone(),
-                                        None,
-                                        cancel.clone(),
-                                    )
-                                }) {
-                                Ok(ticket) => pending.push(Pending::Open(document, ticket, permit)),
-                                Err(error) => failed(&events, &notify, error, Some(cancel), permit),
-                            },
-                            Action::Render(key, cancel) => {
-                                match engine.try_render(key, Priority::Visible, cancel.clone()) {
-                                    Ok(ticket) => pending.push(Pending::Render(ticket, permit)),
-                                    Err(error) => {
-                                        failed(&events, &notify, error, Some(cancel), permit)
-                                    }
-                                }
                             }
-                            Action::Text(id, page, cancel) => {
-                                match engine.try_text(id.clone(), page, cancel.clone()) {
-                                    Ok(ticket) => {
-                                        pending.push(Pending::Text(id, page, ticket, permit))
-                                    }
-                                    Err(error) => {
-                                        failed(&events, &notify, error, Some(cancel), permit)
-                                    }
-                                }
-                            }
-                            Action::Close(id) => match engine.try_close(id.clone()) {
-                                Ok(ticket) => pending.push(Pending::Close(id, ticket, permit)),
-                                Err(error) => failed(&events, &notify, error, None, permit),
-                            },
-                            Action::Import(paths, cancel) => advance_import(
-                                &engine,
-                                ImportState {
-                                    paths: paths.into(),
-                                    count: 0,
-                                    cancel,
-                                    permit,
-                                },
-                                &mut pending,
-                                &events,
-                                &notify,
-                                &mut import_sequence,
-                            ),
                         }
                     }
                     let mut index = 0;
@@ -395,12 +516,15 @@ impl Runtime {
                                 }
                             }
                             Pending::Close(id, ticket, permit) => match ticket.wait() {
-                                Ok(()) => emit(
-                                    &events,
-                                    &notify,
-                                    Update::Committed(id, WriteKind::Close),
-                                    permit,
-                                ),
+                                Ok(()) => {
+                                    visible.retain(|item| item != &id);
+                                    emit(
+                                        &events,
+                                        &notify,
+                                        Update::Committed(id, WriteKind::Close),
+                                        permit,
+                                    );
+                                }
                                 Err(error) => failed(&events, &notify, error, None, permit),
                             },
                             Pending::ImportOpen(path, id, ticket, state) => match ticket.wait() {
@@ -454,9 +578,36 @@ impl Runtime {
                             }
                         }
                     }
+                    if index_cleanup.as_ref().is_some_and(PdfTicket::is_ready) {
+                        let _ = index_cleanup.take().unwrap().wait();
+                    }
+                    let native_admission_pending = pending.iter().any(|item| {
+                        matches!(
+                            item,
+                            Pending::Open(..) | Pending::ImportOpen(..) | Pending::ImportClose(..)
+                        )
+                    });
+                    indexer.set_slot_available(
+                        deferred.is_empty()
+                            && !native_admission_pending
+                            && visible.len() < yamantaka_domain::MAX_HOT_DOCUMENTS
+                            && index_cleanup.is_none(),
+                    );
+                    if let Err(error) = indexer.step(&mut repository, &engine) {
+                        index_cleanup = indexer.abort(&error, &engine).ok().flatten();
+                    }
+                    if let Some(progress) = indexer.take_progress() {
+                        *progress_snapshot.lock().unwrap() = progress;
+                        notify();
+                    }
                     // A blocking select sleeps while idle and wakes on actual command
                     // or PDF completion. SQL is never held behind native rendering.
-                    if !commands.is_empty() {
+                    if !commands.is_empty()
+                        || indexer.needs_step()
+                        || (!deferred.is_empty()
+                            && indexer.native_document_id().is_none()
+                            && index_cleanup.is_none())
+                    {
                         continue;
                     }
                     let mut select = Select::new();
@@ -465,16 +616,27 @@ impl Runtime {
                     for item in &pending {
                         item.register(&mut select);
                     }
+                    indexer.register_readiness(&mut select);
+                    if let Some(ticket) = &index_cleanup {
+                        select.recv(ticket.readiness());
+                    }
                     select.ready();
                 }
                 for item in &pending {
                     item.cancel();
                 }
                 drop(pending); // Drop tickets before engine join; no UI draining required.
+                if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
+                    let _ = ticket.wait();
+                }
+                if let Some(ticket) = index_cleanup {
+                    let _ = ticket.wait();
+                }
                 drop(engine);
             })
             .map_err(|_| Failure::Storage("Use-case worker could not start".into()))?;
         Ok(Self {
+            index_progress,
             sender,
             shutdown,
             outstanding: Arc::new(AtomicUsize::new(0)),
@@ -482,6 +644,10 @@ impl Runtime {
             updates: UpdateReceiver(updates),
             handle: Some(handle),
         })
+    }
+    /// Coalesced bounded snapshot; reading it never queries SQL or PDFium.
+    pub fn index_progress(&self) -> IndexProgress {
+        self.index_progress.lock().unwrap().clone()
     }
     pub fn submit(&self, action: Action) -> Result<()> {
         if matches!(action, Action::Shutdown) {
@@ -543,6 +709,111 @@ mod tests {
         }
         fn import(&mut self, _: &NewDocument) -> Result<String> {
             Ok("imported".into())
+        }
+    }
+    use yamantaka_domain::search::{IndexAccess, IndexSession, IndexState};
+    impl SearchRepository for Repository {
+        fn index_candidates(
+            &self,
+            _after_id: Option<&str>,
+            _limit: usize,
+            _access: IndexAccess,
+            _cancel: &Cancellation,
+        ) -> Result<Vec<String>> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn needs_index(&self, _document_id: &str) -> Result<bool> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn search(
+            &self,
+            _query: &SearchQuery,
+            _cancel: &Cancellation,
+        ) -> Result<Vec<SearchResult>> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn begin_index(
+            &mut self,
+            _document_id: &str,
+            _resume: bool,
+            _access: IndexAccess,
+            _cancel: &Cancellation,
+        ) -> Result<IndexSession> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn index_page(
+            &mut self,
+            _session: &mut IndexSession,
+            _page: u32,
+            _text: &str,
+            _access: IndexAccess,
+            _cancel: &Cancellation,
+        ) -> Result<()> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn finish_index(
+            &mut self,
+            _session: &mut IndexSession,
+            _access: IndexAccess,
+            _cancel: &Cancellation,
+        ) -> Result<()> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn fail_index(
+            &mut self,
+            _session: &mut IndexSession,
+            _code: &str,
+            _cancel: &Cancellation,
+        ) -> Result<()> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn index_state(&self, _document_id: &str) -> Result<Option<IndexState>> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn index_stats(&self) -> Result<IndexStats> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn exclude_from_index(
+            &mut self,
+            _document_id: &str,
+            _excluded: bool,
+            _cancel: &Cancellation,
+        ) -> Result<()> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn refresh_search_entries(
+            &mut self,
+            _access: IndexAccess,
+            _cancel: &Cancellation,
+        ) -> Result<()> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
+        }
+        fn clear_index(&mut self, _cancel: &Cancellation) -> Result<()> {
+            Err(Failure::Unsupported(
+                "Search is unavailable in this fixture".into(),
+            ))
         }
     }
     use yamantaka_domain::PdfEngine;
