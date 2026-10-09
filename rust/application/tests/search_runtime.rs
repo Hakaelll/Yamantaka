@@ -282,6 +282,112 @@ fn reader() -> Document {
 }
 
 #[test]
+fn bookmark_commands_remain_responsive_during_native_work_and_preserve_scoped_cancellation() {
+    use yamantaka_domain::{Failure, bookmarks::BookmarkChange};
+    let (runtime, native, notified) = setup();
+    start(&runtime);
+    let Native::Open(_, native_cancel, native_reply) = next(&native) else {
+        panic!("held index open")
+    };
+    let write = Cancellation::default();
+    runtime
+        .submit(Action::ChangeBookmark(
+            "a".into(),
+            BookmarkChange::Save {
+                page: 2,
+                label: Some("Study landmark".into()),
+            },
+            0,
+            write.clone(),
+        ))
+        .unwrap();
+    let Update::Bookmarks(id, requested, page, token) = update(&runtime) else {
+        panic!("bookmark write snapshot")
+    };
+    assert_eq!((id.as_str(), requested, page.total), ("a", 0, 1));
+    assert!(token.same_request(&write));
+    let bookmark = page.entries[0].clone();
+    assert_eq!(bookmark.page_index, 2);
+    runtime
+        .submit(Action::ChangeBookmark(
+            "a".into(),
+            BookmarkChange::Rename {
+                id: bookmark.id.clone(),
+                label: Some("  Résumé · دراسة  ".into()),
+            },
+            0,
+            Cancellation::default(),
+        ))
+        .unwrap();
+    let Update::Bookmarks(_, _, page, _) = update(&runtime) else {
+        panic!("renamed bookmark snapshot")
+    };
+    assert_eq!(page.entries[0].id, bookmark.id);
+    assert_eq!(page.entries[0].created_at, bookmark.created_at);
+    assert_eq!(page.entries[0].label.as_deref(), Some("Résumé · دراسة"));
+    let cancel = Cancellation::default();
+    cancel.cancel();
+    runtime
+        .submit(Action::ChangeBookmark(
+            "a".into(),
+            BookmarkChange::Remove {
+                id: bookmark.id.clone(),
+            },
+            0,
+            cancel.clone(),
+        ))
+        .unwrap();
+    assert!(
+        matches!(update(&runtime), Update::BookmarkFailed(id,Failure::Cancelled,token) if id=="a" && token.same_request(&cancel))
+    );
+    runtime
+        .submit(Action::Bookmarks(
+            "a".into(),
+            usize::MAX,
+            Cancellation::default(),
+        ))
+        .unwrap();
+    let Update::Bookmarks(id, requested, page, _) = update(&runtime) else {
+        panic!("bounded bookmark query")
+    };
+    assert_eq!(
+        (id.as_str(), requested, page.offset, page.total),
+        ("a", usize::MAX, 0, 1)
+    );
+    assert_eq!(page.entries[0].id, bookmark.id);
+    runtime
+        .submit(Action::Bookmarks("a".into(), 0, cancel))
+        .unwrap();
+    assert!(matches!(
+        update(&runtime),
+        Update::BookmarkFailed(_, Failure::Cancelled, _)
+    ));
+    query_barrier(&runtime);
+    assert!(
+        native.try_recv().is_err(),
+        "bookmark SQL must not issue or wait for PDF calls"
+    );
+    runtime
+        .submit(Action::ChangeBookmark(
+            "a".into(),
+            BookmarkChange::Remove { id: bookmark.id },
+            0,
+            Cancellation::default(),
+        ))
+        .unwrap();
+    assert!(matches!(update(&runtime), Update::Bookmarks(_,0,page,_) if page.total==0));
+    runtime.submit(Action::Index(IndexCommand::Cancel)).unwrap();
+    committed(&runtime, WriteKind::Index);
+    assert!(native_cancel.is_cancelled());
+    native_reply.send(Err(Failure::Cancelled)).unwrap();
+    let Native::Close(_, reply) = next(&native) else {
+        panic!("cancelled index close")
+    };
+    reply.send(Ok(())).unwrap();
+    phase(&runtime, &notified, IndexPhase::Cancelled);
+}
+
+#[test]
 fn open_confirmation_keeps_old_pins_and_rejects_cancelled_or_stale_acceptance() {
     let pins = Arc::new(Mutex::new(Vec::new()));
     let (runtime, native, _) =

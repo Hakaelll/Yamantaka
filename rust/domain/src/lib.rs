@@ -1,4 +1,5 @@
 //! UI and FFI independent contracts and persisted domain semantics.
+pub mod bookmarks;
 pub mod memory;
 
 use serde::{Deserialize, Serialize};

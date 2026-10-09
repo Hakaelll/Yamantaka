@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod bookmarks;
 pub mod database;
 pub mod identity;
 pub mod migration;

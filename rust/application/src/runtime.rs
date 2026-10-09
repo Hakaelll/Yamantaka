@@ -10,6 +10,7 @@ use std::{
     thread::{self, JoinHandle},
     time::Duration,
 };
+use yamantaka_domain::bookmarks::{BookmarkChange, BookmarkPage, BookmarkRepository};
 use yamantaka_domain::pdf_ticket::{AsyncPdfEngine, PdfTicket};
 use yamantaka_domain::reader_preferences::ReaderPreferences;
 use yamantaka_domain::search::{IndexStats, SearchQuery, SearchRepository, SearchResult};
@@ -19,6 +20,8 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    Bookmarks(String, usize, Cancellation),
+    ChangeBookmark(String, BookmarkChange, usize, Cancellation),
     GetDocument(String, Cancellation),
     IndexState(String, Cancellation),
     Search(SearchQuery, Cancellation),
@@ -52,6 +55,8 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    Bookmarks(String, usize, BookmarkPage, Cancellation),
+    BookmarkFailed(String, Failure, Cancellation),
     SearchFailed(Failure, Cancellation),
     Document(String, Option<Document>, Cancellation),
     IndexState(
@@ -230,7 +235,7 @@ fn advance_import<E: AsyncPdfEngine>(
 }
 impl Runtime {
     pub fn start<
-        R: LibraryRepository + SearchRepository + Send + 'static,
+        R: LibraryRepository + SearchRepository + BookmarkRepository + Send + 'static,
         E: AsyncPdfEngine + Send + 'static,
     >(
         mut repository: R,
@@ -280,6 +285,19 @@ impl Runtime {
                         } else {
                             match action {
                                 Action::Shutdown => break,
+                                Action::Bookmarks(id, offset, cancel) => {
+                                    match repository.bookmarks(&id, offset, &cancel) {
+                                        Ok(page) => emit(&events, &notify, Update::Bookmarks(id, offset, page, cancel), permit),
+                                        Err(error) => emit(&events, &notify, Update::BookmarkFailed(id, error, cancel), permit),
+                                    }
+                                }
+                                Action::ChangeBookmark(id, change, offset, cancel) => {
+                                    let result = repository.change_bookmark(&id, &change, offset, &cancel);
+                                    match result {
+                                        Ok(page) => emit(&events, &notify, Update::Bookmarks(id, offset, page, cancel), permit),
+                                        Err(error) => emit(&events, &notify, Update::BookmarkFailed(id, error, cancel), permit),
+                                    }
+                                }
                                 Action::GetDocument(id, cancel) => {
                                     let result = cancel
                                         .check()
@@ -802,6 +820,7 @@ mod tests {
     use std::time::Duration;
 
     struct Repository;
+    impl BookmarkRepository for Repository {}
     impl LibraryRepository for Repository {
         fn query(&self, _: &LibraryQuery) -> Result<Vec<Document>> {
             Ok(Vec::new())

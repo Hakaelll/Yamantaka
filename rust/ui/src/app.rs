@@ -1384,6 +1384,7 @@ impl App for YamantakaApp {
                         }
                     }
                 }
+                Update::Bookmarks(..) | Update::BookmarkFailed(..) => {}
                 Update::Opened(document, info, cancel) => {
                     if cancel.is_cancelled() {
                         self.open_confirmation = Some((document.id.clone(), cancel));
