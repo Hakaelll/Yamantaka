@@ -89,6 +89,7 @@ impl BookmarkRepository for Database {
         document_id: &str,
         change: &BookmarkChange,
         offset: usize,
+        access: yamantaka_domain::search::IndexAccess,
         cancel: &Cancellation,
     ) -> Result<BookmarkPage> {
         cancel.check()?;
@@ -100,6 +101,20 @@ impl BookmarkRepository for Database {
             .optional()
             .map_err(storage)?;
         exists.ok_or_else(|| Failure::Invalid("Bookmark document no longer exists".into()))?;
+        let target_page = match change {
+            BookmarkChange::Ensure { page } | BookmarkChange::Save { page, .. } => *page,
+            BookmarkChange::Rename { id, .. } | BookmarkChange::Remove { id } => tx
+                .query_row(
+                    "SELECT page_index FROM bookmarks WHERE id=? AND document_id=?",
+                    params![id, document_id],
+                    |row| row.get::<_, u32>(0),
+                )
+                .optional()
+                .map_err(storage)?
+                .ok_or_else(|| {
+                    Failure::Invalid("Bookmark no longer belongs to this document".into())
+                })?,
+        };
         let now = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
         match change {
             BookmarkChange::Ensure { page } => {
@@ -142,6 +157,7 @@ impl BookmarkRepository for Database {
                 }
             }
         }
+        crate::search::refresh_bookmark_page(&tx, document_id, target_page, access)?;
         let page = read_page(&tx, document_id, offset, cancel)?;
         cancel.check()?;
         tx.commit().map_err(storage)?;
@@ -159,7 +175,13 @@ mod tests {
         change: &BookmarkChange,
         cancel: &Cancellation,
     ) -> Result<BookmarkPage> {
-        db.change_bookmark(id, change, 0, cancel)
+        db.change_bookmark(
+            id,
+            change,
+            0,
+            yamantaka_domain::search::IndexAccess::Disabled,
+            cancel,
+        )
     }
 
     fn database() -> Database {
@@ -205,6 +227,7 @@ mod tests {
                     label: None,
                 },
                 0,
+                yamantaka_domain::search::IndexAccess::Disabled,
                 &Cancellation::default(),
             )
             .unwrap();
@@ -226,6 +249,7 @@ mod tests {
                     label: None
                 },
                 0,
+                yamantaka_domain::search::IndexAccess::Disabled,
                 &Cancellation::default()
             )
             .is_err()
@@ -266,6 +290,7 @@ mod tests {
                         label: Some("Historical study position".into()),
                     },
                     0,
+                    yamantaka_domain::search::IndexAccess::Disabled,
                     &Cancellation::default(),
                 )
                 .unwrap();
@@ -294,6 +319,7 @@ mod tests {
                     label: Some("Résumé · دراسة".into()),
                 },
                 0,
+                yamantaka_domain::search::IndexAccess::Disabled,
                 &cancel,
             )
             .unwrap();

@@ -325,6 +325,21 @@ fn bookmark_commands_remain_responsive_during_native_work_and_preserve_scoped_ca
     assert_eq!(page.entries[0].id, bookmark.id);
     assert_eq!(page.entries[0].created_at, bookmark.created_at);
     assert_eq!(page.entries[0].label.as_deref(), Some("Résumé · دراسة"));
+    runtime
+        .submit(Action::Search(
+            SearchQuery {
+                text: "Résumé".into(),
+                kinds: vec![yamantaka_domain::search::SearchKind::Bookmark],
+                ..Default::default()
+            },
+            Cancellation::default(),
+        ))
+        .unwrap();
+    let Update::Search(results, _) = update(&runtime) else {
+        panic!("immediate bookmark search");
+    };
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].page, Some(2));
     let cancel = Cancellation::default();
     cancel.cancel();
     runtime
@@ -376,6 +391,17 @@ fn bookmark_commands_remain_responsive_during_native_work_and_preserve_scoped_ca
         ))
         .unwrap();
     assert!(matches!(update(&runtime), Update::Bookmarks(_,0,page,_) if page.total==0));
+    runtime
+        .submit(Action::Search(
+            SearchQuery {
+                text: "Résumé".into(),
+                kinds: vec![yamantaka_domain::search::SearchKind::Bookmark],
+                ..Default::default()
+            },
+            Cancellation::default(),
+        ))
+        .unwrap();
+    assert!(matches!(update(&runtime), Update::Search(results, _) if results.is_empty()));
     runtime.submit(Action::Index(IndexCommand::Cancel)).unwrap();
     committed(&runtime, WriteKind::Index);
     assert!(native_cancel.is_cancelled());

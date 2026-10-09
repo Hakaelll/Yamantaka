@@ -54,6 +54,7 @@ pub trait BookmarkRepository {
         _document_id: &str,
         _change: &BookmarkChange,
         _offset: usize,
+        _access: crate::search::IndexAccess,
         _cancel: &Cancellation,
     ) -> Result<BookmarkPage> {
         Err(Failure::Unsupported("Changing bookmarks".into()))

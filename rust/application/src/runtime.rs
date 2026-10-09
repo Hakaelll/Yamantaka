@@ -292,7 +292,12 @@ impl Runtime {
                                     }
                                 }
                                 Action::ChangeBookmark(id, change, offset, cancel) => {
-                                    let result = repository.change_bookmark(&id, &change, offset, &cancel);
+                                    let access = if indexer.progress().enabled {
+                                        yamantaka_domain::search::IndexAccess::Enabled
+                                    } else {
+                                        yamantaka_domain::search::IndexAccess::Disabled
+                                    };
+                                    let result = repository.change_bookmark(&id, &change, offset, access, &cancel);
                                     match result {
                                         Ok(page) => emit(&events, &notify, Update::Bookmarks(id, offset, page, cancel), permit),
                                         Err(error) => emit(&events, &notify, Update::BookmarkFailed(id, error, cancel), permit),
