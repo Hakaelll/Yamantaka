@@ -1,3 +1,4 @@
+pub mod snapshot;
 use crate::{
     Failure, Result,
     memory::{ByteLease, Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},

@@ -105,6 +105,12 @@ impl YamantakaApp {
             let fallback = self.annotations.fallback();
             let editor = self.annotations.editor.as_mut().unwrap();
             ui.add_enabled_ui(!busy,|ui| {
+                if let EditorSource::Selection {snapshot,..}=&editor.source
+                    && snapshot.pages().len()>1
+                {
+                    ui.label(if english {format!("{} pages. Your note applies to each selected passage.",snapshot.pages().len())} else {format!("{} páginas. Tu nota se aplica a cada pasaje seleccionado.",snapshot.pages().len())});
+                    ui.add_space(8.0);
+                }
                 let passage=editor.passage();
                 if !passage.is_empty() {
                     egui::Frame::new().fill(p.raised).inner_margin(12).corner_radius(8).show(ui,|ui| {
@@ -146,8 +152,8 @@ impl YamantakaApp {
                 }
                 if fallback {
                     ui.add_space(12.0);
-                    ui.label(if english {"This passage has incomplete geometry. Keep it as a page note with its text."} else {"Este pasaje no tiene geometría completa. Consérvalo como nota de página con su texto."});
-                    ui.checkbox(&mut editor.confirmed,if english {"Save as a page note"}else{"Guardar como nota de página"});
+                    ui.label(if english {"Some selected passages have incomplete geometry. Keep those as page notes with their text."} else {"Algunos pasajes no tienen geometría completa. Consérvalos como notas de página con su texto."});
+                    ui.checkbox(&mut editor.confirmed,if english {"Save affected passages as page notes"}else{"Guardar los pasajes afectados como notas de página"});
                 }
             });
             ui.add_space(12.0);

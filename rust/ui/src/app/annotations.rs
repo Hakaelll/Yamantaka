@@ -5,9 +5,8 @@ use yamantaka_application::annotations::{
 use yamantaka_domain::{
     Failure,
     annotations::{repository::*, *},
-    pdf_text::PdfPageText,
     reader_preferences::PageRotation,
-    text_selection::TextSelection,
+    text_selection::snapshot::TextSelectionSnapshot,
 };
 mod panel;
 #[cfg(test)]
@@ -15,8 +14,7 @@ mod tests;
 
 pub(super) enum EditorSource {
     Selection {
-        page: Arc<PdfPageText>,
-        range: TextSelection,
+        snapshot: TextSelectionSnapshot,
         fingerprint: String,
         rotation: PageRotation,
     },
@@ -49,9 +47,7 @@ impl AnnotationEditor {
                 .selected_text
                 .as_deref()
                 .unwrap_or(""),
-            EditorSource::Selection { page, range, .. } => page
-                .selected_text(range.start().character()..range.end().character())
-                .unwrap_or(""),
+            EditorSource::Selection { snapshot, .. } => snapshot.text(),
         }
     }
 }
@@ -172,60 +168,63 @@ impl AnnotationState {
             });
         }
         let EditorSource::Selection {
-            page,
-            range,
+            snapshot,
             fingerprint,
             rotation,
         } = &editor.source
         else {
             unreachable!()
         };
-        let selected = range
-            .page(page)?
-            .ok_or_else(|| Failure::Invalid("The selected passage is unavailable".into()))?;
         let document = self
             .document
             .as_deref()
             .ok_or_else(|| Failure::Invalid("Annotation document is unavailable".into()))?;
-        let draft = AnnotationDraft::from_selection(
+        let batch = yamantaka_domain::annotations::batch::AnnotationDraftBatch::from_selection(
             AnnotationSource {
                 document_id: document,
                 fingerprint,
                 rotation: *rotation,
             },
-            &selected,
+            snapshot.selection(),
+            snapshot.pages(),
             editor.kind,
             editor.color,
             Some(&editor.note),
             governor,
         )?;
-        if matches!(
-            draft.placement(),
-            AnnotationPlacement::PageNoteFallback { .. }
-        ) && !editor.confirmed
-        {
+        if batch.requires_page_note_confirmation() && !editor.confirmed {
             return Err(Failure::Invalid(
                 "Confirm the page-note fallback before saving".into(),
             ));
         }
-        Ok(AnnotationMutation::Create {
-            draft: Arc::new(draft),
+        Ok(AnnotationMutation::CreateBatch {
+            batch: Arc::new(batch),
             confirm_page_note: editor.confirmed,
             tags: Vec::new(),
         })
     }
     fn fallback(&self) -> bool {
         self.editor.as_ref().is_some_and(|editor| {
-            let EditorSource::Selection { page, range, .. } = &editor.source else {
+            let EditorSource::Selection { snapshot, .. } = &editor.source else {
                 return false;
             };
             editor.kind != AnnotationKind::PageComment
-                && range.page(page).ok().flatten().is_some_and(|selected| {
-                    selected.geometry_coverage()
-                        != yamantaka_domain::text_selection::GeometryCoverage::Complete
-                        || !selected.ink_regions().all(|region| {
-                            region.max()[0] - region.min()[0] > 0.0001
-                                && region.max()[1] - region.min()[1] > 0.0001
+                && snapshot.pages().iter().any(|page| {
+                    snapshot
+                        .selection()
+                        .page(page)
+                        .ok()
+                        .flatten()
+                        .is_some_and(|selected| {
+                            if selected.text().trim().is_empty() {
+                                return false;
+                            }
+                            selected.geometry_coverage()
+                                != yamantaka_domain::text_selection::GeometryCoverage::Complete
+                                || !selected.ink_regions().all(|region| {
+                                    region.max()[0] - region.min()[0] > 0.0001
+                                        && region.max()[1] - region.min()[1] > 0.0001
+                                })
                         })
                 })
         })
@@ -241,9 +240,10 @@ impl Drop for AnnotationState {
     }
 }
 impl YamantakaApp {
-    pub fn preview_annotations(&mut self, save: bool) {
+    pub fn preview_annotations(&mut self, save: bool, multi: bool) {
         if self.demo && self.capture.is_some() {
             self.preview_selection(false);
+            self.annotation_multi_preview = multi;
             self.annotation_preview = if save { 2 } else { 1 };
         }
     }
@@ -259,6 +259,9 @@ impl YamantakaApp {
             && self.selection_preview == selection::SelectionPreview::Complete
             && self.selection.preview_ready()
         {
+            if self.annotation_multi_preview && !self.selection.extend_preview(1) {
+                return;
+            }
             self.annotate_selection();
             if let Some(editor) = &mut self.annotations.editor {
                 editor.note = "A passage to revisit during study.".into();
@@ -307,13 +310,12 @@ impl YamantakaApp {
         let Some((document, _)) = &self.active else {
             return;
         };
-        match self.selection.annotation_source() {
-            Ok((range, page)) => {
+        match self.selection.annotation_source(&self.governor) {
+            Ok(snapshot) => {
                 self.annotations.bind(&document.id);
                 self.annotations.editor = Some(AnnotationEditor {
                     source: EditorSource::Selection {
-                        page,
-                        range,
+                        snapshot,
                         fingerprint: document.fingerprint.clone(),
                         rotation: self
                             .reader_preferences

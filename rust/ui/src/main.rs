@@ -284,7 +284,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
                 if args.iter().any(|arg| arg == "--annotations") {
-                    app.preview_annotations(args.iter().any(|arg| arg == "--annotation-save"));
+                    app.preview_annotations(
+                        args.iter().any(|arg| arg == "--annotation-save"),
+                        args.iter().any(|arg| arg == "--annotation-multi"),
+                    );
                 }
                 if args.iter().any(|arg| arg == "--selection") {
                     app.preview_selection(args.iter().any(|value| value == "--selection-keyboard"));

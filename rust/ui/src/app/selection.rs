@@ -16,6 +16,19 @@ pub(super) struct SelectionState {
     gesture: SelectionGesture,
 }
 impl SelectionState {
+    pub(super) fn extend_preview(&mut self, end_page: u32) -> bool {
+        let Some(range) = self.range() else {
+            return false;
+        };
+        let payload = self.pages.get(&end_page).and_then(text::TextState::payload);
+        let ready = payload.is_some();
+        let extent =
+            SelectionPosition::new(end_page, payload.map_or(0, |page| page.characters().len()))
+                .unwrap();
+        self.gesture = SelectionGesture::Selected(range.start(), extent);
+        ready
+    }
+
     pub(super) fn capture_summary(&self) -> serde_json::Value {
         let range = self.range();
         serde_json::json!({"enabled": self.enabled, "residentPages":self.pages.len(), "readyPages":self.pages.values().filter(|state| state.payload().is_some()).count(), "start":range.map(|range| [range.start().page(), range.start().character() as u32]), "end":range.map(|range| [range.end().page(), range.end().character() as u32])})
@@ -96,55 +109,27 @@ impl SelectionState {
         }
         pages
     }
-    pub(super) fn annotation_source(&self) -> Result<(TextSelection, Arc<PdfPageText>)> {
+    pub(super) fn annotation_source(
+        &self,
+        governor: &MemoryGovernor,
+    ) -> Result<yamantaka_domain::text_selection::snapshot::TextSelectionSnapshot> {
         let range = self
             .range()
             .filter(|range| !range.is_empty())
             .ok_or_else(|| Failure::Invalid("Select a passage before adding a note".into()))?;
-        if range.start().page() != range.end().page() {
-            return Err(Failure::Unsupported(
-                "Annotating a passage across multiple pages is not connected yet".into(),
-            ));
-        }
-        let page = self
-            .pages
-            .get(&range.start().page())
-            .and_then(text::TextState::payload)
-            .cloned()
-            .ok_or_else(|| Failure::Invalid("The selected page text is not ready".into()))?;
-        Ok((range, page))
+        let pages = (range.start().page()..=range.end().page()).map(|page| {
+            self.pages
+                .get(&page)
+                .and_then(text::TextState::payload)
+                .cloned()
+                .ok_or_else(|| Failure::Invalid("Selected page text is not ready".into()))
+        });
+        yamantaka_domain::text_selection::snapshot::TextSelectionSnapshot::new(
+            range, pages, governor,
+        )
     }
     fn copy(&self, governor: &MemoryGovernor) -> Result<SelectedText> {
-        let range = self
-            .range()
-            .filter(|range| !range.is_empty())
-            .ok_or_else(|| Failure::Invalid("No text passage is selected".into()))?;
-        let count =
-            usize::try_from(u64::from(range.end().page()) - u64::from(range.start().page()) + 1)
-                .map_err(|_| Failure::MemoryBudget)?;
-        let _lease = governor
-            .try_reserve_one(yamantaka_domain::memory::Cost::new(
-                yamantaka_domain::memory::MemoryCategory::Text,
-                yamantaka_domain::memory::MemoryRepresentation::Cpu,
-                count
-                    .checked_mul(std::mem::size_of::<Arc<PdfPageText>>())
-                    .ok_or(Failure::MemoryBudget)?,
-            ))
-            .map_err(|_| Failure::MemoryBudget)?;
-        let mut pages = Vec::new();
-        pages
-            .try_reserve_exact(count)
-            .map_err(|_| Failure::MemoryBudget)?;
-        for page in range.start().page()..=range.end().page() {
-            pages.push(
-                self.pages
-                    .get(&page)
-                    .and_then(text::TextState::payload)
-                    .cloned()
-                    .ok_or_else(|| Failure::Invalid("Selected page text is not ready".into()))?,
-            );
-        }
-        range.copy_text(&pages, governor)
+        Ok(self.annotation_source(governor)?.into_text())
     }
 }
 

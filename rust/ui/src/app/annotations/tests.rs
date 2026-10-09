@@ -1,7 +1,9 @@
 use super::*;
 use yamantaka_domain::{
-    memory::*, pdf_geometry::NormalizedPageRect, pdf_text::TextCharacter,
-    text_selection::SelectionPosition,
+    memory::*,
+    pdf_geometry::NormalizedPageRect,
+    pdf_text::{PdfPageText, TextCharacter},
+    text_selection::{SelectionPosition, TextSelection},
 };
 use yamantaka_storage::Database;
 
@@ -25,11 +27,15 @@ fn editor(governor: &MemoryGovernor, missing: bool) -> AnnotationEditor {
     let page = Arc::new(PdfPageText::from_reserved(0, text.into(), characters, lease).unwrap());
     AnnotationEditor {
         source: EditorSource::Selection {
-            page,
-            range: TextSelection::new(
-                SelectionPosition::new(0, 0).unwrap(),
-                SelectionPosition::new(0, 4).unwrap(),
-            ),
+            snapshot: TextSelectionSnapshot::new(
+                TextSelection::new(
+                    SelectionPosition::new(0, 0).unwrap(),
+                    SelectionPosition::new(0, 4).unwrap(),
+                ),
+                [Ok(page)],
+                governor,
+            )
+            .unwrap(),
             fingerprint: "fa".into(),
             rotation: PageRotation::Deg90,
         },
@@ -55,8 +61,8 @@ fn execute(db: &mut Database, request: AnnotationRequest) -> AnnotationReply {
             document_id,
             mutation,
         } => {
-            let AnnotationMutation::Create {
-                draft,
+            let AnnotationMutation::CreateBatch {
+                batch,
                 confirm_page_note,
                 tags,
             } = mutation
@@ -65,8 +71,8 @@ fn execute(db: &mut Database, request: AnnotationRequest) -> AnnotationReply {
             };
             db.change_annotation(
                 &document_id,
-                AnnotationChange::Create {
-                    draft: &draft,
+                AnnotationChange::CreateBatch {
+                    batch: &batch,
                     confirm_page_note,
                     tags: &tags,
                 },
@@ -184,6 +190,90 @@ fn stale_replies_and_failed_save_preserve_the_current_editor_for_retry() {
         .request(&governor, Some(state.mutation(&governor).unwrap()), 0)
         .unwrap();
     drop(retry);
+    drop(state);
+    assert_eq!(governor.usage().text, 0);
+}
+
+#[test]
+fn editor_saves_a_frozen_multi_page_passage_with_per_page_fallback() {
+    let governor = MemoryGovernor::default();
+    let mut db = database();
+    let mut first = editor(&governor, false);
+    let second = editor(&governor, true);
+    let EditorSource::Selection {
+        snapshot: first_source,
+        ..
+    } = &first.source
+    else {
+        panic!("selection")
+    };
+    let EditorSource::Selection {
+        snapshot: second_source,
+        ..
+    } = second.source
+    else {
+        panic!("selection")
+    };
+    let lease = governor
+        .try_reserve_one(Cost::new(
+            MemoryCategory::Text,
+            MemoryRepresentation::Cpu,
+            4096,
+        ))
+        .unwrap();
+    let page = Arc::new(
+        PdfPageText::from_reserved(
+            1,
+            "café".into(),
+            second_source.pages()[0]
+                .characters()
+                .iter()
+                .map(|character| TextCharacter {
+                    bytes: character.bytes.clone(),
+                    region: character.region,
+                })
+                .collect(),
+            lease,
+        )
+        .unwrap(),
+    );
+    let range = TextSelection::new(
+        SelectionPosition::new(0, 1).unwrap(),
+        SelectionPosition::new(1, 4).unwrap(),
+    );
+    let snapshot = TextSelectionSnapshot::new(
+        range,
+        [Ok(first_source.pages()[0].clone()), Ok(page)],
+        &governor,
+    )
+    .unwrap();
+    assert_eq!(snapshot.text(), "afé\ncafé");
+    first.source = EditorSource::Selection {
+        snapshot,
+        fingerprint: "fa".into(),
+        rotation: PageRotation::Deg90,
+    };
+    drop(second_source);
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    state.editor = Some(first);
+    assert!(state.fallback());
+    assert!(state.mutation(&governor).is_err());
+    state.editor.as_mut().unwrap().confirmed = true;
+    let mutation = state.mutation(&governor).unwrap();
+    let request = state.request(&governor, Some(mutation), 0).unwrap();
+    state.accept(execute(&mut db, request));
+    let page = state.page.as_ref().unwrap();
+    assert_eq!(page.total, 2);
+    assert_eq!(
+        page.entries()[0].data().values.selected_text.as_deref(),
+        Some("afé")
+    );
+    assert_eq!(
+        page.entries()[1].data().values.kind,
+        AnnotationKind::PageComment
+    );
+    assert!(page.entries()[1].data().values.rects.is_empty());
     drop(state);
     assert_eq!(governor.usage().text, 0);
 }
