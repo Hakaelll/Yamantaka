@@ -49,7 +49,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .map(PathBuf::from)
         .collect();
     let (database, mut prefs, store) = if demo {
-        let store = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/demo-store");
+        let mut store = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/demo-store");
+        // Captures have their own instance identity so QA does not forward to
+        // or interfere with a demonstration window the user is reviewing.
+        if capture.is_some() {
+            store = store.join("captures").join(std::process::id().to_string());
+        }
         let mut db = Database::in_memory_at(11)?;
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../build/rust-fixtures/textual.pdf")
@@ -142,6 +147,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or(true)
     };
     if demo {
+        if args.iter().any(|arg| arg == "--search") {
+            prefs.rust.insert("globalIndexEnabled".into(), true.into());
+        }
         if args.iter().any(|arg| arg == "--reduce-motion") {
             prefs.rust.insert("reduceMotion".into(), true.into());
         }
@@ -240,6 +248,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_reader_options(usize::from(
                         args.iter().any(|arg| arg == "--layout-options"),
                     ));
+                }
+            }
+            if demo
+                && args
+                    .iter()
+                    .any(|arg| arg == "--search" || arg == "--search-disabled")
+            {
+                app.preview_search(args.iter().any(|arg| arg == "--search"));
+                if args.iter().any(|arg| arg == "--search-open-page") {
+                    app.preview_search_action("open");
+                }
+                if args.iter().any(|arg| arg == "--search-excluded") {
+                    app.preview_search_action("exclude");
                 }
             }
             if !initial.is_empty() {

@@ -19,6 +19,8 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    GetDocument(String, Cancellation),
+    IndexState(String, Cancellation),
     Search(SearchQuery, Cancellation),
     Index(IndexCommand),
     IndexStatistics,
@@ -45,6 +47,13 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    SearchFailed(Failure, Cancellation),
+    Document(String, Option<Document>, Cancellation),
+    IndexState(
+        String,
+        Option<yamantaka_domain::search::IndexState>,
+        Cancellation,
+    ),
     Search(Vec<SearchResult>, Cancellation),
     IndexStatistics(IndexStats),
     Library(Vec<Document>, u64, Cancellation),
@@ -246,6 +255,46 @@ impl Runtime {
                         } else {
                             match action {
                                 Action::Shutdown => break,
+                                Action::GetDocument(id, cancel) => {
+                                    let result = cancel
+                                        .check()
+                                        .and_then(|()| repository.get(&id))
+                                        .and_then(|document| {
+                                            cancel.check()?;
+                                            Ok(document)
+                                        });
+                                    match result {
+                                        Ok(document) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::Document(id, document, cancel),
+                                            permit,
+                                        ),
+                                        Err(error) => {
+                                            failed(&events, &notify, error, Some(cancel), permit)
+                                        }
+                                    }
+                                }
+                                Action::IndexState(id, cancel) => {
+                                    let result = cancel
+                                        .check()
+                                        .and_then(|()| repository.index_state(&id))
+                                        .and_then(|state| {
+                                            cancel.check()?;
+                                            Ok(state)
+                                        });
+                                    match result {
+                                        Ok(state) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::IndexState(id, state, cancel),
+                                            permit,
+                                        ),
+                                        Err(error) => {
+                                            failed(&events, &notify, error, Some(cancel), permit)
+                                        }
+                                    }
+                                }
                                 Action::Index(command) => {
                                     let result = if index_cleanup.is_some()
                                         && matches!(&command, IndexCommand::Start { .. })
@@ -289,9 +338,12 @@ impl Runtime {
                                             Update::Search(results, cancel),
                                             permit,
                                         ),
-                                        Err(error) => {
-                                            failed(&events, &notify, error, Some(cancel), permit)
-                                        }
+                                        Err(error) => emit(
+                                            &events,
+                                            &notify,
+                                            Update::SearchFailed(error, cancel),
+                                            permit,
+                                        ),
                                     }
                                 }
                                 Action::IndexStatistics => match repository.index_stats() {

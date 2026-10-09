@@ -78,6 +78,9 @@ fn setup_with_failure(broken_index: bool) -> (Runtime, Receiver<Native>, Receive
     if broken_index {
         db.execute_batch("DROP TABLE search_index_state").unwrap();
     }
+    start_database(db)
+}
+fn start_database(db: Database) -> (Runtime, Receiver<Native>, Receiver<()>) {
     let (send, native) = bounded(16);
     let (wake, notified) = bounded(1);
     (
@@ -88,6 +91,69 @@ fn setup_with_failure(broken_index: bool) -> (Runtime, Receiver<Native>, Receive
         native,
         notified,
     )
+}
+
+#[test]
+fn result_lookup_reaches_documents_outside_the_catalogue_page_and_reads_exclusion_state() {
+    let db = Database::in_memory_at(11).unwrap();
+    for index in 0..81 {
+        db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES ('synthetic-{index:03}','synthetic-{index:03}.pdf','synthetic-{index:03}.pdf','synthetic-{index:03}.pdf','Synthetic study document',3,1,'now','now','now','synthetic-{index:03}');")).unwrap();
+    }
+    let (runtime, native, _) = start_database(db);
+    runtime
+        .submit(Action::Query(Default::default(), Cancellation::default()))
+        .unwrap();
+    let Update::Library(documents, count, _) = update(&runtime) else {
+        panic!("expected catalogue page")
+    };
+    assert_eq!(count, 81);
+    assert_eq!(documents.len(), 80);
+    let id = (0..81)
+        .map(|index| format!("synthetic-{index:03}"))
+        .find(|id| documents.iter().all(|document| document.id != *id))
+        .unwrap();
+    runtime
+        .submit(Action::GetDocument(id.clone(), Cancellation::default()))
+        .unwrap();
+    assert!(
+        matches!(update(&runtime), Update::Document(actual, Some(document), cancel)
+        if actual == id && document.id == id && document.page_count == 3 && !cancel.is_cancelled())
+    );
+    runtime
+        .submit(Action::IndexState(id.clone(), Cancellation::default()))
+        .unwrap();
+    assert!(matches!(update(&runtime), Update::IndexState(actual, None, _) if actual == id));
+    runtime
+        .submit(Action::Index(IndexCommand::Exclude {
+            document_id: id.clone(),
+            excluded: true,
+        }))
+        .unwrap();
+    committed(&runtime, WriteKind::Index);
+    runtime
+        .submit(Action::IndexState(id.clone(), Cancellation::default()))
+        .unwrap();
+    assert!(
+        matches!(update(&runtime), Update::IndexState(actual, Some(state), _)
+        if actual == id && state.status == yamantaka_domain::search::IndexStatus::Excluded)
+    );
+    runtime.submit(Action::IndexStatistics).unwrap();
+    assert!(matches!(update(&runtime), Update::IndexStatistics(stats) if stats.excluded == 1));
+    runtime
+        .submit(Action::GetDocument(
+            "absent".into(),
+            Cancellation::default(),
+        ))
+        .unwrap();
+    assert!(matches!(update(&runtime), Update::Document(id, None, _) if id == "absent"));
+    let cancel = Cancellation::default();
+    cancel.cancel();
+    runtime.submit(Action::GetDocument(id, cancel)).unwrap();
+    runtime
+        .submit(Action::Query(Default::default(), Cancellation::default()))
+        .unwrap();
+    assert!(matches!(update(&runtime), Update::Library(_, 81, _)));
+    assert!(native.try_recv().is_err());
 }
 
 #[test]
@@ -218,7 +284,7 @@ fn actor_requires_consent_and_keeps_sql_responsive_during_cancelled_native_open(
             Cancellation::default(),
         ))
         .unwrap();
-    assert!(matches!(update(&runtime), Update::Failed(_, Some(_))));
+    assert!(matches!(update(&runtime), Update::SearchFailed(_, _)));
     assert!(native.try_recv().is_err());
     start(&runtime);
     let Native::Open(_, cancel, send) = next(&native) else {

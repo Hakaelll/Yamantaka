@@ -1,0 +1,280 @@
+{
+  "synthetic": true,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Library",
+      "rect": [
+        156.21875,
+        8.0,
+        250.0625,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Tools",
+      "rect": [
+        1322.28125,
+        8.0,
+        1406.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Add PDFs",
+      "rect": [
+        1200.5,
+        8.0,
+        1312.28125,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Index library",
+      "rect": [
+        36.0,
+        306.40625,
+        164.125,
+        346.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Manage index",
+      "rect": [
+        174.125,
+        306.40625,
+        214.125,
+        346.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "All",
+      "rect": [
+        36.0,
+        372.40625,
+        79.8125,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Documents",
+      "rect": [
+        89.8125,
+        372.40625,
+        188.21875,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Text",
+      "rect": [
+        198.21875,
+        372.40625,
+        250.6875,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Annotations",
+      "rect": [
+        260.6875,
+        372.40625,
+        363.84375,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Bookmarks",
+      "rect": [
+        373.84375,
+        372.40625,
+        470.1875,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Collections",
+      "rect": [
+        480.1875,
+        372.40625,
+        575.84375,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Tags",
+      "rect": [
+        585.84375,
+        372.40625,
+        640.90625,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Relations",
+      "rect": [
+        650.90625,
+        372.40625,
+        734.90625,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "File filters",
+      "rect": [
+        744.90625,
+        372.40625,
+        784.90625,
+        412.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Open page",
+      "rect": [
+        754.0,
+        674.40625,
+        874.78125,
+        714.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Include in index",
+      "rect": [
+        754.0,
+        736.40625,
+        879.28125,
+        776.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "trackedMemory": {
+    "total": 0,
+    "pages": 0,
+    "tiles": 0,
+    "text": 0,
+    "other": 0,
+    "cpu": 0,
+    "gpu": 0,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."
+}

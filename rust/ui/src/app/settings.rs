@@ -319,6 +319,19 @@ impl YamantakaApp {
                     "Your documents and reading activity stay on this device.",
                 ));
                 ui.add_space(24.0);
+                if theme::control(
+                    ui,
+                    self.tr("Gestionar búsqueda local", "Manage local search"),
+                    Some(theme::Icon::Search),
+                    false,
+                    false,
+                    p,
+                )
+                .clicked()
+                {
+                    self.show_search();
+                }
+                ui.add_space(16.0);
                 for (title, description) in [
                     (
                         self.tr("Sin cuentas", "No accounts"),

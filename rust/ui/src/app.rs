@@ -5,6 +5,7 @@ mod navigation;
 mod reader_controls;
 mod reader_options;
 mod reader_viewport;
+mod search;
 mod settings;
 
 use crate::{
@@ -35,6 +36,7 @@ use yamantaka_storage::preferences::Preferences;
 use yamantaka_windows::{ActivationWatch, Instance};
 
 enum Surface {
+    Search,
     Library,
     Reader,
     Settings,
@@ -58,6 +60,7 @@ impl PageImage {
     }
 }
 pub struct YamantakaApp {
+    search: search::SearchState,
     runtime: Runtime,
     preferences: Preferences,
     store: PathBuf,
@@ -183,6 +186,12 @@ impl YamantakaApp {
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
         let mut app = Self {
+            search: search::SearchState::new(
+                preferences
+                    .get("globalIndexEnabled")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+            ),
             runtime,
             preferences,
             store,
@@ -245,6 +254,11 @@ impl YamantakaApp {
             reader_options_section: 0,
         };
         app.refresh();
+        if app.search.enabled {
+            app.send(Action::Index(
+                yamantaka_application::search_index::IndexCommand::Enable(true),
+            ));
+        }
         app
     }
     fn tr<'a>(&self, es: &'a str, en: &'a str) -> &'a str {
@@ -364,6 +378,7 @@ impl YamantakaApp {
         }
     }
     fn open(&mut self, document: Document) {
+        self.search.pending_page = None;
         self.reader_preferences_cancel.cancel();
         self.reader_preferences_cancel = Cancellation::default();
         self.reader_preferences = None;
@@ -509,17 +524,7 @@ impl YamantakaApp {
                         {
                             self.import(paths);
                         }
-                        if theme::icon_toggle(
-                            ui,
-                            self.tr("Ajustes", "Settings"),
-                            theme::Icon::Settings,
-                            matches!(self.surface, Surface::Settings),
-                            p,
-                        )
-                        .clicked()
-                        {
-                            self.surface = Surface::Settings;
-                        }
+                        self.tools_menu(ui, true, p);
                         if matches!(self.surface, Surface::Library)
                             && let Some(document) = self
                                 .documents
@@ -546,18 +551,7 @@ impl YamantakaApp {
                             egui::vec2(action_width, 40.0),
                             egui::Layout::right_to_left(egui::Align::Center),
                             |ui| {
-                                if theme::control(
-                                    ui,
-                                    self.tr("Ajustes", "Settings"),
-                                    Some(theme::Icon::Settings),
-                                    matches!(self.surface, Surface::Settings),
-                                    false,
-                                    p,
-                                )
-                                .clicked()
-                                {
-                                    self.surface = Surface::Settings;
-                                }
+                                self.tools_menu(ui, false, p);
                                 if theme::control(
                                     ui,
                                     self.tr("Añadir PDF", "Add PDFs"),
@@ -1374,6 +1368,12 @@ impl App for YamantakaApp {
                     self.page = document
                         .last_page_index
                         .min(info.page_sizes.len().saturating_sub(1) as u32);
+                    if let Some((id, page)) = self.search.pending_page.take()
+                        && id == document.id
+                    {
+                        self.page = page.min(info.page_sizes.len().saturating_sub(1) as u32);
+                        self.send(Action::Navigate(id, self.page));
+                    }
                     let count = u32::try_from(info.page_sizes.len()).unwrap_or(0);
                     match ReaderNavigation::new(count, self.page) {
                         Ok(navigation) => self.navigation = Some(navigation),
@@ -1456,9 +1456,89 @@ impl App for YamantakaApp {
                     self.render_retry = self.requested.is_some();
                     self.loading = false;
                 }
+                Update::Committed(_, yamantaka_application::runtime::WriteKind::Index) => {
+                    self.send(Action::IndexStatistics);
+                    self.refresh_selected_index_state();
+                }
                 Update::Committed(_, _) => {}
-                // No UI action submits global search until its surface is connected.
-                Update::Search(_, _) | Update::IndexStatistics(_) => {}
+                Update::Search(results, cancel) => {
+                    if !cancel.is_cancelled() {
+                        self.search.has_more = results.len() == 80;
+                        self.search.results = results;
+                        self.search.searching = false;
+                        self.search.completed = true;
+                        if self.search.preview_results
+                            && self.search.selected.is_none()
+                            && let Some(result) = if self.search.preview_action == Some("open") {
+                                self.search
+                                    .results
+                                    .iter()
+                                    .find(|result| result.page == Some(1))
+                                    .cloned()
+                            } else {
+                                self.search.results.first().cloned()
+                            }
+                        {
+                            self.select_search_result(result.clone());
+                            match self.search.preview_action.take() {
+                                Some("open") => self.activate_search_result(&result),
+                                Some("exclude") => self.exclude_search_result(&result, true),
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                Update::SearchFailed(error, cancel) => {
+                    if !cancel.is_cancelled() {
+                        self.search.searching = false;
+                        self.search.error = Some(error.to_string());
+                    }
+                }
+                Update::IndexStatistics(stats) => {
+                    self.search.stats = Some(stats);
+                }
+                Update::IndexState(id, state, cancel) => {
+                    if !cancel.is_cancelled()
+                        && self
+                            .search
+                            .selected
+                            .as_ref()
+                            .is_some_and(|result| result.document_id == id)
+                    {
+                        self.search.excluded = Some(state.is_some_and(|state| {
+                            state.status == yamantaka_domain::search::IndexStatus::Excluded
+                        }));
+                    }
+                }
+                Update::Document(id, document, cancel) => {
+                    if !cancel.is_cancelled() {
+                        if let Some(document) =
+                            document.filter(|document| document.id == id && !document.missing)
+                        {
+                            let page = self
+                                .search
+                                .lookup_page
+                                .take()
+                                .filter(|(target, _)| *target == id)
+                                .and_then(|(_, page)| page);
+                            if self
+                                .active
+                                .as_ref()
+                                .is_some_and(|(active, _)| active.id == id)
+                            {
+                                if let Some(page) = page {
+                                    self.navigate(page);
+                                }
+                                self.surface = Surface::Reader;
+                            } else {
+                                self.open(document);
+                                self.search.pending_page = page.map(|page| (id, page));
+                            }
+                        } else {
+                            self.error = Some(self.tr("El documento ya no está disponible. Localízalo desde la biblioteca.", "The document is unavailable. Locate it from the library.").into());
+                        }
+                    }
+                }
                 Update::ReaderPreferences(id, preferences, cancel) => {
                     if cancel.is_cancelled()
                         || !self.active.as_ref().is_some_and(|(doc, _)| doc.id == id)
@@ -1496,6 +1576,12 @@ impl App for YamantakaApp {
             data.insert_temp(egui::Id::new("yamantaka-english"), self.english);
         });
         let p = Palette::new(self.dark);
+        self.poll_search(&ctx);
+        if ctx.input_mut(|input| {
+            input.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::F)
+        }) {
+            self.show_search();
+        }
         if ctx.input(|i| i.key_pressed(egui::Key::F11)) {
             let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
             ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
@@ -1588,6 +1674,7 @@ impl App for YamantakaApp {
                         Surface::Library => self.library(ui),
                         Surface::Reader => self.reader(ui),
                         Surface::Settings => self.settings(ui),
+                        Surface::Search => self.global_search(ui),
                     });
             });
         });
@@ -1595,6 +1682,16 @@ impl App for YamantakaApp {
             if !self.capture_requested {
                 let ready = !self.documents.is_empty()
                     && !self.loading
+                    && (!self.search.preview_open_page
+                        || matches!(self.surface, Surface::Reader) && self.page == 1)
+                    && (!self.search.preview_excluded
+                        || self
+                            .search
+                            .stats
+                            .as_ref()
+                            .is_some_and(|stats| stats.excluded > 0))
+                    && (!self.search.preview_results
+                        || self.search.completed && !self.search.searching)
                     && (!matches!(self.surface, Surface::Reader)
                         || self.reader_preferences.is_some()
                             && !self.reader_pages.is_empty()
