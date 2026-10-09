@@ -127,6 +127,24 @@ fn native_unicode_character_ranges_crop_rotations_and_retained_memory() {
             .unwrap();
         assert!(empty.text().is_empty());
         assert!(empty.characters().is_empty());
+        {
+            use yamantaka_domain::text_selection::{
+                GeometryCoverage, SelectionPosition, TextSelection,
+            };
+            let selection = TextSelection::new(
+                SelectionPosition::new(1, 0).unwrap(),
+                SelectionPosition::new(0, 1).unwrap(),
+            );
+            let copy = selection
+                .copy_text(&[page.clone(), empty.clone()], &governor)
+                .unwrap();
+            assert_eq!(copy.text(), "afé study");
+            assert_eq!(selection.page(&page).unwrap().unwrap().text(), "afé study");
+            assert_eq!(
+                selection.page(&page).unwrap().unwrap().geometry_coverage(),
+                GeometryCoverage::Complete
+            );
+        }
         drop(empty);
         worker.close("study".into()).unwrap();
         assert!(governor.usage().text > 0);
@@ -259,6 +277,26 @@ fn cropped_out_characters_keep_text_without_inventing_selection_geometry() {
         .unwrap();
     assert_eq!(page.selected_text(0..1).unwrap(), "i");
     assert!(page.characters()[0].region.is_none());
+    {
+        use yamantaka_domain::text_selection::{
+            GeometryCoverage, SelectionPosition, TextSelection,
+        };
+        let selection = TextSelection::new(
+            SelectionPosition::new(0, 0).unwrap(),
+            SelectionPosition::new(0, 1).unwrap(),
+        );
+        assert_eq!(
+            selection.page(&page).unwrap().unwrap().geometry_coverage(),
+            GeometryCoverage::Unavailable
+        );
+        assert_eq!(
+            selection
+                .copy_text(std::slice::from_ref(&page), &governor)
+                .unwrap()
+                .text(),
+            "i"
+        );
+    }
     drop(page);
     assert_eq!(governor.usage().text, 0);
 }
