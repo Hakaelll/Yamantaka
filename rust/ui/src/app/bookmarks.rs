@@ -98,17 +98,19 @@ impl YamantakaApp {
         if !self.panel {
             return;
         }
-        if self.bookmarks.bind(&document.id) && self.bookmark_panel {
+        if self.bookmarks.bind(&document.id)
+            && (self.reader_panel_tab == outline::ReaderPanelTab::Bookmarks)
+        {
             self.bookmark_command(0, None);
         }
-        if self.bookmark_panel
+        if (self.reader_panel_tab == outline::ReaderPanelTab::Bookmarks)
             && self.bookmarks.page.is_none()
             && self.bookmarks.pending.is_none()
             && self.bookmarks.error.is_none()
         {
             self.bookmark_command(0, None);
         }
-        if !self.bookmark_panel {
+        if self.reader_panel_tab == outline::ReaderPanelTab::Text {
             let identity = (document.id.clone(), self.page, self.generation);
             if self.panel_requested.as_ref() != Some(&identity) {
                 self.panel_text.clear();
@@ -119,6 +121,9 @@ impl YamantakaApp {
                     self.cancel.clone(),
                 ));
             }
+        }
+        if self.reader_panel_tab == outline::ReaderPanelTab::Outline {
+            self.request_outline(&document.id);
         }
         // Narrow windows use the same scrollable content as a full-width drawer,
         // rather than leaving a sliver of PDF alongside a fixed-width sidebar.
@@ -149,37 +154,46 @@ impl YamantakaApp {
     }
 
     fn reader_panel_content(&mut self, ui: &mut egui::Ui, info: &PdfInfo, p: Palette) {
+        let compact = ui.ctx().content_rect().width() < 620.0;
         ui.horizontal_wrapped(|ui| {
-            for (bookmarks, es, en) in [(true, "Marcadores", "Bookmarks"), (false, "Texto", "Text")]
-            {
-                if theme::navigation(ui, self.tr(es, en), self.bookmark_panel == bookmarks, p)
-                    .clicked()
+            for (tab, es, en) in [
+                (outline::ReaderPanelTab::Outline, "Índice", "Contents"),
+                (
+                    outline::ReaderPanelTab::Bookmarks,
+                    "Marcadores",
+                    "Bookmarks",
+                ),
+                (outline::ReaderPanelTab::Text, "Texto", "Text"),
+            ] {
+                if theme::navigation(ui, self.tr(es, en), self.reader_panel_tab == tab, p).clicked()
                 {
-                    self.bookmark_panel = bookmarks;
-                    if bookmarks && self.bookmarks.page.is_none() {
-                        self.bookmark_command(0, None);
-                    }
+                    self.reader_panel_tab = tab;
                 }
             }
-            if theme::icon_button(
-                ui,
-                self.tr("Cerrar panel", "Close panel"),
-                theme::Icon::Minus,
-                p,
-            )
-            .clicked()
+            if !compact
+                && theme::icon_button(
+                    ui,
+                    self.tr("Cerrar panel", "Close panel"),
+                    theme::Icon::Minus,
+                    p,
+                )
+                .clicked()
             {
                 self.panel = false;
             }
         });
         let compact = ui.ctx().content_rect().width() < 620.0;
         ui.add_space(if compact { 8.0 } else { 18.0 });
-        if !self.bookmark_panel {
+        if self.reader_panel_tab == outline::ReaderPanelTab::Text {
             ui.heading(self.tr("Texto de la página", "Page text"));
             if theme::navigation(ui, self.tr("Copiar texto", "Copy text"), false, p).clicked() {
                 ui.ctx().copy_text(self.panel_text.clone());
             }
             ui.label(&self.panel_text);
+            return;
+        }
+        if self.reader_panel_tab == outline::ReaderPanelTab::Outline {
+            self.outline_panel_content(ui, p);
             return;
         }
         if !compact {

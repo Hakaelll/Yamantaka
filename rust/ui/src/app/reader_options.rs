@@ -56,7 +56,12 @@ impl YamantakaApp {
 
     pub(super) fn load_reader_preferences(&mut self, preferences: ReaderPreferences) {
         self.reader_preferences_loading = false;
-        self.zoom = preferences.zoom_level.clamp(0.2, 8.0) as f32;
+        let zoom = preferences.zoom_level as f32;
+        if !zoom.is_finite() || zoom <= 0.0 {
+            self.error = Some("Reader zoom cannot be represented".into());
+            return;
+        }
+        self.zoom = zoom;
         let start = preferences.page_rotation.unrotate_point([0.5, 0.0]);
         self.reader_preferences = Some(preferences);
         self.rebuild_reader_layout();
@@ -78,7 +83,12 @@ impl YamantakaApp {
             self.error = Some(error.to_string());
             return;
         }
-        self.zoom = preferences.zoom_level.clamp(0.2, 8.0) as f32;
+        let zoom = preferences.zoom_level as f32;
+        if !zoom.is_finite() || zoom <= 0.0 {
+            self.error = Some("Reader zoom cannot be represented".into());
+            return;
+        }
+        self.zoom = zoom;
         self.generation += 1;
         self.cancel.cancel();
         self.cancel = Cancellation::default();

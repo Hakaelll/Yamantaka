@@ -189,16 +189,13 @@ impl PdfWorker {
         let worker_governor = governor.clone();
         let handle = thread::Builder::new()
             .name("yamantaka-pdfium".into())
-            .spawn(move || match Pdfium::bind_to_library(library) {
-                Ok(bindings) => {
-                    let pdfium = Pdfium::new(bindings);
+            .spawn(move || match crate::bindings::open(&library) {
+                Ok(pdfium) => {
                     let _ = ready.send(Ok(()));
                     run(&pdfium, receiver, worker_scheduler, limits, worker_governor);
                 }
-                Err(_) => {
-                    let _ = ready.send(Err(Failure::Pdf(
-                        "Bundled PDFium could not be loaded. Verify the release bundle.".into(),
-                    )));
+                Err(error) => {
+                    let _ = ready.send(Err(error));
                 }
             })
             .map_err(|_| Failure::Pdf("PDF worker could not start".into()))?;

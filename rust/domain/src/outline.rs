@@ -130,6 +130,15 @@ impl PdfOutline {
         &self.entries
     }
     pub fn from_reserved(entries: Vec<OutlineEntry>, mut lease: ByteLease) -> crate::Result<Self> {
+        if entries
+            .iter()
+            .enumerate()
+            .any(|(index, entry)| entry.parent.is_some_and(|parent| parent >= index))
+        {
+            return Err(crate::Failure::Invalid(
+                "Outline parents must precede their children".into(),
+            ));
+        }
         let bytes = entries
             .capacity()
             .checked_mul(std::mem::size_of::<OutlineEntry>())
@@ -155,6 +164,27 @@ impl PdfOutline {
 #[cfg(test)]
 mod coordinate_tests {
     use super::PageCoordinateSpace;
+    #[test]
+    fn malformed_parent_indices_are_rejected_and_release_their_reservation() {
+        use crate::memory::{Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation};
+        let governor = MemoryGovernor::default();
+        for parent in [0, 1, usize::MAX] {
+            let lease = governor
+                .try_reserve_one(Cost::new(
+                    MemoryCategory::Text,
+                    MemoryRepresentation::Cpu,
+                    4096,
+                ))
+                .unwrap();
+            let entry = super::OutlineEntry {
+                title: "Invalid".into(),
+                parent: Some(parent),
+                destination: None,
+            };
+            assert!(super::PdfOutline::from_reserved(vec![entry], lease).is_err());
+            assert_eq!(governor.usage().text, 0);
+        }
+    }
     #[test]
     fn coordinates_preserve_crop_offsets_rotations_and_outside_points() {
         let corners = [

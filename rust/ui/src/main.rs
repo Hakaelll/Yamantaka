@@ -37,7 +37,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let reader = protected
         || args
             .iter()
-            .any(|arg| arg == "--reader" || arg == "--bookmarks");
+            .any(|arg| arg == "--reader" || arg == "--bookmarks" || arg == "--outline");
     let light = args.iter().any(|arg| arg == "--light");
     let tilt = args.iter().any(|arg| arg == "--tilt");
     let capture = args.iter().find_map(|arg| {
@@ -63,6 +63,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join(if protected {
                 "../../build/rust-fixtures/protected.pdf"
+            } else if args.iter().any(|arg| arg == "--outline") {
+                "../../build/rust-fixtures/outline.pdf"
             } else {
                 "../../build/rust-fixtures/textual.pdf"
             })
@@ -251,6 +253,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 );
                 if args.iter().any(|arg| arg == "--bookmarks") {
                     app.preview_bookmarks();
+                }
+                if args.iter().any(|arg| arg == "--outline") {
+                    app.preview_outline(if args.iter().any(|arg| arg == "--outline-jump") {
+                        Some(3)
+                    } else {
+                        None
+                    });
                 }
                 if args.iter().any(|arg| arg == "--list-states") {
                     app.preview_list_states();

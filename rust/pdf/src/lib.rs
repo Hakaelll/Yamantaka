@@ -1,4 +1,5 @@
 //! PDFium calls are owned by one worker; no PDFium handle crosses threads.
+mod bindings;
 mod cache;
 mod outline;
 mod page_geometry;

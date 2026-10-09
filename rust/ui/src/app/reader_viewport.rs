@@ -56,9 +56,15 @@ impl YamantakaApp {
         &mut self,
         ui: &mut egui::Ui,
         document: &Document,
-        _: &PdfInfo,
+        info: &PdfInfo,
         p: Palette,
     ) {
+        let viewport = ui.available_size();
+        let viewport_size = [
+            f64::from(viewport.x.max(1.0)),
+            f64::from(viewport.y.max(1.0)),
+        ];
+        self.apply_outline_destination(document, info, viewport_size);
         let (Some(layout), Some(preferences), Some(navigation)) = (
             self.reader_layout.clone(),
             self.reader_preferences.clone(),
@@ -71,11 +77,6 @@ impl YamantakaApp {
             return;
         };
         let anchor = navigation.position();
-        let viewport = ui.available_size();
-        let viewport_size = [
-            f64::from(viewport.x.max(1.0)),
-            f64::from(viewport.y.max(1.0)),
-        ];
         ui.painter()
             .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
         let mut scrolling = egui::ScrollArea::both().id_salt(("pdf-viewport", &document.id));
@@ -237,7 +238,7 @@ impl YamantakaApp {
                 self.send(Action::Navigate(document.id.clone(), self.page));
             }
         }
-        if self.panel && !self.bookmark_panel {
+        if self.panel && self.reader_panel_tab == outline::ReaderPanelTab::Text {
             let identity = (document.id.clone(), self.page, self.generation);
             if self.panel_requested.as_ref() != Some(&identity) {
                 self.panel_text.clear();

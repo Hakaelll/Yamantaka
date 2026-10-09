@@ -4,6 +4,7 @@ mod details;
 mod list;
 mod navigation;
 mod open_intent;
+mod outline;
 mod password;
 mod reader_controls;
 mod reader_options;
@@ -100,7 +101,10 @@ pub struct YamantakaApp {
     zoom: f32,
     reader_scale: f32,
     panel: bool,
-    bookmark_panel: bool,
+    reader_panel_tab: outline::ReaderPanelTab,
+    outline: outline::OutlineState,
+    outline_preview_target: Option<usize>,
+    outline_destination: Option<(String, yamantaka_domain::outline::OutlineDestination)>,
     bookmarks: bookmarks::BookmarkState,
     panel_text: String,
     panel_requested: Option<(String, u32, u64)>,
@@ -243,7 +247,10 @@ impl YamantakaApp {
             zoom: 1.0,
             reader_scale: 1.0,
             panel: false,
-            bookmark_panel: true,
+            reader_panel_tab: outline::ReaderPanelTab::Bookmarks,
+            outline: Default::default(),
+            outline_preview_target: None,
+            outline_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
             panel_text: String::new(),
             panel_requested: None,
@@ -388,13 +395,13 @@ impl YamantakaApp {
             self.list = list;
             self.inspector = details;
             self.panel = panel;
-            self.bookmark_panel = false;
+            self.reader_panel_tab = outline::ReaderPanelTab::Text;
         }
     }
     pub fn preview_bookmarks(&mut self) {
         if self.demo && self.capture.is_some() {
             self.panel = true;
-            self.bookmark_panel = true;
+            self.reader_panel_tab = outline::ReaderPanelTab::Bookmarks;
         }
     }
     /// Exercise the real selected and keyboard-focus treatments on different rows.
@@ -411,6 +418,8 @@ impl YamantakaApp {
         self.surface = surface;
     }
     fn open(&mut self, document: Document) {
+        self.outline_destination = None;
+        self.outline = Default::default();
         self.password = None;
         self.password_attempted = false;
         self.open_intent.begin_open();
@@ -1380,7 +1389,13 @@ impl App for YamantakaApp {
                         }
                     }
                 }
-                Update::Outline(..) | Update::OutlineFailed(..) => {}
+                Update::Outline(id, outline, cancel) => {
+                    self.outline.accept(&id, &cancel, Ok(outline));
+                    self.apply_outline_preview();
+                }
+                Update::OutlineFailed(id, error, cancel) => {
+                    self.outline.accept(&id, &cancel, Err(error.to_string()))
+                }
                 Update::Bookmarks(id, _, page, cancel) => {
                     self.bookmarks.accept(&id, &cancel, Ok(page));
                 }
@@ -1771,7 +1786,14 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = !self.documents.is_empty()
-                    && (!self.panel || !self.bookmark_panel || self.bookmarks.ready())
+                    && (!self.panel
+                        || match self.reader_panel_tab {
+                            outline::ReaderPanelTab::Bookmarks => self.bookmarks.ready(),
+                            outline::ReaderPanelTab::Outline => self.outline.ready(),
+                            outline::ReaderPanelTab::Text => true,
+                        })
+                    && self.outline_destination.is_none()
+                    && self.outline_preview_target.is_none()
                     && !self.loading
                     && match self.preview_password_target {
                         Some("unlock") => matches!(self.surface, Surface::Reader),
