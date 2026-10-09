@@ -42,6 +42,9 @@ struct ExternalConfirmation {
 }
 
 impl LinkState {
+    pub(super) fn confirmation_open(&self) -> bool {
+        self.confirmation.is_some()
+    }
     pub(super) fn ready(&self) -> bool {
         !self.pages.is_empty()
             && self

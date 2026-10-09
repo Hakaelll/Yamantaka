@@ -15,6 +15,7 @@ mod reader_viewport;
 mod render_updates;
 mod search;
 mod settings;
+mod shortcuts;
 mod thumbnails;
 
 use crate::{
@@ -1707,35 +1708,22 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
-        if ctx.input_mut(|input| {
-            input.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::F)
-        }) {
-            self.show_search();
-        }
-        if matches!(self.surface, Surface::Reader) && self.password.is_none() {
-            if ctx.input_mut(|input| input.consume_key(egui::Modifiers::CTRL, egui::Key::F)) {
-                self.show_find();
-            }
-            if ctx.input_mut(|input| input.consume_key(egui::Modifiers::SHIFT, egui::Key::F3)) {
-                self.step_find(false);
-            } else if ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::F3))
-            {
-                self.step_find(true);
-            }
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::F11)) {
-            let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
-            ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
-        }
-        if self.password.is_none()
-            && matches!(self.surface, Surface::Reader)
-            && !ctx.egui_wants_keyboard_input()
-        {
-            if ctx.input(|i| i.key_pressed(egui::Key::ArrowRight)) {
-                self.step_reader(true);
-            }
-            if ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft)) {
-                self.step_reader(false);
+        for shortcut in shortcuts::read(
+            &ctx,
+            self.password.is_some() || self.links.confirmation_open(),
+            matches!(self.surface, Surface::Reader),
+        ) {
+            match shortcut {
+                shortcuts::Shortcut::GlobalSearch => self.show_search(),
+                shortcuts::Shortcut::DocumentFind => self.show_find(),
+                shortcuts::Shortcut::PreviousMatch => self.step_find(false),
+                shortcuts::Shortcut::NextMatch => self.step_find(true),
+                shortcuts::Shortcut::PreviousPage => self.step_reader(false),
+                shortcuts::Shortcut::NextPage => self.step_reader(true),
+                shortcuts::Shortcut::Fullscreen => {
+                    let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
+                    ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
+                }
             }
         }
         let dropped = ctx.input(|i| {
