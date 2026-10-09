@@ -1,3 +1,4 @@
+use crate::annotations::{AnnotationReply, AnnotationRequest};
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
 use crate::search_index::{IndexCommand, IndexProgress, SearchIndexController};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Select, Sender, TryRecvError, bounded};
@@ -11,6 +12,7 @@ use std::{
     thread::{self, JoinHandle},
     time::Duration,
 };
+use yamantaka_domain::annotations::repository::AnnotationRepository;
 use yamantaka_domain::bookmarks::{BookmarkChange, BookmarkPage, BookmarkRepository};
 use yamantaka_domain::pdf_ticket::{AsyncPdfEngine, PdfTicket};
 use yamantaka_domain::reader_preferences::ReaderPreferences;
@@ -21,6 +23,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    Annotation(Box<AnnotationRequest>),
     Bookmarks(String, usize, Cancellation),
     ChangeBookmark(String, BookmarkChange, usize, Cancellation),
     GetDocument(String, Cancellation),
@@ -67,6 +70,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    Annotations(AnnotationReply),
     Bookmarks(String, usize, BookmarkPage, Cancellation),
     BookmarkFailed(String, Failure, Cancellation),
     SearchFailed(Failure, Cancellation),
@@ -321,7 +325,12 @@ fn advance_import<E: AsyncPdfEngine>(
 }
 impl Runtime {
     pub fn start<
-        R: LibraryRepository + SearchRepository + BookmarkRepository + Send + 'static,
+        R: LibraryRepository
+            + SearchRepository
+            + BookmarkRepository
+            + AnnotationRepository
+            + Send
+            + 'static,
         E: AsyncPdfEngine + Send + 'static,
     >(
         mut repository: R,
@@ -371,6 +380,15 @@ impl Runtime {
                         } else {
                             match action {
                                 Action::Shutdown => break,
+                                Action::Annotation(request) => {
+                                    let access = if indexer.progress().enabled {
+                                        yamantaka_domain::search::IndexAccess::Enabled
+                                    } else {
+                                        yamantaka_domain::search::IndexAccess::Disabled
+                                    };
+                                    let reply = request.execute(&mut repository, access);
+                                    emit(&events, &notify, Update::Annotations(reply), permit);
+                                }
                                 Action::Bookmarks(id, offset, cancel) => {
                                     match repository.bookmarks(&id, offset, &cancel) {
                                         Ok(page) => emit(&events, &notify, Update::Bookmarks(id, offset, page, cancel), permit),
@@ -992,6 +1010,7 @@ mod tests {
 
     struct Repository;
     impl BookmarkRepository for Repository {}
+    impl AnnotationRepository for Repository {}
     impl LibraryRepository for Repository {
         fn query(&self, _: &LibraryQuery) -> Result<Vec<Document>> {
             Ok(Vec::new())

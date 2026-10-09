@@ -1,5 +1,6 @@
 //! Presentation commands dispatch only through use cases.
 use yamantaka_domain::{Document, LibraryQuery, LibraryRepository, Result};
+pub mod annotations;
 pub mod document_find;
 pub mod runtime;
 pub mod search_index;

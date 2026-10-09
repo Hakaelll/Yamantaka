@@ -122,6 +122,9 @@ impl AnnotationPage {
     pub fn entries(&self) -> &[AnnotationRecord] {
         &self.entries
     }
+    pub fn into_entries(self) -> Vec<AnnotationRecord> {
+        self.entries
+    }
     pub fn from_reserved(
         entries: Vec<AnnotationRecord>,
         total: u64,

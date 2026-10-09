@@ -897,3 +897,6 @@ fn two_visible_slots_pause_indexing_and_cancelled_import_releases_its_reservatio
     query_barrier(&runtime);
     assert!(native.try_recv().is_err());
 }
+
+#[path = "search_runtime/annotations.rs"]
+mod annotations;

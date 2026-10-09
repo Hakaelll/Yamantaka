@@ -1435,6 +1435,13 @@ impl App for YamantakaApp {
         }
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
+                Update::Annotations(reply) => {
+                    if !reply.cancel.is_cancelled()
+                        && let Err(error) = reply.result
+                    {
+                        self.error = Some(error.to_string());
+                    }
+                }
                 Update::Library(documents, count, cancel) => {
                     if cancel.is_cancelled() {
                         continue;
