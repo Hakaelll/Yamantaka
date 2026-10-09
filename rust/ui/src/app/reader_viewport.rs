@@ -237,7 +237,7 @@ impl YamantakaApp {
                 self.send(Action::Navigate(document.id.clone(), self.page));
             }
         }
-        if self.panel {
+        if self.panel && !self.bookmark_panel {
             let identity = (document.id.clone(), self.page, self.generation);
             if self.panel_requested.as_ref() != Some(&identity) {
                 self.panel_text.clear();

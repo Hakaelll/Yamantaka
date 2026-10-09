@@ -1,3 +1,4 @@
+mod bookmarks;
 mod compact;
 mod details;
 mod list;
@@ -99,6 +100,8 @@ pub struct YamantakaApp {
     zoom: f32,
     reader_scale: f32,
     panel: bool,
+    bookmark_panel: bool,
+    bookmarks: bookmarks::BookmarkState,
     panel_text: String,
     panel_requested: Option<(String, u32, u64)>,
     reader_pages: HashMap<u32, ReaderPage>,
@@ -240,6 +243,8 @@ impl YamantakaApp {
             zoom: 1.0,
             reader_scale: 1.0,
             panel: false,
+            bookmark_panel: true,
+            bookmarks: bookmarks::BookmarkState::default(),
             panel_text: String::new(),
             panel_requested: None,
             reader_pages: HashMap::new(),
@@ -383,6 +388,13 @@ impl YamantakaApp {
             self.list = list;
             self.inspector = details;
             self.panel = panel;
+            self.bookmark_panel = false;
+        }
+    }
+    pub fn preview_bookmarks(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.panel = true;
+            self.bookmark_panel = true;
         }
     }
     /// Exercise the real selected and keyboard-focus treatments on different rows.
@@ -1310,7 +1322,7 @@ impl YamantakaApp {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if theme::control(
                                 ui,
-                                self.tr("Texto", "Text"),
+                                self.tr("Navegador", "Navigator"),
                                 Some(theme::Icon::Panel),
                                 self.panel,
                                 false,
@@ -1333,22 +1345,9 @@ impl YamantakaApp {
                 });
         }
         ui.add_space(16.0);
-        if self.panel {
-            egui::Panel::left("reader-panel")
-                .default_size(280.0)
-                .size_range(180.0..=500.0)
-                .show(ui, |ui| {
-                    ui.add_space(14.0);
-                    ui.heading(self.tr("Texto de la página", "Page text"));
-                    if theme::navigation(ui, self.tr("Copiar texto", "Copy text"), false, p)
-                        .clicked()
-                    {
-                        ui.ctx().copy_text(self.panel_text.clone());
-                    }
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        ui.label(&self.panel_text);
-                    });
-                });
+        self.reader_panel(ui, &document, &info, p);
+        if self.panel && ui.ctx().content_rect().width() < 620.0 {
+            return;
         }
         self.reader_viewport(ui, &document, &info, p);
     }
@@ -1384,7 +1383,27 @@ impl App for YamantakaApp {
                         }
                     }
                 }
-                Update::Bookmarks(..) | Update::BookmarkFailed(..) => {}
+                Update::Bookmarks(id, _, page, cancel) => {
+                    self.bookmarks.accept(&id, &cancel, Ok(page));
+                }
+                Update::BookmarkFailed(id, error, cancel) => {
+                    if !cancel.is_cancelled()
+                        && self
+                            .active
+                            .as_ref()
+                            .is_some_and(|(document, _)| document.id != id)
+                    {
+                        // Leaving a document must not hide an accepted write failure.
+                        self.error = Some(format!(
+                            "{}: {error}",
+                            self.tr(
+                                "No se pudieron guardar los marcadores del documento anterior",
+                                "Could not save bookmarks in the previous document",
+                            )
+                        ));
+                    }
+                    self.bookmarks.accept(&id, &cancel, Err(error.to_string()));
+                }
                 Update::Opened(document, info, cancel) => {
                     if cancel.is_cancelled() {
                         self.open_confirmation = Some((document.id.clone(), cancel));
@@ -1760,6 +1779,7 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = !self.documents.is_empty()
+                    && (!self.panel || !self.bookmark_panel || self.bookmarks.ready())
                     && !self.loading
                     && match self.preview_password_target {
                         Some("unlock") => matches!(self.surface, Surface::Reader),
@@ -1778,8 +1798,12 @@ impl App for YamantakaApp {
                         || self.search.completed && !self.search.searching)
                     && (!matches!(self.surface, Surface::Reader)
                         || self.reader_preferences.is_some()
-                            && !self.reader_pages.is_empty()
-                            && self.reader_pages.values().all(|page| page.image.is_some()));
+                            && (self.panel && ctx.content_rect().width() < 620.0
+                                || !self.reader_pages.is_empty()
+                                    && self
+                                        .reader_pages
+                                        .values()
+                                        .all(|page| page.image.is_some())));
                 if ready {
                     self.capture_ready_since.get_or_insert_with(Instant::now);
                 } else {

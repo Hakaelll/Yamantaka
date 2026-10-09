@@ -102,6 +102,9 @@ impl BookmarkRepository for Database {
         exists.ok_or_else(|| Failure::Invalid("Bookmark document no longer exists".into()))?;
         let now = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
         match change {
+            BookmarkChange::Ensure { page } => {
+                tx.execute("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES(?,?,?,NULL,?,?) ON CONFLICT(document_id,page_index) DO NOTHING", params![uuid::Uuid::new_v4().to_string(), document_id, page, now, now]).map_err(storage)?;
+            }
             BookmarkChange::Save { page, label: value } => {
                 // The canonical reader validates actual PDF page bounds.
                 // Persisted catalogue page counts can be stale after file changes;
@@ -163,6 +166,30 @@ mod tests {
         let db = Database::in_memory_at(11).unwrap();
         db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('a','a.pdf','a.pdf','a.pdf',5000,1,'now','now','now','a'),('b','b.pdf','b.pdf','b.pdf',2,1,'now','now','now','b');").unwrap();
         db
+    }
+
+    #[test]
+    fn ensuring_a_page_preserves_an_existing_named_bookmark_exactly() {
+        let mut db = database();
+        let cancel = Cancellation::default();
+        let first = apply_change(
+            &mut db,
+            "a",
+            &BookmarkChange::Save {
+                page: 2,
+                label: Some("Study this passage".into()),
+            },
+            &cancel,
+        )
+        .unwrap();
+        let repeated =
+            apply_change(&mut db, "a", &BookmarkChange::Ensure { page: 2 }, &cancel).unwrap();
+        assert_eq!(first, repeated);
+        let added =
+            apply_change(&mut db, "a", &BookmarkChange::Ensure { page: 4 }, &cancel).unwrap();
+        assert_eq!(added.total, 2);
+        assert_eq!(added.entries[0], first.entries[0]);
+        assert_eq!(added.entries[1].label, None);
     }
 
     #[test]

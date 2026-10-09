@@ -34,7 +34,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let demo = args.iter().any(|arg| arg == "--demo");
     let settings = args.iter().any(|arg| arg == "--settings");
     let protected = args.iter().any(|arg| arg == "--protected");
-    let reader = protected || args.iter().any(|arg| arg == "--reader");
+    let reader = protected
+        || args
+            .iter()
+            .any(|arg| arg == "--reader" || arg == "--bookmarks");
     let light = args.iter().any(|arg| arg == "--light");
     let tilt = args.iter().any(|arg| arg == "--tilt");
     let capture = args.iter().find_map(|arg| {
@@ -82,6 +85,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,reading_progress,last_page_index) VALUES('demo-{index}','{path}','demo-{index}','fixture.pdf','{title}','{author}',2,900,'2026-10-08','2026-10-08','2026-10-08','synthetic',{},0)",if index==0{0.5}else{0.0}))?;
         }
         let mut reading = ReaderPreferences::new("demo-0");
+        if args.iter().any(|arg| arg == "--bookmarks") {
+            db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
+        }
         for arg in &args {
             if let Some(value) = arg
                 .to_str()
@@ -243,6 +249,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--details"),
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
+                if args.iter().any(|arg| arg == "--bookmarks") {
+                    app.preview_bookmarks();
+                }
                 if args.iter().any(|arg| arg == "--list-states") {
                     app.preview_list_states();
                 }

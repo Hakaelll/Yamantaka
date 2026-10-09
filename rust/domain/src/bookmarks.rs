@@ -23,9 +23,21 @@ pub struct BookmarkPage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BookmarkChange {
-    Save { page: u32, label: Option<String> },
-    Rename { id: String, label: Option<String> },
-    Remove { id: String },
+    /// Add an unnamed bookmark without overwriting an existing page's label.
+    Ensure {
+        page: u32,
+    },
+    Save {
+        page: u32,
+        label: Option<String>,
+    },
+    Rename {
+        id: String,
+        label: Option<String>,
+    },
+    Remove {
+        id: String,
+    },
 }
 
 pub trait BookmarkRepository {

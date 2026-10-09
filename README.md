@@ -25,6 +25,7 @@ No account is required. Documents and library data stay on your computer. The pr
 - **A reader built around the document.** Native PDFium rendering, GPU presentation, page navigation, fit-to-page and fit-to-width, zoom, rotation, margins, page text, canonical history, and positions A/B. Single, facing and virtualized continuous layouts are connected through the canonical navigation model. Six reading environments are stored per document.
 - **Protected reading.** Already catalogued password-protected PDFs have a masked, transient password prompt with retry and cancellation. Credentials are never saved; protected-file import is still pending.
 - **Local full-text search.** Explicit opt-in, resumable indexing, filters, ranked snippets and page navigation, with pause, stop, exclusion, rebuilding and erasing controls. Open it from **Tools → Global search** or **Ctrl+Shift+F**.
+- **Bookmarks for study.** Open the reader's **Navigator → Bookmarks** to save a page, edit its label, remove it or return to a passage. Existing named bookmarks keep their labels when a page is saved again.
 - **A coherent desktop interface.** Dark graphite and warm ivory themes, functional violet accents, local Segoe UI Variable typography, custom controls, visible keyboard focus, Spanish and English surfaces, reduced motion, and text enlargement.
 - **Independent storage.** A separate Rust library, versioned atomic preferences, and compatibility adapters for historical data. The Flutter installation remains a fallback during the transition.
 
@@ -137,7 +138,7 @@ Current evidence is documented separately so dates and scopes remain explicit:
 - [Flutter baseline](docs/validation/flutter-baseline-2026-10-08.md): 330 tests and analysis executed on the reference implementation.
 - [Native gallery and settings validation](docs/validation/rust-visual-stage2.md): captures, control bounds and the bounded visual review.
 - [Protected reading validation](docs/validation/rust-password-opening-2026-10-09.md): ephemeral credential ownership, real PDFium retry tests and five native captures.
-- [Bookmark persistence validation](docs/validation/rust-bookmark-repository-2026-10-09.md): legacy identity, transactional edits, pagination and responsive actor commands; the reader bookmark panel remains pending.
+- [Bookmark persistence validation](docs/validation/rust-bookmark-repository-2026-10-09.md): legacy identity, transactional edits, pagination and responsive actor commands. The [connected bookmark panel validation](docs/validation/rust-bookmark-ui-2026-10-09.md) covers reader integration and current limits.
 - [Search-controller validation](docs/validation/rust-search-controller-2026-10-09.md): cancellation, durable resume, exclusions and nonblocking native boundaries.
 - [Search actor validation](docs/validation/rust-search-runtime-2026-10-09.md): consent, native slot handoff, responsive catalogue queries and shutdown. See the [connected search interface validation](docs/validation/rust-search-ui-2026-10-09.md) for native captures and current scope.
 - [Native page-resource validation](docs/validation/rust-native-page-resources.md): GPU readback, allocation, retirement and scoped rendering evidence.

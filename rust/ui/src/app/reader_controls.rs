@@ -80,7 +80,7 @@ impl YamantakaApp {
 
                     if theme::icon_toggle(
                         ui,
-                        self.tr("Texto de la página", "Page text"),
+                        self.tr("Navegador de lectura", "Reading navigator"),
                         theme::Icon::Panel,
                         self.panel,
                         p,

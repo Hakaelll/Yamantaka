@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='bookmarks-dark'; args=@('--bookmarks') },
+    @{ name='bookmarks-light-es'; args=@('--bookmarks','--light','--es') },
+    @{ name='bookmarks-small-200'; args=@('--bookmarks','--size=640x480','--text-scale=2') },
     @{ name='password-dark'; args=@('--protected') },
     @{ name='password-light-es'; args=@('--protected','--light','--es') },
     @{ name='password-small-200'; args=@('--protected','--size=640x480','--text-scale=2') },
