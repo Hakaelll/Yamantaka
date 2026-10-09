@@ -6,7 +6,7 @@ use std::{
 };
 use yamantaka_domain::{
     Cancellation, Failure, PdfEngine,
-    outline::{DestinationView, OutlineDestination},
+    outline::{DestinationView, OutlineDestination, PageCoordinateSpace},
 };
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
 
@@ -62,6 +62,11 @@ fn fixture(mode: &str) -> Fixture {
             };
             objects.push(format!("<< /Title (Passage) /Parent 6 0 R {sibling} >>"));
         }
+    }
+    if let Some(rotation) = mode.strip_prefix("rotated-") {
+        objects[2] = format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 220] /CropBox [20 30 120 180] /Rotate {rotation} /Resources <<>> /Contents 5 0 R >>"
+        );
     }
     let mut pdf = b"%PDF-1.7\n".to_vec();
     let mut offsets = vec![0];
@@ -121,6 +126,8 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
         entries[0].destination,
         Some(OutlineDestination {
             page: 0,
+            coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])
+                .unwrap(),
             view: DestinationView::Coordinates {
                 x: Some(40.0),
                 y: Some(150.0),
@@ -134,6 +141,8 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
         entries[1].destination,
         Some(OutlineDestination {
             page: 1,
+            coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])
+                .unwrap(),
             view: DestinationView::FitWidth { top: Some(170.0) }
         })
     );
@@ -143,6 +152,8 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
         entries[3].destination,
         Some(OutlineDestination {
             page: 1,
+            coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])
+                .unwrap(),
             view: DestinationView::FitRectangle {
                 left: 20.0,
                 bottom: 30.0,
@@ -217,4 +228,38 @@ fn empty_cyclic_invalid_and_cancelled_outlines_are_bounded_and_recoverable() {
     drop(outline);
     engine.close("a".into()).unwrap();
     assert_eq!(governor.usage().text, 0);
+}
+
+#[test]
+fn native_destination_geometry_matches_cropped_pages_at_every_intrinsic_rotation() {
+    let engine = engine();
+    for (rotation, expected) in [
+        (0, [0.2, 0.2]),
+        (90, [0.8, 0.2]),
+        (180, [0.8, 0.8]),
+        (270, [0.2, 0.8]),
+    ] {
+        let fixture = fixture(&format!("rotated-{rotation}"));
+        engine
+            .open(
+                "geometry".into(),
+                fixture.0.clone(),
+                None,
+                Cancellation::default(),
+            )
+            .unwrap();
+        let outline = engine
+            .outline("geometry".into(), Cancellation::default())
+            .unwrap();
+        let destination = outline.entries()[0].destination.unwrap();
+        let actual = destination.coordinates.normalized_point([40.0, 150.0]);
+        for axis in 0..2 {
+            assert!(
+                (actual[axis] - expected[axis]).abs() < 1e-6,
+                "rotation {rotation}: {actual:?}"
+            );
+        }
+        assert_eq!(destination.coordinates.pdf_point(actual), [40.0, 150.0]);
+        engine.close("geometry".into()).unwrap();
+    }
 }

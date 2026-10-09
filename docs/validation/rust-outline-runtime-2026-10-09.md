@@ -56,3 +56,29 @@ outline traversal. The reservation covers copied results and conservative Rust
 working space. Temporary allocations inside PDFium and its title conversion are
 not a measured global-allocation guarantee. No new UI captures or release claim
 are part of this checkpoint.
+
+## Destination coordinate geometry follow-up
+
+Each local destination now carries a typed page coordinate space. The PDF worker
+asks PDFium to convert three device corners to PDF points. This preserves the
+visible crop origin and intrinsic page rotation without reproducing PDFium's
+coordinate rules in the UI. The conversion config uses a 10,000 by 10,000 device
+rectangle and allocates no bitmap. Domain functions convert between PDF points
+and normalized displayed-page coordinates. Values outside the crop stay outside
+instead of being silently clamped. Non-finite and singular bases are rejected.
+
+A third real PDFium test creates a non-square crop box with a nonzero origin and
+checks the same PDF destination under rotations of 0, 90, 180 and 270 degrees.
+The expected normalized coordinates are literal values, with a tolerance of
+0.000001. A domain test covers inverse conversion, out-of-crop points, and invalid
+bases. The existing actor fixture now carries geometry through the same reply.
+
+The complete workspace passed 146 tests. Clippy with all targets and warnings
+as errors passed, and the formatter check passed. The original 144-test result
+above describes the preceding checkpoint.
+
+Reader integration remains pending. These conversions do not yet apply user
+rotation, destination zoom or fit settings, or horizontal anchors to navigation.
+Page loading during outline traversal also needs interactive latency validation
+for large outlines with destinations. No interface or release completion is
+claimed by this follow-up.
