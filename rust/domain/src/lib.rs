@@ -1,6 +1,7 @@
 //! UI and FFI independent contracts and persisted domain semantics.
 pub mod bookmarks;
 pub mod memory;
+pub mod outline;
 
 use serde::{Deserialize, Serialize};
 pub mod password;
@@ -315,6 +316,9 @@ pub trait PdfEngine {
         cancel: Cancellation,
     ) -> Result<Arc<RenderedPage>>;
     fn text(&self, id: String, page: u32, cancel: Cancellation) -> Result<String>;
+    fn outline(&self, _id: String, _cancel: Cancellation) -> Result<Arc<outline::PdfOutline>> {
+        Err(Failure::Unsupported("PDF outline".into()))
+    }
     fn close(&self, id: String) -> Result<()>;
 }
 

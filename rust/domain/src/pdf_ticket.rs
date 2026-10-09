@@ -78,6 +78,13 @@ pub trait AsyncPdfEngine: PdfEngine {
         cancel: Cancellation,
     ) -> Result<PdfTicket<Arc<RenderedPage>>>;
     fn try_text(&self, id: String, page: u32, cancel: Cancellation) -> Result<PdfTicket<String>>;
+    fn try_outline(
+        &self,
+        _id: String,
+        _cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<crate::outline::PdfOutline>>> {
+        Err(crate::Failure::Unsupported("PDF outline".into()))
+    }
     fn try_close(&self, id: String) -> Result<PdfTicket<()>>;
 }
 

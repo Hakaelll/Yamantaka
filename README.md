@@ -140,6 +140,7 @@ Current evidence is documented separately so dates and scopes remain explicit:
 - [Protected reading validation](docs/validation/rust-password-opening-2026-10-09.md): ephemeral credential ownership, real PDFium retry tests and five native captures.
 - [Bookmark persistence validation](docs/validation/rust-bookmark-repository-2026-10-09.md): legacy identity, transactional edits, pagination and responsive actor commands. The [connected bookmark panel validation](docs/validation/rust-bookmark-ui-2026-10-09.md) covers reader integration and current limits.
 - [Bookmark search validation](docs/validation/rust-bookmark-search-2026-10-09.md): atomic updates, consent, exclusion and search results during native work.
+- [Native outline validation](docs/validation/rust-outline-runtime-2026-10-09.md): Unicode hierarchy, internal destinations, cancellation and shared memory ownership. The outline tab remains pending.
 - [Search-controller validation](docs/validation/rust-search-controller-2026-10-09.md): cancellation, durable resume, exclusions and nonblocking native boundaries.
 - [Search actor validation](docs/validation/rust-search-runtime-2026-10-09.md): consent, native slot handoff, responsive catalogue queries and shutdown. See the [connected search interface validation](docs/validation/rust-search-ui-2026-10-09.md) for native captures and current scope.
 - [Native page-resource validation](docs/validation/rust-native-page-resources.md): GPU readback, allocation, retirement and scoped rendering evidence.

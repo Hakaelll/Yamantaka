@@ -1383,6 +1383,7 @@ impl App for YamantakaApp {
                         }
                     }
                 }
+                Update::Outline(..) | Update::OutlineFailed(..) => {}
                 Update::Bookmarks(id, _, page, cancel) => {
                     self.bookmarks.accept(&id, &cancel, Ok(page));
                 }

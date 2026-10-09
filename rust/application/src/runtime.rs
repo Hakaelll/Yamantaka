@@ -42,6 +42,7 @@ pub enum Action {
     Render(RenderKey, Cancellation),
     Navigate(String, u32),
     Text(String, u32, Cancellation),
+    Outline(String, Cancellation),
     Close(String),
     Shutdown,
 }
@@ -71,6 +72,12 @@ pub enum Update {
     OpenFailed(Box<Document>, Failure, Cancellation),
     Page(Arc<RenderedPage>, Cancellation, u64, u64),
     Text(String, u32, String, Cancellation),
+    Outline(
+        String,
+        Arc<yamantaka_domain::outline::PdfOutline>,
+        Cancellation,
+    ),
+    OutlineFailed(String, Failure, Cancellation),
     Imported(usize, Cancellation),
     ReaderPreferences(String, Option<ReaderPreferences>, Cancellation),
     Committed(String, WriteKind),
@@ -125,6 +132,11 @@ enum Pending {
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(PdfTicket<Arc<RenderedPage>>, Permit),
     Text(String, u32, PdfTicket<String>, Permit),
+    Outline(
+        String,
+        PdfTicket<Arc<yamantaka_domain::outline::PdfOutline>>,
+        Permit,
+    ),
     Close(String, PdfTicket<()>, Permit),
     ImportOpen(PathBuf, String, PdfTicket<PdfInfo>, ImportState),
     ImportClose(PathBuf, PdfInfo, PdfTicket<()>, ImportState),
@@ -141,6 +153,9 @@ impl Pending {
             Self::Text(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
+            Self::Outline(_, ticket, _) => {
+                select.recv(ticket.readiness());
+            }
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
@@ -151,6 +166,7 @@ impl Pending {
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
             Self::Render(ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
+            Self::Outline(_, ticket, _) => ticket.is_ready(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => ticket.is_ready(),
         }
     }
@@ -161,6 +177,7 @@ impl Pending {
             }
             Self::Render(ticket, _) => ticket.cancellation.cancel(),
             Self::Text(_, _, ticket, _) => ticket.cancellation.cancel(),
+            Self::Outline(_, ticket, _) => ticket.cancellation.cancel(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
@@ -561,6 +578,10 @@ impl Runtime {
                                         }
                                     }
                                 }
+                                Action::Outline(id, cancel) => match engine.try_outline(id.clone(), cancel.clone()) {
+                                    Ok(ticket) => pending.push(Pending::Outline(id, ticket, permit)),
+                                    Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
+                                },
                                 Action::Close(id) => match engine.try_close(id.clone()) {
                                     Ok(ticket) => pending.push(Pending::Close(id, ticket, permit)),
                                     Err(error) => failed(&events, &notify, error, None, permit),
@@ -645,6 +666,13 @@ impl Runtime {
                                     Err(error) => {
                                         failed(&events, &notify, error, Some(cancel), permit)
                                     }
+                                }
+                            }
+                            Pending::Outline(id, ticket, permit) => {
+                                let cancel = ticket.cancellation.clone();
+                                match ticket.wait().and_then(|outline| { cancel.check()?; Ok(outline) }) {
+                                    Ok(outline) => emit(&events, &notify, Update::Outline(id, outline, cancel), permit),
+                                    Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
                                 }
                             }
                             Pending::Close(id, ticket, permit) => match ticket.wait() {

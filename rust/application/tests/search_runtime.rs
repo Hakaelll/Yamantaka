@@ -18,6 +18,10 @@ use yamantaka_storage::Database;
 enum Native {
     Open(String, Cancellation, Sender<Result<PdfInfo>>),
     Text(u32, Cancellation, Sender<Result<String>>),
+    Outline(
+        Cancellation,
+        Sender<Result<Arc<yamantaka_domain::outline::PdfOutline>>>,
+    ),
     Close(String, Sender<Result<()>>),
 }
 struct Engine(Sender<Native>, Arc<Mutex<Vec<Vec<String>>>>);
@@ -73,6 +77,15 @@ impl AsyncPdfEngine for Engine {
     fn try_close(&self, id: String) -> Result<PdfTicket<()>> {
         let (send, ticket) = PdfTicket::channel(3, 1, Cancellation::default());
         self.0.try_send(Native::Close(id, send)).unwrap();
+        Ok(ticket)
+    }
+    fn try_outline(
+        &self,
+        _: String,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<yamantaka_domain::outline::PdfOutline>>> {
+        let (send, ticket) = PdfTicket::channel(4, 1, cancel.clone());
+        self.0.try_send(Native::Outline(cancel, send)).unwrap();
         Ok(ticket)
     }
 }
@@ -279,6 +292,70 @@ fn reader() -> Document {
         fingerprint: "reader-revision".into(),
         thumbnail_path: None,
     }
+}
+
+#[test]
+fn outline_tickets_keep_catalogue_queries_responsive_and_preserve_request_identity() {
+    use yamantaka_domain::{
+        Failure,
+        memory::{Cost, GlobalMemoryLimits, MemoryCategory, MemoryGovernor, MemoryRepresentation},
+        outline::{DestinationView, OutlineDestination, OutlineEntry, PdfOutline},
+    };
+    let (runtime, native, _) = setup();
+    let cancel = Cancellation::default();
+    runtime
+        .submit(Action::Outline("a".into(), cancel.clone()))
+        .unwrap();
+    let Native::Outline(native_cancel, reply) = next(&native) else {
+        panic!("outline request");
+    };
+    query_barrier(&runtime);
+    assert!(native_cancel.same_request(&cancel));
+    let governor = MemoryGovernor::new(GlobalMemoryLimits::default());
+    let lease = governor
+        .try_reserve_one(Cost::new(
+            MemoryCategory::Text,
+            MemoryRepresentation::Cpu,
+            1024,
+        ))
+        .unwrap();
+    let outline = Arc::new(
+        PdfOutline::from_reserved(
+            vec![OutlineEntry {
+                title: "Chapter One".into(),
+                parent: None,
+                destination: Some(OutlineDestination {
+                    page: 2,
+                    view: DestinationView::FitPage,
+                }),
+            }],
+            lease,
+        )
+        .unwrap(),
+    );
+    reply.send(Ok(outline)).unwrap();
+    let Update::Outline(id, outline, token) = update(&runtime) else {
+        panic!("outline response");
+    };
+    assert_eq!(id, "a");
+    assert_eq!(outline.entries()[0].title, "Chapter One");
+    assert_eq!(outline.entries()[0].destination.unwrap().page, 2);
+    assert!(token.same_request(&cancel));
+    drop(outline);
+    assert_eq!(governor.usage().text, 0);
+    let cancel = Cancellation::default();
+    runtime
+        .submit(Action::Outline("a".into(), cancel.clone()))
+        .unwrap();
+    let Native::Outline(_, reply) = next(&native) else {
+        panic!("second outline request");
+    };
+    cancel.cancel();
+    reply.send(Err(Failure::Cancelled)).unwrap();
+    assert!(
+        matches!(update(&runtime), Update::OutlineFailed(id,Failure::Cancelled,token) if id=="a" && token.same_request(&cancel))
+    );
+    query_barrier(&runtime);
 }
 
 #[test]

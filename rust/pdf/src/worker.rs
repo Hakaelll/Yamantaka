@@ -83,6 +83,12 @@ enum Request {
         cancel: Cancellation,
         reply: Reply<String>,
     },
+    Outline {
+        id: String,
+        epoch: u64,
+        cancel: Cancellation,
+        reply: Reply<Arc<yamantaka_domain::outline::PdfOutline>>,
+    },
     Close {
         id: String,
         epoch: u64,
@@ -96,6 +102,7 @@ impl Request {
             Self::Open { id, .. }
             | Self::Inspect { id, .. }
             | Self::Text { id, .. }
+            | Self::Outline { id, .. }
             | Self::Close { id, .. } => Some(id),
             Self::Render { key, .. } => Some(&key.document_id),
             Self::Shutdown => None,
@@ -106,7 +113,7 @@ impl Request {
             Self::Shutdown | Self::Close { .. } => 0,
             Self::Open { .. } | Self::Inspect { .. } => 1,
             Self::Render { priority, .. } => 2 + *priority as u8,
-            Self::Text { .. } => 4,
+            Self::Text { .. } | Self::Outline { .. } => 4,
         }
     }
 }
@@ -390,6 +397,21 @@ impl AsyncPdfEngine for PdfWorker {
         self.enqueue(Request::Close { id, epoch, reply })?;
         Ok(ticket)
     }
+    fn try_outline(
+        &self,
+        id: String,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<yamantaka_domain::outline::PdfOutline>>> {
+        let epoch = self.epoch(&id, false);
+        let (reply, ticket) = self.reply(epoch, cancel.clone(), false)?;
+        self.enqueue(Request::Outline {
+            id,
+            epoch,
+            cancel,
+            reply,
+        })?;
+        Ok(ticket)
+    }
 }
 impl PdfEngine for PdfWorker {
     fn open(
@@ -415,6 +437,13 @@ impl PdfEngine for PdfWorker {
     fn close(&self, id: String) -> Result<()> {
         self.try_close(id)?.wait()
     }
+    fn outline(
+        &self,
+        id: String,
+        cancel: Cancellation,
+    ) -> Result<Arc<yamantaka_domain::outline::PdfOutline>> {
+        self.try_outline(id, cancel)?.wait()
+    }
 }
 fn epoch_matches(scheduler: &Arc<Mutex<Scheduler>>, id: &str, epoch: u64) -> Result<()> {
     if scheduler
@@ -437,6 +466,7 @@ fn fail_request(request: Request) {
             reply.send(Err(Failure::Cancelled))
         }
         Request::Text { reply, .. } => reply.send(Err(Failure::Cancelled)),
+        Request::Outline { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Close { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Render { consumers, .. } => {
             for (_, reply) in consumers.lock().unwrap().drain(..) {
@@ -814,6 +844,30 @@ fn run(
                 })();
                 reply.send(epoch_matches(&scheduler, &id, epoch).and(result));
             }
+            Request::Outline {
+                id,
+                epoch,
+                cancel,
+                reply,
+            } => {
+                let result = (|| {
+                    cancel.check()?;
+                    epoch_matches(&scheduler, &id, epoch)?;
+                    let document = documents
+                        .get(&id)
+                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
+                    crate::outline::read(document, &governor, || {
+                        cancel.check()?;
+                        epoch_matches(&scheduler, &id, epoch)
+                    })
+                })();
+                reply.send(
+                    cancel
+                        .check()
+                        .and_then(|()| epoch_matches(&scheduler, &id, epoch))
+                        .and(result),
+                );
+            }
             Request::Close { id, epoch, reply } => {
                 let handle = {
                     let mut state = scheduler.lock().unwrap();
@@ -891,7 +945,7 @@ fn next_request(
                 .position(|item| eligible(item) && item.priority() == priority)
         })
 }
-fn pdf_failure(error: PdfiumError) -> Failure {
+pub(crate) fn pdf_failure(error: PdfiumError) -> Failure {
     if matches!(
         error,
         PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError)
