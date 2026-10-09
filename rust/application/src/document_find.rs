@@ -6,7 +6,7 @@ use std::sync::{
 };
 use yamantaka_domain::{
     Cancellation, Failure, Result,
-    pdf_find::{FIND_PAGE_SIZE, PdfFindQuery, PdfMatch, PdfPageMatches},
+    pdf_find::{DocumentTextPresence, FIND_PAGE_SIZE, PdfFindQuery, PdfMatch, PdfPageMatches},
     pdf_ticket::{AsyncPdfEngine, PdfTicket},
 };
 
@@ -99,6 +99,7 @@ pub struct FindBatch {
     pub start: Option<FindCursor>,
     pub next: Option<FindCursor>,
     pub scanned_pages: u32,
+    pub text_presence: DocumentTextPresence,
 }
 impl FindBatch {
     pub fn matches(&self) -> impl Iterator<Item = (u32, &PdfMatch)> {
@@ -118,6 +119,7 @@ pub(crate) struct FindScan {
     cursor: FindCursor,
     pages: VecDeque<MatchPage>,
     count: usize,
+    text_present: bool,
     ticket: PdfTicket<Arc<PdfPageMatches>>,
 }
 pub(crate) enum ScanStep {
@@ -140,6 +142,7 @@ impl FindScan {
             cursor,
             pages: VecDeque::new(),
             count: 0,
+            text_present: false,
             ticket,
         })
     }
@@ -152,6 +155,7 @@ impl FindScan {
             cursor,
             mut pages,
             mut count,
+            mut text_present,
             ticket,
         } = self;
         request.cancellation.check()?;
@@ -167,6 +171,7 @@ impl FindScan {
                 "PDF search returned a different cursor".into(),
             ));
         }
+        text_present |= payload.has_text();
         let backward = matches!(request.range, FindRange::Before(_));
         let boundary = match request.range {
             FindRange::Forward => None,
@@ -248,6 +253,16 @@ impl FindScan {
                 pages,
                 next: if backward { boundary } else { next },
                 scanned_pages: scanned,
+                text_presence: if text_present {
+                    DocumentTextPresence::Available
+                } else if request.cursor == FindCursor::default()
+                    && next.is_none()
+                    && matches!(request.range, FindRange::Forward | FindRange::Before(None))
+                {
+                    DocumentTextPresence::Unavailable
+                } else {
+                    DocumentTextPresence::Unknown
+                },
             }));
         }
         let cursor = next.expect("unfinished search has a continuation");
@@ -263,6 +278,7 @@ impl FindScan {
             cursor,
             pages,
             count,
+            text_present,
             ticket,
         }))
     }

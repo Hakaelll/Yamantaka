@@ -1,6 +1,6 @@
 use super::*;
 use yamantaka_application::document_find::{FindBatch, FindCursor, FindProgress, FindRequest};
-use yamantaka_domain::pdf_find::PdfFindQuery;
+use yamantaka_domain::pdf_find::{DocumentTextPresence, PdfFindQuery};
 
 #[derive(Clone, Copy)]
 enum SelectionEdge {
@@ -68,6 +68,7 @@ impl FindState {
         match &self.phase {
             FindPhase::Ready { batch, selected } => serde_json::json!({
                 "matches": batch.matches().count(), "selected": selected,
+                "textPresence": format!("{:?}", batch.text_presence),
                 "page": selected.and_then(|index| batch.matches().nth(index).map(|(page, _)| page)),
                 "continuation": batch.next.map(|cursor| [cursor.page, cursor.ordinal]),
             }),
@@ -118,11 +119,11 @@ impl YamantakaApp {
             self.find.stop();
         }
     }
-    pub fn preview_find(&mut self, step: Option<bool>) {
+    pub fn preview_find(&mut self, query: &str, step: Option<bool>) {
         if self.demo && self.capture.is_some() {
             self.panel = true;
             self.reader_panel_tab = outline::ReaderPanelTab::Find;
-            self.find.preview = Some("reading".into());
+            self.find.preview = Some(query.into());
             self.find_preview_step = step;
         }
     }
@@ -418,14 +419,31 @@ impl YamantakaApp {
             FindPhase::Ready { batch, selected } => {
                 let count = batch.matches().count();
                 if count == 0 {
+                    let absent = batch.text_presence == DocumentTextPresence::Unavailable;
                     ui.label(self.tr(
-                        "No hay coincidencias en este recorrido.",
-                        "No matches in this search range.",
+                        if absent {
+                            "Este PDF no contiene texto extraíble."
+                        } else {
+                            "No se encontraron coincidencias."
+                        },
+                        if absent {
+                            "This PDF contains no extractable text."
+                        } else {
+                            "No matches found."
+                        },
                     ));
                     ui.label(
                         RichText::new(self.tr(
-                            "Los PDF escaneados pueden no contener texto buscable.",
-                            "Scanned PDFs may contain no searchable text.",
+                            if absent {
+                                "Puedes seguir leyendo y guardar marcadores de página."
+                            } else {
+                                "Prueba otra palabra o cambia las opciones de búsqueda."
+                            },
+                            if absent {
+                                "You can continue reading and save page bookmarks."
+                            } else {
+                                "Try another word or change the search options."
+                            },
                         ))
                         .color(p.secondary),
                     );

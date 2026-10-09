@@ -145,6 +145,7 @@ fn actor_preserves_find_identity_and_queries_sql_while_native_search_is_held() {
                     rectangles: Vec::new(),
                 }],
                 Some(3),
+                true,
                 lease,
             )
             .unwrap(),
@@ -186,6 +187,16 @@ fn page_result(
     count: u32,
     next: Option<u32>,
 ) -> Arc<PdfPageMatches> {
+    page_result_with_text(governor, page, start, count, next, count > 0)
+}
+fn page_result_with_text(
+    governor: &MemoryGovernor,
+    page: u32,
+    start: u32,
+    count: u32,
+    next: Option<u32>,
+    text_present: bool,
+) -> Arc<PdfPageMatches> {
     let lease = governor
         .try_reserve_one(Cost::new(
             MemoryCategory::Text,
@@ -204,6 +215,7 @@ fn page_result(
                 })
                 .collect(),
             next,
+            text_present,
             lease,
         )
         .unwrap(),
@@ -715,4 +727,127 @@ fn previous_native_search_wraps_to_last_study_match_and_excludes_current_one() {
     }
     engine.close("study".into()).unwrap();
     assert_eq!(governor.usage().text, 0);
+}
+
+#[test]
+fn text_absence_requires_complete_inspection_and_empty_match_pages_preserve_text_evidence() {
+    use yamantaka_application::document_find::{FindCursor, FindRequest};
+    use yamantaka_domain::pdf_find::DocumentTextPresence;
+    for (start, final_text, expected) in [
+        (0, false, DocumentTextPresence::Unavailable),
+        (0, true, DocumentTextPresence::Available),
+        (1, false, DocumentTextPresence::Unknown),
+    ] {
+        let governor = MemoryGovernor::default();
+        let (entered, wait) = bounded(1);
+        let reply = Arc::new(Mutex::new(None));
+        let runtime = Runtime::start(
+            Database::in_memory_at(11).unwrap(),
+            HeldFind {
+                entered,
+                reply: reply.clone(),
+            },
+            || {},
+        )
+        .unwrap();
+        runtime
+            .submit(Action::FindDocument(
+                FindRequest::new(
+                    "reader".into(),
+                    PdfFindQuery::new("absent", false, false).unwrap(),
+                    3,
+                    FindCursor {
+                        page: start,
+                        ordinal: 0,
+                    },
+                    Cancellation::default(),
+                )
+                .unwrap(),
+            ))
+            .unwrap();
+        for page in start..3 {
+            let (_, requested, _, _, _) = wait.recv_timeout(Duration::from_secs(2)).unwrap();
+            assert_eq!(requested, page);
+            reply
+                .lock()
+                .unwrap()
+                .take()
+                .unwrap()
+                .send(Ok(page_result_with_text(
+                    &governor,
+                    page,
+                    0,
+                    0,
+                    None,
+                    final_text && page == 2,
+                )))
+                .unwrap();
+        }
+        match runtime
+            .updates
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap()
+        {
+            Update::DocumentMatches(_, batch, _) => {
+                assert_eq!(batch.text_presence, expected);
+                assert_eq!(batch.matches().count(), 0);
+            }
+            _ => panic!("expected text evidence"),
+        }
+        assert_eq!(governor.usage().text, 0);
+    }
+}
+
+#[test]
+fn native_search_distinguishes_absent_phrase_from_scanned_and_blank_documents() {
+    use yamantaka_application::document_find::{FindCursor, FindRequest};
+    use yamantaka_domain::pdf_find::DocumentTextPresence;
+    use yamantaka_pdf::{MemoryLimits, PdfWorker};
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let governor = MemoryGovernor::default();
+    let engine = PdfWorker::start_with_governor(
+        &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
+        MemoryLimits::default(),
+        governor.clone(),
+    )
+    .unwrap();
+    let runtime =
+        Runtime::start(Database::in_memory_at(11).unwrap(), engine.clone(), || {}).unwrap();
+    for (name, expected) in [
+        ("textual", DocumentTextPresence::Available),
+        ("scanned", DocumentTextPresence::Unavailable),
+        ("5000-pages", DocumentTextPresence::Unavailable),
+    ] {
+        let path = root.join(format!("build/rust-fixtures/{name}.pdf"));
+        let original = std::fs::read(&path).unwrap();
+        let info = engine
+            .open(name.into(), path.clone(), None, Cancellation::default())
+            .unwrap();
+        runtime
+            .submit(Action::FindDocument(
+                FindRequest::new(
+                    name.into(),
+                    PdfFindQuery::new("absent_phrase_731", false, false).unwrap(),
+                    info.pages.len() as u32,
+                    FindCursor::default(),
+                    Cancellation::default(),
+                )
+                .unwrap(),
+            ))
+            .unwrap();
+        match runtime
+            .updates
+            .recv_timeout(Duration::from_secs(30))
+            .unwrap()
+        {
+            Update::DocumentMatches(_, batch, _) => {
+                assert_eq!(batch.text_presence, expected);
+                assert_eq!(batch.matches().count(), 0);
+            }
+            _ => panic!("expected native text evidence"),
+        }
+        engine.close(name.into()).unwrap();
+        assert_eq!(governor.usage().text, 0);
+        assert_eq!(std::fs::read(path).unwrap(), original);
+    }
 }

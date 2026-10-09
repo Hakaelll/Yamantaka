@@ -2,6 +2,13 @@ use crate::{Failure, Result, memory::ByteLease, reader::ReaderPosition};
 
 pub const FIND_PAGE_SIZE: usize = 80;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentTextPresence {
+    Available,
+    Unavailable,
+    Unknown,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PdfFindQuery {
     text: String,
@@ -79,6 +86,7 @@ impl PdfMatch {
 #[derive(Debug)]
 pub struct PdfPageMatches {
     page: u32,
+    text_present: bool,
     matches: Vec<PdfMatch>,
     next_match: Option<u32>,
     _lease: ByteLease,
@@ -87,6 +95,9 @@ pub struct PdfPageMatches {
 impl PdfPageMatches {
     pub fn page(&self) -> u32 {
         self.page
+    }
+    pub fn has_text(&self) -> bool {
+        self.text_present
     }
     pub fn matches(&self) -> &[PdfMatch] {
         &self.matches
@@ -98,9 +109,11 @@ impl PdfPageMatches {
         page: u32,
         matches: Vec<PdfMatch>,
         next_match: Option<u32>,
+        text_present: bool,
         mut lease: ByteLease,
     ) -> Result<Self> {
-        if matches.len() > FIND_PAGE_SIZE
+        if (!text_present && !matches.is_empty())
+            || matches.len() > FIND_PAGE_SIZE
             || matches
                 .windows(2)
                 .any(|pair| pair[0].ordinal >= pair[1].ordinal)
@@ -132,6 +145,7 @@ impl PdfPageMatches {
         lease.try_resize(bytes).map_err(|_| Failure::MemoryBudget)?;
         Ok(Self {
             page,
+            text_present,
             matches,
             next_match,
             _lease: lease,
@@ -142,6 +156,39 @@ impl PdfPageMatches {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn empty_text_cannot_claim_matches_and_a_page_can_have_text_without_matches() {
+        use crate::memory::{Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation};
+        let governor = MemoryGovernor::default();
+        let reserve = || {
+            governor
+                .try_reserve_one(Cost::new(
+                    MemoryCategory::Text,
+                    MemoryRepresentation::Cpu,
+                    4096,
+                ))
+                .unwrap()
+        };
+        assert!(
+            PdfPageMatches::from_reserved(
+                0,
+                vec![PdfMatch {
+                    ordinal: 0,
+                    snippet: "word".into(),
+                    rectangles: Vec::new()
+                }],
+                None,
+                false,
+                reserve()
+            )
+            .is_err()
+        );
+        let page = PdfPageMatches::from_reserved(0, Vec::new(), None, true, reserve()).unwrap();
+        assert!(page.has_text());
+        assert!(page.matches().is_empty());
+        drop(page);
+        assert_eq!(governor.usage().text, 0);
+    }
     #[test]
     fn shared_match_payload_releases_its_lease_and_invalid_continuations_are_rejected() {
         use crate::memory::{Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation};
@@ -160,13 +207,16 @@ mod tests {
             snippet: "needle".into(),
             rectangles: Vec::new(),
         };
-        assert!(PdfPageMatches::from_reserved(0, vec![matched()], Some(2), reserve()).is_err());
         assert!(
-            PdfPageMatches::from_reserved(0, vec![matched(), matched()], None, reserve()).is_err()
+            PdfPageMatches::from_reserved(0, vec![matched()], Some(2), true, reserve()).is_err()
+        );
+        assert!(
+            PdfPageMatches::from_reserved(0, vec![matched(), matched()], None, true, reserve())
+                .is_err()
         );
         assert_eq!(governor.usage().text, 0);
         let result = std::sync::Arc::new(
-            PdfPageMatches::from_reserved(3, vec![matched()], Some(3), reserve()).unwrap(),
+            PdfPageMatches::from_reserved(3, vec![matched()], Some(3), true, reserve()).unwrap(),
         );
         assert!(result.matches()[0].position(3).is_none());
         let clone = result.clone();

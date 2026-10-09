@@ -69,6 +69,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join(if protected {
                 "../../build/rust-fixtures/protected.pdf"
+            } else if args.iter().any(|arg| arg == "--find-scanned") {
+                "../../build/rust-fixtures/scanned.pdf"
             } else if args.iter().any(|arg| arg == "--thumbnails-long") {
                 "../../build/rust-fixtures/5000-pages.pdf"
             } else if args
@@ -273,13 +275,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 );
                 if args.iter().any(|arg| arg == "--find") {
                     app.find_preview_closed = args.iter().any(|arg| arg == "--find-closed");
-                    app.preview_find(if args.iter().any(|arg| arg == "--find-previous") {
-                        Some(false)
-                    } else if args.iter().any(|arg| arg == "--find-next") {
-                        Some(true)
-                    } else {
-                        None
-                    });
+                    app.preview_find(
+                        if args.iter().any(|arg| arg == "--find-absent") {
+                            "absent_phrase_731"
+                        } else {
+                            "reading"
+                        },
+                        if args.iter().any(|arg| arg == "--find-previous") {
+                            Some(false)
+                        } else if args.iter().any(|arg| arg == "--find-next") {
+                            Some(true)
+                        } else {
+                            None
+                        },
+                    );
                 }
                 if args.iter().any(|arg| arg == "--bookmarks") {
                     app.preview_bookmarks();

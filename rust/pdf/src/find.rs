@@ -45,6 +45,11 @@ pub(crate) fn read(
             "PDF page search exceeds the character work limit".into(),
         ));
     }
+    let text_present = text
+        .all()
+        .chars()
+        .any(|character| !character.is_whitespace() && character != '\0');
+    check_current()?;
     let options = PdfSearchOptions::new()
         .match_case(query.match_case())
         .match_whole_word(query.whole_words());
@@ -133,6 +138,10 @@ pub(crate) fn read(
     }
     check_current()?;
     Ok(Arc::new(PdfPageMatches::from_reserved(
-        page, matches, next_match, lease,
+        page,
+        matches,
+        next_match,
+        text_present,
+        lease,
     )?))
 }
