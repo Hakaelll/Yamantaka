@@ -16,6 +16,7 @@ mod render_updates;
 mod search;
 mod settings;
 mod shortcuts;
+mod text;
 mod thumbnails;
 
 use crate::{
@@ -122,8 +123,7 @@ pub struct YamantakaApp {
         yamantaka_domain::pdf_destination::NavigationDestination,
     )>,
     bookmarks: bookmarks::BookmarkState,
-    panel_text: String,
-    panel_requested: Option<(String, u32, u64)>,
+    text: text::TextState,
     reader_pages: HashMap<u32, ReaderPage>,
     reader_layout: Option<Arc<ReaderLayout>>,
     reader_scroll_anchor: bool,
@@ -275,8 +275,7 @@ impl YamantakaApp {
             outline_preview_target: None,
             reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
-            panel_text: String::new(),
-            panel_requested: None,
+            text: Default::default(),
             reader_pages: HashMap::new(),
             reader_layout: None,
             reader_scroll_anchor: true,
@@ -437,6 +436,7 @@ impl YamantakaApp {
     }
     fn show_surface(&mut self, surface: Surface) {
         self.links.clear();
+        self.text.clear();
         self.find.stop();
         self.thumbnails.clear();
         self.open_intent.leave_destination();
@@ -445,6 +445,7 @@ impl YamantakaApp {
     }
     fn open(&mut self, document: Document) {
         self.links.clear();
+        self.text.clear();
         self.thumbnails.clear();
         let preview = self.find.take_preview();
         self.find = Default::default();
@@ -1521,14 +1522,13 @@ impl App for YamantakaApp {
                         .accept(&id, page, &cancel, Err(error.to_string()));
                 }
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
-                Update::Text(id, page, text, cancel) => {
-                    if !cancel.is_cancelled()
-                        && page == self.page
-                        && self.active.as_ref().is_some_and(|(doc, _)| doc.id == id)
-                    {
-                        self.panel_text = text;
-                    }
+                Update::TextGeometry(id, payload, cancel) => {
+                    self.text.accept(&id, payload.page(), &cancel, Ok(payload));
                 }
+                Update::TextGeometryFailed(id, page, error, cancel) => {
+                    self.text.accept(&id, page, &cancel, Err(error.to_string()));
+                }
+                Update::Text(..) => {}
                 Update::Imported(_, cancel) => {
                     if cancel.is_cancelled() {
                         continue;
@@ -1821,7 +1821,7 @@ impl App for YamantakaApp {
                             outline::ReaderPanelTab::Outline => self.outline.ready(),
                             outline::ReaderPanelTab::Thumbnails => self.thumbnails.ready(),
                             outline::ReaderPanelTab::Find => self.find.ready(),
-                            outline::ReaderPanelTab::Text => true,
+                            outline::ReaderPanelTab::Text => self.text.ready(),
                         })
                     && (self.link_preview == links::LinkPreview::Off
                         || self.links.ready()
@@ -1901,6 +1901,7 @@ impl App for YamantakaApp {
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),
                         "documentFind":self.find.capture_summary(),
                         "documentLinks":self.links.capture_summary(),
+                        "pageText":self.text.capture_summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
@@ -1922,6 +1923,7 @@ impl App for YamantakaApp {
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
         self.links.clear();
+        self.text.clear();
         self.find = Default::default();
         self.cancel.cancel();
         self.query_cancel.cancel();

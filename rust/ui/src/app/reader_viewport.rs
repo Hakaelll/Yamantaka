@@ -251,18 +251,9 @@ impl YamantakaApp {
             }
         }
         if self.panel && self.reader_panel_tab == outline::ReaderPanelTab::Text {
-            let identity = (document.id.clone(), self.page, self.generation);
-            if self.panel_requested.as_ref() != Some(&identity) {
-                self.panel_text.clear();
-                self.panel_requested = Some(identity);
-                self.send(Action::Text(
-                    document.id.clone(),
-                    self.page,
-                    self.cancel.clone(),
-                ));
-            }
+            self.request_page_text(&document.id);
         } else {
-            self.panel_requested = None;
+            self.text.clear();
         }
     }
 }

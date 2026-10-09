@@ -45,6 +45,7 @@ pub enum Action {
     Text(String, u32, Cancellation),
     Outline(String, Cancellation),
     PageLinks(String, u32, Cancellation),
+    TextGeometry(String, u32, Cancellation),
     FindDocument(FindRequest),
     FindPage(
         String,
@@ -88,6 +89,12 @@ pub enum Update {
         Cancellation,
     ),
     OutlineFailed(String, Failure, Cancellation),
+    TextGeometry(
+        String,
+        Arc<yamantaka_domain::pdf_text::PdfPageText>,
+        Cancellation,
+    ),
+    TextGeometryFailed(String, u32, Failure, Cancellation),
     PageLinks(
         String,
         Arc<yamantaka_domain::pdf_links::PdfPageLinks>,
@@ -162,6 +169,12 @@ enum Pending {
         PdfTicket<Arc<yamantaka_domain::outline::PdfOutline>>,
         Permit,
     ),
+    TextGeometry(
+        String,
+        u32,
+        PdfTicket<Arc<yamantaka_domain::pdf_text::PdfPageText>>,
+        Permit,
+    ),
     PageLinks(
         String,
         u32,
@@ -198,6 +211,9 @@ impl Pending {
             Self::FindPage(_, ticket, _) => {
                 select.recv(ticket.readiness());
             }
+            Self::TextGeometry(_, _, ticket, _) => {
+                select.recv(ticket.readiness());
+            }
             Self::PageLinks(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
@@ -215,6 +231,7 @@ impl Pending {
             Self::Outline(_, ticket, _) => ticket.is_ready(),
             Self::FindPage(_, ticket, _) => ticket.is_ready(),
             Self::PageLinks(_, _, ticket, _) => ticket.is_ready(),
+            Self::TextGeometry(_, _, ticket, _) => ticket.is_ready(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => ticket.is_ready(),
         }
     }
@@ -229,6 +246,7 @@ impl Pending {
             Self::Outline(_, ticket, _) => ticket.cancellation.cancel(),
             Self::FindPage(_, ticket, _) => ticket.cancellation.cancel(),
             Self::PageLinks(_, _, ticket, _) => ticket.cancellation.cancel(),
+            Self::TextGeometry(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
@@ -627,6 +645,12 @@ impl Runtime {
                                         Err(error) => emit(&events, &notify, Update::DocumentFindFailed(id, error, cancel), permit),
                                     }
                                 }
+                                Action::TextGeometry(id, page, cancel) => {
+                                    match engine.try_text_geometry(id.clone(), page, cancel.clone()) {
+                                        Ok(ticket) => pending.push(Pending::TextGeometry(id, page, ticket, permit)),
+                                        Err(error) => emit(&events, &notify, Update::TextGeometryFailed(id, page, error, cancel), permit),
+                                    }
+                                }
                                 Action::PageLinks(id, page, cancel) => {
                                     match engine.try_page_links(id.clone(), page, cancel.clone()) {
                                         Ok(ticket) => pending.push(Pending::PageLinks(id, page, ticket, permit)),
@@ -756,6 +780,18 @@ impl Runtime {
                                 match ticket.wait().and_then(|outline| { cancel.check()?; Ok(outline) }) {
                                     Ok(outline) => emit(&events, &notify, Update::Outline(id, outline, cancel), permit),
                                     Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
+                                }
+                            }
+                            Pending::TextGeometry(id, page, ticket, permit) => {
+                                let cancel = ticket.cancellation.clone();
+                                let result = ticket.wait().and_then(|text| {
+                                    cancel.check()?;
+                                    if text.page() != page { return Err(Failure::Invalid("PDF text response belongs to a different page".into())); }
+                                    Ok(text)
+                                });
+                                match result {
+                                    Ok(text) => emit(&events, &notify, Update::TextGeometry(id, text, cancel), permit),
+                                    Err(error) => emit(&events, &notify, Update::TextGeometryFailed(id, page, error, cancel), permit),
                                 }
                             }
                             Pending::PageLinks(id, page, ticket, permit) => {

@@ -32,3 +32,5 @@ All 214 workspace tests pass. `cargo fmt --all --check` and warning-denied works
 ## Remaining integration and acceptance
 
 This is the tested native extraction layer. Application actor events, reader pointer/keyboard selection, multi-page selection, clipboard commands, selection presentation, annotation persistence/editing/review/export and the page-note fallback still need connecting and verifying. UI parity remains incomplete. Non-Latin embedded-font native fixtures, protected-document selection interaction, mid-extraction cancellation stress, OS accessibility, physical DPI and performance acceptance are also pending. No release-completion claim is made.
+
+Subsequent actor and Text-tab integration is recorded in [Connected native page-text panel](rust-text-panel-2026-10-09.md). The acceptance list above describes this extraction checkpoint.

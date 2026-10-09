@@ -96,6 +96,7 @@ impl YamantakaApp {
         p: Palette,
     ) {
         if !self.panel {
+            self.text.clear();
             self.thumbnails.clear();
             return;
         }
@@ -115,16 +116,9 @@ impl YamantakaApp {
             self.bookmark_command(0, None);
         }
         if self.reader_panel_tab == outline::ReaderPanelTab::Text {
-            let identity = (document.id.clone(), self.page, self.generation);
-            if self.panel_requested.as_ref() != Some(&identity) {
-                self.panel_text.clear();
-                self.panel_requested = Some(identity);
-                self.send(Action::Text(
-                    document.id.clone(),
-                    self.page,
-                    self.cancel.clone(),
-                ));
-            }
+            self.request_page_text(&document.id);
+        } else {
+            self.text.clear();
         }
         if self.reader_panel_tab == outline::ReaderPanelTab::Outline {
             self.request_outline(&document.id);
@@ -210,19 +204,24 @@ impl YamantakaApp {
         if previous_tab != self.reader_panel_tab {
             self.find.stop();
         }
-        ui.add_space(if compact { 8.0 } else { 18.0 });
+        ui.add_space(
+            if compact && self.reader_panel_tab == outline::ReaderPanelTab::Text {
+                4.0
+            } else if compact {
+                8.0
+            } else {
+                18.0
+            },
+        );
         if self.reader_panel_tab == outline::ReaderPanelTab::Find {
             self.find_panel_content(ui, info, p);
             return;
         }
         if self.reader_panel_tab == outline::ReaderPanelTab::Text {
-            ui.heading(self.tr("Texto de la página", "Page text"));
-            if theme::navigation(ui, self.tr("Copiar texto", "Copy text"), false, p).clicked() {
-                ui.ctx().copy_text(self.panel_text.clone());
-            }
-            ui.label(&self.panel_text);
+            self.text_panel_content(ui, p);
             return;
         }
+        self.text.clear();
         if self.reader_panel_tab == outline::ReaderPanelTab::Thumbnails {
             self.thumbnails_panel_content(ui, info, p);
             return;
