@@ -182,6 +182,16 @@ pub enum AnnotationChange<'a> {
     },
 }
 pub trait AnnotationRepository {
+    fn annotation_marks(
+        &self,
+        _document: &str,
+        _page: u32,
+        _governor: &MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<super::marks::AnnotationMarks> {
+        Err(Failure::Unsupported("Reading annotation marks".into()))
+    }
+
     fn annotations(
         &self,
         _query: &AnnotationQuery,

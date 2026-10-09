@@ -118,6 +118,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let title = title.replace('\'', "''");
             db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,reading_progress,last_page_index) VALUES('demo-{index}','{path}','demo-{index}','fixture.pdf','{title}','{author}',2,900,'2026-10-08','2026-10-08','2026-10-08','synthetic',{},0)",if index==0{0.5}else{0.0}))?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--annotation-many") {
+            db.execute_batch(r#"WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180)
+                INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state)
+                SELECT printf('synthetic-mark-%03d',x),'demo-0',0,'highlight','violet','Synthetic mark',
+                    printf('[{"left":%.4f,"top":%.4f,"right":%.4f,"bottom":%.4f}]',0.08+(x%6)*0.14,0.12+(x/6)*0.023,0.18+(x%6)*0.14,0.13+(x/6)*0.023),
+                    0,'synthetic','attached','2026-10-09','2026-10-09','pending' FROM n;"#)?;
+        }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
             db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
@@ -283,6 +290,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--details"),
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
+                if args.iter().any(|arg| arg == "--annotation-many") {
+                    app.preview_annotation_list();
+                }
                 if args.iter().any(|arg| arg == "--page-note") {
                     app.preview_page_note(args.iter().any(|arg| arg == "--annotation-save"));
                 }

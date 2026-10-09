@@ -100,6 +100,19 @@ impl YamantakaApp {
                 self.annotation_command(None, offset);
             }
         }
+        if let Some(error) = self.annotation_paint.error().map(str::to_owned) {
+            ui.label(self.tr(
+                "No se pudieron cargar las marcas de página.",
+                "Page marks could not be loaded.",
+            ));
+            ui.collapsing(self.tr("Detalles de las marcas", "Mark details"), |ui| {
+                ui.label(error);
+            });
+            if theme::navigation(ui, self.tr("Recargar marcas", "Reload marks"), false, p).clicked()
+            {
+                self.annotation_paint.invalidate();
+            }
+        }
         if self.annotations.editor.is_some() {
             let english = self.english;
             let fallback = self.annotations.fallback();
@@ -330,21 +343,17 @@ impl YamantakaApp {
         paper: egui::Rect,
         rotation: PageRotation,
     ) {
-        let Some(records) = &self.annotations.page else {
+        let Some(records) = self.annotation_paint.marks(page) else {
             return;
         };
-        for record in records.entries() {
-            let values = &record.data().values;
-            if values.page_index != page || values.status != AttachmentStatus::Attached {
-                continue;
-            }
-            let color = mark_color(values.color);
-            for rect in &values.rects {
+        for mark in records.marks() {
+            let color = mark_color(mark.color());
+            for rect in mark.rects() {
                 let region = reader_viewport::page_region(paper, rotation, rect.region());
-                match values.kind {
+                match mark.kind() {
                     AnnotationKind::Underline | AnnotationKind::Strikeout => {
                         let native = rect.region();
-                        let y = if values.kind == AnnotationKind::Underline {
+                        let y = if mark.kind() == AnnotationKind::Underline {
                             native.max()[1]
                         } else {
                             (native.min()[1] + native.max()[1]) * 0.5

@@ -455,3 +455,58 @@ fn page_note_actor_saves_and_indexes_the_note_without_text_extraction() {
     drop(runtime);
     assert_eq!(governor.usage().text, 0);
 }
+
+#[test]
+fn visible_annotation_marks_use_actor_admission_and_remain_independent_of_native_pdf_work() {
+    let (runtime, native, _) = setup();
+    let governor = MemoryGovernor::default();
+    let draft = draft(&governor, false);
+    let saved = change(
+        &runtime,
+        &governor,
+        AnnotationMutation::Create {
+            draft: draft.clone(),
+            confirm_page_note: false,
+            tags: vec![],
+        },
+    );
+    let cancel = Cancellation::default();
+    runtime
+        .submit(Action::AnnotationMarks(Box::new(AnnotationMarksRequest {
+            document: "a".into(),
+            page: 2,
+            governor: governor.clone(),
+            cancel: cancel.clone(),
+        })))
+        .unwrap();
+    match update(&runtime) {
+        Update::AnnotationMarks(reply) => {
+            assert!(reply.cancel.same_request(&cancel));
+            assert_eq!(reply.document, "a");
+            assert_eq!(reply.page, 2);
+            let marks = reply.result.unwrap();
+            assert_eq!(marks.page(), 2);
+            assert_eq!(marks.marks().len(), 1);
+            assert!(!marks.marks()[0].rects().is_empty());
+        }
+        _ => panic!("annotation marks reply"),
+    }
+    let cancel = Cancellation::default();
+    cancel.cancel();
+    runtime
+        .submit(Action::AnnotationMarks(Box::new(AnnotationMarksRequest {
+            document: "a".into(),
+            page: 2,
+            governor: governor.clone(),
+            cancel,
+        })))
+        .unwrap();
+    assert!(
+        matches!(update(&runtime),Update::AnnotationMarks(reply) if matches!(reply.result,Err(Failure::Cancelled)))
+    );
+    assert!(native.try_recv().is_err());
+    drop(saved);
+    drop(draft);
+    drop(runtime);
+    assert_eq!(governor.usage().text, 0);
+}

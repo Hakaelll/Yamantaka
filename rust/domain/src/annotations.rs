@@ -1,4 +1,5 @@
 pub mod batch;
+pub mod marks;
 use crate::{
     Failure, Result,
     memory::{ByteLease, Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},

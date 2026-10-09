@@ -8,6 +8,7 @@ use yamantaka_domain::{
     reader_preferences::PageRotation,
     text_selection::snapshot::TextSelectionSnapshot,
 };
+pub(super) mod paint;
 mod panel;
 #[cfg(test)]
 mod tests;
@@ -70,6 +71,7 @@ pub(super) struct AnnotationState {
     editor: Option<AnnotationEditor>,
     error: Option<String>,
     saved: bool,
+    pub(super) revision: u64,
 }
 impl AnnotationState {
     pub(super) fn editing(&self) -> bool {
@@ -116,6 +118,7 @@ impl AnnotationState {
                 self.error = None;
                 self.saved = pending.writing;
                 if pending.writing {
+                    self.revision = self.revision.wrapping_add(1);
                     self.editor = None;
                 }
             }
@@ -302,6 +305,12 @@ impl YamantakaApp {
         self.annotations.error = None;
         self.panel = true;
         self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+    }
+    pub fn preview_annotation_list(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.panel = true;
+            self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+        }
     }
     pub fn preview_page_note(&mut self, save: bool) {
         if self.demo && self.capture.is_some() {

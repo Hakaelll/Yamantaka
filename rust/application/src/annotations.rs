@@ -143,3 +143,29 @@ impl AnnotationRequest {
         }
     }
 }
+
+pub struct AnnotationMarksRequest {
+    pub document: String,
+    pub page: u32,
+    pub governor: MemoryGovernor,
+    pub cancel: Cancellation,
+}
+pub struct AnnotationMarksReply {
+    pub document: String,
+    pub page: u32,
+    pub result: Result<yamantaka_domain::annotations::marks::AnnotationMarks>,
+    pub cancel: Cancellation,
+}
+impl AnnotationMarksRequest {
+    pub(crate) fn execute(self, repository: &impl AnnotationRepository) -> AnnotationMarksReply {
+        let result = self.cancel.check().and_then(|()| {
+            repository.annotation_marks(&self.document, self.page, &self.governor, &self.cancel)
+        });
+        AnnotationMarksReply {
+            document: self.document,
+            page: self.page,
+            result,
+            cancel: self.cancel,
+        }
+    }
+}

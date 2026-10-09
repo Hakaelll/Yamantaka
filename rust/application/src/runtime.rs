@@ -1,4 +1,6 @@
-use crate::annotations::{AnnotationReply, AnnotationRequest};
+use crate::annotations::{
+    AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
+};
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
 use crate::search_index::{IndexCommand, IndexProgress, SearchIndexController};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Select, Sender, TryRecvError, bounded};
@@ -23,6 +25,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    AnnotationMarks(Box<AnnotationMarksRequest>),
     Annotation(Box<AnnotationRequest>),
     Bookmarks(String, usize, Cancellation),
     ChangeBookmark(String, BookmarkChange, usize, Cancellation),
@@ -70,6 +73,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    AnnotationMarks(AnnotationMarksReply),
     Annotations(AnnotationReply),
     Bookmarks(String, usize, BookmarkPage, Cancellation),
     BookmarkFailed(String, Failure, Cancellation),
@@ -380,6 +384,10 @@ impl Runtime {
                         } else {
                             match action {
                                 Action::Shutdown => break,
+                                Action::AnnotationMarks(request) => {
+                                    let reply = request.execute(&repository);
+                                    emit(&events, &notify, Update::AnnotationMarks(reply), permit);
+                                }
                                 Action::Annotation(request) => {
                                     let access = if indexer.progress().enabled {
                                         yamantaka_domain::search::IndexAccess::Enabled

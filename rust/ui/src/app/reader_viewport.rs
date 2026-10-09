@@ -131,6 +131,7 @@ impl YamantakaApp {
             });
             let link_pages: Vec<u32> = frame.pages.iter().map(|visible| visible.page).collect();
             self.request_visible_links(&document.id, &link_pages);
+            self.request_annotation_marks(&document.id, &link_pages);
             self.selection.retain_visible(&document.id, &link_pages);
             self.request_selection_pages(&document.id, &link_pages);
             let origin = ui.max_rect().min;

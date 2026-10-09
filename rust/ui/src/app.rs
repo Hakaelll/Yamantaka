@@ -126,6 +126,7 @@ pub struct YamantakaApp {
     )>,
     bookmarks: bookmarks::BookmarkState,
     annotations: annotations::AnnotationState,
+    annotation_paint: annotations::paint::AnnotationPaint,
     annotation_preview: u8,
     annotation_multi_preview: bool,
     text: text::TextState,
@@ -284,6 +285,7 @@ impl YamantakaApp {
             reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
             annotations: Default::default(),
+            annotation_paint: Default::default(),
             annotation_preview: 0,
             annotation_multi_preview: false,
             text: Default::default(),
@@ -450,6 +452,7 @@ impl YamantakaApp {
     }
     fn show_surface(&mut self, surface: Surface) {
         self.links.clear();
+        self.annotation_paint.invalidate();
         self.text.clear();
         self.selection.clear();
         self.find.stop();
@@ -460,6 +463,7 @@ impl YamantakaApp {
     }
     fn open(&mut self, document: Document) {
         self.links.clear();
+        self.annotation_paint.invalidate();
         self.text.clear();
         self.selection.clear();
         self.thumbnails.clear();
@@ -1445,7 +1449,9 @@ impl App for YamantakaApp {
         }
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
+                Update::AnnotationMarks(reply) => self.annotation_paint.accept(reply),
                 Update::Annotations(reply) => {
+                    let revision = self.annotations.revision;
                     if let Some(error) = self.annotations.accept(reply) {
                         self.error = Some(format!(
                             "{}: {error}",
@@ -1454,6 +1460,9 @@ impl App for YamantakaApp {
                                 "Could not save the note in the previous document"
                             )
                         ));
+                    }
+                    if self.annotations.revision != revision {
+                        self.annotation_paint.invalidate();
                     }
                 }
                 Update::Library(documents, count, cancel) => {
@@ -1896,6 +1905,7 @@ impl App for YamantakaApp {
                             && self.selection.preview_ready())
                     && self.reader_destination.is_none()
                     && self.annotation_preview == 0
+                    && (!matches!(self.surface, Surface::Reader) || self.annotation_paint.ready())
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
                     && !self.loading
@@ -1970,6 +1980,7 @@ impl App for YamantakaApp {
                         "pageText": if self.selection.enabled { self.selection.text_state(self.page).map(text::TextState::capture_summary) } else { Some(self.text.capture_summary()) },
                         "textSelection":self.selection.capture_summary(),
                         "annotations":self.annotation_capture_summary(),
+                        "annotationPaint":self.annotation_paint.capture_summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
@@ -1991,6 +2002,7 @@ impl App for YamantakaApp {
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
         self.links.clear();
+        self.annotation_paint.invalidate();
         self.text.clear();
         self.selection.clear();
         self.find = Default::default();

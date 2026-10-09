@@ -9,6 +9,7 @@ use yamantaka_domain::{
     reader_preferences::PageRotation,
     search::IndexAccess,
 };
+mod marks;
 mod writes;
 const KNOWN_COLUMNS: [&str; 18] = [
     "id",
@@ -287,6 +288,16 @@ fn read_page(
     AnnotationPage::from_reserved(entries, total, offset, page_lease)
 }
 impl AnnotationRepository for Database {
+    fn annotation_marks(
+        &self,
+        document: &str,
+        page: u32,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<yamantaka_domain::annotations::marks::AnnotationMarks> {
+        marks::read(self, document, page, governor, cancel)
+    }
+
     fn annotations(
         &self,
         query: &AnnotationQuery,
