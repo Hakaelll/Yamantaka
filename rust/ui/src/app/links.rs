@@ -1,6 +1,6 @@
 use super::*;
 use yamantaka_domain::{
-    pdf_links::{PdfLinkTarget, PdfPageLinks},
+    pdf_links::{ExternalLinkRejection, PdfLinkTarget, PdfPageLinks},
     reader_preferences::PageRotation,
 };
 
@@ -50,8 +50,24 @@ impl LinkState {
                 .all(|phase| matches!(phase, LinkPhase::Ready(_)))
     }
     pub(super) fn capture_summary(&self) -> serde_json::Value {
-        serde_json::json!({"residentPages":self.pages.len(), "readyPages":self.pages.values().filter(|phase| matches!(phase, LinkPhase::Ready(_))).count(), "internalLinks":self.pages.values().filter_map(|phase| match phase { LinkPhase::Ready(payload) => Some(payload.links().iter().filter(|link| matches!(link.target, PdfLinkTarget::Internal(_))).count()), _ => None }).sum::<usize>()})
+        let count = |accept: fn(&PdfLinkTarget) -> bool| {
+            self.pages
+                .values()
+                .filter_map(|phase| match phase {
+                    LinkPhase::Ready(payload) => Some(
+                        payload
+                            .links()
+                            .iter()
+                            .filter(|link| accept(&link.target))
+                            .count(),
+                    ),
+                    _ => None,
+                })
+                .sum::<usize>()
+        };
+        serde_json::json!({"residentPages":self.pages.len(), "readyPages":self.pages.values().filter(|phase| matches!(phase, LinkPhase::Ready(_))).count(), "internalLinks":count(|target| matches!(target, PdfLinkTarget::Internal(_))), "externalLinks":count(|target| matches!(target, PdfLinkTarget::External(_))), "rejectedLinks":count(|target| matches!(target, PdfLinkTarget::Rejected(_))), "confirmationOpen":self.confirmation.is_some()})
     }
+
     pub(super) fn clear(&mut self) {
         self.confirmation = None;
         self.pages.clear();
@@ -146,15 +162,15 @@ impl YamantakaApp {
             )
             .show(ctx, |ui| {
                 ui.set_width((ctx.content_rect().width() - 48.0).clamp(160.0, 440.0));
+                ui.label(
+                    RichText::new(self.tr("Abrir enlace externo", "Open external link"))
+                        .size(if compact { 20.0 } else { 24.0 })
+                        .color(palette.ink),
+                );
+                ui.add_space(if compact { 4.0 } else { 12.0 });
                 egui::ScrollArea::vertical()
-                    .max_height((ctx.content_rect().height() - 64.0).max(80.0))
+                    .max_height((ctx.content_rect().height() - 144.0).max(48.0))
                     .show(ui, |ui| {
-                        ui.label(
-                            RichText::new(self.tr("Abrir enlace externo", "Open external link"))
-                                .size(if compact { 20.0 } else { 24.0 })
-                                .color(palette.ink),
-                        );
-                        ui.add_space(8.0);
                         ui.label(
                             RichText::new(self.tr(
                                 "Windows abrirá este destino en otra aplicación.",
@@ -162,34 +178,30 @@ impl YamantakaApp {
                             ))
                             .color(palette.secondary),
                         );
-                        ui.add_space(12.0);
+                        ui.add_space(if compact { 4.0 } else { 12.0 });
                         ui.add(
                             egui::Label::new(RichText::new(uri.as_str()).color(palette.ink)).wrap(),
                         );
-                        ui.add_space(16.0);
-                        ui.horizontal_wrapped(|ui| {
-                            let cancel = theme::navigation(
-                                ui,
-                                self.tr("Cancelar", "Cancel"),
-                                false,
-                                palette,
-                            );
-                            if confirmation.focus_cancel {
-                                cancel.request_focus();
-                                confirmation.focus_cancel = false;
-                            }
-                            cancelled = cancel.clicked();
-                            approved = theme::control(
-                                ui,
-                                self.tr("Abrir", "Open"),
-                                Some(theme::Icon::Right),
-                                true,
-                                false,
-                                palette,
-                            )
-                            .clicked();
-                        });
                     });
+                ui.add_space(if compact { 4.0 } else { 16.0 });
+                ui.horizontal_wrapped(|ui| {
+                    let cancel =
+                        theme::navigation(ui, self.tr("Cancelar", "Cancel"), false, palette);
+                    if confirmation.focus_cancel {
+                        cancel.request_focus();
+                        confirmation.focus_cancel = false;
+                    }
+                    cancelled = cancel.clicked();
+                    approved = theme::control(
+                        ui,
+                        self.tr("Abrir", "Open"),
+                        Some(theme::Icon::Right),
+                        true,
+                        false,
+                        palette,
+                    )
+                    .clicked();
+                });
             });
         cancelled |= modal.should_close();
         if cancelled {
@@ -258,6 +270,9 @@ impl YamantakaApp {
                         PdfLinkTarget::External(_) => self
                             .tr("Abrir enlace externo…", "Open external link…")
                             .to_owned(),
+                        PdfLinkTarget::Rejected(_) => self
+                            .tr("Enlace no permitido", "Link not permitted")
+                            .to_owned(),
                     };
                     for (index, bounds) in link.regions.iter().enumerate() {
                         let rect = reader_viewport::page_region(paper, rotation, *bounds);
@@ -321,6 +336,12 @@ impl YamantakaApp {
             match &payload.links()[link_index].target {
                 PdfLinkTarget::Internal(destination) => {
                     self.reader_destination = Some((document.into(), *destination))
+                }
+                PdfLinkTarget::Rejected(reason) => {
+                    self.error = Some(match reason {
+                        ExternalLinkRejection::InvalidTarget => self.tr("Este enlace no es válido o usa un esquema no permitido. Solo se admiten http, https y mailto.", "This link is invalid or uses a scheme that is not permitted. Only http, https and mailto are allowed."),
+                        ExternalLinkRejection::TooLong => self.tr("Este enlace supera el límite de tamaño y no se puede abrir.", "This link exceeds the size limit and cannot be opened."),
+                    }.to_owned());
                 }
                 PdfLinkTarget::External(_) => {
                     self.links.confirmation = Some(ExternalConfirmation {

@@ -29,6 +29,9 @@ fn fixture_with_uri(rotation: u16, repeated: Option<usize>, uri: &str) -> Fixtur
         || "5 0 R 6 0 R 7 0 R 8 0 R".to_owned(),
         |count| "5 0 R ".repeat(count),
     );
+    fixture_with_references(rotation, &annotations, uri)
+}
+fn fixture_with_references(rotation: u16, annotations: &str, uri: &str) -> Fixture {
     let objects = [
         "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
         "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>".into(),
@@ -294,7 +297,7 @@ fn native_external_links_are_validated_bounded_accounted_and_never_opened_by_ext
         let allowed = value.starts_with("http://")
             || value.starts_with("https://") && value.len() <= 4096
             || value.starts_with("mailto:");
-        assert_eq!(links.links().len(), if allowed { 3 } else { 2 });
+        assert_eq!(links.links().len(), 3);
         assert_eq!(links.unsupported_targets(), if allowed { 0 } else { 1 });
         if allowed {
             let PdfLinkTarget::External(uri) = &links.links()[2].target else {
@@ -303,9 +306,54 @@ fn native_external_links_are_validated_bounded_accounted_and_never_opened_by_ext
             assert!(uri.as_str().starts_with(value.split(':').next().unwrap()));
             assert!(governor.usage().text >= uri.retained_bytes());
         }
+        if !allowed {
+            assert!(matches!(
+                links.links()[2].target,
+                PdfLinkTarget::Rejected(_)
+            ));
+            assert!(!links.links()[2].regions.is_empty());
+        }
         drop(links);
         assert_eq!(governor.usage().text, 0);
         engine.close("book".into()).unwrap();
         assert_eq!(Sha256::digest(fs::read(&fixture.0).unwrap()), before);
     }
+}
+
+#[test]
+fn aggregate_uri_capacity_fails_boundedly_and_the_worker_recovers() {
+    let uri = format!(
+        "https://example.invalid/{}",
+        "a".repeat(4096 - "https://example.invalid/".len())
+    );
+    let fixture = fixture_with_references(0, &"7 0 R ".repeat(140), &uri);
+    let governor = MemoryGovernor::default();
+    let engine = engine(governor.clone());
+    engine
+        .open(
+            "book".into(),
+            fixture.0.clone(),
+            None,
+            Cancellation::default(),
+        )
+        .unwrap();
+    assert!(matches!(
+        engine
+            .try_page_links("book".into(), 0, Cancellation::default())
+            .unwrap()
+            .wait(),
+        Err(Failure::Pdf(_))
+    ));
+    assert_eq!(governor.usage().text, 0);
+    assert!(
+        engine
+            .try_page_links("book".into(), 1, Cancellation::default())
+            .unwrap()
+            .wait()
+            .unwrap()
+            .links()
+            .is_empty()
+    );
+    assert_eq!(governor.usage().text, 0);
+    engine.close("book".into()).unwrap();
 }

@@ -3,7 +3,10 @@ use std::sync::Arc;
 use yamantaka_domain::{
     Failure, Result,
     memory::{Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},
-    pdf_links::{MAX_LINK_REGIONS, MAX_PAGE_LINKS, PdfLinkTarget, PdfPageLink, PdfPageLinks},
+    pdf_links::{
+        ExternalLinkRejection, MAX_LINK_REGIONS, MAX_PAGE_LINKS, PdfLinkTarget, PdfPageLink,
+        PdfPageLinks,
+    },
 };
 
 pub(crate) fn read(
@@ -66,29 +69,35 @@ pub(crate) fn read(
                 )?))
             } else if let Some(uri) = action.as_uri_action() {
                 check_current()?;
-                let value = match uri
+                let target = match uri
                     .uri_with_max_bytes(yamantaka_domain::external_uri::MAX_EXTERNAL_URI_BYTES)
                 {
-                    Ok(value) => value,
-                    Err(PdfiumError::UriLengthExceedsLimit | PdfiumError::NoUriForAction) => {
-                        unsupported_targets += 1;
-                        continue;
+                    Ok(value) => match yamantaka_domain::external_uri::ExternalUri::new(&value) {
+                        Ok(uri) => {
+                            uri_bytes = uri_bytes
+                                .checked_add(uri.retained_bytes())
+                                .ok_or(Failure::MemoryBudget)?;
+                            if uri_bytes > 512 * 1024 {
+                                return Err(Failure::Pdf(
+                                    "PDF page exceeds the URI memory work limit".into(),
+                                ));
+                            }
+                            PdfLinkTarget::External(uri)
+                        }
+                        Err(_) => PdfLinkTarget::Rejected(ExternalLinkRejection::InvalidTarget),
+                    },
+                    Err(PdfiumError::UriLengthExceedsLimit) => {
+                        PdfLinkTarget::Rejected(ExternalLinkRejection::TooLong)
+                    }
+                    Err(PdfiumError::NoUriForAction) => {
+                        PdfLinkTarget::Rejected(ExternalLinkRejection::InvalidTarget)
                     }
                     Err(error) => return Err(crate::worker::pdf_failure(error)),
                 };
-                let Ok(uri) = yamantaka_domain::external_uri::ExternalUri::new(&value) else {
+                if matches!(target, PdfLinkTarget::Rejected(_)) {
                     unsupported_targets += 1;
-                    continue;
-                };
-                uri_bytes = uri_bytes
-                    .checked_add(uri.retained_bytes())
-                    .ok_or(Failure::MemoryBudget)?;
-                if uri_bytes > 512 * 1024 {
-                    return Err(Failure::Pdf(
-                        "PDF page exceeds the URI memory work limit".into(),
-                    ));
                 }
-                Some(PdfLinkTarget::External(uri))
+                Some(target)
             } else {
                 None
             }

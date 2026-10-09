@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='external-link-dark'; args=@('--links','--external-links','--links-activate') },
+    @{ name='external-link-light-es'; args=@('--links','--external-links','--links-activate','--light','--es') },
+    @{ name='external-link-small-200'; args=@('--links','--external-links','--links-activate','--size=640x480','--text-scale=2') },
+    @{ name='external-link-rejected-es'; args=@('--links','--rejected-link','--links-activate','--es') },
     @{ name='links-dark'; args=@('--links') },
     @{ name='links-light-es'; args=@('--links','--light','--es') },
     @{ name='links-small-200'; args=@('--links','--size=640x480','--text-scale=2') },

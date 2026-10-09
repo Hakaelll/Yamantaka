@@ -2,11 +2,14 @@
 from pathlib import Path
 import hashlib
 import json
+import sys
 from reportlab.pdfgen import canvas
 
 root = Path(__file__).resolve().parents[1] / "build" / "rust-fixtures"
 root.mkdir(parents=True, exist_ok=True)
-target = root / "links.pdf"
+external = "--external" in sys.argv
+rejected = "--rejected" in sys.argv
+target = root / ("rejected-links.pdf" if rejected else "external-links.pdf" if external else "links.pdf")
 pdf = canvas.Canvas(str(target), pagesize=(600, 800), invariant=1)
 pdf.setTitle("The art of attention")
 pdf.setAuthor("Synthetic study collection")
@@ -34,11 +37,14 @@ for page, (title, subtitle, passage) in enumerate(chapters):
     pdf.addOutlineEntry(subtitle, f"passage-{page}", level=1)
     pdf.setFillColorRGB(.32, .24, .52)
     pdf.setFont("Helvetica", 12)
-    label = "Continue to the next chapter"
+    label = "Read the reference" if external or rejected else "Continue to the next chapter"
     pdf.drawString(64, 370, label)
     width = pdf.stringWidth(label, "Helvetica", 12)
     pdf.line(64, 367, 64 + width, 367)
-    pdf.linkAbsolute(label, f"chapter-{(page + 1) % len(chapters)}", Rect=(64, 365, 64 + width, 386), thickness=0)
+    if external or rejected:
+        pdf.linkURL("file:///reference.pdf" if rejected else "https://example.invalid/study", rect=(64, 365, 64 + width, 386), thickness=0)
+    else:
+        pdf.linkAbsolute(label, f"chapter-{(page + 1) % len(chapters)}", Rect=(64, 365, 64 + width, 386), thickness=0)
     pdf.showPage()
 pdf.save()
 target.with_suffix(".provenance.json").write_text(json.dumps({

@@ -6,10 +6,17 @@ use crate::{
 pub const MAX_PAGE_LINKS: usize = 512;
 pub const MAX_LINK_REGIONS: usize = 64;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExternalLinkRejection {
+    InvalidTarget,
+    TooLong,
+}
+
 #[derive(Debug)]
 pub enum PdfLinkTarget {
     Internal(NavigationDestination),
     External(crate::external_uri::ExternalUri),
+    Rejected(ExternalLinkRejection),
 }
 
 #[derive(Debug)]
@@ -161,7 +168,7 @@ impl PdfPageLinks {
                 |total, link| {
                     total
                         .checked_add(match &link.target {
-                            PdfLinkTarget::Internal(_) => 0,
+                            PdfLinkTarget::Internal(_) | PdfLinkTarget::Rejected(_) => 0,
                             PdfLinkTarget::External(uri) => uri.retained_bytes(),
                         })?
                         .checked_add(
