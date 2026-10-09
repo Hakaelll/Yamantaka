@@ -2,6 +2,7 @@ mod compact;
 mod details;
 mod list;
 mod navigation;
+mod open_intent;
 mod reader_controls;
 mod reader_options;
 mod reader_viewport;
@@ -61,6 +62,7 @@ impl PageImage {
 }
 pub struct YamantakaApp {
     search: search::SearchState,
+    open_intent: open_intent::OpenIntent,
     runtime: Runtime,
     preferences: Preferences,
     store: PathBuf,
@@ -192,6 +194,7 @@ impl YamantakaApp {
                     .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false),
             ),
+            open_intent: open_intent::OpenIntent::default(),
             runtime,
             preferences,
             store,
@@ -347,6 +350,7 @@ impl YamantakaApp {
         }
     }
     pub fn import(&mut self, paths: Vec<PathBuf>) {
+        self.open_intent.leave_destination();
         self.cancel.cancel();
         self.cancel = Cancellation::default();
         self.loading = true;
@@ -377,8 +381,12 @@ impl YamantakaApp {
             self.preview_list_focus = true;
         }
     }
+    fn show_surface(&mut self, surface: Surface) {
+        self.open_intent.leave_destination();
+        self.surface = surface;
+    }
     fn open(&mut self, document: Document) {
-        self.search.pending_page = None;
+        self.open_intent.begin_open();
         self.reader_preferences_cancel.cancel();
         self.reader_preferences_cancel = Cancellation::default();
         self.reader_preferences = None;
@@ -489,7 +497,7 @@ impl YamantakaApp {
                         )
                     };
                     if response.clicked() {
-                        self.surface = Surface::Library;
+                        self.show_surface(Surface::Library);
                         self.refresh();
                     }
                     if self.active.is_some() {
@@ -509,7 +517,7 @@ impl YamantakaApp {
                             )
                         };
                         if response.clicked() {
-                            self.surface = Surface::Reader;
+                            self.show_surface(Surface::Reader);
                         }
                     }
                     if narrow {
@@ -1181,7 +1189,7 @@ impl YamantakaApp {
                         )
                         .clicked()
                         {
-                            self.surface = Surface::Library;
+                            self.show_surface(Surface::Library);
                             self.refresh();
                         }
                         if ui.available_width() > 880.0 {
@@ -1368,11 +1376,10 @@ impl App for YamantakaApp {
                     self.page = document
                         .last_page_index
                         .min(info.page_sizes.len().saturating_sub(1) as u32);
-                    if let Some((id, page)) = self.search.pending_page.take()
-                        && id == document.id
-                    {
+                    let (target_page, reveal_reader) = self.open_intent.finish_open(&document.id);
+                    if let Some(page) = target_page {
                         self.page = page.min(info.page_sizes.len().saturating_sub(1) as u32);
-                        self.send(Action::Navigate(id, self.page));
+                        self.send(Action::Navigate(document.id.clone(), self.page));
                     }
                     let count = u32::try_from(info.page_sizes.len()).unwrap_or(0);
                     match ReaderNavigation::new(count, self.page) {
@@ -1389,7 +1396,9 @@ impl App for YamantakaApp {
                         id,
                         self.reader_preferences_cancel.clone(),
                     ));
-                    self.surface = Surface::Reader;
+                    if reveal_reader {
+                        self.show_surface(Surface::Reader);
+                    }
                     self.loading = false;
                 }
                 Update::Page(page, cancel, _, _) => {
@@ -1511,16 +1520,10 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Document(id, document, cancel) => {
-                    if !cancel.is_cancelled() {
+                    if let Some(page) = self.open_intent.accept_lookup(&id, &cancel) {
                         if let Some(document) =
                             document.filter(|document| document.id == id && !document.missing)
                         {
-                            let page = self
-                                .search
-                                .lookup_page
-                                .take()
-                                .filter(|(target, _)| *target == id)
-                                .and_then(|(_, page)| page);
                             if self
                                 .active
                                 .as_ref()
@@ -1529,10 +1532,12 @@ impl App for YamantakaApp {
                                 if let Some(page) = page {
                                     self.navigate(page);
                                 }
-                                self.surface = Surface::Reader;
+                                self.show_surface(Surface::Reader);
                             } else {
                                 self.open(document);
-                                self.search.pending_page = page.map(|page| (id, page));
+                                if let Some(page) = page {
+                                    self.open_intent.set_page(id, page);
+                                }
                             }
                         } else {
                             self.error = Some(self.tr("El documento ya no está disponible. Localízalo desde la biblioteca.", "The document is unavailable. Locate it from the library.").into());

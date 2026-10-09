@@ -21,7 +21,7 @@ impl YamantakaApp {
                     )
                     .clicked()
                     {
-                        self.surface = Surface::Library;
+                        self.show_surface(Surface::Library);
                         self.refresh();
                     }
                     if ui

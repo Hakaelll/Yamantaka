@@ -21,16 +21,13 @@ pub(super) struct SearchState {
     pub preview_action: Option<&'static str>,
     pub preview_open_page: bool,
     pub preview_excluded: bool,
-    pub lookup_page: Option<(String, Option<u32>)>,
     last_phase: Option<(u64, IndexPhase)>,
     deadline: Option<Instant>,
     cancel: Cancellation,
     selection_cancel: Cancellation,
-    lookup_cancel: Cancellation,
     focus: bool,
     manual_paused: bool,
     confirm_clear: bool,
-    pub pending_page: Option<(String, u32)>,
 }
 impl SearchState {
     pub fn new(enabled: bool) -> Self {
@@ -53,16 +50,13 @@ impl SearchState {
             preview_action: None,
             preview_open_page: false,
             preview_excluded: false,
-            lookup_page: None,
             last_phase: None,
             deadline: None,
             cancel: Cancellation::default(),
             selection_cancel: Cancellation::default(),
-            lookup_cancel: Cancellation::default(),
             focus: false,
             manual_paused: false,
             confirm_clear: false,
-            pending_page: None,
         }
     }
 }
@@ -99,13 +93,10 @@ impl YamantakaApp {
         }
     }
     pub(super) fn activate_search_result(&mut self, result: &SearchResult) {
-        self.search.lookup_cancel.cancel();
-        self.search.lookup_cancel = Cancellation::default();
-        self.search.lookup_page = Some((result.document_id.clone(), result.page));
-        self.send(Action::GetDocument(
-            result.document_id.clone(),
-            self.search.lookup_cancel.clone(),
-        ));
+        let cancel = self
+            .open_intent
+            .lookup(result.document_id.clone(), result.page);
+        self.send(Action::GetDocument(result.document_id.clone(), cancel));
     }
     pub(super) fn exclude_search_result(&mut self, result: &SearchResult, excluded: bool) {
         self.index_command(IndexCommand::Exclude {
@@ -147,13 +138,13 @@ impl YamantakaApp {
             )
             .clicked()
             {
-                self.surface = Surface::Settings;
+                self.show_surface(Surface::Settings);
                 ui.close();
             }
         });
     }
     pub(super) fn show_search(&mut self) {
-        self.surface = Surface::Search;
+        self.show_surface(Surface::Search);
         self.search.focus = true;
         self.send(Action::IndexStatistics);
     }
@@ -824,6 +815,5 @@ impl Drop for SearchState {
     fn drop(&mut self) {
         self.cancel.cancel();
         self.selection_cancel.cancel();
-        self.lookup_cancel.cancel();
     }
 }
