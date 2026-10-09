@@ -1,7 +1,7 @@
 //! Resolve PDF destinations without changing navigation or preferences.
 use crate::{
     Failure, Result,
-    outline::{DestinationRectangle, DestinationView, OutlineDestination},
+    pdf_destination::{DestinationRectangle, DestinationView, NavigationDestination},
     reader::ReaderPosition,
     reader_layout::ReaderLayout,
 };
@@ -16,7 +16,7 @@ pub struct ResolvedDestination {
 /// Null PDF parameters retain those values even when the destination changes page.
 pub fn resolve(
     layout: &ReaderLayout,
-    destination: OutlineDestination,
+    destination: NavigationDestination,
     viewport: [f64; 2],
     current_pdf_point: [f64; 2],
     current_zoom: f64,
@@ -181,7 +181,7 @@ mod tests {
     use super::*;
     use crate::{
         ReadingDirection,
-        outline::PageCoordinateSpace,
+        pdf_geometry::PageCoordinateSpace,
         reader_preferences::{PageRotation, ReaderPreferences},
     };
     fn layout(rotation: PageRotation) -> ReaderLayout {
@@ -197,8 +197,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn target(view: DestinationView) -> OutlineDestination {
-        OutlineDestination {
+    fn target(view: DestinationView) -> NavigationDestination {
+        NavigationDestination {
             page: 1,
             view,
             coordinates: PageCoordinateSpace::new([0.0, 400.0], [200.0, 400.0], [0.0, 0.0])

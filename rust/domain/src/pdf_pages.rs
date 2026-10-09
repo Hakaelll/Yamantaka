@@ -1,7 +1,7 @@
 use crate::{
     Failure, Result,
     memory::{ByteLease, Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},
-    outline::PageCoordinateSpace,
+    pdf_geometry::PageCoordinateSpace,
 };
 use std::{ops::Deref, sync::Arc};
 

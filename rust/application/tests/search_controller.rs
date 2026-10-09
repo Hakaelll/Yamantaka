@@ -40,7 +40,7 @@ impl Engine {
                 let governor = yamantaka_domain::memory::MemoryGovernor::default();
                 let mut pages =
                     yamantaka_domain::pdf_pages::PdfPagesBuilder::new(3, &governor).unwrap();
-                let coordinates = yamantaka_domain::outline::PageCoordinateSpace::new(
+                let coordinates = yamantaka_domain::pdf_geometry::PageCoordinateSpace::new(
                     [0.0, 800.0],
                     [600.0, 800.0],
                     [0.0, 0.0],

@@ -6,7 +6,8 @@ use std::{
 };
 use yamantaka_domain::{
     Cancellation, Failure, PdfEngine,
-    outline::{DestinationView, OutlineDestination, PageCoordinateSpace},
+    pdf_destination::{DestinationView, NavigationDestination},
+    pdf_geometry::PageCoordinateSpace,
 };
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
 
@@ -149,7 +150,7 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
     assert_eq!(entries[0].parent, None);
     assert_eq!(
         entries[0].destination,
-        Some(OutlineDestination {
+        Some(NavigationDestination {
             page: 0,
             content_bounds: None,
             coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])
@@ -165,7 +166,7 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
     assert_eq!(entries[1].parent, Some(0));
     assert_eq!(
         entries[1].destination,
-        Some(OutlineDestination {
+        Some(NavigationDestination {
             page: 1,
             content_bounds: None,
             coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])
@@ -177,7 +178,7 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
     assert_eq!(entries[2].destination, None);
     assert_eq!(
         entries[3].destination,
-        Some(OutlineDestination {
+        Some(NavigationDestination {
             page: 1,
             content_bounds: None,
             coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])

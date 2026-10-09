@@ -239,7 +239,7 @@ impl YamantakaApp {
 
     fn choose_outline_destination(
         &mut self,
-        destination: yamantaka_domain::outline::OutlineDestination,
+        destination: yamantaka_domain::pdf_destination::NavigationDestination,
         compact: bool,
     ) {
         if let Some(document) = self.outline.document.clone() {

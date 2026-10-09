@@ -343,7 +343,7 @@ impl ReaderLayout {
         &self,
         frame: &ReaderFrame,
         page: u32,
-        coordinates: crate::outline::PageCoordinateSpace,
+        coordinates: crate::pdf_geometry::PageCoordinateSpace,
     ) -> Result<[f64; 2]> {
         self.check_anchor(ReaderPosition::new(page, 0.0)?)?;
         let rect = self.page_rect(page, frame.content_size[0], frame.origin_y, frame.zoom);
@@ -728,7 +728,7 @@ mod tests {
     }
     #[test]
     fn viewport_pdf_point_uses_the_left_edge_and_inverts_user_rotation() {
-        let coordinates = crate::outline::PageCoordinateSpace::new(
+        let coordinates = crate::pdf_geometry::PageCoordinateSpace::new(
             [20.0, 2030.0],
             [1020.0, 2030.0],
             [20.0, 30.0],

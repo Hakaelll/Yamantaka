@@ -1,3 +1,4 @@
+use crate::pdf_geometry::NormalizedPageRect;
 use crate::{Failure, Result, memory::ByteLease, reader::ReaderPosition};
 
 pub const FIND_PAGE_SIZE: usize = 80;
@@ -40,45 +41,17 @@ impl PdfFindQuery {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MatchRectangle {
-    min: [f64; 2],
-    max: [f64; 2],
-}
-
-impl MatchRectangle {
-    pub fn new(min: [f64; 2], max: [f64; 2]) -> Result<Self> {
-        if min
-            .into_iter()
-            .chain(max)
-            .any(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
-            || (0..2).any(|axis| min[axis] >= max[axis])
-        {
-            return Err(Failure::Invalid(
-                "Search rectangles must be finite normalized areas".into(),
-            ));
-        }
-        Ok(Self { min, max })
-    }
-    pub fn min(&self) -> [f64; 2] {
-        self.min
-    }
-    pub fn max(&self) -> [f64; 2] {
-        self.max
-    }
-}
-
 #[derive(Debug)]
 pub struct PdfMatch {
     pub ordinal: u32,
     pub snippet: String,
-    pub rectangles: Vec<MatchRectangle>,
+    pub rectangles: Vec<NormalizedPageRect>,
 }
 
 impl PdfMatch {
     pub fn position(&self, page: u32) -> Option<ReaderPosition> {
         self.rectangles.first().and_then(|rect| {
-            ReaderPosition::at(page, [(rect.min[0] + rect.max[0]) / 2.0, rect.min[1]]).ok()
+            ReaderPosition::at(page, [(rect.min()[0] + rect.max()[0]) / 2.0, rect.min()[1]]).ok()
         })
     }
 }
@@ -134,7 +107,7 @@ impl PdfPageMatches {
                     total.checked_add(item.snippet.capacity())?.checked_add(
                         item.rectangles
                             .capacity()
-                            .checked_mul(std::mem::size_of::<MatchRectangle>())?,
+                            .checked_mul(std::mem::size_of::<NormalizedPageRect>())?,
                     )
                 },
             )
@@ -237,13 +210,13 @@ mod tests {
         let matched = PdfMatch {
             ordinal: 0,
             snippet: "passage".into(),
-            rectangles: vec![MatchRectangle::new([0.2, 0.3], [0.4, 0.5]).unwrap()],
+            rectangles: vec![NormalizedPageRect::new([0.2, 0.3], [0.4, 0.5]).unwrap()],
         };
         assert_eq!(matched.position(7).unwrap().page(), 7);
         let point = matched.position(7).unwrap().point();
         assert!((point[0] - 0.3).abs() < 1e-12 && point[1] == 0.3);
-        assert!(MatchRectangle::new([0.0, f64::NAN], [1.0, 1.0]).is_err());
-        assert!(MatchRectangle::new([0.5, 0.0], [0.5, 1.0]).is_err());
-        assert!(MatchRectangle::new([-0.1, 0.0], [1.0, 1.0]).is_err());
+        assert!(NormalizedPageRect::new([0.0, f64::NAN], [1.0, 1.0]).is_err());
+        assert!(NormalizedPageRect::new([0.5, 0.0], [0.5, 1.0]).is_err());
+        assert!(NormalizedPageRect::new([-0.1, 0.0], [1.0, 1.0]).is_err());
     }
 }

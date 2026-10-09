@@ -1,6 +1,7 @@
 use super::*;
 use yamantaka_application::document_find::{FindBatch, FindCursor, FindProgress, FindRequest};
 use yamantaka_domain::pdf_find::{DocumentTextPresence, PdfFindQuery};
+use yamantaka_domain::pdf_geometry::NormalizedPageRect;
 
 #[derive(Clone, Copy)]
 enum SelectionEdge {
@@ -544,7 +545,7 @@ impl YamantakaApp {
                 continue;
             }
             for bounds in &item.rectangles {
-                let rect = match_rect(paper, rotation, bounds.min(), bounds.max());
+                let rect = match_rect(paper, rotation, *bounds);
                 let active = *selected == Some(index);
                 ui.painter().rect_filled(
                     rect,
@@ -570,27 +571,17 @@ fn submit_on_enter(ui: &egui::Ui, response: &egui::Response) -> bool {
 fn match_rect(
     paper: egui::Rect,
     rotation: yamantaka_domain::reader_preferences::PageRotation,
-    min: [f64; 2],
-    max: [f64; 2],
+    bounds: NormalizedPageRect,
 ) -> egui::Rect {
-    let points = [
-        [min[0], min[1]],
-        [max[0], min[1]],
-        [min[0], max[1]],
-        [max[0], max[1]],
-    ];
-    let mut rect = egui::Rect::NOTHING;
-    for point in points {
-        let point = rotation.rotate_point(point);
-        rect.extend_with(
-            paper.min
-                + egui::vec2(
-                    point[0] as f32 * paper.width(),
-                    point[1] as f32 * paper.height(),
-                ),
-        );
-    }
-    rect
+    let bounds = bounds.rotated(rotation);
+    let position = |point: [f64; 2]| {
+        paper.min
+            + egui::vec2(
+                point[0] as f32 * paper.width(),
+                point[1] as f32 * paper.height(),
+            )
+    };
+    egui::Rect::from_min_max(position(bounds.min()), position(bounds.max()))
 }
 
 #[cfg(test)]
@@ -706,7 +697,11 @@ mod tests {
             (PageRotation::Deg180, [150.0, 260.0, 190.0, 340.0]),
             (PageRotation::Deg270, [50.0, 300.0, 90.0, 380.0]),
         ] {
-            let rect = match_rect(paper, rotation, [0.1, 0.2], [0.3, 0.4]);
+            let rect = match_rect(
+                paper,
+                rotation,
+                NormalizedPageRect::new([0.1, 0.2], [0.3, 0.4]).unwrap(),
+            );
             for (value, expected) in [rect.left(), rect.top(), rect.right(), rect.bottom()]
                 .into_iter()
                 .zip(expected)

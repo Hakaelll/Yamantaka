@@ -240,7 +240,7 @@ fn info() -> PdfInfo {
             let governor = yamantaka_domain::memory::MemoryGovernor::default();
             let mut pages =
                 yamantaka_domain::pdf_pages::PdfPagesBuilder::new(3, &governor).unwrap();
-            let coordinates = yamantaka_domain::outline::PageCoordinateSpace::new(
+            let coordinates = yamantaka_domain::pdf_geometry::PageCoordinateSpace::new(
                 [0.0, 800.0],
                 [600.0, 800.0],
                 [0.0, 0.0],
@@ -318,7 +318,8 @@ fn outline_tickets_keep_catalogue_queries_responsive_and_preserve_request_identi
     use yamantaka_domain::{
         Failure,
         memory::{Cost, GlobalMemoryLimits, MemoryCategory, MemoryGovernor, MemoryRepresentation},
-        outline::{DestinationView, OutlineDestination, OutlineEntry, PdfOutline},
+        outline::{OutlineEntry, PdfOutline},
+        pdf_destination::{DestinationView, NavigationDestination},
     };
     let (runtime, native, _) = setup();
     let cancel = Cancellation::default();
@@ -343,10 +344,10 @@ fn outline_tickets_keep_catalogue_queries_responsive_and_preserve_request_identi
             vec![OutlineEntry {
                 title: "Chapter One".into(),
                 parent: None,
-                destination: Some(OutlineDestination {
+                destination: Some(NavigationDestination {
                     page: 2,
                     content_bounds: None,
-                    coordinates: yamantaka_domain::outline::PageCoordinateSpace::new(
+                    coordinates: yamantaka_domain::pdf_geometry::PageCoordinateSpace::new(
                         [0.0, 200.0],
                         [200.0, 200.0],
                         [0.0, 0.0],

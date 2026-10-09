@@ -1060,7 +1060,7 @@ mod tests {
                     let governor = yamantaka_domain::memory::MemoryGovernor::default();
                     let mut pages =
                         yamantaka_domain::pdf_pages::PdfPagesBuilder::new(1, &governor).unwrap();
-                    let coordinates = yamantaka_domain::outline::PageCoordinateSpace::new(
+                    let coordinates = yamantaka_domain::pdf_geometry::PageCoordinateSpace::new(
                         [0.0, 600.0],
                         [400.0, 600.0],
                         [0.0, 0.0],

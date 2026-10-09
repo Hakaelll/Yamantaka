@@ -1,5 +1,5 @@
 use pdfium_render::prelude::*;
-use yamantaka_domain::{Result, outline::PageCoordinateSpace, pdf_pages::PdfPageInfo};
+use yamantaka_domain::{Result, pdf_geometry::PageCoordinateSpace, pdf_pages::PdfPageInfo};
 
 pub(crate) fn read(page: &PdfPage<'_>) -> Result<PdfPageInfo> {
     // DeviceToPage derives crop and intrinsic-rotation geometry without a bitmap.

@@ -112,7 +112,10 @@ pub struct YamantakaApp {
     thumbnails: thumbnails::ThumbnailState,
     thumbnail_preview_page: Option<u32>,
     outline_preview_target: Option<usize>,
-    outline_destination: Option<(String, yamantaka_domain::outline::OutlineDestination)>,
+    outline_destination: Option<(
+        String,
+        yamantaka_domain::pdf_destination::NavigationDestination,
+    )>,
     bookmarks: bookmarks::BookmarkState,
     panel_text: String,
     panel_requested: Option<(String, u32, u64)>,
