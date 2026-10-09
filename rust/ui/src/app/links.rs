@@ -4,7 +4,7 @@ use yamantaka_domain::{
     reader_preferences::PageRotation,
 };
 
-const MAX_VISIBLE_LINK_PAGES: usize = 16;
+const MAX_PENDING_LINK_PAGES: usize = 2;
 
 enum LinkPhase {
     Pending(Cancellation),
@@ -34,12 +34,24 @@ impl LinkState {
             self.clear();
             self.document = Some(document.into());
         }
-        self.pages.retain(|page, _| {
-            pages
-                .iter()
-                .take(MAX_VISIBLE_LINK_PAGES)
-                .any(|visible| visible == page)
-        });
+        self.pages.retain(|page, _| pages.contains(page));
+    }
+    fn next_pages(&self, visible: &[u32]) -> Vec<u32> {
+        let pending = self
+            .pages
+            .values()
+            .filter(|phase| matches!(phase, LinkPhase::Pending(_)))
+            .count();
+        let mut next = Vec::with_capacity(MAX_PENDING_LINK_PAGES);
+        for &page in visible {
+            if next.len() >= MAX_PENDING_LINK_PAGES.saturating_sub(pending) {
+                break;
+            }
+            if !self.pages.contains_key(&page) && !next.contains(&page) {
+                next.push(page);
+            }
+        }
+        next
     }
     pub(super) fn accept(
         &mut self,
@@ -69,7 +81,7 @@ impl LinkState {
 impl YamantakaApp {
     pub(super) fn request_visible_links(&mut self, document: &str, pages: &[u32]) {
         self.links.retain(document, pages);
-        for &page in pages.iter().take(MAX_VISIBLE_LINK_PAGES) {
+        for page in self.links.next_pages(pages) {
             if self.links.pages.contains_key(&page) {
                 continue;
             }
@@ -114,7 +126,8 @@ impl YamantakaApp {
                     );
                     for (index, bounds) in link.regions.iter().enumerate() {
                         let rect = reader_viewport::page_region(paper, rotation, *bounds);
-                        let response = ui.interact(
+                        let response = link_control(
+                            ui,
                             rect,
                             egui::Id::new((
                                 "pdf-link",
@@ -123,28 +136,9 @@ impl YamantakaApp {
                                 link.annotation_index,
                                 index,
                             )),
-                            egui::Sense::click(),
+                            &label,
+                            palette,
                         );
-                        response.widget_info(|| {
-                            egui::WidgetInfo::labeled(
-                                egui::WidgetType::Link,
-                                ui.is_enabled(),
-                                &label,
-                            )
-                        });
-                        if response.hovered() || response.has_focus() {
-                            ui.painter()
-                                .rect_filled(rect, 1, palette.accent.gamma_multiply(0.12));
-                            ui.painter().rect_stroke(
-                                rect,
-                                1,
-                                egui::Stroke::new(
-                                    if response.has_focus() { 2.0 } else { 1.0 },
-                                    palette.accent,
-                                ),
-                                egui::StrokeKind::Inside,
-                            );
-                        }
                         if response.clicked() {
                             chosen = Some(link.destination);
                         }
@@ -174,6 +168,29 @@ impl YamantakaApp {
             ui.ctx().request_repaint();
         }
     }
+}
+
+fn link_control(
+    ui: &mut egui::Ui,
+    rect: egui::Rect,
+    id: egui::Id,
+    label: &str,
+    palette: Palette,
+) -> egui::Response {
+    let response = ui.interact(rect, id, egui::Sense::click());
+    response
+        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Link, ui.is_enabled(), label));
+    if response.hovered() || response.has_focus() {
+        ui.painter()
+            .rect_filled(rect, 1, palette.accent.gamma_multiply(0.12));
+        ui.painter().rect_stroke(
+            rect,
+            1,
+            egui::Stroke::new(if response.has_focus() { 2.0 } else { 1.0 }, palette.accent),
+            egui::StrokeKind::Inside,
+        );
+    }
+    response
 }
 
 #[cfg(test)]
@@ -254,7 +271,7 @@ mod tests {
         }
     }
     #[test]
-    fn document_switch_and_drop_cancel_pending_pages_and_visible_limit_is_enforced() {
+    fn document_switch_and_drop_cancel_all_pending_pages() {
         let mut state = LinkState::default();
         state.retain("book", &[0]);
         let tokens: Vec<_> = (0..20)
@@ -265,13 +282,128 @@ mod tests {
             })
             .collect();
         state.retain("book", &(0..20).collect::<Vec<_>>());
-        assert_eq!(state.pages.len(), MAX_VISIBLE_LINK_PAGES);
-        assert!(tokens[16..].iter().all(Cancellation::is_cancelled));
+        assert_eq!(state.pages.len(), 20);
+        assert!(tokens.iter().all(|cancel| !cancel.is_cancelled()));
         state.retain("other", &[0]);
         assert!(tokens.iter().all(Cancellation::is_cancelled));
         let cancel = Cancellation::default();
         state.pages.insert(0, LinkPhase::Pending(cancel.clone()));
         drop(state);
         assert!(cancel.is_cancelled());
+    }
+    #[test]
+    fn bounded_pending_admission_eventually_covers_every_visible_page() {
+        let governor = MemoryGovernor::default();
+        let visible: Vec<_> = (0..40).collect();
+        let mut state = LinkState::default();
+        state.retain("book", &visible);
+        while state.pages.len() < visible.len() {
+            let next = state.next_pages(&visible);
+            assert!(!next.is_empty() && next.len() <= MAX_PENDING_LINK_PAGES);
+            for &page in &next {
+                state
+                    .pages
+                    .insert(page, LinkPhase::Pending(Cancellation::default()));
+            }
+            assert!(state.next_pages(&visible).is_empty());
+            for page in next {
+                let Some(LinkPhase::Pending(cancel)) = state.pages.get(&page) else {
+                    unreachable!();
+                };
+                let cancel = cancel.clone();
+                state.accept("book", page, &cancel, Ok(payload(&governor, page)));
+            }
+        }
+        assert!(state.next_pages(&visible).is_empty());
+        assert!(
+            visible
+                .iter()
+                .all(|page| matches!(state.pages.get(page), Some(LinkPhase::Ready(_))))
+        );
+        state.clear();
+        assert_eq!(governor.usage().text, 0);
+    }
+
+    #[test]
+    fn link_regions_activate_with_pointer_enter_and_space_but_not_the_gap() {
+        for activation in ["pointer", "enter", "space", "gap"] {
+            let context = egui::Context::default();
+            let ids = [
+                egui::Id::new("link-region-first"),
+                egui::Id::new("link-region-second"),
+            ];
+            let rectangles = [
+                egui::Rect::from_min_size(egui::pos2(20.0, 20.0), egui::vec2(80.0, 30.0)),
+                egui::Rect::from_min_size(egui::pos2(140.0, 20.0), egui::vec2(80.0, 30.0)),
+            ];
+            let mut clicked = false;
+            let mut focus = false;
+            let mut draw = |input: egui::RawInput, request_focus: bool| {
+                let mut output = context.run_ui(input, |ui| {
+                    for (index, rect) in rectangles.iter().enumerate() {
+                        let response =
+                            link_control(ui, *rect, ids[index], "Go to page 2", Palette::new(true));
+                        if request_focus && index == 0 {
+                            response.request_focus();
+                        }
+                        focus |= response.has_focus();
+                        clicked |= response.clicked();
+                    }
+                });
+                output.textures_delta.clear();
+            };
+            let keyboard = activation == "enter" || activation == "space";
+            draw(egui::RawInput::default(), keyboard);
+            if keyboard {
+                draw(
+                    egui::RawInput {
+                        events: vec![egui::Event::Key {
+                            key: if activation == "enter" {
+                                egui::Key::Enter
+                            } else {
+                                egui::Key::Space
+                            },
+                            physical_key: None,
+                            pressed: true,
+                            repeat: false,
+                            modifiers: egui::Modifiers::NONE,
+                        }],
+                        ..Default::default()
+                    },
+                    false,
+                );
+            } else {
+                let point = if activation == "gap" {
+                    egui::pos2(120.0, 35.0)
+                } else {
+                    rectangles[0].center()
+                };
+                draw(
+                    egui::RawInput {
+                        events: vec![egui::Event::PointerMoved(point)],
+                        ..Default::default()
+                    },
+                    false,
+                );
+                for pressed in [true, false] {
+                    draw(
+                        egui::RawInput {
+                            events: vec![egui::Event::PointerButton {
+                                pos: point,
+                                button: egui::PointerButton::Primary,
+                                pressed,
+                                modifiers: egui::Modifiers::NONE,
+                            }],
+                            ..Default::default()
+                        },
+                        false,
+                    );
+                }
+            }
+            assert_eq!(clicked, activation != "gap", "{activation}");
+            if keyboard {
+                assert!(focus);
+            }
+        }
     }
 }
