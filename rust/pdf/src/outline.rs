@@ -4,8 +4,7 @@ use yamantaka_domain::{
     Failure, Result,
     memory::{Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},
     outline::{
-        DestinationRectangle, DestinationView, OutlineDestination, OutlineEntry,
-        PageCoordinateSpace, PdfOutline,
+        DestinationRectangle, DestinationView, OutlineDestination, OutlineEntry, PdfOutline,
     },
 };
 
@@ -149,15 +148,7 @@ fn destination_value(
         .pages()
         .get(native_index)
         .map_err(super::worker::pdf_failure)?;
-    let config = PdfRenderConfig::new().set_target_size(10_000, 10_000);
-    let corner = |x, y| -> Result<[f64; 2]> {
-        let (x, y) = native_page
-            .pixels_to_points(x, y, &config)
-            .map_err(super::worker::pdf_failure)?;
-        Ok([f64::from(x.value), f64::from(y.value)])
-    };
-    let coordinates =
-        PageCoordinateSpace::new(corner(0, 0)?, corner(10_000, 0)?, corner(0, 10_000)?)?;
+    let coordinates = super::page_geometry::read(&native_page)?.coordinates();
     let content_bounds = if matches!(
         view,
         DestinationView::FitBounds

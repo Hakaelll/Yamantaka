@@ -5,6 +5,7 @@ pub mod outline;
 
 use serde::{Deserialize, Serialize};
 pub mod password;
+pub mod pdf_pages;
 pub mod pdf_ticket;
 pub use password::PdfPassword;
 pub mod reader;
@@ -298,7 +299,7 @@ impl RenderedPage {
 }
 #[derive(Debug, Clone)]
 pub struct PdfInfo {
-    pub page_sizes: Vec<[f32; 2]>,
+    pub pages: Arc<pdf_pages::PdfPages>,
     pub title: Option<String>,
     pub author: Option<String>,
 }

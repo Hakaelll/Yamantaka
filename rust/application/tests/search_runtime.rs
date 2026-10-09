@@ -236,7 +236,26 @@ fn shutdown_cancels_index_open_and_joins_without_draining_saturated_ui_results()
 }
 fn info() -> PdfInfo {
     PdfInfo {
-        page_sizes: vec![[600.0, 800.0]; 3],
+        pages: {
+            let governor = yamantaka_domain::memory::MemoryGovernor::default();
+            let mut pages =
+                yamantaka_domain::pdf_pages::PdfPagesBuilder::new(3, &governor).unwrap();
+            let coordinates = yamantaka_domain::outline::PageCoordinateSpace::new(
+                [0.0, 800.0],
+                [600.0, 800.0],
+                [0.0, 0.0],
+            )
+            .unwrap();
+            for _ in 0..3 {
+                pages
+                    .push(
+                        yamantaka_domain::pdf_pages::PdfPageInfo::new([600.0, 800.0], coordinates)
+                            .unwrap(),
+                    )
+                    .unwrap();
+            }
+            pages.finish().unwrap()
+        },
         title: None,
         author: None,
     }

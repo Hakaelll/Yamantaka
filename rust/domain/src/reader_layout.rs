@@ -337,6 +337,28 @@ impl ReaderLayout {
             (rect.top + rect.height * point[1]).clamp(0.0, frame.content_size[1] - viewport[1]),
         ])
     }
+    /// Recover the viewport's top-left PDF point, including blank page margins.
+    /// The frame and coordinate space must belong to this layout and page.
+    pub fn pdf_point_at_viewport(
+        &self,
+        frame: &ReaderFrame,
+        page: u32,
+        coordinates: crate::outline::PageCoordinateSpace,
+    ) -> Result<[f64; 2]> {
+        self.check_anchor(ReaderPosition::new(page, 0.0)?)?;
+        let rect = self.page_rect(page, frame.content_size[0], frame.origin_y, frame.zoom);
+        let displayed = [
+            (frame.scroll[0] - rect.left) / rect.width,
+            (frame.scroll[1] - rect.top) / rect.height,
+        ];
+        let point = coordinates.pdf_point(self.rotation().unrotate_point(displayed));
+        if point.iter().any(|value| !value.is_finite()) {
+            return Err(Failure::Invalid(
+                "Viewport PDF point exceeds finite coordinates".into(),
+            ));
+        }
+        Ok(point)
+    }
     /// Scroll feedback uses the same canonical ReaderPosition and must update
     /// ReaderNavigation::update_anchor, without adding a history entry.
     pub fn anchor_at_scroll(
@@ -703,5 +725,63 @@ mod tests {
             assert_eq!(frame.pages[0].page, 1);
             assert_eq!(layout.anchor_at_scroll(&frame, anchor).unwrap(), anchor);
         }
+    }
+    #[test]
+    fn viewport_pdf_point_uses_the_left_edge_and_inverts_user_rotation() {
+        let coordinates = crate::outline::PageCoordinateSpace::new(
+            [20.0, 2030.0],
+            [1020.0, 2030.0],
+            [20.0, 30.0],
+        )
+        .unwrap();
+        for (rotation, expected) in [
+            (PageRotation::Deg0, [620.0, 1530.0]),
+            (PageRotation::Deg90, [520.0, 630.0]),
+            (PageRotation::Deg180, [420.0, 530.0]),
+            (PageRotation::Deg270, [520.0, 1430.0]),
+        ] {
+            let mut p = preferences(PageLayout::Single);
+            p.page_rotation = rotation;
+            p.horizontal_margin = 0.0;
+            p.vertical_margin = 0.0;
+            let layout =
+                ReaderLayout::new([[1000.0, 2000.0]], &p, ReadingDirection::Ltr, 24.0).unwrap();
+            let anchor = ReaderPosition::new(0, 0.0).unwrap();
+            let frame = layout
+                .frame(
+                    [200.0, 300.0],
+                    anchor,
+                    ZoomMode::Custom,
+                    1.0,
+                    [600.0, 500.0],
+                    0.0,
+                )
+                .unwrap();
+            assert_eq!(
+                layout
+                    .pdf_point_at_viewport(&frame, 0, coordinates)
+                    .unwrap(),
+                expected
+            );
+        }
+        let p = preferences(PageLayout::Single);
+        let layout =
+            ReaderLayout::new([[1000.0, 2000.0]], &p, ReadingDirection::Ltr, 24.0).unwrap();
+        let frame = layout
+            .frame(
+                [200.0, 300.0],
+                ReaderPosition::new(0, 0.0).unwrap(),
+                ZoomMode::Custom,
+                1.0,
+                [0.0, 0.0],
+                0.0,
+            )
+            .unwrap();
+        assert_eq!(
+            layout
+                .pdf_point_at_viewport(&frame, 0, coordinates)
+                .unwrap(),
+            [0.0, 2040.0]
+        );
     }
 }

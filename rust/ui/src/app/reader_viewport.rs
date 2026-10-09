@@ -21,7 +21,7 @@ impl YamantakaApp {
         };
         let direction = self.reading_direction();
         match ReaderLayout::new(
-            info.page_sizes.iter().copied(),
+            info.pages.iter().map(|page| page.size()),
             preferences,
             direction,
             24.0,

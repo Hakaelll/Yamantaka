@@ -332,7 +332,7 @@ impl SearchIndexController {
                     match result {
                         Ok(info) => {
                             let active = self.run.as_ref().unwrap().active.as_ref().unwrap();
-                            if info.page_sizes.len() != active.session.page_count as usize {
+                            if info.pages.len() != active.session.page_count as usize {
                                 self.record_failure(
                                     repository,
                                     &Failure::Invalid(

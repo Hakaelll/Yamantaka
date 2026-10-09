@@ -51,7 +51,7 @@ fn visible_readers_survive_background_eviction_and_two_pins_reject_extra_opens()
             cancel.clone(),
         )
         .unwrap();
-    assert_eq!(info.page_sizes.len(), 2);
+    assert_eq!(info.pages.len(), 2);
     engine
         .render(key("reader", 1, 2), Priority::Visible, cancel.clone())
         .unwrap();
@@ -111,7 +111,7 @@ fn native_text_vectors_scans_rotation_password_damage_and_5000_pages() {
         let info = engine
             .open(id.into(), path.clone(), None, cancel.clone())
             .unwrap();
-        assert_eq!(info.page_sizes.len(), pages);
+        assert_eq!(info.pages.len(), pages);
         let page = engine
             .render(key(id, 0, 1), Priority::Visible, cancel.clone())
             .unwrap();
@@ -123,7 +123,7 @@ fn native_text_vectors_scans_rotation_password_damage_and_5000_pages() {
                     .unwrap()
                     .contains("Yamantaka Rust")
             );
-            assert_ne!(info.page_sizes[0], info.page_sizes[1]);
+            assert_ne!(info.pages[0], info.pages[1]);
         }
         if id == "scan" {
             assert!(
@@ -290,7 +290,7 @@ fn native_tiles_stitch_to_full_render_for_mixed_pages_and_every_rotation() {
         let info = engine
             .open("tiles".into(), path.clone(), None, Cancellation::default())
             .unwrap();
-        for page in 0..info.page_sizes.len() as u32 {
+        for page in 0..info.pages.len() as u32 {
             for rotation in [0, 90, 180, 270] {
                 // Uneven sizes and partitions exercise anisotropic scale, nonzero
                 // origins and the final pixel on the bottom/right canvas edges.
@@ -512,6 +512,6 @@ fn concurrent_long_document_inspections_finish_before_hot_handle_eviction() {
         })
         .collect();
     for ticket in tickets {
-        assert_eq!(ticket.wait().unwrap().page_sizes.len(), 5000);
+        assert_eq!(ticket.wait().unwrap().pages.len(), 5000);
     }
 }

@@ -305,7 +305,7 @@ impl LibraryRepository for Database {
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
         let fingerprint = crate::identity::legacy_fingerprint(&path)?;
-        self.connection.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,source_title,source_author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES(?1,?2,?3,?4,?5,?6,?5,?6,?7,?8,?9,?10,?10,?11)", params![id,path.to_string_lossy(),normalized,path.file_name().unwrap_or_default().to_string_lossy(),document.info.title,document.info.author,document.info.page_sizes.len() as i64,metadata.len() as i64,chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),now,fingerprint]).map_err(storage)?;
+        self.connection.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,source_title,source_author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES(?1,?2,?3,?4,?5,?6,?5,?6,?7,?8,?9,?10,?10,?11)", params![id,path.to_string_lossy(),normalized,path.file_name().unwrap_or_default().to_string_lossy(),document.info.title,document.info.author,document.info.pages.len() as i64,metadata.len() as i64,chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),now,fingerprint]).map_err(storage)?;
         Ok(id)
     }
     fn query(&self, query: &LibraryQuery) -> Result<Vec<Document>> {

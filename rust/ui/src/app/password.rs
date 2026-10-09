@@ -224,7 +224,7 @@ mod tests {
             .unwrap();
         assert!(
             matches!(runtime.updates.recv_timeout(Duration::from_secs(5)).unwrap(),
-            Update::Opened(doc, info, _) if doc.id == "protected" && !info.page_sizes.is_empty())
+            Update::Opened(doc, info, _) if doc.id == "protected" && !info.pages.is_empty())
         );
         runtime
             .submit(Action::Text("protected".into(), 0, Cancellation::default()))

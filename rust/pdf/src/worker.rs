@@ -53,6 +53,11 @@ impl Drop for Permit {
     }
 }
 type Consumers = Arc<Mutex<Vec<(Cancellation, Reply<Arc<RenderedPage>>)>>>;
+struct InspectInfo {
+    pages: yamantaka_domain::pdf_pages::PdfPagesBuilder,
+    title: Option<String>,
+    author: Option<String>,
+}
 enum Request {
     Open {
         id: String,
@@ -66,7 +71,7 @@ enum Request {
         id: String,
         epoch: u64,
         next_page: u32,
-        info: PdfInfo,
+        info: InspectInfo,
         cancel: Cancellation,
         reply: Reply<PdfInfo>,
     },
@@ -613,8 +618,11 @@ fn run(
                     // before metadata inspection or any terminal event.
                     drop(password);
                     let document = opened.map_err(pdf_failure)?;
-                    let info = PdfInfo {
-                        page_sizes: Vec::with_capacity(document.pages().len() as usize),
+                    let info = InspectInfo {
+                        pages: yamantaka_domain::pdf_pages::PdfPagesBuilder::new(
+                            document.pages().len() as usize,
+                            &governor,
+                        )?,
                         title: document
                             .metadata()
                             .get(PdfDocumentMetadataTagType::Title)
@@ -671,15 +679,18 @@ fn run(
                                     Failure::Invalid("Page index out of range".into())
                                 })?)
                                 .map_err(pdf_failure)?;
-                        info.page_sizes
-                            .push([page.width().value, page.height().value]);
+                        info.pages.push(super::page_geometry::read(&page)?)?;
                         next_page += 1;
                     }
                     epoch_matches(&scheduler, &id, epoch)?;
                     Ok(next_page == count)
                 })();
                 match result {
-                    Ok(true) => reply.send(Ok(info)),
+                    Ok(true) => reply.send(info.pages.finish().map(|pages| PdfInfo {
+                        pages,
+                        title: info.title,
+                        author: info.author,
+                    })),
                     Ok(false) => scheduler.lock().unwrap().queue.push(Request::Inspect {
                         id,
                         epoch,

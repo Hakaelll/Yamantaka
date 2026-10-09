@@ -1199,7 +1199,7 @@ impl YamantakaApp {
             return;
         };
         if ui.ctx().content_rect().width() < 420.0 {
-            self.compact_reader_toolbar(ui, info.page_sizes.len().max(1) as u32, p);
+            self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
         } else {
             egui::Frame::new()
                 .fill(p.surface)
@@ -1254,7 +1254,7 @@ impl YamantakaApp {
                         if ui
                             .add(
                                 egui::DragValue::new(&mut shown)
-                                    .range(1..=info.page_sizes.len().max(1) as u32),
+                                    .range(1..=info.pages.len().max(1) as u32),
                             )
                             .labelled_by(page_label.id)
                             .changed()
@@ -1262,22 +1262,19 @@ impl YamantakaApp {
                             self.navigate(shown.saturating_sub(1));
                         }
                         ui.label(
-                            RichText::new(format!("/ {}", info.page_sizes.len()))
+                            RichText::new(format!("/ {}", info.pages.len()))
                                 .size(13.0)
                                 .color(p.secondary),
                         );
                         if ui
-                            .add_enabled_ui(
-                                (self.page as usize) + 1 < info.page_sizes.len(),
-                                |ui| {
-                                    theme::icon_button(
-                                        ui,
-                                        self.tr("Página siguiente", "Next page"),
-                                        theme::Icon::Right,
-                                        p,
-                                    )
-                                },
-                            )
+                            .add_enabled_ui((self.page as usize) + 1 < info.pages.len(), |ui| {
+                                theme::icon_button(
+                                    ui,
+                                    self.tr("Página siguiente", "Next page"),
+                                    theme::Icon::Right,
+                                    p,
+                                )
+                            })
                             .inner
                             .clicked()
                         {
@@ -1412,12 +1409,12 @@ impl App for YamantakaApp {
                     }
                     self.page = document
                         .last_page_index
-                        .min(info.page_sizes.len().saturating_sub(1) as u32);
+                        .min(info.pages.len().saturating_sub(1) as u32);
                     let (target_page, reveal_reader) = self.open_intent.finish_open(&document.id);
                     if let Some(page) = target_page {
-                        self.page = page.min(info.page_sizes.len().saturating_sub(1) as u32);
+                        self.page = page.min(info.pages.len().saturating_sub(1) as u32);
                     }
-                    let count = u32::try_from(info.page_sizes.len()).unwrap_or(0);
+                    let count = u32::try_from(info.pages.len()).unwrap_or(0);
                     match ReaderNavigation::new(count, self.page) {
                         Ok(navigation) => self.navigation = Some(navigation),
                         Err(error) => {

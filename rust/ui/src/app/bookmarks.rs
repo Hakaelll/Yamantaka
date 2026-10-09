@@ -204,10 +204,9 @@ impl YamantakaApp {
             u64::from(self.page) + 1
         );
         if ui
-            .add_enabled_ui(
-                !busy && (self.page as usize) < info.page_sizes.len(),
-                |ui| theme::control(ui, &add, Some(theme::Icon::Add), false, true, p),
-            )
+            .add_enabled_ui(!busy && (self.page as usize) < info.pages.len(), |ui| {
+                theme::control(ui, &add, Some(theme::Icon::Add), false, true, p)
+            })
             .inner
             .clicked()
         {
@@ -291,7 +290,7 @@ impl YamantakaApp {
             ui.push_id(&bookmark.id, |ui| {
                 ui.separator();
                 ui.add_space(8.0);
-                let valid = (bookmark.page_index as usize) < info.page_sizes.len();
+                let valid = (bookmark.page_index as usize) < info.pages.len();
                 let title = bookmark
                     .label
                     .as_deref()

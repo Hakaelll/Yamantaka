@@ -990,7 +990,29 @@ mod tests {
             _: Cancellation,
         ) -> Result<PdfInfo> {
             Ok(PdfInfo {
-                page_sizes: vec![[400.0, 600.0]],
+                pages: {
+                    let governor = yamantaka_domain::memory::MemoryGovernor::default();
+                    let mut pages =
+                        yamantaka_domain::pdf_pages::PdfPagesBuilder::new(1, &governor).unwrap();
+                    let coordinates = yamantaka_domain::outline::PageCoordinateSpace::new(
+                        [0.0, 600.0],
+                        [400.0, 600.0],
+                        [0.0, 0.0],
+                    )
+                    .unwrap();
+                    for _ in 0..1 {
+                        pages
+                            .push(
+                                yamantaka_domain::pdf_pages::PdfPageInfo::new(
+                                    [400.0, 600.0],
+                                    coordinates,
+                                )
+                                .unwrap(),
+                            )
+                            .unwrap();
+                    }
+                    pages.finish().unwrap()
+                },
                 title: None,
                 author: None,
             })

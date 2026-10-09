@@ -274,7 +274,7 @@ fn native_destination_geometry_matches_cropped_pages_at_every_intrinsic_rotation
         (270, [0.2, 0.8]),
     ] {
         let fixture = fixture(&format!("rotated-{rotation}"));
-        engine
+        let info = engine
             .open(
                 "geometry".into(),
                 fixture.0.clone(),
@@ -286,6 +286,11 @@ fn native_destination_geometry_matches_cropped_pages_at_every_intrinsic_rotation
             .outline("geometry".into(), Cancellation::default())
             .unwrap();
         let destination = outline.entries()[0].destination.unwrap();
+        assert_eq!(info.pages[0].coordinates(), destination.coordinates);
+        let cloned = info.clone();
+        assert!(std::sync::Arc::ptr_eq(&info.pages, &cloned.pages));
+        let retained = engine.memory_governor().usage().other;
+        assert!(retained > 0);
         let actual = destination.coordinates.normalized_point([40.0, 150.0]);
         for axis in 0..2 {
             assert!(
@@ -295,6 +300,11 @@ fn native_destination_geometry_matches_cropped_pages_at_every_intrinsic_rotation
         }
         assert_eq!(destination.coordinates.pdf_point(actual), [40.0, 150.0]);
         engine.close("geometry".into()).unwrap();
+        drop(info);
+        assert_eq!(engine.memory_governor().usage().other, retained);
+        assert_eq!(cloned.pages[0].coordinates(), destination.coordinates);
+        drop(cloned);
+        assert_eq!(engine.memory_governor().usage().other, 0);
     }
 }
 
