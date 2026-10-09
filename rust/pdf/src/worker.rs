@@ -115,6 +115,7 @@ struct Scheduler {
     queue: Vec<Request>,
     in_flight: Option<(RenderKey, u64, Consumers)>,
     epochs: HashMap<String, u64>,
+    visible: HashSet<String>,
     shutdown: bool,
 }
 struct Inner {
@@ -238,6 +239,12 @@ impl PdfWorker {
         if scheduler.shutdown {
             return Err(stopped());
         }
+        if let Request::Open { id, .. } = &request
+            && scheduler.visible.len() == MAX_HOT_DOCUMENTS
+            && !scheduler.visible.contains(id)
+        {
+            return Err(hot_slots_protected());
+        }
         if let Request::Render {
             key,
             epoch,
@@ -311,6 +318,23 @@ fn stopped() -> Failure {
     Failure::Pdf("PDF worker stopped".into())
 }
 impl AsyncPdfEngine for PdfWorker {
+    fn set_visible_documents(&self, ids: &[String]) -> Result<()> {
+        if ids.len() > MAX_HOT_DOCUMENTS || ids.iter().any(|id| id.is_empty()) {
+            return Err(Failure::Invalid("Invalid visible PDF set".into()));
+        }
+        let visible: HashSet<_> = ids.iter().cloned().collect();
+        if visible.len() != ids.len() {
+            return Err(Failure::Invalid("Duplicate visible PDF ID".into()));
+        }
+        let mut state = self.0.scheduler.lock().unwrap();
+        if state.shutdown {
+            return Err(stopped());
+        }
+        state.visible = visible;
+        drop(state);
+        let _ = self.0.wake.try_send(());
+        Ok(())
+    }
     fn try_open(
         &self,
         id: String,
@@ -431,7 +455,7 @@ fn run(
     governor: MemoryGovernor,
 ) {
     let mut documents: HashMap<String, PdfDocument<'_>> = HashMap::new();
-    let mut recency = Vec::new();
+    let mut recency: Vec<String> = Vec::new();
     let mut pages = Cache::new(limits.pages);
     let mut tiles = Cache::new(limits.tiles);
     let mut text = Cache::new(limits.text);
@@ -452,14 +476,25 @@ fn run(
                 live.insert(key.document_id.clone());
             }
             state.epochs.retain(|id, _| live.contains(id));
-            let protected = inspecting_documents(&state);
+            let protected = protected_documents(&state);
             let open_allowed = documents.len() < MAX_HOT_DOCUMENTS
-                || documents.keys().any(|id| !protected.contains(id));
+                || documents.keys().any(|id| !protected.contains(id))
+                || state.visible.len() == MAX_HOT_DOCUMENTS;
             if let Some(index) = next_request(
                 &state.queue,
                 foreground_streak,
                 last_document.as_deref(),
-                open_allowed,
+                |item| match item {
+                    Request::Open {
+                        id, epoch, cancel, ..
+                    } => {
+                        open_allowed
+                            || documents.contains_key(id)
+                            || cancel.is_cancelled()
+                            || state.epochs.get(id) != Some(epoch)
+                    }
+                    _ => true,
+                },
             ) {
                 let request = state.queue.remove(index);
                 if let Request::Render {
@@ -510,22 +545,31 @@ fn run(
                     // Remove stale caches even when the same ID is reopened for a
                     // changed file. Close a victim before opening the next handle:
                     // the native hot-document limit also applies during opening.
+                    // Pins can change after admission. Check again before any
+                    // eviction; never exceed the two-handle native limit.
+                    let victim = {
+                        let state = scheduler.lock().unwrap();
+                        let protected = protected_documents(&state);
+                        if !documents.contains_key(&id) && documents.len() >= MAX_HOT_DOCUMENTS {
+                            let old = recency
+                                .iter()
+                                .find(|old| !protected.contains(*old))
+                                .cloned()
+                                .ok_or_else(hot_slots_protected)?;
+                            // Remove under the metadata lock so a new pin cannot
+                            // race the decision. Drop the native handle outside it.
+                            Some((old.clone(), documents.remove(&old)))
+                        } else {
+                            None
+                        }
+                    };
                     documents.remove(&id);
                     recency.retain(|old| old != &id);
                     pages.retain(|key: &RenderKey| key.document_id != id);
                     tiles.retain(|key: &RenderKey| key.document_id != id);
                     text.retain(|key: &(String, u32)| key.0 != id);
-                    if documents.len() >= MAX_HOT_DOCUMENTS
-                        && let Some(old) = {
-                            let state = scheduler.lock().unwrap();
-                            let protected = inspecting_documents(&state);
-                            recency
-                                .iter()
-                                .find(|old| !protected.contains(*old))
-                                .cloned()
-                        }
-                    {
-                        documents.remove(&old);
+                    if let Some((old, handle)) = victim {
+                        drop(handle);
                         recency.retain(|id| id != &old);
                         pages.retain(|key: &RenderKey| key.document_id != old);
                         tiles.retain(|key: &RenderKey| key.document_id != old);
@@ -766,11 +810,16 @@ fn run(
                 reply.send(epoch_matches(&scheduler, &id, epoch).and(result));
             }
             Request::Close { id, epoch, reply } => {
-                if epoch_matches(&scheduler, &id, epoch).is_err() {
-                    reply.send(Err(Failure::Cancelled));
-                    continue;
-                }
-                documents.remove(&id);
+                let handle = {
+                    let mut state = scheduler.lock().unwrap();
+                    if state.epochs.get(&id) != Some(&epoch) {
+                        reply.send(Err(Failure::Cancelled));
+                        continue;
+                    }
+                    state.visible.remove(&id);
+                    documents.remove(&id)
+                };
+                drop(handle);
                 recency.retain(|old| old != &id);
                 pages.retain(|key: &RenderKey| key.document_id != id);
                 tiles.retain(|key: &RenderKey| key.document_id != id);
@@ -785,25 +834,28 @@ fn run(
 /// Close/shutdown always win. At most eight foreground requests can bypass a
 /// waiting background request, preventing endless visible-page traffic from
 /// starving text, prefetch or cover work. Equal priorities preserve queue order.
-fn inspecting_documents(state: &Scheduler) -> HashSet<String> {
+fn protected_documents(state: &Scheduler) -> HashSet<String> {
     state
-        .queue
+        .visible
         .iter()
-        .filter_map(|request| match request {
+        .cloned()
+        .chain(state.queue.iter().filter_map(|request| match request {
             Request::Inspect { id, epoch, .. } if state.epochs.get(id) == Some(epoch) => {
                 Some(id.clone())
             }
             _ => None,
-        })
+        }))
         .collect()
+}
+fn hot_slots_protected() -> Failure {
+    Failure::Pdf("Visible readers occupy the native PDF slots".into())
 }
 fn next_request(
     queue: &[Request],
     foreground_streak: usize,
     last_document: Option<&str>,
-    open_allowed: bool,
+    eligible: impl Fn(&Request) -> bool,
 ) -> Option<usize> {
-    let eligible = |item: &Request| open_allowed || !matches!(item, Request::Open { .. });
     if let Some(index) = queue.iter().position(|item| item.priority() == 0) {
         return Some(index);
     }
@@ -854,6 +906,49 @@ fn memory_failure(error: MemoryError) -> Failure {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn invalid_pin_sets_and_denied_opens_preserve_scheduler_state_and_capacity() {
+        let worker = worker();
+        worker
+            .set_visible_documents(&["a".into(), "b".into()])
+            .unwrap();
+        for ids in [
+            vec!["a".into(), "a".into()],
+            vec![String::new()],
+            vec!["a".into(), "b".into(), "c".into()],
+        ] {
+            assert!(worker.set_visible_documents(&ids).is_err());
+        }
+        for _ in 0..256 {
+            assert!(
+                worker
+                    .try_open(
+                        "background".into(),
+                        PathBuf::new(),
+                        None,
+                        Cancellation::default()
+                    )
+                    .is_err()
+            );
+        }
+        let state = worker.0.scheduler.lock().unwrap();
+        assert_eq!(state.visible, HashSet::from(["a".into(), "b".into()]));
+        assert!(state.queue.is_empty());
+        assert!(state.epochs.is_empty());
+        assert_eq!(worker.0.outstanding.load(Ordering::Acquire), 0);
+        drop(state);
+        worker.set_visible_documents(&[]).unwrap();
+        let ticket = worker
+            .try_open(
+                "background".into(),
+                PathBuf::new(),
+                None,
+                Cancellation::default(),
+            )
+            .unwrap();
+        assert_eq!(worker.0.scheduler.lock().unwrap().queue.len(), 1);
+        drop(ticket);
+    }
     fn worker() -> PdfWorker {
         let (wake, _receiver) = bounded(1);
         PdfWorker(Arc::new(Inner {
@@ -943,7 +1038,7 @@ mod tests {
         let state = worker.0.scheduler.lock().unwrap();
         assert_eq!(state.queue.len(), 2);
         assert!(
-            next_request(&state.queue, 8, None, true)
+            next_request(&state.queue, 8, None, |_| true)
                 .is_some_and(|i| matches!(state.queue[i], Request::Close { .. }))
         );
         drop(state);
@@ -990,7 +1085,7 @@ mod tests {
             .try_text("a".into(), 0, Cancellation::default())
             .unwrap();
         let state = worker.0.scheduler.lock().unwrap();
-        assert_eq!(next_request(&state.queue, 7, Some("a"), true), Some(1));
-        assert_eq!(next_request(&state.queue, 8, Some("b"), true), Some(2));
+        assert_eq!(next_request(&state.queue, 7, Some("a"), |_| true), Some(1));
+        assert_eq!(next_request(&state.queue, 8, Some("b"), |_| true), Some(2));
     }
 }

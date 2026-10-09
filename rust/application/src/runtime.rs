@@ -282,12 +282,18 @@ impl Runtime {
                                 ),
                                 Err(error) => failed(&events, &notify, error, None, permit),
                             },
-                            Action::Open(document, cancel) => match engine.try_open(
-                                document.id.clone(),
-                                document.path.clone(),
-                                None,
-                                cancel.clone(),
-                            ) {
+                            // The current UI has one visible reader. Replace its
+                            // pin before admission so imports cannot evict it.
+                            Action::Open(document, cancel) => match engine
+                                .set_visible_documents(std::slice::from_ref(&document.id))
+                                .and_then(|()| {
+                                    engine.try_open(
+                                        document.id.clone(),
+                                        document.path.clone(),
+                                        None,
+                                        cancel.clone(),
+                                    )
+                                }) {
                                 Ok(ticket) => pending.push(Pending::Open(document, ticket, permit)),
                                 Err(error) => failed(&events, &notify, error, Some(cancel), permit),
                             },
@@ -567,6 +573,9 @@ mod tests {
     }
 
     impl AsyncPdfEngine for Engine {
+        fn set_visible_documents(&self, _: &[String]) -> Result<()> {
+            Ok(())
+        }
         fn try_open(
             &self,
             id: String,
@@ -735,6 +744,9 @@ mod tests {
         }
     }
     impl AsyncPdfEngine for BlockedEngine {
+        fn set_visible_documents(&self, ids: &[String]) -> Result<()> {
+            Engine.set_visible_documents(ids)
+        }
         fn try_open(
             &self,
             id: String,

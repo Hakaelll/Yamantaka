@@ -60,6 +60,10 @@ impl<T> PdfTicket<T> {
     }
 }
 pub trait AsyncPdfEngine: PdfEngine {
+    /// Atomically replace the visible reader set (at most two distinct IDs).
+    /// This only changes scheduler metadata: it never waits for native work.
+    /// Protected handles must not be evicted by background opens.
+    fn set_visible_documents(&self, ids: &[String]) -> Result<()>;
     fn try_open(
         &self,
         id: String,

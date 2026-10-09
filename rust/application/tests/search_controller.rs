@@ -54,6 +54,9 @@ impl PdfEngine for Engine {
     }
 }
 impl AsyncPdfEngine for Engine {
+    fn set_visible_documents(&self, _: &[String]) -> Result<()> {
+        Ok(())
+    }
     fn try_open(
         &self,
         _: String,

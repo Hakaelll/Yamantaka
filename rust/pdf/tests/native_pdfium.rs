@@ -1,7 +1,72 @@
 use sha2::{Digest, Sha256};
 use std::{fs, path::PathBuf};
+use yamantaka_domain::pdf_ticket::AsyncPdfEngine;
 use yamantaka_domain::{Cancellation, Failure, PdfEngine, Priority, RenderKey};
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
+
+#[test]
+fn visible_readers_survive_background_eviction_and_two_pins_reject_extra_opens() {
+    let engine = engine();
+    let cancel = Cancellation::default();
+    engine.set_visible_documents(&["reader".into()]).unwrap();
+    engine
+        .open(
+            "reader".into(),
+            fixture("textual.pdf"),
+            None,
+            cancel.clone(),
+        )
+        .unwrap();
+    // Reader is older than both background jobs. Only the background slot may
+    // be replaced, regardless of LRU order.
+    for id in ["import", "index"] {
+        engine
+            .open(id.into(), fixture("scanned.pdf"), None, cancel.clone())
+            .unwrap();
+    }
+    assert!(
+        engine
+            .text("reader".into(), 0, cancel.clone())
+            .unwrap()
+            .contains("Yamantaka Rust")
+    );
+    assert!(engine.text("import".into(), 0, cancel.clone()).is_err());
+    engine
+        .render(key("reader", 0, 1), Priority::Visible, cancel.clone())
+        .unwrap();
+    engine
+        .set_visible_documents(&["reader".into(), "index".into()])
+        .unwrap();
+    assert!(
+        engine
+            .try_open("extra".into(), fixture("textual.pdf"), None, cancel.clone())
+            .is_err()
+    );
+    // Reopening a protected ID remains admissible, even with both slots pinned.
+    let info = engine
+        .open(
+            "reader".into(),
+            fixture("rotated.pdf"),
+            None,
+            cancel.clone(),
+        )
+        .unwrap();
+    assert_eq!(info.page_sizes.len(), 2);
+    engine
+        .render(key("reader", 1, 2), Priority::Visible, cancel.clone())
+        .unwrap();
+    engine
+        .render(key("index", 0, 1), Priority::Visible, cancel.clone())
+        .unwrap();
+    // Explicit close releases its pin; background work can use the freed slot.
+    engine.close("index".into()).unwrap();
+    engine
+        .open("extra".into(), fixture("textual.pdf"), None, cancel.clone())
+        .unwrap();
+    engine
+        .render(key("reader", 0, 3), Priority::Visible, cancel)
+        .unwrap();
+}
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
