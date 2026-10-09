@@ -109,6 +109,7 @@ pub struct YamantakaApp {
     reader_panel_tab: outline::ReaderPanelTab,
     find: find::FindState,
     links: links::LinkState,
+    link_preview: links::LinkPreview,
     find_preview_step: Option<bool>,
     pub find_preview_closed: bool,
     outline: outline::OutlineState,
@@ -264,6 +265,7 @@ impl YamantakaApp {
             reader_panel_tab: outline::ReaderPanelTab::Bookmarks,
             find: Default::default(),
             links: Default::default(),
+            link_preview: Default::default(),
             find_preview_step: None,
             find_preview_closed: false,
             outline: Default::default(),
@@ -1387,6 +1389,22 @@ impl YamantakaApp {
     }
 }
 impl App for YamantakaApp {
+    fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+        if self.demo
+            && self.capture.is_some()
+            && self.link_preview == links::LinkPreview::KeyPending
+        {
+            self.link_preview = links::LinkPreview::Activate;
+            input.events.push(egui::Event::Key {
+                key: egui::Key::Enter,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
+    }
+
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.begin_frame()
@@ -1816,6 +1834,12 @@ impl App for YamantakaApp {
                             outline::ReaderPanelTab::Find => self.find.ready(),
                             outline::ReaderPanelTab::Text => true,
                         })
+                    && (self.link_preview == links::LinkPreview::Off
+                        || self.links.ready()
+                            && matches!(
+                                self.link_preview,
+                                links::LinkPreview::Focus | links::LinkPreview::Complete
+                            ))
                     && self.reader_destination.is_none()
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
@@ -1887,6 +1911,10 @@ impl App for YamantakaApp {
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),
                         "documentFind":self.find.capture_summary(),
+                        "documentLinks":self.links.capture_summary(),
+                        "currentReaderPage":self.page,
+                        "readerZoom":self.zoom,
+                        "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
                     let bytes=serde_json::to_vec_pretty(&record).map_err(|error|image::ImageError::IoError(std::io::Error::other(error)))?;

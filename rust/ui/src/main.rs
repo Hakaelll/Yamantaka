@@ -41,6 +41,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 || arg == "--outline"
                 || arg == "--thumbnails"
                 || arg == "--find"
+                || arg == "--links"
         });
     let light = args.iter().any(|arg| arg == "--light");
     let tilt = args.iter().any(|arg| arg == "--tilt");
@@ -69,14 +70,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join(if protected {
                 "../../build/rust-fixtures/protected.pdf"
+            } else if args.iter().any(|arg| arg == "--links") {
+                "../../build/rust-fixtures/links.pdf"
             } else if args.iter().any(|arg| arg == "--find-scanned") {
                 "../../build/rust-fixtures/scanned.pdf"
             } else if args.iter().any(|arg| arg == "--thumbnails-long") {
                 "../../build/rust-fixtures/5000-pages.pdf"
-            } else if args
-                .iter()
-                .any(|arg| arg == "--outline" || arg == "--thumbnails" || arg == "--find")
-            {
+            } else if args.iter().any(|arg| {
+                arg == "--outline" || arg == "--thumbnails" || arg == "--find" || arg == "--links"
+            }) {
                 "../../build/rust-fixtures/outline.pdf"
             } else {
                 "../../build/rust-fixtures/textual.pdf"
@@ -97,10 +99,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         for (index, (title, author)) in names.iter().enumerate() {
             let path = fixture.to_string_lossy().replace('\'', "''");
             let title = if index == 0
-                && args
-                    .iter()
-                    .any(|arg| arg == "--outline" || arg == "--thumbnails" || arg == "--find")
-            {
+                && args.iter().any(|arg| {
+                    arg == "--outline"
+                        || arg == "--thumbnails"
+                        || arg == "--find"
+                        || arg == "--links"
+                }) {
                 "The art of attention"
             } else {
                 title
@@ -273,6 +277,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--details"),
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
+                if args.iter().any(|arg| arg == "--links") {
+                    app.preview_links(args.iter().any(|arg| arg == "--links-activate"));
+                }
                 if args.iter().any(|arg| arg == "--find") {
                     app.find_preview_closed = args.iter().any(|arg| arg == "--find-closed");
                     app.preview_find(

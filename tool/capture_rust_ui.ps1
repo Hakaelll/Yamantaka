@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='links-dark'; args=@('--links') },
+    @{ name='links-light-es'; args=@('--links','--light','--es') },
+    @{ name='links-small-200'; args=@('--links','--size=640x480','--text-scale=2') },
+    @{ name='links-keyboard'; args=@('--links','--links-activate') },
+    @{ name='links-rotated'; args=@('--links','--rotation=90') },
     @{ name='find-no-matches'; args=@('--find','--find-absent') },
     @{ name='find-no-text-es'; args=@('--find','--find-scanned','--light','--es') },
     @{ name='find-dark'; args=@('--find') },

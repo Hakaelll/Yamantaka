@@ -6,6 +6,16 @@ use yamantaka_domain::{
 
 const MAX_PENDING_LINK_PAGES: usize = 2;
 
+#[derive(Default, PartialEq, Eq)]
+pub(super) enum LinkPreview {
+    #[default]
+    Off,
+    Focus,
+    Activate,
+    KeyPending,
+    Complete,
+}
+
 enum LinkPhase {
     Pending(Cancellation),
     Ready(Arc<PdfPageLinks>),
@@ -25,6 +35,16 @@ pub(super) struct LinkState {
     pages: HashMap<u32, LinkPhase>,
 }
 impl LinkState {
+    pub(super) fn ready(&self) -> bool {
+        !self.pages.is_empty()
+            && self
+                .pages
+                .values()
+                .all(|phase| matches!(phase, LinkPhase::Ready(_)))
+    }
+    pub(super) fn capture_summary(&self) -> serde_json::Value {
+        serde_json::json!({"residentPages":self.pages.len(), "readyPages":self.pages.values().filter(|phase| matches!(phase, LinkPhase::Ready(_))).count(), "internalLinks":self.pages.values().filter_map(|phase| match phase { LinkPhase::Ready(payload) => Some(payload.links().len()), _ => None }).sum::<usize>()})
+    }
     pub(super) fn clear(&mut self) {
         self.pages.clear();
         self.document = None;
@@ -79,6 +99,15 @@ impl LinkState {
 }
 
 impl YamantakaApp {
+    pub fn preview_links(&mut self, activate: bool) {
+        if self.demo && self.capture.is_some() {
+            self.link_preview = if activate {
+                LinkPreview::Activate
+            } else {
+                LinkPreview::Focus
+            };
+        }
+    }
     pub(super) fn request_visible_links(&mut self, document: &str, pages: &[u32]) {
         self.links.retain(document, pages);
         for page in self.links.next_pages(pages) {
@@ -139,8 +168,27 @@ impl YamantakaApp {
                             &label,
                             palette,
                         );
+                        theme::record_control_bounds(ui, &label, rect);
+                        if page == self.page
+                            && link.annotation_index == payload.links()[0].annotation_index
+                            && index == 0
+                        {
+                            if matches!(
+                                self.link_preview,
+                                LinkPreview::Focus | LinkPreview::Activate
+                            ) {
+                                response.request_focus();
+                            }
+                            if self.link_preview == LinkPreview::Activate && response.has_focus() {
+                                self.link_preview = LinkPreview::KeyPending;
+                                ui.ctx().request_repaint();
+                            }
+                        }
                         if response.clicked() {
                             chosen = Some(link.destination);
+                            if self.link_preview != LinkPreview::Off {
+                                self.link_preview = LinkPreview::Complete;
+                            }
                         }
                         response
                             .on_hover_cursor(egui::CursorIcon::PointingHand)
