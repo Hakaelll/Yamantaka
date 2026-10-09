@@ -225,6 +225,7 @@ impl YamantakaApp {
                         Color32::from_rgb(100, 100, 109),
                     );
                 }
+                self.paint_annotations(ui, visible.page, paper, layout.rotation());
                 self.paint_find_matches(ui, visible.page, paper, layout.rotation(), p);
                 self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
                 if !self.selection.enabled {

@@ -96,6 +96,24 @@ impl SelectionState {
         }
         pages
     }
+    pub(super) fn annotation_source(&self) -> Result<(TextSelection, Arc<PdfPageText>)> {
+        let range = self
+            .range()
+            .filter(|range| !range.is_empty())
+            .ok_or_else(|| Failure::Invalid("Select a passage before adding a note".into()))?;
+        if range.start().page() != range.end().page() {
+            return Err(Failure::Unsupported(
+                "Annotating a passage across multiple pages is not connected yet".into(),
+            ));
+        }
+        let page = self
+            .pages
+            .get(&range.start().page())
+            .and_then(text::TextState::payload)
+            .cloned()
+            .ok_or_else(|| Failure::Invalid("The selected page text is not ready".into()))?;
+        Ok((range, page))
+    }
     fn copy(&self, governor: &MemoryGovernor) -> Result<SelectedText> {
         let range = self
             .range()
@@ -166,7 +184,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn selection_toolbar(&mut self, ui: &mut egui::Ui, palette: Palette) {
-        if !self.selection.enabled {
+        if !self.selection.enabled || self.annotations.editing() {
             return;
         }
         let compact = ui.ctx().content_rect().width() < 620.0;
@@ -189,7 +207,11 @@ impl YamantakaApp {
                     |ui| {
                         theme::navigation(
                             ui,
-                            self.tr("Copiar pasaje", "Copy passage"),
+                            if compact {
+                                self.tr("Copiar", "Copy")
+                            } else {
+                                self.tr("Copiar pasaje", "Copy passage")
+                            },
                             false,
                             palette,
                         )
@@ -199,7 +221,25 @@ impl YamantakaApp {
                 .clicked();
             if theme::navigation(
                 ui,
-                self.tr("Borrar selección", "Clear selection"),
+                if compact {
+                    self.tr("Anotar", "Annotate")
+                } else {
+                    self.tr("Anotar pasaje", "Annotate passage")
+                },
+                false,
+                palette,
+            )
+            .clicked()
+            {
+                self.annotate_selection();
+            }
+            if theme::navigation(
+                ui,
+                if compact {
+                    self.tr("Borrar", "Clear")
+                } else {
+                    self.tr("Borrar selección", "Clear selection")
+                },
                 false,
                 palette,
             )

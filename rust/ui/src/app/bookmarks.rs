@@ -95,6 +95,7 @@ impl YamantakaApp {
         info: &PdfInfo,
         p: Palette,
     ) {
+        self.prepare_annotations(&document.id);
         if !self.panel {
             self.text.clear();
             self.thumbnails.clear();
@@ -164,6 +165,7 @@ impl YamantakaApp {
             ),
             (outline::ReaderPanelTab::Find, "Buscar", "Find"),
             (outline::ReaderPanelTab::Text, "Texto", "Text"),
+            (outline::ReaderPanelTab::Annotations, "Notas", "Notes"),
         ];
         if compact {
             let selected = tabs
@@ -213,6 +215,10 @@ impl YamantakaApp {
                 18.0
             },
         );
+        if self.reader_panel_tab == outline::ReaderPanelTab::Annotations {
+            self.annotation_panel(ui, info, p);
+            return;
+        }
         if self.reader_panel_tab == outline::ReaderPanelTab::Find {
             self.find_panel_content(ui, info, p);
             return;

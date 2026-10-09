@@ -1,3 +1,4 @@
+mod annotations;
 mod bookmarks;
 mod compact;
 mod details;
@@ -124,6 +125,8 @@ pub struct YamantakaApp {
         yamantaka_domain::pdf_destination::NavigationDestination,
     )>,
     bookmarks: bookmarks::BookmarkState,
+    annotations: annotations::AnnotationState,
+    annotation_preview: u8,
     text: text::TextState,
     selection: selection::SelectionState,
     selection_preview: selection::SelectionPreview,
@@ -279,6 +282,8 @@ impl YamantakaApp {
             outline_preview_target: None,
             reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
+            annotations: Default::default(),
+            annotation_preview: 0,
             text: Default::default(),
             selection: Default::default(),
             selection_preview: Default::default(),
@@ -1427,6 +1432,9 @@ impl App for YamantakaApp {
         {
             self.error = Some(error.to_string());
         }
+        if let Some((document, _)) = &self.active {
+            self.annotations.bind(&document.id);
+        }
         while let Ok(paths) = self.activation.try_recv() {
             ctx.send_viewport_cmd(ViewportCommand::Focus);
             if !paths.is_empty() {
@@ -1436,10 +1444,14 @@ impl App for YamantakaApp {
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
                 Update::Annotations(reply) => {
-                    if !reply.cancel.is_cancelled()
-                        && let Err(error) = reply.result
-                    {
-                        self.error = Some(error.to_string());
+                    if let Some(error) = self.annotations.accept(reply) {
+                        self.error = Some(format!(
+                            "{}: {error}",
+                            self.tr(
+                                "No se pudo guardar la nota del documento anterior",
+                                "Could not save the note in the previous document"
+                            )
+                        ));
                     }
                 }
                 Update::Library(documents, count, cancel) => {
@@ -1764,6 +1776,7 @@ impl App for YamantakaApp {
                 }
             }
         }
+        self.apply_annotation_preview();
         let dropped = ctx.input(|i| {
             i.raw
                 .dropped_files
@@ -1856,6 +1869,7 @@ impl App for YamantakaApp {
                     && ((!self.panel && self.reader_panel_tab != outline::ReaderPanelTab::Find)
                         || match self.reader_panel_tab {
                             outline::ReaderPanelTab::Bookmarks => self.bookmarks.ready(),
+                            outline::ReaderPanelTab::Annotations => self.annotations.ready(),
                             outline::ReaderPanelTab::Outline => self.outline.ready(),
                             outline::ReaderPanelTab::Thumbnails => self.thumbnails.ready(),
                             outline::ReaderPanelTab::Find => self.find.ready(),
@@ -1879,6 +1893,7 @@ impl App for YamantakaApp {
                         || self.selection_preview == selection::SelectionPreview::Complete
                             && self.selection.preview_ready())
                     && self.reader_destination.is_none()
+                    && self.annotation_preview == 0
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
                     && !self.loading
@@ -1952,6 +1967,7 @@ impl App for YamantakaApp {
                         "documentLinks":self.links.capture_summary(),
                         "pageText": if self.selection.enabled { self.selection.text_state(self.page).map(text::TextState::capture_summary) } else { Some(self.text.capture_summary()) },
                         "textSelection":self.selection.capture_summary(),
+                        "annotations":self.annotation_capture_summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,

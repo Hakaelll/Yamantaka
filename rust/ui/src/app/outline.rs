@@ -8,6 +8,7 @@ pub(super) enum ReaderPanelTab {
     Thumbnails,
     Find,
     Bookmarks,
+    Annotations,
     Text,
 }
 
