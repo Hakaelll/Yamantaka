@@ -1487,7 +1487,10 @@ impl App for YamantakaApp {
                 Update::DocumentFindFailed(id, error, cancel) => {
                     self.accept_find(&id, &cancel, Err(error.to_string()))
                 }
-                Update::PageMatches(..) | Update::PageFindFailed(..) => {}
+                Update::PageMatches(..)
+                | Update::PageFindFailed(..)
+                | Update::PageLinks(..)
+                | Update::PageLinksFailed(..) => {}
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::Text(id, page, text, cancel) => {
                     if !cancel.is_cancelled()

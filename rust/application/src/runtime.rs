@@ -44,6 +44,7 @@ pub enum Action {
     Navigate(String, u32),
     Text(String, u32, Cancellation),
     Outline(String, Cancellation),
+    PageLinks(String, u32, Cancellation),
     FindDocument(FindRequest),
     FindPage(
         String,
@@ -87,6 +88,12 @@ pub enum Update {
         Cancellation,
     ),
     OutlineFailed(String, Failure, Cancellation),
+    PageLinks(
+        String,
+        Arc<yamantaka_domain::pdf_links::PdfPageLinks>,
+        Cancellation,
+    ),
+    PageLinksFailed(String, u32, Failure, Cancellation),
     DocumentMatches(String, FindBatch, Cancellation),
     DocumentFindFailed(String, Failure, Cancellation),
     PageMatches(
@@ -155,6 +162,12 @@ enum Pending {
         PdfTicket<Arc<yamantaka_domain::outline::PdfOutline>>,
         Permit,
     ),
+    PageLinks(
+        String,
+        u32,
+        PdfTicket<Arc<yamantaka_domain::pdf_links::PdfPageLinks>>,
+        Permit,
+    ),
     FindPage(
         String,
         PdfTicket<Arc<yamantaka_domain::pdf_find::PdfPageMatches>>,
@@ -185,6 +198,9 @@ impl Pending {
             Self::FindPage(_, ticket, _) => {
                 select.recv(ticket.readiness());
             }
+            Self::PageLinks(_, _, ticket, _) => {
+                select.recv(ticket.readiness());
+            }
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
@@ -198,6 +214,7 @@ impl Pending {
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
             Self::Outline(_, ticket, _) => ticket.is_ready(),
             Self::FindPage(_, ticket, _) => ticket.is_ready(),
+            Self::PageLinks(_, _, ticket, _) => ticket.is_ready(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => ticket.is_ready(),
         }
     }
@@ -211,6 +228,7 @@ impl Pending {
             Self::Text(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::Outline(_, ticket, _) => ticket.cancellation.cancel(),
             Self::FindPage(_, ticket, _) => ticket.cancellation.cancel(),
+            Self::PageLinks(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
@@ -609,6 +627,12 @@ impl Runtime {
                                         Err(error) => emit(&events, &notify, Update::DocumentFindFailed(id, error, cancel), permit),
                                     }
                                 }
+                                Action::PageLinks(id, page, cancel) => {
+                                    match engine.try_page_links(id.clone(), page, cancel.clone()) {
+                                        Ok(ticket) => pending.push(Pending::PageLinks(id, page, ticket, permit)),
+                                        Err(error) => emit(&events, &notify, Update::PageLinksFailed(id, page, error, cancel), permit),
+                                    }
+                                }
                                 Action::FindPage(id, page, query, offset, cancel) => {
                                     match engine.try_find_page(id.clone(), page, query, offset, cancel.clone()) {
                                         Ok(ticket) => pending.push(Pending::FindPage(id, ticket, permit)),
@@ -732,6 +756,18 @@ impl Runtime {
                                 match ticket.wait().and_then(|outline| { cancel.check()?; Ok(outline) }) {
                                     Ok(outline) => emit(&events, &notify, Update::Outline(id, outline, cancel), permit),
                                     Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
+                                }
+                            }
+                            Pending::PageLinks(id, page, ticket, permit) => {
+                                let cancel = ticket.cancellation.clone();
+                                let result = ticket.wait().and_then(|links| {
+                                    cancel.check()?;
+                                    if links.page() != page { return Err(Failure::Invalid("PDF link response belongs to a different page".into())); }
+                                    Ok(links)
+                                });
+                                match result {
+                                    Ok(links) => emit(&events, &notify, Update::PageLinks(id, links, cancel), permit),
+                                    Err(error) => emit(&events, &notify, Update::PageLinksFailed(id, page, error, cancel), permit),
                                 }
                             }
                             Pending::FindPage(id, ticket, permit) => {
