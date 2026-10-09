@@ -1467,7 +1467,10 @@ impl App for YamantakaApp {
                     }
                     self.loading = false;
                 }
-                Update::PageMatches(..) | Update::PageFindFailed(..) => {}
+                Update::PageMatches(..)
+                | Update::PageFindFailed(..)
+                | Update::DocumentMatches(..)
+                | Update::DocumentFindFailed(..) => {}
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::Text(id, page, text, cancel) => {
                     if !cancel.is_cancelled()

@@ -1,3 +1,4 @@
+use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
 use crate::search_index::{IndexCommand, IndexProgress, SearchIndexController};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Select, Sender, TryRecvError, bounded};
 use std::{
@@ -43,6 +44,7 @@ pub enum Action {
     Navigate(String, u32),
     Text(String, u32, Cancellation),
     Outline(String, Cancellation),
+    FindDocument(FindRequest),
     FindPage(
         String,
         u32,
@@ -85,6 +87,8 @@ pub enum Update {
         Cancellation,
     ),
     OutlineFailed(String, Failure, Cancellation),
+    DocumentMatches(String, FindBatch, Cancellation),
+    DocumentFindFailed(String, Failure, Cancellation),
     PageMatches(
         String,
         Arc<yamantaka_domain::pdf_find::PdfPageMatches>,
@@ -142,6 +146,7 @@ struct ImportState {
     permit: Permit,
 }
 enum Pending {
+    FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(PdfTicket<Arc<RenderedPage>>, Permit),
     Text(String, u32, PdfTicket<String>, Permit),
@@ -162,6 +167,9 @@ enum Pending {
 impl Pending {
     fn register<'a>(&'a self, select: &mut Select<'a>) {
         match self {
+            Self::FindDocument(scan, _) => {
+                select.recv(scan.ticket().readiness());
+            }
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
@@ -184,6 +192,7 @@ impl Pending {
     }
     fn ready(&self) -> bool {
         match self {
+            Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
             Self::Render(ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
@@ -194,6 +203,7 @@ impl Pending {
     }
     fn cancel(&self) {
         match self {
+            Self::FindDocument(scan, _) => scan.request.cancellation.cancel(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
@@ -591,6 +601,14 @@ impl Runtime {
                                         }
                                     }
                                 }
+                                Action::FindDocument(request) => {
+                                    let id = request.document_id.clone();
+                                    let cancel = request.cancellation.clone();
+                                    match FindScan::start(request, &engine) {
+                                        Ok(scan) => pending.push(Pending::FindDocument(Box::new(scan), permit)),
+                                        Err(error) => emit(&events, &notify, Update::DocumentFindFailed(id, error, cancel), permit),
+                                    }
+                                }
                                 Action::FindPage(id, page, query, offset, cancel) => {
                                     match engine.try_find_page(id.clone(), page, query, offset, cancel.clone()) {
                                         Ok(ticket) => pending.push(Pending::FindPage(id, ticket, permit)),
@@ -638,6 +656,18 @@ impl Runtime {
                             continue;
                         }
                         match pending.remove(index) {
+                            Pending::FindDocument(scan, permit) => {
+                                let id = scan.request.document_id.clone();
+                                let cancel = scan.request.cancellation.clone();
+                                match scan.advance(&engine, &notify) {
+                                    Ok(ScanStep::Continue(scan)) => {
+                                        pending.insert(index, Pending::FindDocument(Box::new(scan), permit));
+                                        index += 1;
+                                    }
+                                    Ok(ScanStep::Finished(batch)) => emit(&events, &notify, Update::DocumentMatches(id, batch, cancel), permit),
+                                    Err(error) => emit(&events, &notify, Update::DocumentFindFailed(id, error, cancel), permit),
+                                }
+                            }
                             Pending::Open(document, ticket, permit, revision) => {
                                 let cancel = ticket.cancellation.clone();
                                 let result = ticket.wait().and_then(|info| {
