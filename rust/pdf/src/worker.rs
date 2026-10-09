@@ -94,6 +94,13 @@ enum Request {
         cancel: Cancellation,
         reply: Reply<Arc<yamantaka_domain::outline::PdfOutline>>,
     },
+    PageLinks {
+        id: String,
+        epoch: u64,
+        page: u32,
+        cancel: Cancellation,
+        reply: Reply<Arc<yamantaka_domain::pdf_links::PdfPageLinks>>,
+    },
     FindPage {
         id: String,
         epoch: u64,
@@ -118,6 +125,7 @@ impl Request {
             | Self::Text { id, .. }
             | Self::Outline { id, .. }
             | Self::FindPage { id, .. }
+            | Self::PageLinks { id, .. }
             | Self::Close { id, .. } => Some(id),
             Self::Render { key, .. } => Some(&key.document_id),
             Self::Shutdown => None,
@@ -128,7 +136,10 @@ impl Request {
             Self::Shutdown | Self::Close { .. } => 0,
             Self::Open { .. } | Self::Inspect { .. } => 1,
             Self::Render { priority, .. } => 2 + *priority as u8,
-            Self::Text { .. } | Self::Outline { .. } | Self::FindPage { .. } => 4,
+            Self::Text { .. }
+            | Self::Outline { .. }
+            | Self::FindPage { .. }
+            | Self::PageLinks { .. } => 4,
         }
     }
 }
@@ -424,6 +435,23 @@ impl AsyncPdfEngine for PdfWorker {
         })?;
         Ok(ticket)
     }
+    fn try_page_links(
+        &self,
+        id: String,
+        page: u32,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<yamantaka_domain::pdf_links::PdfPageLinks>>> {
+        let epoch = self.epoch(&id, false);
+        let (reply, ticket) = self.reply(epoch, cancel.clone(), false)?;
+        self.enqueue(Request::PageLinks {
+            id,
+            epoch,
+            page,
+            cancel,
+            reply,
+        })?;
+        Ok(ticket)
+    }
     fn try_find_page(
         &self,
         id: String,
@@ -501,6 +529,7 @@ fn fail_request(request: Request) {
         Request::Text { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Outline { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::FindPage { reply, .. } => reply.send(Err(Failure::Cancelled)),
+        Request::PageLinks { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Close { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Render { consumers, .. } => {
             for (_, reply) in consumers.lock().unwrap().drain(..) {
@@ -897,6 +926,31 @@ fn run(
                         .get(&id)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
                     crate::outline::read(document, &governor, || {
+                        cancel.check()?;
+                        epoch_matches(&scheduler, &id, epoch)
+                    })
+                })();
+                reply.send(
+                    cancel
+                        .check()
+                        .and_then(|()| epoch_matches(&scheduler, &id, epoch))
+                        .and(result),
+                );
+            }
+            Request::PageLinks {
+                id,
+                epoch,
+                page,
+                cancel,
+                reply,
+            } => {
+                let result = (|| {
+                    cancel.check()?;
+                    epoch_matches(&scheduler, &id, epoch)?;
+                    let document = documents
+                        .get(&id)
+                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
+                    crate::links::read(document, page, &governor, || {
                         cancel.check()?;
                         epoch_matches(&scheduler, &id, epoch)
                     })

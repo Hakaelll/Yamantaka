@@ -86,6 +86,14 @@ pub trait AsyncPdfEngine: PdfEngine {
         Err(crate::Failure::Unsupported("PDF outline".into()))
     }
     fn try_close(&self, id: String) -> Result<PdfTicket<()>>;
+    fn try_page_links(
+        &self,
+        _id: String,
+        _page: u32,
+        _cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<crate::pdf_links::PdfPageLinks>>> {
+        Err(crate::Failure::Unsupported("PDF page links".into()))
+    }
     fn try_find_page(
         &self,
         _id: String,

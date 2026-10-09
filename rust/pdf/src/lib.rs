@@ -3,6 +3,7 @@ mod bindings;
 mod cache;
 mod destination;
 mod find;
+mod links;
 mod outline;
 mod page_geometry;
 mod worker;
