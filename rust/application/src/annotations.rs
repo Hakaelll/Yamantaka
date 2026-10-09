@@ -13,6 +13,11 @@ use yamantaka_domain::{
 };
 
 pub enum AnnotationMutation {
+    CreateBatch {
+        batch: Arc<yamantaka_domain::annotations::batch::AnnotationDraftBatch>,
+        confirm_page_note: bool,
+        tags: Vec<String>,
+    },
     Create {
         draft: Arc<AnnotationDraft>,
         confirm_page_note: bool,
@@ -46,6 +51,15 @@ pub enum AnnotationMutation {
 impl AnnotationMutation {
     fn borrowed(&self) -> AnnotationChange<'_> {
         match self {
+            Self::CreateBatch {
+                batch,
+                confirm_page_note,
+                tags,
+            } => AnnotationChange::CreateBatch {
+                batch,
+                confirm_page_note: *confirm_page_note,
+                tags,
+            },
             Self::Create {
                 draft,
                 confirm_page_note,

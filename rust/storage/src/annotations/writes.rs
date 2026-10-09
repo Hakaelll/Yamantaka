@@ -238,6 +238,58 @@ fn refresh(db: &Connection, document: &str, page: u32, access: IndexAccess) -> R
     db.execute("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT a.document_id,a.page_index,'annotation',COALESCE(d.title_override,d.source_title,d.title,d.file_name),COALESCE(a.selected_text,'') || ' ' || COALESCE(a.note,''),COALESCE((SELECT group_concat(t.name,' ') FROM annotation_tags at JOIN tags t ON t.id=at.tag_id WHERE at.annotation_id=a.id),'') FROM annotations a JOIN documents d ON d.id=a.document_id WHERE a.document_id=? AND a.page_index=? AND NOT EXISTS(SELECT 1 FROM search_index_state s WHERE s.document_id=d.id AND s.status='excluded')",params![document,page]).map_err(storage)?;
     Ok(())
 }
+struct CreationContext<'a> {
+    document: &'a str,
+    now: &'a str,
+    governor: &'a MemoryGovernor,
+    cancel: &'a Cancellation,
+}
+fn create_draft(
+    db: &Connection,
+    draft: &AnnotationDraft,
+    confirm_page_note: bool,
+    tag_values: &[String],
+    context: &CreationContext<'_>,
+) -> Result<u32> {
+    let CreationContext {
+        document,
+        now,
+        governor,
+        cancel,
+    } = *context;
+    cancel.check()?;
+    if draft.values().document_id != document {
+        return Err(Failure::Invalid(
+            "Annotation draft belongs to another document".into(),
+        ));
+    }
+    if matches!(
+        draft.placement(),
+        AnnotationPlacement::PageNoteFallback { .. }
+    ) && !confirm_page_note
+    {
+        return Err(Failure::Invalid(
+            "Confirm the page-note fallback before saving".into(),
+        ));
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    save(
+        db,
+        &id,
+        draft.values(),
+        SnapshotFields {
+            created: now,
+            updated: now,
+            origin_document_id: None,
+            origin_fingerprint: None,
+            extensions: &[],
+        },
+        tag_values,
+        governor,
+        cancel,
+    )?;
+    Ok(draft.values().page_index)
+}
 pub(super) fn change(
     db: &mut Database,
     document: &str,
@@ -263,43 +315,40 @@ pub(super) fn change(
     }
     let now = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
     let mut pages = BTreeSet::new();
+    let creation = CreationContext {
+        document,
+        now: &now,
+        governor,
+        cancel,
+    };
     match change {
+        AnnotationChange::CreateBatch {
+            batch,
+            confirm_page_note,
+            tags,
+        } => {
+            for draft in batch.drafts() {
+                pages.insert(create_draft(
+                    &tx,
+                    draft,
+                    confirm_page_note,
+                    tags,
+                    &creation,
+                )?);
+            }
+        }
         AnnotationChange::Create {
             draft,
             confirm_page_note,
             tags: tag_values,
         } => {
-            if draft.values().document_id != document {
-                return Err(Failure::Invalid(
-                    "Annotation draft belongs to another document".into(),
-                ));
-            }
-            if matches!(
-                draft.placement(),
-                AnnotationPlacement::PageNoteFallback { .. }
-            ) && !confirm_page_note
-            {
-                return Err(Failure::Invalid(
-                    "Confirm the page-note fallback before saving".into(),
-                ));
-            }
-            let id = uuid::Uuid::new_v4().to_string();
-            save(
+            pages.insert(create_draft(
                 &tx,
-                &id,
-                draft.values(),
-                SnapshotFields {
-                    created: &now,
-                    updated: &now,
-                    origin_document_id: None,
-                    origin_fingerprint: None,
-                    extensions: &[],
-                },
+                draft,
+                confirm_page_note,
                 tag_values,
-                governor,
-                cancel,
-            )?;
-            pages.insert(draft.values().page_index);
+                &creation,
+            )?);
         }
         AnnotationChange::Save { record } => {
             let record = record.data();

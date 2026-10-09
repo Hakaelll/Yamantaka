@@ -324,3 +324,78 @@ fn annotation_response_saturation_is_bounded_and_releases_governed_pages_on_shut
     drop(runtime);
     assert_eq!(governor.usage().text, 0);
 }
+
+#[test]
+fn annotation_batch_command_keeps_both_page_records_and_releases_shared_drafts() {
+    let (runtime, native, _) = setup();
+    let governor = MemoryGovernor::default();
+    let pages: Vec<_> = (0..2)
+        .map(|index| {
+            let text = "café";
+            let lease = governor
+                .try_reserve_one(Cost::new(
+                    MemoryCategory::Text,
+                    MemoryRepresentation::Cpu,
+                    4096,
+                ))
+                .unwrap();
+            let region = NormalizedPageRect::new([0.1, 0.2], [0.3, 0.4]).unwrap();
+            let characters = text
+                .char_indices()
+                .map(|(index, c)| TextCharacter {
+                    bytes: index as u32..(index + c.len_utf8()) as u32,
+                    region: Some(region),
+                })
+                .collect();
+            Arc::new(PdfPageText::from_reserved(index, text.into(), characters, lease).unwrap())
+        })
+        .collect();
+    let selection = TextSelection::new(
+        SelectionPosition::new(0, 1).unwrap(),
+        SelectionPosition::new(1, 4).unwrap(),
+    );
+    let batch = Arc::new(
+        yamantaka_domain::annotations::batch::AnnotationDraftBatch::from_selection(
+            AnnotationSource {
+                document_id: "a",
+                fingerprint: "fa",
+                rotation: PageRotation::Deg0,
+            },
+            selection,
+            &pages,
+            AnnotationKind::Underline,
+            AnnotationColor::Green,
+            Some("Batch study"),
+            &governor,
+        )
+        .unwrap(),
+    );
+    drop(pages);
+    let saved = change(
+        &runtime,
+        &governor,
+        AnnotationMutation::CreateBatch {
+            batch: batch.clone(),
+            confirm_page_note: false,
+            tags: vec!["Study".into()],
+        },
+    );
+    assert_eq!(saved.total, 2);
+    assert_eq!(saved.entries()[0].data().values.page_index, 0);
+    assert_eq!(saved.entries()[1].data().values.page_index, 1);
+    assert_eq!(
+        saved.entries()[0].data().values.selected_text.as_deref(),
+        Some("afé")
+    );
+    assert_eq!(
+        saved.entries()[1].data().values.selected_text.as_deref(),
+        Some("café")
+    );
+    assert_eq!(saved.entries()[0].data().tags, ["Study"]);
+    assert_eq!(Arc::strong_count(&batch), 1);
+    assert!(native.try_recv().is_err());
+    drop(saved);
+    drop(batch);
+    drop(runtime);
+    assert_eq!(governor.usage().text, 0);
+}

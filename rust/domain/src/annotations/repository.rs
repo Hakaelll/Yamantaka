@@ -146,6 +146,11 @@ impl AnnotationPage {
     }
 }
 pub enum AnnotationChange<'a> {
+    CreateBatch {
+        batch: &'a super::batch::AnnotationDraftBatch,
+        confirm_page_note: bool,
+        tags: &'a [String],
+    },
     Create {
         draft: &'a AnnotationDraft,
         confirm_page_note: bool,
