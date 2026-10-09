@@ -11,6 +11,7 @@ pub mod pdf_find;
 pub mod pdf_geometry;
 pub mod pdf_links;
 pub mod pdf_pages;
+pub mod pdf_text;
 pub mod pdf_ticket;
 pub use password::PdfPassword;
 pub mod reader;

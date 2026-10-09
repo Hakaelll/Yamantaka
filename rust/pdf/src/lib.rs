@@ -6,5 +6,6 @@ mod find;
 mod links;
 mod outline;
 mod page_geometry;
+mod text_geometry;
 mod worker;
 pub use worker::{MemoryLimits, PdfWorker};
