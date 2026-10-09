@@ -1,7 +1,7 @@
 use crossbeam_channel::{Receiver, Sender, bounded};
 use std::{
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use yamantaka_application::{
@@ -20,7 +20,7 @@ enum Native {
     Text(u32, Cancellation, Sender<Result<String>>),
     Close(String, Sender<Result<()>>),
 }
-struct Engine(Sender<Native>);
+struct Engine(Sender<Native>, Arc<Mutex<Vec<Vec<String>>>>);
 impl PdfEngine for Engine {
     fn open(
         &self,
@@ -42,7 +42,8 @@ impl PdfEngine for Engine {
     }
 }
 impl AsyncPdfEngine for Engine {
-    fn set_visible_documents(&self, _: &[String]) -> Result<()> {
+    fn set_visible_documents(&self, ids: &[String]) -> Result<()> {
+        self.1.lock().unwrap().push(ids.to_vec());
         Ok(())
     }
     fn try_open(
@@ -87,10 +88,16 @@ fn setup_with_failure(broken_index: bool) -> (Runtime, Receiver<Native>, Receive
     start_database(db)
 }
 fn start_database(db: Database) -> (Runtime, Receiver<Native>, Receiver<()>) {
+    start_database_with_pins(db, Arc::default())
+}
+fn start_database_with_pins(
+    db: Database,
+    pins: Arc<Mutex<Vec<Vec<String>>>>,
+) -> (Runtime, Receiver<Native>, Receiver<()>) {
     let (send, native) = bounded(16);
     let (wake, notified) = bounded(1);
     (
-        Runtime::start(db, Engine(send), move || {
+        Runtime::start(db, Engine(send, pins), move || {
             let _ = wake.try_send(());
         })
         .unwrap(),
@@ -275,6 +282,208 @@ fn reader() -> Document {
 }
 
 #[test]
+fn open_confirmation_keeps_old_pins_and_rejects_cancelled_or_stale_acceptance() {
+    let pins = Arc::new(Mutex::new(Vec::new()));
+    let (runtime, native, _) =
+        start_database_with_pins(Database::in_memory_at(11).unwrap(), pins.clone());
+    let mut old = reader();
+    old.id = "old".into();
+    runtime
+        .submit(Action::Open(old, None, Cancellation::default()))
+        .unwrap();
+    let Native::Open(_, _, reply) = next(&native) else {
+        panic!("old reader open")
+    };
+    reply.send(Ok(info())).unwrap();
+    let Update::Opened(doc, _, token) = update(&runtime) else {
+        panic!("opened old reader")
+    };
+    runtime.submit(Action::ConfirmOpen(doc.id, token)).unwrap();
+    committed(&runtime, WriteKind::VisibleDocuments);
+    assert_eq!(pins.lock().unwrap().last().unwrap(), &["old"]);
+
+    let replacement = reader();
+    runtime
+        .submit(Action::Open(
+            replacement.clone(),
+            None,
+            Cancellation::default(),
+        ))
+        .unwrap();
+    let Native::Open(_, _, reply) = next(&native) else {
+        panic!("replacement open")
+    };
+    assert_eq!(pins.lock().unwrap().last().unwrap(), &["old", "reader"]);
+    reply.send(Ok(info())).unwrap();
+    let Update::Opened(doc, _, token) = update(&runtime) else {
+        panic!("replacement result")
+    };
+    runtime
+        .submit(Action::ConfirmOpen(doc.id.clone(), Cancellation::default()))
+        .unwrap();
+    committed(&runtime, WriteKind::VisibleDocuments);
+    assert_eq!(
+        pins.lock().unwrap().last().unwrap(),
+        &["old", "reader"],
+        "an unrelated token cannot accept an open"
+    );
+    token.cancel();
+    runtime.submit(Action::ConfirmOpen(doc.id, token)).unwrap();
+    committed(&runtime, WriteKind::VisibleDocuments);
+    assert_eq!(pins.lock().unwrap().last().unwrap(), &["old"]);
+
+    let first = Cancellation::default();
+    runtime
+        .submit(Action::Open(replacement.clone(), None, first.clone()))
+        .unwrap();
+    let Native::Open(_, _, first_reply) = next(&native) else {
+        panic!("first replacement")
+    };
+    let second = Cancellation::default();
+    runtime
+        .submit(Action::Open(replacement, None, second.clone()))
+        .unwrap();
+    let Native::Open(_, _, second_reply) = next(&native) else {
+        panic!("newer replacement")
+    };
+    assert!(first.is_cancelled());
+    first_reply.send(Ok(info())).unwrap();
+    assert!(matches!(
+        update(&runtime),
+        Update::OpenFailed(_, yamantaka_domain::Failure::Cancelled, _)
+    ));
+    assert_eq!(
+        pins.lock().unwrap().last().unwrap(),
+        &["old", "reader"],
+        "older completion must not restore pins over newer admission"
+    );
+    second_reply.send(Ok(info())).unwrap();
+    let Update::Opened(doc, _, token) = update(&runtime) else {
+        panic!("latest result")
+    };
+    let mut next_document = reader();
+    next_document.id = "next".into();
+    runtime
+        .submit(Action::Open(next_document, None, Cancellation::default()))
+        .unwrap();
+    runtime
+        .submit(Action::Query(Default::default(), Cancellation::default()))
+        .unwrap();
+    assert!(matches!(update(&runtime), Update::Library(_, 0, _)));
+    assert!(
+        native.try_recv().is_err(),
+        "a later open must await the accepted reader's confirmation"
+    );
+    runtime.submit(Action::ConfirmOpen(doc.id, token)).unwrap();
+    committed(&runtime, WriteKind::VisibleDocuments);
+    let Native::Open(_, _, reply) = next(&native) else {
+        panic!("deferred next open")
+    };
+    assert_eq!(pins.lock().unwrap().last().unwrap(), &["reader", "next"]);
+    reply
+        .send(Err(yamantaka_domain::Failure::PasswordRequired))
+        .unwrap();
+    assert!(matches!(
+        update(&runtime),
+        Update::OpenFailed(_, yamantaka_domain::Failure::PasswordRequired, _)
+    ));
+    assert_eq!(pins.lock().unwrap().last().unwrap(), &["reader"]);
+}
+
+#[test]
+fn confirmation_remains_admissible_when_data_results_fill_all_reservations() {
+    let pins = Arc::new(Mutex::new(Vec::new()));
+    let (runtime, native, _) =
+        start_database_with_pins(Database::in_memory_at(11).unwrap(), pins.clone());
+    runtime
+        .submit(Action::Open(reader(), None, Cancellation::default()))
+        .unwrap();
+    let Native::Open(_, _, reply) = next(&native) else {
+        panic!("reader open")
+    };
+    reply.send(Ok(info())).unwrap();
+    let Update::Opened(doc, _, token) = update(&runtime) else {
+        panic!("reader result")
+    };
+    for _ in 0..128 {
+        runtime
+            .submit(Action::Query(Default::default(), Cancellation::default()))
+            .unwrap();
+    }
+    assert!(
+        runtime
+            .submit(Action::Query(Default::default(), Cancellation::default()))
+            .is_err()
+    );
+    runtime
+        .submit(Action::ConfirmOpen(doc.id, token))
+        .expect("confirmation uses reserved control capacity");
+    for _ in 0..128 {
+        assert!(matches!(update(&runtime), Update::Library(_, _, _)));
+    }
+    committed(&runtime, WriteKind::VisibleDocuments);
+    assert_eq!(pins.lock().unwrap().last().unwrap(), &["reader"]);
+}
+
+#[test]
+fn import_waits_for_ui_confirmation_without_blocking_catalogue_queries() {
+    let (runtime, native, _) = start_database(Database::in_memory_at(11).unwrap());
+    runtime
+        .submit(Action::Open(reader(), None, Cancellation::default()))
+        .unwrap();
+    let Native::Open(_, _, reply) = next(&native) else {
+        panic!("reader open")
+    };
+    reply.send(Ok(info())).unwrap();
+    let Update::Opened(doc, _, token) = update(&runtime) else {
+        panic!("reader result")
+    };
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../build/rust-fixtures/textual.pdf")
+        .canonicalize()
+        .unwrap();
+    runtime
+        .submit(Action::Import(vec![fixture], Cancellation::default()))
+        .unwrap();
+    runtime
+        .submit(Action::Query(Default::default(), Cancellation::default()))
+        .unwrap();
+    assert!(matches!(update(&runtime), Update::Library(_, 0, _)));
+    assert!(
+        native.try_recv().is_err(),
+        "import must retain its reservation until acceptance"
+    );
+    runtime.submit(Action::ConfirmOpen(doc.id, token)).unwrap();
+    committed(&runtime, WriteKind::VisibleDocuments);
+    let Native::Open(_, _, reply) = next(&native) else {
+        panic!("deferred import open")
+    };
+    reply.send(Ok(info())).unwrap();
+    let Native::Close(_, reply) = next(&native) else {
+        panic!("import inspection close")
+    };
+    reply.send(Ok(())).unwrap();
+    assert!(matches!(update(&runtime), Update::Imported(1, _)));
+}
+
+#[test]
+fn shutdown_cancels_a_delivered_open_that_the_ui_has_not_confirmed() {
+    let (runtime, native, _) = start_database(Database::in_memory_at(11).unwrap());
+    runtime
+        .submit(Action::Open(reader(), None, Cancellation::default()))
+        .unwrap();
+    let Native::Open(_, _, reply) = next(&native) else {
+        panic!("reader open")
+    };
+    reply.send(Ok(info())).unwrap();
+    let Update::Opened(_, _, token) = update(&runtime) else {
+        panic!("reader result")
+    };
+    drop(runtime);
+    assert!(token.is_cancelled());
+}
+
+#[test]
 fn actor_requires_consent_and_keeps_sql_responsive_during_cancelled_native_open() {
     let (runtime, native, notified) = setup();
     runtime
@@ -351,7 +560,19 @@ fn foreground_open_waits_for_index_close_and_indexing_resumes_without_late_text(
         "index must wait for reader inspection"
     );
     send.send(Ok(info())).unwrap();
-    assert!(matches!(update(&runtime), Update::Opened(document, _, _) if document.id == "reader"));
+    let Update::Opened(document, _, token) = update(&runtime) else {
+        panic!("expected opened reader")
+    };
+    assert_eq!(document.id, "reader");
+    query_barrier(&runtime);
+    assert!(
+        native.try_recv().is_err(),
+        "index must await UI acceptance of the open result"
+    );
+    runtime
+        .submit(Action::ConfirmOpen(document.id, token))
+        .unwrap();
+    committed(&runtime, WriteKind::VisibleDocuments);
     let Native::Open(id, _, send) = next(&native) else {
         panic!("expected index resume")
     };

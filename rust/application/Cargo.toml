@@ -13,3 +13,4 @@ workspace = true
 
 [dev-dependencies]
 yamantaka-storage.workspace = true
+yamantaka-pdf.workspace = true

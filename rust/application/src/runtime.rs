@@ -25,6 +25,7 @@ pub enum Action {
     Index(IndexCommand),
     IndexStatistics,
     VisibleDocuments(Vec<String>),
+    ConfirmOpen(String, Cancellation),
     Query(LibraryQuery, Cancellation),
     Favorite(String, bool),
     LoadReaderPreferences(String, Cancellation),
@@ -116,7 +117,7 @@ struct ImportState {
     permit: Permit,
 }
 enum Pending {
-    Open(Document, PdfTicket<PdfInfo>, Permit),
+    Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(PdfTicket<Arc<RenderedPage>>, Permit),
     Text(String, u32, PdfTicket<String>, Permit),
     Close(String, PdfTicket<()>, Permit),
@@ -126,7 +127,7 @@ enum Pending {
 impl Pending {
     fn register<'a>(&'a self, select: &mut Select<'a>) {
         match self {
-            Self::Open(_, ticket, _) | Self::ImportOpen(_, _, ticket, _) => {
+            Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
             Self::Render(ticket, _) => {
@@ -142,7 +143,7 @@ impl Pending {
     }
     fn ready(&self) -> bool {
         match self {
-            Self::Open(_, ticket, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
+            Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
             Self::Render(ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
             Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => ticket.is_ready(),
@@ -150,7 +151,7 @@ impl Pending {
     }
     fn cancel(&self) {
         match self {
-            Self::Open(_, ticket, _) | Self::ImportOpen(_, _, ticket, _) => {
+            Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
             Self::Render(ticket, _) => ticket.cancellation.cancel(),
@@ -159,6 +160,21 @@ impl Pending {
                 ticket.cancellation.cancel()
             }
         }
+    }
+}
+fn foreground_admissible(
+    action: &Action,
+    pending: &[Pending],
+    awaiting: &Option<(String, Cancellation)>,
+) -> bool {
+    match action {
+        Action::Import(..) => {
+            awaiting.is_none() && !pending.iter().any(|item| matches!(item, Pending::Open(..)))
+        }
+        Action::Open(..) => awaiting
+            .as_ref()
+            .is_none_or(|(_, token)| token.is_cancelled()),
+        _ => true,
     }
 }
 fn emit(events: &Sender<Event>, notify: &impl Fn(), update: Update, permit: Permit) {
@@ -234,26 +250,30 @@ impl Runtime {
                 let mut indexer = SearchIndexController::default();
                 let mut index_cleanup: Option<PdfTicket<()>> = None;
                 let mut deferred: VecDeque<Command> = VecDeque::new();
+                // Only readers accepted by the UI are committed visible owners.
                 let mut visible: Vec<String> = Vec::new();
+                let mut open_revision = 0u64;
+                let mut awaiting_open: Option<(String, Cancellation)> = None;
                 loop {
                     if stop.try_recv().is_ok() {
                         break;
                     }
                     let index_busy =
                         indexer.native_document_id().is_some() || index_cleanup.is_some();
-                    let command = if !index_busy && !deferred.is_empty() {
+                    let deferred_ready = !index_busy && deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open));
+                    let command = if deferred_ready {
                         deferred.pop_front()
                     } else {
                         commands.try_recv().ok()
                     };
                     if let Some(Command { action, permit }) = command {
-                        if index_busy
+                        if (index_busy
                             && matches!(
                                 &action,
                                 Action::Open(..)
                                     | Action::Import(..)
                                     | Action::VisibleDocuments(..)
-                            )
+                            )) || !foreground_admissible(&action, &pending, &awaiting_open)
                         {
                             indexer.set_slot_available(false);
                             deferred.push_back(Command { action, permit });
@@ -363,6 +383,10 @@ impl Runtime {
                                 Action::VisibleDocuments(ids) => {
                                     match engine.set_visible_documents(&ids) {
                                         Ok(()) => {
+                                            for item in &pending {
+                                                if matches!(item, Pending::Open(..)) { item.cancel(); }
+                                            }
+                                            if let Some((_, token)) = awaiting_open.take() { token.cancel(); }
                                             visible = ids;
                                             emit(
                                                 &events,
@@ -453,28 +477,47 @@ impl Runtime {
                                         Err(error) => failed(&events, &notify, error, None, permit),
                                     }
                                 }
-                                // The current UI has one visible reader. Replace its
-                                // pin before admission so imports cannot evict it.
-                                Action::Open(document, password, cancel) => match engine
-                                    .set_visible_documents(std::slice::from_ref(&document.id))
-                                    .and_then(|()| {
-                                        engine.try_open(
-                                            document.id.clone(),
-                                            document.path.clone(),
-                                            password,
-                                            cancel.clone(),
-                                        )
-                                    }) {
-                                    Ok(ticket) => {
-                                        visible = vec![document.id.clone()];
-                                        pending.push(Pending::Open(document, ticket, permit));
+                                Action::ConfirmOpen(id, cancel) => {
+                                    let matches = awaiting_open.as_ref().is_some_and(|(target, token)| target == &id && token.same_request(&cancel));
+                                    if matches {
+                                        let ids = if cancel.is_cancelled() { visible.clone() } else { vec![id.clone()] };
+                                        match engine.set_visible_documents(&ids) {
+                                            Ok(()) => { visible = ids; awaiting_open = None; }
+                                            Err(error) => { failed(&events, &notify, error, Some(cancel), permit); continue; }
+                                        }
                                     }
-                                    Err(error) => emit(
-                                        &events,
-                                        &notify,
-                                        Update::OpenFailed(Box::new(document), error, cancel),
-                                        permit,
-                                    ),
+                                    // A stale confirmation is an idempotent no-op.
+                                    emit(&events, &notify, Update::Committed(id, WriteKind::VisibleDocuments), permit);
+                                }
+                                Action::Open(document, password, cancel) => {
+                                    let mut protected = visible.clone();
+                                    if !protected.contains(&document.id) { protected.push(document.id.clone()); }
+                                    let revision = open_revision.checked_add(1);
+                                    let preparation = cancel.check().and_then(|()| {
+                                        if protected.len() > yamantaka_domain::MAX_HOT_DOCUMENTS {
+                                            return Err(Failure::Invalid("Close a visible reader before opening another document".into()));
+                                        }
+                                        revision.ok_or_else(|| Failure::Invalid("Document opening revision exhausted".into()))
+                                    });
+                                    let revision = match preparation {
+                                        Ok(revision) => revision,
+                                        Err(error) => { emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit); continue; }
+                                    };
+                                    open_revision = revision;
+                                    for item in &pending {
+                                        if matches!(item, Pending::Open(..)) { item.cancel(); }
+                                    }
+                                    if let Some((_, token)) = awaiting_open.take() { token.cancel(); }
+                                    let result = engine.set_visible_documents(&protected).and_then(|()| engine.try_open(
+                                        document.id.clone(), document.path.clone(), password, cancel.clone(),
+                                    ));
+                                    match result {
+                                        Ok(ticket) => pending.push(Pending::Open(document, ticket, permit, revision)),
+                                        Err(error) => {
+                                            let error = engine.set_visible_documents(&visible).err().unwrap_or(error);
+                                            emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit);
+                                        }
+                                    }
                                 },
                                 Action::Render(key, cancel) => {
                                     match engine.try_render(key, Priority::Visible, cancel.clone())
@@ -522,24 +565,27 @@ impl Runtime {
                             continue;
                         }
                         match pending.remove(index) {
-                            Pending::Open(document, ticket, permit) => {
+                            Pending::Open(document, ticket, permit, revision) => {
                                 let cancel = ticket.cancellation.clone();
-                                match ticket.wait().and_then(|info| {
+                                let result = ticket.wait().and_then(|info| {
                                     cancel.check()?;
+                                    if revision != open_revision { return Err(Failure::Cancelled); }
                                     Ok(info)
-                                }) {
-                                    Ok(info) => emit(
-                                        &events,
-                                        &notify,
-                                        Update::Opened(Box::new(document), info, cancel),
-                                        permit,
-                                    ),
-                                    Err(error) => emit(
-                                        &events,
-                                        &notify,
-                                        Update::OpenFailed(Box::new(document), error, cancel),
-                                        permit,
-                                    ),
+                                });
+                                match result {
+                                    Ok(info) => {
+                                        // Keep the old reader and replacement pinned until
+                                        // the UI accepts this exact request, including races
+                                        // where cancellation follows delivery of Opened.
+                                        awaiting_open = Some((document.id.clone(), cancel.clone()));
+                                        emit(&events, &notify, Update::Opened(Box::new(document), info, cancel), permit);
+                                    }
+                                    Err(error) => {
+                                        let error = if revision == open_revision && awaiting_open.is_none() {
+                                            engine.set_visible_documents(&visible).err().unwrap_or(error)
+                                        } else { error };
+                                        emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit);
+                                    }
                                 }
                             }
                             Pending::Render(ticket, permit) => {
@@ -581,6 +627,8 @@ impl Runtime {
                             Pending::Close(id, ticket, permit) => match ticket.wait() {
                                 Ok(()) => {
                                     visible.retain(|item| item != &id);
+                                    if awaiting_open.as_ref().is_some_and(|(target, _)| target == &id)
+                                        && let Some((_, token)) = awaiting_open.take() { token.cancel(); }
                                     emit(
                                         &events,
                                         &notify,
@@ -653,6 +701,7 @@ impl Runtime {
                     indexer.set_slot_available(
                         deferred.is_empty()
                             && !native_admission_pending
+                            && awaiting_open.is_none()
                             && visible.len() < yamantaka_domain::MAX_HOT_DOCUMENTS
                             && index_cleanup.is_none(),
                     );
@@ -667,7 +716,7 @@ impl Runtime {
                     // or PDF completion. SQL is never held behind native rendering.
                     if !commands.is_empty()
                         || indexer.needs_step()
-                        || (!deferred.is_empty()
+                        || (deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open))
                             && indexer.native_document_id().is_none()
                             && index_cleanup.is_none())
                     {
@@ -688,6 +737,7 @@ impl Runtime {
                 for item in &pending {
                     item.cancel();
                 }
+                if let Some((_, token)) = awaiting_open.take() { token.cancel(); }
                 drop(pending); // Drop tickets before engine join; no UI draining required.
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
                     let _ = ticket.wait();
@@ -719,7 +769,7 @@ impl Runtime {
                 .map_err(|_| Failure::Storage("Use-case worker stopped".into()))?;
             return Ok(());
         }
-        let counter = if matches!(action, Action::Close(_)) {
+        let counter = if matches!(action, Action::Close(_) | Action::ConfirmOpen(..)) {
             &self.control_outstanding
         } else {
             &self.outstanding
@@ -728,9 +778,7 @@ impl Runtime {
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
                 (count < CAPACITY).then_some(count + 1)
             })
-            .map_err(|_| {
-                Failure::Storage("Work queue is full; drain results or cancel pending work".into())
-            })?;
+            .map_err(|_| Failure::QueueFull)?;
         self.sender
             .try_send(Command {
                 action,

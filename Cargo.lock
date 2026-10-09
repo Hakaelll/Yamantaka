@@ -4406,6 +4406,7 @@ dependencies = [
  "crossbeam-channel",
  "serde_json",
  "yamantaka-domain",
+ "yamantaka-pdf",
  "yamantaka-storage",
 ]
 

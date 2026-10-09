@@ -64,6 +64,7 @@ impl PageImage {
 pub struct YamantakaApp {
     search: search::SearchState,
     open_intent: open_intent::OpenIntent,
+    open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
     password_attempted: bool,
     preview_password_action: Option<&'static str>,
@@ -200,6 +201,7 @@ impl YamantakaApp {
                     .unwrap_or(false),
             ),
             open_intent: open_intent::OpenIntent::default(),
+            open_confirmation: None,
             password: None,
             password_attempted: false,
             preview_password_action: None,
@@ -1384,6 +1386,7 @@ impl App for YamantakaApp {
                 }
                 Update::Opened(document, info, cancel) => {
                     if cancel.is_cancelled() {
+                        self.open_confirmation = Some((document.id.clone(), cancel));
                         continue;
                     }
                     self.page = document
@@ -1392,7 +1395,6 @@ impl App for YamantakaApp {
                     let (target_page, reveal_reader) = self.open_intent.finish_open(&document.id);
                     if let Some(page) = target_page {
                         self.page = page.min(info.page_sizes.len().saturating_sub(1) as u32);
-                        self.send(Action::Navigate(document.id.clone(), self.page));
                     }
                     let count = u32::try_from(info.page_sizes.len()).unwrap_or(0);
                     match ReaderNavigation::new(count, self.page) {
@@ -1400,8 +1402,18 @@ impl App for YamantakaApp {
                         Err(error) => {
                             self.error = Some(error.to_string());
                             self.loading = false;
+                            cancel.cancel();
+                            self.open_confirmation = Some((document.id.clone(), cancel));
                             continue;
                         }
+                    }
+                    self.open_confirmation = Some((document.id.clone(), cancel));
+                    // Opening acknowledgement and subsequent rendering have
+                    // independent cancellation lifetimes. Preference application
+                    // must not cancel an already accepted ownership handoff.
+                    self.cancel = Cancellation::default();
+                    if target_page.is_some() {
+                        self.send(Action::Navigate(document.id.clone(), self.page));
                     }
                     self.active = Some((*document, Arc::new(info)));
                     let id = self.active.as_ref().unwrap().0.id.clone();
@@ -1601,6 +1613,22 @@ impl App for YamantakaApp {
                     self.cancel = Cancellation::default();
                     self.reset_render_request();
                 }
+            }
+        }
+        // Coalesce acknowledgement to the latest delivered open, then admit it
+        // after draining results. Retry bounded control backpressure without
+        // dropping the ownership handoff or continuously repainting while idle.
+        if let Some((id, token)) = self.open_confirmation.take() {
+            match self
+                .runtime
+                .submit(Action::ConfirmOpen(id.clone(), token.clone()))
+            {
+                Ok(()) => {}
+                Err(yamantaka_domain::Failure::QueueFull) => {
+                    self.open_confirmation = Some((id, token));
+                    ctx.request_repaint_after(Duration::from_millis(100));
+                }
+                Err(error) => self.error = Some(error.to_string()),
             }
         }
     }

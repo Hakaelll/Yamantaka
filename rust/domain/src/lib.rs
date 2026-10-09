@@ -37,6 +37,8 @@ pub enum Failure {
     LegacyRunning,
     #[error("Operation cancelled")]
     Cancelled,
+    #[error("Work queue is full; drain results or cancel pending work")]
+    QueueFull,
     #[error("PDF operation failed: {0}")]
     Pdf(String),
     #[error("The PDF requires a password")]
@@ -51,6 +53,10 @@ pub type Result<T> = std::result::Result<T, Failure>;
 #[derive(Clone, Default)]
 pub struct Cancellation(Arc<AtomicBool>);
 impl Cancellation {
+    /// Identity of a request, including clones carried by its terminal event.
+    pub fn same_request(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
     pub fn cancel(&self) {
         self.0.store(true, Ordering::Release);
     }
