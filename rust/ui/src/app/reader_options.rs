@@ -139,6 +139,18 @@ impl YamantakaApp {
 
     fn reader_options_content(&mut self, ui: &mut egui::Ui, p: Palette) {
         ui.set_max_width(280.0);
+        if theme::navigation(
+            ui,
+            self.tr("Seleccionar texto", "Select text"),
+            self.selection.enabled,
+            p,
+        )
+        .clicked()
+        {
+            self.toggle_text_selection();
+            ui.close();
+        }
+        ui.separator();
         let Some(mut preferences) = self.reader_preferences.clone() else {
             ui.label(
                 RichText::new(if self.reader_preferences_loading {

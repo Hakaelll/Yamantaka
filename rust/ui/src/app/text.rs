@@ -16,7 +16,7 @@ impl TextState {
     pub(super) fn capture_summary(&self) -> serde_json::Value {
         serde_json::json!({"ready": self.page.is_some(), "failed": self.error.is_some(), "page": self.page.as_ref().map(|page| page.page()), "characters": self.page.as_ref().map_or(0, |page| page.characters().len())})
     }
-    fn begin(&mut self, document: &str, page: u32) -> Option<Cancellation> {
+    pub(super) fn begin(&mut self, document: &str, page: u32) -> Option<Cancellation> {
         if self
             .identity
             .as_ref()
@@ -29,6 +29,15 @@ impl TextState {
         self.identity = Some((document.into(), page));
         self.pending = Some(cancel.clone());
         Some(cancel)
+    }
+    pub(super) fn payload(&self) -> Option<&Arc<PdfPageText>> {
+        self.page.as_ref()
+    }
+    pub(super) fn pending(&self) -> bool {
+        self.pending.is_some()
+    }
+    pub(super) fn error(&self) -> Option<&str> {
+        self.error.as_deref()
     }
     pub(super) fn clear(&mut self) {
         if let Some(cancel) = self.pending.take() {
@@ -73,6 +82,10 @@ impl Drop for TextState {
 
 impl YamantakaApp {
     pub(super) fn request_page_text(&mut self, document: &str) {
+        if self.selection.enabled {
+            self.request_selection_pages(document, &[self.page]);
+            return;
+        }
         if let Some(cancel) = self.text.begin(document, self.page)
             && let Err(error) = self.runtime.submit(Action::TextGeometry(
                 document.into(),
@@ -85,6 +98,14 @@ impl YamantakaApp {
         }
     }
     pub(super) fn text_panel_content(&mut self, ui: &mut egui::Ui, p: Palette) {
+        let state = if self.selection.enabled {
+            let Some(state) = self.selection.text_state(self.page) else {
+                return;
+            };
+            state
+        } else {
+            &self.text
+        };
         let compact = ui.ctx().content_rect().width() < 620.0;
         if compact {
             ui.horizontal_wrapped(|ui| {
@@ -93,7 +114,7 @@ impl YamantakaApp {
                         .size(20.0)
                         .color(p.ink),
                 );
-                if let Some(page) = &self.text.page
+                if let Some(page) = &state.page
                     && !page.text().trim().is_empty()
                     && theme::navigation(ui, self.tr("Copiar texto", "Copy text"), false, p)
                         .clicked()
@@ -104,7 +125,7 @@ impl YamantakaApp {
         } else {
             ui.heading(self.tr("Texto de la página", "Page text"));
         }
-        if self.text.pending.is_some() {
+        if state.pending.is_some() {
             ui.horizontal(|ui| {
                 ui.spinner();
                 ui.label(
@@ -114,14 +135,18 @@ impl YamantakaApp {
             });
             return;
         }
-        if let Some(error) = &self.text.error {
+        if let Some(error) = &state.error {
             ui.label(RichText::new(error).color(p.secondary));
             if theme::navigation(ui, self.tr("Reintentar", "Retry"), false, p).clicked() {
-                self.text.clear();
+                if self.selection.enabled {
+                    self.selection.retry_page(self.page);
+                } else {
+                    self.text.clear();
+                }
             }
             return;
         }
-        let Some(page) = &self.text.page else { return };
+        let Some(page) = &state.page else { return };
         if page.text().trim().is_empty() {
             ui.label(
                 RichText::new(self.tr(

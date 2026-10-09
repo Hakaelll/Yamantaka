@@ -131,6 +131,8 @@ impl YamantakaApp {
             });
             let link_pages: Vec<u32> = frame.pages.iter().map(|visible| visible.page).collect();
             self.request_visible_links(&document.id, &link_pages);
+            self.selection.retain_visible(&document.id, &link_pages);
+            self.request_selection_pages(&document.id, &link_pages);
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
             let preview_budget =
@@ -224,14 +226,17 @@ impl YamantakaApp {
                     );
                 }
                 self.paint_find_matches(ui, visible.page, paper, layout.rotation(), p);
-                self.reader_link_regions(
-                    ui,
-                    &document.id,
-                    visible.page,
-                    paper,
-                    layout.rotation(),
-                    p,
-                );
+                self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
+                if !self.selection.enabled {
+                    self.reader_link_regions(
+                        ui,
+                        &document.id,
+                        visible.page,
+                        paper,
+                        layout.rotation(),
+                        p,
+                    );
+                }
             }
             self.loading = !self.render_retry
                 && self

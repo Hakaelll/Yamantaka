@@ -14,6 +14,7 @@ mod reader_options;
 mod reader_viewport;
 mod render_updates;
 mod search;
+mod selection;
 mod settings;
 mod shortcuts;
 mod text;
@@ -124,6 +125,8 @@ pub struct YamantakaApp {
     )>,
     bookmarks: bookmarks::BookmarkState,
     text: text::TextState,
+    selection: selection::SelectionState,
+    selection_preview: selection::SelectionPreview,
     reader_pages: HashMap<u32, ReaderPage>,
     reader_layout: Option<Arc<ReaderLayout>>,
     reader_scroll_anchor: bool,
@@ -276,6 +279,8 @@ impl YamantakaApp {
             reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
             text: Default::default(),
+            selection: Default::default(),
+            selection_preview: Default::default(),
             reader_pages: HashMap::new(),
             reader_layout: None,
             reader_scroll_anchor: true,
@@ -437,6 +442,7 @@ impl YamantakaApp {
     fn show_surface(&mut self, surface: Surface) {
         self.links.clear();
         self.text.clear();
+        self.selection.clear();
         self.find.stop();
         self.thumbnails.clear();
         self.open_intent.leave_destination();
@@ -446,6 +452,7 @@ impl YamantakaApp {
     fn open(&mut self, document: Document) {
         self.links.clear();
         self.text.clear();
+        self.selection.clear();
         self.thumbnails.clear();
         let preview = self.find.take_preview();
         self.find = Default::default();
@@ -1383,6 +1390,7 @@ impl YamantakaApp {
                 });
         }
         ui.add_space(16.0);
+        self.selection_toolbar(ui, p);
         self.reader_panel(ui, &document, &info, p);
         if self.panel && ui.ctx().content_rect().width() < 620.0 {
             return;
@@ -1392,6 +1400,9 @@ impl YamantakaApp {
 }
 impl App for YamantakaApp {
     fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+        if self.demo && self.capture.is_some() {
+            self.selection_preview.input(input);
+        }
         if self.demo
             && self.capture.is_some()
             && self.link_preview == links::LinkPreview::KeyPending
@@ -1523,9 +1534,13 @@ impl App for YamantakaApp {
                 }
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::TextGeometry(id, payload, cancel) => {
+                    self.selection
+                        .accept(&id, payload.page(), &cancel, Ok(payload.clone()));
                     self.text.accept(&id, payload.page(), &cancel, Ok(payload));
                 }
                 Update::TextGeometryFailed(id, page, error, cancel) => {
+                    self.selection
+                        .accept(&id, page, &cancel, Err(error.to_string()));
                     self.text.accept(&id, page, &cancel, Err(error.to_string()));
                 }
                 Update::Text(..) => {}
@@ -1671,6 +1686,15 @@ impl App for YamantakaApp {
                     );
                 }
             }
+        }
+        if self.demo
+            && self.capture.is_some()
+            && self.selection_preview == selection::SelectionPreview::Waiting
+            && matches!(self.surface, Surface::Reader)
+            && self.active.is_some()
+            && !self.selection.enabled
+        {
+            self.toggle_text_selection();
         }
         // Coalesce acknowledgement to the latest delivered open, then admit it
         // after draining results. Retry bounded control backpressure without
@@ -1821,7 +1845,15 @@ impl App for YamantakaApp {
                             outline::ReaderPanelTab::Outline => self.outline.ready(),
                             outline::ReaderPanelTab::Thumbnails => self.thumbnails.ready(),
                             outline::ReaderPanelTab::Find => self.find.ready(),
-                            outline::ReaderPanelTab::Text => self.text.ready(),
+                            outline::ReaderPanelTab::Text => {
+                                if self.selection.enabled {
+                                    self.selection
+                                        .text_state(self.page)
+                                        .is_some_and(text::TextState::ready)
+                                } else {
+                                    self.text.ready()
+                                }
+                            }
                         })
                     && (self.link_preview == links::LinkPreview::Off
                         || self.links.ready()
@@ -1829,6 +1861,9 @@ impl App for YamantakaApp {
                                 self.link_preview,
                                 links::LinkPreview::Focus | links::LinkPreview::Complete
                             ))
+                    && (self.selection_preview == selection::SelectionPreview::Off
+                        || self.selection_preview == selection::SelectionPreview::Complete
+                            && self.selection.preview_ready())
                     && self.reader_destination.is_none()
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
@@ -1901,7 +1936,8 @@ impl App for YamantakaApp {
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),
                         "documentFind":self.find.capture_summary(),
                         "documentLinks":self.links.capture_summary(),
-                        "pageText":self.text.capture_summary(),
+                        "pageText": if self.selection.enabled { self.selection.text_state(self.page).map(text::TextState::capture_summary) } else { Some(self.text.capture_summary()) },
+                        "textSelection":self.selection.capture_summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
@@ -1924,6 +1960,7 @@ impl App for YamantakaApp {
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
         self.links.clear();
         self.text.clear();
+        self.selection.clear();
         self.find = Default::default();
         self.cancel.cancel();
         self.query_cancel.cancel();

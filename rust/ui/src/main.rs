@@ -283,6 +283,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--details"),
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
+                if args.iter().any(|arg| arg == "--selection") {
+                    app.preview_selection();
+                }
                 if args.iter().any(|arg| arg == "--links") {
                     app.preview_links(args.iter().any(|arg| arg == "--links-activate"));
                 }
