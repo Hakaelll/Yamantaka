@@ -37,6 +37,28 @@ pub struct OutlineDestination {
     pub page: u32,
     pub view: DestinationView,
     pub coordinates: PageCoordinateSpace,
+    pub content_bounds: Option<DestinationRectangle>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DestinationRectangle([f64; 4]);
+impl DestinationRectangle {
+    pub fn new([left, bottom, right, top]: [f64; 4]) -> crate::Result<Self> {
+        if [left, bottom, right, top]
+            .iter()
+            .any(|value| !value.is_finite())
+            || left >= right
+            || bottom >= top
+        {
+            return Err(crate::Failure::Pdf(
+                "Invalid PDF destination rectangle".into(),
+            ));
+        }
+        Ok(Self([left, bottom, right, top]))
+    }
+    pub fn bounds(self) -> [f64; 4] {
+        self.0
+    }
 }
 
 /// PDF points at the displayed page's top-left, top-right and bottom-left.

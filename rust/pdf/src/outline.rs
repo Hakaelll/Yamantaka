@@ -3,13 +3,17 @@ use std::{collections::HashMap, sync::Arc};
 use yamantaka_domain::{
     Failure, Result,
     memory::{Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},
-    outline::{DestinationView, OutlineDestination, OutlineEntry, PageCoordinateSpace, PdfOutline},
+    outline::{
+        DestinationRectangle, DestinationView, OutlineDestination, OutlineEntry,
+        PageCoordinateSpace, PdfOutline,
+    },
 };
 
 const MAX_ENTRIES: usize = 10_000;
 const MAX_TITLE_BYTES: usize = 4096;
 const MAX_TOTAL_TITLE_BYTES: usize = 1024 * 1024;
-const WORKING_BYTES: usize = 4 * 1024 * 1024;
+const WORKING_BYTES: usize = 6 * 1024 * 1024;
+const MAX_CONTENT_OBJECTS: usize = 100_000;
 
 pub(crate) fn read(
     document: &PdfDocument<'_>,
@@ -26,6 +30,7 @@ pub(crate) fn read(
         .map_err(|_| Failure::MemoryBudget)?;
     let mut entries = Vec::new();
     let mut title_bytes = 0usize;
+    let mut remaining_objects = MAX_CONTENT_OBJECTS;
     {
         let bookmarks = document.bookmarks();
         let mut indices = HashMap::new();
@@ -47,7 +52,12 @@ pub(crate) fn read(
                 .parent()
                 .and_then(|parent| indices.get(&parent).copied());
             let destination = if let Some(destination) = bookmark.destination() {
-                Some(destination_value(destination, document)?)
+                Some(destination_value(
+                    destination,
+                    document,
+                    &check_current,
+                    &mut remaining_objects,
+                )?)
             } else if let Some(action) = bookmark.action() {
                 action
                     .as_local_destination_action()
@@ -55,7 +65,14 @@ pub(crate) fn read(
                         action
                             .destination()
                             .map_err(super::worker::pdf_failure)
-                            .and_then(|destination| destination_value(destination, document))
+                            .and_then(|destination| {
+                                destination_value(
+                                    destination,
+                                    document,
+                                    &check_current,
+                                    &mut remaining_objects,
+                                )
+                            })
                     })
                     .transpose()?
             } else {
@@ -76,6 +93,8 @@ pub(crate) fn read(
 fn destination_value(
     destination: PdfDestination<'_>,
     document: &PdfDocument<'_>,
+    check_current: &impl Fn() -> Result<()>,
+    remaining_objects: &mut usize,
 ) -> Result<OutlineDestination> {
     let native_index = destination
         .page_index()
@@ -139,10 +158,63 @@ fn destination_value(
     };
     let coordinates =
         PageCoordinateSpace::new(corner(0, 0)?, corner(10_000, 0)?, corner(0, 10_000)?)?;
+    let content_bounds = if matches!(
+        view,
+        DestinationView::FitBounds
+            | DestinationView::FitBoundsWidth { .. }
+            | DestinationView::FitBoundsHeight { .. }
+    ) {
+        let objects = native_page.objects();
+        *remaining_objects = remaining_objects
+            .checked_sub(objects.len())
+            .ok_or_else(|| {
+                Failure::Pdf("PDF destination content exceeds the object work limit".into())
+            })?;
+        let crop = native_page
+            .boundaries()
+            .bounding()
+            .map_err(super::worker::pdf_failure)?
+            .bounds;
+        let mut bounds: Option<[f64; 4]> = None;
+        for object in objects.iter() {
+            check_current()?;
+            let rect = object.bounds().map_err(super::worker::pdf_failure)?;
+            let next = [
+                f64::from(finite(rect.left().value)?),
+                f64::from(finite(rect.bottom().value)?),
+                f64::from(finite(rect.right().value)?),
+                f64::from(finite(rect.top().value)?),
+            ];
+            bounds = Some(match bounds {
+                None => next,
+                Some(old) => [
+                    old[0].min(next[0]),
+                    old[1].min(next[1]),
+                    old[2].max(next[2]),
+                    old[3].max(next[3]),
+                ],
+            });
+        }
+        let bounds = bounds.map(|b| {
+            [
+                b[0].max(f64::from(crop.left().value)),
+                b[1].max(f64::from(crop.bottom().value)),
+                b[2].min(f64::from(crop.right().value)),
+                b[3].min(f64::from(crop.top().value)),
+            ]
+        });
+        bounds
+            .filter(|b| b[0] < b[2] && b[1] < b[3])
+            .map(DestinationRectangle::new)
+            .transpose()?
+    } else {
+        None
+    };
     Ok(OutlineDestination {
         page,
         view,
         coordinates,
+        content_bounds,
     })
 }
 fn finite(value: f32) -> Result<f32> {

@@ -152,6 +152,13 @@ impl ReaderLayout {
             first[1].max(second[1]),
         ]
     }
+    pub(crate) fn destination_viewport(&self, viewport: [f64; 2]) -> Result<[f64; 2]> {
+        validate_viewport(viewport)?;
+        Ok([
+            (viewport[0] - self.preferences.horizontal_margin * 2.0).max(1.0),
+            (viewport[1] - self.preferences.vertical_margin * 2.0).max(1.0),
+        ])
+    }
     fn zoom_for(
         &self,
         viewport: [f64; 2],
@@ -162,8 +169,7 @@ impl ReaderLayout {
         self.check_anchor(anchor)?;
         validate_viewport(viewport)?;
         let [width, height] = self.unit_size(anchor.page());
-        let horizontal = (viewport[0] - self.preferences.horizontal_margin * 2.0).max(1.0);
-        let vertical = (viewport[1] - self.preferences.vertical_margin * 2.0).max(1.0);
+        let [horizontal, vertical] = self.destination_viewport(viewport)?;
         let zoom = match mode {
             ZoomMode::Custom => custom,
             ZoomMode::FitWidth => horizontal / width,

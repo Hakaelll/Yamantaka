@@ -8,6 +8,7 @@ pub mod password;
 pub mod pdf_ticket;
 pub use password::PdfPassword;
 pub mod reader;
+pub mod reader_destination;
 pub mod reader_layout;
 pub mod reader_preferences;
 pub mod search;

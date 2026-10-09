@@ -18,7 +18,7 @@ older request obsolete. Outline tickets use the existing bounded admission and
 readiness channels. The actor continues to serve catalogue queries while a
 native outline reply is pending.
 
-Extraction reserves 4 MiB in the shared text budget before traversal. The result
+The initial checkpoint reserved 4 MiB in the shared text budget before traversal. The result
 shrinks that reservation to the retained vector, string capacities, and shared
 object metadata. The reservation remains alive until the final shared owner
 drops. Entries are read-only after delivery. Limits reject more than 10,000
@@ -82,3 +82,10 @@ rotation, destination zoom or fit settings, or horizontal anchors to navigation.
 Page loading during outline traversal also needs interactive latency validation
 for large outlines with destinations. No interface or release completion is
 claimed by this follow-up.
+
+## View resolution follow-up
+
+The latest extraction includes visible content bounds for bounding-fit destinations
+and uses a 6 MiB initial reservation. Four native tests and four pure resolution
+tests are described in [destination resolution validation](rust-destination-resolution-2026-10-09.md).
+The outline tab and interactive destination application remain pending.

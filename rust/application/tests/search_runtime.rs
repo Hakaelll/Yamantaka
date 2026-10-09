@@ -326,6 +326,7 @@ fn outline_tickets_keep_catalogue_queries_responsive_and_preserve_request_identi
                 parent: None,
                 destination: Some(OutlineDestination {
                     page: 2,
+                    content_bounds: None,
                     coordinates: yamantaka_domain::outline::PageCoordinateSpace::new(
                         [0.0, 200.0],
                         [200.0, 200.0],

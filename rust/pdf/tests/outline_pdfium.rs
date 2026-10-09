@@ -63,6 +63,31 @@ fn fixture(mode: &str) -> Fixture {
             objects.push(format!("<< /Title (Passage) /Parent 6 0 R {sibling} >>"));
         }
     }
+    if mode.starts_with("fit-bounds") || mode == "object-limit" || mode == "object-work-limit" {
+        objects[6] = format!(
+            "<< /Title {} /Parent 6 0 R /Next 9 0 R /First 8 0 R /Last 8 0 R /Count 1 /Dest [3 0 R /FitB] >>",
+            title(&heading)
+        );
+        let content = match mode {
+            "object-limit" => "0 0 1 1 re f\n".repeat(100_001),
+            "object-work-limit" => {
+                objects[7] = format!(
+                    "<< /Title {} /Parent 7 0 R /Dest [3 0 R /FitB] >>",
+                    title("Repeated bounds")
+                );
+                "0 0 1 1 re f\n".repeat(60_000)
+            }
+            "fit-bounds-cropped" => "-20 -40 300 400 re f".into(),
+            _ => "20 30 80 120 re f".into(),
+        };
+        if mode == "fit-bounds-cropped" {
+            objects[2] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 220] /CropBox [20 30 120 180] /Resources <<>> /Contents 5 0 R >>".into();
+        }
+        objects[4] = format!(
+            "<< /Length {} >>\nstream\n{content}\nendstream",
+            content.len()
+        );
+    }
     if let Some(rotation) = mode.strip_prefix("rotated-") {
         objects[2] = format!(
             "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 220] /CropBox [20 30 120 180] /Rotate {rotation} /Resources <<>> /Contents 5 0 R >>"
@@ -126,6 +151,7 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
         entries[0].destination,
         Some(OutlineDestination {
             page: 0,
+            content_bounds: None,
             coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])
                 .unwrap(),
             view: DestinationView::Coordinates {
@@ -141,6 +167,7 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
         entries[1].destination,
         Some(OutlineDestination {
             page: 1,
+            content_bounds: None,
             coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])
                 .unwrap(),
             view: DestinationView::FitWidth { top: Some(170.0) }
@@ -152,6 +179,7 @@ fn native_outline_preserves_unicode_hierarchy_destinations_and_shared_memory_lif
         entries[3].destination,
         Some(OutlineDestination {
             page: 1,
+            content_bounds: None,
             coordinates: PageCoordinateSpace::new([0.0, 200.0], [200.0, 200.0], [0.0, 0.0])
                 .unwrap(),
             view: DestinationView::FitRectangle {
@@ -189,7 +217,13 @@ fn empty_cyclic_invalid_and_cancelled_outlines_are_bounded_and_recoverable() {
         assert_eq!(governor.usage().text, 0);
         engine.close("a".into()).unwrap();
     }
-    for mode in ["title-limit", "bad-target", "entry-limit"] {
+    for mode in [
+        "title-limit",
+        "bad-target",
+        "entry-limit",
+        "object-limit",
+        "object-work-limit",
+    ] {
         let fixture = fixture(mode);
         engine
             .open("a".into(), fixture.0.clone(), None, Cancellation::default())
@@ -261,5 +295,33 @@ fn native_destination_geometry_matches_cropped_pages_at_every_intrinsic_rotation
         }
         assert_eq!(destination.coordinates.pdf_point(actual), [40.0, 150.0]);
         engine.close("geometry".into()).unwrap();
+    }
+}
+
+#[test]
+fn fit_bounds_uses_page_content_instead_of_the_crop_rectangle() {
+    let engine = engine();
+    for (mode, expected) in [
+        ("fit-bounds", [20.0, 30.0, 100.0, 150.0]),
+        ("fit-bounds-cropped", [20.0, 30.0, 120.0, 180.0]),
+    ] {
+        let fixture = fixture(mode);
+        let before = Sha256::digest(fs::read(&fixture.0).unwrap());
+        engine
+            .open(
+                "bounds".into(),
+                fixture.0.clone(),
+                None,
+                Cancellation::default(),
+            )
+            .unwrap();
+        let outline = engine
+            .outline("bounds".into(), Cancellation::default())
+            .unwrap();
+        let destination = outline.entries()[0].destination.unwrap();
+        assert_eq!(destination.view, DestinationView::FitBounds);
+        assert_eq!(destination.content_bounds.unwrap().bounds(), expected);
+        engine.close("bounds".into()).unwrap();
+        assert_eq!(Sha256::digest(fs::read(&fixture.0).unwrap()), before);
     }
 }
