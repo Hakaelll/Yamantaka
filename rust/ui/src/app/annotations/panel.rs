@@ -160,6 +160,15 @@ impl YamantakaApp {
                 ui.add(egui::TextEdit::multiline(&mut editor.note).desired_rows(4).desired_width(f32::INFINITY).char_limit(4000).hint_text(if english {"What would you like to remember?"} else {"¿Qué te gustaría recordar?"})).labelled_by(label.id);
                 let units=editor.note.encode_utf16().count();
                 ui.label(RichText::new(format!("{units} / 4000")).size(12.0).color(p.secondary));
+                ui.add_space(8.0);
+                let label = ui.label(if english {"Tags, optional"} else {"Etiquetas, opcionales"});
+                ui.add(egui::TextEdit::singleline(&mut editor.tags).desired_width(f32::INFINITY).hint_text(if english {"Study, optics"} else {"Estudio, óptica"})).labelled_by(label.id);
+                let valid_tags = editor.tag_changes().is_ok();
+                ui.label(RichText::new(if valid_tags {
+                    if english {"Separate tags with commas. Up to 12 tags and 160 characters."} else {"Separa con comas. Hasta 12 etiquetas y 160 caracteres."}
+                } else {
+                    if english {"Shorten the tags to 160 characters and keep at most 12."} else {"Reduce las etiquetas a 160 caracteres y deja un máximo de 12."}
+                }).size(12.0).color(if valid_tags {p.secondary} else {p.ink}));
                 if editor.stored().is_some() {
                     ui.add_space(8.0);
                     let label=ui.label(if english {"Review"} else {"Revisión"});
@@ -176,6 +185,7 @@ impl YamantakaApp {
             ui.add_space(12.0);
             let valid = self.annotations.editor.as_ref().is_some_and(|editor| {
                 editor.note.encode_utf16().count() <= 4000
+                    && editor.tag_changes().is_ok()
                     && (!fallback || editor.confirmed)
                     && (!matches!(&editor.source, EditorSource::PageNote { .. })
                         || !editor.note.trim().is_empty())
@@ -268,6 +278,13 @@ impl YamantakaApp {
                     .or(data.values.note.as_deref())
                     .unwrap_or("");
                 ui.add(egui::Label::new(RichText::new(passage).color(p.secondary)).truncate());
+                if !data.tags.is_empty() {
+                    ui.label(
+                        RichText::new(data.tags.join(" · "))
+                            .size(12.0)
+                            .color(p.secondary),
+                    );
+                }
                 ui.horizontal_wrapped(|ui| {
                     let caption = format!(
                         "{} {}",
@@ -297,6 +314,7 @@ impl YamantakaApp {
                             kind: data.values.kind,
                             color: data.values.color,
                             note: data.values.note.clone().unwrap_or_default(),
+                            tags: data.tags.join(", "),
                             review: data.values.review_state,
                             confirmed: false,
                         });

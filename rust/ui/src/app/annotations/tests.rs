@@ -42,6 +42,7 @@ fn editor(governor: &MemoryGovernor, missing: bool) -> AnnotationEditor {
         kind: AnnotationKind::Highlight,
         color: AnnotationColor::Violet,
         note: "Study".into(),
+        tags: String::new(),
         review: AnnotationReviewState::Pending,
         confirmed: false,
     }
@@ -79,6 +80,21 @@ fn execute(db: &mut Database, request: AnnotationRequest) -> AnnotationReply {
                     batch,
                     confirm_page_note: *confirm_page_note,
                     tags,
+                },
+                AnnotationMutation::Edit {
+                    id,
+                    kind,
+                    color,
+                    note,
+                    review,
+                    tags,
+                } => AnnotationChange::Edit {
+                    id,
+                    kind: *kind,
+                    color: *color,
+                    note: note.as_deref(),
+                    review: *review,
+                    tags: tags.as_deref(),
                 },
                 _ => panic!("create fixture"),
             };
@@ -302,6 +318,7 @@ fn page_note_editor_saves_without_a_text_snapshot_and_rejects_blank_notes() {
         kind: AnnotationKind::PageComment,
         color: AnnotationColor::Blue,
         note: "  ".into(),
+        tags: String::new(),
         review: AnnotationReviewState::Pending,
         confirmed: false,
     });
@@ -323,6 +340,113 @@ fn page_note_editor_saves_without_a_text_snapshot_and_rejects_blank_notes() {
             && values.context_after.is_none()
             && values.rects.is_empty()
     );
+    drop(state);
+    assert_eq!(governor.usage().text, 0);
+}
+
+#[test]
+fn tag_editor_validates_unicode_limits_and_preserves_replaces_or_clears_stored_tags() {
+    let governor = MemoryGovernor::default();
+    let mut db = database();
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    let mut draft = editor(&governor, false);
+    draft.tags = "  Étude, optics, ÉTUDE, , optics ".into();
+    assert_eq!(draft.tag_changes().unwrap().unwrap(), ["Étude", "optics"]);
+    draft.tags = "𐐷".repeat(81);
+    assert!(draft.tag_changes().is_err());
+    draft.tags = (0..13)
+        .map(|n| format!("t{n}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert!(draft.tag_changes().is_err());
+    draft.tags = "Étude, optics".into();
+    state.editor = Some(draft);
+    let request = state
+        .request(&governor, Some(state.mutation(&governor).unwrap()), 0)
+        .unwrap();
+    state.accept(execute(&mut db, request));
+    db.execute_batch("UPDATE tags SET name='group,one' WHERE normalized_name='optics';")
+        .unwrap();
+    let request = state.request(&governor, None, 0).unwrap();
+    state.accept(execute(&mut db, request));
+    let page = state.page.as_ref().unwrap().clone();
+    let data = page.entries()[0].data();
+    let geometry = serde_json::to_value(&data.values.rects).unwrap();
+    state.editor = Some(AnnotationEditor {
+        source: EditorSource::Stored {
+            page: page.clone(),
+            index: 0,
+        },
+        kind: data.values.kind,
+        color: data.values.color,
+        note: "Edited note".into(),
+        tags: data.tags.join(", "),
+        review: data.values.review_state,
+        confirmed: false,
+    });
+    assert!(
+        state
+            .editor
+            .as_ref()
+            .unwrap()
+            .tag_changes()
+            .unwrap()
+            .is_none()
+    );
+    let request = state
+        .request(&governor, Some(state.mutation(&governor).unwrap()), 0)
+        .unwrap();
+    state.accept(execute(&mut db, request));
+    assert_eq!(
+        state.page.as_ref().unwrap().entries()[0].data().tags,
+        data.tags
+    );
+    state.editor = Some(AnnotationEditor {
+        source: EditorSource::Stored {
+            page: page.clone(),
+            index: 0,
+        },
+        kind: data.values.kind,
+        color: data.values.color,
+        note: "Edited note".into(),
+        tags: data.tags.join(", "),
+        review: data.values.review_state,
+        confirmed: false,
+    });
+    state.editor.as_mut().unwrap().tags = "Memory, mémoire".into();
+    let request = state
+        .request(&governor, Some(state.mutation(&governor).unwrap()), 0)
+        .unwrap();
+    state.accept(execute(&mut db, request));
+    let updated = state.page.as_ref().unwrap().clone();
+    let data = updated.entries()[0].data();
+    assert_eq!(data.tags, ["Memory", "mémoire"]);
+    assert_eq!(serde_json::to_value(&data.values.rects).unwrap(), geometry);
+    state.editor = Some(AnnotationEditor {
+        source: EditorSource::Stored {
+            page: updated.clone(),
+            index: 0,
+        },
+        kind: data.values.kind,
+        color: data.values.color,
+        note: "Edited note".into(),
+        tags: String::new(),
+        review: data.values.review_state,
+        confirmed: false,
+    });
+    let request = state
+        .request(&governor, Some(state.mutation(&governor).unwrap()), 0)
+        .unwrap();
+    state.accept(execute(&mut db, request));
+    assert!(
+        state.page.as_ref().unwrap().entries()[0]
+            .data()
+            .tags
+            .is_empty()
+    );
+    drop(page);
+    drop(updated);
     drop(state);
     assert_eq!(governor.usage().text, 0);
 }

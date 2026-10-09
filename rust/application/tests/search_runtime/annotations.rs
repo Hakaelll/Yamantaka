@@ -122,17 +122,19 @@ fn owned_annotation_commands_preserve_snapshots_and_work_during_held_pdf_indexin
             color: AnnotationColor::Green,
             note: Some("Résumé".into()),
             review: AnnotationReviewState::Accepted,
+            tags: Some(vec!["Étude".into()]),
         },
     );
     assert_eq!(
         changed.entries()[0].data().values.note.as_deref(),
         Some("Résumé")
     );
+    assert_eq!(changed.entries()[0].data().tags, ["Étude"]);
     drop(changed);
     runtime
         .submit(Action::Search(
             SearchQuery {
-                text: "Résumé".into(),
+                text: "Étude".into(),
                 kinds: vec![yamantaka_domain::search::SearchKind::Annotation],
                 ..Default::default()
             },

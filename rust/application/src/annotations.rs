@@ -35,6 +35,7 @@ pub enum AnnotationMutation {
         color: AnnotationColor,
         note: Option<String>,
         review: AnnotationReviewState,
+        tags: Option<Vec<String>>,
     },
     Review {
         ids: Vec<String>,
@@ -77,12 +78,14 @@ impl AnnotationMutation {
                 color,
                 note,
                 review,
+                tags,
             } => AnnotationChange::Edit {
                 id,
                 kind: *kind,
                 color: *color,
                 note: note.as_deref(),
                 review: *review,
+                tags: tags.as_deref(),
             },
             Self::Review { ids, state } => AnnotationChange::Review { ids, state: *state },
             Self::AddTag { ids, tag } => AnnotationChange::AddTag { ids, tag },

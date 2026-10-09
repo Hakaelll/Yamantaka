@@ -126,6 +126,7 @@ fn create_edit_tags_review_delete_and_snapshot_restore_preserve_identity_and_geo
                 color: AnnotationColor::Blue,
                 note: Some("  Tomorrow 宇宙  "),
                 review: AnnotationReviewState::Accepted,
+                tags: None,
             },
             &query(),
             IndexAccess::Enabled,
@@ -463,7 +464,8 @@ fn paged_filters_literal_patterns_and_budget_failure_are_bounded_and_atomic() {
                 kind: AnnotationKind::PageComment,
                 color: AnnotationColor::Blue,
                 note: Some("Must roll back"),
-                review: AnnotationReviewState::Accepted
+                review: AnnotationReviewState::Accepted,
+                tags: None,
             },
             &query(),
             IndexAccess::Disabled,
@@ -633,5 +635,91 @@ fn version_nine_backup_restores_annotations_and_attachment_review_stays_independ
     drop(changed);
     drop(restored);
     drop(reattached);
+    assert_eq!(governor.usage().text, 0);
+}
+
+#[test]
+fn editing_tags_replaces_or_clears_links_and_rolls_back_with_the_note_and_search() {
+    let mut db = library();
+    let governor = MemoryGovernor::default();
+    let cancel = Cancellation::default();
+    let original = create(&mut db, &governor, false, false, IndexAccess::Enabled).unwrap();
+    let data = original.entries()[0].data();
+    let id = data.id.clone();
+    let geometry = serde_json::to_value(&data.values.rects).unwrap();
+    let tags = vec!["Study".to_string(), "étude".to_string()];
+    let changed = db
+        .change_annotation(
+            "a",
+            AnnotationChange::Edit {
+                id: &id,
+                kind: AnnotationKind::Underline,
+                color: AnnotationColor::Blue,
+                note: Some("New note"),
+                review: AnnotationReviewState::Accepted,
+                tags: Some(&tags),
+            },
+            &query(),
+            IndexAccess::Enabled,
+            &governor,
+            &cancel,
+        )
+        .unwrap();
+    let row = changed.entries()[0].data();
+    assert_eq!(row.tags, vec!["Study", "étude"]);
+    assert_eq!(serde_json::to_value(&row.values.rects).unwrap(), geometry);
+    assert_eq!(hits(&db, "étude").len(), 1);
+    assert!(hits(&db, "Optics").is_empty());
+    db.execute_batch("CREATE TRIGGER reject_new_tag BEFORE INSERT ON annotation_tags WHEN (SELECT name FROM tags WHERE id=NEW.tag_id)='Reject' BEGIN SELECT RAISE(ABORT,'Synthetic rejection'); END;").unwrap();
+    let rejected = vec!["Reject".into()];
+    assert!(
+        db.change_annotation(
+            "a",
+            AnnotationChange::Edit {
+                id: &id,
+                kind: AnnotationKind::Highlight,
+                color: AnnotationColor::Yellow,
+                note: Some("Must roll back"),
+                review: AnnotationReviewState::Resolved,
+                tags: Some(&rejected)
+            },
+            &query(),
+            IndexAccess::Enabled,
+            &governor,
+            &cancel
+        )
+        .is_err()
+    );
+    let after = db.annotations(&query(), &governor, &cancel).unwrap();
+    assert_eq!(after.entries()[0].data().tags, row.tags);
+    assert_eq!(
+        after.entries()[0].data().values.note.as_deref(),
+        Some("New note")
+    );
+    assert_eq!(hits(&db, "étude").len(), 1);
+    assert!(hits(&db, "Reject").is_empty());
+    let cleared = db
+        .change_annotation(
+            "a",
+            AnnotationChange::Edit {
+                id: &id,
+                kind: AnnotationKind::Underline,
+                color: AnnotationColor::Blue,
+                note: Some("New note"),
+                review: AnnotationReviewState::Accepted,
+                tags: Some(&[]),
+            },
+            &query(),
+            IndexAccess::Enabled,
+            &governor,
+            &cancel,
+        )
+        .unwrap();
+    assert!(cleared.entries()[0].data().tags.is_empty());
+    assert!(hits(&db, "étude").is_empty());
+    drop(original);
+    drop(changed);
+    drop(after);
+    drop(cleared);
     assert_eq!(governor.usage().text, 0);
 }

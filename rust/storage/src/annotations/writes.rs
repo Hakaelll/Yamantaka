@@ -388,6 +388,7 @@ pub(super) fn change(
             color,
             note,
             review,
+            tags: tag_values,
         } => {
             if note.is_some_and(|note| note.encode_utf16().count() > MAX_ANNOTATION_NOTE_UTF16) {
                 return Err(Failure::Invalid(
@@ -397,6 +398,9 @@ pub(super) fn change(
             pages.insert(target(&tx, document, id)?);
             let note = note.map(str::trim).filter(|note| !note.is_empty());
             tx.execute("UPDATE annotations SET type=?,color=?,note=?,review_state=?,updated_at=? WHERE id=? AND document_id=?",params![name(kind)?,name(color)?,note,name(review)?,now,id,document]).map_err(storage)?;
+            if let Some(values) = tag_values {
+                tags(&tx, id, values, &now, cancel)?;
+            }
         }
         AnnotationChange::Review { ids, state } => {
             if ids.len() > 80 {

@@ -10,6 +10,7 @@ use yamantaka_domain::{
 };
 pub(super) mod paint;
 mod panel;
+mod tags;
 #[cfg(test)]
 mod tests;
 
@@ -34,6 +35,7 @@ pub(super) struct AnnotationEditor {
     kind: AnnotationKind,
     color: AnnotationColor,
     note: String,
+    tags: String,
     review: AnnotationReviewState,
     confirmed: bool,
 }
@@ -167,6 +169,7 @@ impl AnnotationState {
             .editor
             .as_ref()
             .ok_or_else(|| Failure::Invalid("No annotation is being edited".into()))?;
+        let tag_values = editor.tag_changes()?;
         if let Some(record) = editor.stored() {
             return Ok(AnnotationMutation::Edit {
                 id: record.id.clone(),
@@ -174,6 +177,7 @@ impl AnnotationState {
                 color: editor.color,
                 note: Some(editor.note.clone()),
                 review: editor.review,
+                tags: tag_values,
             });
         }
         if let EditorSource::PageNote {
@@ -203,7 +207,7 @@ impl AnnotationState {
             return Ok(AnnotationMutation::Create {
                 draft: Arc::new(draft),
                 confirm_page_note: false,
-                tags: Vec::new(),
+                tags: tag_values.unwrap_or_default(),
             });
         }
         let EditorSource::Selection {
@@ -239,7 +243,7 @@ impl AnnotationState {
         Ok(AnnotationMutation::CreateBatch {
             batch: Arc::new(batch),
             confirm_page_note: editor.confirmed,
-            tags: Vec::new(),
+            tags: tag_values.unwrap_or_default(),
         })
     }
     fn fallback(&self) -> bool {
@@ -299,6 +303,7 @@ impl YamantakaApp {
             kind: AnnotationKind::PageComment,
             color: AnnotationColor::Violet,
             note: String::new(),
+            tags: String::new(),
             review: AnnotationReviewState::Pending,
             confirmed: false,
         });
@@ -336,6 +341,7 @@ impl YamantakaApp {
             self.begin_page_note();
             if let Some(editor) = &mut self.annotations.editor {
                 editor.note = "An observation from this scanned page.".into();
+                editor.tags = "Study, Optics".into();
             }
         }
         if matches!(self.annotation_preview, 1 | 2)
@@ -349,6 +355,7 @@ impl YamantakaApp {
             self.annotate_selection();
             if let Some(editor) = &mut self.annotations.editor {
                 editor.note = "A passage to revisit during study.".into();
+                editor.tags = "Study, Optics".into();
             }
         }
         if self.annotations.editor.is_some() && self.annotations.pending.is_none() {
@@ -409,6 +416,7 @@ impl YamantakaApp {
                     kind: AnnotationKind::Highlight,
                     color: AnnotationColor::Violet,
                     note: String::new(),
+                    tags: String::new(),
                     review: AnnotationReviewState::Pending,
                     confirmed: false,
                 });

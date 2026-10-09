@@ -168,6 +168,8 @@ pub enum AnnotationChange<'a> {
         color: AnnotationColor,
         note: Option<&'a str>,
         review: AnnotationReviewState,
+        /// None preserves links; Some replaces them, including an empty list.
+        tags: Option<&'a [String]>,
     },
     Review {
         ids: &'a [String],
