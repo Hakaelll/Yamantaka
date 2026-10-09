@@ -25,3 +25,5 @@ The public-checkpoint privacy guard was also run over every vendored file and re
 ## Remaining work
 
 The production link extractor currently returns internal targets and counts external targets as unsupported. Its next step is to call the bounded URI getter, apply the same allowed http/https/mailto policy as Flutter and connect an explicit confirmation dialog to Windows external opening. This dependency checkpoint does not claim external-link parity or complete rewrite/release acceptance.
+
+Subsequent integration: [external PDF link policy and confirmation](rust-external-pdf-links-2026-10-09.md) now connects the bounded getter and allowed-scheme dialog; native acceptance remains pending.

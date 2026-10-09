@@ -3,7 +3,7 @@ use std::sync::Arc;
 use yamantaka_domain::{
     Failure, Result,
     memory::{Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},
-    pdf_links::{MAX_LINK_REGIONS, MAX_PAGE_LINKS, PdfPageLink, PdfPageLinks},
+    pdf_links::{MAX_LINK_REGIONS, MAX_PAGE_LINKS, PdfLinkTarget, PdfPageLink, PdfPageLinks},
 };
 
 pub(crate) fn read(
@@ -34,6 +34,7 @@ pub(crate) fn read(
         ));
     }
     let mut links = Vec::new();
+    let mut uri_bytes = 0usize;
     let mut unsupported_targets = 0;
     let mut link_count = 0;
     let mut remaining_objects = crate::destination::MAX_CONTENT_OBJECTS;
@@ -48,29 +49,53 @@ pub(crate) fn read(
             return Err(Failure::Pdf("PDF page exceeds the link work limit".into()));
         }
         let link = annotation.link().map_err(crate::worker::pdf_failure)?;
-        let destination = if let Some(destination) = link.destination() {
-            Some(crate::destination::read(
+        let target = if let Some(destination) = link.destination() {
+            Some(PdfLinkTarget::Internal(crate::destination::read(
                 destination,
                 document,
                 &check_current,
                 &mut remaining_objects,
-            )?)
+            )?))
         } else if let Some(action) = link.action() {
-            action
-                .as_local_destination_action()
-                .map(|action| {
-                    crate::destination::read(
-                        action.destination().map_err(crate::worker::pdf_failure)?,
-                        document,
-                        &check_current,
-                        &mut remaining_objects,
-                    )
-                })
-                .transpose()?
+            if let Some(local) = action.as_local_destination_action() {
+                Some(PdfLinkTarget::Internal(crate::destination::read(
+                    local.destination().map_err(crate::worker::pdf_failure)?,
+                    document,
+                    &check_current,
+                    &mut remaining_objects,
+                )?))
+            } else if let Some(uri) = action.as_uri_action() {
+                check_current()?;
+                let value = match uri
+                    .uri_with_max_bytes(yamantaka_domain::external_uri::MAX_EXTERNAL_URI_BYTES)
+                {
+                    Ok(value) => value,
+                    Err(PdfiumError::UriLengthExceedsLimit | PdfiumError::NoUriForAction) => {
+                        unsupported_targets += 1;
+                        continue;
+                    }
+                    Err(error) => return Err(crate::worker::pdf_failure(error)),
+                };
+                let Ok(uri) = yamantaka_domain::external_uri::ExternalUri::new(&value) else {
+                    unsupported_targets += 1;
+                    continue;
+                };
+                uri_bytes = uri_bytes
+                    .checked_add(uri.retained_bytes())
+                    .ok_or(Failure::MemoryBudget)?;
+                if uri_bytes > 512 * 1024 {
+                    return Err(Failure::Pdf(
+                        "PDF page exceeds the URI memory work limit".into(),
+                    ));
+                }
+                Some(PdfLinkTarget::External(uri))
+            } else {
+                None
+            }
         } else {
             None
         };
-        let Some(destination) = destination else {
+        let Some(target) = target else {
             unsupported_targets += 1;
             continue;
         };
@@ -121,7 +146,7 @@ pub(crate) fn read(
             links.push(PdfPageLink {
                 annotation_index: index as u32,
                 regions,
-                destination,
+                target,
             });
         }
     }

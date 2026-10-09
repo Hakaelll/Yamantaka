@@ -22,6 +22,9 @@ fn fixture(rotation: u16) -> Fixture {
     fixture_with_annotations(rotation, None)
 }
 fn fixture_with_annotations(rotation: u16, repeated: Option<usize>) -> Fixture {
+    fixture_with_uri(rotation, repeated, "https://example.invalid")
+}
+fn fixture_with_uri(rotation: u16, repeated: Option<usize>, uri: &str) -> Fixture {
     let annotations = repeated.map_or_else(
         || "5 0 R 6 0 R 7 0 R 8 0 R".to_owned(),
         |count| "5 0 R ".repeat(count),
@@ -33,7 +36,7 @@ fn fixture_with_annotations(rotation: u16, repeated: Option<usize>) -> Fixture {
         "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] >>".into(),
         "<< /Type /Annot /Subtype /Link /Rect [60 680 200 720] /QuadPoints [60 720 120 720 60 700 120 700 140 700 200 700 140 680 200 680] /Dest [4 0 R /XYZ 64 700 1.5] >>".into(),
         "<< /Type /Annot /Subtype /Link /Rect [60 600 200 620] /A << /S /GoTo /D [4 0 R /FitH 500] >> >>".into(),
-        "<< /Type /Annot /Subtype /Link /Rect [60 500 200 520] /A << /S /URI /URI (https://example.invalid) >> >>".into(),
+        format!("<< /Type /Annot /Subtype /Link /Rect [60 500 200 520] /A << /S /URI /URI ({uri}) >> >>"),
         "<< /Type /Annot /Subtype /Link /Rect [0 0 10 10] /Dest [4 0 R /Fit] >>".into(),
     ];
     let mut bytes = b"%PDF-1.7\n".to_vec();
@@ -94,13 +97,16 @@ fn native_links_preserve_separate_regions_destinations_crop_rotation_and_source(
             .wait()
             .unwrap();
         assert_eq!(links.page(), 0);
-        assert_eq!(links.links().len(), 2);
-        assert_eq!(links.unsupported_targets(), 1);
+        assert_eq!(links.links().len(), 3);
+        assert_eq!(links.unsupported_targets(), 0);
         let first = &links.links()[0];
         assert_eq!(first.annotation_index, 0);
-        assert_eq!(first.destination.page, 1);
+        let yamantaka_domain::pdf_links::PdfLinkTarget::Internal(destination) = first.target else {
+            panic!("expected internal destination");
+        };
+        assert_eq!(destination.page, 1);
         assert_eq!(
-            first.destination.view,
+            destination.view,
             DestinationView::Coordinates {
                 x: Some(64.0),
                 y: Some(700.0),
@@ -120,7 +126,11 @@ fn native_links_preserve_separate_regions_destinations_crop_rotation_and_source(
             );
         }
         assert_eq!(
-            links.links()[1].destination.view,
+            match links.links()[1].target {
+                yamantaka_domain::pdf_links::PdfLinkTarget::Internal(destination) =>
+                    destination.view,
+                _ => panic!("expected local GoTo"),
+            },
             DestinationView::FitWidth { top: Some(500.0) }
         );
         assert!(
@@ -250,4 +260,52 @@ fn native_uri_reader_checks_the_limit_before_allocation_and_preserves_existing_a
     assert_eq!(uri.uri().unwrap(), expected);
     assert_eq!(Sha256::digest(fs::read(&fixture.0).unwrap()), original);
     drop(worker);
+}
+
+#[test]
+fn native_external_links_are_validated_bounded_accounted_and_never_opened_by_extraction() {
+    use yamantaka_domain::pdf_links::PdfLinkTarget;
+    for value in [
+        "https://example.invalid/path",
+        "http://example.invalid",
+        "mailto:study",
+        "file:///document.pdf",
+        "javascript:alert",
+        "https:",
+        &format!("https://example.invalid/{}", "a".repeat(4096)),
+    ] {
+        let fixture = fixture_with_uri(0, None, value);
+        let before = Sha256::digest(fs::read(&fixture.0).unwrap());
+        let governor = MemoryGovernor::default();
+        let engine = engine(governor.clone());
+        engine
+            .open(
+                "book".into(),
+                fixture.0.clone(),
+                None,
+                Cancellation::default(),
+            )
+            .unwrap();
+        let links = engine
+            .try_page_links("book".into(), 0, Cancellation::default())
+            .unwrap()
+            .wait()
+            .unwrap();
+        let allowed = value.starts_with("http://")
+            || value.starts_with("https://") && value.len() <= 4096
+            || value.starts_with("mailto:");
+        assert_eq!(links.links().len(), if allowed { 3 } else { 2 });
+        assert_eq!(links.unsupported_targets(), if allowed { 0 } else { 1 });
+        if allowed {
+            let PdfLinkTarget::External(uri) = &links.links()[2].target else {
+                panic!("expected external URI");
+            };
+            assert!(uri.as_str().starts_with(value.split(':').next().unwrap()));
+            assert!(governor.usage().text >= uri.retained_bytes());
+        }
+        drop(links);
+        assert_eq!(governor.usage().text, 0);
+        engine.close("book".into()).unwrap();
+        assert_eq!(Sha256::digest(fs::read(&fixture.0).unwrap()), before);
+    }
 }

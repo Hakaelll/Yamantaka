@@ -7,10 +7,16 @@ pub const MAX_PAGE_LINKS: usize = 512;
 pub const MAX_LINK_REGIONS: usize = 64;
 
 #[derive(Debug)]
+pub enum PdfLinkTarget {
+    Internal(NavigationDestination),
+    External(crate::external_uri::ExternalUri),
+}
+
+#[derive(Debug)]
 pub struct PdfPageLink {
     pub annotation_index: u32,
     pub regions: Vec<NormalizedPageRect>,
-    pub destination: NavigationDestination,
+    pub target: PdfLinkTarget,
 }
 
 #[cfg(test)]
@@ -37,13 +43,13 @@ mod tests {
         let link = |index, count| PdfPageLink {
             annotation_index: index,
             regions: vec![NormalizedPageRect::new([0.1, 0.2], [0.3, 0.4]).unwrap(); count],
-            destination: NavigationDestination {
+            target: PdfLinkTarget::Internal(NavigationDestination {
                 page: 1,
                 view: DestinationView::FitPage,
                 coordinates: PageCoordinateSpace::new([0.0, 800.0], [600.0, 800.0], [0.0, 0.0])
                     .unwrap(),
                 content_bounds: None,
-            },
+            }),
         };
         for links in [
             vec![link(0, 0)],
@@ -65,6 +71,45 @@ mod tests {
         assert_eq!(retained.page(), 3);
         assert_eq!(retained.unsupported_targets(), 4);
         assert!(governor.usage().text > 0 && governor.usage().text < 4096);
+        drop(retained);
+        assert_eq!(governor.usage().text, 0);
+    }
+    #[test]
+    fn retained_uri_bytes_share_the_page_lease_and_release_after_the_final_owner() {
+        use crate::external_uri::ExternalUri;
+        let governor = MemoryGovernor::default();
+        let make = |length| {
+            let uri = ExternalUri::new(&format!("https://example.invalid/{}", "a".repeat(length)))
+                .unwrap();
+            let lease = governor
+                .try_reserve_one(Cost::new(
+                    MemoryCategory::Text,
+                    MemoryRepresentation::Cpu,
+                    8192,
+                ))
+                .unwrap();
+            std::sync::Arc::new(
+                PdfPageLinks::from_reserved(
+                    0,
+                    vec![PdfPageLink {
+                        annotation_index: 0,
+                        regions: vec![NormalizedPageRect::new([0.0, 0.0], [0.1, 0.1]).unwrap()],
+                        target: PdfLinkTarget::External(uri),
+                    }],
+                    0,
+                    lease,
+                )
+                .unwrap(),
+            )
+        };
+        let small = make(1);
+        let small_usage = governor.usage().text;
+        drop(small);
+        let large = make(3000);
+        assert!(governor.usage().text >= small_usage + 2999);
+        let retained = large.clone();
+        drop(large);
+        assert!(governor.usage().text > 3000);
         drop(retained);
         assert_eq!(governor.usage().text, 0);
     }
@@ -114,11 +159,16 @@ impl PdfPageLinks {
                     .checked_mul(std::mem::size_of::<PdfPageLink>())
                     .ok_or(Failure::MemoryBudget)?,
                 |total, link| {
-                    total.checked_add(
-                        link.regions
-                            .capacity()
-                            .checked_mul(std::mem::size_of::<NormalizedPageRect>())?,
-                    )
+                    total
+                        .checked_add(match &link.target {
+                            PdfLinkTarget::Internal(_) => 0,
+                            PdfLinkTarget::External(uri) => uri.retained_bytes(),
+                        })?
+                        .checked_add(
+                            link.regions
+                                .capacity()
+                                .checked_mul(std::mem::size_of::<NormalizedPageRect>())?,
+                        )
                 },
             )
             .and_then(|bytes| {

@@ -1823,6 +1823,7 @@ impl App for YamantakaApp {
             });
         });
         self.password_dialog(&ctx);
+        self.external_link_dialog(&ctx);
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = !self.documents.is_empty()

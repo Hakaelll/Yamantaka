@@ -145,6 +145,28 @@ pub fn pick_pdfs() -> Option<Vec<PathBuf>> {
 pub fn pick_folder() -> Option<PathBuf> {
     rfd::FileDialog::new().pick_folder()
 }
+pub fn open_external_uri(uri: &yamantaka_domain::external_uri::ExternalUri) -> Result<()> {
+    let operation = HSTRING::from("open");
+    let target = HSTRING::from(uri.as_str());
+    // The validated URI is the shell target, with no executable or parameters.
+    // Owned UTF-16 strings remain alive throughout the synchronous call.
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            &operation,
+            &target,
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    if result.0 as isize <= 32 {
+        return Err(Failure::Storage(
+            "Windows could not open the external link".into(),
+        ));
+    }
+    Ok(())
+}
 pub fn reveal(path: &Path) -> Result<()> {
     let executable = HSTRING::from("explorer.exe");
     let parameters = HSTRING::from(format!("/select,\"{}\"", path.display()));

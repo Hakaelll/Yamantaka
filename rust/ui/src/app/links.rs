@@ -1,6 +1,6 @@
 use super::*;
 use yamantaka_domain::{
-    pdf_destination::NavigationDestination, pdf_links::PdfPageLinks,
+    pdf_links::{PdfLinkTarget, PdfPageLinks},
     reader_preferences::PageRotation,
 };
 
@@ -33,7 +33,14 @@ impl Drop for LinkPhase {
 pub(super) struct LinkState {
     document: Option<String>,
     pages: HashMap<u32, LinkPhase>,
+    confirmation: Option<ExternalConfirmation>,
 }
+struct ExternalConfirmation {
+    payload: Arc<PdfPageLinks>,
+    link_index: usize,
+    focus_cancel: bool,
+}
+
 impl LinkState {
     pub(super) fn ready(&self) -> bool {
         !self.pages.is_empty()
@@ -43,9 +50,10 @@ impl LinkState {
                 .all(|phase| matches!(phase, LinkPhase::Ready(_)))
     }
     pub(super) fn capture_summary(&self) -> serde_json::Value {
-        serde_json::json!({"residentPages":self.pages.len(), "readyPages":self.pages.values().filter(|phase| matches!(phase, LinkPhase::Ready(_))).count(), "internalLinks":self.pages.values().filter_map(|phase| match phase { LinkPhase::Ready(payload) => Some(payload.links().len()), _ => None }).sum::<usize>()})
+        serde_json::json!({"residentPages":self.pages.len(), "readyPages":self.pages.values().filter(|phase| matches!(phase, LinkPhase::Ready(_))).count(), "internalLinks":self.pages.values().filter_map(|phase| match phase { LinkPhase::Ready(payload) => Some(payload.links().iter().filter(|link| matches!(link.target, PdfLinkTarget::Internal(_))).count()), _ => None }).sum::<usize>()})
     }
     pub(super) fn clear(&mut self) {
+        self.confirmation = None;
         self.pages.clear();
         self.document = None;
     }
@@ -55,6 +63,13 @@ impl LinkState {
             self.document = Some(document.into());
         }
         self.pages.retain(|page, _| pages.contains(page));
+        if self
+            .confirmation
+            .as_ref()
+            .is_some_and(|confirmation| !pages.contains(&confirmation.payload.page()))
+        {
+            self.confirmation = None;
+        }
     }
     fn next_pages(&self, visible: &[u32]) -> Vec<u32> {
         let pending = self
@@ -108,6 +123,92 @@ impl YamantakaApp {
             };
         }
     }
+    pub(super) fn external_link_dialog(&mut self, ctx: &egui::Context) {
+        let Some(mut confirmation) = self.links.confirmation.take() else {
+            return;
+        };
+        let PdfLinkTarget::External(uri) =
+            &confirmation.payload.links()[confirmation.link_index].target
+        else {
+            return;
+        };
+        let palette = Palette::new(self.dark);
+        let compact = ctx.content_rect().height() < 420.0;
+        let mut approved = false;
+        let mut cancelled = false;
+        let modal = egui::Modal::new(egui::Id::new("confirm-external-pdf-link"))
+            .frame(
+                egui::Frame::new()
+                    .fill(palette.surface)
+                    .stroke(egui::Stroke::new(1.0, palette.line))
+                    .corner_radius(12)
+                    .inner_margin(if compact { 12 } else { 24 }),
+            )
+            .show(ctx, |ui| {
+                ui.set_width((ctx.content_rect().width() - 48.0).clamp(160.0, 440.0));
+                egui::ScrollArea::vertical()
+                    .max_height((ctx.content_rect().height() - 64.0).max(80.0))
+                    .show(ui, |ui| {
+                        ui.label(
+                            RichText::new(self.tr("Abrir enlace externo", "Open external link"))
+                                .size(if compact { 20.0 } else { 24.0 })
+                                .color(palette.ink),
+                        );
+                        ui.add_space(8.0);
+                        ui.label(
+                            RichText::new(self.tr(
+                                "Windows abrirá este destino en otra aplicación.",
+                                "Windows will open this destination in another application.",
+                            ))
+                            .color(palette.secondary),
+                        );
+                        ui.add_space(12.0);
+                        ui.add(
+                            egui::Label::new(RichText::new(uri.as_str()).color(palette.ink)).wrap(),
+                        );
+                        ui.add_space(16.0);
+                        ui.horizontal_wrapped(|ui| {
+                            let cancel = theme::navigation(
+                                ui,
+                                self.tr("Cancelar", "Cancel"),
+                                false,
+                                palette,
+                            );
+                            if confirmation.focus_cancel {
+                                cancel.request_focus();
+                                confirmation.focus_cancel = false;
+                            }
+                            cancelled = cancel.clicked();
+                            approved = theme::control(
+                                ui,
+                                self.tr("Abrir", "Open"),
+                                Some(theme::Icon::Right),
+                                true,
+                                false,
+                                palette,
+                            )
+                            .clicked();
+                        });
+                    });
+            });
+        cancelled |= modal.should_close();
+        if cancelled {
+            return;
+        }
+        if approved {
+            // Native captures never dispatch to an external application.
+            if self.demo && self.capture.is_some() {
+                return;
+            }
+            if let Err(error) = yamantaka_windows::open_external_uri(uri) {
+                self.error = Some(error.to_string());
+            } else {
+                return;
+            }
+        }
+        self.links.confirmation = Some(confirmation);
+    }
+
     pub(super) fn request_visible_links(&mut self, document: &str, pages: &[u32]) {
         self.links.retain(document, pages);
         for page in self.links.next_pages(pages) {
@@ -143,16 +244,21 @@ impl YamantakaApp {
         let Some(phase) = self.links.pages.get(&page) else {
             return;
         };
-        let mut chosen: Option<NavigationDestination> = None;
+        let mut chosen: Option<(Arc<PdfPageLinks>, usize)> = None;
         let mut retry = false;
         match phase {
             LinkPhase::Ready(payload) => {
-                for link in payload.links() {
-                    let label = format!(
-                        "{} {}",
-                        self.tr("Ir a la página", "Go to page"),
-                        link.destination.page + 1
-                    );
+                for (link_index, link) in payload.links().iter().enumerate() {
+                    let label = match &link.target {
+                        PdfLinkTarget::Internal(destination) => format!(
+                            "{} {}",
+                            self.tr("Ir a la página", "Go to page"),
+                            destination.page + 1
+                        ),
+                        PdfLinkTarget::External(_) => self
+                            .tr("Abrir enlace externo…", "Open external link…")
+                            .to_owned(),
+                    };
                     for (index, bounds) in link.regions.iter().enumerate() {
                         let rect = reader_viewport::page_region(paper, rotation, *bounds);
                         let response = link_control(
@@ -185,7 +291,7 @@ impl YamantakaApp {
                             }
                         }
                         if response.clicked() {
-                            chosen = Some(link.destination);
+                            chosen = Some((payload.clone(), link_index));
                             if self.link_preview != LinkPreview::Off {
                                 self.link_preview = LinkPreview::Complete;
                             }
@@ -211,8 +317,19 @@ impl YamantakaApp {
         if retry {
             self.links.pages.remove(&page);
         }
-        if let Some(destination) = chosen {
-            self.reader_destination = Some((document.into(), destination));
+        if let Some((payload, link_index)) = chosen {
+            match &payload.links()[link_index].target {
+                PdfLinkTarget::Internal(destination) => {
+                    self.reader_destination = Some((document.into(), *destination))
+                }
+                PdfLinkTarget::External(_) => {
+                    self.links.confirmation = Some(ExternalConfirmation {
+                        payload,
+                        link_index,
+                        focus_cancel: true,
+                    })
+                }
+            }
             ui.ctx().request_repaint();
         }
     }
@@ -453,5 +570,47 @@ mod tests {
                 assert!(focus);
             }
         }
+    }
+    #[test]
+    fn confirmation_retains_the_source_lease_and_is_dismissed_when_the_page_leaves() {
+        use yamantaka_domain::{
+            external_uri::ExternalUri, pdf_geometry::NormalizedPageRect, pdf_links::PdfPageLink,
+        };
+        let governor = MemoryGovernor::default();
+        let lease = governor
+            .try_reserve_one(Cost::new(
+                MemoryCategory::Text,
+                MemoryRepresentation::Cpu,
+                8192,
+            ))
+            .unwrap();
+        let payload = Arc::new(
+            PdfPageLinks::from_reserved(
+                7,
+                vec![PdfPageLink {
+                    annotation_index: 0,
+                    regions: vec![NormalizedPageRect::new([0.0, 0.0], [0.1, 0.1]).unwrap()],
+                    target: PdfLinkTarget::External(
+                        ExternalUri::new("https://example.invalid").unwrap(),
+                    ),
+                }],
+                0,
+                lease,
+            )
+            .unwrap(),
+        );
+        let mut state = LinkState::default();
+        state.retain("book", &[7]);
+        state.pages.insert(7, LinkPhase::Ready(payload.clone()));
+        state.confirmation = Some(ExternalConfirmation {
+            payload,
+            link_index: 0,
+            focus_cancel: true,
+        });
+        state.pages.remove(&7);
+        assert!(governor.usage().text > 0);
+        state.retain("book", &[8]);
+        assert!(state.confirmation.is_none());
+        assert_eq!(governor.usage().text, 0);
     }
 }

@@ -9,5 +9,6 @@ serde.workspace = true
 thiserror.workspace = true
 crossbeam-channel.workspace = true
 zeroize.workspace = true
+url.workspace = true
 [lints]
 workspace = true
