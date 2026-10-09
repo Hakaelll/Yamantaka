@@ -6,8 +6,12 @@ use std::{
 };
 use yamantaka_domain::{
     Cancellation, Failure, PdfEngine,
+    annotations::{
+        AnnotationColor, AnnotationDraft, AnnotationKind, AnnotationPlacement, AnnotationSource,
+    },
     memory::{GlobalMemoryLimits, MemoryGovernor},
     pdf_ticket::AsyncPdfEngine,
+    reader_preferences::PageRotation,
 };
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
 
@@ -140,6 +144,48 @@ fn native_unicode_character_ranges_crop_rotations_and_retained_memory() {
                 .unwrap();
             assert_eq!(copy.text(), "afé study");
             assert_eq!(selection.page(&page).unwrap().unwrap().text(), "afé study");
+            let selected = selection.page(&page).unwrap().unwrap();
+            let fingerprint = format!("{before:x}");
+            for kind in [
+                AnnotationKind::Highlight,
+                AnnotationKind::Underline,
+                AnnotationKind::Strikeout,
+                AnnotationKind::TextNote,
+                AnnotationKind::PageMarker,
+                AnnotationKind::PageComment,
+            ] {
+                let draft = AnnotationDraft::from_selection(
+                    AnnotationSource {
+                        document_id: "study",
+                        fingerprint: &fingerprint,
+                        rotation: PageRotation::Deg0,
+                    },
+                    &selected,
+                    kind,
+                    AnnotationColor::Violet,
+                    Some("Native study note"),
+                    &governor,
+                )
+                .unwrap();
+                assert_eq!(draft.placement(), AnnotationPlacement::Attached);
+                assert_eq!(draft.values().selected_text.as_deref(), Some("afé study"));
+                assert_eq!(draft.values().context_before.as_deref(), Some("c"));
+                assert!(draft.values().context_after.is_none());
+                assert_eq!(draft.values().kind, kind);
+                if kind == AnnotationKind::PageComment {
+                    assert!(draft.values().rects.is_empty());
+                } else {
+                    assert_eq!(
+                        draft
+                            .values()
+                            .rects
+                            .iter()
+                            .map(|rect| rect.region())
+                            .collect::<Vec<_>>(),
+                        selected.ink_regions().collect::<Vec<_>>()
+                    );
+                }
+            }
             assert_eq!(
                 selection.page(&page).unwrap().unwrap().geometry_coverage(),
                 GeometryCoverage::Complete
@@ -289,6 +335,28 @@ fn cropped_out_characters_keep_text_without_inventing_selection_geometry() {
             selection.page(&page).unwrap().unwrap().geometry_coverage(),
             GeometryCoverage::Unavailable
         );
+        let draft = AnnotationDraft::from_selection(
+            AnnotationSource {
+                document_id: "study",
+                fingerprint: "cropped-fixture",
+                rotation: PageRotation::Deg0,
+            },
+            &selection.page(&page).unwrap().unwrap(),
+            AnnotationKind::Highlight,
+            AnnotationColor::Yellow,
+            None,
+            &governor,
+        )
+        .unwrap();
+        assert_eq!(
+            draft.placement(),
+            AnnotationPlacement::PageNoteFallback {
+                requested: AnnotationKind::Highlight,
+                coverage: GeometryCoverage::Unavailable
+            }
+        );
+        assert!(draft.values().rects.is_empty());
+        assert_eq!(draft.values().selected_text.as_deref(), Some("i"));
         assert_eq!(
             selection
                 .copy_text(std::slice::from_ref(&page), &governor)

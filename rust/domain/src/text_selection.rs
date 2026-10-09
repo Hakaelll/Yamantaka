@@ -159,6 +159,49 @@ impl SelectedPage<'_> {
     pub fn text(&self) -> &str {
         self.text
     }
+    /// Flutter keeps up to 80 UTF-16 units around an annotation passage.
+    /// Native scalar boundaries avoid splitting supplementary characters.
+    pub fn annotation_context(&self) -> (&str, &str) {
+        let characters = self.page.characters();
+        let start = characters
+            .get(self.characters.start)
+            .map_or(self.page.text().len(), |character| {
+                character.bytes.start as usize
+            });
+        let end = characters
+            .get(self.characters.end)
+            .map_or(self.page.text().len(), |character| {
+                character.bytes.start as usize
+            });
+        let mut before = start;
+        let mut units = 0;
+        for character in characters[..self.characters.start].iter().rev() {
+            let value =
+                &self.page.text()[character.bytes.start as usize..character.bytes.end as usize];
+            let count = value.encode_utf16().count();
+            if units + count > 80 {
+                break;
+            }
+            units += count;
+            before = character.bytes.start as usize;
+        }
+        let mut after = end;
+        units = 0;
+        for character in &characters[self.characters.end..] {
+            let value =
+                &self.page.text()[character.bytes.start as usize..character.bytes.end as usize];
+            let count = value.encode_utf16().count();
+            if units + count > 80 {
+                break;
+            }
+            units += count;
+            after = character.bytes.end as usize;
+        }
+        (
+            &self.page.text()[before..start],
+            &self.page.text()[end..after],
+        )
+    }
     pub fn regions(&self) -> impl Iterator<Item = NormalizedPageRect> + '_ {
         self.page.characters()[self.characters.clone()]
             .iter()
@@ -182,6 +225,18 @@ impl SelectedPage<'_> {
             (false, _) => GeometryCoverage::Unavailable,
         }
     }
+    /// Annotation bounds omit whitespace without removing it from copied text.
+    pub fn ink_regions(&self) -> impl Iterator<Item = NormalizedPageRect> + '_ {
+        self.page.characters()[self.characters.clone()]
+            .iter()
+            .filter_map(|character| {
+                let value =
+                    &self.page.text()[character.bytes.start as usize..character.bytes.end as usize];
+                (!value.chars().all(char::is_whitespace))
+                    .then_some(character.region)
+                    .flatten()
+            })
+    }
 }
 
 /// The materialized clipboard/export text owns its own Text-memory reservation.
@@ -199,6 +254,24 @@ impl SelectedText {
 mod tests {
     use super::*;
     use crate::{memory::GlobalMemoryLimits, pdf_text::TextCharacter};
+    #[test]
+    fn annotation_context_keeps_eighty_utf16_units_without_split_surrogates() {
+        let governor = MemoryGovernor::default();
+        let surrounding = "📖".repeat(40);
+        let text = format!("a{surrounding}é{surrounding}z");
+        let snapshot = page(&governor, 0, &text, &[]);
+        let selection = TextSelection::new(
+            SelectionPosition::new(0, 41).unwrap(),
+            SelectionPosition::new(0, 42).unwrap(),
+        );
+        let selected = selection.page(&snapshot).unwrap().unwrap();
+        assert_eq!(selected.text(), "é");
+        let (before, after) = selected.annotation_context();
+        assert_eq!(before, surrounding);
+        assert_eq!(after, surrounding);
+        assert_eq!(before.encode_utf16().count(), 80);
+        assert_eq!(after.encode_utf16().count(), 80);
+    }
 
     fn page(
         governor: &MemoryGovernor,
