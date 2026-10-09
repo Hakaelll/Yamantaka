@@ -9,6 +9,12 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='thumbnails-dark'; args=@('--thumbnails') },
+    @{ name='thumbnails-jump'; args=@('--thumbnails','--thumbnail-page=1') },
+    @{ name='thumbnails-rotated'; args=@('--thumbnails','--rotation=90') },
+    @{ name='thumbnails-5000-last'; args=@('--thumbnails','--thumbnails-long','--thumbnail-page=4999') },
+    @{ name='thumbnails-light-es'; args=@('--thumbnails','--light','--es') },
+    @{ name='thumbnails-small-200'; args=@('--thumbnails','--size=640x480','--text-scale=2') },
     @{ name='outline-dark'; args=@('--outline') },
     @{ name='outline-passage'; args=@('--outline','--outline-jump') },
     @{ name='outline-light-es'; args=@('--outline','--light','--es') },

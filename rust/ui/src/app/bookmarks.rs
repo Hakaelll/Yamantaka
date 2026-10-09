@@ -96,7 +96,11 @@ impl YamantakaApp {
         p: Palette,
     ) {
         if !self.panel {
+            self.thumbnails.clear();
             return;
+        }
+        if self.reader_panel_tab != outline::ReaderPanelTab::Thumbnails {
+            self.thumbnails.clear();
         }
         if self.bookmarks.bind(&document.id)
             && (self.reader_panel_tab == outline::ReaderPanelTab::Bookmarks)
@@ -155,34 +159,51 @@ impl YamantakaApp {
 
     fn reader_panel_content(&mut self, ui: &mut egui::Ui, info: &PdfInfo, p: Palette) {
         let compact = ui.ctx().content_rect().width() < 620.0;
-        ui.horizontal_wrapped(|ui| {
-            for (tab, es, en) in [
-                (outline::ReaderPanelTab::Outline, "Índice", "Contents"),
-                (
-                    outline::ReaderPanelTab::Bookmarks,
-                    "Marcadores",
-                    "Bookmarks",
-                ),
-                (outline::ReaderPanelTab::Text, "Texto", "Text"),
-            ] {
-                if theme::navigation(ui, self.tr(es, en), self.reader_panel_tab == tab, p).clicked()
-                {
-                    self.reader_panel_tab = tab;
+        let tabs = [
+            (outline::ReaderPanelTab::Outline, "Índice", "Contents"),
+            (outline::ReaderPanelTab::Thumbnails, "Páginas", "Pages"),
+            (
+                outline::ReaderPanelTab::Bookmarks,
+                "Marcadores",
+                "Bookmarks",
+            ),
+            (outline::ReaderPanelTab::Text, "Texto", "Text"),
+        ];
+        if compact {
+            let selected = tabs
+                .iter()
+                .find(|(tab, _, _)| *tab == self.reader_panel_tab)
+                .unwrap();
+            egui::ComboBox::from_id_salt("reader-panel-section")
+                .selected_text(self.tr(selected.1, selected.2))
+                .width(ui.available_width())
+                .show_ui(ui, |ui| {
+                    for (tab, es, en) in tabs {
+                        let label = self.tr(es, en);
+                        ui.selectable_value(&mut self.reader_panel_tab, tab, label);
+                    }
+                });
+        } else {
+            ui.horizontal_wrapped(|ui| {
+                for (tab, es, en) in tabs {
+                    if theme::navigation(ui, self.tr(es, en), self.reader_panel_tab == tab, p)
+                        .clicked()
+                    {
+                        self.reader_panel_tab = tab;
+                    }
                 }
-            }
-            if !compact
-                && theme::icon_button(
+                if theme::icon_button(
                     ui,
                     self.tr("Cerrar panel", "Close panel"),
                     theme::Icon::Minus,
                     p,
                 )
                 .clicked()
-            {
-                self.panel = false;
-            }
-        });
-        let compact = ui.ctx().content_rect().width() < 620.0;
+                {
+                    self.panel = false;
+                }
+            });
+        }
         ui.add_space(if compact { 8.0 } else { 18.0 });
         if self.reader_panel_tab == outline::ReaderPanelTab::Text {
             ui.heading(self.tr("Texto de la página", "Page text"));
@@ -190,6 +211,10 @@ impl YamantakaApp {
                 ui.ctx().copy_text(self.panel_text.clone());
             }
             ui.label(&self.panel_text);
+            return;
+        }
+        if self.reader_panel_tab == outline::ReaderPanelTab::Thumbnails {
+            self.thumbnails_panel_content(ui, info, p);
             return;
         }
         if self.reader_panel_tab == outline::ReaderPanelTab::Outline {

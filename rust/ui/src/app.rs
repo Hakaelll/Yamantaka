@@ -9,8 +9,10 @@ mod password;
 mod reader_controls;
 mod reader_options;
 mod reader_viewport;
+mod render_updates;
 mod search;
 mod settings;
+mod thumbnails;
 
 use crate::{
     book,
@@ -103,6 +105,8 @@ pub struct YamantakaApp {
     panel: bool,
     reader_panel_tab: outline::ReaderPanelTab,
     outline: outline::OutlineState,
+    thumbnails: thumbnails::ThumbnailState,
+    thumbnail_preview_page: Option<u32>,
     outline_preview_target: Option<usize>,
     outline_destination: Option<(String, yamantaka_domain::outline::OutlineDestination)>,
     bookmarks: bookmarks::BookmarkState,
@@ -249,6 +253,8 @@ impl YamantakaApp {
             panel: false,
             reader_panel_tab: outline::ReaderPanelTab::Bookmarks,
             outline: Default::default(),
+            thumbnails: Default::default(),
+            thumbnail_preview_page: None,
             outline_preview_target: None,
             outline_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
@@ -413,11 +419,13 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        self.thumbnails.clear();
         self.open_intent.leave_destination();
         self.password = None;
         self.surface = surface;
     }
     fn open(&mut self, document: Document) {
+        self.thumbnails.clear();
         self.outline_destination = None;
         self.outline = Default::default();
         self.password = None;
@@ -1459,44 +1467,7 @@ impl App for YamantakaApp {
                     }
                     self.loading = false;
                 }
-                Update::Page(page, cancel, _, _) => {
-                    if cancel.is_cancelled() {
-                        continue;
-                    }
-                    if self
-                        .reader_pages
-                        .get(&page.key.page)
-                        .is_some_and(|slot| slot.requested.as_ref() == Some(&page.key))
-                    {
-                        let replacement = if let Some(presenter) = &mut self.presenter {
-                            presenter.upload(&page).map(PageImage::Native)
-                        } else {
-                            // The verified alternate compositor still uses egui
-                            // uploads. Its GPU lifetime accounting is pending.
-                            Ok(PageImage::Managed(ctx.load_texture(
-                                "visible-page",
-                                egui::ColorImage::from_rgba_unmultiplied(
-                                    [page.width as usize, page.height as usize],
-                                    page.pixels(),
-                                ),
-                                TextureOptions::LINEAR,
-                            )))
-                        };
-                        match replacement {
-                            Ok(texture) => {
-                                if let Some(slot) = self.reader_pages.get_mut(&page.key.page) {
-                                    slot.image = Some(texture);
-                                    slot.image_key = Some(page.key.clone());
-                                }
-                            }
-                            Err(error) => {
-                                self.error = Some(error.to_string());
-                                self.render_retry = true;
-                            }
-                        }
-                        self.loading = false;
-                    }
-                }
+                Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::Text(id, page, text, cancel) => {
                     if !cancel.is_cancelled()
                         && page == self.page
@@ -1541,6 +1512,12 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Failed(error, cancel) => {
+                    if cancel
+                        .as_ref()
+                        .is_some_and(|token| self.thumbnails.fail(token, error.to_string()))
+                    {
+                        continue;
+                    }
                     if cancel.is_some_and(|token| token.is_cancelled()) {
                         continue;
                     }
@@ -1790,10 +1767,12 @@ impl App for YamantakaApp {
                         || match self.reader_panel_tab {
                             outline::ReaderPanelTab::Bookmarks => self.bookmarks.ready(),
                             outline::ReaderPanelTab::Outline => self.outline.ready(),
+                            outline::ReaderPanelTab::Thumbnails => self.thumbnails.ready(),
                             outline::ReaderPanelTab::Text => true,
                         })
                     && self.outline_destination.is_none()
                     && self.outline_preview_target.is_none()
+                    && self.thumbnail_preview_page.is_none()
                     && !self.loading
                     && match self.preview_password_target {
                         Some("unlock") => matches!(self.surface, Surface::Reader),
@@ -1860,6 +1839,7 @@ impl App for YamantakaApp {
                     let usage = self.governor.usage();
                     let record=serde_json::json!({"synthetic":self.demo,"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
+                        "visibleThumbnailSlots":self.thumbnails.resident_count(),
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
                     let bytes=serde_json::to_vec_pretty(&record).map_err(|error|image::ImageError::IoError(std::io::Error::other(error)))?;
@@ -1881,6 +1861,7 @@ impl App for YamantakaApp {
         self.query_cancel.cancel();
         self.reader_preferences_cancel.cancel();
         self.reader_pages.clear();
+        self.thumbnails.clear();
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.shutdown()
         {

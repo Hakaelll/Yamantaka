@@ -158,10 +158,11 @@ impl YamantakaApp {
                 if slot.requested.as_ref() != Some(&key) && !self.render_retry {
                     slot.cancel.cancel();
                     slot.cancel = Cancellation::default();
-                    match self
-                        .runtime
-                        .submit(Action::Render(key.clone(), slot.cancel.clone()))
-                    {
+                    match self.runtime.submit(Action::Render(
+                        key.clone(),
+                        yamantaka_domain::Priority::Visible,
+                        slot.cancel.clone(),
+                    )) {
                         Ok(()) => {
                             slot.requested = Some(key.clone());
                             self.requested = Some(key);

@@ -416,21 +416,7 @@ fn control_impl(
             egui::Stroke::new(1.5, p.accent),
         );
     }
-    if ui.ctx().data(|data| {
-        data.get_temp::<bool>(egui::Id::new("capture-control-bounds"))
-            .unwrap_or(false)
-    }) {
-        ui.ctx().data_mut(|data| {
-            let controls = data
-                .get_temp_mut_or_default::<Vec<ControlBounds>>(egui::Id::new("capture-controls"));
-            controls.push(ControlBounds {
-                label: label.to_owned(),
-                rect,
-                clip: ui.clip_rect(),
-                enabled: ui.is_enabled(),
-            });
-        });
-    }
+    record_control_bounds(ui, label, rect);
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -495,6 +481,11 @@ pub fn reading_environment(
             egui::StrokeKind::Inside,
         );
     }
+    record_control_bounds(ui, label, rect);
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+pub fn record_control_bounds(ui: &egui::Ui, label: &str, rect: egui::Rect) {
     if ui.ctx().data(|data| {
         data.get_temp::<bool>(egui::Id::new("capture-control-bounds"))
             .unwrap_or(false)
@@ -506,8 +497,7 @@ pub fn reading_environment(
                     rect,
                     clip: ui.clip_rect(),
                     enabled: ui.is_enabled(),
-                })
+                });
         });
     }
-    response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }

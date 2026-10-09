@@ -35,9 +35,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let settings = args.iter().any(|arg| arg == "--settings");
     let protected = args.iter().any(|arg| arg == "--protected");
     let reader = protected
-        || args
-            .iter()
-            .any(|arg| arg == "--reader" || arg == "--bookmarks" || arg == "--outline");
+        || args.iter().any(|arg| {
+            arg == "--reader" || arg == "--bookmarks" || arg == "--outline" || arg == "--thumbnails"
+        });
     let light = args.iter().any(|arg| arg == "--light");
     let tilt = args.iter().any(|arg| arg == "--tilt");
     let capture = args.iter().find_map(|arg| {
@@ -63,7 +63,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join(if protected {
                 "../../build/rust-fixtures/protected.pdf"
-            } else if args.iter().any(|arg| arg == "--outline") {
+            } else if args.iter().any(|arg| arg == "--thumbnails-long") {
+                "../../build/rust-fixtures/5000-pages.pdf"
+            } else if args
+                .iter()
+                .any(|arg| arg == "--outline" || arg == "--thumbnails")
+            {
                 "../../build/rust-fixtures/outline.pdf"
             } else {
                 "../../build/rust-fixtures/textual.pdf"
@@ -83,6 +88,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         ];
         for (index, (title, author)) in names.iter().enumerate() {
             let path = fixture.to_string_lossy().replace('\'', "''");
+            let title = if index == 0
+                && args
+                    .iter()
+                    .any(|arg| arg == "--outline" || arg == "--thumbnails")
+            {
+                "The art of attention"
+            } else {
+                title
+            };
             let title = title.replace('\'', "''");
             db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,reading_progress,last_page_index) VALUES('demo-{index}','{path}','demo-{index}','fixture.pdf','{title}','{author}',2,900,'2026-10-08','2026-10-08','2026-10-08','synthetic',{},0)",if index==0{0.5}else{0.0}))?;
         }
@@ -260,6 +274,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         None
                     });
+                }
+                if args.iter().any(|arg| arg == "--thumbnails") {
+                    app.preview_thumbnails(args.iter().find_map(|arg| {
+                        arg.to_str()
+                            .and_then(|arg| arg.strip_prefix("--thumbnail-page="))
+                            .and_then(|page| page.parse().ok())
+                    }));
                 }
                 if args.iter().any(|arg| arg == "--list-states") {
                     app.preview_list_states();

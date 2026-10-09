@@ -39,7 +39,7 @@ pub enum Action {
         Cancellation,
     ),
     Import(Vec<PathBuf>, Cancellation),
-    Render(RenderKey, Cancellation),
+    Render(RenderKey, Priority, Cancellation),
     Navigate(String, u32),
     Text(String, u32, Cancellation),
     Outline(String, Cancellation),
@@ -559,8 +559,8 @@ impl Runtime {
                                         }
                                     }
                                 },
-                                Action::Render(key, cancel) => {
-                                    match engine.try_render(key, Priority::Visible, cancel.clone())
+                                Action::Render(key, priority, cancel) => {
+                                    match engine.try_render(key, priority, cancel.clone())
                                     {
                                         Ok(ticket) => pending.push(Pending::Render(ticket, permit)),
                                         Err(error) => {
@@ -1176,7 +1176,7 @@ mod tests {
     }
     type BlockedReply = Arc<std::sync::Mutex<Option<Sender<Result<Arc<RenderedPage>>>>>>;
     struct BlockedEngine {
-        entered: Sender<()>,
+        entered: Sender<Priority>,
         reply: BlockedReply,
     }
     impl PdfEngine for BlockedEngine {
@@ -1215,12 +1215,12 @@ mod tests {
         fn try_render(
             &self,
             _: RenderKey,
-            _: Priority,
+            priority: Priority,
             cancel: Cancellation,
         ) -> Result<PdfTicket<Arc<RenderedPage>>> {
             let (send, ticket) = PdfTicket::channel(42, 9, cancel);
             *self.reply.lock().unwrap() = Some(send);
-            self.entered.try_send(()).unwrap();
+            self.entered.try_send(priority).unwrap();
             Ok(ticket)
         }
         fn try_text(
@@ -1237,53 +1237,56 @@ mod tests {
     }
     #[test]
     fn sql_query_finishes_while_native_render_ticket_remains_blocked() {
-        let (entered, wait) = bounded(1);
-        let reply = Arc::new(std::sync::Mutex::new(None));
-        let runtime = Runtime::start(
-            Repository,
-            BlockedEngine {
-                entered,
-                reply: reply.clone(),
-            },
-            || {},
-        )
-        .unwrap();
-        runtime
-            .submit(Action::Render(
-                RenderKey {
-                    document_id: "book".into(),
-                    page: 0,
-                    region: None,
-                    physical_width: 10,
-                    physical_height: 10,
-                    rotation: 0,
-                    generation: 1,
+        for priority in [Priority::Visible, Priority::Thumbnail] {
+            let (entered, wait) = bounded(1);
+            let reply = Arc::new(std::sync::Mutex::new(None));
+            let runtime = Runtime::start(
+                Repository,
+                BlockedEngine {
+                    entered,
+                    reply: reply.clone(),
                 },
-                Cancellation::default(),
-            ))
+                || {},
+            )
             .unwrap();
-        wait.recv_timeout(Duration::from_secs(2)).unwrap();
-        runtime
-            .submit(Action::Query(
-                LibraryQuery::default(),
-                Cancellation::default(),
-            ))
-            .unwrap();
-        assert!(matches!(
-            runtime.updates.recv_timeout(Duration::from_secs(2)),
-            Ok(Update::Library(_, _, _))
-        ));
-        reply
-            .lock()
-            .unwrap()
-            .take()
-            .unwrap()
-            .try_send(Err(Failure::MemoryBudget))
-            .unwrap();
-        assert!(matches!(
-            runtime.updates.recv_timeout(Duration::from_secs(2)),
-            Ok(Update::Failed(Failure::MemoryBudget, _))
-        ));
+            runtime
+                .submit(Action::Render(
+                    RenderKey {
+                        document_id: "book".into(),
+                        page: 0,
+                        region: None,
+                        physical_width: 10,
+                        physical_height: 10,
+                        rotation: 0,
+                        generation: 1,
+                    },
+                    priority,
+                    Cancellation::default(),
+                ))
+                .unwrap();
+            assert_eq!(wait.recv_timeout(Duration::from_secs(2)).unwrap(), priority);
+            runtime
+                .submit(Action::Query(
+                    LibraryQuery::default(),
+                    Cancellation::default(),
+                ))
+                .unwrap();
+            assert!(matches!(
+                runtime.updates.recv_timeout(Duration::from_secs(2)),
+                Ok(Update::Library(_, _, _))
+            ));
+            reply
+                .lock()
+                .unwrap()
+                .take()
+                .unwrap()
+                .try_send(Err(Failure::MemoryBudget))
+                .unwrap();
+            assert!(matches!(
+                runtime.updates.recv_timeout(Duration::from_secs(2)),
+                Ok(Update::Failed(Failure::MemoryBudget, _))
+            ));
+        }
     }
 
     #[test]
