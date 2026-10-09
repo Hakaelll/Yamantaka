@@ -5,11 +5,12 @@ use crate::{
     reader_preferences::PageRotation,
     text_selection::{GeometryCoverage, SelectedPage},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+pub mod repository;
 
 pub const MAX_ANNOTATION_NOTE_UTF16: usize = 4000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AnnotationKind {
     Highlight,
@@ -20,7 +21,7 @@ pub enum AnnotationKind {
     PageComment,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AnnotationColor {
     Yellow,
@@ -30,14 +31,14 @@ pub enum AnnotationColor {
     Violet,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AttachmentStatus {
     Attached,
     ReviewRequired,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum AnnotationReviewState {
     Pending,
@@ -46,7 +47,8 @@ pub enum AnnotationReviewState {
 }
 
 /// JSON keys remain compatible with Flutter's normalized-page-v1 geometry.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "RectangleFields")]
 pub struct AnnotationRect {
     left: f64,
     top: f64,
@@ -68,6 +70,20 @@ impl From<NormalizedPageRect> for AnnotationRect {
 impl AnnotationRect {
     pub fn region(self) -> NormalizedPageRect {
         NormalizedPageRect::new([self.left, self.top], [self.right, self.bottom]).unwrap()
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RectangleFields {
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
+}
+impl TryFrom<RectangleFields> for AnnotationRect {
+    type Error = Failure;
+    fn try_from(value: RectangleFields) -> Result<Self> {
+        Ok(NormalizedPageRect::new([value.left, value.top], [value.right, value.bottom])?.into())
     }
 }
 
