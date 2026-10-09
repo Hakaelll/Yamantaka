@@ -1,6 +1,6 @@
 use super::*;
-use yamantaka_domain::PageLayout;
 use yamantaka_domain::reader_preferences::{CoverPolicy, InitialSide, PageRotation, ReaderMode};
+use yamantaka_domain::{PageLayout, reader::ReaderPosition};
 
 impl YamantakaApp {
     pub fn preview_reader_options(&mut self, section: usize) {
@@ -52,6 +52,24 @@ impl YamantakaApp {
             Some(ZoomMode::FitWidth) => self.tr("Ajustar ancho", "Fit width").into(),
             _ => format!("{:.0}%", self.zoom * 100.0),
         }
+    }
+
+    pub(super) fn load_reader_preferences(&mut self, preferences: ReaderPreferences) {
+        self.reader_preferences_loading = false;
+        self.zoom = preferences.zoom_level.clamp(0.2, 8.0) as f32;
+        let start = preferences.page_rotation.unrotate_point([0.5, 0.0]);
+        self.reader_preferences = Some(preferences);
+        self.rebuild_reader_layout();
+        if let Some(navigation) = &mut self.navigation {
+            navigation.update_anchor(
+                ReaderPosition::at(self.page, start)
+                    .expect("Quarter-turn page starts are normalized"),
+            );
+        }
+        self.generation += 1;
+        self.cancel.cancel();
+        self.cancel = Cancellation::default();
+        self.reset_render_request();
     }
 
     pub(super) fn apply_reader_preferences(&mut self, mut preferences: ReaderPreferences) {

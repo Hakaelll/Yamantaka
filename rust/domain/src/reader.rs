@@ -2,24 +2,36 @@
 use crate::{Failure, PageLayout, ReadingDirection, Result};
 use std::{collections::VecDeque, num::NonZeroU32, ops::Range};
 
-/// A PDF page index and a fraction of its height, unaffected by zoom or layout.
+/// A point on the page before user rotation, independent of zoom and layout.
+/// Its displayed x aligns with the viewport center; y aligns with the top edge.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ReaderPosition {
     page: u32,
     normalized_offset: f64,
+    normalized_horizontal: f64,
 }
 
 impl ReaderPosition {
     pub fn new(page: u32, normalized_offset: f64) -> Result<Self> {
-        if !normalized_offset.is_finite() || !(0.0..=1.0).contains(&normalized_offset) {
+        Self::at(page, [0.5, normalized_offset])
+    }
+    pub fn at(page: u32, point: [f64; 2]) -> Result<Self> {
+        if point
+            .iter()
+            .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+        {
             return Err(Failure::Invalid(
-                "Page offset must be finite and within 0..=1".into(),
+                "Page coordinates must be finite and within 0..=1".into(),
             ));
         }
         Ok(Self {
             page,
-            normalized_offset,
+            normalized_horizontal: point[0],
+            normalized_offset: point[1],
         })
+    }
+    pub fn point(self) -> [f64; 2] {
+        [self.normalized_horizontal, self.normalized_offset]
     }
 
     pub fn page(self) -> u32 {
@@ -33,6 +45,7 @@ impl ReaderPosition {
         Self {
             page,
             normalized_offset: 0.0,
+            normalized_horizontal: 0.5,
         }
     }
 }
@@ -192,6 +205,7 @@ pub struct ReaderNavigation {
     direction: ReadingDirection,
     spread_config: SpreadConfig,
     first_page_physical_right: bool,
+    rotation: crate::reader_preferences::PageRotation,
     history: VecDeque<ReaderPosition>,
     history_cursor: usize,
     history_capacity: usize,
@@ -225,6 +239,7 @@ impl ReaderNavigation {
             direction: ReadingDirection::Ltr,
             spread_config: SpreadConfig::default(),
             first_page_physical_right: false,
+            rotation: crate::reader_preferences::PageRotation::Deg0,
             history: VecDeque::from([position]),
             history_cursor: 0,
             history_capacity: capacity,
@@ -268,6 +283,7 @@ impl ReaderNavigation {
     ) {
         use crate::reader_preferences::{CoverPolicy, InitialSide};
         self.layout = preferences.effective_layout();
+        self.rotation = preferences.page_rotation;
         self.direction = direction;
         self.spread_config = SpreadConfig::from_preferences(preferences);
         self.first_page_physical_right = preferences.cover_policy == CoverPolicy::NoCover
@@ -319,7 +335,10 @@ impl ReaderNavigation {
     }
 
     pub fn go_to_page(&mut self, page: u32) -> bool {
-        self.navigate_to(ReaderPosition::page_start(page))
+        self.navigate_to(
+            ReaderPosition::at(page, self.rotation.unrotate_point([0.5, 0.0]))
+                .expect("Quarter-turn page starts are finite normalized points"),
+        )
     }
 
     /// Scroll/pan feedback replaces the current anchor without adding history.
@@ -804,5 +823,41 @@ mod tests {
         let empty = PageGeometry::new([], 20.0).unwrap();
         assert_eq!(empty.visible(0.0, 100.0).unwrap(), 0..0);
         assert_eq!(empty.position_at(0.0).unwrap(), None);
+    }
+    #[test]
+    fn two_dimensional_history_marks_and_rotated_page_starts_share_one_position() {
+        use crate::reader_preferences::{PageRotation, ReaderPreferences};
+        let a = ReaderPosition::at(2, [0.7, 0.3]).unwrap();
+        let b = ReaderPosition::at(4, [0.2, 0.6]).unwrap();
+        let mut reader = ReaderNavigation::new(8, 0).unwrap();
+        reader.navigate_to(a);
+        reader.set_mark(MarkSlot::A, a).unwrap();
+        reader.navigate_to(b);
+        assert!(reader.back());
+        assert_eq!(reader.position(), a);
+        assert!(reader.forward());
+        assert_eq!(reader.position(), b);
+        let mut preferences = ReaderPreferences::new("geometry");
+        preferences.page_rotation = PageRotation::Deg90;
+        reader.apply_preferences(&preferences, ReadingDirection::Rtl);
+        assert_eq!(reader.position(), b);
+        reader.go_to_page(6);
+        assert_eq!(reader.position().point(), [0.0, 0.5]);
+        assert_eq!(
+            preferences
+                .page_rotation
+                .rotate_point(reader.position().point()),
+            [0.5, 0.0]
+        );
+        assert!(reader.jump_to_mark(MarkSlot::A));
+        assert_eq!(reader.position(), a);
+        for point in [
+            [f64::NAN, 0.0],
+            [0.0, f64::INFINITY],
+            [-0.1, 0.0],
+            [0.0, 1.1],
+        ] {
+            assert!(ReaderPosition::at(0, point).is_err());
+        }
     }
 }

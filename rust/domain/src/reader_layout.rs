@@ -240,21 +240,7 @@ impl ReaderLayout {
                 (visible.bottom() - origin_y) / zoom,
             )?;
             for page in range {
-                let [width, height] = self
-                    .geometry
-                    .size(page)
-                    .expect("Visible PageGeometry range is bounded");
-                let rect = LogicalRect {
-                    left: (content_width - width * zoom) / 2.0,
-                    top: origin_y
-                        + self
-                            .geometry
-                            .offset(page)
-                            .expect("Visible page offset exists")
-                            * zoom,
-                    width: width * zoom,
-                    height: height * zoom,
-                };
+                let rect = self.page_rect(page as u32, content_width, origin_y, zoom);
                 if rect.intersects(visible) {
                     pages.push(VisiblePage {
                         page: page as u32,
@@ -263,12 +249,7 @@ impl ReaderLayout {
                 }
             }
         } else if self.layout() == PageLayout::Single {
-            let rect = LogicalRect {
-                left: (content_width - unit[0] * zoom) / 2.0,
-                top: origin_y,
-                width: unit[0] * zoom,
-                height: unit[1] * zoom,
-            };
+            let rect = self.page_rect(anchor.page(), content_width, origin_y, zoom);
             if rect.intersects(visible) {
                 pages.push(VisiblePage {
                     page: anchor.page(),
@@ -277,22 +258,11 @@ impl ReaderLayout {
             }
         } else {
             let spread = self.spread(anchor.page());
-            let mut x = (content_width - unit[0] * zoom) / 2.0;
             for page in [spread.left, spread.right].into_iter().flatten() {
-                let [width, height] = self
-                    .geometry
-                    .size(page as usize)
-                    .expect("Spread page exists");
-                let rect = LogicalRect {
-                    left: x,
-                    top: origin_y,
-                    width: width * zoom,
-                    height: height * zoom,
-                };
+                let rect = self.page_rect(page, content_width, origin_y, zoom);
                 if rect.intersects(visible) {
                     pages.push(VisiblePage { page, rect });
                 }
-                x += (width + self.pair_gap) * zoom;
             }
         }
         Ok(ReaderFrame {
@@ -304,6 +274,40 @@ impl ReaderLayout {
             origin_y,
         })
     }
+    fn page_rect(&self, page: u32, content_width: f64, origin_y: f64, zoom: f64) -> LogicalRect {
+        let [width, height] = self
+            .geometry
+            .size(page as usize)
+            .expect("Validated page anchor");
+        let mut left = (content_width - width * zoom) / 2.0;
+        let mut top = origin_y;
+        if self.layout() == PageLayout::Continuous {
+            top += self
+                .geometry
+                .offset(page as usize)
+                .expect("Validated page offset")
+                * zoom;
+        } else if self.layout() == PageLayout::Spread {
+            left = (content_width - self.unit_size(page)[0] * zoom) / 2.0;
+            let spread = self.spread(page);
+            if spread.right == Some(page)
+                && let Some(first) = spread.left
+            {
+                left += (self
+                    .geometry
+                    .size(first as usize)
+                    .expect("Validated spread")[0]
+                    + self.pair_gap)
+                    * zoom;
+            }
+        }
+        LogicalRect {
+            left,
+            top,
+            width: width * zoom,
+            height: height * zoom,
+        }
+    }
     /// Preserve a normalized page anchor when changing zoom, rotation, layout,
     /// viewport size or margins. Near document edges the finite canvas clamps.
     pub fn scroll_for_anchor(
@@ -314,21 +318,17 @@ impl ReaderLayout {
         custom_zoom: f64,
     ) -> Result<[f64; 2]> {
         let frame = self.frame(viewport, anchor, zoom_mode, custom_zoom, [0.0, 0.0], 0.0)?;
-        let size = self
-            .geometry
-            .size(anchor.page() as usize)
-            .expect("Anchor validated by frame");
-        let page_start = if self.layout() == PageLayout::Continuous {
-            self.geometry
-                .offset(anchor.page() as usize)
-                .expect("Validated page offset")
-        } else {
-            0.0
-        };
-        let y = frame.origin_y + (page_start + size[1] * anchor.normalized_offset()) * frame.zoom;
+        let rect = self.page_rect(
+            anchor.page(),
+            frame.content_size[0],
+            frame.origin_y,
+            frame.zoom,
+        );
+        let point = self.rotation().rotate_point(anchor.point());
         Ok([
-            (frame.content_size[0] - viewport[0]) / 2.0,
-            y.clamp(0.0, frame.content_size[1] - viewport[1]),
+            (rect.left + rect.width * point[0] - viewport[0] / 2.0)
+                .clamp(0.0, frame.content_size[0] - viewport[0]),
+            (rect.top + rect.height * point[1]).clamp(0.0, frame.content_size[1] - viewport[1]),
         ])
     }
     /// Scroll feedback uses the same canonical ReaderPosition and must update
@@ -339,23 +339,22 @@ impl ReaderLayout {
         previous: ReaderPosition,
     ) -> Result<ReaderPosition> {
         self.check_anchor(previous)?;
-        if self.layout() == PageLayout::Continuous {
-            return self
-                .geometry
+        let page = if self.layout() == PageLayout::Continuous {
+            self.geometry
                 .position_at((frame.scroll[1] - frame.origin_y) / frame.zoom)?
                 .ok_or_else(|| {
                     Failure::Invalid("Cannot recover an anchor from empty geometry".into())
-                });
-        }
-        let height = self
-            .geometry
-            .size(previous.page() as usize)
-            .expect("Validated page anchor")[1]
-            * frame.zoom;
-        ReaderPosition::new(
-            previous.page(),
-            ((frame.scroll[1] - frame.origin_y) / height).clamp(0.0, 1.0),
-        )
+                })?
+                .page()
+        } else {
+            previous.page()
+        };
+        let rect = self.page_rect(page, frame.content_size[0], frame.origin_y, frame.zoom);
+        let displayed = [
+            ((frame.scroll[0] + frame.viewport[0] / 2.0 - rect.left) / rect.width).clamp(0.0, 1.0),
+            ((frame.scroll[1] - rect.top) / rect.height).clamp(0.0, 1.0),
+        ];
+        ReaderPosition::at(page, self.rotation().unrotate_point(displayed))
     }
 }
 fn validate_viewport(viewport: [f64; 2]) -> Result<()> {
@@ -541,7 +540,7 @@ mod tests {
     fn canonical_anchor_survives_zoom_rotation_and_viewport_changes() {
         let mut p = preferences(PageLayout::Continuous);
         let sizes = [[600.0, 800.0]; 20];
-        let anchor = ReaderPosition::new(9, 0.375).unwrap();
+        let anchor = ReaderPosition::at(9, [0.45, 0.375]).unwrap();
         for rotation in [
             PageRotation::Deg0,
             PageRotation::Deg90,
@@ -551,7 +550,7 @@ mod tests {
             p.page_rotation = rotation;
             let layout = ReaderLayout::new(sizes, &p, ReadingDirection::Ltr, 24.0).unwrap();
             for zoom in [0.5, 1.0, 2.0, 4.0] {
-                for viewport in [[640.0, 480.0], [1440.0, 960.0]] {
+                for viewport in [[160.0, 120.0], [240.0, 180.0]] {
                     let scroll = layout
                         .scroll_for_anchor(viewport, anchor, ZoomMode::Custom, zoom)
                         .unwrap();
@@ -560,9 +559,9 @@ mod tests {
                         .unwrap();
                     let actual = layout.anchor_at_scroll(&f, anchor).unwrap();
                     assert_eq!(actual.page(), anchor.page());
-                    assert!(
-                        (actual.normalized_offset() - anchor.normalized_offset()).abs() < 1e-10
-                    );
+                    for axis in 0..2 {
+                        assert!((actual.point()[axis] - anchor.point()[axis]).abs() < 1e-10);
+                    }
                 }
             }
         }
@@ -634,5 +633,69 @@ mod tests {
             .unwrap();
         assert_eq!(f.scroll, [0.0, f.content_size[1] - 480.0]);
         assert!(f.content_size.into_iter().all(f64::is_finite));
+    }
+    #[test]
+    fn horizontal_pan_round_trips_and_canvas_edges_clamp_explicitly() {
+        let mut p = preferences(PageLayout::Single);
+        p.horizontal_margin = 0.0;
+        p.vertical_margin = 0.0;
+        let layout =
+            ReaderLayout::new([[1000.0, 2000.0]], &p, ReadingDirection::Ltr, 24.0).unwrap();
+        let anchor = ReaderPosition::at(0, [0.7, 0.25]).unwrap();
+        let scroll = layout
+            .scroll_for_anchor([200.0, 300.0], anchor, ZoomMode::Custom, 1.0)
+            .unwrap();
+        assert_eq!(scroll, [600.0, 500.0]);
+        let frame = layout
+            .frame([200.0, 300.0], anchor, ZoomMode::Custom, 1.0, scroll, 0.0)
+            .unwrap();
+        assert_eq!(layout.anchor_at_scroll(&frame, anchor).unwrap(), anchor);
+        let edge = ReaderPosition::at(0, [1.0, 1.0]).unwrap();
+        assert_eq!(
+            layout
+                .scroll_for_anchor([200.0, 300.0], edge, ZoomMode::Custom, 1.0)
+                .unwrap(),
+            [800.0, 1700.0]
+        );
+        let oversized = layout
+            .frame(
+                [1600.0, 2400.0],
+                anchor,
+                ZoomMode::Custom,
+                1.0,
+                [0.0, 0.0],
+                0.0,
+            )
+            .unwrap();
+        assert_eq!(
+            layout.anchor_at_scroll(&oversized, anchor).unwrap().point(),
+            [0.5, 0.0]
+        );
+    }
+    #[test]
+    fn spread_pan_targets_the_selected_physical_page_in_ltr_and_rtl() {
+        use crate::reader_preferences::{CoverPolicy, InitialSide};
+        let mut p = preferences(PageLayout::Spread);
+        p.cover_policy = CoverPolicy::NoCover;
+        p.initial_side = InitialSide::Left;
+        p.horizontal_margin = 0.0;
+        p.vertical_margin = 0.0;
+        let anchor = ReaderPosition::at(1, [0.6, 0.2]).unwrap();
+        for (direction, expected) in [
+            (ReadingDirection::Ltr, [862.0, 160.0]),
+            (ReadingDirection::Rtl, [260.0, 160.0]),
+        ] {
+            let layout = ReaderLayout::new([[600.0, 800.0]; 2], &p, direction, 24.0).unwrap();
+            let scroll = layout
+                .scroll_for_anchor([200.0, 300.0], anchor, ZoomMode::Custom, 1.0)
+                .unwrap();
+            assert_eq!(scroll, expected);
+            let frame = layout
+                .frame([200.0, 300.0], anchor, ZoomMode::Custom, 1.0, scroll, 0.0)
+                .unwrap();
+            assert_eq!(frame.pages.len(), 1);
+            assert_eq!(frame.pages[0].page, 1);
+            assert_eq!(layout.anchor_at_scroll(&frame, anchor).unwrap(), anchor);
+        }
     }
 }

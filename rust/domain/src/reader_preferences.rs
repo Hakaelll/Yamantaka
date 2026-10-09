@@ -56,6 +56,23 @@ pub enum PageRotation {
     Deg270,
 }
 impl PageRotation {
+    pub fn rotate_point(self, [x, y]: [f64; 2]) -> [f64; 2] {
+        match self {
+            Self::Deg0 => [x, y],
+            Self::Deg90 => [1.0 - y, x],
+            Self::Deg180 => [1.0 - x, 1.0 - y],
+            Self::Deg270 => [y, 1.0 - x],
+        }
+    }
+    pub fn unrotate_point(self, point: [f64; 2]) -> [f64; 2] {
+        match self {
+            Self::Deg0 => Self::Deg0,
+            Self::Deg90 => Self::Deg270,
+            Self::Deg180 => Self::Deg180,
+            Self::Deg270 => Self::Deg90,
+        }
+        .rotate_point(point)
+    }
     pub fn degrees(self) -> u16 {
         match self {
             Self::Deg0 => 0,
@@ -230,5 +247,19 @@ mod tests {
         p.validate().unwrap(); // Flutter's finite scroll offsets are not silently clamped.
         p.scroll_offset = f64::NAN;
         assert!(p.validate().is_err());
+    }
+    #[test]
+    fn clockwise_rotation_uses_literal_page_coordinates_and_has_an_inverse() {
+        for (rotation, expected) in [
+            (PageRotation::Deg0, [0.2, 0.3]),
+            (PageRotation::Deg90, [0.7, 0.2]),
+            (PageRotation::Deg180, [0.8, 0.7]),
+            (PageRotation::Deg270, [0.3, 0.8]),
+        ] {
+            assert_eq!(rotation.rotate_point([0.2, 0.3]), expected);
+            let actual = rotation.unrotate_point(expected);
+            assert!((actual[0] - 0.2).abs() < 1e-12);
+            assert!((actual[1] - 0.3).abs() < 1e-12);
+        }
     }
 }

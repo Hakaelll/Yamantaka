@@ -1624,15 +1624,9 @@ impl App for YamantakaApp {
                     {
                         continue;
                     }
-                    self.reader_preferences_loading = false;
-                    let preferences = preferences.unwrap_or_else(|| ReaderPreferences::new(id));
-                    self.zoom = preferences.zoom_level.clamp(0.2, 8.0) as f32;
-                    self.reader_preferences = Some(preferences);
-                    self.rebuild_reader_layout();
-                    self.generation += 1;
-                    self.cancel.cancel();
-                    self.cancel = Cancellation::default();
-                    self.reset_render_request();
+                    self.load_reader_preferences(
+                        preferences.unwrap_or_else(|| ReaderPreferences::new(id)),
+                    );
                 }
             }
         }
