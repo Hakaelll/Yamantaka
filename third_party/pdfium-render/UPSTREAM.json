@@ -1,0 +1,602 @@
+{
+  "package": "pdfium-render",
+  "version": "0.9.4",
+  "registryArchiveSha256": "8948a803616a9e936b15a6637af2cd48c5fb8ae0fcdeb3c32eac3a540e255a19",
+  "source": "https://crates.io/crates/pdfium-render/0.9.4",
+  "files": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "4a0d6088d42ab586f8e8b3026b89799adb699ca5bc6c77597c933b938a886455"
+    },
+    {
+      "path": "LICENSE.md",
+      "sha256": "819dfb7c49a24bec7511f29304478d67f272bfd1f976b728095f2eb2c522791c"
+    },
+    {
+      "path": "README.md",
+      "sha256": "b6049d2d425ce6b085bf4cbddd98f6230c9294f91f924676a751d7a05f62b554"
+    },
+    {
+      "path": "build.rs",
+      "sha256": "d197d27dce67a6e01ad07a2b4978bd73734898ce43b233fa8ac0e60f68b22879"
+    },
+    {
+      "path": "src/bindgen/pdfium_5961.rs",
+      "sha256": "6d691b5553104684d663f9bf1872ef8b1982f28b3ec8405a75305f5a16f40215"
+    },
+    {
+      "path": "src/bindgen/pdfium_6015.rs",
+      "sha256": "2b5250c612071ef4a1fe316131a1dcaccb4b33010c188097bc25fe21d5dda575"
+    },
+    {
+      "path": "src/bindgen/pdfium_6043.rs",
+      "sha256": "2bbfa3a49c38a1ef94f22b560f3fc8584e1ae619b1cb5b06c5ff6c2b7c301cb6"
+    },
+    {
+      "path": "src/bindgen/pdfium_6084.rs",
+      "sha256": "f158aace11855b92d2914db06f3d4ecfabda06d958f71481fc0dcaf8fe175d45"
+    },
+    {
+      "path": "src/bindgen/pdfium_6110.rs",
+      "sha256": "031f217260d941e1a670f6bbcfb88e891266a47cef1d4badd7600f83869da09c"
+    },
+    {
+      "path": "src/bindgen/pdfium_6124.rs",
+      "sha256": "083cdfde7fe6ba5852dea6c3d26911be8877606b419301b90eef49c8f283c19c"
+    },
+    {
+      "path": "src/bindgen/pdfium_6164.rs",
+      "sha256": "9605bb94f1bd6a4796af7a0c5224145d8041178c17148421bcdc208267170536"
+    },
+    {
+      "path": "src/bindgen/pdfium_6259.rs",
+      "sha256": "ed43c15ee91bab7e9d6dfe36e7b501ecd50d42480de53222ad313d464987c80c"
+    },
+    {
+      "path": "src/bindgen/pdfium_6295.rs",
+      "sha256": "ee675d399ebeec4a4ff87c7d1d56ccbaa17df429b6bbbd8ebece8f68329f2076"
+    },
+    {
+      "path": "src/bindgen/pdfium_6337.rs",
+      "sha256": "625550aa24f67cd6ce89f453af6ba45f0ccecc5ad632b109003cd9143a6cb9d1"
+    },
+    {
+      "path": "src/bindgen/pdfium_6406.rs",
+      "sha256": "67e5155b1817983831d69140d0e2a25014c15eb1b662570c4e91a789d8fcbefe"
+    },
+    {
+      "path": "src/bindgen/pdfium_6490.rs",
+      "sha256": "62a87045f822228173dddf97e82edf9d7e92a18e7f88ebd1adb9cd11f81da6ec"
+    },
+    {
+      "path": "src/bindgen/pdfium_6555.rs",
+      "sha256": "7b7155f71044b26f85b4491287844a3bee7f6a849b4baeb6a01a6d737b36cb2c"
+    },
+    {
+      "path": "src/bindgen/pdfium_6569.rs",
+      "sha256": "ed0cc55edb00e8e5bfb254cc6278c0da1b834560d9f0c86e4069dd7ebc45333d"
+    },
+    {
+      "path": "src/bindgen/pdfium_6611.rs",
+      "sha256": "b24e1d8273eb5b98f1741b17ca9332eca1171419aa3396775d6a467cfac54ee7"
+    },
+    {
+      "path": "src/bindgen/pdfium_6666.rs",
+      "sha256": "c7e763b729bc8091b7d1a780f0922bc9b01cb81da20056ceb47cb798c59e68e7"
+    },
+    {
+      "path": "src/bindgen/pdfium_6721.rs",
+      "sha256": "6f83f2ddbe66184d699c5c5b89d833a93a57194f6a83dd6f6b9eda2626aa101d"
+    },
+    {
+      "path": "src/bindgen/pdfium_6996.rs",
+      "sha256": "e1f12a008fb9982e1c6589aedba3fc2a8e5a545478e4df4b9b4055f46400f02f"
+    },
+    {
+      "path": "src/bindgen/pdfium_7123.rs",
+      "sha256": "3f9abfc42fdcebf60eb3bfcaef77e660a4b190a04f4d54db05999625515544f0"
+    },
+    {
+      "path": "src/bindgen/pdfium_7215.rs",
+      "sha256": "3b8576cb2a8c10430555c67f1824289a894980084b7497e4805c416ed47c5c65"
+    },
+    {
+      "path": "src/bindgen/pdfium_7350.rs",
+      "sha256": "4739e318ba41454f866e58b0cdcc74747ce79fad18ceadf8cda59e2597bc3ee9"
+    },
+    {
+      "path": "src/bindgen/pdfium_7543.rs",
+      "sha256": "fc0729a37778230a1500a0599ebd278d7512a1a9300d574ddef7c7f7aaf6929a"
+    },
+    {
+      "path": "src/bindgen/pdfium_7763.rs",
+      "sha256": "7e0ab4a2a3ad6ecce14a2196822a990fd2bb7fcaa46731a8ae5aa7c80a422204"
+    },
+    {
+      "path": "src/bindgen/pdfium_7881.rs",
+      "sha256": "1781dd644a1616ee95d8d940018c070d96c65f0dd3c27e6533bf478db31f85ca"
+    },
+    {
+      "path": "src/bindgen/pdfium_future.rs",
+      "sha256": "201b826c8f2f727b7a2980d99d3b1d388ec8ababde5dfded2b66b377402912f1"
+    },
+    {
+      "path": "src/bindings/dynamic_bindings.rs",
+      "sha256": "0e9191dd0f1c5f90a035dd3e5a2ee4f54c84af4fa4bbb4f501784c3768802a1c"
+    },
+    {
+      "path": "src/bindings/static_bindings.rs",
+      "sha256": "34d6d38224dc5a17423acdc134b95ffe0825a8695fcafe344cfd215c0e3328e9"
+    },
+    {
+      "path": "src/bindings/thread_safe.rs",
+      "sha256": "a4d8129956778d1d2672a985e400738485409db885e531ebbe903f5a12484650"
+    },
+    {
+      "path": "src/bindings/version.rs",
+      "sha256": "4e6715eedad0d1b08d5abcb134e160ebf8dfc31e005b0c1742c112ff9e4145fd"
+    },
+    {
+      "path": "src/bindings/wasm_bindings.rs",
+      "sha256": "e57886ef56ac6fb3fcffda22e8cc8f2c9c6e41d0427b937cdd25a877eef1bdd6"
+    },
+    {
+      "path": "src/bindings.rs",
+      "sha256": "fabd7674d08f2407c2dcc5ec71cdcf66db270e54ffb3d94f2323b575f0d9cea3"
+    },
+    {
+      "path": "src/config.rs",
+      "sha256": "d3bfd78ee0773b13b1939c3b27b97e66e7fedffec2dfc8200896574b5d6743ff"
+    },
+    {
+      "path": "src/error.rs",
+      "sha256": "5659d9beb187f382f2fe426ea8d94d9b22123bb08a51f8af0b13ce1a2a35b8be"
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "e474483fe73e9db5fde51856dfca530231b30ab01719204961ff0e302a8da880"
+    },
+    {
+      "path": "src/pdf/action/embedded_destination.rs",
+      "sha256": "11734b9215e209d09b29008482a5a1f2da7ef6fca2ec95cf153a062b1c25a157"
+    },
+    {
+      "path": "src/pdf/action/launch.rs",
+      "sha256": "0000e63aa983e5d7204926d4b769dcb2f5eec933675081a0770fb500a658c175"
+    },
+    {
+      "path": "src/pdf/action/local_destination.rs",
+      "sha256": "44f39d7bc971493852a0227f21b5222cb758e2252ee36f89444ba71ac740e330"
+    },
+    {
+      "path": "src/pdf/action/private.rs",
+      "sha256": "dcf324d1c345be868d38a6d806db47e6894b23132bdd575061155dad7a72c95b"
+    },
+    {
+      "path": "src/pdf/action/remote_destination.rs",
+      "sha256": "f61fbbf54b94d9e76963158e2ee95300cffe607222d8c3d01cd474cdc4487fe4"
+    },
+    {
+      "path": "src/pdf/action/unsupported.rs",
+      "sha256": "ccad64b73b836226d234206ea4abdd31b0cd56c7359d2bbc1198c93199620129"
+    },
+    {
+      "path": "src/pdf/action/uri.rs",
+      "sha256": "209578d3d7e3104926d59d1cb3c875538991bd7c36c05fa8c56db7bdf2027187"
+    },
+    {
+      "path": "src/pdf/action.rs",
+      "sha256": "57bb3b86f4224319458808069d1162c0490d8822b7f6dc916a0e86548d39ed33"
+    },
+    {
+      "path": "src/pdf/appearance_mode.rs",
+      "sha256": "2a6f21e49621923ce558bef48e73c19ad02e91796c4eff4a05831df9824b35dd"
+    },
+    {
+      "path": "src/pdf/bitmap.rs",
+      "sha256": "cd18186f44f14ca472b7459bb028b057780ba8542f07ab0e97ab0a41a3e1f76b"
+    },
+    {
+      "path": "src/pdf/color.rs",
+      "sha256": "74993b79ece4334c197d122c8bf191ba4edc5177e014c365ece92eee94ee03f5"
+    },
+    {
+      "path": "src/pdf/color_space.rs",
+      "sha256": "11034a78911673f9cb1f914d0358f64bf3893e23096708bb5a3d1861881c8412"
+    },
+    {
+      "path": "src/pdf/destination.rs",
+      "sha256": "78430f964b9334da07d951360d4788501c8f4d384bcf41224b7ed90956d4a4d2"
+    },
+    {
+      "path": "src/pdf/document/attachment.rs",
+      "sha256": "926b26dc2b67d72cc62ac4f9e9fa720c8211a94d85f5dc13a06f5f3c15b9168f"
+    },
+    {
+      "path": "src/pdf/document/attachments.rs",
+      "sha256": "0cac477ccdfc85ef2c259493426b3976a155f1f7d7fdc996b7102c822c021c27"
+    },
+    {
+      "path": "src/pdf/document/bookmark.rs",
+      "sha256": "7f9dd6e2b1d07168d5d5be954e036b1ab39b8ee8b55b22b0fb65a0a473c46756"
+    },
+    {
+      "path": "src/pdf/document/bookmarks.rs",
+      "sha256": "a1de98c46c3451ba9af6173b4f3433613ccae3cbd7cbe15da67e9ab26724cfbf"
+    },
+    {
+      "path": "src/pdf/document/catalog.rs",
+      "sha256": "ecfbb925e7af82eeed197022bd77b9e4eec357d06d0bb811b8144c2bc6e6c6d9"
+    },
+    {
+      "path": "src/pdf/document/fonts.rs",
+      "sha256": "de5c6100072ffee2ba4c4e85e916d2fe61e243c81daf3116a4726a2c02baeea7"
+    },
+    {
+      "path": "src/pdf/document/form.rs",
+      "sha256": "d29e6f0c9199a70d64444294d0c58acca8eb06279e8568e3e986e878d5864a5f"
+    },
+    {
+      "path": "src/pdf/document/metadata.rs",
+      "sha256": "23eee23cd9d427e76827264d2e3e47125535d8f9e7dd27e6d38675d4a477d736"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/attachment_points.rs",
+      "sha256": "e150bd23cbd1f623a53a46b6370e10af24f186a77d1336d76ab77274d498b0b8"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/circle.rs",
+      "sha256": "086bf9eb1584a570971c166d941bf269eff33b8e32e9245198264f945ab7b380"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/free_text.rs",
+      "sha256": "0827322982a8783be13f60039ce93edbe12e1748bd83e2465d1c7644d12d8a57"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/highlight.rs",
+      "sha256": "2b5122ea181627c47becf45ce5bab9e320954a3b2b3604931da95a206ee43fb3"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/ink.rs",
+      "sha256": "56cd6bd833d6df1009685d60c04b927e2f11e577dcfdc2f625655a61623c7c2e"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/link.rs",
+      "sha256": "f0935bec210b8a9d4b916a7f50ee76b42829e362b1a71c470bf252908337ce9d"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/objects.rs",
+      "sha256": "ad1f5b5a35b137edb8b83642c26a27b3338800a2723d6e5e2e9bfb9b36f4c9aa"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/popup.rs",
+      "sha256": "48a096ca6be5046c836fcca5cf4ac3b76d31bdb7c013f7a8e5c3fae753317f48"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/private.rs",
+      "sha256": "222edfb91dad3dd41f1f4d4eb95996293af43f23d65c6482ac26f171b613088b"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/redacted.rs",
+      "sha256": "6cb04ec009e4836f2c17cdd7cc8badcb14543084782ffcf4eca5cf47198f2aab"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/square.rs",
+      "sha256": "23760ba2e0ffe826b4a78925e9a44a888d637c59fb2f0308a23cf25b25bad9b3"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/squiggly.rs",
+      "sha256": "b252411153f1e7d90c5aa9dc8f14b2aa99b60ab609d47d02376fe152e17cdb99"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/stamp.rs",
+      "sha256": "ee4bc6901d77894f62c1fa741945862bd28089c609928ceff1724c347cb483e6"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/strikeout.rs",
+      "sha256": "ae90fdf24d374c0ab2dfe46043a6cd1b388fc0e11cebfe026a072c7641f1e900"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/text.rs",
+      "sha256": "15e061134b0648e0e32dd9e2302706a839fb15558f736887a475ab3d789fba1e"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/underline.rs",
+      "sha256": "203b8ac8725f0fdcf1cbad615632bcbab9b9e79350a1b83b0f9897a880a64537"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/unsupported.rs",
+      "sha256": "91c85d1676e67002725777a5a1175b84cfd232cee9fdeefd216b5ac2d1cf3825"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/variable_text.rs",
+      "sha256": "28f20dfb9da72c69f6235b962abe878c68d305591c084f9732f4140ae7a03e72"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/widget.rs",
+      "sha256": "0023cb86abdd160b6d825755e1c7643015a8f3ee881c37abe0722bcaf82ef1e7"
+    },
+    {
+      "path": "src/pdf/document/page/annotation/xfa_widget.rs",
+      "sha256": "f5a596effadc069c62ff50e2f7a72de19c33e3d1b5be55d411a766de4bc71659"
+    },
+    {
+      "path": "src/pdf/document/page/annotation.rs",
+      "sha256": "9b23e98e3df0eb3092b57afef6cc1ab412fc262824197db95347c53af73ad0e6"
+    },
+    {
+      "path": "src/pdf/document/page/annotations.rs",
+      "sha256": "94204d6f6cd3431a5c41a3adf96b88285e132ca721d711448b650f22341d6452"
+    },
+    {
+      "path": "src/pdf/document/page/boundaries.rs",
+      "sha256": "c3188aa31d4aacb03c77f89fd161e259e6cb9107081e6778edee8c7f393617de"
+    },
+    {
+      "path": "src/pdf/document/page/field/button.rs",
+      "sha256": "34a1ac9055deebd9b19c6e0eb732668f19eee18ea1916e814f681128fc97dbc5"
+    },
+    {
+      "path": "src/pdf/document/page/field/checkbox.rs",
+      "sha256": "9caec17f5d3052d6761ada8f07461ebce5859b4114360c06ef618e0ee436e2fc"
+    },
+    {
+      "path": "src/pdf/document/page/field/combo.rs",
+      "sha256": "3a45b120f02268b71900acebc54429f044340b189ad62bed1fbadae27da2b2f8"
+    },
+    {
+      "path": "src/pdf/document/page/field/list.rs",
+      "sha256": "13eb00b7a0be1f31ba42a98e6a2517c6131152dc10c607922e448530c86cc177"
+    },
+    {
+      "path": "src/pdf/document/page/field/option.rs",
+      "sha256": "662f1a6dd8955a48180f5d9684634e102d204ed7c599f01c986d555dcc781b81"
+    },
+    {
+      "path": "src/pdf/document/page/field/options.rs",
+      "sha256": "987ac0fdce81efa916bfddad15f8ee20b1237aaf6d6a8afd463881b48bab0b68"
+    },
+    {
+      "path": "src/pdf/document/page/field/private.rs",
+      "sha256": "a8af58b5c46609ce263442aa6b93697c774437f38b59d59ce975bd08ec324411"
+    },
+    {
+      "path": "src/pdf/document/page/field/radio.rs",
+      "sha256": "3a90049c466a117a8e7374fbe5423ca7c85b75801a2a0873a3f15534b17ad65a"
+    },
+    {
+      "path": "src/pdf/document/page/field/signature.rs",
+      "sha256": "6aee06d07beffd8ac510fc794b5d24ec2d0fdc0e17a84a5b396065c59a98ae68"
+    },
+    {
+      "path": "src/pdf/document/page/field/text.rs",
+      "sha256": "c8ae85783f3a9393e7efa86f433a28136e2fc0bb2d7f2c91ba891a67f9917f88"
+    },
+    {
+      "path": "src/pdf/document/page/field/unknown.rs",
+      "sha256": "5ce49f3d9e1cfdf5c75b89c0fe95a384f39dd2da8a691d59a6a96664b881d54e"
+    },
+    {
+      "path": "src/pdf/document/page/field.rs",
+      "sha256": "69f1ac749de37a04e5d6fd49ce00f659fb2dcec98571e2f56e6b23b184095328"
+    },
+    {
+      "path": "src/pdf/document/page/flatten.rs",
+      "sha256": "202bef4a203b2f437eae1cfbcdd60b011b43e581289df75a77de8cfa94b5984f"
+    },
+    {
+      "path": "src/pdf/document/page/index_cache.rs",
+      "sha256": "a27a9db6037bd3503dc00c9b228b78514601a9358a08f7a1f8d892a7c15ace87"
+    },
+    {
+      "path": "src/pdf/document/page/links.rs",
+      "sha256": "3414280f8d5f918334eb1fac54c6f332b263f68a8792c1d0894152168fbdbed6"
+    },
+    {
+      "path": "src/pdf/document/page/object/content_mark.rs",
+      "sha256": "a10e119800a963cd272c86b222fd62c07fec84ada28bc288dd3a0aa61a8617f3"
+    },
+    {
+      "path": "src/pdf/document/page/object/group.rs",
+      "sha256": "807f2e0097387dedf087f2ff5039291c55039ee14a97c32d5747b42802409630"
+    },
+    {
+      "path": "src/pdf/document/page/object/image.rs",
+      "sha256": "3e5bc7e9e1daf3f67edb8e8cf99bd0777886a8d5d2c229fc3d55f7eae85218de"
+    },
+    {
+      "path": "src/pdf/document/page/object/ownership.rs",
+      "sha256": "95e5f46aa0068553664e2eaf53d8ab23fc2ea1a66449b1fa2e2711660e4e4a88"
+    },
+    {
+      "path": "src/pdf/document/page/object/path.rs",
+      "sha256": "665daa156a7d28eaff6d9080ae1ec606edf3fe322dbeaae06ceb32cc02c6b7f9"
+    },
+    {
+      "path": "src/pdf/document/page/object/private.rs",
+      "sha256": "0867d2fdbb1eb7f54a3616c7fe6fb16b3d951dd336100ef231e2dc613d8e4846"
+    },
+    {
+      "path": "src/pdf/document/page/object/shading.rs",
+      "sha256": "9a16e17cba9d26685a453eea66afd0179e604a4dfb6c400e7e7fac586332c12f"
+    },
+    {
+      "path": "src/pdf/document/page/object/text.rs",
+      "sha256": "6f4f410d5cbfe5640604c0f43f2d7d5e6a8da59971bafc40829ac06987847ef2"
+    },
+    {
+      "path": "src/pdf/document/page/object/unsupported.rs",
+      "sha256": "6e3fe9a03fffb8721552ff7fb2951c6268cee9ffe074fac53726a7197f31cc70"
+    },
+    {
+      "path": "src/pdf/document/page/object/x_object_form.rs",
+      "sha256": "9859afd6e7282f21d73c32a601c45b09519c4b531bba671db286ee1e10e7a17a"
+    },
+    {
+      "path": "src/pdf/document/page/object.rs",
+      "sha256": "f95d00ae529289d7709d1ab85f8f00ad714d510f69327d2b4ca27709262300ae"
+    },
+    {
+      "path": "src/pdf/document/page/objects/common.rs",
+      "sha256": "4babc8b1b63963d67ea945d0b9d386d2d182d4fad038aa3d267c3302101d837b"
+    },
+    {
+      "path": "src/pdf/document/page/objects/private.rs",
+      "sha256": "95a5e4ca58297a05b8481683d82ba10f615451638bbeeb4604a4ed96a28dfd91"
+    },
+    {
+      "path": "src/pdf/document/page/objects.rs",
+      "sha256": "eb400b1c7ebeed3bd20ba0339bb9b9d19327361e9f8a0c7faba1fd1f7fa2c106"
+    },
+    {
+      "path": "src/pdf/document/page/paragraph.rs",
+      "sha256": "9ff3ded592d8ef7efdf8f5b8e79969aad0e6cd03af7a53d44105d54025b679a6"
+    },
+    {
+      "path": "src/pdf/document/page/render_config.rs",
+      "sha256": "ab3906e1a8654e640f07c19efc7bd009f8f0ecc0c5df2cbee1b5f58388a60d67"
+    },
+    {
+      "path": "src/pdf/document/page/size.rs",
+      "sha256": "2d9bb8fd2e76e92208939bc4f4106d8e25ed1c7a1bf6a2df3b2a4af8a2cd02a1"
+    },
+    {
+      "path": "src/pdf/document/page/structure_tree.rs",
+      "sha256": "4633c94f82f500fd1db627a09eee9cbb1a2e6e20f471858b38aee36adb839d27"
+    },
+    {
+      "path": "src/pdf/document/page/text/char.rs",
+      "sha256": "da8a73e74d30aa5fd07be6389146c8466b61ccf24567430e6437eb93521556f2"
+    },
+    {
+      "path": "src/pdf/document/page/text/chars.rs",
+      "sha256": "4936f020332e80d2a2b19929f3ae5caabd0771980f238a02629fd463e6130697"
+    },
+    {
+      "path": "src/pdf/document/page/text/search.rs",
+      "sha256": "a46f8f760d3c764bd6d822c388be4c056c8f844cc64944b16786f3d39a2dc74d"
+    },
+    {
+      "path": "src/pdf/document/page/text/segment.rs",
+      "sha256": "60897a58552f4d262b854484752e35fb7c39246665e8515c7bd5060ee6e4b593"
+    },
+    {
+      "path": "src/pdf/document/page/text/segments.rs",
+      "sha256": "b296241e8ee36b89e9c5eab0ceac83695140c673edd1389eb049566dfa65111b"
+    },
+    {
+      "path": "src/pdf/document/page/text.rs",
+      "sha256": "5c8c9a0a8ea746b61e94412ce32da1bfbc99de399c832381e192f57bea47ffa2"
+    },
+    {
+      "path": "src/pdf/document/page.rs",
+      "sha256": "daec4c99f59026c4a2f311e1e1892093e10c96d46c0712491e10982f6a1c63ec"
+    },
+    {
+      "path": "src/pdf/document/pages.rs",
+      "sha256": "26b961d5e52bba551dabf0928132ae8994f4fc21411b7789b1ff8666224f4999"
+    },
+    {
+      "path": "src/pdf/document/permissions.rs",
+      "sha256": "2f75f1728035f8451b7ff12c8368732cba80b77d3df9c90aa5093c4e56b73fad"
+    },
+    {
+      "path": "src/pdf/document/signature.rs",
+      "sha256": "44c9772aacdcb8148933a41df7c3840ca76a2b1d5e4221cfb1c3c69de2e31cec"
+    },
+    {
+      "path": "src/pdf/document/signatures.rs",
+      "sha256": "cb00b93904c3482b534cbb310263b3e969e88adf54cfcc5d035469583d85bf0a"
+    },
+    {
+      "path": "src/pdf/document.rs",
+      "sha256": "ff2a0d4542611e70a9ca66412afbb0d1ffe998336972c0d26084913b3d2afb1c"
+    },
+    {
+      "path": "src/pdf/font/glyph.rs",
+      "sha256": "5a7fe63747ba6cb8edea0cfd4ce5c821d824ae7606841109651c7607873f4a97"
+    },
+    {
+      "path": "src/pdf/font/glyphs.rs",
+      "sha256": "2e5840149f41b95aba82bb7201fe42b6b118359665ebae71da59ad62fabacb37"
+    },
+    {
+      "path": "src/pdf/font/provider.rs",
+      "sha256": "1e2af01e4ab23c79b0dc32c07167d00345882eb207ca6065cd474f3c8184d62b"
+    },
+    {
+      "path": "src/pdf/font.rs",
+      "sha256": "600a5de03ff55ba5bc0c71284b96cf9317f5cc450afbd9916e65a707b749d51d"
+    },
+    {
+      "path": "src/pdf/link.rs",
+      "sha256": "6d61d6c24bc5dd8eb40fea9b994592976a6b4d6fbf9c6a5789746ace70cfcf44"
+    },
+    {
+      "path": "src/pdf/matrix.rs",
+      "sha256": "b31ed4bdfb0141d52b00fac782359bb5418558b6becd2db0fcb9fbfb91f843c9"
+    },
+    {
+      "path": "src/pdf/path/clip_path.rs",
+      "sha256": "338ab28cfd5720883053b344ce0fde153c99a27338284c69ad272fc2583c802d"
+    },
+    {
+      "path": "src/pdf/path/segment.rs",
+      "sha256": "8774523a4df2a187cb86265814964f653f824ad51941cdea8ccdc1e972ac72b2"
+    },
+    {
+      "path": "src/pdf/path/segments.rs",
+      "sha256": "5cc131901b6b3c9f7e8b0c8f5fb0a7f27aa9ba95132f7db96ec634d5c4176b98"
+    },
+    {
+      "path": "src/pdf/path.rs",
+      "sha256": "2bc7a614f1cdc7aa8ede63c82b8b44c350f954617275e3b8f0a6f6359510073e"
+    },
+    {
+      "path": "src/pdf/points.rs",
+      "sha256": "5137b6f4096af1991ef044ef9b93aed7ac8ddda97d6a97749b95083462443191"
+    },
+    {
+      "path": "src/pdf/quad_points.rs",
+      "sha256": "d93442d4c53883c4d69dc952546ecf25cc9840f068cb9e986581810a2730d238"
+    },
+    {
+      "path": "src/pdf/rect.rs",
+      "sha256": "a7fc68f5f0d8bf7dba1f6ebda9319ce2210625a3ba42bfb1ddb1c35a7d9a989d"
+    },
+    {
+      "path": "src/pdf/transform.rs",
+      "sha256": "9f486d3b667d24a836b11e64bd5e7d5479641a3aa0e7228f17050e9e0ba12fb9"
+    },
+    {
+      "path": "src/pdf.rs",
+      "sha256": "d30e7a6e30ba98566e6ab74cfaeebc5d6ff5982c2f79af02206adc4946fdc383"
+    },
+    {
+      "path": "src/pdfium.rs",
+      "sha256": "5b64f737c82037f00d43f998fd43a9a1a5026a9b19518e533c09b774d228cbc0"
+    },
+    {
+      "path": "src/utils.rs",
+      "sha256": "829952b0f96b55fc3294b53793f417caf3a0859d4c1386c65d9993aca9e904f9"
+    }
+  ],
+  "localPatches": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "c17aa8a0372212df64aec9b6f54fb432fbec76c6254063c67b3d7628b7054312"
+    },
+    {
+      "path": "src/pdf/action/uri.rs",
+      "sha256": "4c80653d9235efc338064f3afc24ee5ccde334dde58d8001420136c6433d68f4"
+    },
+    {
+      "path": "src/error.rs",
+      "sha256": "ef8fe6d09c4ddc44c7930ab4dc1891884b76b653b1bf7dff211aeb70391f2e7f"
+    },
+    {
+      "path": "src/pdf/document/page/object/content_mark.rs",
+      "sha256": "f51482558cc5705f6872d0a06bb32e96701f1602488ebe6acb57e94981f7721d"
+    }
+  ]
+}

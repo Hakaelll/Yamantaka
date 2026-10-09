@@ -223,3 +223,31 @@ fn excessive_annotations_and_links_fail_without_retaining_partial_payloads() {
         engine.close("book".into()).unwrap();
     }
 }
+
+#[test]
+fn native_uri_reader_checks_the_limit_before_allocation_and_preserves_existing_api() {
+    use pdfium_render::prelude::*;
+    let fixture = fixture(0);
+    let original = Sha256::digest(fs::read(&fixture.0).unwrap());
+    let worker = engine(MemoryGovernor::default());
+    let pdfium = Pdfium::default();
+    let document = pdfium.load_pdf_from_file(&fixture.0, None).unwrap();
+    let page = document.pages().get(0).unwrap();
+    let annotation = page.annotations().get(2).unwrap();
+    let link = annotation.as_link_annotation().unwrap().link().unwrap();
+    let action = link.action().unwrap();
+    let uri = action.as_uri_action().unwrap();
+    let expected = "https://example.invalid";
+    for limit in [0, expected.len() - 1] {
+        assert!(matches!(
+            uri.uri_with_max_bytes(limit),
+            Err(PdfiumError::UriLengthExceedsLimit)
+        ));
+    }
+    for limit in [expected.len(), expected.len() + 1, usize::MAX] {
+        assert_eq!(uri.uri_with_max_bytes(limit).unwrap(), expected);
+    }
+    assert_eq!(uri.uri().unwrap(), expected);
+    assert_eq!(Sha256::digest(fs::read(&fixture.0).unwrap()), original);
+    drop(worker);
+}

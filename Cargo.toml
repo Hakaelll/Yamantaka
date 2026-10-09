@@ -1,6 +1,7 @@
 [workspace]
 members = ["rust/domain", "rust/application", "rust/storage", "rust/pdf", "rust/windows", "rust/ui"]
 resolver = "2"
+exclude = ["third_party/pdfium-render"]
 
 [workspace.package]
 version = "0.16.0-alpha.1"
@@ -39,3 +40,6 @@ unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
 all = "warn"
+
+[patch.crates-io]
+pdfium-render = { path = "third_party/pdfium-render" }
