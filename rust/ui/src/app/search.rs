@@ -114,6 +114,17 @@ impl YamantakaApp {
             theme::control(ui, label, Some(theme::Icon::Menu), false, false, p)
         };
         egui::Popup::menu(&response).show(|ui| {
+            if theme::navigation(
+                ui,
+                self.tr("Notas de la biblioteca", "Library notes"),
+                matches!(self.surface, Surface::Notes),
+                p,
+            )
+            .clicked()
+            {
+                self.show_global_notes();
+                ui.close();
+            }
             if theme::control(
                 ui,
                 self.tr("Búsqueda global", "Global search"),

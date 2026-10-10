@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='global-notes-filters'; args=@('--annotation-many','--global-notes-filters') },
+    @{ name='global-notes-open'; args=@('--annotation-many','--global-notes-open') },
+    @{ name='global-notes-dark'; args=@('--annotation-many','--global-notes') },
+    @{ name='global-notes-review-es'; args=@('--annotation-many','--global-notes-review','--light','--es') },
+    @{ name='global-notes-tag'; args=@('--annotation-many','--global-notes-tag') },
+    @{ name='global-notes-empty'; args=@('--annotation-many','--global-notes-empty') },
+    @{ name='global-notes-small-200'; args=@('--annotation-many','--global-notes','--size=640x480','--text-scale=2') },
     @{ name='annotation-bulk-tag-dark'; args=@('--reader','--annotation-many','--annotation-bulk-tag') },
     @{ name='annotation-bulk-tag-saved-es'; args=@('--reader','--annotation-many','--annotation-bulk-tag-save','--light','--es') },
     @{ name='annotation-bulk-tag-export'; args=@('--reader','--annotation-many','--annotation-bulk-tag-save','--export-json') },

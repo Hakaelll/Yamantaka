@@ -12,7 +12,7 @@ mod bulk;
 pub(super) mod export;
 mod filters;
 pub(super) mod paint;
-mod panel;
+pub(super) mod panel;
 mod tags;
 #[cfg(test)]
 mod tests;
@@ -87,6 +87,23 @@ pub(super) struct AnnotationState {
     bulk_tag_preview: Option<bool>,
 }
 impl AnnotationState {
+    pub(in crate::app) fn writing(&self) -> bool {
+        self.pending.as_ref().is_some_and(|p| p.writing)
+    }
+    pub(in crate::app) fn invalidate_records(&mut self) {
+        if self.editing() || self.writing() {
+            return;
+        }
+        if let Some(pending) = self.pending.take() {
+            pending.cancel.cancel();
+        }
+        self.page = None;
+        self.error = None;
+        self.saved = false;
+        self.selected = Default::default();
+        self.bulk_tag.clear();
+        self.revision = self.revision.wrapping_add(1);
+    }
     pub(super) fn editing(&self) -> bool {
         self.editor.is_some()
     }
@@ -302,6 +319,9 @@ impl Drop for AnnotationState {
 }
 impl YamantakaApp {
     pub(super) fn begin_page_note(&mut self) {
+        if self.global_notes.writing() {
+            return;
+        }
         let Some((document, info)) = &self.active else {
             return;
         };
@@ -402,6 +422,9 @@ impl YamantakaApp {
         }
     }
     fn annotation_command(&mut self, mutation: Option<AnnotationMutation>, offset: usize) {
+        if mutation.is_some() && self.global_notes.writing() {
+            return;
+        }
         let Some(request) = self.annotations.request(&self.governor, mutation, offset) else {
             return;
         };
@@ -416,6 +439,9 @@ impl YamantakaApp {
         }
     }
     pub(super) fn annotate_selection(&mut self) {
+        if self.global_notes.writing() {
+            return;
+        }
         let Some((document, _)) = &self.active else {
             return;
         };

@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn kind_label(kind: AnnotationKind, english: bool) -> &'static str {
+pub(in crate::app) fn kind_label(kind: AnnotationKind, english: bool) -> &'static str {
     match (kind, english) {
         (AnnotationKind::Highlight, true) => "Highlight",
         (AnnotationKind::Highlight, false) => "Resaltado",
@@ -16,7 +16,7 @@ pub(super) fn kind_label(kind: AnnotationKind, english: bool) -> &'static str {
         (AnnotationKind::PageComment, false) => "Nota de página",
     }
 }
-fn review_label(state: AnnotationReviewState, english: bool) -> &'static str {
+pub(in crate::app) fn review_label(state: AnnotationReviewState, english: bool) -> &'static str {
     match (state, english) {
         (AnnotationReviewState::Pending, true) => "Pending",
         (AnnotationReviewState::Pending, false) => "Pendiente",
@@ -26,7 +26,7 @@ fn review_label(state: AnnotationReviewState, english: bool) -> &'static str {
         (AnnotationReviewState::Resolved, false) => "Resuelta",
     }
 }
-fn color_label(color: AnnotationColor, english: bool) -> &'static str {
+pub(in crate::app) fn color_label(color: AnnotationColor, english: bool) -> &'static str {
     match (color, english) {
         (AnnotationColor::Yellow, true) => "Yellow",
         (AnnotationColor::Yellow, false) => "Amarillo",
@@ -65,7 +65,7 @@ impl YamantakaApp {
         info: &PdfInfo,
         p: Palette,
     ) {
-        let busy = self.annotations.pending.is_some();
+        let busy = self.annotations.pending.is_some() || self.global_notes.writing();
         let offset = self.annotations.page.as_ref().map_or(0, |page| page.offset);
         ui.label(
             RichText::new(self.tr("Notas de lectura", "Reading notes"))

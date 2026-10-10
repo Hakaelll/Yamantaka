@@ -26,6 +26,7 @@ fn record(governor: &MemoryGovernor, page: u32) -> AnnotationRecord {
         .unwrap();
     AnnotationRecord::from_reserved(
         AnnotationRecordData {
+            document_title: None,
             id: format!("r{page}"),
             values: AnnotationDraftValues {
                 document_id: "a".into(),

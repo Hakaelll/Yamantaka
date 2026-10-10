@@ -57,11 +57,34 @@ fn field<'a>(row: &'a Row<'_>, index: usize) -> Result<&'a str> {
         .as_str()
         .map_err(storage)
 }
+fn read_title(
+    db: &Connection,
+    document: &str,
+    lease: &mut yamantaka_domain::memory::ByteLease,
+    bytes: usize,
+) -> Result<Option<String>> {
+    let mut title_statement = db.prepare("SELECT COALESCE(title_override,title,source_title,file_name) FROM documents WHERE id=?").map_err(storage)?;
+    let mut title_rows = title_statement.query([document]).map_err(storage)?;
+    if let Some(title_row) = title_rows.next().map_err(storage)? {
+        let title = field(title_row, 0)?;
+        lease
+            .try_resize(
+                bytes
+                    .checked_add(title.len())
+                    .ok_or(Failure::MemoryBudget)?,
+            )
+            .map_err(|_| Failure::MemoryBudget)?;
+        Ok(Some(title.into()))
+    } else {
+        Ok(None)
+    }
+}
 fn read_record(
     db: &Connection,
     row: &Row<'_>,
     governor: &MemoryGovernor,
     cancel: &Cancellation,
+    include_title: bool,
 ) -> Result<AnnotationRecord> {
     cancel.check()?;
     let mut bytes = row
@@ -175,8 +198,14 @@ fn read_record(
         extensions.push(((*name).into(), value));
     }
     drop(columns);
+    let document_title = if include_title {
+        read_title(db, &values.document_id, &mut lease, bytes)?
+    } else {
+        None
+    };
     AnnotationRecord::from_reserved(
         AnnotationRecordData {
+            document_title,
             id: id.into(),
             values,
             tags,
@@ -254,11 +283,19 @@ fn read_page(
         .map_err(storage)?;
     let total =
         u64::try_from(total).map_err(|_| Failure::Invalid("Annotation count is invalid".into()))?;
-    let offset = query.offset.min(100000);
-    let order = if query.newest_first || query.document_id.is_none() {
-        "a.updated_at DESC,a.page_index,a.id"
-    } else {
-        "a.page_index,a.created_at,a.id"
+    let offset = query.offset.min(i64::MAX as usize);
+    let order = match query.grouping {
+        Some(AnnotationGrouping::Document) => {
+            "(SELECT COALESCE(title_override,title,source_title,file_name) FROM documents WHERE id=a.document_id) COLLATE NOCASE,a.document_id,a.updated_at,a.id"
+        }
+        Some(AnnotationGrouping::Page) => "a.page_index,a.updated_at,a.id",
+        Some(AnnotationGrouping::Review) => {
+            "CASE a.review_state WHEN 'pending' THEN 0 WHEN 'accepted' THEN 1 ELSE 2 END,a.updated_at,a.id"
+        }
+        None if query.newest_first || query.document_id.is_none() => {
+            "a.updated_at DESC,a.page_index,a.id"
+        }
+        None => "a.page_index,a.created_at,a.id",
     };
     values.extend([
         Value::Integer(ANNOTATION_PAGE_SIZE as i64),
@@ -288,7 +325,7 @@ fn read_page(
         .try_reserve_exact(ANNOTATION_PAGE_SIZE)
         .map_err(|_| Failure::MemoryBudget)?;
     while let Some(row) = rows.next().map_err(storage)? {
-        entries.push(read_record(db, row, governor, cancel)?);
+        entries.push(read_record(db, row, governor, cancel, true)?);
     }
     cancel.check()?;
     AnnotationPage::from_reserved(entries, total, offset, page_lease)
@@ -340,7 +377,7 @@ impl AnnotationRepository for Database {
                 .map_err(storage)?;
             let mut rows = statement.query([document]).map_err(storage)?;
             while let Some(row) = rows.next().map_err(storage)? {
-                let record = read_record(&tx, row, governor, cancel)?;
+                let record = read_record(&tx, row, governor, cancel, false)?;
                 visitor(&record)?;
                 cancel.check()?;
                 count = count.checked_add(1).ok_or(Failure::MemoryBudget)?;

@@ -1,6 +1,12 @@
 use super::*;
 use crate::{Cancellation, search::IndexAccess};
 pub const ANNOTATION_PAGE_SIZE: usize = 80;
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AnnotationGrouping {
+    Document,
+    Page,
+    Review,
+}
 #[derive(Default)]
 pub struct AnnotationQuery {
     pub document_id: Option<String>,
@@ -11,12 +17,15 @@ pub struct AnnotationQuery {
     pub tag: Option<String>,
     pub text: String,
     pub newest_first: bool,
+    pub grouping: Option<AnnotationGrouping>,
     pub updated_after: Option<String>,
     pub updated_before: Option<String>,
     pub offset: usize,
 }
 pub struct AnnotationRecordData {
     pub id: String,
+    /// Current catalogue title for presentation; not persisted with the annotation.
+    pub document_title: Option<String>,
     pub values: AnnotationDraftValues,
     pub tags: Vec<String>,
     pub created_at: String,
@@ -50,6 +59,7 @@ impl AnnotationRecord {
             &values.document_fingerprint,
         ];
         let optional = [
+            &data.document_title,
             &data.origin_document_id,
             &data.origin_fingerprint,
             &values.note,

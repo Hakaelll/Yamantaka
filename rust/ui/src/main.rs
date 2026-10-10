@@ -143,6 +143,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         {
             db.execute_batch("INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('synthetic-study','Study','study','violet','2026-10-10T12:00:00Z','2026-10-10T12:00:00Z'); INSERT INTO annotation_tags(annotation_id,tag_id) SELECT id,'synthetic-study' FROM annotations WHERE id<'synthetic-mark-020';")?;
         }
+        if capture.is_some()
+            && args.iter().any(|arg| {
+                arg.to_str()
+                    .is_some_and(|value| value.starts_with("--global-notes"))
+            })
+        {
+            db.execute_batch("UPDATE annotations SET document_id='demo-1',document_fingerprint=(SELECT fingerprint FROM documents WHERE id='demo-1') WHERE id>='synthetic-mark-002';")?;
+        }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
             db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
@@ -341,6 +349,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_annotation_tag(
                         args.iter().any(|arg| arg == "--annotation-bulk-tag-save"),
                     );
+                }
+                if args.iter().any(|arg| {
+                    arg.to_str()
+                        .is_some_and(|value| value.starts_with("--global-notes"))
+                }) {
+                    let action = if args.iter().any(|arg| arg == "--global-notes-open") {
+                        "open"
+                    } else if args.iter().any(|arg| arg == "--global-notes-filters") {
+                        "filters"
+                    } else if args.iter().any(|arg| arg == "--global-notes-review") {
+                        "review"
+                    } else if args.iter().any(|arg| arg == "--global-notes-tag") {
+                        "tag"
+                    } else if args.iter().any(|arg| arg == "--global-notes-empty") {
+                        "empty"
+                    } else {
+                        "list"
+                    };
+                    app.preview_global_notes(action);
                 }
                 if args.iter().any(|arg| arg == "--page-note") {
                     app.preview_page_note(args.iter().any(|arg| arg == "--annotation-save"));

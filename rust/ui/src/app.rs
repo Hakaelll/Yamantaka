@@ -3,6 +3,7 @@ mod bookmarks;
 mod compact;
 mod details;
 mod find;
+mod global_notes;
 mod links;
 mod list;
 mod navigation;
@@ -50,6 +51,7 @@ use yamantaka_windows::{ActivationWatch, Instance};
 
 enum Surface {
     Search,
+    Notes,
     Library,
     Reader,
     Settings,
@@ -74,6 +76,7 @@ impl PageImage {
 }
 pub struct YamantakaApp {
     search: search::SearchState,
+    global_notes: global_notes::GlobalNotes,
     open_intent: open_intent::OpenIntent,
     open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
@@ -285,6 +288,7 @@ impl YamantakaApp {
             outline_preview_target: None,
             reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
+            global_notes: Default::default(),
             annotations: Default::default(),
             annotation_export: Default::default(),
             annotation_paint: Default::default(),
@@ -453,6 +457,9 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        if matches!(self.surface, Surface::Notes) {
+            self.global_notes.leave();
+        }
         self.links.clear();
         self.annotation_paint.invalidate();
         self.text.clear();
@@ -1454,6 +1461,10 @@ impl App for YamantakaApp {
                 Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
                 Update::AnnotationMarks(reply) => self.annotation_paint.accept(reply),
                 Update::Annotations(reply) => {
+                    if self.global_notes.matches(&reply) {
+                        self.accept_global_note_reply(reply);
+                        continue;
+                    }
                     let revision = self.annotations.revision;
                     if let Some(error) = self.annotations.accept(reply) {
                         self.error = Some(format!(
@@ -1794,6 +1805,7 @@ impl App for YamantakaApp {
         self.apply_annotation_filter_preview();
         self.apply_annotation_bulk_preview();
         self.apply_annotation_tag_preview();
+        self.apply_global_note_preview();
         self.apply_annotation_export_preview();
         let dropped = ctx.input(|i| {
             i.raw
@@ -1876,6 +1888,7 @@ impl App for YamantakaApp {
                         Surface::Reader => self.reader(ui),
                         Surface::Settings => self.settings(ui),
                         Surface::Search => self.global_search(ui),
+                        Surface::Notes => self.global_notes_panel(ui),
                     });
             });
         });
@@ -1884,7 +1897,8 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = !self.documents.is_empty()
-                    && ((!self.panel && self.reader_panel_tab != outline::ReaderPanelTab::Find)
+                    && (!matches!(self.surface, Surface::Reader)
+                        || (!self.panel && self.reader_panel_tab != outline::ReaderPanelTab::Find)
                         || match self.reader_panel_tab {
                             outline::ReaderPanelTab::Bookmarks => self.bookmarks.ready(),
                             outline::ReaderPanelTab::Annotations => self.annotations.ready(),
@@ -1913,6 +1927,8 @@ impl App for YamantakaApp {
                     && self.reader_destination.is_none()
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
+                    && (!matches!(self.surface, Surface::Notes) || self.global_notes.ready())
+                    && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     // The compact drawer hides the PDF, so it has no visible marks to request.
                     && (!matches!(self.surface, Surface::Reader)
                         || self.panel && ctx.content_rect().width() < 620.0
@@ -1993,6 +2009,7 @@ impl App for YamantakaApp {
                         "annotations":self.annotation_capture_summary(),
                         "annotationPaint":self.annotation_paint.capture_summary(),
                         "annotationExport":self.annotation_export.capture_summary(),
+                        "globalNotes":self.global_notes.summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
@@ -2014,6 +2031,7 @@ impl App for YamantakaApp {
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
         self.annotation_export.cancel();
+        self.global_notes.cancel();
         self.links.clear();
         self.annotation_paint.invalidate();
         self.text.clear();
