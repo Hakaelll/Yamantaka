@@ -440,6 +440,9 @@ fn execute(db: &mut Database, request: AnnotationRequest) -> AnnotationReply {
         AnnotationOperation::Read => {
             db.annotations(&request.query, &request.governor, &request.cancel)
         }
+        AnnotationOperation::Batch { .. } => {
+            panic!("Reader fixture expects document-scoped operations")
+        }
         AnnotationOperation::Change {
             document_id,
             mutation,

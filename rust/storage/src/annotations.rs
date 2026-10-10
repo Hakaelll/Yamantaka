@@ -9,6 +9,7 @@ use yamantaka_domain::{
     reader_preferences::PageRotation,
     search::IndexAccess,
 };
+mod batch;
 mod marks;
 mod writes;
 const SELECT_RECORDS: &str = "SELECT a.id,a.document_id,a.page_index,a.type,a.color,a.note,a.selected_text,a.context_before,a.context_after,a.rects_json,a.page_rotation,a.document_fingerprint,a.status,a.created_at,a.updated_at,a.review_state,a.origin_document_id,a.origin_fingerprint,a.* FROM annotations a";
@@ -370,6 +371,16 @@ impl AnnotationRepository for Database {
         let result = read_page(&tx, query, governor, cancel)?;
         tx.commit().map_err(storage)?;
         Ok(result)
+    }
+    fn change_annotation_batch(
+        &mut self,
+        change: AnnotationBatchChange<'_>,
+        query: &AnnotationQuery,
+        access: IndexAccess,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<AnnotationPage> {
+        batch::change(self, change, query, access, governor, cancel)
     }
     fn change_annotation(
         &mut self,

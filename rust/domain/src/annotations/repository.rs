@@ -183,7 +183,36 @@ pub enum AnnotationChange<'a> {
         fingerprint: &'a str,
     },
 }
+/// A frozen identity includes its document so moved or stale records are rejected.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AnnotationTarget {
+    pub document_id: String,
+    pub annotation_id: String,
+}
+pub enum AnnotationBatchChange<'a> {
+    Review {
+        targets: &'a [AnnotationTarget],
+        state: AnnotationReviewState,
+    },
+    AddTag {
+        targets: &'a [AnnotationTarget],
+        tag: &'a str,
+    },
+}
 pub trait AnnotationRepository {
+    /// Applies a cross-document batch atomically, including the resulting query and index refresh.
+    fn change_annotation_batch(
+        &mut self,
+        _change: AnnotationBatchChange<'_>,
+        _query: &AnnotationQuery,
+        _access: IndexAccess,
+        _governor: &MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<AnnotationPage> {
+        Err(Failure::Unsupported(
+            "Changing annotations across documents".into(),
+        ))
+    }
     /// Opens an independent reader for export work without sharing the actor's connection.
     fn export_reader(&self) -> Result<Box<dyn AnnotationRepository + Send>> {
         Err(Failure::Unsupported("Independent annotation export".into()))

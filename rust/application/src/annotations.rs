@@ -4,8 +4,8 @@ use yamantaka_domain::{
     annotations::{
         AnnotationColor, AnnotationDraft, AnnotationKind, AnnotationReviewState,
         repository::{
-            AnnotationChange, AnnotationPage, AnnotationQuery, AnnotationRecord,
-            AnnotationRepository,
+            AnnotationBatchChange, AnnotationChange, AnnotationPage, AnnotationQuery,
+            AnnotationRecord, AnnotationRepository, AnnotationTarget,
         },
     },
     memory::MemoryGovernor,
@@ -95,8 +95,32 @@ impl AnnotationMutation {
         }
     }
 }
+pub enum AnnotationBatchMutation {
+    Review {
+        targets: Vec<AnnotationTarget>,
+        state: AnnotationReviewState,
+    },
+    AddTag {
+        targets: Vec<AnnotationTarget>,
+        tag: String,
+    },
+}
+impl AnnotationBatchMutation {
+    fn borrowed(&self) -> AnnotationBatchChange<'_> {
+        match self {
+            Self::Review { targets, state } => AnnotationBatchChange::Review {
+                targets,
+                state: *state,
+            },
+            Self::AddTag { targets, tag } => AnnotationBatchChange::AddTag { targets, tag },
+        }
+    }
+}
 pub enum AnnotationOperation {
     Read,
+    Batch {
+        mutation: AnnotationBatchMutation,
+    },
     Change {
         document_id: String,
         mutation: AnnotationMutation,
@@ -120,13 +144,22 @@ impl AnnotationRequest {
         access: IndexAccess,
     ) -> AnnotationReply {
         let document_id = match &self.operation {
-            AnnotationOperation::Read => self.query.document_id.clone(),
+            AnnotationOperation::Read | AnnotationOperation::Batch { .. } => {
+                self.query.document_id.clone()
+            }
             AnnotationOperation::Change { document_id, .. } => Some(document_id.clone()),
         };
         let result = self.cancel.check().and_then(|()| match &self.operation {
             AnnotationOperation::Read => {
                 repository.annotations(&self.query, &self.governor, &self.cancel)
             }
+            AnnotationOperation::Batch { mutation } => repository.change_annotation_batch(
+                mutation.borrowed(),
+                &self.query,
+                access,
+                &self.governor,
+                &self.cancel,
+            ),
             AnnotationOperation::Change {
                 document_id,
                 mutation,

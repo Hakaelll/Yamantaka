@@ -985,3 +985,6 @@ fn two_visible_slots_pause_indexing_and_cancelled_import_releases_its_reservatio
 
 #[path = "search_runtime/annotations.rs"]
 mod annotations;
+
+#[path = "search_runtime/annotation_global_batch.rs"]
+mod annotation_global_batch;

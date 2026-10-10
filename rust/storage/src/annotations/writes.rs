@@ -226,7 +226,12 @@ fn save(
     db.execute(&format!("INSERT INTO annotations({columns}) VALUES({placeholders}) ON CONFLICT(id) DO UPDATE SET {updates}"),params_from_iter(parameters)).map_err(storage)?;
     tags(db, id, tag_values, snapshot.updated, cancel)
 }
-fn refresh(db: &Connection, document: &str, page: u32, access: IndexAccess) -> Result<()> {
+pub(super) fn refresh(
+    db: &Connection,
+    document: &str,
+    page: u32,
+    access: IndexAccess,
+) -> Result<()> {
     if access == IndexAccess::Disabled {
         return Ok(());
     }
@@ -403,38 +408,17 @@ pub(super) fn change(
             }
         }
         AnnotationChange::Review { ids, state } => {
-            if ids.len() > 80 {
-                return Err(Failure::Invalid(
-                    "Review batches support at most eighty annotations".into(),
-                ));
-            }
+            validate_batch(ids.len())?;
             for id in ids.iter().collect::<BTreeSet<_>>() {
                 cancel.check()?;
-                pages.insert(target(&tx, document, id)?);
-                tx.execute("UPDATE annotations SET review_state=?,updated_at=? WHERE id=? AND document_id=?",params![name(state)?,now,id,document]).map_err(storage)?;
+                pages.insert(review_one(&tx, document, id, state, &now)?);
             }
         }
         AnnotationChange::AddTag { ids, tag } => {
-            if ids.len() > 80 {
-                return Err(Failure::Invalid(
-                    "Tag batches support at most eighty annotations".into(),
-                ));
-            }
+            validate_batch(ids.len())?;
             for id in ids.iter().collect::<BTreeSet<_>>() {
                 cancel.check()?;
-                pages.insert(target(&tx, document, id)?);
-                let tag = ensure_tag(&tx, tag, &now)?;
-                let (count,present):(i64,bool)=tx.query_row("SELECT count(*),COALESCE(max(tag_id=?),0) FROM annotation_tags WHERE annotation_id=?",params![tag,id],|row| Ok((row.get(0)?,row.get(1)?))).map_err(storage)?;
-                if count >= 12 && !present {
-                    return Err(Failure::Invalid(
-                        "Annotations support at most twelve tags".into(),
-                    ));
-                }
-                tx.execute(
-                    "INSERT OR IGNORE INTO annotation_tags(annotation_id,tag_id) VALUES(?,?)",
-                    params![id, tag],
-                )
-                .map_err(storage)?;
+                pages.insert(tag_one(&tx, document, id, tag, &now)?);
             }
         }
         AnnotationChange::CheckAttachment { fingerprint } => {
@@ -449,4 +433,56 @@ pub(super) fn change(
     cancel.check()?;
     tx.commit().map_err(storage)?;
     Ok(result)
+}
+
+pub(super) fn validate_batch(count: usize) -> Result<()> {
+    if count > 80 {
+        return Err(Failure::Invalid(
+            "Annotation batches support at most eighty targets".into(),
+        ));
+    }
+    Ok(())
+}
+pub(super) fn review_one(
+    db: &Connection,
+    document: &str,
+    id: &str,
+    state: AnnotationReviewState,
+    now: &str,
+) -> Result<u32> {
+    let page = target(db, document, id)?;
+    db.execute(
+        "UPDATE annotations SET review_state=?,updated_at=? WHERE id=? AND document_id=?",
+        params![name(state)?, now, id, document],
+    )
+    .map_err(storage)?;
+    Ok(page)
+}
+pub(super) fn tag_one(
+    db: &Connection,
+    document: &str,
+    id: &str,
+    tag: &str,
+    now: &str,
+) -> Result<u32> {
+    let page = target(db, document, id)?;
+    let tag = ensure_tag(db, tag, now)?;
+    let (count, present): (i64, bool) = db
+        .query_row(
+            "SELECT count(*),COALESCE(max(tag_id=?),0) FROM annotation_tags WHERE annotation_id=?",
+            params![tag, id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(storage)?;
+    if count >= 12 && !present {
+        return Err(Failure::Invalid(
+            "Annotations support at most twelve tags".into(),
+        ));
+    }
+    db.execute(
+        "INSERT OR IGNORE INTO annotation_tags(annotation_id,tag_id) VALUES(?,?)",
+        params![id, tag],
+    )
+    .map_err(storage)?;
+    Ok(page)
 }
