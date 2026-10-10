@@ -1732,6 +1732,13 @@ impl App for YamantakaApp {
                         preferences.unwrap_or_else(|| ReaderPreferences::new(id)),
                     );
                 }
+                Update::ReadingSession(reply) => {
+                    if let Err(error) = reply.result
+                        && !matches!(error, yamantaka_domain::Failure::Cancelled)
+                    {
+                        self.error = Some(error.to_string());
+                    }
+                }
             }
         }
         if self.demo

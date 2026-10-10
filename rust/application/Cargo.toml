@@ -13,6 +13,7 @@ crossbeam-channel.workspace = true
 workspace = true
 
 [dev-dependencies]
+rusqlite.workspace = true
 yamantaka-storage.workspace = true
 yamantaka-pdf.workspace = true
 tempfile.workspace = true

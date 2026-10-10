@@ -3,6 +3,7 @@ use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
+use crate::reading_sessions::{ReadingSessionReply, ReadingSessionRequest};
 use crate::search_index::{IndexCommand, IndexProgress, SearchIndexController};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Select, Sender, TryRecvError, bounded};
 use std::{
@@ -19,6 +20,7 @@ use yamantaka_domain::annotations::repository::AnnotationRepository;
 use yamantaka_domain::bookmarks::{BookmarkChange, BookmarkPage, BookmarkRepository};
 use yamantaka_domain::pdf_ticket::{AsyncPdfEngine, PdfTicket};
 use yamantaka_domain::reader_preferences::ReaderPreferences;
+use yamantaka_domain::reading_sessions::ReadingSessionRepository;
 use yamantaka_domain::search::{IndexStats, SearchQuery, SearchRepository, SearchResult};
 use yamantaka_domain::{
     Cancellation, Document, Failure, LibraryQuery, LibraryRepository, NewDocument, PdfInfo,
@@ -26,6 +28,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    ReadingSession(Box<ReadingSessionRequest>),
     AnnotationExport(Box<AnnotationExportRequest>),
     AnnotationMarks(Box<AnnotationMarksRequest>),
     Annotation(Box<AnnotationRequest>),
@@ -75,6 +78,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    ReadingSession(ReadingSessionReply),
     AnnotationExport(AnnotationExportReply),
     AnnotationMarks(AnnotationMarksReply),
     Annotations(AnnotationReply),
@@ -336,6 +340,7 @@ impl Runtime {
             + SearchRepository
             + BookmarkRepository
             + AnnotationRepository
+            + ReadingSessionRepository
             + Send
             + 'static,
         E: AsyncPdfEngine + Send + 'static,
@@ -387,6 +392,10 @@ impl Runtime {
                             deferred.push_back(Command { action, permit });
                         } else {
                             match action {
+                                Action::ReadingSession(request) => emit(
+                                    &events, &notify,
+                                    Update::ReadingSession(request.execute(&mut repository)), permit,
+                                ),
                                 Action::Shutdown => break,
                                 Action::AnnotationExport(request) => {
                                     let scope = request.scope();
@@ -1050,6 +1059,22 @@ mod tests {
         export_gate: Option<Arc<export_tests::Gate>>,
     }
     impl BookmarkRepository for Repository {}
+    impl ReadingSessionRepository for Repository {
+        fn start_reading_session(
+            &mut self,
+            _: &yamantaka_domain::reading_sessions::ReadingSessionStart<'_>,
+            _: &Cancellation,
+        ) -> Result<()> {
+            Err(Failure::Unsupported("Test session storage".into()))
+        }
+        fn finish_reading_session(
+            &mut self,
+            _: &yamantaka_domain::reading_sessions::ReadingSessionFinish<'_>,
+            _: &Cancellation,
+        ) -> Result<()> {
+            Err(Failure::Unsupported("Test session storage".into()))
+        }
+    }
     impl AnnotationRepository for Repository {
         fn export_reader(&self) -> Result<Box<dyn AnnotationRepository + Send>> {
             self.export_gate

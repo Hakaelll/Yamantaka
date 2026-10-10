@@ -4405,6 +4405,7 @@ version = "0.16.0-alpha.1"
 dependencies = [
  "chrono",
  "crossbeam-channel",
+ "rusqlite",
  "serde_json",
  "tempfile",
  "yamantaka-domain",
