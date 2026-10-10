@@ -1,6 +1,50 @@
 use super::*;
 
 #[test]
+fn coherent_review_snapshot_exports_only_the_frozen_filtered_page() {
+    let db = Database::in_memory_at(11).unwrap();
+    db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,title,title_override,author_override,reading_progress,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('a','a.pdf','a.pdf','a.pdf','Source','A manual','Manual author',0.5,3,1,'now','now','now','fa'),('b','b.pdf','b.pdf','b.pdf','B',NULL,NULL,0.25,3,1,'now','now','now','fb'); WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180) INSERT INTO annotations(id,document_id,page_index,type,color,note,document_fingerprint,created_at,updated_at) SELECT printf('review-%03d',x),CASE WHEN x<2 THEN 'a' ELSE 'b' END,x%3,'pageComment','violet','Study',CASE WHEN x<2 THEN 'fa' ELSE 'fb' END,'2026-10-10T12:00:00Z','2026-10-10T12:00:00Z' FROM n;").unwrap();
+    let governor = MemoryGovernor::default();
+    let snapshot = db
+        .annotation_review_snapshot(
+            &AnnotationQuery {
+                grouping: Some(AnnotationGrouping::Document),
+                ..Default::default()
+            },
+            &governor,
+            &Cancellation::default(),
+        )
+        .unwrap();
+    db.execute_batch("UPDATE documents SET title_override='Changed',author_override='Changed',reading_progress=0.75 WHERE id='a'; UPDATE annotations SET note='Changed';").unwrap();
+    let (bytes, count) = write_review_snapshot(
+        Vec::new(),
+        AnnotationExportFormat::Json,
+        &snapshot,
+        "2026-10-10T12:00:00Z",
+        &governor,
+        Cancellation::default(),
+    )
+    .unwrap();
+    assert_eq!(count, 80);
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(value["documents"][0]["metadata"]["title"], "A manual");
+    assert_eq!(value["documents"][0]["metadata"]["author"], "Manual author");
+    assert_eq!(value["documents"][0]["metadata"]["progress"], 0.5);
+    let docs = value["documents"].as_array().unwrap();
+    assert_eq!(docs.len(), 2);
+    assert_eq!(docs[0]["annotations"].as_array().unwrap().len(), 2);
+    assert_eq!(docs[1]["annotations"].as_array().unwrap().len(), 78);
+    assert!(
+        docs.iter()
+            .flat_map(|d| d["annotations"].as_array().unwrap())
+            .all(|a| a["note"] == "Study")
+    );
+    assert_eq!(governor.usage().other, 0);
+    drop(snapshot);
+    assert_eq!(governor.usage().total, 0);
+}
+
+#[test]
 fn review_export_preserves_the_global_envelope_and_legacy_document_bodies() {
     let governor = MemoryGovernor::default();
     let later = record(&governor, 9);

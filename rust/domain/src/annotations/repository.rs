@@ -210,6 +210,17 @@ pub enum AnnotationBatchChange<'a> {
     },
 }
 pub trait AnnotationRepository {
+    /// Captures one filtered review page and its document metadata in one read transaction.
+    fn annotation_review_snapshot(
+        &self,
+        _query: &AnnotationQuery,
+        _governor: &MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<super::review::AnnotationReviewSnapshot> {
+        Err(Failure::Unsupported(
+            "Reading annotation review snapshots".into(),
+        ))
+    }
     /// Applies a cross-document batch atomically, including the resulting query and index refresh.
     fn change_annotation_batch(
         &mut self,

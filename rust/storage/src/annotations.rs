@@ -11,6 +11,7 @@ use yamantaka_domain::{
 };
 mod batch;
 mod marks;
+mod review;
 mod writes;
 const SELECT_RECORDS: &str = "SELECT a.id,a.document_id,a.page_index,a.type,a.color,a.note,a.selected_text,a.context_before,a.context_after,a.rects_json,a.page_rotation,a.document_fingerprint,a.status,a.created_at,a.updated_at,a.review_state,a.origin_document_id,a.origin_fingerprint,a.* FROM annotations a";
 const KNOWN_COLUMNS: [&str; 18] = [
@@ -331,6 +332,14 @@ fn read_page(
     AnnotationPage::from_reserved(entries, total, offset, page_lease)
 }
 impl AnnotationRepository for Database {
+    fn annotation_review_snapshot(
+        &self,
+        query: &AnnotationQuery,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<yamantaka_domain::annotations::review::AnnotationReviewSnapshot> {
+        review::read(self, query, governor, cancel)
+    }
     fn export_reader(&self) -> Result<Box<dyn AnnotationRepository + Send>> {
         let path = self
             .connection

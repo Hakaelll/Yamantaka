@@ -1,6 +1,75 @@
 use super::*;
 use yamantaka_domain::{annotations::repository::ANNOTATION_PAGE_SIZE, memory::MemoryGovernor};
 
+pub fn write_review_snapshot<W: Write>(
+    writer: W,
+    format: AnnotationExportFormat,
+    snapshot: &yamantaka_domain::annotations::review::AnnotationReviewSnapshot,
+    exported_at: &str,
+    governor: &MemoryGovernor,
+    cancel: Cancellation,
+) -> Result<(W, u64)> {
+    use yamantaka_domain::memory::{Cost, MemoryCategory, MemoryRepresentation};
+    cancel.check()?;
+    let Some(first) = snapshot.page().entries().first() else {
+        return write_annotation_review(writer, format, &[], exported_at, governor, cancel);
+    };
+    let mut rows = [first; ANNOTATION_PAGE_SIZE];
+    let mut lengths = [0usize; ANNOTATION_PAGE_SIZE];
+    let mut offset = 0;
+    for (index, metadata) in snapshot.documents().iter().enumerate() {
+        for record in snapshot
+            .page()
+            .entries()
+            .iter()
+            .filter(|r| r.data().values.document_id == metadata.document)
+        {
+            rows[offset] = record;
+            lengths[index] += 1;
+            offset += 1;
+        }
+    }
+    let bytes = snapshot
+        .documents()
+        .len()
+        .checked_mul(std::mem::size_of::<AnnotationReviewDocument<'_>>())
+        .ok_or(Failure::MemoryBudget)?;
+    let mut lease = governor
+        .try_reserve_one(Cost::new(
+            MemoryCategory::Other,
+            MemoryRepresentation::Cpu,
+            bytes,
+        ))
+        .map_err(|_| Failure::MemoryBudget)?;
+    let mut documents = Vec::new();
+    documents
+        .try_reserve_exact(snapshot.documents().len())
+        .map_err(|_| Failure::MemoryBudget)?;
+    lease
+        .try_resize(
+            documents
+                .capacity()
+                .checked_mul(std::mem::size_of::<AnnotationReviewDocument<'_>>())
+                .ok_or(Failure::MemoryBudget)?,
+        )
+        .map_err(|_| Failure::MemoryBudget)?;
+    offset = 0;
+    for (index, metadata) in snapshot.documents().iter().enumerate() {
+        documents.push(AnnotationReviewDocument {
+            metadata: AnnotationExportMetadata {
+                document: &metadata.document,
+                title: metadata.title.as_deref().unwrap_or("Unavailable document"),
+                author: metadata.author.as_deref(),
+                progress: metadata.progress,
+                exported_at,
+            },
+            annotations: &rows[offset..offset + lengths[index]],
+        });
+        offset += lengths[index];
+    }
+    write_annotation_review(writer, format, &documents, exported_at, governor, cancel)
+}
+
 pub struct AnnotationReviewDocument<'a> {
     pub metadata: AnnotationExportMetadata<'a>,
     pub annotations: &'a [&'a AnnotationRecord],
