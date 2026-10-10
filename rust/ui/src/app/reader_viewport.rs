@@ -88,6 +88,7 @@ impl YamantakaApp {
                 f64::from(self.zoom),
             ) {
                 Ok([x, y]) => {
+                    let y = self.restoration.scroll.take().unwrap_or(y);
                     scrolling = scrolling.scroll_offset(egui::vec2(x as f32, y as f32));
                 }
                 Err(error) => {

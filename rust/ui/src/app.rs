@@ -16,6 +16,7 @@ mod reader_destination;
 mod reader_options;
 mod reader_viewport;
 mod render_updates;
+mod restoration;
 mod search;
 mod selection;
 mod sessions;
@@ -82,6 +83,7 @@ pub struct YamantakaApp {
     global_notes: global_notes::GlobalNotes,
     history: history::HistoryState,
     open_intent: open_intent::OpenIntent,
+    restoration: restoration::RestorationState,
     open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
     password_attempted: bool,
@@ -294,6 +296,7 @@ impl YamantakaApp {
             outline_preview_target: None,
             reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
+            restoration: Default::default(),
             global_notes: Default::default(),
             history: Default::default(),
             annotations: Default::default(),
@@ -464,6 +467,9 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        if !matches!(surface, Surface::Reader) {
+            self.restoration.clear();
+        }
         if matches!(self.surface, Surface::Notes) {
             self.global_notes.leave();
         }
@@ -480,15 +486,24 @@ impl YamantakaApp {
         self.password = None;
         self.surface = surface;
     }
-    fn open(&mut self, document: Document) {
+    fn open(&mut self, document: Document) -> bool {
         if !self.demo
             && self.preferences.record_reading_sessions()
             && !self.sessions.lifecycle.has_capacity()
         {
             self.error = Some(self.tr("Hay sesiones pendientes de guardar. Reintenta su guardado antes de abrir otro documento.", "Reading sessions are awaiting saving. Retry saving them before opening another document.").into());
-            return;
+            return false;
         }
         self.cache_reading_context();
+        let next_cancel = Cancellation::default();
+        if let Err(error) = self
+            .runtime
+            .submit(Action::Open(document, None, next_cancel.clone()))
+        {
+            self.error = Some(error.to_string());
+            return false;
+        }
+        self.restoration.clear();
         self.links.clear();
         self.annotation_paint.invalidate();
         self.text.clear();
@@ -507,13 +522,13 @@ impl YamantakaApp {
         self.reader_preferences = None;
         self.reader_preferences_loading = true;
         self.cancel.cancel();
-        self.cancel = Cancellation::default();
+        self.cancel = next_cancel;
         self.loading = true;
         self.reader_pages.clear();
         self.reader_layout = None;
         self.reset_render_request();
         self.generation += 1;
-        self.send(Action::Open(document, None, self.cancel.clone()));
+        true
     }
     fn navigate(&mut self, page: u32) {
         if self
@@ -525,6 +540,7 @@ impl YamantakaApp {
         }
     }
     fn apply_navigation(&mut self) {
+        self.restoration.clear();
         if let (Some((doc, _)), Some(navigation)) = (&self.active, &self.navigation) {
             self.page = navigation.position().page();
             self.generation += 1;
@@ -1724,7 +1740,8 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Document(id, document, cancel) => {
-                    if let Some(page) = self.open_intent.accept_lookup(&id, &cancel) {
+                    if let Some(target) = self.open_intent.accept_lookup(&id, &cancel) {
+                        let page = target.page;
                         if let Some(document) =
                             document.filter(|document| document.id == id && !document.missing)
                         {
@@ -1737,10 +1754,28 @@ impl App for YamantakaApp {
                                     self.navigate(page);
                                 }
                                 self.show_surface(Surface::Reader);
+                                if let Some(context) = target.context {
+                                    self.restoration.arm(
+                                        id,
+                                        self.reader_preferences_cancel.clone(),
+                                        context,
+                                    );
+                                    if let Some(preferences) = self.reader_preferences.clone() {
+                                        self.load_reader_preferences(preferences);
+                                    }
+                                }
                             } else {
-                                self.open(document);
-                                if let Some(page) = page {
-                                    self.open_intent.set_page(id, page);
+                                if self.open(document) {
+                                    if let Some(page) = page {
+                                        self.open_intent.set_page(id.clone(), page);
+                                    }
+                                    if let Some(context) = target.context {
+                                        self.restoration.arm(
+                                            id,
+                                            self.reader_preferences_cancel.clone(),
+                                            context,
+                                        );
+                                    }
                                 }
                             }
                         } else {
@@ -1750,6 +1785,7 @@ impl App for YamantakaApp {
                 }
                 Update::ReaderPreferences(id, preferences, cancel) => {
                     if cancel.is_cancelled()
+                        || !cancel.same_request(&self.reader_preferences_cancel)
                         || !self.active.as_ref().is_some_and(|(doc, _)| doc.id == id)
                     {
                         continue;
@@ -1993,6 +2029,8 @@ impl App for YamantakaApp {
                     && self.annotation_export.ready()
                     && (!matches!(self.surface, Surface::Notes) || self.global_notes.ready())
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
+                    && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
+                    && self.restoration.ready()
                     && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     // The compact drawer hides the PDF, so it has no visible marks to request.
                     && (!matches!(self.surface, Surface::Reader)
@@ -2077,6 +2115,7 @@ impl App for YamantakaApp {
                         "annotationExport":self.annotation_export.capture_summary(),
                         "globalNotes":self.global_notes.summary(),
                         "readingHistory": self.history.summary(),
+                        "readingRestoration": self.restoration_summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,

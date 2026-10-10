@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='history-restored'; args=@('--history-restore') },
+    @{ name='history-restored-es'; args=@('--history-restore','--es','--light','--reduced-motion') },
+    @{ name='history-invalid'; args=@('--history-invalid') },
     @{ name='history-dark'; args=@('--history') },
     @{ name='history-light-es'; args=@('--history','--light','--es','--reduced-motion') },
     @{ name='history-next'; args=@('--history-next') },

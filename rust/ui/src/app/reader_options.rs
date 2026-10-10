@@ -56,6 +56,7 @@ impl YamantakaApp {
 
     pub(super) fn load_reader_preferences(&mut self, preferences: ReaderPreferences) {
         self.reader_preferences_loading = false;
+        let preferences = self.restore_loaded_preferences(preferences);
         let zoom = preferences.zoom_level as f32;
         if !zoom.is_finite() || zoom <= 0.0 {
             self.error = Some("Reader zoom cannot be represented".into());

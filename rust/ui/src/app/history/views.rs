@@ -134,6 +134,33 @@ impl YamantakaApp {
                         self.send(Action::GetDocument(entry.document.clone(), cancel));
                     }
                 });
+                match self.history.context_for(page) {
+                    Ok(Some(context)) => {
+                        ui.add_enabled_ui(!entry.missing && !self.annotations.editing(), |ui| {
+                            if theme::navigation(
+                                ui,
+                                self.tr("Restaurar lectura", "Restore reading"),
+                                false,
+                                p,
+                            )
+                            .clicked()
+                            {
+                                self.restore_history_entry(
+                                    entry.document.clone(),
+                                    entry.end_page,
+                                    context,
+                                );
+                            }
+                        });
+                    }
+                    Ok(None) => {}
+                    Err(_) => {
+                        ui.label(self.tr(
+                            "Este contexto necesita revisión; puedes abrir la página guardada.",
+                            "This context needs review; you can open the saved page.",
+                        ));
+                    }
+                }
                 if compact {
                     ui.add_space(8.0);
                     ui.label(format!(

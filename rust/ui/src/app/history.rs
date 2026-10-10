@@ -3,6 +3,8 @@ use super::*;
 mod tests;
 mod views;
 use yamantaka_application::reading_sessions::{ReadingHistoryReply, ReadingHistoryRequest};
+use yamantaka_domain::reading_sessions::restoration::ReaderSessionRestoration;
+type ContextResult = std::result::Result<Option<ReaderSessionRestoration>, String>;
 use yamantaka_domain::reading_sessions::history::{
     READING_HISTORY_PAGE_SIZE, ReadingHistoryPage, ReadingHistoryQuery,
 };
@@ -13,8 +15,32 @@ pub(super) struct HistoryState {
     pending: Option<(ReadingHistoryQuery, Cancellation)>,
     cursor: usize,
     error: Option<String>,
+    context: Option<(usize, ContextResult)>,
+    preview_restore: bool,
+    preview_target: Option<(String, u32)>,
 }
 impl HistoryState {
+    fn context_for(&mut self, page: &ReadingHistoryPage) -> ContextResult {
+        if !self
+            .context
+            .as_ref()
+            .is_some_and(|(cursor, _)| *cursor == self.cursor)
+        {
+            let decoded = page.entries().get(self.cursor).map_or(Ok(None), |entry| {
+                yamantaka_application::reading_sessions::restoration::decode_session_context(
+                    entry.context_json.as_deref(),
+                )
+                .map_err(|error| error.to_string())
+            });
+            self.context = Some((self.cursor, decoded));
+        }
+        self.context.as_ref().unwrap().1.clone()
+    }
+    pub(super) fn source_ready(&self, current: Option<(&str, u32)>) -> bool {
+        self.preview_target
+            .as_ref()
+            .is_none_or(|(id, page)| current == Some((id.as_str(), *page)))
+    }
     pub(super) fn ready(&self) -> bool {
         self.pending.is_none() && self.page.is_some() && self.error.is_none()
     }
@@ -53,6 +79,7 @@ impl HistoryState {
         match reply.result {
             Ok(page) => {
                 self.page = Some(page);
+                self.context = None;
                 self.cursor = 0;
                 self.error = None;
             }
@@ -64,14 +91,16 @@ impl HistoryState {
             cancel.cancel();
         }
         self.page = None;
+        self.context = None;
         self.cursor = 0;
         self.error = None;
     }
 }
 impl YamantakaApp {
-    pub fn preview_history(&mut self, next: bool) {
+    pub fn preview_history(&mut self, next: bool, restore: bool) {
         if self.demo && self.capture.is_some() {
             self.show_history();
+            self.history.preview_restore = restore;
             if next {
                 self.request_history(80);
             }
@@ -80,6 +109,21 @@ impl YamantakaApp {
     pub(super) fn show_history(&mut self) {
         self.show_surface(Surface::History);
         self.request_history(0);
+    }
+    pub(super) fn restore_history_entry(
+        &mut self,
+        id: String,
+        page: u32,
+        context: ReaderSessionRestoration,
+    ) {
+        if self.annotations.editing() {
+            return;
+        }
+        let cancel = self.open_intent.lookup_context(id.clone(), page, context);
+        if let Err(error) = self.runtime.submit(Action::GetDocument(id, cancel)) {
+            self.open_intent.leave_destination();
+            self.error = Some(error.to_string());
+        }
     }
     fn request_history(&mut self, offset: usize) {
         let request = self.history.request(offset, &self.governor);
@@ -118,6 +162,15 @@ impl YamantakaApp {
             }
             if let Some(error) = &self.history.error { ui.label(error); }
             let Some(page) = self.history.page.clone() else { return; };
+            if self.history.preview_restore {
+                self.history.preview_restore = false;
+                if let Some(entry) = page.entries().first() {
+                    self.history.preview_target = Some((entry.document.clone(), entry.end_page));
+                    if let Ok(Some(context)) = self.history.context_for(&page) {
+                        self.restore_history_entry(entry.document.clone(),entry.end_page,context);
+                    }
+                }
+            }
             if page.entries().is_empty() {
                 if page.offset() > 0 {
                     ui.label(self.tr("Esta página ya no contiene sesiones.", "This page no longer contains sessions."));
