@@ -64,6 +64,11 @@ pub struct ReadingSessionLifecycle {
     sessions: Vec<Session>,
 }
 impl ReadingSessionLifecycle {
+    pub fn current_document(&self) -> Option<&str> {
+        self.sessions.last().and_then(|session| {
+            matches!(session.phase, Phase::Reading(_)).then_some(session.document.as_str())
+        })
+    }
     pub fn has_capacity(&self) -> bool {
         self.sessions.len() < MAX_UNCOMPLETED_SESSIONS
     }

@@ -3,6 +3,12 @@ use super::*;
 const CATEGORY_KEY: &str = "settings-category";
 
 impl YamantakaApp {
+    pub fn preview_privacy(&mut self, ctx: &egui::Context) {
+        if self.demo && self.capture.is_some() {
+            ctx.data_mut(|data| data.insert_temp(egui::Id::new(CATEGORY_KEY), 3_usize));
+            self.show_surface(Surface::Settings);
+        }
+    }
     pub(super) fn settings(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark);
         let cramped = ui.available_width() < 420.0;
@@ -312,13 +318,35 @@ impl YamantakaApp {
                 ), p);
             }
             _ => {
-                section_title(ui, self.tr("Privacidad", "Privacy"));
-                ui.add_space(4.0);
-                ui.label(self.tr(
-                    "Tus documentos y tu actividad de lectura permanecen en este dispositivo.",
-                    "Your documents and reading activity stay on this device.",
-                ));
-                ui.add_space(24.0);
+                if !cramped {
+                    section_title(ui, self.tr("Privacidad", "Privacy"));
+                    ui.add_space(4.0);
+                    ui.label(self.tr(
+                        "Tus documentos y tu actividad de lectura permanecen en este dispositivo.",
+                        "Your documents and reading activity stay on this device.",
+                    ));
+                    ui.add_space(24.0);
+                }
+
+                egui::Frame::new().fill(p.surface).corner_radius(12)
+                    .inner_margin(egui::Margin::same(if cramped { 12 } else { 18 })).show(ui, |ui| {
+                        if !cramped {
+                        ui.label(RichText::new(self.tr("Tu tiempo de lectura", "Your reading time")).size(18.0).strong());
+                        ui.add_space(8.0);
+                        }
+                        let mut enabled = self.preferences.record_reading_sessions();
+                        if ui.checkbox(&mut enabled, self.tr("Guardar sesiones de lectura", "Save reading sessions")).changed() {
+                            let path = self.store.join("preferences.json");
+                            let demo = self.demo;
+                            if let Err(error) = sessions::change_recording(&mut self.preferences, enabled, |preferences| {
+                                if demo { Ok(()) } else { preferences.save(&path) }
+                            }) { self.error = Some(error.to_string()); }
+                        }
+                        ui.add_space(6.0);
+                        quiet(ui, self.tr("Conserva el tiempo activo y el punto donde dejaste cada lectura. Al desactivarlo, se cierra la sesión actual y se mantienen las anteriores.", "Keep your active reading time and where you left each reading. Turning this off ends the current session and keeps earlier sessions."), p);
+                    });
+                ui.add_space(20.0);
+
                 if theme::control(
                     ui,
                     self.tr("Gestionar búsqueda local", "Manage local search"),

@@ -101,6 +101,9 @@ impl YamantakaApp {
         let device_limit = ui.ctx().input(|input| input.max_texture_side).min(16384) as u32;
         let mut feedback = None;
         scrolling.show_viewport(ui, |ui, visible| {
+            if let Some(preferences) = &mut self.reader_preferences {
+                preferences.scroll_offset = f64::from(visible.top()).max(0.0);
+            }
             let frame = match layout.frame(
                 viewport_size,
                 anchor,

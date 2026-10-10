@@ -62,6 +62,7 @@ impl YamantakaApp {
             return;
         }
         self.zoom = zoom;
+        self.reader_scale = zoom;
         let start = preferences.page_rotation.unrotate_point([0.5, 0.0]);
         self.reader_preferences = Some(preferences);
         self.rebuild_reader_layout();

@@ -69,6 +69,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let mut db = if capture.is_some()
             && args.iter().any(|arg| {
                 arg == "--export-json"
+                    || arg == "--sessions-preview"
                     || arg == "--export-markdown"
                     || arg == "--global-notes-export-json"
                     || arg == "--global-notes-export-markdown"
@@ -194,6 +195,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             paths.store.clone(),
         )
     };
+    if demo && args.iter().any(|arg| arg == "--sessions-disabled") {
+        prefs
+            .rust
+            .insert("recordReadingSessions".into(), false.into());
+    }
     let activations = if demo {
         store.join("activations")
     } else {
@@ -316,6 +322,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args.iter().any(|arg| arg == "--sessions-preview") {
+                    app.preview_sessions();
+                }
+                if args.iter().any(|arg| arg == "--privacy") {
+                    app.preview_privacy(&cc.egui_ctx);
+                }
                 app.preview_layout(
                     args.iter().any(|arg| arg == "--list"),
                     args.iter().any(|arg| arg == "--details"),

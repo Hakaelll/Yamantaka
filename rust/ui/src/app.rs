@@ -17,6 +17,7 @@ mod reader_viewport;
 mod render_updates;
 mod search;
 mod selection;
+mod sessions;
 mod settings;
 mod shortcuts;
 mod text;
@@ -85,6 +86,7 @@ pub struct YamantakaApp {
     preview_password_target: Option<&'static str>,
     runtime: Runtime,
     preferences: Preferences,
+    sessions: sessions::SessionState,
     store: PathBuf,
     dark: bool,
     english: bool,
@@ -244,6 +246,7 @@ impl YamantakaApp {
             preview_password_target: None,
             runtime,
             preferences,
+            sessions: Default::default(),
             store,
             dark,
             english,
@@ -471,6 +474,14 @@ impl YamantakaApp {
         self.surface = surface;
     }
     fn open(&mut self, document: Document) {
+        if !self.demo
+            && self.preferences.record_reading_sessions()
+            && !self.sessions.lifecycle.has_capacity()
+        {
+            self.error = Some(self.tr("Hay sesiones pendientes de guardar. Reintenta su guardado antes de abrir otro documento.", "Reading sessions are awaiting saving. Retry saving them before opening another document.").into());
+            return;
+        }
+        self.cache_reading_context();
         self.links.clear();
         self.annotation_paint.invalidate();
         self.text.clear();
@@ -1418,6 +1429,7 @@ impl YamantakaApp {
             return;
         }
         self.reader_viewport(ui, &document, &info, p);
+        self.cache_reading_context();
     }
 }
 impl App for YamantakaApp {
@@ -1442,6 +1454,7 @@ impl App for YamantakaApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
+        self.observe_reading_session(ctx);
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.begin_frame()
         {
@@ -1525,6 +1538,12 @@ impl App for YamantakaApp {
                 }
                 Update::Opened(document, info, cancel) => {
                     if cancel.is_cancelled() {
+                        self.open_confirmation = Some((document.id.clone(), cancel));
+                        continue;
+                    }
+                    if let Err(error) = self.finish_reading_session() {
+                        self.error = Some(error.to_string());
+                        cancel.cancel();
                         self.open_confirmation = Some((document.id.clone(), cancel));
                         continue;
                     }
@@ -1733,14 +1752,15 @@ impl App for YamantakaApp {
                     );
                 }
                 Update::ReadingSession(reply) => {
-                    if let Err(error) = reply.result
-                        && !matches!(error, yamantaka_domain::Failure::Cancelled)
-                    {
+                    let id = reply.id.clone();
+                    if let Some(Err(error)) = self.sessions.lifecycle.accept(reply) {
+                        self.sessions.remember_failure(id);
                         self.error = Some(error.to_string());
                     }
                 }
             }
         }
+        self.sync_reading_session(ctx);
         if self.demo
             && self.capture.is_some()
             && self.selection_preview == selection::SelectionPreview::Waiting
@@ -1836,6 +1856,18 @@ impl App for YamantakaApp {
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
                                 ui.label(RichText::new(error).color(p.ink));
+                                if !self.sessions.failed.is_empty()
+                                    && theme::primary_icon(
+                                        ui,
+                                        self.tr("Reintentar sesiones", "Retry saving sessions"),
+                                        theme::Icon::Right,
+                                        p,
+                                    )
+                                    .clicked()
+                                {
+                                    self.sessions.retry_failed();
+                                    self.error = None;
+                                }
                                 if self.render_retry
                                     && theme::primary_icon(
                                         ui,
@@ -2008,6 +2040,7 @@ impl App for YamantakaApp {
                     let usage = self.governor.usage();
                     let record=serde_json::json!({"synthetic":self.demo,"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
+                        "readingSession":self.session_capture_summary(),
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),
                         "documentFind":self.find.capture_summary(),
                         "documentLinks":self.links.capture_summary(),
@@ -2037,6 +2070,9 @@ impl App for YamantakaApp {
         }
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        if let Err(error) = self.persist_reading_sessions_on_close() {
+            eprintln!("{error}");
+        }
         self.annotation_export.cancel();
         self.global_notes.cancel();
         self.links.clear();

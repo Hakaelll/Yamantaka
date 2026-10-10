@@ -22,6 +22,12 @@ impl Default for Preferences {
     }
 }
 impl Preferences {
+    pub fn record_reading_sessions(&self) -> bool {
+        match self.get("recordReadingSessions") {
+            None => true,
+            Some(value) => value.as_bool().unwrap_or(false),
+        }
+    }
     pub fn load(path: &Path) -> Result<Self> {
         if !path.exists() {
             return Ok(Self::default());
