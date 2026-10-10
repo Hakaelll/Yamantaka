@@ -270,3 +270,19 @@ impl<'a, W: Write> AnnotationExporter<'a, W> {
         Ok(self.writer)
     }
 }
+
+pub fn write_document_annotations<W: Write>(
+    repository: &impl yamantaka_domain::annotations::repository::AnnotationRepository,
+    writer: W,
+    format: AnnotationExportFormat,
+    metadata: AnnotationExportMetadata<'_>,
+    governor: &yamantaka_domain::memory::MemoryGovernor,
+    cancel: Cancellation,
+) -> Result<(W, u64)> {
+    let document = metadata.document;
+    let mut exporter = AnnotationExporter::new(writer, format, metadata, cancel.clone())?;
+    let count = repository.visit_annotations(document, governor, &cancel, &mut |record| {
+        exporter.push(record)
+    })?;
+    Ok((exporter.finish()?, count))
+}

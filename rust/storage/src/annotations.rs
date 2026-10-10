@@ -11,6 +11,7 @@ use yamantaka_domain::{
 };
 mod marks;
 mod writes;
+const SELECT_RECORDS: &str = "SELECT a.id,a.document_id,a.page_index,a.type,a.color,a.note,a.selected_text,a.context_before,a.context_after,a.rects_json,a.page_rotation,a.document_fingerprint,a.status,a.created_at,a.updated_at,a.review_state,a.origin_document_id,a.origin_fingerprint,a.* FROM annotations a";
 const KNOWN_COLUMNS: [&str; 18] = [
     "id",
     "document_id",
@@ -262,7 +263,11 @@ fn read_page(
         Value::Integer(ANNOTATION_PAGE_SIZE as i64),
         Value::Integer(offset as i64),
     ]);
-    let mut statement=db.prepare(&format!("SELECT a.id,a.document_id,a.page_index,a.type,a.color,a.note,a.selected_text,a.context_before,a.context_after,a.rects_json,a.page_rotation,a.document_fingerprint,a.status,a.created_at,a.updated_at,a.review_state,a.origin_document_id,a.origin_fingerprint,a.* FROM annotations a{where_sql} ORDER BY {order} LIMIT ? OFFSET ?")).map_err(storage)?;
+    let mut statement = db
+        .prepare(&format!(
+            "{SELECT_RECORDS}{where_sql} ORDER BY {order} LIMIT ? OFFSET ?"
+        ))
+        .map_err(storage)?;
     let mut rows = statement
         .query(params_from_iter(&values))
         .map_err(storage)?;
@@ -288,6 +293,35 @@ fn read_page(
     AnnotationPage::from_reserved(entries, total, offset, page_lease)
 }
 impl AnnotationRepository for Database {
+    fn visit_annotations(
+        &self,
+        document: &str,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+        visitor: &mut dyn FnMut(&AnnotationRecord) -> Result<()>,
+    ) -> Result<u64> {
+        cancel.check()?;
+        let tx = self.connection.unchecked_transaction().map_err(storage)?;
+        let mut count = 0u64;
+        {
+            let mut statement = tx
+                .prepare(&format!(
+                    "{SELECT_RECORDS} WHERE a.document_id=? ORDER BY a.page_index,a.created_at,a.id"
+                ))
+                .map_err(storage)?;
+            let mut rows = statement.query([document]).map_err(storage)?;
+            while let Some(row) = rows.next().map_err(storage)? {
+                let record = read_record(&tx, row, governor, cancel)?;
+                visitor(&record)?;
+                cancel.check()?;
+                count = count.checked_add(1).ok_or(Failure::MemoryBudget)?;
+            }
+        }
+        cancel.check()?;
+        tx.commit().map_err(storage)?;
+        Ok(count)
+    }
+
     fn annotation_marks(
         &self,
         document: &str,

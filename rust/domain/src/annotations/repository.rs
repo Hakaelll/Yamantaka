@@ -184,6 +184,16 @@ pub enum AnnotationChange<'a> {
     },
 }
 pub trait AnnotationRepository {
+    fn visit_annotations(
+        &self,
+        _document: &str,
+        _governor: &MemoryGovernor,
+        _cancel: &Cancellation,
+        _visitor: &mut dyn FnMut(&AnnotationRecord) -> Result<()>,
+    ) -> Result<u64> {
+        Err(Failure::Unsupported("Visiting annotations".into()))
+    }
+
     fn annotation_marks(
         &self,
         _document: &str,

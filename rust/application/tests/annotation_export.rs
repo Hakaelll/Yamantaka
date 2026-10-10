@@ -203,31 +203,18 @@ fn export_streams_across_repository_pages_without_truncating_at_eighty() {
     let db = Database::in_memory_at(11).unwrap();
     db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('a','a.pdf','a.pdf','a.pdf',3,1,'now','now','now','fa'); WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180) INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) SELECT printf('r%03d',x),'a',x/80,'pageComment','blue','Study','[]',0,'fa','attached','2026-10-08T12:00:00Z','2026-10-09T12:00:00Z','pending' FROM n;").unwrap();
     let governor = MemoryGovernor::default();
-    let mut exporter = AnnotationExporter::new(
+    let (output, count) = write_document_annotations(
+        &db,
         Vec::new(),
         AnnotationExportFormat::Json,
         metadata(),
+        &governor,
         Cancellation::default(),
     )
     .unwrap();
-    for offset in [0, 80, 160] {
-        let page = db
-            .annotations(
-                &AnnotationQuery {
-                    document_id: Some("a".into()),
-                    offset,
-                    ..Default::default()
-                },
-                &governor,
-                &Cancellation::default(),
-            )
-            .unwrap();
-        for record in page.entries() {
-            exporter.push(record).unwrap();
-        }
-    }
+    assert_eq!(count, 181);
     assert_eq!(governor.usage().text, 0);
-    let json: serde_json::Value = serde_json::from_slice(&exporter.finish().unwrap()).unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
     let entries = json["annotations"].as_array().unwrap();
     assert_eq!(entries.len(), 181);
     assert_eq!(entries[180]["id"], "r180");
