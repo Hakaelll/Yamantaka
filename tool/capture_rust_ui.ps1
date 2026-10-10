@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='annotation-filter-dark'; args=@('--reader','--annotation-many','--annotation-filter') },
+    @{ name='annotation-filter-light-es'; args=@('--reader','--annotation-many','--annotation-filter','--light','--es') },
+    @{ name='annotation-filter-empty'; args=@('--reader','--annotation-many','--annotation-filter-empty') },
+    @{ name='annotation-filter-export'; args=@('--reader','--annotation-many','--annotation-filter','--export-json') },
+    @{ name='annotation-filter-small-200'; args=@('--reader','--annotation-many','--annotation-filter','--size=640x480','--text-scale=2') },
     @{ name='annotation-export-json'; args=@('--reader','--annotation-many','--export-json') },
     @{ name='annotation-export-markdown-es'; args=@('--reader','--annotation-many','--export-markdown','--light','--es') },
     @{ name='annotation-export-small-200'; args=@('--reader','--annotation-many','--export-json','--size=640x480','--text-scale=2') },

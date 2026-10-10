@@ -1,6 +1,6 @@
 use super::*;
 
-fn kind_label(kind: AnnotationKind, english: bool) -> &'static str {
+pub(super) fn kind_label(kind: AnnotationKind, english: bool) -> &'static str {
     match (kind, english) {
         (AnnotationKind::Highlight, true) => "Highlight",
         (AnnotationKind::Highlight, false) => "Resaltado",
@@ -257,15 +257,22 @@ impl YamantakaApp {
             ui.add_space(16.0);
             self.annotation_export_panel(ui, p);
         }
-        ui.add_space(20.0);
+        ui.add_space(16.0);
+        self.annotation_filters_panel(ui, p);
+        ui.add_space(12.0);
         let Some(page) = self.annotations.page.clone() else {
             return;
         };
         if page.total == 0 {
             ui.label(
-                RichText::new(
-                    self.tr("Tus notas aparecerán aquí.", "Your notes will appear here."),
-                )
+                RichText::new(if self.annotations.filters.count() > 0 {
+                    self.tr(
+                        "No hay notas que coincidan. Prueba otros filtros.",
+                        "No notes match. Try different filters.",
+                    )
+                } else {
+                    self.tr("Tus notas aparecerán aquí.", "Your notes will appear here.")
+                })
                 .color(p.secondary),
             );
         }

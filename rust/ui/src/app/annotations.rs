@@ -9,6 +9,7 @@ use yamantaka_domain::{
     text_selection::snapshot::TextSelectionSnapshot,
 };
 pub(super) mod export;
+mod filters;
 pub(super) mod paint;
 mod panel;
 mod tags;
@@ -75,6 +76,10 @@ pub(super) struct AnnotationState {
     error: Option<String>,
     saved: bool,
     pub(super) revision: u64,
+    filters: filters::Filters,
+    filter_draft: filters::Filters,
+    filters_open: bool,
+    filter_preview: Option<bool>,
 }
 impl AnnotationState {
     pub(super) fn editing(&self) -> bool {
@@ -95,6 +100,9 @@ impl AnnotationState {
             self.pending.take().unwrap().cancel.cancel();
         }
         self.document = Some(document.into());
+        self.filters = Default::default();
+        self.filter_draft = Default::default();
+        self.filters_open = false;
         self.page = None;
         self.editor = None;
         self.error = None;
@@ -156,11 +164,7 @@ impl AnnotationState {
         self.saved = false;
         Some(AnnotationRequest {
             operation,
-            query: AnnotationQuery {
-                document_id: Some(document),
-                offset,
-                ..Default::default()
-            },
+            query: self.filters.query(document, offset),
             governor: governor.clone(),
             cancel,
         })
@@ -332,7 +336,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn annotation_capture_summary(&self) -> serde_json::Value {
-        serde_json::json!({"resident":self.annotations.page.as_ref().map_or(0,|page|page.entries().len()),"total":self.annotations.page.as_ref().map_or(0,|page|page.total),"pending":self.annotations.pending.is_some(),"editing":self.annotations.editor.is_some(),"fallback":self.annotations.fallback(),"saved":self.annotations.saved})
+        serde_json::json!({"filters":{"active":self.annotations.filters.count(),"text":self.annotations.filters.text,"tag":self.annotations.filters.tag,"kind":self.annotations.filters.kind,"review":self.annotations.filters.review},"resident":self.annotations.page.as_ref().map_or(0,|page|page.entries().len()),"total":self.annotations.page.as_ref().map_or(0,|page|page.total),"pending":self.annotations.pending.is_some(),"editing":self.annotations.editor.is_some(),"fallback":self.annotations.fallback(),"saved":self.annotations.saved})
     }
     pub(super) fn apply_annotation_preview(&mut self) {
         if self.annotation_preview == 0 {

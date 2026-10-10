@@ -7,6 +7,99 @@ use yamantaka_domain::{
 };
 use yamantaka_storage::Database;
 
+#[test]
+fn combined_filters_reset_and_pagination_use_the_canonical_repository_query() {
+    let governor = MemoryGovernor::default();
+    let mut db = database();
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    state.editor = Some(editor(&governor, false));
+    state.editor.as_mut().unwrap().tags = "Study".into();
+    let mutation = state.mutation(&governor).unwrap();
+    let request = state.request(&governor, Some(mutation), 0).unwrap();
+    state.accept(execute(&mut db, request));
+    let revision = state.revision;
+    state.filter_draft = filters::Filters {
+        text: " café ".into(),
+        tag: " study ".into(),
+        kind: Some(AnnotationKind::Highlight),
+        review: Some(AnnotationReviewState::Pending),
+    };
+    assert!(state.apply_filters());
+    assert!(state.page.is_none());
+    let request = state.request(&governor, None, 0).unwrap();
+    assert_eq!(request.query.text, "café");
+    assert_eq!(request.query.tag.as_deref(), Some("study"));
+    assert!(request.query.page.is_none());
+    state.accept(execute(&mut db, request));
+    assert_eq!(state.page.as_ref().unwrap().total, 1);
+    assert_eq!(
+        state.revision, revision,
+        "Filtering must not invalidate page geometry"
+    );
+    let request = state.request(&governor, None, 80).unwrap();
+    assert_eq!(request.query.offset, 80);
+    assert_eq!(request.query.tag.as_deref(), Some("study"));
+    state.accept(execute(&mut db, request));
+    state.filter_draft.text = "absent".into();
+    assert!(state.apply_filters());
+    let request = state.request(&governor, None, 0).unwrap();
+    state.accept(execute(&mut db, request));
+    assert_eq!(state.page.as_ref().unwrap().total, 0);
+    state.filter_draft = Default::default();
+    assert!(state.apply_filters());
+    let request = state.request(&governor, None, 0).unwrap();
+    state.accept(execute(&mut db, request));
+    assert_eq!(state.page.as_ref().unwrap().total, 1);
+    state.bind("b");
+    assert_eq!(state.filters.count(), 0);
+    assert_eq!(state.filter_draft.count(), 0);
+    drop(state);
+    assert_eq!(governor.usage().total, 0);
+}
+
+#[test]
+fn filter_changes_cancel_old_reads_and_preserve_editors_and_accepted_writes() {
+    let governor = MemoryGovernor::default();
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    let old = state.request(&governor, None, 80).unwrap();
+    state.filter_draft.text = "Study".into();
+    assert!(state.apply_filters());
+    assert!(old.cancel.is_cancelled());
+    let current = state.request(&governor, None, 0).unwrap();
+    state.accept(AnnotationReply {
+        document_id: Some("a".into()),
+        result: Err(Failure::Cancelled),
+        cancel: old.cancel,
+    });
+    assert!(
+        state
+            .pending
+            .as_ref()
+            .unwrap()
+            .cancel
+            .same_request(&current.cancel)
+    );
+    state.accept(AnnotationReply {
+        document_id: Some("a".into()),
+        result: Err(Failure::MemoryBudget),
+        cancel: current.cancel,
+    });
+    state.editor = Some(editor(&governor, false));
+    state.filter_draft.tag = "other".into();
+    assert!(!state.apply_filters());
+    let mutation = state.mutation(&governor).unwrap();
+    let write = state.request(&governor, Some(mutation), 0).unwrap();
+    state.editor = None;
+    assert!(!state.apply_filters());
+    assert!(!write.cancel.is_cancelled());
+    assert!(state.filters.tag.is_empty());
+    drop(write);
+    drop(state);
+    assert_eq!(governor.usage().total, 0);
+}
+
 fn editor(governor: &MemoryGovernor, missing: bool) -> AnnotationEditor {
     let text = "café";
     let lease = governor

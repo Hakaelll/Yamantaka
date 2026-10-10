@@ -136,6 +136,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     printf('[{"left":%.4f,"top":%.4f,"right":%.4f,"bottom":%.4f}]',0.08+(x%6)*0.14,0.12+(x/6)*0.023,0.18+(x%6)*0.14,0.13+(x/6)*0.023),
                     0,'synthetic','attached','2026-10-09T12:00:00Z','2026-10-09T12:00:00Z','pending' FROM n;"#)?;
         }
+        if capture.is_some()
+            && args
+                .iter()
+                .any(|arg| arg == "--annotation-filter" || arg == "--annotation-filter-empty")
+        {
+            db.execute_batch("INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('synthetic-study','Study','study','violet','2026-10-10T12:00:00Z','2026-10-10T12:00:00Z'); INSERT INTO annotation_tags(annotation_id,tag_id) SELECT id,'synthetic-study' FROM annotations WHERE id<'synthetic-mark-020';")?;
+        }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
             db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
@@ -310,6 +317,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     app.preview_annotation_export(
                         args.iter().any(|arg| arg == "--export-markdown"),
+                    );
+                }
+                if args
+                    .iter()
+                    .any(|arg| arg == "--annotation-filter" || arg == "--annotation-filter-empty")
+                {
+                    app.preview_annotation_filters(
+                        args.iter().any(|arg| arg == "--annotation-filter-empty"),
                     );
                 }
                 if args.iter().any(|arg| arg == "--page-note") {

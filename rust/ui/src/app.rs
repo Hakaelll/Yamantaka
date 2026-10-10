@@ -1791,6 +1791,7 @@ impl App for YamantakaApp {
             }
         }
         self.apply_annotation_preview();
+        self.apply_annotation_filter_preview();
         self.apply_annotation_export_preview();
         let dropped = ctx.input(|i| {
             i.raw
