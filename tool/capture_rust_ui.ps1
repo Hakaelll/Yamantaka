@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='goal-editor'; args=@('--details','--goal-editor','--sessions-preview') },
+    @{ name='goal-editor-light-es'; args=@('--details','--goal-editor','--light','--es','--reduced-motion') },
+    @{ name='goal-editor-small-200'; args=@('--details','--goal-editor','--size=640x480','--text-scale=2') },
+    @{ name='goal-saved'; args=@('--details','--goal-save','--sessions-preview') },
+    @{ name='goal-cleared'; args=@('--details','--goal-clear','--sessions-preview','--light','--es') },
     @{ name='history-deleted'; args=@('--history-delete','--sessions-preview') },
     @{ name='history-deleted-es'; args=@('--history-delete','--sessions-preview','--light','--es','--reduced-motion') },
     @{ name='history-restored'; args=@('--history-restore') },

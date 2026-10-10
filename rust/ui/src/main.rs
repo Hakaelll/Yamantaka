@@ -181,6 +181,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 db.execute_batch("UPDATE app_metadata SET value=json_set(value,'$.\"synthetic-session-180\".readingTheme','future') WHERE key='reading_session_contexts_v1';")?;
             }
         }
+        if args
+            .iter()
+            .any(|arg| arg == "--goal-editor" || arg == "--goal-save" || arg == "--goal-clear")
+        {
+            db.execute_batch("INSERT INTO app_metadata(key,value,updated_at) VALUES('reading_goals_v1','{\"demo-0\":{\"pages\":12,\"minutes\":30,\"future\":{\"kept\":true}},\"demo-1\":{\"pages\":8},\"future\":false}','synthetic');")?;
+        }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
             db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
@@ -351,6 +357,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--privacy") {
                     app.preview_privacy(&cc.egui_ctx);
+                }
+                if args.iter().any(|arg| {
+                    arg == "--goal-editor" || arg == "--goal-save" || arg == "--goal-clear"
+                }) {
+                    app.preview_goal(if args.iter().any(|arg| arg == "--goal-save") {
+                        2
+                    } else if args.iter().any(|arg| arg == "--goal-clear") {
+                        3
+                    } else {
+                        1
+                    });
                 }
                 app.preview_layout(
                     args.iter().any(|arg| arg == "--list"),

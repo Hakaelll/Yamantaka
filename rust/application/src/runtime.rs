@@ -4,6 +4,7 @@ use crate::annotations::{
 };
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
 use crate::reading_sessions::deletion::{ReadingSessionDeleteReply, ReadingSessionDeleteRequest};
+use crate::reading_sessions::goals::{ReadingGoalReply, ReadingGoalRequest};
 use crate::reading_sessions::{
     ReadingHistoryReply, ReadingHistoryRequest, ReadingSessionReply, ReadingSessionRequest,
 };
@@ -33,6 +34,7 @@ use yamantaka_domain::{
 pub enum Action {
     ReadingHistory(Box<ReadingHistoryRequest>),
     TrimReadingHistory(usize, Cancellation),
+    ReadingGoal(Box<ReadingGoalRequest>),
     DeleteReadingSession(Box<ReadingSessionDeleteRequest>),
     ReadingSession(Box<ReadingSessionRequest>),
     AnnotationExport(Box<AnnotationExportRequest>),
@@ -86,6 +88,7 @@ pub enum WriteKind {
 pub enum Update {
     ReadingHistory(ReadingHistoryReply),
     ReadingHistoryTrimmed(Result<u64>, Cancellation),
+    ReadingGoal(ReadingGoalReply),
     ReadingSessionDeleted(ReadingSessionDeleteReply),
     ReadingSession(ReadingSessionReply),
     AnnotationExport(AnnotationExportReply),
@@ -419,6 +422,7 @@ impl Runtime {
                             match action {
                                 Action::ReadingHistory(request) => emit(&events, &notify, Update::ReadingHistory(request.execute(&repository)), permit),
                                 Action::DeleteReadingSession(request) => emit(&events,&notify,Update::ReadingSessionDeleted(request.execute(&mut repository)),permit),
+                                Action::ReadingGoal(request) => emit(&events,&notify,Update::ReadingGoal(request.execute(&mut repository)),permit),
                                 Action::TrimReadingHistory(limit, cancel) => {
                                     let result = repository.trim_reading_history(limit, &cancel);
                                     emit(&events, &notify, Update::ReadingHistoryTrimmed(result, cancel), permit);

@@ -137,6 +137,8 @@ impl YamantakaApp {
                         ui.add_space(6.0);
                         ui.separator();
                         ui.add_space(6.0);
+                        self.reading_goal(ui, &document);
+                        ui.add_space(8.0);
                         let path = display_path(&document.path);
                         ui.horizontal_wrapped(|ui| {
                             ui.label(

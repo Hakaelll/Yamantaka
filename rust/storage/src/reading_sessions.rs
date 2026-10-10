@@ -3,6 +3,7 @@ use rusqlite::{OptionalExtension, params};
 use yamantaka_domain::{Cancellation, Failure, Result, reading_sessions::*};
 const CONTEXTS: &str = "reading_session_contexts_v1";
 mod context_pruning;
+mod goals;
 mod history;
 
 fn timestamp(value: &str) -> Result<chrono::DateTime<chrono::Utc>> {
@@ -12,6 +13,21 @@ fn timestamp(value: &str) -> Result<chrono::DateTime<chrono::Utc>> {
 }
 
 impl ReadingSessionRepository for Database {
+    fn reading_goal(
+        &self,
+        document: &str,
+        cancel: &Cancellation,
+    ) -> Result<Option<yamantaka_domain::reading_sessions::goals::ReadingGoal>> {
+        goals::load(self, document, cancel)
+    }
+    fn save_reading_goal(
+        &mut self,
+        document: &str,
+        goal: Option<yamantaka_domain::reading_sessions::goals::ReadingGoal>,
+        cancel: &Cancellation,
+    ) -> Result<Option<yamantaka_domain::reading_sessions::goals::ReadingGoal>> {
+        goals::save(self, document, goal, cancel)
+    }
     fn delete_reading_session(
         &mut self,
         id: &str,

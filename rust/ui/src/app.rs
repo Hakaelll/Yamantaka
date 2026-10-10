@@ -4,6 +4,7 @@ mod compact;
 mod details;
 mod find;
 mod global_notes;
+mod goals;
 mod history;
 mod links;
 mod list;
@@ -82,6 +83,7 @@ pub struct YamantakaApp {
     search: search::SearchState,
     global_notes: global_notes::GlobalNotes,
     history: history::HistoryState,
+    goals: goals::GoalState,
     open_intent: open_intent::OpenIntent,
     restoration: restoration::RestorationState,
     open_confirmation: Option<(String, Cancellation)>,
@@ -299,6 +301,7 @@ impl YamantakaApp {
             restoration: Default::default(),
             global_notes: Default::default(),
             history: Default::default(),
+            goals: Default::default(),
             annotations: Default::default(),
             annotation_export: Default::default(),
             annotation_paint: Default::default(),
@@ -1815,6 +1818,7 @@ impl App for YamantakaApp {
                         self.error = Some(error.to_string());
                     }
                 }
+                Update::ReadingGoal(reply) => self.accept_goal(reply),
                 Update::ReadingSessionDeleted(reply) => self.accept_history_delete(reply),
                 Update::ReadingHistory(reply) => {
                     self.history.accept(reply);
@@ -2032,6 +2036,7 @@ impl App for YamantakaApp {
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     && self.restoration.ready()
+                    && (!matches!(self.surface, Surface::Library) || !self.inspector || self.goals.ready())
                     && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     // The compact drawer hides the PDF, so it has no visible marks to request.
                     && (!matches!(self.surface, Surface::Reader)
@@ -2117,6 +2122,7 @@ impl App for YamantakaApp {
                         "globalNotes":self.global_notes.summary(),
                         "readingHistory": self.history.summary(),
                         "readingRestoration": self.restoration_summary(),
+                        "readingGoal": self.goals.summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,

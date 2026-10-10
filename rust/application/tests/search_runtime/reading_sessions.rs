@@ -407,3 +407,69 @@ fn session_writes_and_failures_are_scoped_while_a_native_open_is_held() {
     );
     held.send(Err(Failure::Cancelled)).unwrap();
 }
+
+#[test]
+fn goal_commands_are_scoped_and_continue_while_pdf_open_is_held() {
+    use yamantaka_application::reading_sessions::goals::{ReadingGoalChange, ReadingGoalRequest};
+    use yamantaka_domain::reading_sessions::goals::ReadingGoal;
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("library.sqlite3");
+    let db = Database::open(&path).unwrap();
+    db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES ('a','a.pdf','a.pdf','a.pdf',3,1,'now','now','now','fa');").unwrap();
+    let (runtime, native, _) = start_database(db);
+    runtime
+        .submit(Action::GetDocument("a".into(), Cancellation::default()))
+        .unwrap();
+    let Update::Document(_, Some(document), _) = update(&runtime) else {
+        panic!("Expected document");
+    };
+    runtime
+        .submit(Action::Open(document, None, Cancellation::default()))
+        .unwrap();
+    let Native::Open(_, _, held) = next(&native) else {
+        panic!("Expected held open");
+    };
+    let goal = Some(ReadingGoal::new(Some(12), Some(30)).unwrap());
+    for (change, cancelled, expected) in [
+        (ReadingGoalChange::Save(goal), true, None),
+        (ReadingGoalChange::Read, false, None),
+        (ReadingGoalChange::Save(goal), false, goal),
+        (ReadingGoalChange::Read, false, goal),
+        (ReadingGoalChange::Save(None), false, None),
+    ] {
+        let cancel = Cancellation::default();
+        if cancelled {
+            cancel.cancel();
+        }
+        runtime
+            .submit(Action::ReadingGoal(Box::new(ReadingGoalRequest {
+                document: "a".into(),
+                change,
+                cancel: cancel.clone(),
+            })))
+            .unwrap();
+        let Update::ReadingGoal(reply) = update(&runtime) else {
+            panic!("Expected goal reply");
+        };
+        assert_eq!(reply.document, "a");
+        assert_eq!(reply.change, change);
+        assert!(reply.cancel.same_request(&cancel));
+        if cancelled {
+            assert!(matches!(reply.result, Err(Failure::Cancelled)));
+        } else {
+            assert_eq!(reply.result.unwrap(), expected);
+        }
+    }
+    let read = rusqlite::Connection::open(&path).unwrap();
+    assert_eq!(
+        read.query_row(
+            "SELECT count(*) FROM app_metadata WHERE key='reading_goals_v1'",
+            [],
+            |r| r.get::<_, i64>(0)
+        )
+        .unwrap(),
+        0
+    );
+    assert!(native.try_recv().is_err());
+    held.send(Err(Failure::Cancelled)).unwrap();
+}

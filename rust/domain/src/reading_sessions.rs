@@ -1,6 +1,7 @@
 use crate::{Cancellation, Failure, Result};
 use serde::{Deserialize, Serialize};
 mod context_decode;
+pub mod goals;
 pub mod history;
 pub mod restoration;
 
@@ -73,6 +74,21 @@ pub struct ReadingSessionFinish<'a> {
     pub context: Option<&'a ReaderSessionContext>,
 }
 pub trait ReadingSessionRepository {
+    fn reading_goal(
+        &self,
+        _document: &str,
+        _cancel: &Cancellation,
+    ) -> Result<Option<goals::ReadingGoal>> {
+        Err(Failure::Unsupported("Reading goals".into()))
+    }
+    fn save_reading_goal(
+        &mut self,
+        _document: &str,
+        _goal: Option<goals::ReadingGoal>,
+        _cancel: &Cancellation,
+    ) -> Result<Option<goals::ReadingGoal>> {
+        Err(Failure::Unsupported("Saving reading goals".into()))
+    }
     fn delete_reading_session(
         &mut self,
         _id: &str,
