@@ -1753,8 +1753,22 @@ impl App for YamantakaApp {
                 }
                 Update::ReadingSession(reply) => {
                     let id = reply.id.clone();
-                    if let Some(Err(error)) = self.sessions.lifecycle.accept(reply) {
-                        self.sessions.remember_failure(id);
+                    match self.sessions.lifecycle.accept(reply) {
+                        Some(Err(error)) => {
+                            self.sessions.remember_failure(id);
+                            self.error = Some(error.to_string());
+                        }
+                        Some(Ok(())) => self.send(Action::TrimReadingHistory(
+                            self.preferences.reading_history_limit(),
+                            Cancellation::default(),
+                        )),
+                        None => {}
+                    }
+                }
+                Update::ReadingHistoryTrimmed(result, cancel) => {
+                    if !cancel.is_cancelled()
+                        && let Err(error) = result
+                    {
                         self.error = Some(error.to_string());
                     }
                 }

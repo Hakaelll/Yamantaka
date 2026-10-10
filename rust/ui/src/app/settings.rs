@@ -338,12 +338,33 @@ impl YamantakaApp {
                         if ui.checkbox(&mut enabled, self.tr("Guardar sesiones de lectura", "Save reading sessions")).changed() {
                             let path = self.store.join("preferences.json");
                             let demo = self.demo;
-                            if let Err(error) = sessions::change_recording(&mut self.preferences, enabled, |preferences| {
+                            if let Err(error) = sessions::change_preference(&mut self.preferences, "recordReadingSessions", enabled.into(), |preferences| {
                                 if demo { Ok(()) } else { preferences.save(&path) }
                             }) { self.error = Some(error.to_string()); }
                         }
                         ui.add_space(6.0);
                         quiet(ui, self.tr("Conserva el tiempo activo y el punto donde dejaste cada lectura. Al desactivarlo, se cierra la sesión actual y se mantienen las anteriores.", "Keep your active reading time and where you left each reading. Turning this off ends the current session and keeps earlier sessions."), p);
+                        ui.add_space(16.0);
+                        let limit_heading = ui.label(RichText::new(self.tr("Sesiones completadas que conservar", "Completed sessions to keep")).strong());
+                        let saved_limit = self.preferences.reading_history_limit();
+                        let limit_id = egui::Id::new("reading-history-limit-draft");
+                        let mut limit = ui.ctx().data_mut(|data| data.get_temp::<usize>(limit_id)).unwrap_or(saved_limit);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.add(egui::DragValue::new(&mut limit).range(25..=1000).speed(1.0)).labelled_by(limit_heading.id);
+                            let apply = theme::control(ui, self.tr("Aplicar", "Apply"), Some(theme::Icon::Right), false, true, p);
+                            if apply.clicked() {
+                                let path = self.store.join("preferences.json");
+                                let demo = self.demo;
+                                match sessions::change_preference(&mut self.preferences, "readingHistoryLimit", limit.into(), |preferences| {
+                                    if demo { Ok(()) } else { preferences.save(&path) }
+                                }) {
+                                    Ok(()) => self.send(Action::TrimReadingHistory(limit, Cancellation::default())),
+                                    Err(error) => self.error = Some(error.to_string()),
+                                }
+                            }
+                        });
+                        ui.ctx().data_mut(|data| data.insert_temp(limit_id, limit));
+                        quiet(ui, self.tr("Al aplicar un límite, se eliminan las sesiones completadas más antiguas. Las lecturas abiertas se mantienen.", "Applying a limit removes the oldest completed sessions. Open readings are kept."), p);
                     });
                 ui.add_space(20.0);
 

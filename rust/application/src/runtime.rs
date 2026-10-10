@@ -28,6 +28,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    TrimReadingHistory(usize, Cancellation),
     ReadingSession(Box<ReadingSessionRequest>),
     AnnotationExport(Box<AnnotationExportRequest>),
     AnnotationMarks(Box<AnnotationMarksRequest>),
@@ -78,6 +79,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    ReadingHistoryTrimmed(Result<u64>, Cancellation),
     ReadingSession(ReadingSessionReply),
     AnnotationExport(AnnotationExportReply),
     AnnotationMarks(AnnotationMarksReply),
@@ -170,7 +172,7 @@ pub struct Runtime {
 }
 enum RuntimeControl {
     Stop,
-    PersistSessions(Vec<ReadingSessionRequest>, Sender<Result<()>>),
+    PersistSessions(Vec<ReadingSessionRequest>, usize, Sender<Result<()>>),
 }
 struct ImportState {
     paths: std::collections::VecDeque<PathBuf>,
@@ -374,11 +376,14 @@ impl Runtime {
                 loop {
                     match stop.try_recv() {
                         Ok(RuntimeControl::Stop) => break,
-                        Ok(RuntimeControl::PersistSessions(requests, completed)) => {
+                        Ok(RuntimeControl::PersistSessions(requests, limit, completed)) => {
                             let mut result = Ok(());
                             for request in requests {
                                 let outcome = request.execute(&mut repository).result;
                                 if result.is_ok() { result = outcome; }
+                            }
+                            if result.is_ok() {
+                                result = repository.trim_reading_history(limit, &Cancellation::default()).map(|_| ());
                             }
                             let _ = completed.try_send(result);
                         }
@@ -405,6 +410,10 @@ impl Runtime {
                             deferred.push_back(Command { action, permit });
                         } else {
                             match action {
+                                Action::TrimReadingHistory(limit, cancel) => {
+                                    let result = repository.trim_reading_history(limit, &cancel);
+                                    emit(&events, &notify, Update::ReadingHistoryTrimmed(result, cancel), permit);
+                                }
                                 Action::ReadingSession(request) => emit(
                                     &events, &notify,
                                     Update::ReadingSession(request.execute(&mut repository)), permit,
@@ -1029,7 +1038,11 @@ impl Runtime {
     }
     /// Blocking persistence barrier for shutdown/recovery, independent of UI event capacity.
     /// The caller must finalize activity first and retain these immutable commands on failure.
-    pub fn persist_reading_sessions(&self, requests: Vec<ReadingSessionRequest>) -> Result<()> {
+    pub fn persist_reading_sessions(
+        &self,
+        requests: Vec<ReadingSessionRequest>,
+        history_limit: usize,
+    ) -> Result<()> {
         if requests.len() > crate::reading_sessions::lifecycle::MAX_UNCOMPLETED_SESSIONS * 2 {
             return Err(Failure::Invalid(
                 "Too many reading session recovery commands".into(),
@@ -1040,7 +1053,11 @@ impl Runtime {
         }
         let (completed, reply) = bounded(1);
         self.shutdown
-            .try_send(RuntimeControl::PersistSessions(requests, completed))
+            .try_send(RuntimeControl::PersistSessions(
+                requests,
+                history_limit,
+                completed,
+            ))
             .map_err(|error| match error {
                 crossbeam_channel::TrySendError::Full(_) => Failure::QueueFull,
                 crossbeam_channel::TrySendError::Disconnected(_) => {

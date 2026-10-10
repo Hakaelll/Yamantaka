@@ -22,6 +22,16 @@ impl Default for Preferences {
     }
 }
 impl Preferences {
+    pub fn reading_history_limit(&self) -> usize {
+        self.get("readingHistoryLimit")
+            .and_then(|value| {
+                value
+                    .as_i64()
+                    .map(|n| n.clamp(25, 1000) as usize)
+                    .or_else(|| value.as_u64().map(|n| n.clamp(25, 1000) as usize))
+            })
+            .unwrap_or(250)
+    }
     pub fn record_reading_sessions(&self) -> bool {
         match self.get("recordReadingSessions") {
             None => true,

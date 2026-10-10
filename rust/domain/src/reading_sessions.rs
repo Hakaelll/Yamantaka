@@ -44,6 +44,9 @@ pub struct ReadingSessionFinish<'a> {
     pub context: Option<&'a ReaderSessionContext>,
 }
 pub trait ReadingSessionRepository {
+    fn trim_reading_history(&mut self, _limit: usize, _cancel: &Cancellation) -> Result<u64> {
+        Err(Failure::Unsupported("Trimming reading history".into()))
+    }
     fn start_reading_session(
         &mut self,
         start: &ReadingSessionStart<'_>,

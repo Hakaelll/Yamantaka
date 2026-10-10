@@ -223,8 +223,10 @@ impl YamantakaApp {
         }
         self.cache_reading_context();
         self.finish_reading_session()?;
-        self.runtime
-            .persist_reading_sessions(self.sessions.lifecycle.recovery_commands()?)?;
+        self.runtime.persist_reading_sessions(
+            self.sessions.lifecycle.recovery_commands()?,
+            self.preferences.reading_history_limit(),
+        )?;
         self.sessions.lifecycle = Default::default();
         self.sessions.failed.clear();
         self.sessions.queue_retry = None;
@@ -232,21 +234,18 @@ impl YamantakaApp {
     }
 }
 
-pub(super) fn change_recording(
+pub(super) fn change_preference(
     preferences: &mut Preferences,
-    enabled: bool,
+    key: &str,
+    value: serde_json::Value,
     persist: impl FnOnce(&Preferences) -> Result<()>,
 ) -> Result<()> {
-    let previous = preferences
-        .rust
-        .insert("recordReadingSessions".into(), enabled.into());
+    let previous = preferences.rust.insert(key.into(), value);
     if let Err(error) = persist(preferences) {
         if let Some(value) = previous {
-            preferences
-                .rust
-                .insert("recordReadingSessions".into(), value);
+            preferences.rust.insert(key.into(), value);
         } else {
-            preferences.rust.remove("recordReadingSessions");
+            preferences.rust.remove(key);
         }
         return Err(error);
     }
@@ -268,14 +267,23 @@ mod tests {
             .insert("futureSetting".into(), "preserved".into());
         assert!(!preferences.record_reading_sessions());
         assert!(
-            change_recording(&mut preferences, true, |_| Err(Failure::Storage(
-                "synthetic failure".into()
-            )))
+            change_preference(
+                &mut preferences,
+                "recordReadingSessions",
+                true.into(),
+                |_| Err(Failure::Storage("synthetic failure".into()))
+            )
             .is_err()
         );
         assert!(!preferences.record_reading_sessions());
         assert!(!preferences.rust.contains_key("recordReadingSessions"));
-        change_recording(&mut preferences, true, |_| Ok(())).unwrap();
+        change_preference(
+            &mut preferences,
+            "recordReadingSessions",
+            true.into(),
+            |_| Ok(()),
+        )
+        .unwrap();
         assert!(preferences.record_reading_sessions());
         assert_eq!(preferences.legacy["recordReadingSessions"], false);
         assert_eq!(preferences.legacy["futureSetting"], "preserved");
