@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='annotation-export-json'; args=@('--reader','--annotation-many','--export-json') },
+    @{ name='annotation-export-markdown-es'; args=@('--reader','--annotation-many','--export-markdown','--light','--es') },
+    @{ name='annotation-export-small-200'; args=@('--reader','--annotation-many','--export-json','--size=640x480','--text-scale=2') },
     @{ name='annotation-many-rotated'; args=@('--reader','--annotation-many','--rotation=90') },
     @{ name='page-note-scanned-editor'; args=@('--reader','--page-note','--find-scanned') },
     @{ name='page-note-scanned-saved-es'; args=@('--reader','--page-note','--find-scanned','--annotation-save','--light','--es') },
@@ -122,12 +125,20 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    $export = $null
+    if ($controls.annotationExport.artifact) {
+        $artifactName = [string]$controls.annotationExport.artifact
+        if ([IO.Path]::GetFileName($artifactName) -ne $artifactName) { throw 'Export artifact must be a file name.' }
+        $artifactPath = Join-Path $outputPath $artifactName
+        if (-not $controls.annotationExport.saved -or $controls.annotationExport.pending -or -not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) { throw 'Export capture must contain a successfully published file.' }
+        $export = [ordered]@{ file=$artifactName; sha256=(Get-FileHash -LiteralPath $artifactPath -Algorithm SHA256).Hash; count=$controls.annotationExport.count }
+    }
     $captures += [ordered]@{
         name=$case.name; args=@('--demo') + $case.args
         image="$($case.name).png"; imageSha256=(Get-FileHash -LiteralPath $imagePath -Algorithm SHA256).Hash
         controls="$($case.name).controls.json"; controlsSha256=(Get-FileHash -LiteralPath $controlPath -Algorithm SHA256).Hash
         viewport=$controls.viewport; pixelsPerPoint=$controls.pixelsPerPoint
-        exitCode=$process.ExitCode
+        exitCode=$process.ExitCode; annotationExport=$export
     }
     Write-Output "Captured $($case.name)"
 }

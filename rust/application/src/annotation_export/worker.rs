@@ -26,8 +26,37 @@ pub struct AnnotationExportReply {
     pub cancel: Cancellation,
 }
 impl AnnotationExportRequest {
+    pub fn new(
+        document: &yamantaka_domain::Document,
+        progress: f64,
+        destination: PathBuf,
+        format: AnnotationExportFormat,
+        governor: MemoryGovernor,
+    ) -> Self {
+        Self {
+            document: document.id.clone(),
+            title: document.display_title().to_owned(),
+            author: document.author.clone(),
+            progress,
+            exported_at: chrono::Utc::now().to_rfc3339(),
+            destination,
+            format,
+            governor,
+            cancel: Cancellation::default(),
+        }
+    }
     fn execute(self, repository: &dyn AnnotationRepository) -> AnnotationExportReply {
         let result = self.cancel.check().and_then(|()| {
+            if !self
+                .destination
+                .extension()
+                .and_then(|value| value.to_str())
+                .is_some_and(|value| value.eq_ignore_ascii_case(self.format.extension()))
+            {
+                return Err(Failure::Invalid(
+                    "Annotation export extension does not match its format".into(),
+                ));
+            }
             repository.publish_annotation_export(&self.destination, &self.cancel, &mut |writer| {
                 write_document_annotations(
                     repository,

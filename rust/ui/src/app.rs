@@ -126,6 +126,7 @@ pub struct YamantakaApp {
     )>,
     bookmarks: bookmarks::BookmarkState,
     annotations: annotations::AnnotationState,
+    annotation_export: annotations::export::ExportState,
     annotation_paint: annotations::paint::AnnotationPaint,
     annotation_preview: u8,
     annotation_multi_preview: bool,
@@ -285,6 +286,7 @@ impl YamantakaApp {
             reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
             annotations: Default::default(),
+            annotation_export: Default::default(),
             annotation_paint: Default::default(),
             annotation_preview: 0,
             annotation_multi_preview: false,
@@ -1449,13 +1451,7 @@ impl App for YamantakaApp {
         }
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
-                Update::AnnotationExport(reply) => {
-                    if let Err(error) = reply.result
-                        && !matches!(error, yamantaka_domain::Failure::Cancelled)
-                    {
-                        self.error = Some(error.to_string());
-                    }
-                }
+                Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
                 Update::AnnotationMarks(reply) => self.annotation_paint.accept(reply),
                 Update::Annotations(reply) => {
                     let revision = self.annotations.revision;
@@ -1795,6 +1791,7 @@ impl App for YamantakaApp {
             }
         }
         self.apply_annotation_preview();
+        self.apply_annotation_export_preview();
         let dropped = ctx.input(|i| {
             i.raw
                 .dropped_files
@@ -1912,7 +1909,11 @@ impl App for YamantakaApp {
                             && self.selection.preview_ready())
                     && self.reader_destination.is_none()
                     && self.annotation_preview == 0
-                    && (!matches!(self.surface, Surface::Reader) || self.annotation_paint.ready())
+                    && self.annotation_export.ready()
+                    // The compact drawer hides the PDF, so it has no visible marks to request.
+                    && (!matches!(self.surface, Surface::Reader)
+                        || self.panel && ctx.content_rect().width() < 620.0
+                        || self.annotation_paint.ready())
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
                     && !self.loading
@@ -1988,6 +1989,7 @@ impl App for YamantakaApp {
                         "textSelection":self.selection.capture_summary(),
                         "annotations":self.annotation_capture_summary(),
                         "annotationPaint":self.annotation_paint.capture_summary(),
+                        "annotationExport":self.annotation_export.capture_summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
@@ -2008,6 +2010,7 @@ impl App for YamantakaApp {
         }
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        self.annotation_export.cancel();
         self.links.clear();
         self.annotation_paint.invalidate();
         self.text.clear();

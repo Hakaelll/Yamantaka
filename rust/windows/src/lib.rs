@@ -1,4 +1,5 @@
 //! Native Windows integration with a Rust-only application identity.
+pub mod annotation_export;
 use sha2::{Digest, Sha256};
 use std::{
     fs,

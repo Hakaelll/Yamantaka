@@ -10,6 +10,14 @@ pub enum AnnotationExportFormat {
     Markdown,
     Json,
 }
+impl AnnotationExportFormat {
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Markdown => "md",
+            Self::Json => "json",
+        }
+    }
+}
 pub struct AnnotationExportMetadata<'a> {
     pub document: &'a str,
     pub title: &'a str,

@@ -66,7 +66,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         } else if args.iter().any(|arg| arg == "--demo-window") {
             store = store.join("previews").join(std::process::id().to_string());
         }
-        let mut db = Database::in_memory_at(11)?;
+        let mut db = if capture.is_some()
+            && args
+                .iter()
+                .any(|arg| arg == "--export-json" || arg == "--export-markdown")
+        {
+            std::fs::create_dir_all(&store).map_err(|_| {
+                yamantaka_domain::Failure::Storage("Synthetic export store could not open".into())
+            })?;
+            Database::open(&store.join("export-preview.sqlite3"))?
+        } else {
+            Database::in_memory_at(11)?
+        };
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join(if protected {
                 "../../build/rust-fixtures/protected.pdf"
@@ -123,7 +134,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state)
                 SELECT printf('synthetic-mark-%03d',x),'demo-0',0,'highlight','violet','Synthetic mark',
                     printf('[{"left":%.4f,"top":%.4f,"right":%.4f,"bottom":%.4f}]',0.08+(x%6)*0.14,0.12+(x/6)*0.023,0.18+(x%6)*0.14,0.13+(x/6)*0.023),
-                    0,'synthetic','attached','2026-10-09','2026-10-09','pending' FROM n;"#)?;
+                    0,'synthetic','attached','2026-10-09T12:00:00Z','2026-10-09T12:00:00Z','pending' FROM n;"#)?;
         }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
@@ -292,6 +303,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 );
                 if args.iter().any(|arg| arg == "--annotation-many") {
                     app.preview_annotation_list();
+                }
+                if args
+                    .iter()
+                    .any(|arg| arg == "--export-json" || arg == "--export-markdown")
+                {
+                    app.preview_annotation_export(
+                        args.iter().any(|arg| arg == "--export-markdown"),
+                    );
                 }
                 if args.iter().any(|arg| arg == "--page-note") {
                     app.preview_page_note(args.iter().any(|arg| arg == "--annotation-save"));

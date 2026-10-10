@@ -8,6 +8,7 @@ use yamantaka_domain::{
     reader_preferences::PageRotation,
     text_selection::snapshot::TextSelectionSnapshot,
 };
+pub(super) mod export;
 pub(super) mod paint;
 mod panel;
 mod tags;

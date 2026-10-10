@@ -337,6 +337,16 @@ fn annotation_export_publishes_all_rows_while_native_pdf_open_is_held() {
     };
     assert!(reply.cancel.same_request(&cancelled));
     assert!(matches!(reply.result, Err(Failure::Cancelled)));
+    let Action::AnnotationExport(mut mismatch) = request(Cancellation::default()) else {
+        unreachable!()
+    };
+    mismatch.destination = dir.path().join("mismatched.md");
+    runtime.submit(Action::AnnotationExport(mismatch)).unwrap();
+    let Update::AnnotationExport(reply) = update(&runtime) else {
+        panic!("Expected format rejection")
+    };
+    assert!(matches!(reply.result, Err(Failure::Invalid(_))));
+    assert!(!dir.path().join("mismatched.md").exists());
     assert!(
         native.try_recv().is_err(),
         "Export must not submit PDF work"

@@ -253,6 +253,10 @@ impl YamantakaApp {
                 .color(p.secondary),
             );
         }
+        if self.annotations.editor.is_none() || self.annotation_export.busy() {
+            ui.add_space(16.0);
+            self.annotation_export_panel(ui, p);
+        }
         ui.add_space(20.0);
         let Some(page) = self.annotations.page.clone() else {
             return;
