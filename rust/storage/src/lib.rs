@@ -7,5 +7,6 @@ pub mod identity;
 pub mod migration;
 pub mod preferences;
 pub mod reader_preferences;
+pub mod reading_sessions;
 pub mod search;
 pub use database::Database;

@@ -20,6 +20,7 @@ pub mod reader_destination;
 pub mod reader_layout;
 pub mod reader_preferences;
 pub mod reading_activity;
+pub mod reading_sessions;
 pub mod search;
 pub mod text_selection;
 use std::{
