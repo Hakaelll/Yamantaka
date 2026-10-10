@@ -19,6 +19,7 @@ pub mod reader;
 pub mod reader_destination;
 pub mod reader_layout;
 pub mod reader_preferences;
+pub mod reader_tabs;
 pub mod reading_activity;
 pub mod reading_sessions;
 pub mod search;
