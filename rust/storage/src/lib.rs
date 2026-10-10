@@ -1,3 +1,4 @@
+pub mod annotation_export;
 pub mod annotations;
 pub mod backup;
 pub mod bookmarks;

@@ -4405,6 +4405,7 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "serde_json",
+ "tempfile",
  "yamantaka-domain",
  "yamantaka-pdf",
  "yamantaka-storage",
