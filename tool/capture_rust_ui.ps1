@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-preserved'; args=@('--reader','--open-replacement-failure') },
+    @{ name='reader-preserved-light-es'; args=@('--reader','--open-replacement-failure','--light','--es','--reduced-motion') },
+    @{ name='reader-preserved-small-200'; args=@('--reader','--open-replacement-failure','--size=640x480','--text-scale=2') },
     @{ name='goal-editor'; args=@('--details','--goal-editor','--sessions-preview') },
     @{ name='goal-editor-light-es'; args=@('--details','--goal-editor','--light','--es','--reduced-motion') },
     @{ name='goal-editor-small-200'; args=@('--details','--goal-editor','--size=640x480','--text-scale=2') },

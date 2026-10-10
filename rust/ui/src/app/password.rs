@@ -27,12 +27,17 @@ impl YamantakaApp {
         }
     }
     pub(super) fn retry_password(&mut self, document: Document, value: PdfPassword) {
-        self.cancel.cancel();
-        self.cancel = Cancellation::default();
+        let id = document.id.clone();
+        let cancel = self.opening.retry(id.clone());
         self.password_attempted = true;
         self.loading = true;
-        self.reader_preferences_loading = true;
-        self.send(Action::Open(document, Some(value), self.cancel.clone()));
+        if let Err(error) = self
+            .runtime
+            .submit(Action::Open(document, Some(value), cancel.clone()))
+        {
+            self.cancel_reader_opening();
+            self.error = Some(error.to_string());
+        }
     }
 
     pub(super) fn password_dialog(&mut self, ctx: &egui::Context) {
@@ -162,10 +167,7 @@ impl YamantakaApp {
             ctx.memory_mut(|memory| memory.surrender_focus(field_id));
         }
         if cancel {
-            self.cancel.cancel();
-            self.open_intent.leave_destination();
-            self.password_attempted = false;
-            self.loading = false;
+            self.cancel_reader_opening();
         } else if submit {
             self.retry_password(challenge.document, challenge.value);
         } else {

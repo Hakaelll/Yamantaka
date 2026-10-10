@@ -501,6 +501,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_list_states();
                 }
             }
+            if demo && args.iter().any(|arg| arg == "--open-replacement-failure") {
+                app.preview_failed_replacement();
+            }
             if demo && protected {
                 app.preview_password(if args.iter().any(|arg| arg == "--password-unlock") {
                     "unlock"

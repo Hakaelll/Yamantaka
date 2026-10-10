@@ -10,6 +10,7 @@ mod links;
 mod list;
 mod navigation;
 mod open_intent;
+mod opening;
 mod outline;
 mod password;
 mod reader_controls;
@@ -85,6 +86,7 @@ pub struct YamantakaApp {
     history: history::HistoryState,
     goals: goals::GoalState,
     open_intent: open_intent::OpenIntent,
+    opening: opening::ReaderOpening,
     restoration: restoration::RestorationState,
     open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
@@ -246,6 +248,7 @@ impl YamantakaApp {
                     .unwrap_or(false),
             ),
             open_intent: open_intent::OpenIntent::default(),
+            opening: Default::default(),
             open_confirmation: None,
             password: None,
             password_attempted: false,
@@ -499,6 +502,7 @@ impl YamantakaApp {
         }
         self.cache_reading_context();
         let next_cancel = Cancellation::default();
+        let id = document.id.clone();
         if let Err(error) = self
             .runtime
             .submit(Action::Open(document, None, next_cancel.clone()))
@@ -506,33 +510,15 @@ impl YamantakaApp {
             self.error = Some(error.to_string());
             return false;
         }
+        self.opening.bind(id, next_cancel);
         self.restoration.clear();
-        self.links.clear();
-        self.annotation_paint.invalidate();
-        self.text.clear();
-        self.selection.clear();
-        self.thumbnails.clear();
-        let preview = self.find.take_preview();
-        self.find = Default::default();
-        self.find.restore_preview(preview);
-        self.reader_destination = None;
-        self.outline = Default::default();
         self.password = None;
         self.password_attempted = false;
         self.open_intent.begin_open();
-        self.reader_preferences_cancel.cancel();
-        self.reader_preferences_cancel = Cancellation::default();
-        self.reader_preferences = None;
-        self.reader_preferences_loading = true;
-        self.cancel.cancel();
-        self.cancel = next_cancel;
         self.loading = true;
-        self.reader_pages.clear();
-        self.reader_layout = None;
-        self.reset_render_request();
-        self.generation += 1;
         true
     }
+
     fn navigate(&mut self, page: u32) {
         if self
             .navigation
@@ -1563,39 +1549,51 @@ impl App for YamantakaApp {
                     self.bookmarks.accept(&id, &cancel, Err(error.to_string()));
                 }
                 Update::Opened(document, info, cancel) => {
-                    if cancel.is_cancelled() {
-                        self.open_confirmation = Some((document.id.clone(), cancel));
-                        continue;
-                    }
-                    if let Err(error) = self.finish_reading_session() {
-                        self.error = Some(error.to_string());
+                    if cancel.is_cancelled() || !self.opening.matches(&document.id, &cancel) {
+                        if self.opening.fail(&document.id, &cancel, false) {
+                            self.loading = false;
+                            self.restoration.clear();
+                        }
                         cancel.cancel();
                         self.open_confirmation = Some((document.id.clone(), cancel));
                         continue;
                     }
-                    self.page = document
-                        .last_page_index
-                        .min(info.pages.len().saturating_sub(1) as u32);
                     let (target_page, reveal_reader) = self.open_intent.finish_open(&document.id);
-                    if let Some(page) = target_page {
-                        self.page = page.min(info.pages.len().saturating_sub(1) as u32);
-                    }
+                    let page = target_page
+                        .unwrap_or(document.last_page_index)
+                        .min(info.pages.len().saturating_sub(1) as u32);
                     let count = u32::try_from(info.pages.len()).unwrap_or(0);
-                    match ReaderNavigation::new(count, self.page) {
-                        Ok(navigation) => self.navigation = Some(navigation),
+                    let navigation = match ReaderNavigation::new(count, page) {
+                        Ok(navigation) => navigation,
                         Err(error) => {
                             self.error = Some(error.to_string());
-                            self.loading = false;
+                            self.opening.fail(&document.id, &cancel, false);
+                            self.restoration.clear();
                             cancel.cancel();
                             self.open_confirmation = Some((document.id.clone(), cancel));
+                            self.loading = false;
                             continue;
                         }
+                    };
+                    if let Err(error) = self.finish_reading_session() {
+                        self.error = Some(error.to_string());
+                        self.opening.fail(&document.id, &cancel, false);
+                        self.restoration.clear();
+                        cancel.cancel();
+                        self.open_confirmation = Some((document.id.clone(), cancel));
+                        self.loading = false;
+                        continue;
                     }
+                    let Some(preferences_cancel) = self.opening.accept(&document.id, &cancel)
+                    else {
+                        cancel.cancel();
+                        self.open_confirmation = Some((document.id.clone(), cancel));
+                        continue;
+                    };
+                    self.replace_reader_state(preferences_cancel);
+                    self.page = page;
+                    self.navigation = Some(navigation);
                     self.open_confirmation = Some((document.id.clone(), cancel));
-                    // Opening acknowledgement and subsequent rendering have
-                    // independent cancellation lifetimes. Preference application
-                    // must not cancel an already accepted ownership handoff.
-                    self.cancel = Cancellation::default();
                     if target_page.is_some() {
                         self.send(Action::Navigate(document.id.clone(), self.page));
                     }
@@ -1644,11 +1642,19 @@ impl App for YamantakaApp {
                     self.refresh();
                 }
                 Update::OpenFailed(document, error, cancel) => {
-                    if cancel.is_cancelled() {
+                    let cancelled = cancel.is_cancelled();
+                    let password = matches!(error, yamantaka_domain::Failure::PasswordRequired)
+                        && self.open_intent.wants_reader();
+                    if !self.opening.fail(&document.id, &cancel, password) {
                         continue;
                     }
                     self.loading = false;
-                    self.reader_preferences_loading = false;
+                    if !password || cancelled {
+                        self.restoration.clear();
+                    }
+                    if cancelled {
+                        continue;
+                    }
                     if matches!(error, yamantaka_domain::Failure::PasswordRequired)
                         && self.open_intent.wants_reader()
                     {
@@ -1782,7 +1788,7 @@ impl App for YamantakaApp {
                                     if let Some(context) = target.context {
                                         self.restoration.arm(
                                             id,
-                                            self.reader_preferences_cancel.clone(),
+                                            self.opening.preferences().unwrap(),
                                             context,
                                         );
                                     }
@@ -1832,6 +1838,7 @@ impl App for YamantakaApp {
                 }
             }
         }
+        self.advance_replacement_preview();
         self.sync_reading_session(ctx);
         if self.demo
             && self.capture.is_some()
@@ -1966,13 +1973,17 @@ impl App for YamantakaApp {
                             });
                         });
                 }
-                if self.loading {
+                if self.loading || self.opening.busy() {
                     ui.horizontal(|ui| {
                         ui.spinner();
                         ui.label(self.tr("Procesando documentos…", "Working on your documents…"));
                         if ui.button(self.tr("Cancelar", "Cancel")).clicked() {
-                            self.cancel.cancel();
-                            self.loading = false;
+                            if self.opening.busy() {
+                                self.cancel_reader_opening();
+                            } else {
+                                self.cancel.cancel();
+                                self.loading = false;
+                            }
                             self.refresh();
                         }
                     });
@@ -2052,6 +2063,7 @@ impl App for YamantakaApp {
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
                     && !self.loading
+                    && self.opening.ready()
                     && match self.preview_password_target {
                         Some("unlock") => matches!(self.surface, Surface::Reader),
                         Some(_) => self.password.is_some(),
@@ -2129,6 +2141,7 @@ impl App for YamantakaApp {
                         "globalNotes":self.global_notes.summary(),
                         "readingHistory": self.history.summary(),
                         "readingRestoration": self.restoration_summary(),
+                        "readerOpening":self.opening.summary(),
                         "readingGoal": self.goals.summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
