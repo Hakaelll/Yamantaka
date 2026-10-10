@@ -3,6 +3,7 @@ use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
+use crate::reader_close::{ReaderCloseReply, ReaderCloseRequest};
 use crate::reading_sessions::deletion::{ReadingSessionDeleteReply, ReadingSessionDeleteRequest};
 use crate::reading_sessions::goals::{ReadingGoalReply, ReadingGoalRequest};
 use crate::reading_sessions::{
@@ -73,7 +74,7 @@ pub enum Action {
         u32,
         Cancellation,
     ),
-    Close(String),
+    Close(ReaderCloseRequest),
     Shutdown,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,10 +83,10 @@ pub enum WriteKind {
     VisibleDocuments,
     Favorite,
     Position,
-    Close,
     ReaderPreferences,
 }
 pub enum Update {
+    ReaderClosed(ReaderCloseReply),
     ReadingHistory(ReadingHistoryReply),
     ReadingHistoryTrimmed(Result<u64>, Cancellation),
     ReadingGoal(ReadingGoalReply),
@@ -217,7 +218,7 @@ enum Pending {
         PdfTicket<Arc<yamantaka_domain::pdf_find::PdfPageMatches>>,
         Permit,
     ),
-    Close(String, PdfTicket<()>, Permit),
+    Close(ReaderCloseRequest, PdfTicket<()>, Permit),
     ImportOpen(PathBuf, String, PdfTicket<PdfInfo>, ImportState),
     ImportClose(PathBuf, PdfInfo, PdfTicket<()>, ImportState),
 }
@@ -293,9 +294,12 @@ fn foreground_admissible(
         Action::Import(..) => {
             awaiting.is_none() && !pending.iter().any(|item| matches!(item, Pending::Open(..)))
         }
-        Action::Open(..) => awaiting
+        Action::Open(document, ..) => awaiting
             .as_ref()
-            .is_none_or(|(_, token)| token.is_cancelled()),
+            .is_none_or(|(_, token)| token.is_cancelled())
+            && !pending.iter().any(
+                |item| matches!(item,Pending::Close(request, ..) if request.document==document.id),
+            ),
         _ => true,
     }
 }
@@ -767,9 +771,17 @@ impl Runtime {
                                     Ok(ticket) => pending.push(Pending::Outline(id, ticket, permit)),
                                     Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
                                 },
-                                Action::Close(id) => match engine.try_close(id.clone()) {
-                                    Ok(ticket) => pending.push(Pending::Close(id, ticket, permit)),
-                                    Err(error) => failed(&events, &notify, error, None, permit),
+                                Action::Close(request) => {
+                                    let valid=request.cancel.check().and_then(|()|if request.document.is_empty() {Err(Failure::Invalid("Reader close requires a document identity".into()))}else{Ok(())});
+                                    if let Err(error)=valid {emit(&events,&notify,Update::ReaderClosed(request.reply(Err(error))),permit);continue;}
+                                    match engine.try_close(request.document.clone()) {
+                                        Ok(ticket) => {
+                                            for item in &pending {if matches!(item,Pending::Open(document, ..) if document.id==request.document) {item.cancel();}}
+                                            if awaiting_open.as_ref().is_some_and(|(id,_)|*id==request.document) && let Some((_,token))=awaiting_open.take() {token.cancel();}
+                                            pending.push(Pending::Close(request,ticket,permit));
+                                        }
+                                        Err(error) => emit(&events,&notify,Update::ReaderClosed(request.reply(Err(error))),permit),
+                                    }
                                 },
                                 Action::Import(paths, cancel) => advance_import(
                                     &engine,
@@ -907,19 +919,13 @@ impl Runtime {
                                     Err(error) => emit(&events, &notify, Update::PageFindFailed(id, error, cancel), permit),
                                 }
                             }
-                            Pending::Close(id, ticket, permit) => match ticket.wait() {
-                                Ok(()) => {
-                                    visible.retain(|item| item != &id);
-                                    if awaiting_open.as_ref().is_some_and(|(target, _)| target == &id)
-                                        && let Some((_, token)) = awaiting_open.take() { token.cancel(); }
-                                    emit(
-                                        &events,
-                                        &notify,
-                                        Update::Committed(id, WriteKind::Close),
-                                        permit,
-                                    );
+                            Pending::Close(request, ticket, permit) => {
+                                let result=ticket.wait();
+                                if result.is_ok() {
+                                    visible.retain(|id|*id!=request.document);
+                                    if awaiting_open.as_ref().is_some_and(|(id,_)|*id==request.document) && let Some((_,token))=awaiting_open.take() {token.cancel();}
                                 }
-                                Err(error) => failed(&events, &notify, error, None, permit),
+                                emit(&events,&notify,Update::ReaderClosed(request.reply(result)),permit);
                             },
                             Pending::ImportOpen(path, id, ticket, state) => match ticket.wait() {
                                 Ok(info) => match engine.try_close(id) {
@@ -1626,8 +1632,12 @@ mod tests {
                 .submit(Action::Favorite(format!("book-{n}"), true))
                 .unwrap();
         }
+        let close_token = Cancellation::default();
         runtime
-            .submit(Action::Close("active".into()))
+            .submit(Action::Close(ReaderCloseRequest {
+                document: "active".into(),
+                cancel: close_token.clone(),
+            }))
             .expect("close has a separate reservation");
         let mut writes = 0;
         let mut closed = false;
@@ -1638,8 +1648,10 @@ mod tests {
                 .unwrap()
             {
                 Update::Committed(_, WriteKind::Favorite) => writes += 1,
-                Update::Committed(id, WriteKind::Close) => {
-                    assert_eq!(id, "active");
+                Update::ReaderClosed(reply) => {
+                    assert_eq!(reply.document, "active");
+                    assert!(reply.cancel.same_request(&close_token));
+                    reply.result.unwrap();
                     assert!(!closed);
                     closed = true;
                 }

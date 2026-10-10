@@ -14,6 +14,8 @@ use yamantaka_domain::{
     search::SearchQuery,
 };
 use yamantaka_storage::Database;
+#[path = "search_runtime/reader_close.rs"]
+mod reader_close;
 #[path = "search_runtime/reading_sessions.rs"]
 mod reading_sessions;
 #[path = "search_runtime/review_export.rs"]

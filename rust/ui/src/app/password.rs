@@ -232,13 +232,20 @@ mod tests {
         assert!(
             matches!(runtime.updates.recv_timeout(Duration::from_secs(5)).unwrap(), Update::Text(id, 0, text, _) if id == "protected" && !text.is_empty())
         );
-        runtime.submit(Action::Close("protected".into())).unwrap();
+        runtime
+            .submit(Action::Close(
+                yamantaka_application::reader_close::ReaderCloseRequest {
+                    document: "protected".into(),
+                    cancel: Cancellation::default(),
+                },
+            ))
+            .unwrap();
         assert!(matches!(
             runtime
                 .updates
                 .recv_timeout(Duration::from_secs(5))
                 .unwrap(),
-            Update::Committed(_, yamantaka_application::runtime::WriteKind::Close)
+            Update::ReaderClosed(reply) if reply.document=="protected" && reply.result.is_ok()
         ));
         drop(runtime);
         assert_eq!(std::fs::read(path).unwrap(), original);

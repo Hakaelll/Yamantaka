@@ -1688,6 +1688,13 @@ impl App for YamantakaApp {
                     self.render_retry = self.requested.is_some();
                     self.loading = false;
                 }
+                Update::ReaderClosed(reply) => {
+                    if let Err(error) = reply.result
+                        && !matches!(error, yamantaka_domain::Failure::Cancelled)
+                    {
+                        self.error = Some(error.to_string());
+                    }
+                }
                 Update::Committed(_, yamantaka_application::runtime::WriteKind::Index) => {
                     self.send(Action::IndexStatistics);
                     self.refresh_selected_index_state();
