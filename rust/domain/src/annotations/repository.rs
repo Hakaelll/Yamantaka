@@ -184,6 +184,21 @@ pub enum AnnotationChange<'a> {
     },
 }
 pub trait AnnotationRepository {
+    /// Opens an independent reader for export work without sharing the actor's connection.
+    fn export_reader(&self) -> Result<Box<dyn AnnotationRepository + Send>> {
+        Err(Failure::Unsupported("Independent annotation export".into()))
+    }
+
+    /// Publishes only successful output to a new destination, without replacing existing files.
+    fn publish_annotation_export(
+        &self,
+        _destination: &std::path::Path,
+        _cancel: &Cancellation,
+        _write: &mut dyn FnMut(&mut dyn std::io::Write) -> Result<u64>,
+    ) -> Result<u64> {
+        Err(Failure::Unsupported("Publishing annotation exports".into()))
+    }
+
     fn visit_annotations(
         &self,
         _document: &str,

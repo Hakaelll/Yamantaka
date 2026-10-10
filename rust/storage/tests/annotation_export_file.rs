@@ -116,3 +116,51 @@ fn missing_document_paths_extensions_and_bad_parents_fail_before_writing() {
     }
     assert_eq!(entries(dir.path()), 0);
 }
+
+#[test]
+fn an_independent_export_reader_cannot_change_the_live_library() {
+    use yamantaka_domain::{
+        annotations::repository::*, memory::MemoryGovernor, search::IndexAccess,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("library.sqlite3")).unwrap();
+    db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('a','a.pdf','a.pdf','a.pdf',1,1,'now','now','now','fa'); INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) VALUES('r','a',0,'pageComment','blue','Original','[]',0,'fa','attached','2026-10-08T12:00:00Z','2026-10-09T12:00:00Z','pending');").unwrap();
+    let mut reader = db.export_reader().unwrap();
+    let governor = MemoryGovernor::default();
+    let cancel = Cancellation::default();
+    let query = AnnotationQuery {
+        document_id: Some("a".into()),
+        ..Default::default()
+    };
+    assert!(matches!(
+        reader.change_annotation(
+            "a",
+            AnnotationChange::Remove { id: "r" },
+            &query,
+            IndexAccess::Disabled,
+            &governor,
+            &cancel
+        ),
+        Err(Failure::Storage(_))
+    ));
+    let original = db.annotations(&query, &governor, &cancel).unwrap();
+    assert_eq!(original.total, 1);
+    assert_eq!(
+        original.entries()[0].data().values.note.as_deref(),
+        Some("Original")
+    );
+    drop(original);
+    db.execute_batch("UPDATE annotations SET note='Changed';")
+        .unwrap();
+    let changed = reader.annotations(&query, &governor, &cancel).unwrap();
+    assert_eq!(
+        changed.entries()[0].data().values.note.as_deref(),
+        Some("Changed")
+    );
+    drop(changed);
+    assert_eq!(governor.usage().text, 0);
+    assert!(matches!(
+        Database::in_memory_at(11).unwrap().export_reader(),
+        Err(Failure::Unsupported(_))
+    ));
+}

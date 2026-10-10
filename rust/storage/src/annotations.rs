@@ -293,6 +293,34 @@ fn read_page(
     AnnotationPage::from_reserved(entries, total, offset, page_lease)
 }
 impl AnnotationRepository for Database {
+    fn export_reader(&self) -> Result<Box<dyn AnnotationRepository + Send>> {
+        let path = self
+            .connection
+            .path()
+            .filter(|path| !path.is_empty())
+            .ok_or_else(|| {
+                Failure::Unsupported("Independent export requires a file-backed library".into())
+            })?;
+        let connection = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|_| Failure::Storage("Annotation export reader could not open".into()))?;
+        connection
+            .busy_timeout(std::time::Duration::from_secs(3))
+            .map_err(|_| Failure::Storage("Annotation export reader could not open".into()))?;
+        Ok(Box::new(Database { connection }))
+    }
+
+    fn publish_annotation_export(
+        &self,
+        destination: &std::path::Path,
+        cancel: &Cancellation,
+        write: &mut dyn FnMut(&mut dyn std::io::Write) -> Result<u64>,
+    ) -> Result<u64> {
+        self.create_annotation_export(destination, cancel, |file| write(file))
+    }
+
     fn visit_annotations(
         &self,
         document: &str,

@@ -269,6 +269,81 @@ fn update(runtime: &Runtime) -> Update {
         .recv_timeout(Duration::from_secs(5))
         .unwrap()
 }
+
+#[test]
+fn annotation_export_publishes_all_rows_while_native_pdf_open_is_held() {
+    use yamantaka_application::annotation_export::{
+        AnnotationExportFormat, worker::AnnotationExportRequest,
+    };
+    use yamantaka_domain::{Failure, memory::MemoryGovernor};
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("library.sqlite3")).unwrap();
+    db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,title,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('a','a.pdf','a.pdf','a.pdf','Study 学习',3,1,'now','now','now','fa'); WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180) INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) SELECT printf('r%03d',x),'a',x/80,'pageComment','blue','Study 学习','[]',0,'fa','attached','2026-10-08T12:00:00Z','2026-10-09T12:00:00Z','pending' FROM n;").unwrap();
+    let (runtime, native, _) = start_database(db);
+    runtime
+        .submit(Action::GetDocument("a".into(), Cancellation::default()))
+        .unwrap();
+    let Update::Document(_, Some(document), _) = update(&runtime) else {
+        panic!("Expected source")
+    };
+    runtime
+        .submit(Action::Open(document, None, Cancellation::default()))
+        .unwrap();
+    let Native::Open(_, _, held_open) = next(&native) else {
+        panic!("Expected held PDF open")
+    };
+    let path = dir.path().join("Étude 学习.json");
+    let governor = MemoryGovernor::default();
+    let request = |cancel| {
+        Action::AnnotationExport(Box::new(AnnotationExportRequest {
+            document: "a".into(),
+            title: "Study 学习".into(),
+            author: None,
+            progress: 0.5,
+            exported_at: "2026-10-10T12:00:00Z".into(),
+            destination: path.clone(),
+            format: AnnotationExportFormat::Json,
+            governor: governor.clone(),
+            cancel,
+        }))
+    };
+    let cancel = Cancellation::default();
+    runtime.submit(request(cancel.clone())).unwrap();
+    let Update::AnnotationExport(reply) = update(&runtime) else {
+        panic!("Expected export")
+    };
+    assert_eq!(reply.document, "a");
+    assert!(reply.cancel.same_request(&cancel));
+    assert_eq!(reply.result.unwrap(), 181);
+    assert!(!cancel.is_cancelled());
+    let bytes = std::fs::read(&path).unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["annotations"].as_array().unwrap().len(), 181);
+    assert_eq!(json["annotations"][180]["id"], "r180");
+    assert_eq!(governor.usage().text, 0);
+    let occupied = Cancellation::default();
+    runtime.submit(request(occupied.clone())).unwrap();
+    let Update::AnnotationExport(reply) = update(&runtime) else {
+        panic!("Expected occupied destination")
+    };
+    assert!(reply.cancel.same_request(&occupied));
+    assert!(matches!(reply.result, Err(Failure::DestinationOccupied)));
+    assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    let cancelled = Cancellation::default();
+    cancelled.cancel();
+    runtime.submit(request(cancelled.clone())).unwrap();
+    let Update::AnnotationExport(reply) = update(&runtime) else {
+        panic!("Expected cancellation")
+    };
+    assert!(reply.cancel.same_request(&cancelled));
+    assert!(matches!(reply.result, Err(Failure::Cancelled)));
+    assert!(
+        native.try_recv().is_err(),
+        "Export must not submit PDF work"
+    );
+    held_open.send(Ok(info())).unwrap();
+    assert!(matches!(update(&runtime), Update::Opened(_, _, _)));
+}
 fn committed(runtime: &Runtime, kind: WriteKind) {
     assert!(matches!(update(runtime), Update::Committed(_, actual) if actual == kind));
 }

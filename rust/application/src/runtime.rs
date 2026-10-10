@@ -1,3 +1,4 @@
+use crate::annotation_export::worker::{AnnotationExportReply, AnnotationExportRequest, ExportJob};
 use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
@@ -25,6 +26,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    AnnotationExport(Box<AnnotationExportRequest>),
     AnnotationMarks(Box<AnnotationMarksRequest>),
     Annotation(Box<AnnotationRequest>),
     Bookmarks(String, usize, Cancellation),
@@ -73,6 +75,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    AnnotationExport(AnnotationExportReply),
     AnnotationMarks(AnnotationMarksReply),
     Annotations(AnnotationReply),
     Bookmarks(String, usize, BookmarkPage, Cancellation),
@@ -350,6 +353,7 @@ impl Runtime {
             .name("yamantaka-use-cases".into())
             .spawn(move || {
                 let mut pending: Vec<Pending> = Vec::new();
+                let mut export: Option<(ExportJob, Permit)> = None;
                 let mut import_sequence = 0;
                 let mut indexer = SearchIndexController::default();
                 let mut index_cleanup: Option<PdfTicket<()>> = None;
@@ -384,6 +388,22 @@ impl Runtime {
                         } else {
                             match action {
                                 Action::Shutdown => break,
+                                Action::AnnotationExport(request) => {
+                                    let document = request.document.clone();
+                                    let cancel = request.cancel.clone();
+                                    let result = if export.is_some() {
+                                        Err(Failure::QueueFull)
+                                    } else {
+                                        cancel.check().and_then(|()| repository.export_reader())
+                                            .and_then(|reader| ExportJob::start(*request, reader))
+                                    };
+                                    match result {
+                                        Ok(job) => export = Some((job, permit)),
+                                        Err(error) => emit(&events, &notify, Update::AnnotationExport(
+                                            AnnotationExportReply { document, result: Err(error), cancel }
+                                        ), permit),
+                                    }
+                                }
                                 Action::AnnotationMarks(request) => {
                                     let reply = request.execute(&repository);
                                     emit(&events, &notify, Update::AnnotationMarks(reply), permit);
@@ -723,6 +743,10 @@ impl Runtime {
                             }
                         }
                     }
+                    if let Some(reply) = export.as_mut().and_then(|(job, _)| job.poll()) {
+                        let (_, permit) = export.take().unwrap();
+                        emit(&events, &notify, Update::AnnotationExport(reply), permit);
+                    }
                     let mut index = 0;
                     while index < pending.len() {
                         if !pending[index].ready() {
@@ -940,6 +964,9 @@ impl Runtime {
                     let mut select = Select::new();
                     select.recv(&stop);
                     select.recv(&commands);
+                    if let Some((job, _)) = &export {
+                        job.register(&mut select);
+                    }
                     for item in &pending {
                         item.register(&mut select);
                     }
@@ -954,6 +981,7 @@ impl Runtime {
                 }
                 if let Some((_, token)) = awaiting_open.take() { token.cancel(); }
                 drop(pending); // Drop tickets before engine join; no UI draining required.
+                drop(export); // Cancel and join file work before releasing the actor.
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
                     let _ = ticket.wait();
                 }
@@ -1016,9 +1044,23 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-    struct Repository;
+    mod export_tests;
+    #[derive(Default)]
+    struct Repository {
+        export_gate: Option<Arc<export_tests::Gate>>,
+    }
     impl BookmarkRepository for Repository {}
-    impl AnnotationRepository for Repository {}
+    impl AnnotationRepository for Repository {
+        fn export_reader(&self) -> Result<Box<dyn AnnotationRepository + Send>> {
+            self.export_gate
+                .as_ref()
+                .map(|gate| {
+                    Box::new(export_tests::Reader(gate.clone()))
+                        as Box<dyn AnnotationRepository + Send>
+                })
+                .ok_or_else(|| Failure::Unsupported("Export is unavailable in this fixture".into()))
+        }
+    }
     impl LibraryRepository for Repository {
         fn query(&self, _: &LibraryQuery) -> Result<Vec<Document>> {
             Ok(Vec::new())
@@ -1239,7 +1281,7 @@ mod tests {
     }
     #[test]
     fn queued_query_response_remains_cancelable_after_completion() {
-        let runtime = Runtime::start(Repository, Engine, || {}).unwrap();
+        let runtime = Runtime::start(Repository::default(), Engine, || {}).unwrap();
         let old = Cancellation::default();
         runtime
             .submit(Action::Query(LibraryQuery::default(), old.clone()))
@@ -1273,7 +1315,7 @@ mod tests {
 
     #[test]
     fn text_response_preserves_document_page_and_cancelable_lifetime() {
-        let runtime = Runtime::start(Repository, Engine, || {}).unwrap();
+        let runtime = Runtime::start(Repository::default(), Engine, || {}).unwrap();
         let token = Cancellation::default();
         runtime
             .submit(Action::Text("book-a".into(), 7, token.clone()))
@@ -1294,7 +1336,7 @@ mod tests {
 
     #[test]
     fn paused_ui_saturates_exactly_at_reserved_capacity_without_losing_writes() {
-        let runtime = Runtime::start(Repository, Engine, || {}).unwrap();
+        let runtime = Runtime::start(Repository::default(), Engine, || {}).unwrap();
         for n in 0..CAPACITY {
             runtime
                 .submit(Action::Favorite(format!("book-{n}"), true))
@@ -1325,7 +1367,7 @@ mod tests {
     }
     #[test]
     fn shutdown_joins_without_ui_drain_even_when_all_terminal_slots_are_retained() {
-        let runtime = Runtime::start(Repository, Engine, || {}).unwrap();
+        let runtime = Runtime::start(Repository::default(), Engine, || {}).unwrap();
         for n in 0..CAPACITY {
             runtime
                 .submit(Action::Favorite(format!("book-{n}"), true))
@@ -1406,7 +1448,7 @@ mod tests {
             let (entered, wait) = bounded(1);
             let reply = Arc::new(std::sync::Mutex::new(None));
             let runtime = Runtime::start(
-                Repository,
+                Repository::default(),
                 BlockedEngine {
                     entered,
                     reply: reply.clone(),
@@ -1456,7 +1498,7 @@ mod tests {
 
     #[test]
     fn reader_preferences_load_keeps_cancellation_and_foreign_document_save_is_rejected() {
-        let runtime = Runtime::start(Repository, Engine, || {}).unwrap();
+        let runtime = Runtime::start(Repository::default(), Engine, || {}).unwrap();
         let token = Cancellation::default();
         runtime
             .submit(Action::LoadReaderPreferences("book".into(), token.clone()))
@@ -1486,7 +1528,7 @@ mod tests {
 
     #[test]
     fn close_control_is_admitted_with_all_data_slots_retained_by_paused_ui() {
-        let runtime = Runtime::start(Repository, Engine, || {}).unwrap();
+        let runtime = Runtime::start(Repository::default(), Engine, || {}).unwrap();
         for n in 0..CAPACITY {
             runtime
                 .submit(Action::Favorite(format!("book-{n}"), true))

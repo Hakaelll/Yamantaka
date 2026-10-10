@@ -1,3 +1,4 @@
+pub mod worker;
 use std::io::Write;
 use yamantaka_domain::{
     Cancellation, Failure, Result,
@@ -272,7 +273,7 @@ impl<'a, W: Write> AnnotationExporter<'a, W> {
 }
 
 pub fn write_document_annotations<W: Write>(
-    repository: &impl yamantaka_domain::annotations::repository::AnnotationRepository,
+    repository: &(impl yamantaka_domain::annotations::repository::AnnotationRepository + ?Sized),
     writer: W,
     format: AnnotationExportFormat,
     metadata: AnnotationExportMetadata<'_>,

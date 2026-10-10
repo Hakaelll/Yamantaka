@@ -1449,6 +1449,13 @@ impl App for YamantakaApp {
         }
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
+                Update::AnnotationExport(reply) => {
+                    if let Err(error) = reply.result
+                        && !matches!(error, yamantaka_domain::Failure::Cancelled)
+                    {
+                        self.error = Some(error.to_string());
+                    }
+                }
                 Update::AnnotationMarks(reply) => self.annotation_paint.accept(reply),
                 Update::Annotations(reply) => {
                     let revision = self.annotations.revision;
