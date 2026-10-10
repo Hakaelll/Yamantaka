@@ -85,6 +85,17 @@ impl Default for GlobalNotes {
     }
 }
 impl GlobalNotes {
+    pub(in crate::app) fn export_ready(&self) -> bool {
+        self.pending.is_none()
+            && self
+                .page
+                .as_ref()
+                .is_some_and(|page| !page.entries().is_empty())
+    }
+    pub(in crate::app) fn export_query(&self) -> Option<AnnotationQuery> {
+        let page = self.page.as_ref()?;
+        self.export_ready().then(|| self.filters.query(page.offset))
+    }
     pub(super) fn source_ready(&self, active: Option<(&str, u32)>) -> bool {
         self.preview_source
             .as_ref()
@@ -253,6 +264,9 @@ impl YamantakaApp {
             return;
         };
         match action {
+            "export-json" | "export-markdown" => {
+                self.preview_review_export(action == "export-markdown")
+            }
             "review" | "tag" => {
                 for selected in self.global_notes.selected.iter_mut().take(3) {
                     *selected = true;
@@ -363,6 +377,7 @@ impl YamantakaApp {
                             .color(p.secondary),
                     );
                     self.global_notes_actions(ui, p, page.offset);
+                    self.annotation_export_panel(ui, p);
                     ui.add_space(16.0);
                     if page.total == 0 {
                         ui.label(self.tr(

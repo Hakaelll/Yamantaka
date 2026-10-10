@@ -67,10 +67,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             store = store.join("previews").join(std::process::id().to_string());
         }
         let mut db = if capture.is_some()
-            && args
-                .iter()
-                .any(|arg| arg == "--export-json" || arg == "--export-markdown")
-        {
+            && args.iter().any(|arg| {
+                arg == "--export-json"
+                    || arg == "--export-markdown"
+                    || arg == "--global-notes-export-json"
+                    || arg == "--global-notes-export-markdown"
+            }) {
             std::fs::create_dir_all(&store).map_err(|_| {
                 yamantaka_domain::Failure::Storage("Synthetic export store could not open".into())
             })?;
@@ -357,7 +359,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     arg.to_str()
                         .is_some_and(|value| value.starts_with("--global-notes"))
                 }) {
-                    let action = if args.iter().any(|arg| arg == "--global-notes-open") {
+                    let action = if args.iter().any(|arg| arg == "--global-notes-export-json") {
+                        "export-json"
+                    } else if args
+                        .iter()
+                        .any(|arg| arg == "--global-notes-export-markdown")
+                    {
+                        "export-markdown"
+                    } else if args.iter().any(|arg| arg == "--global-notes-open") {
                         "open"
                     } else if args.iter().any(|arg| arg == "--global-notes-filters") {
                         "filters"
