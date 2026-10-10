@@ -2,6 +2,9 @@ use super::*;
 #[cfg(test)]
 mod tests;
 mod views;
+use yamantaka_application::reading_sessions::deletion::{
+    ReadingSessionDeleteReply, ReadingSessionDeleteRequest,
+};
 use yamantaka_application::reading_sessions::{ReadingHistoryReply, ReadingHistoryRequest};
 use yamantaka_domain::reading_sessions::restoration::ReaderSessionRestoration;
 type ContextResult = std::result::Result<Option<ReaderSessionRestoration>, String>;
@@ -15,11 +18,54 @@ pub(super) struct HistoryState {
     pending: Option<(ReadingHistoryQuery, Cancellation)>,
     cursor: usize,
     error: Option<String>,
+    deleting: Option<(String, String, Cancellation)>,
+    deleted: bool,
     context: Option<(usize, ContextResult)>,
     preview_restore: bool,
+    preview_delete: bool,
     preview_target: Option<(String, u32)>,
 }
 impl HistoryState {
+    fn begin_delete(
+        &mut self,
+        id: String,
+        document: String,
+    ) -> Option<ReadingSessionDeleteRequest> {
+        if self.deleting.is_some() {
+            return None;
+        }
+        if let Some((_, cancel)) = self.pending.take() {
+            cancel.cancel();
+        }
+        let cancel = Cancellation::default();
+        self.deleting = Some((id.clone(), document.clone(), cancel.clone()));
+        self.deleted = false;
+        self.error = None;
+        Some(ReadingSessionDeleteRequest {
+            id,
+            document,
+            cancel,
+        })
+    }
+    fn accept_delete(
+        &mut self,
+        reply: ReadingSessionDeleteReply,
+    ) -> Option<yamantaka_domain::Result<bool>> {
+        if reply.cancel.is_cancelled()
+            || !self
+                .deleting
+                .as_ref()
+                .is_some_and(|(id, document, cancel)| {
+                    *id == reply.id
+                        && *document == reply.document
+                        && cancel.same_request(&reply.cancel)
+                })
+        {
+            return None;
+        }
+        self.deleting = None;
+        Some(reply.result)
+    }
     fn context_for(&mut self, page: &ReadingHistoryPage) -> ContextResult {
         if !self
             .context
@@ -42,10 +88,13 @@ impl HistoryState {
             .is_none_or(|(id, page)| current == Some((id.as_str(), *page)))
     }
     pub(super) fn ready(&self) -> bool {
-        self.pending.is_none() && self.page.is_some() && self.error.is_none()
+        self.pending.is_none()
+            && self.deleting.is_none()
+            && self.page.is_some()
+            && self.error.is_none()
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"ready":self.ready(), "resident":self.page.as_ref().map_or(0,|page|page.entries().len()),"total":self.page.as_ref().map_or(0,|page|page.total()), "offset":self.page.as_ref().map_or(0,|page|page.offset()),"cursor":self.cursor,"pending":self.pending.is_some()})
+        serde_json::json!({"ready":self.ready(), "resident":self.page.as_ref().map_or(0,|page|page.entries().len()),"total":self.page.as_ref().map_or(0,|page|page.total()), "offset":self.page.as_ref().map_or(0,|page|page.offset()),"cursor":self.cursor,"pending":self.pending.is_some(),"deleting":self.deleting.is_some(),"deleted":self.deleted})
     }
 
     fn request(&mut self, offset: usize, governor: &MemoryGovernor) -> ReadingHistoryRequest {
@@ -97,10 +146,11 @@ impl HistoryState {
     }
 }
 impl YamantakaApp {
-    pub fn preview_history(&mut self, next: bool, restore: bool) {
+    pub fn preview_history(&mut self, next: bool, restore: bool, delete: bool) {
         if self.demo && self.capture.is_some() {
             self.show_history();
             self.history.preview_restore = restore;
+            self.history.preview_delete = delete;
             if next {
                 self.request_history(80);
             }
@@ -109,6 +159,51 @@ impl YamantakaApp {
     pub(super) fn show_history(&mut self) {
         self.show_surface(Surface::History);
         self.request_history(0);
+    }
+    pub(super) fn delete_history_entry(&mut self, id: String, document: String) {
+        let Some(request) = self.history.begin_delete(id, document) else {
+            return;
+        };
+        let reply = ReadingSessionDeleteReply {
+            id: request.id.clone(),
+            document: request.document.clone(),
+            cancel: request.cancel.clone(),
+            result: Ok(false),
+        };
+        if let Err(error) = self
+            .runtime
+            .submit(Action::DeleteReadingSession(Box::new(request)))
+        {
+            self.accept_history_delete(ReadingSessionDeleteReply {
+                result: Err(error),
+                ..reply
+            });
+        }
+    }
+    pub(super) fn accept_history_delete(&mut self, reply: ReadingSessionDeleteReply) {
+        match self.history.accept_delete(reply) {
+            Some(Ok(removed)) => {
+                self.history.deleted = removed;
+                if matches!(self.surface, Surface::History) {
+                    let offset = self.history.page.as_ref().map_or(0, |page| {
+                        if page.entries().len() == 1 {
+                            page.offset().saturating_sub(READING_HISTORY_PAGE_SIZE)
+                        } else {
+                            page.offset()
+                        }
+                    });
+                    self.request_history(offset);
+                }
+            }
+            Some(Err(error)) => {
+                if matches!(self.surface, Surface::History) {
+                    self.history.error = Some(error.to_string());
+                } else {
+                    self.error = Some(error.to_string());
+                }
+            }
+            None => {}
+        }
     }
     pub(super) fn restore_history_entry(
         &mut self,
@@ -126,6 +221,9 @@ impl YamantakaApp {
         }
     }
     fn request_history(&mut self, offset: usize) {
+        if self.history.deleting.is_some() {
+            return;
+        }
         let request = self.history.request(offset, &self.governor);
         let query = request.query.clone();
         let cancel = request.cancel.clone();
@@ -154,14 +252,20 @@ impl YamantakaApp {
             let offset = self.history.page.as_ref().map_or(0, |page| page.offset());
             if !compact {
             ui.horizontal_wrapped(|ui| {
-                ui.add_enabled_ui(self.history.pending.is_none(), |ui| {
+                ui.add_enabled_ui(self.history.pending.is_none() && self.history.deleting.is_none(), |ui| {
                     if theme::navigation(ui, self.tr("Actualizar", "Refresh"), false, p).clicked() { self.request_history(offset); }
                 });
                 if self.history.pending.is_some() { ui.spinner(); ui.label(self.tr("Cargando lecturas…", "Loading readings…")); }
             });
             }
+            if self.history.deleting.is_some() { ui.spinner(); ui.label(self.tr("Eliminando sesión…", "Removing session…")); }
+            if self.history.deleted { ui.label(self.tr("Sesión eliminada del historial.", "Session removed from history.")); }
             if let Some(error) = &self.history.error { ui.label(error); }
             let Some(page) = self.history.page.clone() else { return; };
+            if self.history.preview_delete {
+                self.history.preview_delete = false;
+                if let Some(entry)=page.entries().first() { self.delete_history_entry(entry.id.clone(),entry.document.clone()); }
+            }
             if self.history.preview_restore {
                 self.history.preview_restore = false;
                 if let Some(entry) = page.entries().first() {
@@ -174,7 +278,7 @@ impl YamantakaApp {
             if page.entries().is_empty() {
                 if page.offset() > 0 {
                     ui.label(self.tr("Esta página ya no contiene sesiones.", "This page no longer contains sessions."));
-                    ui.add_enabled_ui(self.history.pending.is_none(), |ui| {
+                    ui.add_enabled_ui(self.history.pending.is_none() && self.history.deleting.is_none(), |ui| {
                         if theme::navigation(ui, self.tr("Volver al inicio", "Back to first page"), false, p).clicked() { self.request_history(0); }
                     });
                     return;
@@ -202,14 +306,14 @@ impl YamantakaApp {
             if compact {
                 ui.add_space(12.0);
                 ui.label(format!("{}–{} / {}", page.offset().saturating_add(1), page.offset().saturating_add(page.entries().len()), page.total()));
-                ui.add_enabled_ui(self.history.pending.is_none(), |ui| {
+                ui.add_enabled_ui(self.history.pending.is_none() && self.history.deleting.is_none(), |ui| {
                     if theme::navigation(ui, self.tr("Actualizar", "Refresh"), false, p).clicked() { self.request_history(offset); }
                 });
                 if self.history.pending.is_some() { ui.spinner(); }
             }
             ui.add_space(16.0);
             ui.horizontal_wrapped(|ui| {
-                ui.add_enabled_ui(self.history.pending.is_none(), |ui| {
+                ui.add_enabled_ui(self.history.pending.is_none() && self.history.deleting.is_none(), |ui| {
                     ui.add_enabled_ui(offset > 0, |ui| {
                         if theme::navigation(ui, self.tr("Anterior", "Previous"), false, p).clicked() { self.request_history(offset.saturating_sub(READING_HISTORY_PAGE_SIZE)); }
                     });

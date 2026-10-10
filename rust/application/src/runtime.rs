@@ -3,6 +3,7 @@ use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
+use crate::reading_sessions::deletion::{ReadingSessionDeleteReply, ReadingSessionDeleteRequest};
 use crate::reading_sessions::{
     ReadingHistoryReply, ReadingHistoryRequest, ReadingSessionReply, ReadingSessionRequest,
 };
@@ -32,6 +33,7 @@ use yamantaka_domain::{
 pub enum Action {
     ReadingHistory(Box<ReadingHistoryRequest>),
     TrimReadingHistory(usize, Cancellation),
+    DeleteReadingSession(Box<ReadingSessionDeleteRequest>),
     ReadingSession(Box<ReadingSessionRequest>),
     AnnotationExport(Box<AnnotationExportRequest>),
     AnnotationMarks(Box<AnnotationMarksRequest>),
@@ -84,6 +86,7 @@ pub enum WriteKind {
 pub enum Update {
     ReadingHistory(ReadingHistoryReply),
     ReadingHistoryTrimmed(Result<u64>, Cancellation),
+    ReadingSessionDeleted(ReadingSessionDeleteReply),
     ReadingSession(ReadingSessionReply),
     AnnotationExport(AnnotationExportReply),
     AnnotationMarks(AnnotationMarksReply),
@@ -415,6 +418,7 @@ impl Runtime {
                         } else {
                             match action {
                                 Action::ReadingHistory(request) => emit(&events, &notify, Update::ReadingHistory(request.execute(&repository)), permit),
+                                Action::DeleteReadingSession(request) => emit(&events,&notify,Update::ReadingSessionDeleted(request.execute(&mut repository)),permit),
                                 Action::TrimReadingHistory(limit, cancel) => {
                                     let result = repository.trim_reading_history(limit, &cancel);
                                     emit(&events, &notify, Update::ReadingHistoryTrimmed(result, cancel), permit);

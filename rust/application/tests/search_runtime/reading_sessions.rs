@@ -1,4 +1,5 @@
 use super::*;
+use yamantaka_application::reading_sessions::deletion::ReadingSessionDeleteRequest;
 use yamantaka_application::reading_sessions::lifecycle::ReadingSessionLifecycle;
 use yamantaka_application::reading_sessions::*;
 use yamantaka_domain::{Failure, reading_sessions::ReaderSessionContext};
@@ -6,6 +7,88 @@ use yamantaka_domain::{
     memory::{GlobalMemoryLimits, MemoryGovernor},
     reading_sessions::history::ReadingHistoryQuery,
 };
+
+#[test]
+fn completed_session_deletion_remains_scoped_while_pdf_open_is_held() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("library.sqlite3");
+    let db = Database::open(&path).unwrap();
+    db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('a','a.pdf','a.pdf','a.pdf',2,1,'now','now','now','fa'); INSERT INTO reading_sessions(id,document_id,started_at,ended_at,start_page,end_page,active_seconds) VALUES('session','a','2026-01-01T00:00:00Z','2026-01-01T00:01:00Z',0,1,10); INSERT INTO app_metadata(key,value,updated_at) VALUES('reading_session_contexts_v1','{\"session\":{\"future\":true},\"unrelated\":false}','now');").unwrap();
+    let read = rusqlite::Connection::open(&path).unwrap();
+    let (runtime, native, _) = start_database(db);
+    runtime
+        .submit(Action::GetDocument("a".into(), Cancellation::default()))
+        .unwrap();
+    let Update::Document(_, Some(document), _) = update(&runtime) else {
+        panic!("Expected document")
+    };
+    runtime
+        .submit(Action::Open(document, None, Cancellation::default()))
+        .unwrap();
+    let Native::Open(_, _, held) = next(&native) else {
+        panic!("Expected held PDF")
+    };
+    for (document, cancelled, expected) in [
+        ("a", true, false),
+        ("wrong", false, false),
+        ("a", false, true),
+        ("a", false, false),
+    ] {
+        let token = Cancellation::default();
+        if cancelled {
+            token.cancel();
+        }
+        runtime
+            .submit(Action::DeleteReadingSession(Box::new(
+                ReadingSessionDeleteRequest {
+                    id: "session".into(),
+                    document: document.into(),
+                    cancel: token.clone(),
+                },
+            )))
+            .unwrap();
+        let Update::ReadingSessionDeleted(reply) = update(&runtime) else {
+            panic!("Expected deletion reply")
+        };
+        assert_eq!(reply.id, "session");
+        assert_eq!(reply.document, document);
+        assert!(reply.cancel.same_request(&token));
+        if cancelled {
+            assert!(matches!(reply.result, Err(Failure::Cancelled)));
+        } else {
+            assert_eq!(reply.result.unwrap(), expected);
+        }
+        let count = read
+            .query_row("SELECT count(*) FROM reading_sessions", [], |r| {
+                r.get::<_, i64>(0)
+            })
+            .unwrap();
+        assert_eq!(
+            count,
+            if expected || document == "a" && !cancelled {
+                0
+            } else {
+                1
+            }
+        );
+        assert!(native.try_recv().is_err());
+    }
+    let value: String = read
+        .query_row(
+            "SELECT value FROM app_metadata WHERE key='reading_session_contexts_v1'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&value).unwrap(),
+        serde_json::json!({"unrelated":false})
+    );
+    held.send(Err(Failure::Invalid(
+        "Synthetic held opening completed".into(),
+    )))
+    .unwrap();
+}
 
 fn request(change: ReadingSessionChange, cancel: Cancellation) -> Action {
     Action::ReadingSession(Box::new(ReadingSessionRequest {

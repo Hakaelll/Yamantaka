@@ -12,6 +12,60 @@ fn reply(request: ReadingHistoryRequest, db: &Database) -> ReadingHistoryReply {
     }
 }
 #[test]
+fn delete_identity_is_frozen_and_survives_leaving_the_destination() {
+    let mut state = HistoryState::default();
+    let request = state.begin_delete("session".into(), "a".into()).unwrap();
+    assert!(state.begin_delete("other".into(), "b".into()).is_none());
+    state.leave();
+    assert!(!request.cancel.is_cancelled());
+    state.accept_delete(ReadingSessionDeleteReply {
+        id: request.id.clone(),
+        document: "b".into(),
+        cancel: request.cancel.clone(),
+        result: Ok(true),
+    });
+    assert!(state.deleting.is_some());
+    state.accept_delete(ReadingSessionDeleteReply {
+        id: request.id.clone(),
+        document: request.document.clone(),
+        cancel: Cancellation::default(),
+        result: Ok(true),
+    });
+    assert!(state.deleting.is_some());
+    assert!(
+        state
+            .accept_delete(ReadingSessionDeleteReply {
+                id: request.id,
+                document: request.document,
+                cancel: request.cancel,
+                result: Ok(true)
+            })
+            .unwrap()
+            .unwrap()
+    );
+    assert!(state.deleting.is_none());
+}
+#[test]
+fn failed_delete_releases_the_write_slot_and_can_retry() {
+    let mut state = HistoryState::default();
+    let read = state.request(0, &MemoryGovernor::default());
+    let request = state.begin_delete("session".into(), "a".into()).unwrap();
+    assert!(read.cancel.is_cancelled());
+    assert!(state.pending.is_none());
+    assert!(
+        state
+            .accept_delete(ReadingSessionDeleteReply {
+                id: request.id,
+                document: request.document,
+                cancel: request.cancel,
+                result: Err(Failure::MemoryBudget)
+            })
+            .unwrap()
+            .is_err()
+    );
+    assert!(state.begin_delete("session".into(), "a".into()).is_some());
+}
+#[test]
 fn latest_query_and_token_own_the_history_destination() {
     let governor = MemoryGovernor::default();
     let db = Database::in_memory_at(11).unwrap();

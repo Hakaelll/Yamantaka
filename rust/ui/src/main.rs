@@ -163,13 +163,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     || arg == "--history-next"
                     || arg == "--history-restore"
                     || arg == "--history-invalid"
+                    || arg == "--history-delete"
             })
         {
             db.execute_batch("WITH RECURSIVE n(x) AS(VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180) INSERT INTO reading_sessions(id,document_id,started_at,ended_at,start_page,end_page,active_seconds) SELECT printf('synthetic-session-%03d',x),CASE WHEN x%2=0 THEN 'demo-0' ELSE 'demo-1' END,'2026-10-09T09:00:00Z','2026-10-09T10:00:00Z',0,1,120+x*11 FROM n; INSERT INTO reading_sessions(id,document_id,started_at,start_page,end_page,active_seconds) VALUES('synthetic-live','demo-0','2026-10-10T09:00:00Z',0,0,0);")?;
         }
         if capture.is_some()
             && args.iter().any(|arg| {
-                arg == "--history" || arg == "--history-restore" || arg == "--history-invalid"
+                arg == "--history"
+                    || arg == "--history-restore"
+                    || arg == "--history-invalid"
+                    || arg == "--history-delete"
             })
         {
             db.execute_batch(r#"INSERT INTO app_metadata(key,value,updated_at) VALUES('reading_session_contexts_v1','{"synthetic-session-180":{"zoomLevel":1.75,"pageLayout":"continuous","readingMode":"document","readingTheme":"sepia","scrollOffset":1500,"panelSection":null,"future":{"retained":true}}}','now');"#)?;
@@ -418,11 +422,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         || arg == "--history-next"
                         || arg == "--history-restore"
                         || arg == "--history-invalid"
+                        || arg == "--history-delete"
                         || arg == "--history-empty"
                 }) {
                     app.preview_history(
                         args.iter().any(|arg| arg == "--history-next"),
                         args.iter().any(|arg| arg == "--history-restore"),
+                        args.iter().any(|arg| arg == "--history-delete"),
                     );
                 }
                 if args.iter().any(|arg| arg == "--page-note") {

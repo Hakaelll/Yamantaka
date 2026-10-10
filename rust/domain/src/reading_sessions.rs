@@ -73,6 +73,16 @@ pub struct ReadingSessionFinish<'a> {
     pub context: Option<&'a ReaderSessionContext>,
 }
 pub trait ReadingSessionRepository {
+    fn delete_reading_session(
+        &mut self,
+        _id: &str,
+        _document: &str,
+        _cancel: &Cancellation,
+    ) -> Result<bool> {
+        Err(Failure::Unsupported(
+            "Deleting a completed reading session".into(),
+        ))
+    }
     fn reading_history(
         &self,
         _query: &history::ReadingHistoryQuery,

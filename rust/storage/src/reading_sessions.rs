@@ -2,6 +2,7 @@ use crate::{Database, database::storage};
 use rusqlite::{OptionalExtension, params};
 use yamantaka_domain::{Cancellation, Failure, Result, reading_sessions::*};
 const CONTEXTS: &str = "reading_session_contexts_v1";
+mod context_pruning;
 mod history;
 
 fn timestamp(value: &str) -> Result<chrono::DateTime<chrono::Utc>> {
@@ -11,6 +12,35 @@ fn timestamp(value: &str) -> Result<chrono::DateTime<chrono::Utc>> {
 }
 
 impl ReadingSessionRepository for Database {
+    fn delete_reading_session(
+        &mut self,
+        id: &str,
+        document: &str,
+        cancel: &Cancellation,
+    ) -> Result<bool> {
+        cancel.check()?;
+        let tx = self.connection.transaction().map_err(storage)?;
+        let exists: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM reading_sessions WHERE id=?1 AND document_id=?2 AND ended_at IS NOT NULL)",params![id,document],|r|r.get(0)).map_err(storage)?;
+        if !exists {
+            cancel.check()?;
+            return Ok(false);
+        }
+        context_pruning::prune(
+            &tx,
+            "SELECT id FROM reading_sessions WHERE id=?1 AND ended_at IS NOT NULL",
+            id,
+        )?;
+        let deleted = tx.execute("DELETE FROM reading_sessions WHERE id=?1 AND document_id=?2 AND ended_at IS NOT NULL",params![id,document]).map_err(storage)?;
+        if deleted != 1 {
+            return Err(Failure::Invalid(
+                "Reading session deletion was not applied; original data is preserved".into(),
+            ));
+        }
+        cancel.check()?;
+        tx.commit().map_err(storage)?;
+        Ok(true)
+    }
+
     fn reading_history(
         &self,
         query: &history::ReadingHistoryQuery,
@@ -33,29 +63,18 @@ impl ReadingSessionRepository for Database {
             cancel.check()?;
             return Ok(0);
         }
-        let valid: Option<bool> = tx.query_row("SELECT CASE WHEN json_valid(value) THEN json_type(value)='object' ELSE 0 END FROM app_metadata WHERE key=?1", [CONTEXTS], |r| r.get(0)).optional().map_err(storage)?;
-        if valid == Some(false) {
+        context_pruning::prune(&tx, removed, limit)?;
+        let deleted = tx
+            .execute(
+                &format!("DELETE FROM reading_sessions WHERE id IN ({removed})"),
+                [limit],
+            )
+            .map_err(storage)?;
+        if i64::try_from(deleted).ok() != Some(count) {
             return Err(Failure::Invalid(
-                "Stored reading session contexts require recovery".into(),
+                "Reading history pruning was not applied; original data is preserved".into(),
             ));
         }
-        let update = format!(
-            "WITH removed AS ({removed}) UPDATE app_metadata SET value=(SELECT json_group_object(key,json(CASE type WHEN 'object' THEN value WHEN 'array' THEN value WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' WHEN 'null' THEN 'null' ELSE json_quote(value) END)) FROM json_each(app_metadata.value) WHERE key NOT IN (SELECT id FROM removed)),updated_at=?3 WHERE app_metadata.key=?2 AND EXISTS(SELECT 1 FROM json_each(app_metadata.value) WHERE key IN (SELECT id FROM removed))"
-        );
-        tx.execute(
-            &update,
-            params![
-                limit,
-                CONTEXTS,
-                chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true)
-            ],
-        )
-        .map_err(storage)?;
-        tx.execute(
-            &format!("DELETE FROM reading_sessions WHERE id IN ({removed})"),
-            [limit],
-        )
-        .map_err(storage)?;
         cancel.check()?;
         tx.commit().map_err(storage)?;
         u64::try_from(count)

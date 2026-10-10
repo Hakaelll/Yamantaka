@@ -2,6 +2,7 @@ use yamantaka_domain::reading_sessions::{
     ReaderSessionContext, ReadingSessionFinish, ReadingSessionRepository, ReadingSessionStart,
 };
 use yamantaka_domain::{Cancellation, Result};
+pub mod deletion;
 pub mod lifecycle;
 pub mod restoration;
 use std::sync::Arc;

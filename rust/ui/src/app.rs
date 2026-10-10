@@ -1815,6 +1815,7 @@ impl App for YamantakaApp {
                         self.error = Some(error.to_string());
                     }
                 }
+                Update::ReadingSessionDeleted(reply) => self.accept_history_delete(reply),
                 Update::ReadingHistory(reply) => {
                     self.history.accept(reply);
                 }
