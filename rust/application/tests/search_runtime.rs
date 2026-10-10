@@ -14,6 +14,8 @@ use yamantaka_domain::{
     search::SearchQuery,
 };
 use yamantaka_storage::Database;
+#[path = "search_runtime/review_export.rs"]
+mod review_export;
 
 enum Native {
     Open(String, Cancellation, Sender<Result<PdfInfo>>),
@@ -296,10 +298,13 @@ fn annotation_export_publishes_all_rows_while_native_pdf_open_is_held() {
     let governor = MemoryGovernor::default();
     let request = |cancel| {
         Action::AnnotationExport(Box::new(AnnotationExportRequest {
-            document: "a".into(),
-            title: "Study 学习".into(),
-            author: None,
-            progress: 0.5,
+            source:
+                yamantaka_application::annotation_export::worker::AnnotationExportSource::Document {
+                    document: "a".into(),
+                    title: "Study 学习".into(),
+                    author: None,
+                    progress: 0.5,
+                },
             exported_at: "2026-10-10T12:00:00Z".into(),
             destination: path.clone(),
             format: AnnotationExportFormat::Json,
@@ -312,7 +317,12 @@ fn annotation_export_publishes_all_rows_while_native_pdf_open_is_held() {
     let Update::AnnotationExport(reply) = update(&runtime) else {
         panic!("Expected export")
     };
-    assert_eq!(reply.document, "a");
+    assert_eq!(
+        reply.scope,
+        yamantaka_application::annotation_export::worker::AnnotationExportScope::Document(
+            "a".into()
+        )
+    );
     assert!(reply.cancel.same_request(&cancel));
     assert_eq!(reply.result.unwrap(), 181);
     assert!(!cancel.is_cancelled());

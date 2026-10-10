@@ -42,10 +42,12 @@ impl Drop for Reader {
 }
 fn request(cancel: Cancellation) -> Action {
     Action::AnnotationExport(Box::new(AnnotationExportRequest {
-        document: "study".into(),
-        title: "Study".into(),
-        author: None,
-        progress: 0.5,
+        source: crate::annotation_export::worker::AnnotationExportSource::Document {
+            document: "study".into(),
+            title: "Study".into(),
+            author: None,
+            progress: 0.5,
+        },
         exported_at: "2026-10-10T12:00:00Z".into(),
         destination: PathBuf::from("synthetic.json"),
         format: AnnotationExportFormat::Json,
@@ -107,7 +109,10 @@ fn a_held_export_does_not_block_catalogue_commands_and_rejects_another_export() 
     else {
         panic!("Expected completion")
     };
-    assert_eq!(reply.document, "study");
+    assert_eq!(
+        reply.scope,
+        crate::annotation_export::worker::AnnotationExportScope::Document("study".into())
+    );
     assert_eq!(reply.result.unwrap(), 0);
     assert!(reply.cancel.same_request(&first));
     assert!(

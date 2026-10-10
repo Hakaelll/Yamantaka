@@ -389,7 +389,7 @@ impl Runtime {
                             match action {
                                 Action::Shutdown => break,
                                 Action::AnnotationExport(request) => {
-                                    let document = request.document.clone();
+                                    let scope = request.scope();
                                     let cancel = request.cancel.clone();
                                     let result = if export.is_some() {
                                         Err(Failure::QueueFull)
@@ -400,7 +400,7 @@ impl Runtime {
                                     match result {
                                         Ok(job) => export = Some((job, permit)),
                                         Err(error) => emit(&events, &notify, Update::AnnotationExport(
-                                            AnnotationExportReply { document, result: Err(error), cancel }
+                                            AnnotationExportReply { scope, result: Err(error), cancel }
                                         ), permit),
                                     }
                                 }

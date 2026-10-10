@@ -1,7 +1,7 @@
 use super::*;
 use yamantaka_application::annotation_export::{
     AnnotationExportFormat,
-    worker::{AnnotationExportReply, AnnotationExportRequest},
+    worker::{AnnotationExportReply, AnnotationExportRequest, AnnotationExportScope},
 };
 
 struct PendingExport {
@@ -36,12 +36,15 @@ impl ExportState {
     }
     pub(in crate::app) fn accept(&mut self, reply: AnnotationExportReply) {
         if !self.pending.as_ref().is_some_and(|pending| {
-            pending.document == reply.document && pending.cancel.same_request(&reply.cancel)
+            reply.scope == AnnotationExportScope::Document(pending.document.clone())
+                && pending.cancel.same_request(&reply.cancel)
         }) {
             return;
         }
         self.pending = None;
-        self.outcome = Some((reply.document, reply.result));
+        if let AnnotationExportScope::Document(document) = reply.scope {
+            self.outcome = Some((document, reply.result));
+        }
     }
     fn submitted(&mut self, document: String, cancel: Cancellation) {
         self.pending = Some(PendingExport { document, cancel });
@@ -89,7 +92,7 @@ impl YamantakaApp {
         };
         let request =
             AnnotationExportRequest::new(document, progress, path, format, self.governor.clone());
-        let id = request.document.clone();
+        let id = document.id.clone();
         let cancel = request.cancel.clone();
         match self
             .runtime
@@ -252,9 +255,16 @@ mod tests {
         let mut state = ExportState::default();
         let token = Cancellation::default();
         state.submitted("a".into(), token.clone());
+        state.accept(AnnotationExportReply {
+            scope: AnnotationExportScope::Review,
+            result: Ok(80),
+            cancel: token.clone(),
+        });
+        assert!(state.pending.is_some());
+        assert!(state.outcome.is_none());
         for (document, cancel) in [("a", Cancellation::default()), ("b", token.clone())] {
             state.accept(AnnotationExportReply {
-                document: document.into(),
+                scope: AnnotationExportScope::Document(document.into()),
                 result: Ok(181),
                 cancel,
             });
@@ -262,7 +272,7 @@ mod tests {
             assert!(state.outcome.is_none());
         }
         state.accept(AnnotationExportReply {
-            document: "a".into(),
+            scope: AnnotationExportScope::Document("a".into()),
             result: Ok(181),
             cancel: token,
         });
@@ -276,7 +286,7 @@ mod tests {
         state.submitted("a".into(), token.clone());
         token.cancel();
         state.accept(AnnotationExportReply {
-            document: "a".into(),
+            scope: AnnotationExportScope::Document("a".into()),
             result: Ok(2),
             cancel: token,
         });
@@ -285,7 +295,7 @@ mod tests {
         state.submitted("b".into(), retry.clone());
         assert!(state.outcome.is_none());
         state.accept(AnnotationExportReply {
-            document: "b".into(),
+            scope: AnnotationExportScope::Document("b".into()),
             result: Err(Failure::Cancelled),
             cancel: retry,
         });

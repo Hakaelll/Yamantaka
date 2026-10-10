@@ -1,19 +1,36 @@
-use super::{AnnotationExportFormat, AnnotationExportMetadata, write_document_annotations};
+use super::{
+    AnnotationExportFormat, AnnotationExportMetadata, write_document_annotations,
+    write_review_snapshot,
+};
 use crossbeam_channel::{Receiver, Select, TryRecvError, bounded};
 use std::{
     path::PathBuf,
     thread::{self, JoinHandle},
 };
 use yamantaka_domain::{
-    Cancellation, Failure, Result, annotations::repository::AnnotationRepository,
+    Cancellation, Failure, Result,
+    annotations::repository::{AnnotationQuery, AnnotationRepository},
     memory::MemoryGovernor,
 };
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum AnnotationExportScope {
+    Document(String),
+    Review,
+}
+pub enum AnnotationExportSource {
+    Document {
+        document: String,
+        title: String,
+        author: Option<String>,
+        progress: f64,
+    },
+    Review {
+        query: AnnotationQuery,
+    },
+}
 pub struct AnnotationExportRequest {
-    pub document: String,
-    pub title: String,
-    pub author: Option<String>,
-    pub progress: f64,
+    pub source: AnnotationExportSource,
     pub exported_at: String,
     pub destination: PathBuf,
     pub format: AnnotationExportFormat,
@@ -21,7 +38,7 @@ pub struct AnnotationExportRequest {
     pub cancel: Cancellation,
 }
 pub struct AnnotationExportReply {
-    pub document: String,
+    pub scope: AnnotationExportScope,
     pub result: Result<u64>,
     pub cancel: Cancellation,
 }
@@ -34,10 +51,12 @@ impl AnnotationExportRequest {
         governor: MemoryGovernor,
     ) -> Self {
         Self {
-            document: document.id.clone(),
-            title: document.display_title().to_owned(),
-            author: document.author.clone(),
-            progress,
+            source: AnnotationExportSource::Document {
+                document: document.id.clone(),
+                title: document.display_title().to_owned(),
+                author: document.author.clone(),
+                progress,
+            },
             exported_at: chrono::Utc::now().to_rfc3339(),
             destination,
             format,
@@ -45,7 +64,31 @@ impl AnnotationExportRequest {
             cancel: Cancellation::default(),
         }
     }
+    pub fn review(
+        query: AnnotationQuery,
+        destination: PathBuf,
+        format: AnnotationExportFormat,
+        governor: MemoryGovernor,
+    ) -> Self {
+        Self {
+            source: AnnotationExportSource::Review { query },
+            destination,
+            format,
+            governor,
+            exported_at: chrono::Utc::now().to_rfc3339(),
+            cancel: Cancellation::default(),
+        }
+    }
+    pub fn scope(&self) -> AnnotationExportScope {
+        match &self.source {
+            AnnotationExportSource::Document { document, .. } => {
+                AnnotationExportScope::Document(document.clone())
+            }
+            AnnotationExportSource::Review { .. } => AnnotationExportScope::Review,
+        }
+    }
     fn execute(self, repository: &dyn AnnotationRepository) -> AnnotationExportReply {
+        let scope = self.scope();
         let result = self.cancel.check().and_then(|()| {
             if !self
                 .destination
@@ -58,25 +101,48 @@ impl AnnotationExportRequest {
                 ));
             }
             repository.publish_annotation_export(&self.destination, &self.cancel, &mut |writer| {
-                write_document_annotations(
-                    repository,
-                    writer,
-                    self.format,
-                    AnnotationExportMetadata {
-                        document: &self.document,
-                        title: &self.title,
-                        author: self.author.as_deref(),
-                        progress: self.progress,
-                        exported_at: &self.exported_at,
-                    },
-                    &self.governor,
-                    self.cancel.clone(),
-                )
-                .map(|(_, count)| count)
+                match &self.source {
+                    AnnotationExportSource::Document {
+                        document,
+                        title,
+                        author,
+                        progress,
+                    } => write_document_annotations(
+                        repository,
+                        writer,
+                        self.format,
+                        AnnotationExportMetadata {
+                            document,
+                            title,
+                            author: author.as_deref(),
+                            progress: *progress,
+                            exported_at: &self.exported_at,
+                        },
+                        &self.governor,
+                        self.cancel.clone(),
+                    )
+                    .map(|(_, count)| count),
+                    AnnotationExportSource::Review { query } => {
+                        let snapshot = repository.annotation_review_snapshot(
+                            query,
+                            &self.governor,
+                            &self.cancel,
+                        )?;
+                        write_review_snapshot(
+                            writer,
+                            self.format,
+                            &snapshot,
+                            &self.exported_at,
+                            &self.governor,
+                            self.cancel.clone(),
+                        )
+                        .map(|(_, count)| count)
+                    }
+                }
             })
         });
         AnnotationExportReply {
-            document: self.document,
+            scope,
             result,
             cancel: self.cancel,
         }
@@ -84,7 +150,7 @@ impl AnnotationExportRequest {
 }
 
 pub(crate) struct ExportJob {
-    document: String,
+    scope: AnnotationExportScope,
     cancel: Cancellation,
     replies: Receiver<AnnotationExportReply>,
     handle: Option<JoinHandle<()>>,
@@ -95,7 +161,7 @@ impl ExportJob {
         request: AnnotationExportRequest,
         reader: Box<dyn AnnotationRepository + Send>,
     ) -> Result<Self> {
-        let document = request.document.clone();
+        let scope = request.scope();
         let cancel = request.cancel.clone();
         let (send, replies) = bounded(1);
         let handle = thread::Builder::new()
@@ -105,7 +171,7 @@ impl ExportJob {
             })
             .map_err(|_| Failure::Storage("Annotation export worker could not start".into()))?;
         Ok(Self {
-            document,
+            scope,
             cancel,
             replies,
             handle: Some(handle),
@@ -120,7 +186,7 @@ impl ExportJob {
             Ok(reply) => reply,
             Err(TryRecvError::Empty) => return None,
             Err(TryRecvError::Disconnected) => AnnotationExportReply {
-                document: self.document.clone(),
+                scope: self.scope.clone(),
                 result: Err(Failure::Storage("Annotation export worker stopped".into())),
                 cancel: self.cancel.clone(),
             },
