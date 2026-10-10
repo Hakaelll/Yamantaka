@@ -83,3 +83,109 @@ fn a_malformed_late_record_leaves_no_partial_export_and_releases_memory() {
     assert!(!path.exists());
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
 }
+
+#[test]
+fn cancellation_inside_one_large_note_discards_staged_output_in_both_formats() {
+    use std::io::{self, Write};
+    struct CancellingFile<'a> {
+        file: &'a mut fs::File,
+        cancel: Cancellation,
+        bytes: usize,
+    }
+    impl Write for CancellingFile<'_> {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            let count = self.file.write(bytes)?;
+            self.bytes += count;
+            self.cancel.cancel();
+            Ok(count)
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            self.file.flush()
+        }
+    }
+    let db = fixture();
+    db.execute_batch(
+        "UPDATE annotations SET note=replace(hex(zeroblob(128000)),'00','a') WHERE id='r000';",
+    )
+    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let governor = MemoryGovernor::default();
+    for (name, format) in [
+        ("notes.json", AnnotationExportFormat::Json),
+        ("notes.md", AnnotationExportFormat::Markdown),
+    ] {
+        let path = dir.path().join(name);
+        let cancel = Cancellation::default();
+        let mut written = 0;
+        let result = db.create_annotation_export(&path, &cancel, |file| {
+            let mut writer = CancellingFile {
+                file,
+                cancel: cancel.clone(),
+                bytes: 0,
+            };
+            let result = write_document_annotations(
+                &db,
+                &mut writer,
+                format,
+                metadata(),
+                &governor,
+                cancel.clone(),
+            )
+            .map(|(_, count)| count);
+            written = writer.bytes;
+            result
+        });
+        assert!(matches!(result, Err(Failure::Cancelled)));
+        assert!(
+            written > 0 && written < 128000,
+            "Cancellation must stop inside the first note"
+        );
+        assert!(!path.exists());
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+        assert_eq!(governor.usage().total, 0);
+    }
+}
+
+#[test]
+fn denied_output_memory_leaves_no_file_and_a_fresh_governor_can_retry() {
+    use yamantaka_domain::memory::GlobalMemoryLimits;
+    let db = fixture();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("notes.json");
+    let cancel = Cancellation::default();
+    let denied = MemoryGovernor::new(GlobalMemoryLimits {
+        other: Some(0),
+        ..Default::default()
+    });
+    let result = db.create_annotation_export(&path, &cancel, |file| {
+        write_document_annotations(
+            &db,
+            file,
+            AnnotationExportFormat::Json,
+            metadata(),
+            &denied,
+            cancel.clone(),
+        )
+        .map(|(_, count)| count)
+    });
+    assert!(matches!(result, Err(Failure::MemoryBudget)));
+    assert_eq!(denied.usage().total, 0);
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+    let governor = MemoryGovernor::default();
+    assert_eq!(
+        db.create_annotation_export(&path, &cancel, |file| {
+            write_document_annotations(
+                &db,
+                file,
+                AnnotationExportFormat::Json,
+                metadata(),
+                &governor,
+                cancel.clone(),
+            )
+            .map(|(_, count)| count)
+        })
+        .unwrap(),
+        181
+    );
+    assert_eq!(governor.usage().total, 0);
+}

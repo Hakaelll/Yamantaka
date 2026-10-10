@@ -1,3 +1,4 @@
+mod output;
 pub mod worker;
 use std::io::Write;
 use yamantaka_domain::{
@@ -288,10 +289,17 @@ pub fn write_document_annotations<W: Write>(
     governor: &yamantaka_domain::memory::MemoryGovernor,
     cancel: Cancellation,
 ) -> Result<(W, u64)> {
-    let document = metadata.document;
-    let mut exporter = AnnotationExporter::new(writer, format, metadata, cancel.clone())?;
-    let count = repository.visit_annotations(document, governor, &cancel, &mut |record| {
-        exporter.push(record)
-    })?;
-    Ok((exporter.finish()?, count))
+    let result = (|| {
+        let document = metadata.document;
+        let writer = output::ExportOutput::new(writer, governor, cancel.clone())?;
+        let mut exporter = AnnotationExporter::new(writer, format, metadata, cancel.clone())?;
+        let count = repository.visit_annotations(document, governor, &cancel, &mut |record| {
+            exporter.push(record)
+        })?;
+        Ok((exporter.finish()?.into_inner(), count))
+    })();
+    result.or_else(|error| {
+        cancel.check()?;
+        Err(error)
+    })
 }
