@@ -7,6 +7,8 @@ use yamantaka_domain::{
     pdf_geometry::NormalizedPageRect,
 };
 use yamantaka_storage::Database;
+#[path = "annotation_export/review_export.rs"]
+mod review_export;
 fn metadata() -> AnnotationExportMetadata<'static> {
     AnnotationExportMetadata {
         document: "a",
@@ -17,6 +19,9 @@ fn metadata() -> AnnotationExportMetadata<'static> {
     }
 }
 fn record(governor: &MemoryGovernor, page: u32) -> AnnotationRecord {
+    record_for(governor, page, "a")
+}
+fn record_for(governor: &MemoryGovernor, page: u32, document: &str) -> AnnotationRecord {
     let lease = governor
         .try_reserve_one(Cost::new(
             MemoryCategory::Text,
@@ -29,7 +34,7 @@ fn record(governor: &MemoryGovernor, page: u32) -> AnnotationRecord {
             document_title: None,
             id: format!("r{page}"),
             values: AnnotationDraftValues {
-                document_id: "a".into(),
+                document_id: document.into(),
                 page_index: page,
                 kind: AnnotationKind::Underline,
                 color: AnnotationColor::Violet,

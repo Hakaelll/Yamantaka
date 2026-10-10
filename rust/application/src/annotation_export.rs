@@ -1,4 +1,6 @@
 mod output;
+mod review;
+pub use review::{AnnotationReviewDocument, write_annotation_review};
 pub mod worker;
 use std::io::Write;
 use yamantaka_domain::{
