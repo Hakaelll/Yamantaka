@@ -3,6 +3,7 @@ use yamantaka_domain::reading_sessions::{
 };
 use yamantaka_domain::{Cancellation, Result};
 pub mod lifecycle;
+pub mod restoration;
 use std::sync::Arc;
 use yamantaka_domain::{
     memory::MemoryGovernor,

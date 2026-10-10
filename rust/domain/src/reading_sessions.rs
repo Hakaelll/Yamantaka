@@ -1,9 +1,11 @@
 use crate::{Cancellation, Failure, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+mod context_decode;
 pub mod history;
+pub mod restoration;
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", from = "StoredContext")]
 pub struct ReaderSessionContext {
     pub zoom_level: f64,
     pub page_layout: String,
@@ -11,6 +13,32 @@ pub struct ReaderSessionContext {
     pub reading_theme: String,
     pub scroll_offset: f64,
     pub panel_section: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredContext {
+    zoom_level: Option<f64>,
+    #[serde(default, deserialize_with = "context_decode::name")]
+    page_layout: Option<String>,
+    #[serde(default, deserialize_with = "context_decode::name")]
+    reading_mode: Option<String>,
+    #[serde(default, deserialize_with = "context_decode::name")]
+    reading_theme: Option<String>,
+    scroll_offset: Option<f64>,
+    #[serde(default, deserialize_with = "context_decode::panel")]
+    panel_section: Option<String>,
+}
+impl From<StoredContext> for ReaderSessionContext {
+    fn from(value: StoredContext) -> Self {
+        Self {
+            zoom_level: value.zoom_level.unwrap_or(1.0),
+            page_layout: value.page_layout.unwrap_or_else(|| "single".into()),
+            reading_mode: value.reading_mode.unwrap_or_else(|| "document".into()),
+            reading_theme: value.reading_theme.unwrap_or_else(|| "ivory".into()),
+            scroll_offset: value.scroll_offset.unwrap_or(0.0),
+            panel_section: value.panel_section,
+        }
+    }
 }
 impl ReaderSessionContext {
     pub fn validate(&self) -> Result<()> {

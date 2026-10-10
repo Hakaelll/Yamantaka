@@ -98,6 +98,17 @@ impl PageRotation {
 /// values beyond the supported page extent fail recoverably rather than reset.
 pub const MAX_READER_MARGIN: f64 = 16_384.0;
 
+pub fn parse_layout_name(name: &str) -> Result<PageLayout> {
+    match name {
+        "single" => Ok(PageLayout::Single),
+        "facing" | "spread" => Ok(PageLayout::Spread),
+        "continuous" => Ok(PageLayout::Continuous),
+        _ => Err(Failure::Invalid(format!(
+            "Unknown reader layout {name:?}; stored preference is preserved"
+        ))),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReaderPreferences {
     pub document_id: String,
@@ -148,16 +159,7 @@ impl ReaderPreferences {
         }
     }
     pub fn load_layout_name(&mut self, name: &str) -> Result<()> {
-        let layout = match name {
-            "single" => PageLayout::Single,
-            "facing" | "spread" => PageLayout::Spread,
-            "continuous" => PageLayout::Continuous,
-            _ => {
-                return Err(Failure::Invalid(format!(
-                    "Unknown reader layout {name:?}; stored preference is preserved"
-                )));
-            }
-        };
+        let layout = parse_layout_name(name)?;
         self.page_layout = layout;
         self.original_layout = Some((layout, name.into()));
         Ok(())
