@@ -1,4 +1,5 @@
 use super::*;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub(super) struct BulkSelection(pub(super) [bool; 80]);
 impl Default for BulkSelection {
@@ -12,10 +13,7 @@ impl BulkSelection {
     }
 }
 impl AnnotationState {
-    pub(super) fn review_mutation(
-        &self,
-        state: AnnotationReviewState,
-    ) -> Option<AnnotationMutation> {
+    fn selected_ids(&self) -> Option<Vec<String>> {
         if self.pending.is_some() || self.editor.is_some() {
             return None;
         }
@@ -27,7 +25,24 @@ impl AnnotationState {
             .filter(|(_, selected)| *selected)
             .map(|(record, _)| record.data().id.clone())
             .collect();
-        (!ids.is_empty()).then_some(AnnotationMutation::Review { ids, state })
+        (!ids.is_empty()).then_some(ids)
+    }
+    pub(super) fn review_mutation(
+        &self,
+        state: AnnotationReviewState,
+    ) -> Option<AnnotationMutation> {
+        self.selected_ids()
+            .map(|ids| AnnotationMutation::Review { ids, state })
+    }
+    pub(super) fn tag_mutation(&self) -> Option<AnnotationMutation> {
+        let tag = self.bulk_tag.trim();
+        if tag.is_empty() || tag.len() > 4096 || tag.graphemes(true).count() > 80 {
+            return None;
+        }
+        self.selected_ids().map(|ids| AnnotationMutation::AddTag {
+            ids,
+            tag: tag.into(),
+        })
     }
 }
 impl YamantakaApp {
@@ -120,6 +135,64 @@ impl YamantakaApp {
                     }
                 }
             });
+            ui.add_space(8.0);
+            let label = ui.label(self.tr("Añadir una etiqueta", "Add one tag"));
+            ui.add(
+                egui::TextEdit::singleline(&mut self.annotations.bulk_tag)
+                    .desired_width(f32::INFINITY)
+                    .char_limit(4096),
+            )
+            .labelled_by(label.id);
+            let units = self.annotations.bulk_tag.trim().graphemes(true).count();
+            ui.label(
+                RichText::new(format!("{units} / 80"))
+                    .size(12.0)
+                    .color(p.secondary),
+            );
+            if ui
+                .add_enabled_ui(
+                    !self.annotations.bulk_tag.trim().is_empty()
+                        && self.annotations.bulk_tag.trim().len() <= 4096
+                        && units <= 80,
+                    |ui| {
+                        theme::navigation(
+                            ui,
+                            self.tr("Añadir a las seleccionadas", "Add to selected"),
+                            false,
+                            p,
+                        )
+                    },
+                )
+                .inner
+                .clicked()
+                && let Some(mutation) = self.annotations.tag_mutation()
+            {
+                self.annotation_command(Some(mutation), page.offset);
+            }
         });
+    }
+}
+
+impl YamantakaApp {
+    pub fn preview_annotation_tag(&mut self, save: bool) {
+        if self.demo && self.capture.is_some() {
+            self.preview_annotation_list();
+            self.annotations.bulk_tag_preview = Some(save);
+        }
+    }
+    pub(in crate::app) fn apply_annotation_tag_preview(&mut self) {
+        if !self.annotations.ready() {
+            return;
+        }
+        let Some(save) = self.annotations.bulk_tag_preview.take() else {
+            return;
+        };
+        for selected in self.annotations.selected.0.iter_mut().take(3) {
+            *selected = true;
+        }
+        self.annotations.bulk_tag = "Study".into();
+        if save && let Some(mutation) = self.annotations.tag_mutation() {
+            self.annotation_command(Some(mutation), 0);
+        }
     }
 }

@@ -253,6 +253,142 @@ fn failed_bulk_review_rolls_back_and_preserves_selection_for_retry() {
     assert_eq!(governor.usage().total, 0);
 }
 
+#[test]
+fn bulk_tag_preserves_existing_tags_is_idempotent_and_validates_input() {
+    let governor = MemoryGovernor::default();
+    let mut db = database();
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    for _ in 0..3 {
+        state.editor = Some(editor(&governor, false));
+        state.editor.as_mut().unwrap().tags = "Existing".into();
+        let mutation = state.mutation(&governor).unwrap();
+        let request = state.request(&governor, Some(mutation), 0).unwrap();
+        state.accept(execute(&mut db, request));
+    }
+    state.selected.0[0] = true;
+    state.selected.0[2] = true;
+    for invalid in ["   ".to_owned(), "a".repeat(81), "😀".repeat(81)] {
+        state.bulk_tag = invalid;
+        assert!(state.tag_mutation().is_none());
+    }
+    for valid in ["😀".repeat(80), "e\u{301}".repeat(80)] {
+        state.bulk_tag = valid;
+        assert!(
+            state.tag_mutation().is_some(),
+            "Count user-perceived characters, not UTF-16 units"
+        );
+    }
+    let ids: Vec<_> = state
+        .page
+        .as_ref()
+        .unwrap()
+        .entries()
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != 1)
+        .map(|(_, r)| r.data().id.clone())
+        .collect();
+    for tag in [" Study ", " study "] {
+        for (index, row) in state.page.as_ref().unwrap().entries().iter().enumerate() {
+            state.selected.0[index] = ids.contains(&row.data().id);
+        }
+        state.bulk_tag = tag.into();
+        let mutation = state.tag_mutation().unwrap();
+        let request = state.request(&governor, Some(mutation), 0).unwrap();
+        assert!(state.tag_mutation().is_none());
+        state.accept(execute(&mut db, request));
+        assert_eq!(state.selected.count(), 0);
+        assert!(state.bulk_tag.is_empty());
+        for row in state.page.as_ref().unwrap().entries() {
+            assert!(row.data().tags.iter().any(|tag| tag == "Existing"));
+            assert_eq!(
+                row.data().tags.len(),
+                if ids.contains(&row.data().id) { 2 } else { 1 }
+            );
+            assert_eq!(
+                row.data()
+                    .tags
+                    .iter()
+                    .filter(|tag| tag.as_str() == "Study")
+                    .count(),
+                usize::from(ids.contains(&row.data().id))
+            );
+            assert_eq!(
+                row.data().values.review_state,
+                AnnotationReviewState::Pending
+            );
+            assert_eq!(row.data().values.note.as_deref(), Some("Study"));
+        }
+    }
+    drop(state);
+    assert_eq!(governor.usage().total, 0);
+}
+
+#[test]
+fn bulk_tag_limit_failure_rolls_back_the_entire_batch_and_retains_the_draft() {
+    let governor = MemoryGovernor::default();
+    let mut db = database();
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    for tags in [
+        "Existing".to_owned(),
+        (0..12)
+            .map(|i| format!("Tag{i}"))
+            .collect::<Vec<_>>()
+            .join(", "),
+    ] {
+        state.editor = Some(editor(&governor, false));
+        state.editor.as_mut().unwrap().tags = tags;
+        let mutation = state.mutation(&governor).unwrap();
+        let request = state.request(&governor, Some(mutation), 0).unwrap();
+        state.accept(execute(&mut db, request));
+    }
+    state.selected.0[0] = true;
+    state.selected.0[1] = true;
+    state.bulk_tag = "Study".into();
+    let mutation = state.tag_mutation().unwrap();
+    let request = state.request(&governor, Some(mutation), 0).unwrap();
+    state.accept(execute(&mut db, request));
+    assert!(state.error.is_some());
+    assert_eq!(state.selected.count(), 2);
+    assert_eq!(state.bulk_tag, "Study");
+    assert!(state.tag_mutation().is_some());
+    let all = db
+        .annotations(
+            &AnnotationQuery {
+                document_id: Some("a".into()),
+                ..Default::default()
+            },
+            &governor,
+            &Cancellation::default(),
+        )
+        .unwrap();
+    assert_eq!(all.total, 2);
+    assert!(
+        all.entries()
+            .iter()
+            .all(|r| !r.data().tags.iter().any(|tag| tag == "Study"))
+    );
+    assert_eq!(
+        all.entries()
+            .iter()
+            .map(|r| r.data().tags.len())
+            .sum::<usize>(),
+        13
+    );
+    drop(all);
+    state.filter_draft.tag = "Existing".into();
+    assert!(state.apply_filters());
+    assert!(state.bulk_tag.is_empty());
+    assert_eq!(state.selected.count(), 0);
+    state.bulk_tag = "other".into();
+    state.bind("b");
+    assert!(state.bulk_tag.is_empty());
+    drop(state);
+    assert_eq!(governor.usage().total, 0);
+}
+
 fn editor(governor: &MemoryGovernor, missing: bool) -> AnnotationEditor {
     let text = "café";
     let lease = governor
@@ -345,6 +481,7 @@ fn execute(db: &mut Database, request: AnnotationRequest) -> AnnotationReply {
                 AnnotationMutation::Review { ids, state } => {
                     AnnotationChange::Review { ids, state: *state }
                 }
+                AnnotationMutation::AddTag { ids, tag } => AnnotationChange::AddTag { ids, tag },
                 _ => panic!("create fixture"),
             };
             db.change_annotation(

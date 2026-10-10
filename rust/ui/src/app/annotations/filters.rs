@@ -38,6 +38,7 @@ impl AnnotationState {
             pending.cancel.cancel();
         }
         self.selected = Default::default();
+        self.bulk_tag.clear();
         self.filters = self.filter_draft.clone();
         self.page = None;
         self.error = None;

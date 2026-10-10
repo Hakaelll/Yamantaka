@@ -335,6 +335,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         args.iter().any(|arg| arg == "--annotation-bulk-save"),
                     );
                 }
+                if args.iter().any(|arg| {
+                    arg == "--annotation-bulk-tag" || arg == "--annotation-bulk-tag-save"
+                }) {
+                    app.preview_annotation_tag(
+                        args.iter().any(|arg| arg == "--annotation-bulk-tag-save"),
+                    );
+                }
                 if args.iter().any(|arg| arg == "--page-note") {
                     app.preview_page_note(args.iter().any(|arg| arg == "--annotation-save"));
                 }

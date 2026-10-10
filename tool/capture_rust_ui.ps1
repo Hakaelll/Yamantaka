@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='annotation-bulk-tag-dark'; args=@('--reader','--annotation-many','--annotation-bulk-tag') },
+    @{ name='annotation-bulk-tag-saved-es'; args=@('--reader','--annotation-many','--annotation-bulk-tag-save','--light','--es') },
+    @{ name='annotation-bulk-tag-export'; args=@('--reader','--annotation-many','--annotation-bulk-tag-save','--export-json') },
     @{ name='annotation-bulk-small-200'; args=@('--reader','--annotation-many','--annotation-bulk','--size=640x480','--text-scale=2') },
     @{ name='annotation-bulk-dark'; args=@('--reader','--annotation-many','--annotation-bulk') },
     @{ name='annotation-bulk-saved-es'; args=@('--reader','--annotation-many','--annotation-bulk-save','--light','--es') },
