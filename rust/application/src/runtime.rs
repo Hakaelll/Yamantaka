@@ -3,7 +3,9 @@ use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
-use crate::reading_sessions::{ReadingSessionReply, ReadingSessionRequest};
+use crate::reading_sessions::{
+    ReadingHistoryReply, ReadingHistoryRequest, ReadingSessionReply, ReadingSessionRequest,
+};
 use crate::search_index::{IndexCommand, IndexProgress, SearchIndexController};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Select, Sender, TryRecvError, bounded};
 use std::{
@@ -28,6 +30,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    ReadingHistory(Box<ReadingHistoryRequest>),
     TrimReadingHistory(usize, Cancellation),
     ReadingSession(Box<ReadingSessionRequest>),
     AnnotationExport(Box<AnnotationExportRequest>),
@@ -79,6 +82,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    ReadingHistory(ReadingHistoryReply),
     ReadingHistoryTrimmed(Result<u64>, Cancellation),
     ReadingSession(ReadingSessionReply),
     AnnotationExport(AnnotationExportReply),
@@ -410,6 +414,7 @@ impl Runtime {
                             deferred.push_back(Command { action, permit });
                         } else {
                             match action {
+                                Action::ReadingHistory(request) => emit(&events, &notify, Update::ReadingHistory(request.execute(&repository)), permit),
                                 Action::TrimReadingHistory(limit, cancel) => {
                                     let result = repository.trim_reading_history(limit, &cancel);
                                     emit(&events, &notify, Update::ReadingHistoryTrimmed(result, cancel), permit);

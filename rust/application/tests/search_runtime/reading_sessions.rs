@@ -2,6 +2,10 @@ use super::*;
 use yamantaka_application::reading_sessions::lifecycle::ReadingSessionLifecycle;
 use yamantaka_application::reading_sessions::*;
 use yamantaka_domain::{Failure, reading_sessions::ReaderSessionContext};
+use yamantaka_domain::{
+    memory::{GlobalMemoryLimits, MemoryGovernor},
+    reading_sessions::history::ReadingHistoryQuery,
+};
 
 fn request(change: ReadingSessionChange, cancel: Cancellation) -> Action {
     Action::ReadingSession(Box::new(ReadingSessionRequest {
@@ -34,6 +38,90 @@ fn actor_retention_replies_keep_cancellation_identity_and_do_not_require_pdf_wor
     assert!(matches!(result, Err(Failure::Cancelled)));
     assert!(reply.same_request(&token));
     assert!(native.try_recv().is_err());
+}
+
+#[test]
+fn governed_history_replies_remain_scoped_and_live_while_native_open_is_held() {
+    let db = Database::in_memory_at(11).unwrap();
+    db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,title,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('a','a.pdf','a.pdf','a.pdf','Study',3,1,'now','now','now','fa'); WITH RECURSIVE n(x) AS(VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180) INSERT INTO reading_sessions(id,document_id,started_at,ended_at,start_page,end_page,active_seconds) SELECT printf('s-%03d',x),'a','2020-01-01T00:00:00Z','2020-01-01T00:01:00Z',0,1,20 FROM n;").unwrap();
+    let (runtime, native, _) = start_database(db);
+    runtime
+        .submit(Action::GetDocument("a".into(), Cancellation::default()))
+        .unwrap();
+    let Update::Document(_, Some(document), _) = update(&runtime) else {
+        panic!("Expected document")
+    };
+    runtime
+        .submit(Action::Open(document, None, Cancellation::default()))
+        .unwrap();
+    let Native::Open(_, _, held) = next(&native) else {
+        panic!("Expected held PDF")
+    };
+    let governor = MemoryGovernor::default();
+    let token = Cancellation::default();
+    runtime
+        .submit(Action::ReadingHistory(Box::new(ReadingHistoryRequest {
+            query: ReadingHistoryQuery {
+                document: Some("a".into()),
+                offset: 80,
+            },
+            governor: governor.clone(),
+            cancel: token.clone(),
+        })))
+        .unwrap();
+    let Update::ReadingHistory(reply) = update(&runtime) else {
+        panic!("Expected history")
+    };
+    assert_eq!(reply.query.document.as_deref(), Some("a"));
+    assert_eq!(reply.query.offset, 80);
+    assert!(reply.cancel.same_request(&token));
+    let page = reply.result.unwrap();
+    assert_eq!(
+        (page.total(), page.offset(), page.entries().len()),
+        (181, 80, 80)
+    );
+    let retained = page.clone();
+    drop(page);
+    assert!(governor.usage().total > 0);
+    runtime.submit(Action::Favorite("a".into(), true)).unwrap();
+    assert!(matches!(
+        update(&runtime),
+        Update::Committed(_, WriteKind::Favorite)
+    ));
+    drop(retained);
+    assert_eq!(governor.usage().total, 0);
+    token.cancel();
+    runtime
+        .submit(Action::ReadingHistory(Box::new(ReadingHistoryRequest {
+            query: Default::default(),
+            governor: governor.clone(),
+            cancel: token.clone(),
+        })))
+        .unwrap();
+    let Update::ReadingHistory(reply) = update(&runtime) else {
+        panic!("Expected cancelled history")
+    };
+    assert!(matches!(reply.result, Err(Failure::Cancelled)));
+    assert!(reply.cancel.same_request(&token));
+    let denied = MemoryGovernor::new(GlobalMemoryLimits {
+        total: 100,
+        text: 100,
+        ..Default::default()
+    });
+    runtime
+        .submit(Action::ReadingHistory(Box::new(ReadingHistoryRequest {
+            query: Default::default(),
+            governor: denied.clone(),
+            cancel: Cancellation::default(),
+        })))
+        .unwrap();
+    let Update::ReadingHistory(reply) = update(&runtime) else {
+        panic!("Expected denied history")
+    };
+    assert!(matches!(reply.result, Err(Failure::MemoryBudget)));
+    assert_eq!(denied.usage().total, 0);
+    assert!(native.try_recv().is_err());
+    held.send(Err(Failure::Cancelled)).unwrap();
 }
 
 #[test]

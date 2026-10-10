@@ -2,6 +2,7 @@ use crate::{Database, database::storage};
 use rusqlite::{OptionalExtension, params};
 use yamantaka_domain::{Cancellation, Failure, Result, reading_sessions::*};
 const CONTEXTS: &str = "reading_session_contexts_v1";
+mod history;
 
 fn timestamp(value: &str) -> Result<chrono::DateTime<chrono::Utc>> {
     chrono::DateTime::parse_from_rfc3339(value)
@@ -10,6 +11,14 @@ fn timestamp(value: &str) -> Result<chrono::DateTime<chrono::Utc>> {
 }
 
 impl ReadingSessionRepository for Database {
+    fn reading_history(
+        &self,
+        query: &history::ReadingHistoryQuery,
+        governor: &yamantaka_domain::memory::MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<history::ReadingHistoryPage> {
+        history::read(self, query, governor, cancel)
+    }
     fn trim_reading_history(&mut self, limit: usize, cancel: &Cancellation) -> Result<u64> {
         cancel.check()?;
         let limit = limit.clamp(25, 1000) as i64;

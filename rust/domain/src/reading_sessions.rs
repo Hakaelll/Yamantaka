@@ -1,5 +1,6 @@
 use crate::{Cancellation, Failure, Result};
 use serde::Serialize;
+pub mod history;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +45,14 @@ pub struct ReadingSessionFinish<'a> {
     pub context: Option<&'a ReaderSessionContext>,
 }
 pub trait ReadingSessionRepository {
+    fn reading_history(
+        &self,
+        _query: &history::ReadingHistoryQuery,
+        _governor: &crate::memory::MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<history::ReadingHistoryPage> {
+        Err(Failure::Unsupported("Reading session history".into()))
+    }
     fn trim_reading_history(&mut self, _limit: usize, _cancel: &Cancellation) -> Result<u64> {
         Err(Failure::Unsupported("Trimming reading history".into()))
     }

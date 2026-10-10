@@ -3,6 +3,36 @@ use yamantaka_domain::reading_sessions::{
 };
 use yamantaka_domain::{Cancellation, Result};
 pub mod lifecycle;
+use std::sync::Arc;
+use yamantaka_domain::{
+    memory::MemoryGovernor,
+    reading_sessions::history::{ReadingHistoryPage, ReadingHistoryQuery},
+};
+
+pub struct ReadingHistoryRequest {
+    pub query: ReadingHistoryQuery,
+    pub governor: MemoryGovernor,
+    pub cancel: Cancellation,
+}
+pub struct ReadingHistoryReply {
+    pub query: ReadingHistoryQuery,
+    pub result: Result<Arc<ReadingHistoryPage>>,
+    pub cancel: Cancellation,
+}
+impl ReadingHistoryRequest {
+    pub(crate) fn execute(self, repository: &impl ReadingSessionRepository) -> ReadingHistoryReply {
+        let result = self
+            .cancel
+            .check()
+            .and_then(|()| repository.reading_history(&self.query, &self.governor, &self.cancel))
+            .map(Arc::new);
+        ReadingHistoryReply {
+            query: self.query,
+            result,
+            cancel: self.cancel,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub enum ReadingSessionChange {

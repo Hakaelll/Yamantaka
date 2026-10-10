@@ -1772,6 +1772,13 @@ impl App for YamantakaApp {
                         self.error = Some(error.to_string());
                     }
                 }
+                Update::ReadingHistory(reply) => {
+                    if !reply.cancel.is_cancelled()
+                        && let Err(error) = reply.result
+                    {
+                        self.error = Some(error.to_string());
+                    }
+                }
             }
         }
         self.sync_reading_session(ctx);
