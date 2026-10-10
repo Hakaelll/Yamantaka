@@ -2,7 +2,9 @@ use yamantaka_domain::reading_sessions::{
     ReaderSessionContext, ReadingSessionFinish, ReadingSessionRepository, ReadingSessionStart,
 };
 use yamantaka_domain::{Cancellation, Result};
+pub mod lifecycle;
 
+#[derive(Clone)]
 pub enum ReadingSessionChange {
     Start {
         started_at: String,
@@ -38,14 +40,17 @@ pub struct ReadingSessionReply {
 }
 
 impl ReadingSessionRequest {
+    pub fn operation(&self) -> ReadingSessionOperation {
+        match &self.change {
+            ReadingSessionChange::Start { .. } => ReadingSessionOperation::Start,
+            ReadingSessionChange::Finish { .. } => ReadingSessionOperation::Finish,
+        }
+    }
     pub(crate) fn execute(
         self,
         repository: &mut impl ReadingSessionRepository,
     ) -> ReadingSessionReply {
-        let operation = match &self.change {
-            ReadingSessionChange::Start { .. } => ReadingSessionOperation::Start,
-            ReadingSessionChange::Finish { .. } => ReadingSessionOperation::Finish,
-        };
+        let operation = self.operation();
         let result = self.cancel.check().and_then(|()| match &self.change {
             ReadingSessionChange::Start { started_at, page } => repository.start_reading_session(
                 &ReadingSessionStart {

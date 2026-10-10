@@ -8,20 +8,7 @@ fn timestamp(value: &str) -> Result<chrono::DateTime<chrono::Utc>> {
         .map(|v| v.with_timezone(&chrono::Utc))
         .map_err(|_| Failure::Invalid("Reading session timestamp is invalid".into()))
 }
-fn identity(id: &str, document: &str) -> Result<()> {
-    if id.is_empty()
-        || id.len() > 128
-        || !id
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-        || document.is_empty()
-    {
-        return Err(Failure::Invalid(
-            "Reading session identity is invalid".into(),
-        ));
-    }
-    Ok(())
-}
+
 impl ReadingSessionRepository for Database {
     fn start_reading_session(
         &mut self,
@@ -29,7 +16,7 @@ impl ReadingSessionRepository for Database {
         cancel: &Cancellation,
     ) -> Result<()> {
         cancel.check()?;
-        identity(start.id, start.document)?;
+        validate_session_identity(start.id, start.document)?;
         let date =
             timestamp(start.started_at)?.to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
         let tx = self.connection.transaction().map_err(storage)?;
@@ -55,7 +42,7 @@ impl ReadingSessionRepository for Database {
         cancel: &Cancellation,
     ) -> Result<()> {
         cancel.check()?;
-        identity(finish.id, finish.document)?;
+        validate_session_identity(finish.id, finish.document)?;
         let ended = timestamp(finish.ended_at)?;
         let date = ended.to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
         let seconds = finish.active_seconds.min(86400) as i64;

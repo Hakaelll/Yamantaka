@@ -162,11 +162,15 @@ impl UpdateReceiver {
 pub struct Runtime {
     index_progress: Arc<Mutex<IndexProgress>>,
     sender: Sender<Command>,
-    shutdown: Sender<()>,
+    shutdown: Sender<RuntimeControl>,
     outstanding: Arc<AtomicUsize>,
     control_outstanding: Arc<AtomicUsize>,
     pub updates: UpdateReceiver,
     handle: Option<JoinHandle<()>>,
+}
+enum RuntimeControl {
+    Stop,
+    PersistSessions(Vec<ReadingSessionRequest>, Sender<Result<()>>),
 }
 struct ImportState {
     paths: std::collections::VecDeque<PathBuf>,
@@ -351,7 +355,7 @@ impl Runtime {
     ) -> Result<Self> {
         let (sender, commands) = bounded::<Command>(CAPACITY * 2);
         let (events, updates) = bounded(CAPACITY * 2);
-        let (shutdown, stop) = bounded(1);
+        let (shutdown, stop) = bounded::<RuntimeControl>(1);
         let index_progress = Arc::new(Mutex::new(IndexProgress::default()));
         let progress_snapshot = index_progress.clone();
         let handle = thread::Builder::new()
@@ -368,8 +372,17 @@ impl Runtime {
                 let mut open_revision = 0u64;
                 let mut awaiting_open: Option<(String, Cancellation)> = None;
                 loop {
-                    if stop.try_recv().is_ok() {
-                        break;
+                    match stop.try_recv() {
+                        Ok(RuntimeControl::Stop) => break,
+                        Ok(RuntimeControl::PersistSessions(requests, completed)) => {
+                            let mut result = Ok(());
+                            for request in requests {
+                                let outcome = request.execute(&mut repository).result;
+                                if result.is_ok() { result = outcome; }
+                            }
+                            let _ = completed.try_send(result);
+                        }
+                        Err(_) => {}
                     }
                     let index_busy =
                         indexer.native_document_id().is_some() || index_cleanup.is_some();
@@ -1014,10 +1027,34 @@ impl Runtime {
     pub fn index_progress(&self) -> IndexProgress {
         self.index_progress.lock().unwrap().clone()
     }
+    /// Blocking persistence barrier for shutdown/recovery, independent of UI event capacity.
+    /// The caller must finalize activity first and retain these immutable commands on failure.
+    pub fn persist_reading_sessions(&self, requests: Vec<ReadingSessionRequest>) -> Result<()> {
+        if requests.len() > crate::reading_sessions::lifecycle::MAX_UNCOMPLETED_SESSIONS * 2 {
+            return Err(Failure::Invalid(
+                "Too many reading session recovery commands".into(),
+            ));
+        }
+        if requests.is_empty() {
+            return Ok(());
+        }
+        let (completed, reply) = bounded(1);
+        self.shutdown
+            .try_send(RuntimeControl::PersistSessions(requests, completed))
+            .map_err(|error| match error {
+                crossbeam_channel::TrySendError::Full(_) => Failure::QueueFull,
+                crossbeam_channel::TrySendError::Disconnected(_) => {
+                    Failure::Storage("Use-case worker stopped".into())
+                }
+            })?;
+        reply.recv().map_err(|_| {
+            Failure::Storage("Use-case worker stopped before session persistence completed".into())
+        })?
+    }
     pub fn submit(&self, action: Action) -> Result<()> {
         if matches!(action, Action::Shutdown) {
             self.shutdown
-                .try_send(())
+                .try_send(RuntimeControl::Stop)
                 .map_err(|_| Failure::Storage("Use-case worker stopped".into()))?;
             return Ok(());
         }
@@ -1041,7 +1078,7 @@ impl Runtime {
 }
 impl Drop for Runtime {
     fn drop(&mut self) {
-        let _ = self.shutdown.try_send(());
+        let _ = self.shutdown.try_send(RuntimeControl::Stop);
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
         }

@@ -1,7 +1,7 @@
 use crate::{Cancellation, Failure, Result};
 use serde::Serialize;
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReaderSessionContext {
     pub zoom_level: f64,
@@ -54,4 +54,19 @@ pub trait ReadingSessionRepository {
         finish: &ReadingSessionFinish<'_>,
         cancel: &Cancellation,
     ) -> Result<()>;
+}
+
+pub fn validate_session_identity(id: &str, document: &str) -> Result<()> {
+    if id.is_empty()
+        || id.len() > 128
+        || !id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        || document.is_empty()
+    {
+        return Err(Failure::Invalid(
+            "Reading session identity is invalid".into(),
+        ));
+    }
+    Ok(())
 }
