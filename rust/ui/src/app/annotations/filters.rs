@@ -37,6 +37,7 @@ impl AnnotationState {
         if let Some(pending) = self.pending.take() {
             pending.cancel.cancel();
         }
+        self.selected = Default::default();
         self.filters = self.filter_draft.clone();
         self.page = None;
         self.error = None;

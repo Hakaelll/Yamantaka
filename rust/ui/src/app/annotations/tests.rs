@@ -100,6 +100,159 @@ fn filter_changes_cancel_old_reads_and_preserve_editors_and_accepted_writes() {
     assert_eq!(governor.usage().total, 0);
 }
 
+#[test]
+fn bulk_review_freezes_ids_updates_only_selected_rows_and_refreshes_filters() {
+    let governor = MemoryGovernor::default();
+    let mut db = database();
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    for _ in 0..3 {
+        state.editor = Some(editor(&governor, false));
+        let mutation = state.mutation(&governor).unwrap();
+        let request = state.request(&governor, Some(mutation), 0).unwrap();
+        state.accept(execute(&mut db, request));
+    }
+    state.filter_draft.review = Some(AnnotationReviewState::Pending);
+    assert!(state.apply_filters());
+    let request = state.request(&governor, None, 0).unwrap();
+    state.accept(execute(&mut db, request));
+    state.selected.0[0] = true;
+    state.selected.0[2] = true;
+    let ids: Vec<_> = state
+        .page
+        .as_ref()
+        .unwrap()
+        .entries()
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| *index != 1)
+        .map(|(_, row)| row.data().id.clone())
+        .collect();
+    state.editor = Some(editor(&governor, false));
+    assert!(
+        state
+            .review_mutation(AnnotationReviewState::Accepted)
+            .is_none()
+    );
+    state.editor = None;
+    let mutation = state
+        .review_mutation(AnnotationReviewState::Accepted)
+        .unwrap();
+    let request = state.request(&governor, Some(mutation), 0).unwrap();
+    assert!(
+        state
+            .review_mutation(AnnotationReviewState::Resolved)
+            .is_none()
+    );
+    assert_eq!(request.query.review, Some(AnnotationReviewState::Pending));
+    match &request.operation {
+        AnnotationOperation::Change {
+            mutation: AnnotationMutation::Review { ids: frozen, .. },
+            ..
+        } => assert_eq!(frozen, &ids),
+        _ => panic!("Expected frozen review batch"),
+    }
+    let revision = state.revision;
+    state.accept(execute(&mut db, request));
+    assert_eq!(state.selected.count(), 0);
+    assert_eq!(state.page.as_ref().unwrap().total, 1);
+    assert_eq!(state.revision, revision + 1);
+    assert!(state.saved);
+    let all = db
+        .annotations(
+            &AnnotationQuery {
+                document_id: Some("a".into()),
+                ..Default::default()
+            },
+            &governor,
+            &Cancellation::default(),
+        )
+        .unwrap();
+    assert_eq!(all.total, 3);
+    for row in all.entries() {
+        assert_eq!(
+            row.data().values.review_state,
+            if ids.contains(&row.data().id) {
+                AnnotationReviewState::Accepted
+            } else {
+                AnnotationReviewState::Pending
+            }
+        );
+        assert_eq!(row.data().values.selected_text.as_deref(), Some("café"));
+        assert_eq!(row.data().values.note.as_deref(), Some("Study"));
+    }
+    drop(all);
+    drop(state);
+    assert_eq!(governor.usage().total, 0);
+}
+
+#[test]
+fn failed_bulk_review_rolls_back_and_preserves_selection_for_retry() {
+    let governor = MemoryGovernor::default();
+    let mut db = database();
+    let mut state = AnnotationState::default();
+    state.bind("a");
+    for _ in 0..2 {
+        state.editor = Some(editor(&governor, false));
+        let mutation = state.mutation(&governor).unwrap();
+        let request = state.request(&governor, Some(mutation), 0).unwrap();
+        state.accept(execute(&mut db, request));
+    }
+    state.selected.0[0] = true;
+    state.selected.0[1] = true;
+    let removed = state.page.as_ref().unwrap().entries()[1].data().id.clone();
+    db.execute_batch(&format!("DELETE FROM annotations WHERE id='{removed}'"))
+        .unwrap();
+    let revision = state.revision;
+    let mutation = state
+        .review_mutation(AnnotationReviewState::Resolved)
+        .unwrap();
+    let request = state.request(&governor, Some(mutation), 0).unwrap();
+    state.accept(execute(&mut db, request));
+    assert!(state.error.is_some());
+    assert_eq!(state.selected.count(), 2);
+    assert_eq!(state.revision, revision);
+    assert!(
+        state
+            .review_mutation(AnnotationReviewState::Pending)
+            .is_some()
+    );
+    let all = db
+        .annotations(
+            &AnnotationQuery {
+                document_id: Some("a".into()),
+                ..Default::default()
+            },
+            &governor,
+            &Cancellation::default(),
+        )
+        .unwrap();
+    assert_eq!(all.total, 1);
+    assert_eq!(
+        all.entries()[0].data().values.review_state,
+        AnnotationReviewState::Pending
+    );
+    drop(all);
+    state.filter_draft.text = "Study".into();
+    assert!(state.apply_filters());
+    assert_eq!(state.selected.count(), 0);
+    let request = state.request(&governor, None, 0).unwrap();
+    state.accept(execute(&mut db, request));
+    state.selected.0[0] = true;
+    let request = state.request(&governor, None, 80).unwrap();
+    assert_eq!(state.selected.count(), 0);
+    drop(request);
+    state.bind("b");
+    assert_eq!(state.selected.count(), 0);
+    assert!(
+        state
+            .review_mutation(AnnotationReviewState::Accepted)
+            .is_none()
+    );
+    drop(state);
+    assert_eq!(governor.usage().total, 0);
+}
+
 fn editor(governor: &MemoryGovernor, missing: bool) -> AnnotationEditor {
     let text = "café";
     let lease = governor
@@ -189,6 +342,9 @@ fn execute(db: &mut Database, request: AnnotationRequest) -> AnnotationReply {
                     review: *review,
                     tags: tags.as_deref(),
                 },
+                AnnotationMutation::Review { ids, state } => {
+                    AnnotationChange::Review { ids, state: *state }
+                }
                 _ => panic!("create fixture"),
             };
             db.change_annotation(

@@ -140,15 +140,11 @@ impl YamantakaApp {
                 }
             });
         } else {
-            ui.label(
-                RichText::new(self.tr("Lleva tus notas contigo", "Take your notes with you"))
-                    .color(p.ink),
-            );
-            ui.add_space(6.0);
             let can_export = self.annotations.pending.is_none() && self.active.is_some();
             let mut selected = None;
             ui.add_enabled_ui(can_export, |ui| {
                 ui.horizontal_wrapped(|ui| {
+                    ui.label(self.tr("Exportar", "Export"));
                     for (format, label) in [
                         (AnnotationExportFormat::Markdown, "Markdown"),
                         (AnnotationExportFormat::Json, "JSON"),

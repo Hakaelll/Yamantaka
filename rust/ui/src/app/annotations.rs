@@ -8,6 +8,7 @@ use yamantaka_domain::{
     reader_preferences::PageRotation,
     text_selection::snapshot::TextSelectionSnapshot,
 };
+mod bulk;
 pub(super) mod export;
 mod filters;
 pub(super) mod paint;
@@ -80,6 +81,8 @@ pub(super) struct AnnotationState {
     filter_draft: filters::Filters,
     filters_open: bool,
     filter_preview: Option<bool>,
+    selected: bulk::BulkSelection,
+    bulk_preview: Option<bool>,
 }
 impl AnnotationState {
     pub(super) fn editing(&self) -> bool {
@@ -100,6 +103,7 @@ impl AnnotationState {
             self.pending.take().unwrap().cancel.cancel();
         }
         self.document = Some(document.into());
+        self.selected = Default::default();
         self.filters = Default::default();
         self.filter_draft = Default::default();
         self.filters_open = false;
@@ -125,6 +129,7 @@ impl AnnotationState {
         }
         match reply.result {
             Ok(page) => {
+                self.selected = Default::default();
                 self.page = Some(Arc::new(page));
                 self.error = None;
                 self.saved = pending.writing;
@@ -149,6 +154,9 @@ impl AnnotationState {
         let document = self.document.clone()?;
         let cancel = Cancellation::default();
         let writing = mutation.is_some();
+        if !writing {
+            self.selected = Default::default();
+        }
         let operation = mutation.map_or(AnnotationOperation::Read, |mutation| {
             AnnotationOperation::Change {
                 document_id: document.clone(),
@@ -336,7 +344,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn annotation_capture_summary(&self) -> serde_json::Value {
-        serde_json::json!({"filters":{"active":self.annotations.filters.count(),"text":self.annotations.filters.text,"tag":self.annotations.filters.tag,"kind":self.annotations.filters.kind,"review":self.annotations.filters.review},"resident":self.annotations.page.as_ref().map_or(0,|page|page.entries().len()),"total":self.annotations.page.as_ref().map_or(0,|page|page.total),"pending":self.annotations.pending.is_some(),"editing":self.annotations.editor.is_some(),"fallback":self.annotations.fallback(),"saved":self.annotations.saved})
+        serde_json::json!({"selected":self.annotations.selected.count(),"acceptedResident":self.annotations.page.as_ref().map_or(0,|page|page.entries().iter().filter(|record|record.data().values.review_state==AnnotationReviewState::Accepted).count()),"filters":{"active":self.annotations.filters.count(),"text":self.annotations.filters.text,"tag":self.annotations.filters.tag,"kind":self.annotations.filters.kind,"review":self.annotations.filters.review},"resident":self.annotations.page.as_ref().map_or(0,|page|page.entries().len()),"total":self.annotations.page.as_ref().map_or(0,|page|page.total),"pending":self.annotations.pending.is_some(),"editing":self.annotations.editor.is_some(),"fallback":self.annotations.fallback(),"saved":self.annotations.saved})
     }
     pub(super) fn apply_annotation_preview(&mut self) {
         if self.annotation_preview == 0 {

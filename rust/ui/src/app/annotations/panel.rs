@@ -16,6 +16,16 @@ pub(super) fn kind_label(kind: AnnotationKind, english: bool) -> &'static str {
         (AnnotationKind::PageComment, false) => "Nota de página",
     }
 }
+fn review_label(state: AnnotationReviewState, english: bool) -> &'static str {
+    match (state, english) {
+        (AnnotationReviewState::Pending, true) => "Pending",
+        (AnnotationReviewState::Pending, false) => "Pendiente",
+        (AnnotationReviewState::Accepted, true) => "Accepted",
+        (AnnotationReviewState::Accepted, false) => "Aceptada",
+        (AnnotationReviewState::Resolved, true) => "Resolved",
+        (AnnotationReviewState::Resolved, false) => "Resuelta",
+    }
+}
 fn color_label(color: AnnotationColor, english: bool) -> &'static str {
     match (color, english) {
         (AnnotationColor::Yellow, true) => "Yellow",
@@ -80,8 +90,8 @@ impl YamantakaApp {
         if self.annotations.saved {
             ui.label(
                 RichText::new(self.tr(
-                    "Nota guardada en tu biblioteca.",
-                    "Note saved in your library.",
+                    "Notas actualizadas en tu biblioteca.",
+                    "Notes updated in your library.",
                 ))
                 .color(p.secondary),
             );
@@ -216,42 +226,41 @@ impl YamantakaApp {
                 }
             });
         } else {
-            let caption = format!(
-                "{} {}",
-                self.tr("Añadir nota a la página", "Add note to page"),
-                u64::from(self.page) + 1
-            );
-            if ui
-                .add_enabled_ui(!busy, |ui| {
-                    theme::control(ui, &caption, Some(theme::Icon::Add), false, true, p)
-                })
-                .inner
-                .clicked()
-            {
-                self.begin_page_note();
-            }
-            ui.add_space(8.0);
-            if ui
-                .add_enabled_ui(!busy, |ui| {
-                    theme::navigation(
+            ui.add_enabled_ui(!busy, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    if theme::control(
+                        ui,
+                        self.tr("Nota de página", "Page note"),
+                        Some(theme::Icon::Add),
+                        false,
+                        true,
+                        p,
+                    )
+                    .on_hover_text(format!(
+                        "{} {}",
+                        self.tr("Añadir nota a la página", "Add note to page"),
+                        u64::from(self.page) + 1
+                    ))
+                    .clicked()
+                    {
+                        self.begin_page_note();
+                    }
+                    if theme::navigation(
                         ui,
                         self.tr("Anotar selección", "Annotate selection"),
                         false,
                         p,
                     )
-                })
-                .inner
-                .clicked()
-            {
-                self.annotate_selection();
-            }
-            ui.label(
-                RichText::new(self.tr(
-                    "Selecciona un pasaje en el PDF para añadir una nota.",
-                    "Select a passage in the PDF to add a note.",
-                ))
-                .color(p.secondary),
-            );
+                    .on_hover_text(self.tr(
+                        "Selecciona un pasaje en el PDF para añadir una nota.",
+                        "Select a passage in the PDF to add a note.",
+                    ))
+                    .clicked()
+                    {
+                        self.annotate_selection();
+                    }
+                });
+            });
         }
         if self.annotations.editor.is_none() || self.annotation_export.busy() {
             ui.add_space(16.0);
@@ -276,12 +285,49 @@ impl YamantakaApp {
                 .color(p.secondary),
             );
         }
+        self.annotation_bulk_panel(ui, p);
         for (index, record) in page.entries().iter().enumerate() {
             let data = record.data();
             ui.push_id(&data.id, |ui| {
                 ui.separator();
                 ui.add_space(8.0);
-                ui.label(RichText::new(kind_label(data.values.kind, self.english)).color(p.ink));
+                ui.horizontal_wrapped(|ui| {
+                    let selected = self.annotations.selected.0[index];
+                    let caption = format!(
+                        "{} {}",
+                        self.tr(
+                            if selected {
+                                "Nota seleccionada"
+                            } else {
+                                "Seleccionar nota"
+                            },
+                            if selected {
+                                "Selected note"
+                            } else {
+                                "Select note"
+                            }
+                        ),
+                        page.offset.saturating_add(index).saturating_add(1)
+                    );
+                    if ui
+                        .add_enabled_ui(
+                            self.annotations.pending.is_none() && !self.annotations.editing(),
+                            |ui| theme::navigation(ui, &caption, selected, p),
+                        )
+                        .inner
+                        .clicked()
+                    {
+                        self.annotations.selected.0[index] = !selected;
+                    }
+                    ui.label(
+                        RichText::new(format!(
+                            "{} · {}",
+                            kind_label(data.values.kind, self.english),
+                            review_label(data.values.review_state, self.english)
+                        ))
+                        .color(p.ink),
+                    );
+                });
                 let passage = data
                     .values
                     .selected_text
