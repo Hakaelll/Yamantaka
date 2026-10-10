@@ -31,3 +31,11 @@ The first capture attempt timed out because the harness waited for an invisible 
 ## Remaining acceptance
 
 These are synthetic native captures and controller/storage regressions. They do not prove physical keyboard traversal, scrolling through the compact screen, Narrator, monitor DPI changes or multi-monitor operation. The global screen still needs deeper visual refinement and complete interaction acceptance, including selection/actions with long real titles and passages. Global export controls, mutation history and the remaining annotation parity work are not completed by this checkpoint. The full rewrite and Release acceptance gates remain open.
+
+## Reading presentation follow-up
+
+The list/detail rendering now lives in a dedicated `global_notes/views.rs` module. The current row has a quiet surface treatment and a labelled checkbox beside its document control. This preserves separate passage focus and batch selection. The detail uses the existing bundled Source Serif Display family for selected passages, with sans-serif document metadata and user notes. Apply is now a primary action in the grouping row, and narrow screens use a smaller heading.
+
+Current-row emphasis interpolates over 140 ms using egui's bounded animation. Reduced motion applies its final state immediately. This adds no unconditional repaint loop; physical interaction timing and idle CPU measurement are still pending.
+
+Seven follow-up native captures at `build/rust-visual/global-notes-polish` cover an original synthetic passage in dark and light Spanish themes, reduced motion, expanded filters, review, tagging, source opening and compact text zoom. Every executable, lockfile, UI-source, image and control hash in the manifest was verified. Executable SHA-256: `08EE6D3996E7D5AFFD92BD75F3DD259A8FB1E6A7E6BBEAB8DF7B0704AB8EF948`. The functional assertions retain 181 total notes, 80 resident records across two documents, three Study tags after tagging, two accepted records in the refreshed first page and two source-page marks after opening. The UI suite passes with 66 tests, and workspace/all-target Clippy passes without warnings. These captures supplement the initial checkpoint; they do not replace the remaining acceptance gates above.

@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='global-notes-passage'; args=@('--annotation-many','--global-notes-passage') },
+    @{ name='global-notes-passage-reduced-es'; args=@('--annotation-many','--global-notes-passage','--reduce-motion','--light','--es') },
     @{ name='global-notes-filters'; args=@('--annotation-many','--global-notes-filters') },
     @{ name='global-notes-open'; args=@('--annotation-many','--global-notes-open') },
     @{ name='global-notes-dark'; args=@('--annotation-many','--global-notes') },

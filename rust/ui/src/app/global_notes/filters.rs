@@ -70,6 +70,18 @@ impl YamantakaApp {
                         ),
                     ],
                 );
+                if theme::control(
+                    ui,
+                    if english { "Apply" } else { "Aplicar" },
+                    None,
+                    false,
+                    true,
+                    p,
+                )
+                .clicked()
+                {
+                    apply = true;
+                }
             });
             if self.global_notes.expanded {
                 let draft = &mut self.global_notes.draft;
@@ -196,9 +208,6 @@ impl YamantakaApp {
                         ],
                     );
                 });
-            }
-            if theme::navigation(ui, self.tr("Aplicar", "Apply"), false, p).clicked() {
-                apply = true;
             }
         });
         if apply {

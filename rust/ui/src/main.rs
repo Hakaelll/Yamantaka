@@ -150,6 +150,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             })
         {
             db.execute_batch("UPDATE annotations SET document_id='demo-1',document_fingerprint=(SELECT fingerprint FROM documents WHERE id='demo-1') WHERE id>='synthetic-mark-002';")?;
+            if args.iter().any(|arg| arg == "--global-notes-passage") {
+                db.execute_batch("UPDATE annotations SET selected_text='A personal library grows through the connections we make between its pages. Returning to a passage can reveal a question we did not notice on the first reading.',note='Synthetic study note: compare this idea with the next chapter, then write a short explanation in your own words.' WHERE id='synthetic-mark-000';")?;
+            }
         }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
