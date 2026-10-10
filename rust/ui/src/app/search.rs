@@ -116,6 +116,17 @@ impl YamantakaApp {
         egui::Popup::menu(&response).show(|ui| {
             if theme::navigation(
                 ui,
+                self.tr("Diario de lectura", "Reading journal"),
+                matches!(self.surface, Surface::History),
+                p,
+            )
+            .clicked()
+            {
+                self.show_history();
+                ui.close();
+            }
+            if theme::navigation(
+                ui,
                 self.tr("Notas de la biblioteca", "Library notes"),
                 matches!(self.surface, Surface::Notes),
                 p,

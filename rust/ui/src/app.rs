@@ -4,6 +4,7 @@ mod compact;
 mod details;
 mod find;
 mod global_notes;
+mod history;
 mod links;
 mod list;
 mod navigation;
@@ -53,6 +54,7 @@ use yamantaka_windows::{ActivationWatch, Instance};
 enum Surface {
     Search,
     Notes,
+    History,
     Library,
     Reader,
     Settings,
@@ -78,6 +80,7 @@ impl PageImage {
 pub struct YamantakaApp {
     search: search::SearchState,
     global_notes: global_notes::GlobalNotes,
+    history: history::HistoryState,
     open_intent: open_intent::OpenIntent,
     open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
@@ -292,6 +295,7 @@ impl YamantakaApp {
             reader_destination: None,
             bookmarks: bookmarks::BookmarkState::default(),
             global_notes: Default::default(),
+            history: Default::default(),
             annotations: Default::default(),
             annotation_export: Default::default(),
             annotation_paint: Default::default(),
@@ -462,6 +466,9 @@ impl YamantakaApp {
     fn show_surface(&mut self, surface: Surface) {
         if matches!(self.surface, Surface::Notes) {
             self.global_notes.leave();
+        }
+        if matches!(self.surface, Surface::History) {
+            self.history.leave();
         }
         self.links.clear();
         self.annotation_paint.invalidate();
@@ -1773,11 +1780,7 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::ReadingHistory(reply) => {
-                    if !reply.cancel.is_cancelled()
-                        && let Err(error) = reply.result
-                    {
-                        self.error = Some(error.to_string());
-                    }
+                    self.history.accept(reply);
                 }
             }
         }
@@ -1949,6 +1952,7 @@ impl App for YamantakaApp {
                         Surface::Settings => self.settings(ui),
                         Surface::Search => self.global_search(ui),
                         Surface::Notes => self.global_notes_panel(ui),
+                        Surface::History => self.history_panel(ui),
                     });
             });
         });
@@ -1988,6 +1992,7 @@ impl App for YamantakaApp {
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
                     && (!matches!(self.surface, Surface::Notes) || self.global_notes.ready())
+                    && (!matches!(self.surface, Surface::History) || self.history.ready())
                     && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     // The compact drawer hides the PDF, so it has no visible marks to request.
                     && (!matches!(self.surface, Surface::Reader)
@@ -2071,6 +2076,7 @@ impl App for YamantakaApp {
                         "annotationPaint":self.annotation_paint.capture_summary(),
                         "annotationExport":self.annotation_export.capture_summary(),
                         "globalNotes":self.global_notes.summary(),
+                        "readingHistory": self.history.summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,

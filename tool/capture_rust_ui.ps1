@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='history-dark'; args=@('--history') },
+    @{ name='history-light-es'; args=@('--history','--light','--es','--reduced-motion') },
+    @{ name='history-next'; args=@('--history-next') },
+    @{ name='history-empty'; args=@('--history-empty') },
+    @{ name='history-small-200'; args=@('--history','--size=640x480','--text-scale=2') },
     @{ name='global-notes-export-json'; args=@('--annotation-many','--global-notes-export-json') },
     @{ name='global-notes-export-markdown-es'; args=@('--annotation-many','--global-notes-export-markdown','--light','--es') },
     @{ name='global-notes-passage'; args=@('--annotation-many','--global-notes-passage') },

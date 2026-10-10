@@ -157,6 +157,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 db.execute_batch("UPDATE annotations SET selected_text='A personal library grows through the connections we make between its pages. Returning to a passage can reveal a question we did not notice on the first reading.',note='Synthetic study note: compare this idea with the next chapter, then write a short explanation in your own words.' WHERE id='synthetic-mark-000';")?;
             }
         }
+        if capture.is_some()
+            && args
+                .iter()
+                .any(|arg| arg == "--history" || arg == "--history-next")
+        {
+            db.execute_batch("WITH RECURSIVE n(x) AS(VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180) INSERT INTO reading_sessions(id,document_id,started_at,ended_at,start_page,end_page,active_seconds) SELECT printf('synthetic-session-%03d',x),CASE WHEN x%2=0 THEN 'demo-0' ELSE 'demo-1' END,'2026-10-09T09:00:00Z','2026-10-09T10:00:00Z',0,1,120+x*11 FROM n; INSERT INTO reading_sessions(id,document_id,started_at,start_page,end_page,active_seconds) VALUES('synthetic-live','demo-0','2026-10-10T09:00:00Z',0,0,0);")?;
+        }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
             db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
@@ -392,6 +399,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         "list"
                     };
                     app.preview_global_notes(action);
+                }
+                if args.iter().any(|arg| {
+                    arg == "--history" || arg == "--history-next" || arg == "--history-empty"
+                }) {
+                    app.preview_history(args.iter().any(|arg| arg == "--history-next"));
                 }
                 if args.iter().any(|arg| arg == "--page-note") {
                     app.preview_page_note(args.iter().any(|arg| arg == "--annotation-save"));
