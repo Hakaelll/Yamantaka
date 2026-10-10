@@ -47,10 +47,16 @@ fn write_error(_: impl std::fmt::Display) -> Failure {
     Failure::Storage("Annotation export could not be written".into())
 }
 fn text(writer: &mut impl Write, value: &str, quote: bool) -> Result<()> {
-    for character in value.chars() {
+    let mut characters = value.chars().peekable();
+    while let Some(character) = characters.next() {
         match character {
+            '\r' => {
+                if characters.peek() == Some(&'\n') {
+                    characters.next();
+                }
+                writer.write_all(if quote { b"\n> " } else { b"\n" })
+            }
             '\n' if quote => writer.write_all(b"\n> "),
-            '\r' => continue,
             '&' => writer.write_all(b"&amp;"),
             '<' => writer.write_all(b"&lt;"),
             '>' => writer.write_all(b"&gt;"),

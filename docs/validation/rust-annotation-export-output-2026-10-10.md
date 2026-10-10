@@ -20,6 +20,12 @@ Two new file integration regressions use the connected SQLite visitor, formatter
 
 The existing complete-format, malformed-final-record, runtime, UI-state and repository regressions remain passing. Formatting, warning-denied workspace/all-target Clippy and the full locked workspace test suite pass. Local log: `build/verification/annotation-export-output-tests.log`.
 
+## Follow-up: legacy line endings
+
+The Markdown text adapter now preserves line boundaries from LF, CRLF and standalone CR input. It streams CRLF as one LF and standalone CR as LF without joining adjacent lines. Passage quoting prefixes every resulting line, including blank and trailing lines. Unicode content and existing Markdown/HTML escaping remain intact; JSON retains the original line-ending characters.
+
+A SQLite-backed regression exports five line-ending variants through the connected service in both formats. It covers notes, selected passages, title and author metadata, leading/trailing separators, adjacent separators, accented Latin, CJK and Hebrew text, with released governed memory after each export. Formatting, warning-denied workspace/all-target Clippy and the full locked workspace tests pass. Local log: `build/verification/annotation-export-lines-tests.log`.
+
 ## Remaining scope
 
 Cancellation checks do not interrupt a blocked operating-system write or sync call. SQLite decoding and other opaque native work still need latency/lock-contention acceptance. The buffer is governed, but complete SQLite/output resource accounting, a transactional metadata snapshot, crash cleanup, native save-dialog and error/cancel interaction acceptance, replacement policy, per-record progress and broader annotation parity remain pending. No new native visual pass is claimed for this backend-only change, and no end-to-end performance improvement or final release parity is claimed.
