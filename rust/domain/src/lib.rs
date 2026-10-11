@@ -178,6 +178,12 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn reader_continuity(&self) -> Result<Option<reader_tabs::DocumentTabs>> {
+        Ok(None)
+    }
+    fn save_reader_continuity(&mut self, _tabs: &reader_tabs::DocumentTabs) -> Result<()> {
+        Err(Failure::Unsupported("Reader continuity persistence".into()))
+    }
     fn query(&self, query: &LibraryQuery) -> Result<Vec<Document>>;
     fn count(&self, query: &LibraryQuery) -> Result<u64>;
     fn set_favorite(&mut self, id: &str, favorite: bool) -> Result<()>;

@@ -65,6 +65,7 @@ fn setup() -> (Runtime, Receiver<()>, Sender<()>, Receiver<()>) {
             release: held,
             ended: end,
         })),
+        ..Default::default()
     };
     (
         Runtime::start(repo, Engine, || {}).unwrap(),

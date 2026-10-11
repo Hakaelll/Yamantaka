@@ -13,7 +13,7 @@ No account is required. Documents and library data stay on your computer. The pr
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.
 
 <p align="center">
-  <img src="docs/screenshots/rust-stage2/library-dark.png" alt="Native Yamantaka library with procedural 3D book covers and a compact continue-reading strip" width="1100" />
+  <img src="docs/screenshots/rust-reading-feature/library-dark.png" alt="Native Yamantaka library with procedural 3D book covers and an editorial continue-reading feature" width="1100" />
 </p>
 
 *Native Windows capture of an isolated synthetic study collection. The capture demonstrates the current gallery; it is not a photograph of a personal library or proof of complete feature parity.*
@@ -196,7 +196,8 @@ Current evidence is documented separately so dates and scopes remain explicit:
 - [Native reader tab selection](docs/validation/rust-reader-tabs-ui-2026-10-11.md): connected selection, duplicate context, pinning, reordering and keyboard cycling with scoped native admission. All 392 workspace tests and seven final-source native captures pass; persistence and physical interaction remain pending.
 - [Native tab closure and reopening](docs/validation/rust-tab-closure-2026-10-11.md): scoped last/inactive closure, adjacent-reader handoff, full-context reopening and keyboard commands. Verified with 396 workspace tests, nine native captures and a completed synthetic reading session; persistence and physical acceptance remain pending.
 - [Bulk reader tab closure](docs/validation/rust-bulk-tab-close-2026-10-11.md): Close others/Close to right preserve pinned readings and retire unused native documents through a bounded serial queue with scoped retry. Verified with 399 workspace tests and eight native captures; persistence, warm-resource policy and physical acceptance remain pending.
-- [Reader continuity storage](docs/validation/rust-reader-continuity-storage-2026-10-11.md): A separate versioned JSON adapter preserves complete open/closed tab contexts and rejects incompatible snapshots without overwriting them. Automatic UI persistence, startup recovery and legacy closure import remain pending.
+- [Reader continuity storage](docs/validation/rust-reader-continuity-storage-2026-10-11.md): The storage checkpoint verifies a separate versioned JSON adapter for complete open/closed tab contexts and non-destructive rejection of incompatible snapshots. Subsequent application integration is covered in the next checkpoint.
+- [Library reading feature](docs/validation/rust-library-feature-2026-10-11.md): A larger physical reading feature and editorial library heading begin the next visual pass. Scoped continuity persistence and startup opening are now connected; real restart/recovery acceptance and legacy closure import remain pending.
 - [External PDF link confirmation](docs/validation/rust-external-pdf-links-2026-10-09.md): bounded http/https/mailto destinations, redacted diagnostics and an explicit Windows opening dialog. Native modal and external-handler acceptance remain pending.
 - [Bounded PDF URI reading](docs/validation/rust-bounded-pdf-uri-2026-10-09.md): verified local PDFium wrapper patch checks URI size before allocation. External link confirmation remains pending.
 - [Native internal link presentation](docs/validation/rust-pdf-links-native-2026-10-09.md): five GPU captures of focus, rotation, compact text scaling and keyboard navigation from page 1 to page 2. Broader interaction and external links remain pending.

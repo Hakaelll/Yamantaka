@@ -6,6 +6,7 @@ mod find;
 mod global_notes;
 mod goals;
 mod history;
+mod library_intro;
 mod links;
 mod list;
 mod navigation;
@@ -343,6 +344,7 @@ impl YamantakaApp {
             reader_options_section: 0,
         };
         app.refresh();
+        app.begin_reader_continuity();
         if app.search.enabled {
             app.send(Action::Index(
                 yamantaka_application::search_index::IndexCommand::Enable(true),
@@ -436,6 +438,7 @@ impl YamantakaApp {
         }
     }
     pub fn import(&mut self, paths: Vec<PathBuf>) {
+        self.tabs.continuity.overridden = true;
         self.open_intent.leave_destination();
         self.password = None;
         self.cancel.cancel();
@@ -784,11 +787,10 @@ impl YamantakaApp {
                         egui::Layout::top_down(egui::Align::Min),
                         |ui| {
                             ui.set_width(title_width);
-                            theme::display(
-                                ui,
-                                self.tr("Tu biblioteca", "Your library"),
-                                if available <420.0 {18.0} else if compact { 26.0 } else { 34.0 },
-                            );
+                            ui.label(RichText::new(self.tr("Tu biblioteca", "Your library")).font(
+                                egui::FontId::new(if compact { 26.0 } else { 38.0 },
+                                    if compact { egui::FontFamily::Proportional } else { egui::FontFamily::Name("Editorial".into()) }),
+                            ));
                             if available>=420.0 {
                             ui.add(
                                 egui::Label::new(
@@ -935,87 +937,7 @@ impl YamantakaApp {
                     .cloned()
                     && !compact
                 {
-                    egui::Frame::new()
-                        .fill(p.surface)
-                        .inner_margin(egui::Margin::symmetric(14, 8))
-                        .corner_radius(12.0)
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                let response = ui
-                                    .push_id("continuity-book", |ui| {
-                                        book::miniature(ui, &document, 42.0, self.reduced_motion, p)
-                                    })
-                                    .inner;
-                                if response.clicked() {
-                                    self.open(document.clone());
-                                }
-                                ui.add_space(10.0);
-                                ui.vertical(|ui| {
-                                    ui.spacing_mut().item_spacing.y=2.0;
-                                    ui.spacing_mut().interact_size.y=0.0;
-                                    ui.add_space(2.0);
-                                    ui.add(
-                                        egui::Label::new(
-                                            RichText::new(document.display_title()).font(
-                                                egui::FontId::new(
-                                                    20.0,
-                                                    egui::FontFamily::Name("Editorial".into()),
-                                                ),
-                                            ),
-                                        )
-                                        .truncate(),
-                                    );
-                                    ui.label(
-                                        RichText::new(document.author.as_deref().unwrap_or(""))
-                                            .size(13.0)
-                                            .color(p.secondary),
-                                    );
-                                    ui.add_space(2.0);
-                                    ui.horizontal(|ui| {
-                                        let (track, _) = ui.allocate_exact_size(
-                                            egui::vec2(100.0, 3.0),
-                                            egui::Sense::hover(),
-                                        );
-                                        ui.painter().rect_filled(track, 2.0, p.line);
-                                        let mut progress = track;
-                                        progress.max.x = progress.min.x
-                                            + track.width()
-                                                * document.reading_progress.clamp(0.0, 1.0) as f32;
-                                        ui.painter().rect_filled(progress, 2.0, p.accent);
-                                        ui.label(
-                                            RichText::new(format!(
-                                                "{}%  ·  {} {} {} {}",
-                                                (document.reading_progress * 100.0).round(),
-                                                self.tr("página", "page"),
-                                                document.last_page_index + 1,
-                                                self.tr("de", "of"),
-                                                document.page_count
-                                            ))
-                                            .size(12.0)
-                                            .color(p.secondary),
-                                        );
-                                    });
-                                });
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        if theme::control(
-                                            ui,
-                                            self.tr("Continuar leyendo", "Continue reading"),
-                                            Some(theme::Icon::Right),
-                                            false,
-                                            true,
-                                            p,
-                                        )
-                                        .clicked()
-                                        {
-                                            self.open(document.clone());
-                                        }
-                                    },
-                                );
-                            });
-                        });
-                    ui.add_space(10.0);
+                    self.reading_feature(ui, &document, p);
                 }
                 if self.documents.is_empty() {
                     let filtered=!self.query.is_empty()||self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only;
@@ -1905,6 +1827,7 @@ impl App for YamantakaApp {
                 Update::ReadingHistory(reply) => {
                     self.history.accept(reply);
                 }
+                Update::ReaderContinuity(reply) => self.accept_reader_continuity(reply),
             }
         }
         self.advance_replacement_preview();
@@ -1912,6 +1835,7 @@ impl App for YamantakaApp {
         self.advance_bulk_tab_preview();
         self.retire_closed_reader();
         self.sync_reading_session(ctx);
+        self.pump_reader_continuity(ctx);
         if self.demo
             && self.capture.is_some()
             && self.selection_preview == selection::SelectionPreview::Waiting
@@ -2271,6 +2195,9 @@ impl App for YamantakaApp {
         }
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        if let Err(error) = self.persist_reader_continuity_on_close() {
+            eprintln!("{error}");
+        }
         if let Err(error) = self.persist_reading_sessions_on_close() {
             eprintln!("{error}");
         }

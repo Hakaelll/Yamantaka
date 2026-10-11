@@ -4,6 +4,7 @@ use crate::annotations::{
 };
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
 use crate::reader_close::{ReaderCloseReply, ReaderCloseRequest};
+use crate::reader_continuity::{ContinuityReply, ContinuityRequest, ContinuityWriter};
 use crate::reading_sessions::deletion::{ReadingSessionDeleteReply, ReadingSessionDeleteRequest};
 use crate::reading_sessions::goals::{ReadingGoalReply, ReadingGoalRequest};
 use crate::reading_sessions::{
@@ -33,6 +34,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    ReaderContinuity(Box<ContinuityRequest>),
     ReadingHistory(Box<ReadingHistoryRequest>),
     TrimReadingHistory(usize, Cancellation),
     ReadingGoal(Box<ReadingGoalRequest>),
@@ -86,6 +88,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    ReaderContinuity(ContinuityReply),
     ReaderClosed(ReaderCloseReply),
     ReadingHistory(ReadingHistoryReply),
     ReadingHistoryTrimmed(Result<u64>, Cancellation),
@@ -183,6 +186,11 @@ pub struct Runtime {
 }
 enum RuntimeControl {
     Stop,
+    PersistContinuity(
+        u64,
+        Box<yamantaka_domain::reader_tabs::DocumentTabs>,
+        Sender<Result<()>>,
+    ),
     PersistSessions(Vec<ReadingSessionRequest>, usize, Sender<Result<()>>),
 }
 struct ImportState {
@@ -378,6 +386,7 @@ impl Runtime {
             .name("yamantaka-use-cases".into())
             .spawn(move || {
                 let mut pending: Vec<Pending> = Vec::new();
+                let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut import_sequence = 0;
                 let mut indexer = SearchIndexController::default();
@@ -390,6 +399,9 @@ impl Runtime {
                 loop {
                     match stop.try_recv() {
                         Ok(RuntimeControl::Stop) => break,
+                        Ok(RuntimeControl::PersistContinuity(revision, tabs, completed)) => {
+                            let _ = completed.try_send(continuity.save(&mut repository, revision, &tabs));
+                        }
                         Ok(RuntimeControl::PersistSessions(requests, limit, completed)) => {
                             let mut result = Ok(());
                             for request in requests {
@@ -637,6 +649,10 @@ impl Runtime {
                                             failed(&events, &notify, error, Some(cancel), permit)
                                         }
                                     }
+                                }
+                                Action::ReaderContinuity(request) => {
+                                    let reply = continuity.execute(&mut repository, *request);
+                                    emit(&events, &notify, Update::ReaderContinuity(reply), permit);
                                 }
                                 Action::SaveReaderPreferences(id, prefs) => {
                                     let result = if prefs.document_id != id {
@@ -1087,6 +1103,31 @@ impl Runtime {
             Failure::Storage("Use-case worker stopped before session persistence completed".into())
         })?
     }
+    /// A newer revision fences queued older writes even when control overtakes data.
+    pub fn persist_reader_continuity(
+        &self,
+        revision: u64,
+        tabs: yamantaka_domain::reader_tabs::DocumentTabs,
+    ) -> Result<()> {
+        let (completed, reply) = bounded(1);
+        self.shutdown
+            .try_send(RuntimeControl::PersistContinuity(
+                revision,
+                Box::new(tabs),
+                completed,
+            ))
+            .map_err(|error| match error {
+                crossbeam_channel::TrySendError::Full(_) => Failure::QueueFull,
+                crossbeam_channel::TrySendError::Disconnected(_) => {
+                    Failure::Storage("Use-case worker stopped".into())
+                }
+            })?;
+        reply.recv().map_err(|_| {
+            Failure::Storage(
+                "Use-case worker stopped before reader continuity persistence completed".into(),
+            )
+        })?
+    }
     pub fn submit(&self, action: Action) -> Result<()> {
         if matches!(action, Action::Shutdown) {
             self.shutdown
@@ -1126,10 +1167,12 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    mod continuity_tests;
     mod export_tests;
     #[derive(Default)]
     struct Repository {
         export_gate: Option<Arc<export_tests::Gate>>,
+        continuity: Arc<Mutex<Option<yamantaka_domain::reader_tabs::DocumentTabs>>>,
     }
     impl BookmarkRepository for Repository {}
     impl ReadingSessionRepository for Repository {
@@ -1160,6 +1203,16 @@ mod tests {
         }
     }
     impl LibraryRepository for Repository {
+        fn reader_continuity(&self) -> Result<Option<yamantaka_domain::reader_tabs::DocumentTabs>> {
+            Ok(self.continuity.lock().unwrap().clone())
+        }
+        fn save_reader_continuity(
+            &mut self,
+            tabs: &yamantaka_domain::reader_tabs::DocumentTabs,
+        ) -> Result<()> {
+            *self.continuity.lock().unwrap() = Some(tabs.clone());
+            Ok(())
+        }
         fn query(&self, _: &LibraryQuery) -> Result<Vec<Document>> {
             Ok(Vec::new())
         }

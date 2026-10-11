@@ -152,3 +152,33 @@ fn oversized_input_and_output_fail_without_replacing_existing_data() {
     assert!(save(&path, &model).is_err());
     assert!(!path.exists());
 }
+
+#[test]
+fn repository_keeps_each_librarys_sidecar_independent_and_requires_file_backing_for_writes() {
+    use yamantaka_domain::{LibraryRepository, SCHEMA_VERSION};
+    use yamantaka_storage::Database;
+    let directory = tempfile::tempdir().unwrap();
+    let mut first = Database::open(&directory.path().join("first.sqlite3")).unwrap();
+    let second = Database::open(&directory.path().join("second.sqlite3")).unwrap();
+    first.save_reader_continuity(&model()).unwrap();
+    assert_eq!(
+        first
+            .reader_continuity()
+            .unwrap()
+            .unwrap()
+            .active()
+            .unwrap()
+            .id(),
+        "second"
+    );
+    assert!(second.reader_continuity().unwrap().is_none());
+    assert!(
+        directory
+            .path()
+            .join("first.reader-continuity.json")
+            .is_file()
+    );
+    let mut memory = Database::in_memory_at(SCHEMA_VERSION).unwrap();
+    assert!(memory.reader_continuity().unwrap().is_none());
+    assert!(memory.save_reader_continuity(&model()).is_err());
+}

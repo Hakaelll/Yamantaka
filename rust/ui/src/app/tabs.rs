@@ -6,6 +6,7 @@ use yamantaka_domain::reading_sessions::restoration::SessionPanel;
 mod bulk;
 mod closing;
 mod commands;
+mod continuity;
 mod preview;
 mod preview_bulk;
 #[cfg(test)]
@@ -21,6 +22,7 @@ struct PendingSwitch {
 }
 #[derive(Default)]
 pub(super) struct TabState {
+    pub(in crate::app) continuity: continuity::ContinuityState,
     pub(super) model: DocumentTabs,
     captions: HashMap<String, String>,
     pending: Option<PendingSwitch>,

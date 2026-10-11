@@ -31,6 +31,9 @@ colors:
   paper-bottom: "#B1AB9D"
   paper-rule: "#989283"
 typography:
+  library-display:
+    fontFamily: "Source Serif 4 Display, Segoe UI Variable, Segoe UI, egui proportional fallback"
+    fontSize: "38px"
   display:
     fontFamily: "Segoe UI Variable, Segoe UI, egui proportional fallback"
     fontSize: "34px"

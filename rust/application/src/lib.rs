@@ -4,6 +4,7 @@ pub mod annotation_export;
 pub mod annotations;
 pub mod document_find;
 pub mod reader_close;
+pub mod reader_continuity;
 pub mod reading_sessions;
 pub mod runtime;
 pub mod search_index;

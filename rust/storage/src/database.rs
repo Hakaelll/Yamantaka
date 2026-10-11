@@ -272,6 +272,28 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn reader_continuity(&self) -> Result<Option<yamantaka_domain::reader_tabs::DocumentTabs>> {
+        let Some(path) = self.connection.path().filter(|path| !path.is_empty()) else {
+            return Ok(None);
+        };
+        crate::reader_continuity::load(&Path::new(path).with_extension("reader-continuity.json"))
+    }
+    fn save_reader_continuity(
+        &mut self,
+        tabs: &yamantaka_domain::reader_tabs::DocumentTabs,
+    ) -> Result<()> {
+        let path = self
+            .connection
+            .path()
+            .filter(|path| !path.is_empty())
+            .ok_or_else(|| {
+                Failure::Unsupported("Reader continuity requires a file-backed library".into())
+            })?;
+        crate::reader_continuity::save(
+            &Path::new(path).with_extension("reader-continuity.json"),
+            tabs,
+        )
+    }
     fn get_reader_preferences(
         &self,
         document_id: &str,
