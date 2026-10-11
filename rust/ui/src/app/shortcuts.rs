@@ -9,6 +9,8 @@ pub(super) enum Shortcut {
     PreviousPage,
     NextPage,
     Fullscreen,
+    NextTab,
+    PreviousTab,
 }
 
 pub(super) fn read(ctx: &egui::Context, modal_open: bool, reader_active: bool) -> Vec<Shortcut> {
@@ -27,6 +29,14 @@ pub(super) fn read(ctx: &egui::Context, modal_open: bool, reader_active: bool) -
             return commands;
         }
         if reader_active {
+            if input.consume_key(
+                egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+                egui::Key::Tab,
+            ) {
+                commands.push(Shortcut::PreviousTab);
+            } else if input.consume_key(egui::Modifiers::CTRL, egui::Key::Tab) {
+                commands.push(Shortcut::NextTab);
+            }
             if input.consume_key(egui::Modifiers::CTRL, egui::Key::F) {
                 commands.push(Shortcut::DocumentFind);
             }
@@ -74,6 +84,24 @@ mod tests {
         );
         output.textures_delta.clear();
         result
+    }
+
+    #[test]
+    fn tab_shortcuts_cycle_only_in_the_reader_and_leave_modal_focus_alone() {
+        for (modifiers, expected) in [
+            (egui::Modifiers::CTRL, Shortcut::NextTab),
+            (
+                egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+                Shortcut::PreviousTab,
+            ),
+        ] {
+            assert_eq!(
+                route(vec![key(egui::Key::Tab, modifiers)], false, true),
+                vec![expected]
+            );
+            assert!(route(vec![key(egui::Key::Tab, modifiers)], false, false).is_empty());
+            assert!(route(vec![key(egui::Key::Tab, modifiers)], true, true).is_empty());
+        }
     }
 
     #[test]

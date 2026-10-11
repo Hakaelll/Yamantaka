@@ -55,6 +55,9 @@ impl ReaderOpening {
             .as_ref()
             .is_some_and(|pending| !pending.password)
     }
+    pub(super) fn token(&self) -> Option<Cancellation> {
+        self.pending.as_ref().map(|pending| pending.open.clone())
+    }
     pub(super) fn preferences(&self) -> Option<Cancellation> {
         self.pending
             .as_ref()
@@ -176,6 +179,7 @@ impl YamantakaApp {
         self.generation += 1;
     }
     pub(super) fn cancel_reader_opening(&mut self) {
+        self.tabs.cancel();
         self.opening.cancel();
         self.restoration.clear();
         self.open_intent.leave_destination();

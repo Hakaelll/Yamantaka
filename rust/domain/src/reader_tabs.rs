@@ -92,7 +92,7 @@ impl ReaderTab {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct DocumentTabs {
     tabs: Vec<ReaderTab>,
     active: Option<String>,

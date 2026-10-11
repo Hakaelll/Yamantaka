@@ -29,6 +29,7 @@ impl YamantakaApp {
     pub(super) fn retry_password(&mut self, document: Document, value: PdfPassword) {
         let id = document.id.clone();
         let cancel = self.opening.retry(id.clone());
+        self.tabs.bind_open(cancel.clone());
         self.password_attempted = true;
         self.loading = true;
         if let Err(error) = self

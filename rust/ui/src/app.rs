@@ -24,6 +24,7 @@ mod selection;
 mod sessions;
 mod settings;
 mod shortcuts;
+mod tabs;
 mod text;
 mod thumbnails;
 
@@ -87,6 +88,7 @@ pub struct YamantakaApp {
     goals: goals::GoalState,
     open_intent: open_intent::OpenIntent,
     opening: opening::ReaderOpening,
+    tabs: tabs::TabState,
     restoration: restoration::RestorationState,
     open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
@@ -249,6 +251,7 @@ impl YamantakaApp {
             ),
             open_intent: open_intent::OpenIntent::default(),
             opening: Default::default(),
+            tabs: Default::default(),
             open_confirmation: None,
             password: None,
             password_attempted: false,
@@ -474,6 +477,7 @@ impl YamantakaApp {
     }
     fn show_surface(&mut self, surface: Surface) {
         if !matches!(surface, Surface::Reader) {
+            self.tabs.leave_destination();
             self.restoration.clear();
         }
         if matches!(self.surface, Surface::Notes) {
@@ -493,6 +497,31 @@ impl YamantakaApp {
         self.surface = surface;
     }
     fn open(&mut self, document: Document) -> bool {
+        self.sync_tab_context();
+        if let Some(id) = self
+            .tabs
+            .model
+            .tabs()
+            .iter()
+            .find(|tab| tab.document() == document.id)
+            .map(|tab| tab.id().to_owned())
+        {
+            return self.select_reader_tab(&id);
+        }
+        self.tabs.cancel();
+        self.open_candidate(document)
+    }
+    fn open_candidate(&mut self, document: Document) -> bool {
+        if self.annotations.editing() {
+            self.error = Some(
+                self.tr(
+                    "Termina o cancela la nota antes de cambiar de lectura.",
+                    "Finish or cancel the note before switching readings.",
+                )
+                .into(),
+            );
+            return false;
+        }
         if !self.demo
             && self.preferences.record_reading_sessions()
             && !self.sessions.lifecycle.has_capacity()
@@ -1291,6 +1320,7 @@ impl YamantakaApp {
             ));
             return;
         };
+        self.reader_tab_strip(ui, p);
         if ui.ctx().content_rect().width() < 420.0 {
             self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
         } else {
@@ -1549,9 +1579,24 @@ impl App for YamantakaApp {
                     self.bookmarks.accept(&id, &cancel, Err(error.to_string()));
                 }
                 Update::Opened(document, info, cancel) => {
-                    if cancel.is_cancelled() || !self.opening.matches(&document.id, &cancel) {
+                    let editing =
+                        self.annotations.editing() && self.opening.matches(&document.id, &cancel);
+                    if editing {
+                        self.error = Some(
+                            self.tr(
+                                "Termina o cancela la nota antes de cambiar de lectura.",
+                                "Finish or cancel the note before switching readings.",
+                            )
+                            .into(),
+                        );
+                    }
+                    if cancel.is_cancelled()
+                        || !self.opening.matches(&document.id, &cancel)
+                        || editing
+                    {
                         if self.opening.fail(&document.id, &cancel, false) {
                             self.loading = false;
+                            self.tabs.fail(&document.id, &cancel);
                             self.restoration.clear();
                         }
                         cancel.cancel();
@@ -1568,6 +1613,7 @@ impl App for YamantakaApp {
                         Err(error) => {
                             self.error = Some(error.to_string());
                             self.opening.fail(&document.id, &cancel, false);
+                            self.tabs.fail(&document.id, &cancel);
                             self.restoration.clear();
                             cancel.cancel();
                             self.open_confirmation = Some((document.id.clone(), cancel));
@@ -1578,6 +1624,7 @@ impl App for YamantakaApp {
                     if let Err(error) = self.finish_reading_session() {
                         self.error = Some(error.to_string());
                         self.opening.fail(&document.id, &cancel, false);
+                        self.tabs.fail(&document.id, &cancel);
                         self.restoration.clear();
                         cancel.cancel();
                         self.open_confirmation = Some((document.id.clone(), cancel));
@@ -1590,6 +1637,9 @@ impl App for YamantakaApp {
                         self.open_confirmation = Some((document.id.clone(), cancel));
                         continue;
                     };
+                    self.sync_tab_context();
+                    self.tabs
+                        .accept_open(&document.id, &cancel, preferences_cancel.clone());
                     self.replace_reader_state(preferences_cancel);
                     self.page = page;
                     self.navigation = Some(navigation);
@@ -1650,6 +1700,7 @@ impl App for YamantakaApp {
                     }
                     self.loading = false;
                     if !password || cancelled {
+                        self.tabs.fail(&document.id, &cancel);
                         self.restoration.clear();
                     }
                     if cancelled {
@@ -1678,6 +1729,13 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Failed(error, cancel) => {
+                    if let Some(token) = &cancel {
+                        self.tabs.fail_preferences(token);
+                        if self.tabs.fail_lookup(token) {
+                            self.error = Some(error.to_string());
+                            continue;
+                        }
+                    }
                     if cancel
                         .as_ref()
                         .is_some_and(|token| self.thumbnails.fail(token, error.to_string()))
@@ -1756,6 +1814,9 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Document(id, document, cancel) => {
+                    if self.accept_tab_lookup(&id, document.clone(), &cancel) {
+                        continue;
+                    }
                     if let Some(target) = self.open_intent.accept_lookup(&id, &cancel) {
                         let page = target.page;
                         if let Some(document) =
@@ -1781,7 +1842,8 @@ impl App for YamantakaApp {
                                     }
                                 }
                             } else {
-                                if self.open(document) {
+                                self.tabs.cancel();
+                                if self.open_candidate(document) {
                                     if let Some(page) = page {
                                         self.open_intent.set_page(id.clone(), page);
                                     }
@@ -1839,6 +1901,7 @@ impl App for YamantakaApp {
             }
         }
         self.advance_replacement_preview();
+        self.advance_tab_preview();
         self.sync_reading_session(ctx);
         if self.demo
             && self.capture.is_some()
@@ -1901,6 +1964,8 @@ impl App for YamantakaApp {
                 shortcuts::Shortcut::NextMatch => self.step_find(true),
                 shortcuts::Shortcut::PreviousPage => self.step_reader(false),
                 shortcuts::Shortcut::NextPage => self.step_reader(true),
+                shortcuts::Shortcut::NextTab => self.relative_reader_tab(false),
+                shortcuts::Shortcut::PreviousTab => self.relative_reader_tab(true),
                 shortcuts::Shortcut::Fullscreen => {
                     let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
                     ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
@@ -1973,12 +2038,12 @@ impl App for YamantakaApp {
                             });
                         });
                 }
-                if self.loading || self.opening.busy() {
+                if self.loading || self.opening.busy() || self.tabs.busy() {
                     ui.horizontal(|ui| {
                         ui.spinner();
                         ui.label(self.tr("Procesando documentos…", "Working on your documents…"));
                         if ui.button(self.tr("Cancelar", "Cancel")).clicked() {
-                            if self.opening.busy() {
+                            if self.opening.busy() || self.tabs.busy() {
                                 self.cancel_reader_opening();
                             } else {
                                 self.cancel.cancel();
@@ -2064,6 +2129,7 @@ impl App for YamantakaApp {
                     && self.thumbnail_preview_page.is_none()
                     && !self.loading
                     && self.opening.ready()
+                    && self.tabs.ready()
                     && match self.preview_password_target {
                         Some("unlock") => matches!(self.surface, Surface::Reader),
                         Some(_) => self.password.is_some(),
@@ -2142,6 +2208,7 @@ impl App for YamantakaApp {
                         "readingHistory": self.history.summary(),
                         "readingRestoration": self.restoration_summary(),
                         "readerOpening":self.opening.summary(),
+                        "readerTabs":self.tabs.summary(),
                         "readingGoal": self.goals.summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,

@@ -352,6 +352,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args.iter().any(|arg| arg == "--tabs") {
+                    app.preview_reader_tabs();
+                }
                 if args.iter().any(|arg| arg == "--sessions-preview") {
                     app.preview_sessions();
                 }
