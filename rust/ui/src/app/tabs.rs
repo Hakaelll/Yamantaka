@@ -3,9 +3,11 @@ use std::collections::HashMap;
 use yamantaka_domain::reader_tabs::{DocumentTabs, ReaderTab};
 use yamantaka_domain::reading_sessions::restoration::SessionPanel;
 
+mod bulk;
 mod closing;
 mod commands;
 mod preview;
+mod preview_bulk;
 #[cfg(test)]
 mod tests;
 mod view;
@@ -15,7 +17,7 @@ struct PendingSwitch {
     target: ReaderTab,
     lookup: Cancellation,
     opening: Option<Cancellation>,
-    retire: Option<String>,
+    retire: Vec<String>,
 }
 #[derive(Default)]
 pub(super) struct TabState {
@@ -26,8 +28,9 @@ pub(super) struct TabState {
     preview: preview::TabPreview,
     preview_first: Option<String>,
     pub(super) closing: closing::CloseState,
-    retire_after_switch: Option<String>,
+    retire_after_switch: Vec<String>,
     preview_close: usize,
+    bulk_preview: preview_bulk::BulkPreview,
 }
 impl TabState {
     pub(super) fn cancel(&mut self) {
@@ -42,17 +45,7 @@ impl TabState {
     fn begin(&mut self, plan: DocumentTabs, lookup: Cancellation) {
         self.cancel();
         let target = plan.active().expect("A switch plan has a target").clone();
-        let retire = self
-            .model
-            .tabs()
-            .iter()
-            .find(|old| {
-                !plan
-                    .tabs()
-                    .iter()
-                    .any(|tab| tab.document() == old.document())
-            })
-            .map(|tab| tab.document().to_owned());
+        let retire = removed_documents(&self.model, &plan);
         self.pending = Some(PendingSwitch {
             retire,
             plan,
@@ -143,7 +136,7 @@ impl TabState {
         self.restoration.take().map(|(tab, _)| tab)
     }
     pub(super) fn busy(&self) -> bool {
-        self.pending.is_some() || self.closing.busy() || self.retire_after_switch.is_some()
+        self.pending.is_some() || self.closing.busy() || !self.retire_after_switch.is_empty()
     }
     pub(super) fn leave_destination(&mut self) {
         if self
@@ -158,11 +151,12 @@ impl TabState {
         self.pending.is_none()
             && self.restoration.is_none()
             && !self.closing.busy()
-            && self.retire_after_switch.is_none()
+            && self.retire_after_switch.is_empty()
             && self.preview.ready()
+            && self.bulk_preview.ready()
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"closePending":self.closing.busy(),"closed":self.model.closed().iter().map(|t|serde_json::json!({"id":t.id(),"document":t.document(),"page":t.page(),"zoom":t.preferences().zoom_level,"scroll":t.preferences().scroll_offset})).collect::<Vec<_>>(),"preview":format!("{:?}",self.preview),"pending":self.pending.as_ref().map(|p|p.target.id()),
+        serde_json::json!({"bulkPreview":format!("{:?}",self.bulk_preview),"nativeClosures":self.closing.summary(),"closePending":self.closing.busy(),"closed":self.model.closed().iter().map(|t|serde_json::json!({"id":t.id(),"document":t.document(),"page":t.page(),"zoom":t.preferences().zoom_level,"scroll":t.preferences().scroll_offset})).collect::<Vec<_>>(),"preview":format!("{:?}",self.preview),"pending":self.pending.as_ref().map(|p|p.target.id()),
             "active":self.model.active().map(ReaderTab::id),
             "tabs":self.model.tabs().iter().map(|t|serde_json::json!({"id":t.id(),"document":t.document(),"page":t.page(),"pinned":t.pinned(),"zoom":t.preferences().zoom_level,"zoomMode":t.preferences().zoom_mode.persisted_name(),"rotation":t.preferences().page_rotation.degrees(),"horizontalMargin":t.preferences().horizontal_margin,"verticalMargin":t.preferences().vertical_margin,"scroll":t.preferences().scroll_offset})).collect::<Vec<_>>()})
     }
@@ -192,4 +186,19 @@ fn reader_panel(panel: SessionPanel) -> outline::ReaderPanelTab {
         SessionPanel::Annotations => outline::ReaderPanelTab::Annotations,
         SessionPanel::Text => outline::ReaderPanelTab::Text,
     }
+}
+
+fn removed_documents(before: &DocumentTabs, after: &DocumentTabs) -> Vec<String> {
+    let mut documents = Vec::new();
+    for tab in before.tabs() {
+        if !after
+            .tabs()
+            .iter()
+            .any(|live| live.document() == tab.document())
+            && !documents.iter().any(|id| id == tab.document())
+        {
+            documents.push(tab.document().to_owned());
+        }
+    }
+    documents
 }

@@ -6,38 +6,8 @@ pub(super) enum CloseKind {
     Inactive(DocumentTabs),
     Retire,
 }
-struct PendingClose {
-    document: String,
-    token: Cancellation,
-    kind: CloseKind,
-}
-#[derive(Default)]
-pub(in crate::app) struct CloseState {
-    pending: Option<PendingClose>,
-    failed_retirement: Option<String>,
-}
-impl CloseState {
-    pub(in crate::app) fn busy(&self) -> bool {
-        self.pending.is_some()
-    }
-    fn bind(&mut self, document: String, token: Cancellation, kind: CloseKind) {
-        self.pending = Some(PendingClose {
-            document,
-            token,
-            kind,
-        });
-    }
-    fn take(&mut self, document: &str, token: &Cancellation) -> Option<PendingClose> {
-        if !self
-            .pending
-            .as_ref()
-            .is_some_and(|p| p.document == document && p.token.same_request(token))
-        {
-            return None;
-        }
-        self.pending.take()
-    }
-}
+mod state;
+pub(super) use state::CloseState;
 impl TabState {
     pub(super) fn refresh_plan_context(&self, plan: &mut DocumentTabs) {
         let selected = plan.active().map(|t| t.id().to_owned());
@@ -130,6 +100,14 @@ impl YamantakaApp {
         }
     }
     fn submit_tab_close(&mut self, document: String, kind: CloseKind) {
+        if let Err(error) = self
+            .tabs
+            .closing
+            .can_enqueue(std::slice::from_ref(&document))
+        {
+            self.error = Some(error.to_string());
+            return;
+        }
         let token = Cancellation::default();
         match self.runtime.submit(Action::Close(ReaderCloseRequest {
             document: document.clone(),
@@ -138,36 +116,40 @@ impl YamantakaApp {
             Ok(()) => self.tabs.closing.bind(document, token, kind),
             Err(error) => {
                 if matches!(kind, CloseKind::Retire) {
-                    self.tabs.closing.failed_retirement = Some(document);
+                    self.tabs.closing.fail(document);
                 }
                 self.error = Some(error.to_string());
             }
         }
     }
     pub(in crate::app) fn retire_closed_reader(&mut self) {
-        if !self.tabs.closing.busy()
-            && let Some(document) = self.tabs.retire_after_switch.take()
-        {
+        if !self.tabs.retire_after_switch.is_empty() {
+            let documents = std::mem::take(&mut self.tabs.retire_after_switch);
+            if let Err(error) = self.tabs.closing.enqueue(documents) {
+                self.error = Some(error.to_string());
+                return;
+            }
+        }
+        if let Some(document) = self.tabs.closing.next() {
             self.submit_tab_close(document, CloseKind::Retire);
         }
     }
     pub(in crate::app) fn retry_reader_close(&mut self) {
-        if self.tabs.closing.busy() {
+        if self.tabs.busy() || self.opening.busy() {
             return;
         }
-        if let Some(document) = self.tabs.closing.failed_retirement.take()
-            && !self
-                .tabs
-                .model
-                .tabs()
-                .iter()
-                .any(|t| t.document() == document)
-        {
-            self.submit_tab_close(document, CloseKind::Retire);
-        }
+        let live: Vec<_> = self
+            .tabs
+            .model
+            .tabs()
+            .iter()
+            .map(ReaderTab::document)
+            .collect();
+        self.tabs.closing.retry(&live);
+        self.retire_closed_reader();
     }
     pub(in crate::app) fn can_retry_reader_close(&self) -> bool {
-        !self.tabs.busy() && !self.opening.busy() && self.tabs.closing.failed_retirement.is_some()
+        !self.tabs.busy() && !self.opening.busy() && self.tabs.closing.has_failure()
     }
     pub(in crate::app) fn accept_tab_close(&mut self, reply: &ReaderCloseReply) -> bool {
         let Some(pending) = self.tabs.closing.take(&reply.document, &reply.cancel) else {
@@ -175,11 +157,12 @@ impl YamantakaApp {
         };
         if let Err(error) = &reply.result {
             if matches!(pending.kind, CloseKind::Retire) {
-                self.tabs.closing.failed_retirement = Some(pending.document);
+                self.tabs.closing.fail(pending.document);
             }
             self.error = Some(error.to_string());
             return true;
         }
+        self.tabs.closing.succeeded();
         self.sync_tab_context();
         match pending.kind {
             CloseKind::Last(mut plan) => {
@@ -201,16 +184,12 @@ impl YamantakaApp {
                 self.tabs.refresh_plan_context(&mut plan);
                 self.tabs.model = plan;
             }
-            CloseKind::Retire => {
-                self.tabs.closing.failed_retirement = None;
-            }
+            CloseKind::Retire => {}
         }
         true
     }
     pub(in crate::app) fn forget_failed_retirement(&mut self, document: &str) {
-        if self.tabs.closing.failed_retirement.as_deref() == Some(document) {
-            self.tabs.closing.failed_retirement = None;
-        }
+        self.tabs.closing.forget(document);
     }
 }
 

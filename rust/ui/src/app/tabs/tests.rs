@@ -142,5 +142,34 @@ fn adopting_an_active_closure_refreshes_its_last_position_and_schedules_native_r
     assert_eq!(state.model.active().unwrap().id(), "b");
     assert_eq!(state.model.closed()[0].page(), 2);
     assert_eq!(state.model.closed()[0].preferences().scroll_offset, 2400.0);
-    assert_eq!(state.retire_after_switch.as_deref(), Some("first"));
+    assert_eq!(state.retire_after_switch, vec!["first"]);
+}
+
+#[test]
+fn bulk_switch_retirement_deduplicates_documents_and_preserves_pinned_readings() {
+    let mut state = TabState::default();
+    state.model.open(tab("a", "first", 1), false).unwrap();
+    state
+        .model
+        .open(tab("b", "second", 0).with_pinned(true), false)
+        .unwrap();
+    state.model.open(tab("c", "third", 0), false).unwrap();
+    state.model.open(tab("d", "third", 2), true).unwrap();
+    let mut plan = state.model.clone();
+    assert!(plan.close_others("a"));
+    state.begin(plan, Cancellation::default());
+    let opening = Cancellation::default();
+    state.bind_open(opening.clone());
+    assert!(state.accept_open("first", &opening, Cancellation::default()));
+    assert_eq!(state.model.tabs().len(), 2);
+    assert!(
+        state
+            .model
+            .tabs()
+            .iter()
+            .any(|t| t.document() == "second" && t.pinned())
+    );
+    assert_eq!(state.retire_after_switch, vec!["third"]);
+    assert_eq!(state.model.closed().len(), 2);
+    assert_eq!(state.model.active().unwrap().id(), "a");
 }

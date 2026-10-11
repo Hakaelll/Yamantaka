@@ -30,6 +30,7 @@ impl YamantakaApp {
         let mut reorder = None;
         let mut close = None;
         let mut reopen = false;
+        let mut bulk = None;
         egui::Frame::new()
             .fill(palette.surface)
             .inner_margin(egui::Margin::symmetric(18, 6))
@@ -66,6 +67,22 @@ impl YamantakaApp {
                                 .clicked()
                             {
                                 close = active.clone();
+                            }
+                            if ui
+                                .button(self.tr("Cerrar las demás", "Close other readings"))
+                                .clicked()
+                                && let Some(id) = active.clone()
+                            {
+                                bulk = Some((id, false));
+                            }
+                            if ui
+                                .button(
+                                    self.tr("Cerrar a la derecha", "Close readings to the right"),
+                                )
+                                .clicked()
+                                && let Some(id) = active.clone()
+                            {
+                                bulk = Some((id, true));
                             }
                             if ui
                                 .add_enabled(
@@ -176,6 +193,28 @@ impl YamantakaApp {
                                                 ui.close();
                                             }
                                             if ui
+                                                .button(
+                                                    self.tr(
+                                                        "Cerrar las demás",
+                                                        "Close other readings",
+                                                    ),
+                                                )
+                                                .clicked()
+                                            {
+                                                bulk = Some((id.clone(), false));
+                                                ui.close();
+                                            }
+                                            if ui
+                                                .button(self.tr(
+                                                    "Cerrar a la derecha",
+                                                    "Close readings to the right",
+                                                ))
+                                                .clicked()
+                                            {
+                                                bulk = Some((id.clone(), true));
+                                                ui.close();
+                                            }
+                                            if ui
                                                 .add_enabled(
                                                     !self.tabs.model.closed().is_empty(),
                                                     egui::Button::new(self.tr(
@@ -256,6 +295,10 @@ impl YamantakaApp {
                         });
                 }
             });
+        if let Some((id, to_right)) = bulk {
+            self.close_other_reader_tabs(&id, to_right);
+            return;
+        }
         if let Some(id) = close {
             self.close_reader_tab(&id);
             return;

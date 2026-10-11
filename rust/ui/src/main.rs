@@ -352,6 +352,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args.iter().any(|arg| arg == "--tabs-close-others") {
+                    app.preview_bulk_tab_close(false);
+                }
+                if args.iter().any(|arg| arg == "--tabs-close-right") {
+                    app.preview_bulk_tab_close(true);
+                }
                 if args.iter().any(|arg| arg == "--tabs-inactive-close") {
                     app.preview_tab_closure(4);
                 }

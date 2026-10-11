@@ -63,6 +63,14 @@ impl YamantakaApp {
         if self.tabs.closing.busy() {
             return false;
         }
+        if let Err(error) = self
+            .tabs
+            .closing
+            .can_enqueue(&removed_documents(&self.tabs.model, &plan))
+        {
+            self.error = Some(error.to_string());
+            return false;
+        }
         if self.annotations.editing() {
             self.error = Some(
                 self.tr(

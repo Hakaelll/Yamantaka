@@ -1909,6 +1909,7 @@ impl App for YamantakaApp {
         }
         self.advance_replacement_preview();
         self.advance_tab_preview();
+        self.advance_bulk_tab_preview();
         self.retire_closed_reader();
         self.sync_reading_session(ctx);
         if self.demo
