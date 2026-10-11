@@ -49,6 +49,7 @@ impl DocumentTabs {
             None
         };
         let selected = tab.id.clone();
+        self.closed.retain(|closed| closed.id != tab.id);
         self.tabs.push(tab);
         self.active = Some(selected.clone());
         self.resources();
@@ -234,7 +235,45 @@ impl DocumentTabs {
             .map(|tab| tab.id.clone());
         self.tabs = tabs;
         self.active = active;
+        self.closed
+            .retain(|closed| !self.tabs.iter().any(|tab| tab.id == closed.id));
         self.resources();
+        Ok(())
+    }
+
+    /// Restore a complete continuity snapshot without dropping invalid entries.
+    pub fn restore_continuity(
+        &mut self,
+        tabs: Vec<ReaderTab>,
+        active: Option<&str>,
+        closed: Vec<ReaderTab>,
+    ) -> Result<()> {
+        if closed.len() > MAX_CLOSED_TABS {
+            return Err(Failure::Invalid(
+                "A continuity snapshot exceeds ten closed readings".into(),
+            ));
+        }
+        if active.is_some_and(|id| !tabs.iter().any(|tab| tab.id == id)) {
+            return Err(Failure::Invalid(
+                "The active continuity tab does not exist".into(),
+            ));
+        }
+        for (index, tab) in closed.iter().enumerate() {
+            tab.validate()?;
+            if tabs
+                .iter()
+                .chain(&closed[..index])
+                .any(|other| other.id == tab.id)
+            {
+                return Err(Failure::Invalid(
+                    "Continuity contains duplicate tab identities".into(),
+                ));
+            }
+        }
+        let mut restored = Self::default();
+        restored.restore(tabs, active)?;
+        restored.closed = closed;
+        *self = restored;
         Ok(())
     }
 }

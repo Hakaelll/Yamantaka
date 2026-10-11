@@ -12,6 +12,37 @@ fn tab(index: usize) -> ReaderTab {
     )
     .unwrap()
 }
+
+#[test]
+fn continuity_restore_is_atomic_and_successful_identity_reuse_removes_stale_closure() {
+    let mut model = DocumentTabs::default();
+    model.open(tab(0), true).unwrap();
+    model.close("tab-0");
+    model.open(tab(1), true).unwrap();
+    for closed in [
+        vec![tab(2), tab(2)],
+        vec![tab(1)],
+        (0..=MAX_CLOSED_TABS).map(tab).collect(),
+    ] {
+        assert!(
+            model
+                .restore_continuity(vec![tab(1)], Some("tab-1"), closed)
+                .is_err()
+        );
+        assert_eq!(model.active().unwrap().id(), "tab-1");
+        assert_eq!(model.closed()[0].id(), "tab-0");
+    }
+    assert!(
+        model
+            .restore_continuity(vec![tab(2)], Some("missing"), vec![])
+            .is_err()
+    );
+    model.open(tab(0), true).unwrap();
+    assert!(model.closed().is_empty());
+    model.close("tab-0");
+    model.restore(vec![tab(0)], None).unwrap();
+    assert!(model.closed().is_empty());
+}
 #[test]
 fn opening_reuses_a_documents_snapshot_and_force_new_keeps_independent_positions() {
     let mut tabs = DocumentTabs::default();
