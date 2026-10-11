@@ -9,6 +9,12 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='tabs-inactive-closed'; args=@('--reader','--tabs-inactive-close') },
+    @{ name='tabs-close-reopen'; args=@('--reader','--tabs-close-reopen') },
+    @{ name='tabs-close-reopen-es'; args=@('--reader','--tabs-close-reopen','--light','--es','--reduced-motion') },
+    @{ name='tabs-last-reopen'; args=@('--reader','--tabs-last-reopen') },
+    @{ name='tabs-last-reopen-small-200'; args=@('--reader','--tabs-last-reopen','--size=640x480','--text-scale=2') },
+    @{ name='tabs-last-closed'; args=@('--reader','--tabs-last-close','--sessions-preview') },
     @{ name='reader-tabs'; args=@('--reader','--tabs') },
     @{ name='reader-tabs-light-es'; args=@('--reader','--tabs','--light','--es','--reduced-motion') },
     @{ name='reader-tabs-small-200'; args=@('--reader','--tabs','--size=640x480','--text-scale=2') },

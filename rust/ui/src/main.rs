@@ -352,6 +352,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args.iter().any(|arg| arg == "--tabs-inactive-close") {
+                    app.preview_tab_closure(4);
+                }
+                if args.iter().any(|arg| arg == "--tabs-close-reopen") {
+                    app.preview_tab_closure(1);
+                }
+                if args.iter().any(|arg| arg == "--tabs-last-reopen") {
+                    app.preview_tab_closure(2);
+                }
+                if args.iter().any(|arg| arg == "--tabs-last-close") {
+                    app.preview_tab_closure(3);
+                }
                 if args.iter().any(|arg| arg == "--tabs") {
                     app.preview_reader_tabs();
                 }

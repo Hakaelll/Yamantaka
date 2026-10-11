@@ -107,6 +107,16 @@ impl YamantakaApp {
             ));
         }
     }
+    pub(super) fn validate_reading_session_context(&self) -> Result<()> {
+        if self.sessions.lifecycle.current_document().is_none() {
+            return Ok(());
+        }
+        self.sessions
+            .snapshot
+            .as_ref()
+            .ok_or_else(|| Failure::Invalid("Reading session context is unavailable".into()))
+            .and_then(|(_, context)| context.validate())
+    }
     pub(super) fn finish_reading_session(&mut self) -> Result<()> {
         if self.sessions.lifecycle.current_document().is_none() {
             return Ok(());

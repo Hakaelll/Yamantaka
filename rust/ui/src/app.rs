@@ -512,6 +512,9 @@ impl YamantakaApp {
         self.open_candidate(document)
     }
     fn open_candidate(&mut self, document: Document) -> bool {
+        if self.tabs.closing.busy() {
+            return false;
+        }
         if self.annotations.editing() {
             self.error = Some(
                 self.tr(
@@ -1640,6 +1643,7 @@ impl App for YamantakaApp {
                     self.sync_tab_context();
                     self.tabs
                         .accept_open(&document.id, &cancel, preferences_cancel.clone());
+                    self.forget_failed_retirement(&document.id);
                     self.replace_reader_state(preferences_cancel);
                     self.page = page;
                     self.navigation = Some(navigation);
@@ -1753,6 +1757,9 @@ impl App for YamantakaApp {
                     self.loading = false;
                 }
                 Update::ReaderClosed(reply) => {
+                    if self.accept_tab_close(&reply) {
+                        continue;
+                    }
                     if let Err(error) = reply.result
                         && !matches!(error, yamantaka_domain::Failure::Cancelled)
                     {
@@ -1902,6 +1909,7 @@ impl App for YamantakaApp {
         }
         self.advance_replacement_preview();
         self.advance_tab_preview();
+        self.retire_closed_reader();
         self.sync_reading_session(ctx);
         if self.demo
             && self.capture.is_some()
@@ -1966,6 +1974,12 @@ impl App for YamantakaApp {
                 shortcuts::Shortcut::NextPage => self.step_reader(true),
                 shortcuts::Shortcut::NextTab => self.relative_reader_tab(false),
                 shortcuts::Shortcut::PreviousTab => self.relative_reader_tab(true),
+                shortcuts::Shortcut::CloseTab => {
+                    if let Some(id) = self.tabs.model.active().map(|t| t.id().to_owned()) {
+                        self.close_reader_tab(&id);
+                    }
+                }
+                shortcuts::Shortcut::ReopenTab => self.reopen_reader_tab(),
                 shortcuts::Shortcut::Fullscreen => {
                     let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
                     ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
@@ -1992,6 +2006,18 @@ impl App for YamantakaApp {
             egui::Frame::new().fill(p.canvas).show(ui, |ui| {
                 if !matches!(self.surface, Surface::Reader) {
                     self.toolbar(ui);
+                    if !self.tabs.model.closed().is_empty()
+                        && !self.tabs.busy()
+                        && theme::navigation(
+                            ui,
+                            self.tr("Reabrir última lectura", "Reopen last reading"),
+                            false,
+                            p,
+                        )
+                        .clicked()
+                    {
+                        self.reopen_reader_tab();
+                    }
                 }
                 if let Some(error) = self.error.clone() {
                     egui::Frame::new()
@@ -2011,6 +2037,18 @@ impl App for YamantakaApp {
                                 {
                                     self.sessions.retry_failed();
                                     self.error = None;
+                                }
+                                if self.can_retry_reader_close()
+                                    && theme::primary_icon(
+                                        ui,
+                                        self.tr("Reintentar cierre", "Retry close"),
+                                        theme::Icon::Right,
+                                        p,
+                                    )
+                                    .clicked()
+                                {
+                                    self.error = None;
+                                    self.retry_reader_close();
                                 }
                                 if self.render_retry
                                     && theme::primary_icon(
@@ -2042,7 +2080,9 @@ impl App for YamantakaApp {
                     ui.horizontal(|ui| {
                         ui.spinner();
                         ui.label(self.tr("Procesando documentos…", "Working on your documents…"));
-                        if ui.button(self.tr("Cancelar", "Cancel")).clicked() {
+                        if !self.tabs.closing.busy()
+                            && ui.button(self.tr("Cancelar", "Cancel")).clicked()
+                        {
                             if self.opening.busy() || self.tabs.busy() {
                                 self.cancel_reader_opening();
                             } else {

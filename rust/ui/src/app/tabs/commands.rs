@@ -59,7 +59,10 @@ impl YamantakaApp {
         }
         self.request_tab_plan(plan)
     }
-    fn request_tab_plan(&mut self, plan: DocumentTabs) -> bool {
+    pub(super) fn request_tab_plan(&mut self, plan: DocumentTabs) -> bool {
+        if self.tabs.closing.busy() {
+            return false;
+        }
         if self.annotations.editing() {
             self.error = Some(
                 self.tr(

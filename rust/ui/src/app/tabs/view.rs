@@ -28,15 +28,14 @@ impl YamantakaApp {
         let mut duplicate = false;
         let mut pin = None;
         let mut reorder = None;
+        let mut close = None;
+        let mut reopen = false;
         egui::Frame::new()
             .fill(palette.surface)
             .inner_margin(egui::Margin::symmetric(18, 6))
             .show(ui, |ui| {
                 ui.set_min_width(ui.available_width());
-                if self.tabs.pending.is_some()
-                    || self.opening.busy()
-                    || self.reader_preferences_loading
-                {
+                if self.tabs.busy() || self.opening.busy() || self.reader_preferences_loading {
                     ui.disable();
                 }
                 if ui.available_width() < 420.0 {
@@ -62,6 +61,23 @@ impl YamantakaApp {
                                 }
                             }
                             ui.separator();
+                            if ui
+                                .button(self.tr("Cerrar lectura", "Close reading"))
+                                .clicked()
+                            {
+                                close = active.clone();
+                            }
+                            if ui
+                                .add_enabled(
+                                    !self.tabs.model.closed().is_empty(),
+                                    egui::Button::new(
+                                        self.tr("Reabrir última lectura", "Reopen last reading"),
+                                    ),
+                                )
+                                .clicked()
+                            {
+                                reopen = true;
+                            }
                             duplicate = ui
                                 .button(self.tr("Duplicar lectura", "Duplicate reading"))
                                 .clicked();
@@ -153,6 +169,26 @@ impl YamantakaApp {
                                         }
                                         response.on_hover_text(title).context_menu(|ui| {
                                             if ui
+                                                .button(self.tr("Cerrar lectura", "Close reading"))
+                                                .clicked()
+                                            {
+                                                close = Some(id.clone());
+                                                ui.close();
+                                            }
+                                            if ui
+                                                .add_enabled(
+                                                    !self.tabs.model.closed().is_empty(),
+                                                    egui::Button::new(self.tr(
+                                                        "Reabrir última lectura",
+                                                        "Reopen last reading",
+                                                    )),
+                                                )
+                                                .clicked()
+                                            {
+                                                reopen = true;
+                                                ui.close();
+                                            }
+                                            if ui
                                                 .button(
                                                     self.tr(
                                                         "Duplicar lectura",
@@ -220,6 +256,14 @@ impl YamantakaApp {
                         });
                 }
             });
+        if let Some(id) = close {
+            self.close_reader_tab(&id);
+            return;
+        }
+        if reopen {
+            self.reopen_reader_tab();
+            return;
+        }
         if duplicate {
             if let Some(id) = selected {
                 self.duplicate_reader_tab_from(&id);

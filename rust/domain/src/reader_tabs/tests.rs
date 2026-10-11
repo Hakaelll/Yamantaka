@@ -218,3 +218,31 @@ fn invalid_restoration_and_snapshot_updates_leave_existing_state_intact() {
     assert!(tabs.relative(false).is_none());
     assert!(tabs.hot_documents().is_empty());
 }
+
+#[test]
+fn refreshing_a_closed_snapshot_is_validated_and_keeps_identity_and_pinning() {
+    let mut tabs = DocumentTabs::default();
+    tabs.open(tab(0).with_pinned(true), false).unwrap();
+    tabs.close("tab-0");
+    let mut preferences = ReaderPreferences::new("document-0");
+    preferences.zoom_level = 1.75;
+    preferences.scroll_offset = 1500.0;
+    assert!(
+        tabs.refresh_closed("tab-0", 3, preferences.clone(), Some(SessionPanel::Text))
+            .unwrap()
+    );
+    let saved = tabs.closed()[0].clone();
+    assert!(saved.pinned());
+    assert_eq!(saved.page(), 3);
+    assert_eq!(saved.preferences(), &preferences);
+    assert!(
+        tabs.refresh_closed("missing", 4, preferences.clone(), None)
+            .is_ok_and(|changed| !changed)
+    );
+    preferences.document_id = "wrong".into();
+    assert!(tabs.refresh_closed("tab-0", 4, preferences, None).is_err());
+    assert_eq!(tabs.closed()[0], saved);
+    tabs.reopen_last_closed().unwrap();
+    assert_eq!(tabs.active().unwrap().page(), 3);
+    assert_eq!(tabs.active().unwrap().panel(), Some(SessionPanel::Text));
+}

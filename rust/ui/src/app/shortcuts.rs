@@ -11,6 +11,8 @@ pub(super) enum Shortcut {
     Fullscreen,
     NextTab,
     PreviousTab,
+    CloseTab,
+    ReopenTab,
 }
 
 pub(super) fn read(ctx: &egui::Context, modal_open: bool, reader_active: bool) -> Vec<Shortcut> {
@@ -28,7 +30,13 @@ pub(super) fn read(ctx: &egui::Context, modal_open: bool, reader_active: bool) -
             commands.push(Shortcut::GlobalSearch);
             return commands;
         }
+        if input.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::T) {
+            commands.push(Shortcut::ReopenTab);
+        }
         if reader_active {
+            if input.consume_key(egui::Modifiers::CTRL, egui::Key::W) {
+                commands.push(Shortcut::CloseTab);
+            }
             if input.consume_key(
                 egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
                 egui::Key::Tab,
@@ -86,6 +94,36 @@ mod tests {
         result
     }
 
+    #[test]
+    fn close_and_reopen_shortcuts_respect_reader_and_modal_scope() {
+        assert_eq!(
+            route(vec![key(egui::Key::W, egui::Modifiers::CTRL)], false, true),
+            vec![Shortcut::CloseTab]
+        );
+        assert!(route(vec![key(egui::Key::W, egui::Modifiers::CTRL)], false, false).is_empty());
+        assert_eq!(
+            route(
+                vec![key(
+                    egui::Key::T,
+                    egui::Modifiers::CTRL | egui::Modifiers::SHIFT
+                )],
+                false,
+                false
+            ),
+            vec![Shortcut::ReopenTab]
+        );
+        assert!(
+            route(
+                vec![key(
+                    egui::Key::T,
+                    egui::Modifiers::CTRL | egui::Modifiers::SHIFT
+                )],
+                true,
+                false
+            )
+            .is_empty()
+        );
+    }
     #[test]
     fn tab_shortcuts_cycle_only_in_the_reader_and_leave_modal_focus_alone() {
         for (modifiers, expected) in [

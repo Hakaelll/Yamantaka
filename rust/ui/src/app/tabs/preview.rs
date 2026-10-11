@@ -9,6 +9,10 @@ pub(super) enum TabPreview {
     WaitSecond,
     ReturnFirst,
     Complete,
+    WaitClosed,
+    WaitReopened,
+    WaitLastClosed,
+    WaitInactiveClosed,
 }
 impl TabPreview {
     pub(super) fn ready(&self) -> bool {
@@ -20,6 +24,12 @@ impl YamantakaApp {
         if self.demo && self.capture.is_some() {
             self.preview_reader = true;
             self.tabs.preview = TabPreview::ConfigureFirst;
+        }
+    }
+    pub fn preview_tab_closure(&mut self, mode: usize) {
+        self.preview_reader_tabs();
+        if self.demo && self.capture.is_some() {
+            self.tabs.preview_close = mode;
         }
     }
     pub(in crate::app) fn advance_tab_preview(&mut self) {
@@ -47,7 +57,11 @@ impl YamantakaApp {
                 if self.restoration.ready()
                     && self.reader_pages.values().any(|p| p.image.is_some()) =>
             {
-                if let Some(document) = self.documents.get(1).cloned() {
+                if matches!(self.tabs.preview_close, 2 | 3) {
+                    let id = self.tabs.model.active().unwrap().id().to_owned();
+                    self.close_reader_tab(&id);
+                    self.tabs.preview = TabPreview::WaitLastClosed;
+                } else if let Some(document) = self.documents.get(1).cloned() {
                     self.open(document);
                     self.tabs.preview = TabPreview::WaitSecond;
                 }
@@ -74,6 +88,63 @@ impl YamantakaApp {
             }
             TabPreview::ReturnFirst
                 if self.tabs.pending.is_none()
+                    && self.tabs.restoration.is_none()
+                    && self.restoration.ready()
+                    && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-0")
+                    && self.reader_preferences.is_some()
+                    && self.reader_pages.values().any(|p| p.image.is_some()) =>
+            {
+                if self.tabs.preview_close == 4 {
+                    let ids: Vec<_> = self
+                        .tabs
+                        .model
+                        .tabs()
+                        .iter()
+                        .filter(|t| t.document() == "demo-1")
+                        .map(|t| t.id().to_owned())
+                        .collect();
+                    self.close_reader_tab(&ids[0]);
+                    self.close_reader_tab(&ids[1]);
+                    self.tabs.preview = TabPreview::WaitInactiveClosed;
+                } else if self.tabs.preview_close == 1 {
+                    let id = self.tabs.model.active().unwrap().id().to_owned();
+                    self.close_reader_tab(&id);
+                    self.tabs.preview = TabPreview::WaitClosed;
+                } else {
+                    self.tabs.preview = TabPreview::Complete;
+                }
+            }
+            TabPreview::WaitInactiveClosed
+                if !self.tabs.busy()
+                    && self.tabs.model.tabs().len() == 1
+                    && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-0") =>
+            {
+                self.tabs.preview = TabPreview::Complete;
+            }
+            TabPreview::WaitClosed
+                if !self.tabs.busy()
+                    && !self.opening.busy()
+                    && self.tabs.restoration.is_none()
+                    && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-1") =>
+            {
+                self.reopen_reader_tab();
+                self.tabs.preview = TabPreview::WaitReopened;
+            }
+            TabPreview::WaitLastClosed
+                if !self.tabs.busy()
+                    && self.active.is_none()
+                    && matches!(self.surface, Surface::Library) =>
+            {
+                if self.tabs.preview_close == 3 {
+                    self.tabs.preview = TabPreview::Complete;
+                } else {
+                    self.reopen_reader_tab();
+                    self.tabs.preview = TabPreview::WaitReopened;
+                }
+            }
+            TabPreview::WaitReopened
+                if !self.tabs.busy()
+                    && !self.opening.busy()
                     && self.tabs.restoration.is_none()
                     && self.restoration.ready()
                     && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-0")

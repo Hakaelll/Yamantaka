@@ -123,3 +123,24 @@ fn leaving_the_reader_revokes_lookup_but_retains_an_admitted_native_handoff() {
     assert!(state.accept_open("second", &opening, Cancellation::default()));
     assert_eq!(state.model.active().unwrap().id(), "b");
 }
+
+#[test]
+fn adopting_an_active_closure_refreshes_its_last_position_and_schedules_native_retirement() {
+    let mut state = TabState::default();
+    state.model.open(tab("a", "first", 0), false).unwrap();
+    state.model.open(tab("b", "second", 1), false).unwrap();
+    state.model.activate("a");
+    let mut plan = state.model.clone();
+    plan.close("a");
+    state.begin(plan, Cancellation::default());
+    let mut preferences = state.model.active().unwrap().preferences().clone();
+    preferences.scroll_offset = 2400.0;
+    state.model.update_active(2, preferences, None).unwrap();
+    let opening = Cancellation::default();
+    state.bind_open(opening.clone());
+    assert!(state.accept_open("second", &opening, Cancellation::default()));
+    assert_eq!(state.model.active().unwrap().id(), "b");
+    assert_eq!(state.model.closed()[0].page(), 2);
+    assert_eq!(state.model.closed()[0].preferences().scroll_offset, 2400.0);
+    assert_eq!(state.retire_after_switch.as_deref(), Some("first"));
+}

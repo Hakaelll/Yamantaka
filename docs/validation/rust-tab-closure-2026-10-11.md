@@ -1,0 +1,23 @@
+# Native tab closure and reopening
+
+Reader tab menus now expose Close reading and Reopen last reading. Ctrl+W closes the active reading, and Ctrl+Shift+T reopens the last closure from either the reader or library. After the last tab closes, the library displays a Reopen last reading control. The compact selector exposes the same menu commands.
+
+Closing a duplicate retains native ownership while another tab still uses its PDF. An inactive tab with no surviving duplicate waits for the exact scoped native close result before its plan is committed. Closing the last active tab likewise waits for native success before clearing the reader and returning to the library. Failed admission or native closure retains those tab plans unapplied.
+
+Closing an active tab with an adjacent reading stages the closure in a prospective switch plan. The adjacent PDF must open successfully before that plan becomes active. Once accepted, an unused outgoing PDF is retired through a separately identified native close. The outgoing reader's latest page, preferences and panel update its closed snapshot, including any scroll changes while the adjacent PDF was opening. Closure and retirement block conflicting tab/open commands until the native reply resolves. A failed post-switch retirement offers Retry close; successful reopening of that document removes the obsolete retry intent.
+
+The reply token identifies a close request. A native success remains actionable after late token cancellation because cancellation cannot recreate a handle already closed. The pending-close consumer checks both document and token and consumes its reply once. The ten-entry closed stack retains full preferences and pin state, and reopening stages the original tab snapshot without consuming the live stack until successful adoption. The stack remains in memory; persistent recently-closed history is not connected yet.
+
+Before closing the last active PDF, the UI validates its cached reading-session context. Confirmed closure completes the session, cancels reader work and releases current page/navigation state. This does not modify the original PDF. A failure to finish session persistence is still surfaced; native closure cannot be reversed after success.
+
+## Verification
+
+All 396 locked workspace tests pass, including four additional regressions for validated closed-context refresh, exact native-close identity and late cancellation, latest outgoing context at active closure, and close/reopen shortcut scope. Formatting and warning-denied workspace/all-target Clippy pass. The final workspace log is `build/verification/reader-tab-close-tests.log`.
+
+Nine native synthetic captures in `build/rust-visual/tab-close-verified` cover active closure/reopen in dark and light Spanish with reduced motion; last-tab closure/reopen, including 640 by 480 with doubled text; last-tab closure with reading sessions enabled; inactive duplicate closure followed by native retirement; the connected tab selector; failed replacement preservation; and protected-document unlock. The final manifest independently verifies all 56 UI source files, complete source inventory, Cargo.lock, PNGs, control snapshots and successful process exits against executable SHA-256 `C0996C3E2ED7633B53CA6179D1679ED884E0804D6D377A747166C5FCE68B521F`.
+
+The reopened first reading retains zero-based page 1, zoom 1.75, continuous sepia layout and scroll 1500. Active closure/reopen leaves three readings with no pending close. Last closure leaves no active tab and one closed snapshot; its synthetic SQLite store contains exactly one completed reading session ending on page 1, with zoom and scroll preserved in `reading_session_contexts_v1`. The inactive test closes two readings of the second PDF while the first stays active at the same page/zoom/scroll, then records both closed snapshots. The library after last closure and compact reopened-reader screenshots were inspected. Doubled text is not physical DPI certification.
+
+## Remaining acceptance
+
+Connect Close others/Close to right, a complete native warm-document policy and persistence of recently closed readings, startup tabs and workspaces. Exercise native failure/retry UI paths, protected adjacent-document cancellation, rapid mixed close/open sequences, resource recovery and physical mouse/keyboard/focus behavior. Narrator, monitor DPI, multi-monitor behavior and final Release acceptance remain pending. The existing scoped actor regressions cover native failure outcomes, but the screenshots do not prove UI fault injection or physical menu interaction. This checkpoint does not complete tab parity or the rewrite.

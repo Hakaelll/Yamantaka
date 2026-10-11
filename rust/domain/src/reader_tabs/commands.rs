@@ -188,6 +188,30 @@ impl DocumentTabs {
         self.tabs[index] = updated;
         Ok(())
     }
+    /// Refresh a closure captured while its outgoing reader was still visible.
+    pub fn refresh_closed(
+        &mut self,
+        id: &str,
+        page: u32,
+        preferences: ReaderPreferences,
+        panel: Option<SessionPanel>,
+    ) -> Result<bool> {
+        let Some(index) = self.closed.iter().position(|tab| tab.id() == id) else {
+            return Ok(false);
+        };
+        let previous = &self.closed[index];
+        let mut updated = ReaderTab::new(
+            previous.id.clone(),
+            previous.document.clone(),
+            page,
+            preferences,
+            panel,
+        )?;
+        updated.pinned = previous.pinned;
+        updated.resource = previous.resource;
+        self.closed[index] = updated;
+        Ok(true)
+    }
     /// Invalid restoration leaves the current tab set and closed stack intact.
     pub fn restore(&mut self, tabs: Vec<ReaderTab>, active: Option<&str>) -> Result<()> {
         if tabs.len() > MAX_TABS {
