@@ -5,6 +5,8 @@ use eframe::egui::{
 };
 use yamantaka_domain::Document;
 
+mod material;
+
 #[derive(Clone, Copy, Default)]
 pub struct BookPhysics {
     tilt: Vec2,
@@ -62,7 +64,7 @@ impl BookPhysics {
         let x = point.x - center.x;
         let y = point.y - center.y;
         let rx = -0.08 - self.tilt.y * 0.052;
-        let ry = -0.26 + self.tilt.x * 0.074;
+        let ry = -0.32 + self.tilt.x * 0.095;
         let rotated_x = x * ry.cos() + depth * ry.sin();
         let rotated_z = -x * ry.sin() + depth * ry.cos();
         let rotated_y = y * rx.cos() - rotated_z * rx.sin();
@@ -184,7 +186,7 @@ fn cover_impl(
     }
     ui.ctx()
         .data_mut(|data| data.insert_temp(response.id, physics));
-    let depth = (width * 0.095).clamp(12.0, 26.0);
+    let depth = (width * 0.13).clamp(12.0, 30.0);
     let project = |point| physics.project(point, depth * 0.5, book);
     let painter = ui.painter();
     let seed = document.id.bytes().fold(2166136261_u32, |hash, b| {
@@ -275,27 +277,7 @@ fn cover_impl(
         ],
         color.gamma_multiply(0.48),
     );
-    // Every jacket vertex, including font-atlas geometry, follows one rigid transform.
-    // A directional cloth/paper material. Light and channel are attached to the
-    // same cover mesh as its type and artwork; no screen-space shimmer loop.
-    let mut material = egui::epaint::Mesh::default();
-    let lighting = (0.12 + physics.tilt.x * 0.04).clamp(0.07, 0.16);
-    for (pos, shade) in [
-        (book.left_top(), color.lerp_to_gamma(ink, lighting)),
-        (book.right_top(), color),
-        (book.right_bottom(), color.gamma_multiply(0.76)),
-        (book.left_bottom(), color.gamma_multiply(0.86)),
-    ] {
-        material.colored_vertex(pos, shade);
-    }
-    material.add_triangle(0, 1, 2);
-    material.add_triangle(0, 2, 3);
-    let mut jacket = vec![egui::Shape::mesh(material)];
-    jacket.push(egui::Shape::rect_filled(
-        Rect::from_min_max(book.min, Pos2::new(book.left() + 9.0, book.bottom())),
-        0.0,
-        color.gamma_multiply(0.72),
-    ));
+    let mut jacket = material::jacket(book, color, ink, physics.tilt.x, seed, width);
     jacket.push(egui::Shape::line_segment(
         [
             book.left_top() + egui::vec2(2.0, 1.5),
@@ -305,15 +287,15 @@ fn cover_impl(
     ));
     jacket.push(egui::Shape::line_segment(
         [
-            egui::pos2(book.left() + 12.0, book.top() + 2.0),
-            egui::pos2(book.left() + 12.0, book.bottom() - 2.0),
+            egui::pos2(book.left() + book.width() * 0.085, book.top() + 2.0),
+            egui::pos2(book.left() + book.width() * 0.085, book.bottom() - 2.0),
         ],
         Stroke::new(1.8, Color32::from_black_alpha(40)),
     ));
     jacket.push(egui::Shape::line_segment(
         [
-            book.min + egui::vec2(10.0, 2.0),
-            Pos2::new(book.left() + 10.0, book.bottom() - 2.0),
+            book.min + egui::vec2(book.width() * 0.07, 2.0),
+            Pos2::new(book.left() + book.width() * 0.07, book.bottom() - 2.0),
         ],
         Stroke::new(1.0, Color32::from_white_alpha(26)),
     ));
@@ -577,14 +559,20 @@ fn cover_impl(
         }
     }
     if selected {
-        painter.rect_stroke(
-            book.expand(4.0),
-            6.0,
+        let edge = book.expand(4.0);
+        painter.add(egui::Shape::closed_line(
+            [
+                edge.left_top(),
+                edge.right_top(),
+                edge.right_bottom(),
+                edge.left_bottom(),
+            ]
+            .map(project)
+            .to_vec(),
             Stroke::new(1.5, palette.accent),
-            StrokeKind::Outside,
-        );
+        ));
         painter.circle_filled(
-            book.right_top() + egui::vec2(-10.0, 12.0),
+            project(book.right_top() + egui::vec2(-10.0, 12.0)),
             5.0,
             palette.accent,
         );

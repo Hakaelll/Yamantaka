@@ -150,6 +150,7 @@ Beauty comes from physical coherence and clear hierarchy: connected book geometr
 **Key Characteristics:**
 
 - Physical cover volumes with independent, readable catalogue labels.
+- Sculpted spine light, recessed hinges and fixed cloth weave attached to the book plane; projected selection follows the same volume.
 - Neutral graphite or warm paper; violet for action, selection and focus.
 - Local Segoe interface type paired with editorial document lettering.
 - Drawn vector controls with separate focus, pressed and selected states.

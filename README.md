@@ -13,7 +13,7 @@ No account is required. Documents and library data stay on your computer. The pr
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.
 
 <p align="center">
-  <img src="docs/screenshots/rust-reading-feature/library-dark.png" alt="Native Yamantaka library with procedural 3D book covers and an editorial continue-reading feature" width="1100" />
+  <img src="docs/screenshots/rust-bound-cloth/library-dark.png" alt="Native Yamantaka library with cloth-bound 3D book covers and an editorial continue-reading feature" width="1100" />
 </p>
 
 *Native Windows capture of an isolated synthetic study collection. The capture demonstrates the current gallery; it is not a photograph of a personal library or proof of complete feature parity.*
