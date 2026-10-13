@@ -1,0 +1,546 @@
+{
+  "synthetic": true,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Duplicate current reading",
+      "rect": [
+        228.40625,
+        8.40625,
+        268.40625,
+        48.40625
+      ],
+      "clip": [
+        18.0,
+        0.0,
+        1422.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Library",
+      "rect": [
+        18.0,
+        74.0,
+        111.84375,
+        114.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Previous page",
+      "rect": [
+        474.84375,
+        76.0,
+        514.84375,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Next page",
+      "rect": [
+        638.375,
+        76.0,
+        678.375,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom out",
+      "rect": [
+        702.375,
+        76.0,
+        742.375,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom in",
+      "rect": [
+        808.5625,
+        76.0,
+        848.5625,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Fit page",
+      "rect": [
+        858.5625,
+        76.0,
+        898.5625,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Navigator",
+      "rect": [
+        1309.125,
+        76.0,
+        1422.0,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reading options",
+      "rect": [
+        1259.125,
+        76.0,
+        1299.125,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reading",
+      "rect": [
+        1011.8125,
+        131.0,
+        1090.03125,
+        171.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Layout",
+      "rect": [
+        1100.03125,
+        131.0,
+        1169.375,
+        171.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Positions",
+      "rect": [
+        1179.375,
+        131.0,
+        1262.4375,
+        171.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Select text",
+      "rect": [
+        1012.0,
+        196.8125,
+        1103.75,
+        236.8125
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Whole page",
+      "rect": [
+        1012.0,
+        290.40625,
+        1114.65625,
+        330.40625
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Page width",
+      "rect": [
+        1012.0,
+        340.40625,
+        1108.3125,
+        380.40625
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom out",
+      "rect": [
+        1012.0,
+        434.0,
+        1052.0,
+        474.0
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom in",
+      "rect": [
+        1125.28125,
+        434.0,
+        1165.28125,
+        474.0
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Light",
+      "rect": [
+        1012.0,
+        484.0,
+        1134.0,
+        532.0
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Ivory",
+      "rect": [
+        1144.0,
+        484.0,
+        1266.0,
+        532.0
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Sepia",
+      "rect": [
+        1012.0,
+        542.0,
+        1134.0,
+        590.0
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Gray",
+      "rect": [
+        1144.0,
+        542.0,
+        1266.0,
+        590.0
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Dark",
+      "rect": [
+        1012.0,
+        600.0,
+        1134.0,
+        648.0
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Black",
+      "rect": [
+        1144.0,
+        600.0,
+        1266.0,
+        648.0
+      ],
+      "clip": [
+        0.0,
+        197.0,
+        1440.0,
+        932.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Open external link…",
+      "rect": [
+        488.75,
+        254.625,
+        747.75,
+        273.125
+      ],
+      "clip": [
+        0.0,
+        152.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "documentFind": null,
+  "documentLinks": {
+    "residentPages": 1,
+    "readyPages": 1,
+    "internalLinks": 0,
+    "externalLinks": 1,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 0,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 0,
+      "text": "",
+      "tag": "",
+      "kind": null,
+      "review": null
+    },
+    "resident": 0,
+    "total": 0,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "residentPages": 1,
+    "readyPages": 1,
+    "marks": 0
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": false,
+    "count": 0,
+    "artifact": null
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 0,
+    "resident": 0,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": false,
+    "documents": 0
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": false,
+    "preferences": {
+      "document": "demo-0",
+      "zoom": 1.0,
+      "layout": "single",
+      "mode": "document",
+      "theme": "ivory",
+      "scroll": 0.0
+    }
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Off",
+    "pending": null,
+    "active": "e8263e5c-30b5-4468-820c-937e0d0f03a8",
+    "tabs": [
+      {
+        "id": "e8263e5c-30b5-4468-820c-937e0d0f03a8",
+        "document": "demo-0",
+        "page": 0,
+        "pinned": false,
+        "zoom": 1.0,
+        "zoomMode": "fitPage",
+        "rotation": 0,
+        "horizontalMargin": 32.0,
+        "verticalMargin": 24.0,
+        "scroll": 0.0
+      }
+    ]
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 0,
+  "readerZoom": 1.0,
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 7388640,
+    "pages": 7355608,
+    "tiles": 0,
+    "text": 32856,
+    "other": 176,
+    "cpu": 4824540,
+    "gpu": 2564100,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."
+}

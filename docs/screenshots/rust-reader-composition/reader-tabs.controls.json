@@ -1,0 +1,330 @@
+{
+  "synthetic": true,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Duplicate current reading",
+      "rect": [
+        648.40625,
+        9.90625,
+        688.40625,
+        49.90625
+      ],
+      "clip": [
+        18.0,
+        0.0,
+        1422.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Library",
+      "rect": [
+        18.0,
+        77.0,
+        111.84375,
+        117.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Previous page",
+      "rect": [
+        474.84375,
+        79.0,
+        514.84375,
+        119.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Next page",
+      "rect": [
+        638.375,
+        79.0,
+        678.375,
+        119.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Zoom out",
+      "rect": [
+        702.375,
+        79.0,
+        742.375,
+        119.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom in",
+      "rect": [
+        791.96875,
+        79.0,
+        831.96875,
+        119.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Fit page",
+      "rect": [
+        841.96875,
+        79.0,
+        881.96875,
+        119.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Navigator",
+      "rect": [
+        1309.125,
+        79.0,
+        1422.0,
+        119.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reading options",
+      "rect": [
+        1259.125,
+        79.0,
+        1299.125,
+        119.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "documentFind": null,
+  "documentLinks": {
+    "residentPages": 1,
+    "readyPages": 1,
+    "internalLinks": 0,
+    "externalLinks": 0,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 0,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 0,
+      "text": "",
+      "tag": "",
+      "kind": null,
+      "review": null
+    },
+    "resident": 0,
+    "total": 0,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "residentPages": 1,
+    "readyPages": 1,
+    "marks": 0
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": false,
+    "count": 0,
+    "artifact": null
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 0,
+    "resident": 0,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": false,
+    "documents": 0
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": false,
+    "preferences": {
+      "document": "demo-0",
+      "zoom": 1.75,
+      "layout": "continuous",
+      "mode": "document",
+      "theme": "sepia",
+      "scroll": 1500.0
+    }
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Complete",
+    "pending": null,
+    "active": "84694af0-4881-4431-928c-4abef95332f5",
+    "tabs": [
+      {
+        "id": "c51f0346-caf5-4032-a59a-c4b13432fce6",
+        "document": "demo-1",
+        "page": 0,
+        "pinned": true,
+        "zoom": 1.0,
+        "zoomMode": "fitWidth",
+        "rotation": 90,
+        "horizontalMargin": 31.0,
+        "verticalMargin": 24.0,
+        "scroll": 24.0
+      },
+      {
+        "id": "84694af0-4881-4431-928c-4abef95332f5",
+        "document": "demo-0",
+        "page": 1,
+        "pinned": false,
+        "zoom": 1.75,
+        "zoomMode": "custom",
+        "rotation": 0,
+        "horizontalMargin": 32.0,
+        "verticalMargin": 24.0,
+        "scroll": 1500.0
+      },
+      {
+        "id": "e5114e31-1835-47f7-80cf-e6cd953171d9",
+        "document": "demo-1",
+        "page": 0,
+        "pinned": false,
+        "zoom": 1.0,
+        "zoomMode": "fitWidth",
+        "rotation": 90,
+        "horizontalMargin": 31.0,
+        "verticalMargin": 24.0,
+        "scroll": 0.0
+      }
+    ]
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 1,
+  "readerZoom": 1.75,
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 27292776,
+    "pages": 27260408,
+    "tiles": 0,
+    "text": 32192,
+    "other": 176,
+    "cpu": 18108776,
+    "gpu": 9184000,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."
+}

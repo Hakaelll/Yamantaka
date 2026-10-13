@@ -205,10 +205,10 @@ impl YamantakaApp {
                 ) {
                     ui.painter().add(
                         egui::epaint::Shadow {
-                            offset: [0, 5],
-                            blur: 18,
+                            offset: [0, 3],
+                            blur: 12,
                             spread: 0,
-                            color: Color32::from_black_alpha(72),
+                            color: Color32::from_black_alpha(32),
                         }
                         .as_shape(paper, 1),
                     );
