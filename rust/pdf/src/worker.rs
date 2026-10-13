@@ -59,6 +59,13 @@ struct InspectInfo {
     author: Option<String>,
 }
 enum Request {
+    DetectCover {
+        id: String,
+        path: PathBuf,
+        generation: u64,
+        cancel: Cancellation,
+        reply: Reply<yamantaka_domain::cover_policy::DetectedCover>,
+    },
     Cover {
         id: String,
         path: PathBuf,
@@ -135,7 +142,8 @@ enum Request {
 impl Request {
     fn document_id(&self) -> Option<&str> {
         match self {
-            Self::Cover { id, .. }
+            Self::DetectCover { id, .. }
+            | Self::Cover { id, .. }
             | Self::Open { id, .. }
             | Self::Inspect { id, .. }
             | Self::Text { id, .. }
@@ -152,7 +160,7 @@ impl Request {
         match self {
             Self::Shutdown | Self::Close { .. } => 0,
             Self::Open { .. } | Self::Inspect { .. } => 1,
-            Self::Cover { .. } => 7,
+            Self::Cover { .. } | Self::DetectCover { .. } => 7,
             Self::Render { priority, .. } => 2 + *priority as u8,
             Self::Text { .. }
             | Self::Outline { .. }
@@ -382,6 +390,23 @@ fn stopped() -> Failure {
     Failure::Pdf("PDF worker stopped".into())
 }
 impl AsyncPdfEngine for PdfWorker {
+    fn try_detect_cover(
+        &self,
+        id: String,
+        path: PathBuf,
+        generation: u64,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<yamantaka_domain::cover_policy::DetectedCover>> {
+        let (reply, ticket) = self.reply(0, cancel.clone(), false)?;
+        self.enqueue(Request::DetectCover {
+            id,
+            path,
+            generation,
+            cancel,
+            reply,
+        })?;
+        Ok(ticket)
+    }
     fn set_visible_documents(&self, ids: &[String]) -> Result<()> {
         if ids.len() > MAX_HOT_DOCUMENTS || ids.iter().any(|id| id.is_empty()) {
             return Err(Failure::Invalid("Invalid visible PDF set".into()));
@@ -597,6 +622,7 @@ fn fail_request(request: Request) {
             reply.send(Err(Failure::Cancelled))
         }
         Request::Cover { reply, .. } => reply.send(Err(Failure::Cancelled)),
+        Request::DetectCover { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Text { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Outline { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::FindPage { reply, .. } => reply.send(Err(Failure::Cancelled)),
@@ -690,6 +716,30 @@ fn run(
             0
         };
         match request {
+            Request::DetectCover {
+                id,
+                path,
+                generation,
+                cancel,
+                reply,
+            } => {
+                let result = if cancel.is_cancelled() {
+                    Err(Failure::Cancelled)
+                } else if !documents.contains_key(&id) && documents.len() >= MAX_HOT_DOCUMENTS {
+                    Err(hot_slots_protected())
+                } else {
+                    crate::cover_detection::detect(
+                        pdfium,
+                        documents.get(&id),
+                        &id,
+                        &path,
+                        generation,
+                        &cancel,
+                        &governor,
+                    )
+                };
+                reply.send(result);
+            }
             Request::Cover {
                 id,
                 path,

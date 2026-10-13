@@ -60,6 +60,17 @@ impl<T> PdfTicket<T> {
     }
 }
 pub trait AsyncPdfEngine: PdfEngine {
+    fn try_detect_cover(
+        &self,
+        _id: String,
+        _path: PathBuf,
+        _generation: u64,
+        _cancel: Cancellation,
+    ) -> Result<PdfTicket<crate::cover_policy::DetectedCover>> {
+        Err(crate::Failure::Unsupported(
+            "Automatic PDF cover selection".into(),
+        ))
+    }
     fn try_cover(
         &self,
         _id: String,

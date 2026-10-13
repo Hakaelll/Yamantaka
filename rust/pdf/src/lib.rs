@@ -1,6 +1,7 @@
 //! PDFium calls are owned by one worker; no PDFium handle crosses threads.
 mod bindings;
 mod cache;
+mod cover_detection;
 mod covers;
 mod destination;
 mod find;
