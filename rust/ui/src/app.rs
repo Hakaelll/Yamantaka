@@ -1,6 +1,9 @@
 mod annotations;
 mod bookmarks;
 mod compact;
+mod cover_picker;
+mod cover_picker_preview;
+mod cover_picker_view;
 mod details;
 mod find;
 mod global_notes;
@@ -138,6 +141,8 @@ pub struct YamantakaApp {
     outline: outline::OutlineState,
     thumbnails: thumbnails::ThumbnailState,
     library_covers: library_covers::LibraryCovers,
+    cover_picker: Option<cover_picker::CoverPicker>,
+    cover_picker_demo: cover_picker_preview::CoverPickerDemo,
     thumbnail_preview_page: Option<u32>,
     outline_preview_target: Option<usize>,
     reader_destination: Option<(
@@ -305,6 +310,8 @@ impl YamantakaApp {
             outline: Default::default(),
             thumbnails: Default::default(),
             library_covers: Default::default(),
+            cover_picker: None,
+            cover_picker_demo: Default::default(),
             thumbnail_preview_page: None,
             outline_preview_target: None,
             reader_destination: None,
@@ -483,6 +490,14 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        if self
+            .cover_picker
+            .as_ref()
+            .is_some_and(|picker| picker.saving.is_some())
+        {
+            return;
+        }
+        self.cover_picker = None;
         if !matches!(surface, Surface::Reader) {
             self.tabs.leave_destination();
             self.restoration.clear();
@@ -1287,6 +1302,14 @@ impl App for YamantakaApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
+        if self
+            .cover_picker
+            .as_ref()
+            .is_some_and(|picker| picker.saving.is_some())
+            && ctx.input(|input| input.viewport().close_requested())
+        {
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+        }
         self.observe_reading_session(ctx);
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.begin_frame()
@@ -1465,8 +1488,14 @@ impl App for YamantakaApp {
                         .accept(&id, page, &cancel, Err(error.to_string()));
                 }
                 Update::Cover(id, result, cancel) => {
-                    self.accept_library_cover(ctx, &id, result, &cancel)
+                    if !self.accept_cover_picker_image(&id, &result, &cancel) {
+                        self.accept_library_cover(ctx, &id, result, &cancel);
+                    }
                 }
+                Update::CoverSourcePage(id, result, cancel) => {
+                    self.accept_cover_source_page(&id, result, &cancel)
+                }
+                Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::TextGeometry(id, payload, cancel) => {
                     self.selection
@@ -1699,6 +1728,7 @@ impl App for YamantakaApp {
                 Update::ReaderContinuity(reply) => self.accept_reader_continuity(reply),
             }
         }
+        self.advance_cover_picker_preview();
         self.advance_replacement_preview();
         self.advance_tab_preview();
         self.advance_bulk_tab_preview();
@@ -1896,7 +1926,10 @@ impl App for YamantakaApp {
                         );
                     });
                 }
-                if matches!(self.surface, Surface::Library) && self.inspector {
+                if matches!(self.surface, Surface::Library)
+                    && self.inspector
+                    && self.cover_picker.is_none()
+                {
                     egui::Panel::bottom("document-details")
                         .default_size(148.0)
                         .size_range(80.0..=ui.ctx().content_rect().height().max(160.0) * 0.5)
@@ -1905,6 +1938,9 @@ impl App for YamantakaApp {
                 egui::CentralPanel::default()
                     .frame(egui::Frame::new().fill(p.canvas))
                     .show(ui, |ui| match self.surface {
+                        Surface::Library if self.cover_picker.is_some() => {
+                            self.cover_picker_view(ui)
+                        }
                         Surface::Library => self.library(ui),
                         Surface::Reader => self.reader(ui),
                         Surface::Settings => self.settings(ui),
@@ -1956,6 +1992,8 @@ impl App for YamantakaApp {
                     && self.restoration.ready()
                     && (!matches!(self.surface, Surface::Library) || !self.inspector || self.goals.ready())
                     && self.library_covers.slots_ready()
+                    && self.cover_picker_capture_ready()
+                    && self.cover_picker.as_ref().is_none_or(|picker|picker.capture_ready())
                     && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     // The compact drawer hides the PDF, so it has no visible marks to request.
                     && (!matches!(self.surface, Surface::Reader)
@@ -2029,11 +2067,13 @@ impl App for YamantakaApp {
                     let controls=ctx.data(|data|data.get_temp::<Vec<theme::ControlBounds>>(egui::Id::new("capture-controls")).unwrap_or_default());
                     let controls:Vec<_>=controls.into_iter().map(|item|serde_json::json!({"label":item.label,"rect":rect(item.rect),"clip":rect(item.clip),"enabled":item.enabled})).collect();
                     let usage = self.governor.usage();
-                    let record=serde_json::json!({"synthetic":self.demo,"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
+                    let record=serde_json::json!({"synthetic":self.demo,"captureProcessId":std::process::id(),"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
                         "readingSession":self.session_capture_summary(),
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),
                         "libraryCovers":self.cover_summary(),
+                        "coverPicker":self.cover_picker_summary(),
+                        "coverPickerDemo":self.cover_picker_demo_summary(),
                         "documentFind":self.find.capture_summary(),
                         "documentLinks":self.links.capture_summary(),
                         "pageText": if self.selection.enabled { self.selection.text_state(self.page).map(text::TextState::capture_summary) } else { Some(self.text.capture_summary()) },

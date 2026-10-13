@@ -8,7 +8,7 @@
 
 Yamantaka brings your documents into a personal library, keeps your reading context close, and stores your work locally. The native Rust rewrite pairs a gallery of physical 3D book covers with a focused PDF reader, warm paper environments, and a consistent desktop interface.
 
-The native library renders PDF imagery on its 3D books and honors saved source-page choices, including manual cover selections copied from Flutter. [Cover selection verification](docs/validation/rust-saved-cover-page-2026-10-13.md) records the current behavior and the remaining work on the interactive picker and persistent cache.
+The native library renders PDF imagery on its 3D books and honors saved source-page choices, including manual selections copied from Flutter. Open a document's details and choose **Choose cover** to preview another PDF page and save it as the cover. The original PDF stays unchanged. [Cover picker verification](docs/validation/rust-cover-picker-2026-10-13.md) records preview, saving, cancellation and recovery checks. Automatic candidate scoring and the persistent thumbnail cache remain pending.
 
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 

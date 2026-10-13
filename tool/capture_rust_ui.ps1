@@ -9,6 +9,12 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='cover-picker-dark'; args=@('--pdf-covers','--cover-picker') },
+    @{ name='cover-picker-light-es'; args=@('--pdf-covers','--cover-picker','--light','--es','--reduce-motion') },
+    @{ name='cover-picker-saved'; args=@('--pdf-covers','--cover-picker-save','--details') },
+    @{ name='cover-picker-cancelled'; args=@('--pdf-covers','--cover-picker-cancel','--details') },
+    @{ name='cover-picker-failed-save'; args=@('--pdf-covers','--cover-picker-failed-save') },
+    @{ name='cover-picker-small-200'; args=@('--pdf-covers','--cover-picker','--size=640x480','--text-scale=2') },
     @{ name='pdf-saved-cover-page'; args=@('--pdf-covers','--saved-cover-page','--details') },
     @{ name='pdf-saved-cover-page-es'; args=@('--pdf-covers','--saved-cover-page','--details','--light','--es','--reduce-motion') },
     @{ name='pdf-covers-dark'; args=@('--pdf-covers') },

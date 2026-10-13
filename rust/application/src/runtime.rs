@@ -34,6 +34,9 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    CoverSourcePage(String, Cancellation),
+    PreviewCover(String, PathBuf, u32, u64, Cancellation),
+    SaveManualCover(Box<crate::manual_cover::ManualCoverRequest>),
     Cover(String, PathBuf, u64, Cancellation),
     ReaderContinuity(Box<ContinuityRequest>),
     ReadingHistory(Box<ReadingHistoryRequest>),
@@ -89,6 +92,8 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    CoverSourcePage(String, Result<Option<u32>>, Cancellation),
+    ManualCover(crate::manual_cover::ManualCoverReply),
     Cover(String, Result<Arc<RenderedPage>>, Cancellation),
     ReaderContinuity(ContinuityReply),
     ReaderClosed(ReaderCloseReply),
@@ -741,6 +746,17 @@ impl Runtime {
                                         }
                                     }
                                 },
+                                Action::CoverSourcePage(id, cancel) => {
+                                    let result = cancel.check().and_then(|_| repository.cover_source_page(&id)).and_then(|page| { cancel.check()?; Ok(page) });
+                                    emit(&events,&notify,Update::CoverSourcePage(id,result,cancel),permit);
+                                }
+                                Action::SaveManualCover(request) => emit(&events,&notify,Update::ManualCover(request.execute(&mut repository)),permit),
+                                Action::PreviewCover(id,path,page,generation,cancel) => {
+                                    match engine.try_cover(id.clone(),path,page,generation,cancel.clone()) {
+                                        Ok(ticket) => pending.push(Pending::Cover(id,ticket,permit)),
+                                        Err(error) => emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
+                                    }
+                                }
                                 Action::Cover(id, path, generation, cancel) => {
                                     let ticket = cancel.check()
                                         .and_then(|_| repository.cover_source_page(&id))

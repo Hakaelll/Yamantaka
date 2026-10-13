@@ -69,6 +69,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let mut db = if capture.is_some()
             && args.iter().any(|arg| {
                 arg == "--export-json"
+                    || arg == "--cover-picker-save"
+                    || arg == "--cover-picker-cancel"
+                    || arg == "--cover-picker-failed-save"
                     || arg == "--sessions-preview"
                     || arg == "--export-markdown"
                     || arg == "--global-notes-export-json"
@@ -137,6 +140,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             };
             let title = title.replace('\'', "''");
             db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,reading_progress,last_page_index) VALUES('demo-{index}','{path}','demo-{index}','fixture.pdf','{title}','{author}',2,900,'2026-10-08','2026-10-08','2026-10-08','synthetic',{},0)",if index==0{0.5}else{0.0}))?;
+        }
+        if args.iter().any(|arg| arg == "--cover-picker-failed-save") {
+            db.execute_batch("CREATE TRIGGER synthetic_cover_rejection BEFORE INSERT ON document_covers BEGIN SELECT RAISE(ABORT,'synthetic cover save rejection'); END;")?;
         }
         if args.iter().any(|arg| arg == "--saved-cover-page") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',1,'','','2026-10-13T00:00:00Z','2026-10-08',1,'manual',1,'contain',0.75);")?;
@@ -361,6 +367,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args.iter().any(|arg| arg == "--cover-picker") {
+                    app.preview_cover_editor("open");
+                }
+                if args.iter().any(|arg| arg == "--cover-picker-save") {
+                    app.preview_cover_editor("save");
+                }
+                if args.iter().any(|arg| arg == "--cover-picker-cancel") {
+                    app.preview_cover_editor("cancel");
+                }
+                if args.iter().any(|arg| arg == "--cover-picker-failed-save") {
+                    app.preview_cover_editor("failed-save");
+                }
                 if args.iter().any(|arg| arg == "--tabs-close-others") {
                     app.preview_bulk_tab_close(false);
                 }

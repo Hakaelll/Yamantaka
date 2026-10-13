@@ -22,7 +22,7 @@ foreach ($capture in $manifest.captures) {
     $originPath = Join-Path $destinationPath "$($capture.name).origin.txt"
     @"
 Origin: native screenshot of the Yamantaka Rust executable, not an AI-generated image.
-Captured with tool/capture_rust_ui.ps1; isolated in-memory synthetic study collection; PDF source is the repository's generated acceptance fixture. No personal library was opened.
+Captured with tool/capture_rust_ui.ps1; isolated synthetic study collection; PDF source is the repository's generated acceptance fixture. Write scenarios may use an isolated file-backed synthetic store. No personal library was opened.
 Case: $($capture.name)
 Arguments: $($capture.args -join ' ')
 Capture UTC: $($manifest.capturedAtUtc)

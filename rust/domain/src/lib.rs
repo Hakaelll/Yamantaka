@@ -1,6 +1,7 @@
 //! UI and FFI independent contracts and persisted domain semantics.
 pub mod annotations;
 pub mod bookmarks;
+pub mod cover_selection;
 pub mod external_uri;
 pub mod memory;
 pub mod outline;
@@ -178,6 +179,9 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn save_manual_cover(&mut self, _choice: &cover_selection::ManualCover) -> Result<()> {
+        Err(Failure::Unsupported("Manual PDF cover selection".into()))
+    }
     fn cover_source_page(&self, _document_id: &str) -> Result<Option<u32>> {
         Ok(None)
     }

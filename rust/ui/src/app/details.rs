@@ -117,6 +117,22 @@ impl YamantakaApp {
                                     ));
                                     self.refresh();
                                 }
+                                if ui
+                                    .add_enabled_ui(!document.missing, |ui| {
+                                        theme::control(
+                                            ui,
+                                            self.tr("Elegir portada", "Choose cover"),
+                                            None,
+                                            false,
+                                            false,
+                                            p,
+                                        )
+                                    })
+                                    .inner
+                                    .clicked()
+                                {
+                                    self.begin_cover_picker(document.clone());
+                                }
                                 if theme::navigation(ui, "Explorer", false, p).clicked()
                                     && let Err(error) = yamantaka_windows::reveal(&document.path)
                                 {
