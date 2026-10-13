@@ -117,7 +117,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             ("The Geometry of Silence", "Study collection"),
         ];
         for (index, (title, author)) in names.iter().enumerate() {
-            let path = fixture.to_string_lossy().replace('\'', "''");
+            let cover_fixture = args.iter().any(|arg| arg == "--pdf-covers").then(|| {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
+                    "../../build/rust-fixtures/covers/cover-{index}.pdf"
+                ))
+            });
+            let document_path = cover_fixture.as_ref().unwrap_or(&fixture).canonicalize()?;
+            let path = document_path.to_string_lossy().replace('\'', "''");
             let title = if index == 0
                 && args.iter().any(|arg| {
                     arg == "--outline"

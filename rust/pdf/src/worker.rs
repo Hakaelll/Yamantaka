@@ -59,6 +59,13 @@ struct InspectInfo {
     author: Option<String>,
 }
 enum Request {
+    Cover {
+        id: String,
+        path: PathBuf,
+        generation: u64,
+        cancel: Cancellation,
+        reply: Reply<Arc<RenderedPage>>,
+    },
     Open {
         id: String,
         epoch: u64,
@@ -127,7 +134,8 @@ enum Request {
 impl Request {
     fn document_id(&self) -> Option<&str> {
         match self {
-            Self::Open { id, .. }
+            Self::Cover { id, .. }
+            | Self::Open { id, .. }
             | Self::Inspect { id, .. }
             | Self::Text { id, .. }
             | Self::Outline { id, .. }
@@ -143,6 +151,7 @@ impl Request {
         match self {
             Self::Shutdown | Self::Close { .. } => 0,
             Self::Open { .. } | Self::Inspect { .. } => 1,
+            Self::Cover { .. } => 7,
             Self::Render { priority, .. } => 2 + *priority as u8,
             Self::Text { .. }
             | Self::Outline { .. }
@@ -394,6 +403,23 @@ impl AsyncPdfEngine for PdfWorker {
         })?;
         Ok(ticket)
     }
+    fn try_cover(
+        &self,
+        id: String,
+        path: PathBuf,
+        generation: u64,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<RenderedPage>>> {
+        let (reply, ticket) = self.reply(0, cancel.clone(), false)?;
+        self.enqueue(Request::Cover {
+            id,
+            path,
+            generation,
+            cancel,
+            reply,
+        })?;
+        Ok(ticket)
+    }
     fn try_render(
         &self,
         key: RenderKey,
@@ -552,6 +578,7 @@ fn fail_request(request: Request) {
         Request::Open { reply, .. } | Request::Inspect { reply, .. } => {
             reply.send(Err(Failure::Cancelled))
         }
+        Request::Cover { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Text { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Outline { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::FindPage { reply, .. } => reply.send(Err(Failure::Cancelled)),
@@ -644,6 +671,30 @@ fn run(
             0
         };
         match request {
+            Request::Cover {
+                id,
+                path,
+                generation,
+                cancel,
+                reply,
+            } => {
+                let result = if cancel.is_cancelled() {
+                    Err(Failure::Cancelled)
+                } else if !documents.contains_key(&id) && documents.len() >= MAX_HOT_DOCUMENTS {
+                    Err(hot_slots_protected())
+                } else {
+                    super::covers::render(
+                        pdfium,
+                        documents.get(&id),
+                        id.clone(),
+                        &path,
+                        generation,
+                        &cancel,
+                        &governor,
+                    )
+                };
+                reply.send(result);
+            }
             Request::Shutdown => {
                 let pending = std::mem::take(&mut scheduler.lock().unwrap().queue);
                 for request in pending {

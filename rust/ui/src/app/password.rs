@@ -229,6 +229,21 @@ mod tests {
             matches!(runtime.updates.recv_timeout(Duration::from_secs(5)).unwrap(),
             Update::Opened(doc, info, _) if doc.id == "protected" && !info.pages.is_empty())
         );
+        let cover_token = Cancellation::default();
+        runtime
+            .submit(Action::Cover(
+                "protected".into(),
+                path.clone(),
+                99,
+                cover_token.clone(),
+            ))
+            .unwrap();
+        assert!(
+            matches!(runtime.updates.recv_timeout(Duration::from_secs(5)).unwrap(),
+            Update::Cover(id, Ok(page), token) if id == "protected"
+                && page.key.generation == 99 && page.height == 512
+                && token.same_request(&cover_token))
+        );
         runtime
             .submit(Action::Text("protected".into(), 0, Cancellation::default()))
             .unwrap();

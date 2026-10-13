@@ -1,5 +1,65 @@
 use eframe::egui::{self, Color32, Rect, Shape, Stroke};
 
+pub(super) fn pdf_spine(points: [egui::Pos2; 4], cover: &super::PdfCover) -> Shape {
+    let mut mesh = egui::epaint::Mesh::with_texture(cover.texture);
+    for (pos, uv) in points.into_iter().zip([
+        egui::pos2(0.0, 0.0),
+        egui::pos2(0.035, 0.0),
+        egui::pos2(0.035, 1.0),
+        egui::pos2(0.0, 1.0),
+    ]) {
+        mesh.vertices.push(egui::epaint::Vertex {
+            pos,
+            uv,
+            color: Color32::from_gray(160),
+        });
+    }
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    Shape::mesh(mesh)
+}
+
+pub(super) fn pdf_jacket(book: Rect, cover: super::PdfCover) -> Vec<Shape> {
+    let aspect = cover.size[0] as f32 / cover.size[1] as f32;
+    let target = book.width() / book.height();
+    let (left, right, bottom) = if aspect > target {
+        let span = target / aspect;
+        ((1.0 - span) * 0.5, (1.0 + span) * 0.5, 1.0)
+    } else {
+        (0.0, 1.0, aspect / target)
+    };
+    let mut mesh = egui::epaint::Mesh::with_texture(cover.texture);
+    for row in 0..=12 {
+        for column in 0..=8 {
+            let x = column as f32 / 8.0;
+            let y = row as f32 / 12.0;
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: book.min + book.size() * egui::vec2(x, y),
+                uv: egui::pos2(left + (right - left) * x, bottom * y),
+                color: Color32::WHITE,
+            });
+        }
+    }
+    for row in 0..12 {
+        for column in 0..8 {
+            let a = row * 9 + column;
+            mesh.add_triangle(a, a + 1, a + 10);
+            mesh.add_triangle(a, a + 10, a + 9);
+        }
+    }
+    let hinge = book.left() + book.width() * 0.085;
+    vec![
+        Shape::mesh(mesh),
+        Shape::line_segment(
+            [
+                egui::pos2(hinge, book.top()),
+                egui::pos2(hinge, book.bottom()),
+            ],
+            Stroke::new(1.3, Color32::from_black_alpha(42)),
+        ),
+    ]
+}
+
 /// Bound cloth, hinge and edge light share the jacket plane and rigid projection.
 pub(super) fn jacket(
     book: Rect,

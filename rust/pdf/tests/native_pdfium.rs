@@ -97,6 +97,87 @@ fn hash(path: &std::path::Path) -> String {
 }
 
 #[test]
+fn pdf_covers_are_bounded_cancellable_and_preserve_active_readers_and_originals() {
+    let engine = engine();
+    let path = fixture("textual.pdf");
+    let before = hash(&path);
+    engine
+        .open("reader".into(), path.clone(), None, Cancellation::default())
+        .unwrap();
+    engine.set_visible_documents(&["reader".into()]).unwrap();
+    let cover = engine
+        .try_cover("cover".into(), path.clone(), 7, Cancellation::default())
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(cover.key.document_id, "cover");
+    assert_eq!(cover.key.generation, 7);
+    assert_eq!(cover.key.page, 0);
+    assert_eq!(cover.height, 512);
+    assert!(cover.width > 0 && cover.width <= 512);
+    assert_eq!(
+        cover.pixels().len(),
+        cover.width as usize * cover.height as usize * 4
+    );
+    assert!(cover.pixels().chunks_exact(4).any(|pixel| pixel[0] < 180));
+    assert!(
+        !engine
+            .text("reader".into(), 0, Cancellation::default())
+            .unwrap()
+            .is_empty()
+    );
+    let cancel = Cancellation::default();
+    cancel.cancel();
+    assert!(matches!(
+        engine
+            .try_cover("cancelled".into(), path.clone(), 8, cancel)
+            .unwrap()
+            .wait(),
+        Err(Failure::Cancelled)
+    ));
+    assert!(matches!(
+        engine
+            .try_cover(
+                "protected".into(),
+                fixture("protected.pdf"),
+                9,
+                Cancellation::default()
+            )
+            .unwrap()
+            .wait(),
+        Err(Failure::PasswordRequired)
+    ));
+    engine
+        .open("second".into(), path.clone(), None, Cancellation::default())
+        .unwrap();
+    engine
+        .set_visible_documents(&["reader".into(), "second".into()])
+        .unwrap();
+    assert!(
+        engine
+            .try_cover("third".into(), path.clone(), 10, Cancellation::default())
+            .unwrap()
+            .wait()
+            .is_err()
+    );
+    let reused = engine
+        .try_cover("reader".into(), path.clone(), 11, Cancellation::default())
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(reused.key.generation, 11);
+    assert!(
+        !engine
+            .text("second".into(), 0, Cancellation::default())
+            .unwrap()
+            .is_empty()
+    );
+    engine.close("reader".into()).unwrap();
+    engine.close("second".into()).unwrap();
+    assert_eq!(hash(&path), before);
+}
+
+#[test]
 fn native_text_vectors_scans_rotation_password_damage_and_5000_pages() {
     let engine = engine();
     let cancel = Cancellation::default();

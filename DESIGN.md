@@ -151,6 +151,7 @@ Beauty comes from physical coherence and clear hierarchy: connected book geometr
 
 - Physical cover volumes with independent, readable catalogue labels.
 - Sculpted spine light, recessed hinges and fixed cloth weave attached to the book plane; projected selection follows the same volume.
+- Available PDF imagery is mounted on the physical cover and spine. Procedural jackets provide the fallback; native WGPU first-page extraction is verified in the [PDF cover checkpoint](docs/validation/rust-pdf-covers-2026-10-13.md).
 - Neutral graphite or warm paper; violet for action, selection and focus.
 - Local Segoe interface type paired with editorial document lettering.
 - Drawn vector controls with separate focus, pressed and selected states.

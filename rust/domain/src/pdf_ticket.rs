@@ -60,6 +60,15 @@ impl<T> PdfTicket<T> {
     }
 }
 pub trait AsyncPdfEngine: PdfEngine {
+    fn try_cover(
+        &self,
+        _id: String,
+        _path: PathBuf,
+        _generation: u64,
+        _cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<RenderedPage>>> {
+        Err(crate::Failure::Unsupported("PDF cover".into()))
+    }
     /// Atomically replace the visible reader set (at most two distinct IDs).
     /// This only changes scheduler metadata: it never waits for native work.
     /// Protected handles must not be evicted by background opens.

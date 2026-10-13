@@ -7,6 +7,17 @@ use yamantaka_domain::Document;
 
 mod material;
 
+#[derive(Clone)]
+pub(crate) struct PdfCover {
+    pub texture: egui::TextureId,
+    pub size: [u32; 2],
+    pub path: std::path::PathBuf,
+    pub fingerprint: String,
+}
+pub(crate) fn cover_id(id: &str) -> egui::Id {
+    egui::Id::new(("pdf-cover-surface", id))
+}
+
 #[derive(Clone, Copy, Default)]
 pub struct BookPhysics {
     tilt: Vec2,
@@ -151,6 +162,15 @@ fn cover_impl(
             .data_mut(|data| data.remove::<BookPhysics>(response.id));
         return response;
     }
+    ui.ctx().data_mut(|data| {
+        let mut requests = data
+            .get_temp::<Vec<Document>>(egui::Id::new("pdf-cover-requests"))
+            .unwrap_or_default();
+        if requests.len() < 16 && !requests.iter().any(|doc| doc.id == document.id) {
+            requests.push(document.clone());
+        }
+        data.insert_temp(egui::Id::new("pdf-cover-requests"), requests);
+    });
     let book = Rect::from_min_size(
         rect.min + egui::vec2(11.0, 10.0),
         Vec2::new(width - 20.0, height - 14.0),
@@ -186,6 +206,10 @@ fn cover_impl(
     }
     ui.ctx()
         .data_mut(|data| data.insert_temp(response.id, physics));
+    let pdf_cover = ui
+        .ctx()
+        .data(|data| data.get_temp::<PdfCover>(cover_id(&document.id)))
+        .filter(|cover| cover.path == document.path && cover.fingerprint == document.fingerprint);
     let depth = (width * 0.13).clamp(12.0, 30.0);
     let project = |point| physics.project(point, depth * 0.5, book);
     let painter = ui.painter();
@@ -267,282 +291,288 @@ fn cover_impl(
             Stroke::new(0.45, Color32::from_rgb(152, 146, 131)),
         );
     }
-    polygon(
-        painter,
-        vec![
-            back(book.left_top()),
-            project(book.left_top()),
-            project(book.left_bottom()),
-            back(book.left_bottom()),
-        ],
-        color.gamma_multiply(0.48),
-    );
-    let mut jacket = material::jacket(book, color, ink, physics.tilt.x, seed, width);
-    jacket.push(egui::Shape::line_segment(
-        [
-            book.left_top() + egui::vec2(2.0, 1.5),
-            book.right_top() + egui::vec2(-1.0, 1.5),
-        ],
-        Stroke::new(1.1, Color32::from_white_alpha(44)),
-    ));
-    jacket.push(egui::Shape::line_segment(
-        [
-            egui::pos2(book.left() + book.width() * 0.085, book.top() + 2.0),
-            egui::pos2(book.left() + book.width() * 0.085, book.bottom() - 2.0),
-        ],
-        Stroke::new(1.8, Color32::from_black_alpha(40)),
-    ));
-    jacket.push(egui::Shape::line_segment(
-        [
-            book.min + egui::vec2(book.width() * 0.07, 2.0),
-            Pos2::new(book.left() + book.width() * 0.07, book.bottom() - 2.0),
-        ],
-        Stroke::new(1.0, Color32::from_white_alpha(26)),
-    ));
-    let small = width < 170.0;
-    let titleless = width <= 60.0;
-    let miniature = width < 110.0;
-    let inner = book.shrink(if titleless {
-        3.0
-    } else if miniature {
-        7.0
-    } else if small {
-        14.0
+    let spine = [
+        back(book.left_top()),
+        project(book.left_top()),
+        project(book.left_bottom()),
+        back(book.left_bottom()),
+    ];
+    if let Some(cover) = &pdf_cover {
+        painter.add(material::pdf_spine(spine, cover));
     } else {
-        22.0
-    });
-    let family = seed % 6;
-    let (title_region, art_region, author_region) = jacket_regions(
-        inner,
-        family,
-        !small && document.author.is_some(),
-        titleless,
-    );
-    if !titleless {
-        let family_font = if matches!(family, 0 | 3 | 5) {
-            "Jacket"
-        } else {
-            "Editorial"
-        };
-        let mut size = (width * if matches!(family, 1 | 4) { 0.115 } else { 0.10 }).clamp(
-            if miniature {
-                7.0
-            } else if small {
-                11.0
-            } else {
-                13.0
-            },
-            if family == 3 { 27.0 } else { 25.0 },
-        );
-        let title = loop {
-            let mut job = egui::text::LayoutJob::simple(
-                document.display_title().to_owned(),
-                FontId::new(size, egui::FontFamily::Name(family_font.into())),
-                ink,
-                title_region.width(),
-            );
-            job.wrap.max_rows = 3;
-            job.wrap.overflow_character = Some('…');
-            let galley = painter.layout_job(job);
-            if galley.size().y <= title_region.height()
-                || size
-                    <= if miniature {
-                        7.0
-                    } else if small {
-                        10.0
-                    } else {
-                        12.0
-                    }
-            {
-                break galley;
-            }
-            size -= 1.0;
-        };
-        let x = if family == 5 {
-            title_region.center().x - title.size().x * 0.5
-        } else if family == 1 {
-            title_region.right() - title.size().x
-        } else {
-            title_region.left()
-        };
-        let y = if family == 2 {
-            title_region.center().y - title.size().y * 0.5
-        } else {
-            title_region.top()
-        };
-        jacket.push(egui::Shape::galley(egui::pos2(x, y), title, ink));
+        polygon(painter, spine.to_vec(), color.gamma_multiply(0.48));
     }
-    let art_height = art_region.height();
-    let center = art_region.center();
-    let radius =
-        (art_region.width() * if family == 1 { 0.47 } else { 0.38 }).min(art_height * 0.43);
-    let art = ink.gamma_multiply(0.78);
-    let foil = Color32::from_rgb(201, 168, 117);
-    let line = |a, b| egui::Shape::line_segment([a, b], Stroke::new(1.0, art));
-    match family {
-        0 => {
-            jacket.push(egui::Shape::circle_filled(
-                center,
-                radius * 0.85,
-                color.lerp_to_gamma(foil, 0.38),
-            ));
-            for n in 0..6 {
-                let c = center + egui::vec2((n as f32 - 2.5) * art_region.width() * 0.022, 0.0);
-                let points = (0..96)
-                    .map(|n| {
-                        let angle = n as f32 * std::f32::consts::TAU / 96.0;
-                        c + egui::vec2(angle.cos(), angle.sin()) * radius
-                    })
-                    .collect();
-                jacket.push(egui::Shape::closed_line(points, Stroke::new(0.85, foil)));
-            }
+    let jacket = if let Some(cover) = pdf_cover {
+        material::pdf_jacket(book, cover)
+    } else {
+        let mut jacket = material::jacket(book, color, ink, physics.tilt.x, seed, width);
+        jacket.push(egui::Shape::line_segment(
+            [
+                book.left_top() + egui::vec2(2.0, 1.5),
+                book.right_top() + egui::vec2(-1.0, 1.5),
+            ],
+            Stroke::new(1.1, Color32::from_white_alpha(44)),
+        ));
+        jacket.push(egui::Shape::line_segment(
+            [
+                egui::pos2(book.left() + book.width() * 0.085, book.top() + 2.0),
+                egui::pos2(book.left() + book.width() * 0.085, book.bottom() - 2.0),
+            ],
+            Stroke::new(1.8, Color32::from_black_alpha(40)),
+        ));
+        jacket.push(egui::Shape::line_segment(
+            [
+                book.min + egui::vec2(book.width() * 0.07, 2.0),
+                Pos2::new(book.left() + book.width() * 0.07, book.bottom() - 2.0),
+            ],
+            Stroke::new(1.0, Color32::from_white_alpha(26)),
+        ));
+        let small = width < 170.0;
+        let titleless = width <= 60.0;
+        let miniature = width < 110.0;
+        let inner = book.shrink(if titleless {
+            3.0
+        } else if miniature {
+            7.0
+        } else if small {
+            14.0
+        } else {
+            22.0
+        });
+        let family = seed % 6;
+        let (title_region, art_region, author_region) = jacket_regions(
+            inner,
+            family,
+            !small && document.author.is_some(),
+            titleless,
+        );
+        if !titleless {
+            let family_font = if matches!(family, 0 | 3 | 5) {
+                "Jacket"
+            } else {
+                "Editorial"
+            };
+            let mut size = (width * if matches!(family, 1 | 4) { 0.115 } else { 0.10 }).clamp(
+                if miniature {
+                    7.0
+                } else if small {
+                    11.0
+                } else {
+                    13.0
+                },
+                if family == 3 { 27.0 } else { 25.0 },
+            );
+            let title = loop {
+                let mut job = egui::text::LayoutJob::simple(
+                    document.display_title().to_owned(),
+                    FontId::new(size, egui::FontFamily::Name(family_font.into())),
+                    ink,
+                    title_region.width(),
+                );
+                job.wrap.max_rows = 3;
+                job.wrap.overflow_character = Some('…');
+                let galley = painter.layout_job(job);
+                if galley.size().y <= title_region.height()
+                    || size
+                        <= if miniature {
+                            7.0
+                        } else if small {
+                            10.0
+                        } else {
+                            12.0
+                        }
+                {
+                    break galley;
+                }
+                size -= 1.0;
+            };
+            let x = if family == 5 {
+                title_region.center().x - title.size().x * 0.5
+            } else if family == 1 {
+                title_region.right() - title.size().x
+            } else {
+                title_region.left()
+            };
+            let y = if family == 2 {
+                title_region.center().y - title.size().y * 0.5
+            } else {
+                title_region.top()
+            };
+            jacket.push(egui::Shape::galley(egui::pos2(x, y), title, ink));
         }
-        1 => {
-            let r = radius;
-            let points = [
-                center + egui::vec2(0.0, -r),
-                center + egui::vec2(r, 0.0),
-                center + egui::vec2(0.0, r),
-                center + egui::vec2(-r, 0.0),
-            ]
-            .into_iter()
-            .collect();
-            jacket.push(egui::Shape::closed_line(points, Stroke::new(1.0, art)));
-            jacket.push(line(
-                center + egui::vec2(0.0, -r),
-                center + egui::vec2(0.0, r),
-            ));
-            jacket.push(egui::Shape::convex_polygon(
-                vec![
+        let art_height = art_region.height();
+        let center = art_region.center();
+        let radius =
+            (art_region.width() * if family == 1 { 0.47 } else { 0.38 }).min(art_height * 0.43);
+        let art = ink.gamma_multiply(0.78);
+        let foil = Color32::from_rgb(201, 168, 117);
+        let line = |a, b| egui::Shape::line_segment([a, b], Stroke::new(1.0, art));
+        match family {
+            0 => {
+                jacket.push(egui::Shape::circle_filled(
+                    center,
+                    radius * 0.85,
+                    color.lerp_to_gamma(foil, 0.38),
+                ));
+                for n in 0..6 {
+                    let c = center + egui::vec2((n as f32 - 2.5) * art_region.width() * 0.022, 0.0);
+                    let points = (0..96)
+                        .map(|n| {
+                            let angle = n as f32 * std::f32::consts::TAU / 96.0;
+                            c + egui::vec2(angle.cos(), angle.sin()) * radius
+                        })
+                        .collect();
+                    jacket.push(egui::Shape::closed_line(points, Stroke::new(0.85, foil)));
+                }
+            }
+            1 => {
+                let r = radius;
+                let points = [
                     center + egui::vec2(0.0, -r),
                     center + egui::vec2(r, 0.0),
                     center + egui::vec2(0.0, r),
-                ],
-                foil.gamma_multiply(0.88),
-                Stroke::NONE,
-            ));
-            jacket.push(egui::Shape::convex_polygon(
-                vec![
-                    center + egui::vec2(0.0, -r),
                     center + egui::vec2(-r, 0.0),
-                    center + egui::vec2(0.0, r),
-                ],
-                color.gamma_multiply(0.65),
-                Stroke::new(0.8, foil),
-            ));
-        }
-        2 => {
-            let a = radius * 0.85;
-            let top = center - egui::vec2(0.0, a);
-            let left = center - egui::vec2(a, 0.0);
-            let right = center + egui::vec2(a, 0.0);
-            let bottom = center + egui::vec2(0.0, a);
-            jacket.push(egui::Shape::convex_polygon(
-                vec![top, left, center, right],
-                Color32::from_rgb(198, 185, 147),
-                Stroke::NONE,
-            ));
-            jacket.push(egui::Shape::convex_polygon(
-                vec![left, center, bottom],
-                Color32::from_rgb(128, 136, 104),
-                Stroke::NONE,
-            ));
-            for (a, b) in [
-                (top, left),
-                (top, right),
-                (left, center),
-                (right, center),
-                (center, bottom),
-                (left, bottom),
-                (right, bottom),
-            ] {
-                jacket.push(line(a, b));
-            }
-        }
-        3 => {
-            let r = Rect::from_center_size(
-                center,
-                egui::vec2(art_region.width() * 0.94, art_height * 0.90),
-            );
-            for n in 0..4 {
-                let left = r.left() + r.width() * n as f32 / 4.0;
-                jacket.push(egui::Shape::rect_filled(
-                    Rect::from_min_max(
-                        egui::pos2(left, r.top()),
-                        egui::pos2(left + r.width() / 4.0 - 2.0, r.bottom()),
-                    ),
-                    0.0,
-                    foil.gamma_multiply(0.35 + n as f32 * 0.15),
-                ));
-            }
-        }
-        4 => {
-            for n in 0..9 {
-                let points = (0..48)
-                    .map(|sample| {
-                        let t = sample as f32 / 47.0;
-                        center
-                            + egui::vec2(
-                                (t - 0.5) * art_region.width() * 0.98,
-                                (n as f32 - 4.0) * art_height / 14.0
-                                    + (t * std::f32::consts::PI * 1.4 + n as f32 * 0.13).sin()
-                                        * art_height
-                                        * 0.16,
-                            )
-                    })
-                    .collect();
-                jacket.push(egui::Shape::line(
-                    points,
-                    Stroke::new(
-                        if n % 3 == 0 { 2.0 } else { 0.8 },
-                        if n % 3 == 0 { foil } else { art },
-                    ),
-                ));
-            }
-        }
-        _ => {
-            jacket.push(egui::Shape::circle_filled(
-                center,
-                radius * 0.38,
-                color.lerp_to_gamma(foil, 0.5),
-            ));
-            for n in 0..16 {
-                let angle = n as f32 * std::f32::consts::TAU / 16.0;
+                ]
+                .into_iter()
+                .collect();
+                jacket.push(egui::Shape::closed_line(points, Stroke::new(1.0, art)));
                 jacket.push(line(
-                    center + egui::vec2(angle.cos(), angle.sin()) * radius * 0.43,
-                    center + egui::vec2(angle.cos(), angle.sin()) * radius,
+                    center + egui::vec2(0.0, -r),
+                    center + egui::vec2(0.0, r),
+                ));
+                jacket.push(egui::Shape::convex_polygon(
+                    vec![
+                        center + egui::vec2(0.0, -r),
+                        center + egui::vec2(r, 0.0),
+                        center + egui::vec2(0.0, r),
+                    ],
+                    foil.gamma_multiply(0.88),
+                    Stroke::NONE,
+                ));
+                jacket.push(egui::Shape::convex_polygon(
+                    vec![
+                        center + egui::vec2(0.0, -r),
+                        center + egui::vec2(-r, 0.0),
+                        center + egui::vec2(0.0, r),
+                    ],
+                    color.gamma_multiply(0.65),
+                    Stroke::new(0.8, foil),
                 ));
             }
-            jacket.push(egui::Shape::circle_stroke(
-                center,
-                radius * 0.43,
-                Stroke::new(1.0, foil),
+            2 => {
+                let a = radius * 0.85;
+                let top = center - egui::vec2(0.0, a);
+                let left = center - egui::vec2(a, 0.0);
+                let right = center + egui::vec2(a, 0.0);
+                let bottom = center + egui::vec2(0.0, a);
+                jacket.push(egui::Shape::convex_polygon(
+                    vec![top, left, center, right],
+                    Color32::from_rgb(198, 185, 147),
+                    Stroke::NONE,
+                ));
+                jacket.push(egui::Shape::convex_polygon(
+                    vec![left, center, bottom],
+                    Color32::from_rgb(128, 136, 104),
+                    Stroke::NONE,
+                ));
+                for (a, b) in [
+                    (top, left),
+                    (top, right),
+                    (left, center),
+                    (right, center),
+                    (center, bottom),
+                    (left, bottom),
+                    (right, bottom),
+                ] {
+                    jacket.push(line(a, b));
+                }
+            }
+            3 => {
+                let r = Rect::from_center_size(
+                    center,
+                    egui::vec2(art_region.width() * 0.94, art_height * 0.90),
+                );
+                for n in 0..4 {
+                    let left = r.left() + r.width() * n as f32 / 4.0;
+                    jacket.push(egui::Shape::rect_filled(
+                        Rect::from_min_max(
+                            egui::pos2(left, r.top()),
+                            egui::pos2(left + r.width() / 4.0 - 2.0, r.bottom()),
+                        ),
+                        0.0,
+                        foil.gamma_multiply(0.35 + n as f32 * 0.15),
+                    ));
+                }
+            }
+            4 => {
+                for n in 0..9 {
+                    let points = (0..48)
+                        .map(|sample| {
+                            let t = sample as f32 / 47.0;
+                            center
+                                + egui::vec2(
+                                    (t - 0.5) * art_region.width() * 0.98,
+                                    (n as f32 - 4.0) * art_height / 14.0
+                                        + (t * std::f32::consts::PI * 1.4 + n as f32 * 0.13).sin()
+                                            * art_height
+                                            * 0.16,
+                                )
+                        })
+                        .collect();
+                    jacket.push(egui::Shape::line(
+                        points,
+                        Stroke::new(
+                            if n % 3 == 0 { 2.0 } else { 0.8 },
+                            if n % 3 == 0 { foil } else { art },
+                        ),
+                    ));
+                }
+            }
+            _ => {
+                jacket.push(egui::Shape::circle_filled(
+                    center,
+                    radius * 0.38,
+                    color.lerp_to_gamma(foil, 0.5),
+                ));
+                for n in 0..16 {
+                    let angle = n as f32 * std::f32::consts::TAU / 16.0;
+                    jacket.push(line(
+                        center + egui::vec2(angle.cos(), angle.sin()) * radius * 0.43,
+                        center + egui::vec2(angle.cos(), angle.sin()) * radius,
+                    ));
+                }
+                jacket.push(egui::Shape::circle_stroke(
+                    center,
+                    radius * 0.43,
+                    Stroke::new(1.0, foil),
+                ));
+            }
+        }
+        if let (Some(author), Some(region)) = (&document.author, author_region) {
+            let mut job = egui::text::LayoutJob::simple(
+                author.clone(),
+                FontId::proportional((width * 0.06).clamp(12.0, 14.0)),
+                ink,
+                region.width(),
+            );
+            job.wrap.max_rows = 1;
+            job.wrap.overflow_character = Some('…');
+            let galley = painter.layout_job(job);
+            let x = if family == 1 {
+                region.right() - galley.size().x
+            } else if family == 5 {
+                region.center().x - galley.size().x * 0.5
+            } else {
+                region.left()
+            };
+            jacket.push(egui::Shape::galley(
+                egui::pos2(x, region.top()),
+                galley,
+                ink,
             ));
         }
-    }
-    if let (Some(author), Some(region)) = (&document.author, author_region) {
-        let mut job = egui::text::LayoutJob::simple(
-            author.clone(),
-            FontId::proportional((width * 0.06).clamp(12.0, 14.0)),
-            ink,
-            region.width(),
-        );
-        job.wrap.max_rows = 1;
-        job.wrap.overflow_character = Some('…');
-        let galley = painter.layout_job(job);
-        let x = if family == 1 {
-            region.right() - galley.size().x
-        } else if family == 5 {
-            region.center().x - galley.size().x * 0.5
-        } else {
-            region.left()
-        };
-        jacket.push(egui::Shape::galley(
-            egui::pos2(x, region.top()),
-            galley,
-            ink,
-        ));
-    }
+        jacket
+    };
     let shapes = jacket
         .into_iter()
         .map(|shape| egui::epaint::ClippedShape {

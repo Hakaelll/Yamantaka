@@ -6,6 +6,7 @@ mod find;
 mod global_notes;
 mod goals;
 mod history;
+mod library_covers;
 mod library_intro;
 mod links;
 mod list;
@@ -136,6 +137,7 @@ pub struct YamantakaApp {
     pub find_preview_closed: bool,
     outline: outline::OutlineState,
     thumbnails: thumbnails::ThumbnailState,
+    library_covers: library_covers::LibraryCovers,
     thumbnail_preview_page: Option<u32>,
     outline_preview_target: Option<usize>,
     reader_destination: Option<(
@@ -302,6 +304,7 @@ impl YamantakaApp {
             find_preview_closed: false,
             outline: Default::default(),
             thumbnails: Default::default(),
+            library_covers: Default::default(),
             thumbnail_preview_page: None,
             outline_preview_target: None,
             reader_destination: None,
@@ -1461,6 +1464,9 @@ impl App for YamantakaApp {
                     self.links
                         .accept(&id, page, &cancel, Err(error.to_string()));
                 }
+                Update::Cover(id, result, cancel) => {
+                    self.accept_library_cover(ctx, &id, result, &cancel)
+                }
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::TextGeometry(id, payload, cancel) => {
                     self.selection
@@ -1910,6 +1916,7 @@ impl App for YamantakaApp {
         });
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
+        self.pump_library_covers(&ctx);
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = !self.documents.is_empty()
@@ -1948,6 +1955,7 @@ impl App for YamantakaApp {
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     && self.restoration.ready()
                     && (!matches!(self.surface, Surface::Library) || !self.inspector || self.goals.ready())
+                    && self.library_covers.slots_ready()
                     && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     // The compact drawer hides the PDF, so it has no visible marks to request.
                     && (!matches!(self.surface, Surface::Reader)
@@ -2025,6 +2033,7 @@ impl App for YamantakaApp {
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
                         "readingSession":self.session_capture_summary(),
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),
+                        "libraryCovers":self.cover_summary(),
                         "documentFind":self.find.capture_summary(),
                         "documentLinks":self.links.capture_summary(),
                         "pageText": if self.selection.enabled { self.selection.text_state(self.page).map(text::TextState::capture_summary) } else { Some(self.text.capture_summary()) },

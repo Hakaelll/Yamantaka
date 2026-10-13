@@ -34,6 +34,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    Cover(String, PathBuf, u64, Cancellation),
     ReaderContinuity(Box<ContinuityRequest>),
     ReadingHistory(Box<ReadingHistoryRequest>),
     TrimReadingHistory(usize, Cancellation),
@@ -88,6 +89,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    Cover(String, Result<Arc<RenderedPage>>, Cancellation),
     ReaderContinuity(ContinuityReply),
     ReaderClosed(ReaderCloseReply),
     ReadingHistory(ReadingHistoryReply),
@@ -200,6 +202,7 @@ struct ImportState {
     permit: Permit,
 }
 enum Pending {
+    Cover(String, PdfTicket<Arc<RenderedPage>>, Permit),
     FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(PdfTicket<Arc<RenderedPage>>, Permit),
@@ -239,7 +242,7 @@ impl Pending {
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
-            Self::Render(ticket, _) => {
+            Self::Cover(_, ticket, _) | Self::Render(ticket, _) => {
                 select.recv(ticket.readiness());
             }
             Self::Text(_, _, ticket, _) => {
@@ -266,7 +269,7 @@ impl Pending {
         match self {
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
-            Self::Render(ticket, _) => ticket.is_ready(),
+            Self::Cover(_, ticket, _) | Self::Render(ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
             Self::Outline(_, ticket, _) => ticket.is_ready(),
             Self::FindPage(_, ticket, _) => ticket.is_ready(),
@@ -281,7 +284,7 @@ impl Pending {
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
-            Self::Render(ticket, _) => ticket.cancellation.cancel(),
+            Self::Cover(_, ticket, _) | Self::Render(ticket, _) => ticket.cancellation.cancel(),
             Self::Text(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::Outline(_, ticket, _) => ticket.cancellation.cancel(),
             Self::FindPage(_, ticket, _) => ticket.cancellation.cancel(),
@@ -738,6 +741,12 @@ impl Runtime {
                                         }
                                     }
                                 },
+                                Action::Cover(id, path, generation, cancel) => {
+                                    match engine.try_cover(id.clone(), path, generation, cancel.clone()) {
+                                        Ok(ticket) => pending.push(Pending::Cover(id, ticket, permit)),
+                                        Err(error) => emit(&events, &notify, Update::Cover(id, Err(error), cancel), permit),
+                                    }
+                                }
                                 Action::Render(key, priority, cancel) => {
                                     match engine.try_render(key, priority, cancel.clone())
                                     {
@@ -860,6 +869,11 @@ impl Runtime {
                                         emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit);
                                     }
                                 }
+                            }
+                            Pending::Cover(id, ticket, permit) => {
+                                let cancel = ticket.cancellation.clone();
+                                let result = ticket.wait().and_then(|page| { cancel.check()?; Ok(page) });
+                                emit(&events, &notify, Update::Cover(id, result, cancel), permit);
                             }
                             Pending::Render(ticket, permit) => {
                                 let cancel = ticket.cancellation.clone();
