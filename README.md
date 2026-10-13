@@ -10,6 +10,8 @@ Yamantaka brings your documents into a personal library, keeps your reading cont
 
 The native library renders PDF imagery on its 3D books and honors saved source-page choices, including manual selections copied from Flutter. Without a stored choice, it [scores the first six pages and saves an automatic selection](docs/validation/rust-automatic-cover-2026-10-13.md). Open a document's details and choose **Choose cover** to preview another PDF page and save it as the cover. The original PDF stays unchanged. [Cover picker verification](docs/validation/rust-cover-picker-2026-10-13.md) records preview, saving, cancellation and recovery checks. A [bounded disk cache](docs/validation/rust-cover-cache-2026-10-13.md) reuses native cover pixels across worker restarts. Automatic decision invalidation, small/large thumbnail parity and cache cleanup controls remain pending.
 
+The picker also includes **Restore automatic cover**, which recomputes a selection while keeping the saved choice until replacement succeeds. A newer choice or a failed write prevents replacement. [Restoration verification](docs/validation/rust-cover-restore-2026-10-13.md) records transaction, race, recovery and native presentation checks.
+
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.

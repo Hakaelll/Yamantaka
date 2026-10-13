@@ -43,6 +43,10 @@ impl YamantakaApp {
                     .is_some_and(|picker| picker.ready())
                 {
                     match action {
+                        "restore" | "failed-restore" => {
+                            self.restore_cover_picker();
+                            self.cover_picker_demo.stage = 3;
+                        }
                         "save" | "failed-save" => {
                             self.save_cover_picker();
                             self.cover_picker_demo.stage = 3;
@@ -59,7 +63,7 @@ impl YamantakaApp {
                 || self
                     .cover_picker
                     .as_ref()
-                    .is_some_and(|picker| picker.save_failed) =>
+                    .is_some_and(|picker| picker.save_failed || picker.restore_failed) =>
             {
                 self.cover_picker_demo.stage = 4;
             }

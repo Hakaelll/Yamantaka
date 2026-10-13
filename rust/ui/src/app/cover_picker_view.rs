@@ -7,6 +7,7 @@ struct PickerActions {
     save: bool,
     changed: bool,
     retry: bool,
+    restore: bool,
 }
 
 impl YamantakaApp {
@@ -152,20 +153,27 @@ impl YamantakaApp {
         }
         let retry_read = actions.retry && !picker.loaded;
         let retry_save = actions.retry && picker.save_failed;
+        let retry_restore = actions.retry && picker.restore_failed;
+        let reload_committed = retry_restore && picker.restore_committed;
         let document = picker.document.clone();
-        if retry_save {
+        if retry_save || retry_restore {
             picker.error = None;
         }
         self.cover_picker = Some(picker);
-        if retry_read {
+        if retry_read || reload_committed {
             self.begin_cover_picker(document);
         } else if retry_save {
             self.save_cover_picker();
+        } else if retry_restore {
+            self.restore_cover_picker();
         } else if actions.changed || actions.retry {
             self.preview_cover_picker();
         }
         if actions.save {
             self.save_cover_picker();
+        }
+        if actions.restore {
+            self.restore_cover_picker();
         }
     }
 
@@ -312,10 +320,12 @@ impl YamantakaApp {
                     "Abre y desbloquea el PDF en el lector antes de elegir su portada.",
                     "Open and unlock the PDF in the reader before choosing its cover.",
                 )
+            } else if picker.restore_committed {
+                self.tr("La portada automática se guardó, pero no se pudo mostrar. Reintenta la vista previa.","The automatic cover was saved, but could not be displayed. Retry the preview.")
             } else {
                 self.tr(
-                    "No se pudo completar el cambio. Tu portada anterior se conserva.",
-                    "The change could not be completed. Your previous cover is preserved.",
+                    "No se pudo completar el cambio. La portada guardada se conserva.",
+                    "The change could not be completed. The saved cover is preserved.",
                 )
             };
             ui.label(message);
@@ -340,7 +350,11 @@ impl YamantakaApp {
                     theme::control(
                         ui,
                         if busy {
-                            self.tr("Guardando…", "Saving…")
+                            if picker.restoring {
+                                self.tr("Restaurando…", "Restoring…")
+                            } else {
+                                self.tr("Guardando…", "Saving…")
+                            }
                         } else {
                             self.tr("Usar como portada", "Use as cover")
                         },
@@ -359,5 +373,19 @@ impl YamantakaApp {
                 .inner
                 .clicked();
         });
+        ui.add_space(8.0);
+        actions.restore |= ui
+            .add_enabled_ui(picker.ready() && !actions.changed, |ui| {
+                theme::control(
+                    ui,
+                    self.tr("Restaurar portada automática", "Restore automatic cover"),
+                    None,
+                    false,
+                    false,
+                    p,
+                )
+            })
+            .inner
+            .clicked();
     }
 }

@@ -1,0 +1,10 @@
+Origin: native screenshot of the Yamantaka Rust executable, not an AI-generated image.
+Captured with tool/capture_rust_ui.ps1; isolated synthetic study collection; PDF source is the repository's generated acceptance fixture. Write scenarios may use an isolated file-backed synthetic store. No personal library was opened.
+Case: cover-restore-controls
+Arguments: --demo --pdf-covers --automatic-cover --automatic-cover-manual --cover-picker
+Capture UTC: 10/13/2026 17:03:51
+Executable SHA-256: 6505B43D419A23464742B012430EE9DE7A183C2D47BC3DA912BB40656292629A
+Original PNG SHA-256: 967357A5966FDDFD3B273FC34B6CD9FB78B36157BE867D5B341F8B578B270005
+Logical viewport: 0, 0, 1440, 960
+Pixels per logical point: 1.25
+See capture-manifest.json for exact source hashes and conditions. These captures do not certify physical monitor DPI, Narrator, full functional parity or whole-rewrite acceptance.

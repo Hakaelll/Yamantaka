@@ -123,7 +123,7 @@ impl YamantakaApp {
             "pending":self.library_covers.slots.values().filter(|slot| !slot.finished).count(),
             "source":"PDF selected page","sourcePages":self.library_covers.slots.iter().filter_map(|(id,slot)| slot.source_page.map(|page|(id.clone(),page))).collect::<std::collections::BTreeMap<_,_>>(),"maximumVisible":16})
     }
-    pub(super) fn install_saved_cover(
+    pub(super) fn install_selected_cover(
         &mut self,
         ctx: &egui::Context,
         document: &Document,
@@ -163,6 +163,12 @@ impl YamantakaApp {
                 source_page: Some(page),
             },
         );
+    }
+    pub(super) fn invalidate_library_cover(&mut self, ctx: &egui::Context, id: &str) {
+        if let Some(slot) = self.library_covers.slots.remove(id) {
+            slot.cancel.cancel();
+        }
+        ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(id)));
     }
 }
 

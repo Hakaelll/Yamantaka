@@ -8,6 +8,9 @@ pub(super) struct CoverPicker {
     pub(super) generation: u64,
     pub(super) loaded: bool,
     pub(super) save_failed: bool,
+    pub(super) restore_failed: bool,
+    pub(super) restore_committed: bool,
+    pub(super) restoring: bool,
     pub(super) loading: Option<Cancellation>,
     pub(super) preview: Option<Cancellation>,
     pub(super) saving: Option<Cancellation>,
@@ -65,6 +68,9 @@ impl YamantakaApp {
             saving: None,
             loaded: false,
             save_failed: false,
+            restore_failed: false,
+            restore_committed: false,
+            restoring: false,
             image: None,
             image_page: None,
             aspect: None,
@@ -84,6 +90,8 @@ impl YamantakaApp {
         }
         picker.error = None;
         picker.save_failed = false;
+        picker.restore_failed = false;
+        picker.restore_committed = false;
         let Some(generation) = picker.generation.checked_add(1) else {
             return;
         };
@@ -132,10 +140,14 @@ impl YamantakaApp {
     }
     pub(super) fn accept_cover_picker_image(
         &mut self,
+        ctx: &egui::Context,
         id: &str,
         result: &yamantaka_domain::Result<Arc<RenderedPage>>,
         cancel: &Cancellation,
     ) -> bool {
+        if self.accept_restored_cover(ctx, id, result, cancel) {
+            return true;
+        }
         let Some(picker) = &mut self.cover_picker else {
             return false;
         };
@@ -226,7 +238,7 @@ impl YamantakaApp {
                 self.cover_picker_demo.saved = true;
                 let mut picker = self.cover_picker.take().unwrap();
                 if let (Some(image), Some(aspect)) = (picker.image.take(), picker.aspect) {
-                    self.install_saved_cover(ctx, &picker.document, picker.page, aspect, image);
+                    self.install_selected_cover(ctx, &picker.document, picker.page, aspect, image);
                 }
             }
             Err(error) => {

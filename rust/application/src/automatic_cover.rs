@@ -31,5 +31,26 @@ pub(crate) fn complete(
     }
 }
 
+pub(crate) fn restore(
+    repository: &mut impl LibraryRepository,
+    document: Document,
+    generation: u64,
+    detected: DetectedCover,
+    expected: Option<yamantaka_domain::cover_revision::CoverRevision>,
+) -> Result<Arc<RenderedPage>> {
+    if detected.image.key.generation != generation {
+        return Err(Failure::Invalid("Stale automatic cover generation".into()));
+    }
+    let choice = AutomaticCover::new(document, detected.choice, &detected.image)?;
+    if !repository.replace_automatic_cover(&choice, expected)? {
+        return Err(Failure::Invalid(
+            "Cover changed while restoring; reopen the picker".into(),
+        ));
+    }
+    Ok(detected.image)
+}
+
+#[cfg(test)]
+mod restore_tests;
 #[cfg(test)]
 mod tests;

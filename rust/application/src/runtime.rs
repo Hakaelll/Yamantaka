@@ -34,6 +34,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    RestoreAutomaticCover(String, PathBuf, u64, Cancellation),
     CoverSourcePage(String, Cancellation),
     PreviewCover(String, PathBuf, u32, u64, Cancellation),
     SaveManualCover(Box<crate::manual_cover::ManualCoverRequest>),
@@ -207,6 +208,13 @@ struct ImportState {
     permit: Permit,
 }
 enum Pending {
+    RestoreCover(
+        Document,
+        u64,
+        Option<yamantaka_domain::cover_revision::CoverRevision>,
+        PdfTicket<yamantaka_domain::cover_policy::DetectedCover>,
+        Permit,
+    ),
     AutomaticCover(
         Document,
         u64,
@@ -247,7 +255,7 @@ enum Pending {
 impl Pending {
     fn register<'a>(&'a self, select: &mut Select<'a>) {
         match self {
-            Self::AutomaticCover(_, _, ticket, _) => {
+            Self::AutomaticCover(_, _, ticket, _) | Self::RestoreCover(_, _, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
             Self::FindDocument(scan, _) => {
@@ -281,7 +289,9 @@ impl Pending {
     }
     fn ready(&self) -> bool {
         match self {
-            Self::AutomaticCover(_, _, ticket, _) => ticket.is_ready(),
+            Self::AutomaticCover(_, _, ticket, _) | Self::RestoreCover(_, _, _, ticket, _) => {
+                ticket.is_ready()
+            }
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
             Self::Cover(_, ticket, _) | Self::Render(ticket, _) => ticket.is_ready(),
@@ -295,7 +305,9 @@ impl Pending {
     }
     fn cancel(&self) {
         match self {
-            Self::AutomaticCover(_, _, ticket, _) => ticket.cancellation.cancel(),
+            Self::AutomaticCover(_, _, ticket, _) | Self::RestoreCover(_, _, _, ticket, _) => {
+                ticket.cancellation.cancel()
+            }
             Self::FindDocument(scan, _) => scan.request.cancellation.cancel(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
@@ -840,6 +852,20 @@ impl Runtime {
                                     Ok(ticket) => pending.push(Pending::Outline(id, ticket, permit)),
                                     Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
                                 },
+                                Action::RestoreAutomaticCover(id,path,generation,cancel) => {
+                                    let started=cancel.check().and_then(|_|repository.get(&id)).and_then(|document| {
+                                        let document=document.ok_or_else(||Failure::Invalid("Cover document no longer exists".into()))?;
+                                        if document.path!=path || document.missing {return Err(Failure::Invalid("Cover source changed or is missing".into()));}
+                                        let expected=repository.cover_revision(&id)?;
+                                        cancel.check()?;
+                                        let ticket=engine.try_detect_cover(id.clone(),path,generation,cancel.clone())?;
+                                        Ok((document,expected,ticket))
+                                    });
+                                    match started {
+                                        Ok((document,expected,ticket))=>pending.push(Pending::RestoreCover(document,generation,expected,ticket,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
+                                    }
+                                },
                                 Action::Close(request) => {
                                     let valid=request.cancel.check().and_then(|()|if request.document.is_empty() {Err(Failure::Invalid("Reader close requires a document identity".into()))}else{Ok(())});
                                     if let Err(error)=valid {emit(&events,&notify,Update::ReaderClosed(request.reply(Err(error))),permit);continue;}
@@ -918,6 +944,12 @@ impl Runtime {
                                 let cancel = ticket.cancellation.clone();
                                 let result = ticket.wait().and_then(|page| { cancel.check()?; Ok(page) });
                                 emit(&events, &notify, Update::Cover(id, result, cancel), permit);
+                            }
+                            Pending::RestoreCover(document,generation,expected,ticket,permit) => {
+                                let cancel=ticket.cancellation.clone();
+                                let id=document.id.clone();
+                                let result=ticket.wait().and_then(|detected| {cancel.check()?;crate::automatic_cover::restore(&mut repository,document,generation,detected,expected)});
+                                emit(&events,&notify,Update::Cover(id,result,cancel),permit);
                             }
                             Pending::AutomaticCover(document,generation,ticket,permit) => {
                                 let cancel=ticket.cancellation.clone();

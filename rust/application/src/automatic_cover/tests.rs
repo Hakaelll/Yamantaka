@@ -18,7 +18,7 @@ use yamantaka_domain::{
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
 use yamantaka_storage::{Database, cover_cache::CoverCache};
 
-fn setup(path: &Path) -> (Database, Document, PathBuf, PathBuf) {
+pub(super) fn setup(path: &Path) -> (Database, Document, PathBuf, PathBuf) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let pdf = root
         .join("build/rust-fixtures/automatic-cover.pdf")
@@ -31,23 +31,23 @@ fn setup(path: &Path) -> (Database, Document, PathBuf, PathBuf) {
     let doc = db.get("auto").unwrap().unwrap();
     (db, doc, pdf, dll)
 }
-fn selection(path: &Path) -> Option<(u32, String, u32, f64)> {
+pub(super) fn selection(path: &Path) -> Option<(u32, String, u32, f64)> {
     use rusqlite::OptionalExtension;
     let db =
         rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
             .unwrap();
     db.query_row("SELECT source_page_index,selection_mode,algorithm_version,confidence FROM document_covers WHERE document_id='auto'",[],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).optional().unwrap()
 }
-fn receive(runtime: &Runtime) -> Update {
+pub(super) fn receive(runtime: &Runtime) -> Update {
     runtime
         .updates
         .recv_timeout(Duration::from_secs(10))
         .unwrap()
 }
 
-struct Gate {
-    native: PdfWorker,
-    ready: std::sync::mpsc::Sender<crossbeam_channel::Sender<Result<DetectedCover>>>,
+pub(super) struct Gate {
+    pub(super) native: PdfWorker,
+    pub(super) ready: std::sync::mpsc::Sender<crossbeam_channel::Sender<Result<DetectedCover>>>,
 }
 impl PdfEngine for Gate {
     fn open(

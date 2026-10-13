@@ -5,6 +5,20 @@ use yamantaka_domain::{
 };
 
 pub(crate) fn save(database: &mut Database, choice: &AutomaticCover) -> Result<bool> {
+    persist(database, choice, Write::Missing)
+}
+pub(crate) fn replace(
+    database: &mut Database,
+    choice: &AutomaticCover,
+    expected: Option<yamantaka_domain::cover_revision::CoverRevision>,
+) -> Result<bool> {
+    persist(database, choice, Write::Unchanged(expected))
+}
+enum Write {
+    Missing,
+    Unchanged(Option<yamantaka_domain::cover_revision::CoverRevision>),
+}
+fn persist(database: &mut Database, choice: &AutomaticCover, write: Write) -> Result<bool> {
     let transaction = database.connection.transaction().map_err(storage)?;
     let document = choice.document();
     let current: Option<(String, String, u32, String)> = transaction
@@ -27,20 +41,18 @@ pub(crate) fn save(database: &mut Database, choice: &AutomaticCover) -> Result<b
             "Document changed during automatic cover selection".into(),
         ));
     }
-    let existing: bool = transaction
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM document_covers WHERE document_id=?1)",
-            [&document.id],
-            |row| row.get(0),
-        )
-        .map_err(storage)?;
-    if existing {
+    let revision = crate::cover_revision::read(&transaction, &document.id)?;
+    if match write {
+        Write::Missing => revision.is_some(),
+        Write::Unchanged(expected) => revision != expected,
+    } {
         return Ok(false);
     }
     let now = chrono::Utc::now().to_rfc3339();
     let inserted=transaction.execute(
         "INSERT INTO document_covers(document_id,source_page_index,small_thumbnail_path,large_thumbnail_path,generated_at,source_modified_at,confidence,selection_mode,algorithm_version,crop_mode,page_aspect_ratio)
-         VALUES(?1,?2,'','',?3,?4,?5,'automatic',?6,'contain',?7)",
+         VALUES(?1,?2,'','',?3,?4,?5,'automatic',?6,'contain',?7)
+         ON CONFLICT(document_id) DO UPDATE SET source_page_index=excluded.source_page_index,small_thumbnail_path='',large_thumbnail_path='',generated_at=excluded.generated_at,source_modified_at=excluded.source_modified_at,confidence=excluded.confidence,selection_mode='automatic',algorithm_version=excluded.algorithm_version,crop_mode='contain',page_aspect_ratio=excluded.page_aspect_ratio",
         rusqlite::params![document.id,choice.page(),now,modified,choice.confidence(),COVER_ALGORITHM_VERSION,choice.aspect()]).map_err(storage)?;
     if inserted != 1 {
         return Err(Failure::Storage("Automatic cover was not saved".into()));
@@ -189,6 +201,52 @@ mod tests {
             db.execute_batch(sql).unwrap();
             assert!(db.save_automatic_cover(&choice).is_err(), "{sql}");
             assert_eq!(db.cover_source_page("d").unwrap(), None);
+            assert_eq!(
+                db.get("d").unwrap().unwrap().thumbnail_path,
+                Some("old-cache".into())
+            );
+        }
+    }
+
+    #[test]
+    fn restore_replaces_only_the_exact_captured_decision_and_cannot_replay_it() {
+        let mut db = database();
+        let choice = choice(&db);
+        db.execute_batch("INSERT INTO document_covers VALUES('d',0,'old-small','old-large','old','old',1,'manual',4,'contain',0.75);").unwrap();
+        let expected = db.cover_revision("d").unwrap();
+        assert!(db.replace_automatic_cover(&choice, expected).unwrap());
+        assert_eq!(db.cover_source_page("d").unwrap(), Some(1));
+        assert_ne!(db.cover_revision("d").unwrap(), expected);
+        assert!(!db.replace_automatic_cover(&choice, expected).unwrap());
+    }
+    #[test]
+    fn changed_metadata_and_failed_restore_writes_preserve_the_manual_decision() {
+        for sql in [
+            "UPDATE document_covers SET small_thumbnail_path='new-small'",
+            "UPDATE document_covers SET large_thumbnail_path='new-large'",
+            "UPDATE document_covers SET generated_at='new'",
+            "UPDATE document_covers SET source_modified_at='new'",
+            "UPDATE document_covers SET confidence=0.7900000000000001",
+            "UPDATE document_covers SET page_aspect_ratio=0.76",
+            "UPDATE document_covers SET algorithm_version=5",
+            "UPDATE document_covers SET source_page_index=2",
+            "CREATE TRIGGER ignored BEFORE UPDATE ON document_covers BEGIN SELECT RAISE(IGNORE); END;",
+            "CREATE TRIGGER aborted BEFORE UPDATE OF thumbnail_path ON documents BEGIN SELECT RAISE(ABORT,'synthetic failure'); END;",
+            "CREATE TRIGGER mutated AFTER UPDATE ON document_covers BEGIN UPDATE document_covers SET algorithm_version=5 WHERE document_id=NEW.document_id; END;",
+        ] {
+            let mut db = database();
+            let choice = choice(&db);
+            db.execute_batch("INSERT INTO document_covers VALUES('d',0,'old-small','old-large','old','old',0.79,'manual',4,'contain',0.75);").unwrap();
+            let expected = db.cover_revision("d").unwrap();
+            db.execute_batch(sql).unwrap();
+            let current = db.cover_revision("d").unwrap();
+            if sql.starts_with("UPDATE") {
+                assert_ne!(current, expected, "{sql}");
+                assert!(!db.replace_automatic_cover(&choice, expected).unwrap());
+            } else {
+                assert!(db.replace_automatic_cover(&choice, expected).is_err());
+            }
+            assert_eq!(db.cover_revision("d").unwrap(), current, "{sql}");
             assert_eq!(
                 db.get("d").unwrap().unwrap().thumbnail_path,
                 Some("old-cache".into())

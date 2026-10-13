@@ -4,6 +4,7 @@ pub mod automatic_cover;
 pub mod bookmarks;
 pub mod cover_cache;
 pub mod cover_policy;
+pub mod cover_revision;
 pub mod cover_selection;
 pub mod external_uri;
 pub mod memory;
@@ -182,6 +183,16 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn cover_revision(&self, _id: &str) -> Result<Option<cover_revision::CoverRevision>> {
+        Err(Failure::Unsupported("Cover decision revision".into()))
+    }
+    fn replace_automatic_cover(
+        &mut self,
+        _choice: &automatic_cover::AutomaticCover,
+        _expected: Option<cover_revision::CoverRevision>,
+    ) -> Result<bool> {
+        Err(Failure::Unsupported("Restore automatic PDF cover".into()))
+    }
     /// Returns false when a newer stored choice already owns the cover.
     fn save_automatic_cover(&mut self, _choice: &automatic_cover::AutomaticCover) -> Result<bool> {
         Err(Failure::Unsupported(

@@ -4,6 +4,7 @@ mod compact;
 mod cover_picker;
 mod cover_picker_preview;
 mod cover_picker_view;
+mod cover_restore;
 mod details;
 mod find;
 mod global_notes;
@@ -1488,7 +1489,7 @@ impl App for YamantakaApp {
                         .accept(&id, page, &cancel, Err(error.to_string()));
                 }
                 Update::Cover(id, result, cancel) => {
-                    if !self.accept_cover_picker_image(&id, &result, &cancel) {
+                    if !self.accept_cover_picker_image(ctx, &id, &result, &cancel) {
                         self.accept_library_cover(ctx, &id, result, &cancel);
                     }
                 }

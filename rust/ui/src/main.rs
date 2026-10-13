@@ -162,6 +162,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if args.iter().any(|arg| arg == "--automatic-cover-manual") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-08',1,'manual',4,'contain',0.7142857142857143);")?;
         }
+        if args
+            .iter()
+            .any(|arg| arg == "--cover-picker-restore-failed")
+        {
+            db.execute_batch("CREATE TRIGGER synthetic_restore_rejection BEFORE UPDATE OF thumbnail_path ON documents WHEN OLD.id='demo-0' BEGIN SELECT RAISE(ABORT,'synthetic restore rejection'); END;")?;
+        }
         if args.iter().any(|arg| arg == "--cover-picker-failed-save") {
             db.execute_batch("CREATE TRIGGER synthetic_cover_rejection BEFORE INSERT ON document_covers BEGIN SELECT RAISE(ABORT,'synthetic cover save rejection'); END;")?;
         }
@@ -406,6 +412,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if demo {
                 if args.iter().any(|arg| arg == "--cover-picker") {
                     app.preview_cover_editor("open");
+                }
+                if args.iter().any(|arg| arg == "--cover-picker-restore") {
+                    app.preview_cover_editor("restore");
+                }
+                if args
+                    .iter()
+                    .any(|arg| arg == "--cover-picker-restore-failed")
+                {
+                    app.preview_cover_editor("failed-restore");
                 }
                 if args.iter().any(|arg| arg == "--cover-picker-save") {
                     app.preview_cover_editor("save");
