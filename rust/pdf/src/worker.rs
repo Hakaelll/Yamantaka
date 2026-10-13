@@ -62,6 +62,7 @@ enum Request {
     Cover {
         id: String,
         path: PathBuf,
+        page: u32,
         generation: u64,
         cancel: Cancellation,
         reply: Reply<Arc<RenderedPage>>,
@@ -407,6 +408,7 @@ impl AsyncPdfEngine for PdfWorker {
         &self,
         id: String,
         path: PathBuf,
+        page: u32,
         generation: u64,
         cancel: Cancellation,
     ) -> Result<PdfTicket<Arc<RenderedPage>>> {
@@ -414,6 +416,7 @@ impl AsyncPdfEngine for PdfWorker {
         self.enqueue(Request::Cover {
             id,
             path,
+            page,
             generation,
             cancel,
             reply,
@@ -674,6 +677,7 @@ fn run(
             Request::Cover {
                 id,
                 path,
+                page,
                 generation,
                 cancel,
                 reply,
@@ -686,9 +690,12 @@ fn run(
                     super::covers::render(
                         pdfium,
                         documents.get(&id),
-                        id.clone(),
-                        &path,
-                        generation,
+                        super::covers::CoverSource {
+                            id: id.clone(),
+                            path: &path,
+                            page,
+                            generation,
+                        },
                         &cancel,
                         &governor,
                     )

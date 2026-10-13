@@ -106,7 +106,7 @@ fn pdf_covers_are_bounded_cancellable_and_preserve_active_readers_and_originals(
         .unwrap();
     engine.set_visible_documents(&["reader".into()]).unwrap();
     let cover = engine
-        .try_cover("cover".into(), path.clone(), 7, Cancellation::default())
+        .try_cover("cover".into(), path.clone(), 0, 7, Cancellation::default())
         .unwrap()
         .wait()
         .unwrap();
@@ -120,6 +120,33 @@ fn pdf_covers_are_bounded_cancellable_and_preserve_active_readers_and_originals(
         cover.width as usize * cover.height as usize * 4
     );
     assert!(cover.pixels().chunks_exact(4).any(|pixel| pixel[0] < 180));
+    let selected = engine
+        .try_cover(
+            "selected".into(),
+            path.clone(),
+            1,
+            12,
+            Cancellation::default(),
+        )
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(selected.key.page, 1);
+    assert_eq!(selected.width, 512);
+    assert_eq!(selected.height, 384);
+    assert!(
+        engine
+            .try_cover(
+                "invalid-page".into(),
+                path.clone(),
+                2,
+                13,
+                Cancellation::default()
+            )
+            .unwrap()
+            .wait()
+            .is_err()
+    );
     assert!(
         !engine
             .text("reader".into(), 0, Cancellation::default())
@@ -130,7 +157,7 @@ fn pdf_covers_are_bounded_cancellable_and_preserve_active_readers_and_originals(
     cancel.cancel();
     assert!(matches!(
         engine
-            .try_cover("cancelled".into(), path.clone(), 8, cancel)
+            .try_cover("cancelled".into(), path.clone(), 0, 8, cancel)
             .unwrap()
             .wait(),
         Err(Failure::Cancelled)
@@ -140,6 +167,7 @@ fn pdf_covers_are_bounded_cancellable_and_preserve_active_readers_and_originals(
             .try_cover(
                 "protected".into(),
                 fixture("protected.pdf"),
+                0,
                 9,
                 Cancellation::default()
             )
@@ -155,13 +183,19 @@ fn pdf_covers_are_bounded_cancellable_and_preserve_active_readers_and_originals(
         .unwrap();
     assert!(
         engine
-            .try_cover("third".into(), path.clone(), 10, Cancellation::default())
+            .try_cover("third".into(), path.clone(), 0, 10, Cancellation::default())
             .unwrap()
             .wait()
             .is_err()
     );
     let reused = engine
-        .try_cover("reader".into(), path.clone(), 11, Cancellation::default())
+        .try_cover(
+            "reader".into(),
+            path.clone(),
+            0,
+            11,
+            Cancellation::default(),
+        )
         .unwrap()
         .wait()
         .unwrap();

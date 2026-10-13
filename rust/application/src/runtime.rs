@@ -742,7 +742,10 @@ impl Runtime {
                                     }
                                 },
                                 Action::Cover(id, path, generation, cancel) => {
-                                    match engine.try_cover(id.clone(), path, generation, cancel.clone()) {
+                                    let ticket = cancel.check()
+                                        .and_then(|_| repository.cover_source_page(&id))
+                                        .and_then(|page| engine.try_cover(id.clone(), path, page.unwrap_or(0), generation, cancel.clone()));
+                                    match ticket {
                                         Ok(ticket) => pending.push(Pending::Cover(id, ticket, permit)),
                                         Err(error) => emit(&events, &notify, Update::Cover(id, Err(error), cancel), permit),
                                     }

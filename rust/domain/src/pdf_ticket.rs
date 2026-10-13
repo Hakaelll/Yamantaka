@@ -64,6 +64,7 @@ pub trait AsyncPdfEngine: PdfEngine {
         &self,
         _id: String,
         _path: PathBuf,
+        _page: u32,
         _generation: u64,
         _cancel: Cancellation,
     ) -> Result<PdfTicket<Arc<RenderedPage>>> {

@@ -33,6 +33,7 @@ fn wal_capture_includes_committed_frames_and_never_overwrites() {
     let source_path = root.path().join("legacy.sqlite3");
     let source = Database::open(&source_path).unwrap();
     source.execute_batch(DOCUMENT).unwrap();
+    source.execute_batch("INSERT INTO document_covers VALUES('original',4,'legacy-small','legacy-large','2026-10-08T00:00:00Z','2026-10-08T00:00:00Z',1,'manual',4,'contain',0.75);").unwrap();
     assert!(source_path.with_file_name("legacy.sqlite3-wal").exists());
     let prefs = root.path().join("shared_preferences.json");
     fs::write(
@@ -58,6 +59,20 @@ fn wal_capture_includes_committed_frames_and_never_overwrites() {
         repeated.preserved_data_sha256,
         receipt.preserved_data_sha256
     );
+    let copied = rusqlite::Connection::open_with_flags(
+        target.join("yamantaka.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    let choice: (u32,String,String,String,u32,f64) = copied.query_row(
+        "SELECT source_page_index,selection_mode,small_thumbnail_path,large_thumbnail_path,algorithm_version,page_aspect_ratio FROM document_covers WHERE document_id='original'", [],
+        |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?)),
+    ).unwrap();
+    assert_eq!(
+        choice,
+        (4, "manual".into(), String::new(), String::new(), 4, 0.75)
+    );
+    assert_eq!(source.cover_source_page("original").unwrap(), Some(4));
     assert_eq!(
         Preferences::load(&target.join("preferences.json"))
             .unwrap()

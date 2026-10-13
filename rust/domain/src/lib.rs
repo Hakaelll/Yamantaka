@@ -178,6 +178,9 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn cover_source_page(&self, _document_id: &str) -> Result<Option<u32>> {
+        Ok(None)
+    }
     fn reader_continuity(&self) -> Result<Option<reader_tabs::DocumentTabs>> {
         Ok(None)
     }

@@ -138,6 +138,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let title = title.replace('\'', "''");
             db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,reading_progress,last_page_index) VALUES('demo-{index}','{path}','demo-{index}','fixture.pdf','{title}','{author}',2,900,'2026-10-08','2026-10-08','2026-10-08','synthetic',{},0)",if index==0{0.5}else{0.0}))?;
         }
+        if args.iter().any(|arg| arg == "--saved-cover-page") {
+            db.execute_batch("INSERT INTO document_covers VALUES('demo-0',1,'','','2026-10-13T00:00:00Z','2026-10-08',1,'manual',1,'contain',0.75);")?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--annotation-many") {
             db.execute_batch(r#"WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180)
                 INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state)

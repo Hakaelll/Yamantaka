@@ -5,6 +5,7 @@ pub(super) struct LibraryCovers {
     slots: HashMap<String, CoverSlot>,
     generation: u64,
 }
+
 struct CoverSlot {
     path: std::path::PathBuf,
     fingerprint: String,
@@ -12,6 +13,7 @@ struct CoverSlot {
     cancel: Cancellation,
     image: Option<PageImage>,
     finished: bool,
+    source_page: Option<u32>,
 }
 impl LibraryCovers {
     pub(super) fn slots_ready(&self) -> bool {
@@ -60,6 +62,7 @@ impl YamantakaApp {
                             cancel,
                             image: None,
                             finished: false,
+                            source_page: None,
                         },
                     );
                 }
@@ -87,10 +90,7 @@ impl YamantakaApp {
         let Ok(page) = result else {
             return;
         };
-        if page.key.document_id != id
-            || page.key.generation != slot.generation
-            || page.key.page != 0
-        {
+        if page.key.document_id != id || page.key.generation != slot.generation {
             return;
         }
         // The native presenter reserves CPU staging and GPU payload before upload.
@@ -99,6 +99,7 @@ impl YamantakaApp {
             return;
         };
         if let Ok(texture) = presenter.upload(&page) {
+            slot.source_page = Some(page.key.page);
             ctx.data_mut(|data| {
                 data.insert_temp(
                     book::cover_id(id),
@@ -117,6 +118,49 @@ impl YamantakaApp {
         serde_json::json!({"resident": self.library_covers.slots.len(),
             "ready":self.library_covers.slots.values().filter(|slot| slot.image.is_some()).count(),
             "pending":self.library_covers.slots.values().filter(|slot| !slot.finished).count(),
-            "source":"PDF page 1","maximumVisible":16})
+            "source":"PDF selected page","sourcePages":self.library_covers.slots.iter().filter_map(|(id,slot)| slot.source_page.map(|page|(id.clone(),page))).collect::<std::collections::BTreeMap<_,_>>(),"maximumVisible":16})
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use yamantaka_pdf::{MemoryLimits, PdfWorker};
+    use yamantaka_storage::Database;
+
+    #[test]
+    fn native_actor_renders_the_saved_manual_page_without_a_reader_open() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let path = root
+            .join("build/rust-fixtures/textual.pdf")
+            .canonicalize()
+            .unwrap();
+        let before = std::fs::read(&path).unwrap();
+        let db = Database::in_memory_at(11).unwrap();
+        db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('saved','synthetic.pdf','synthetic','synthetic.pdf',2,1,'now','now','now','synthetic');
+            INSERT INTO document_covers VALUES('saved',1,'preserved-small','preserved-large','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z',1,'manual',4,'contain',0.75);").unwrap();
+        let worker = PdfWorker::start(
+            &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
+            MemoryLimits::default(),
+        )
+        .unwrap();
+        let runtime = Runtime::start(db, worker, || {}).unwrap();
+        let cancel = Cancellation::default();
+        runtime
+            .submit(Action::Cover(
+                "saved".into(),
+                path.clone(),
+                41,
+                cancel.clone(),
+            ))
+            .unwrap();
+        assert!(
+            matches!(runtime.updates.recv_timeout(std::time::Duration::from_secs(5)).unwrap(),
+            Update::Cover(id,Ok(page),token) if id=="saved" && page.key.page==1
+                && page.key.generation==41 && page.width==512 && page.height==384
+                && token.same_request(&cancel))
+        );
+        drop(runtime);
+        assert_eq!(std::fs::read(path).unwrap(), before);
     }
 }

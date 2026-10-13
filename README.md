@@ -8,6 +8,8 @@
 
 Yamantaka brings your documents into a personal library, keeps your reading context close, and stores your work locally. The native Rust rewrite pairs a gallery of physical 3D book covers with a focused PDF reader, warm paper environments, and a consistent desktop interface.
 
+The native library renders PDF imagery on its 3D books and honors saved source-page choices, including manual cover selections copied from Flutter. [Cover selection verification](docs/validation/rust-saved-cover-page-2026-10-13.md) records the current behavior and the remaining work on the interactive picker and persistent cache.
+
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.

@@ -3,12 +3,17 @@ use std::{path::Path, sync::Arc};
 use yamantaka_domain::memory::{MemoryCategory, MemoryGovernor, TrackedBytesBuilder};
 use yamantaka_domain::{Cancellation, Failure, RenderKey, RenderedPage, Result};
 
+pub(crate) struct CoverSource<'a> {
+    pub id: String,
+    pub path: &'a Path,
+    pub page: u32,
+    pub generation: u64,
+}
+
 pub(crate) fn render<'a>(
     pdfium: &'a Pdfium,
     existing: Option<&PdfDocument<'a>>,
-    id: String,
-    path: &Path,
-    generation: u64,
+    source: CoverSource<'_>,
     cancel: &Cancellation,
     governor: &MemoryGovernor,
 ) -> Result<Arc<RenderedPage>> {
@@ -19,26 +24,31 @@ pub(crate) fn render<'a>(
         existing
     } else {
         opened = pdfium
-            .load_pdf_from_file(path, None)
+            .load_pdf_from_file(source.path, None)
             .map_err(super::worker::pdf_failure)?;
         &opened
     };
     cancel.check()?;
     let page = document
         .pages()
-        .get(0)
+        .get(
+            source
+                .page
+                .try_into()
+                .map_err(|_| Failure::Invalid("Cover page index out of range".into()))?,
+        )
         .map_err(super::worker::pdf_failure)?;
     let size = super::page_geometry::read(&page)?.size();
     let longest = size[0].max(size[1]);
     let dimension = |value: f32| ((value / longest * 512.0).round() as u32).clamp(1, 512);
     let key = RenderKey {
-        document_id: id,
-        page: 0,
+        document_id: source.id,
+        page: source.page,
         region: None,
         physical_width: dimension(size[0]),
         physical_height: dimension(size[1]),
         rotation: 0,
-        generation,
+        generation: source.generation,
     };
     let bytes = key.byte_size(512, 512 * 512 * 4)?;
     let mut pixels = TrackedBytesBuilder::try_zeroed(governor, MemoryCategory::Pages, bytes)
