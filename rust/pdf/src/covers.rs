@@ -16,7 +16,30 @@ pub(crate) fn render<'a>(
     source: CoverSource<'_>,
     cancel: &Cancellation,
     governor: &MemoryGovernor,
+    cache: Option<&dyn yamantaka_domain::cover_cache::CoverImageCache>,
 ) -> Result<Arc<RenderedPage>> {
+    cancel.check()?;
+    // An already-open handle can represent an older file revision. Cache only
+    // temporary opens, whose source identity is checked before and after render.
+    let cache = cache.filter(|_| existing.is_none());
+    let identity = cache.and_then(|cache| cache.identity(source.path, source.page, cancel).ok());
+    if let (Some(cache), Some(identity)) = (cache, identity) {
+        let request = yamantaka_domain::cover_cache::CoverCacheRequest {
+            identity,
+            document: &source.id,
+            page: source.page,
+            generation: source.generation,
+        };
+        match cache.load(request, governor, cancel) {
+            Ok(Some(image))
+                if cache.identity(source.path, source.page, cancel).ok() == Some(identity) =>
+            {
+                return Ok(image);
+            }
+            Err(Failure::MemoryBudget) => return Err(Failure::MemoryBudget),
+            _ => {}
+        }
+    }
     cancel.check()?;
     // Temporary handles stay on the native owner and are dropped on every exit.
     let opened;
@@ -72,5 +95,13 @@ pub(crate) fn render<'a>(
     for pixel in pixels.as_mut_slice().chunks_exact_mut(4) {
         pixel.swap(0, 2);
     }
-    Ok(Arc::new(RenderedPage::from_pixels(key, pixels.finish())?))
+    let image = Arc::new(RenderedPage::from_pixels(key, pixels.finish())?);
+    if let (Some(cache), Some(identity)) = (cache, identity)
+        && cache.identity(source.path, source.page, cancel).ok() == Some(identity)
+    {
+        // Disk failures never discard a successfully rendered cover.
+        let _ = cache.save(identity, &image, cancel);
+    }
+    cancel.check()?;
+    Ok(image)
 }

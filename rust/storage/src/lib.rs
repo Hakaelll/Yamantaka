@@ -2,6 +2,7 @@ pub mod annotation_export;
 pub mod annotations;
 pub mod backup;
 pub mod bookmarks;
+pub mod cover_cache;
 mod cover_selection;
 pub mod database;
 pub mod identity;

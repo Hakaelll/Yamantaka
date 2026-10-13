@@ -4447,6 +4447,7 @@ dependencies = [
  "tempfile",
  "uuid",
  "yamantaka-domain",
+ "yamantaka-pdf",
 ]
 
 [[package]]

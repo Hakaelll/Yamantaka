@@ -1,6 +1,7 @@
 //! UI and FFI independent contracts and persisted domain semantics.
 pub mod annotations;
 pub mod bookmarks;
+pub mod cover_cache;
 pub mod cover_selection;
 pub mod external_uri;
 pub mod memory;

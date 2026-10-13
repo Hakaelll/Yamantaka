@@ -263,7 +263,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // The 72 MiB page category includes CPU pages, the replacement texture and
     // its staging buffer. Keep the CPU cache a bounded subset of that ledger.
     let governor = MemoryGovernor::new(GlobalMemoryLimits::default());
-    let engine = PdfWorker::start_with_governor(
+    let cover_cache_root = if demo {
+        store.join("cover-cache-v1")
+    } else {
+        paths.cache.join("covers-v1")
+    };
+    let cache_megabytes = prefs
+        .get("maxCacheMegabytes")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(256)
+        .clamp(64, 1024);
+    let engine = PdfWorker::start_with_cover_cache(
         &library,
         MemoryLimits {
             pages: 24 * 1024 * 1024,
@@ -271,6 +281,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             ..MemoryLimits::default()
         },
         governor.clone(),
+        Some(std::sync::Arc::new(
+            yamantaka_storage::cover_cache::CoverCache::new(
+                cover_cache_root,
+                cache_megabytes * 1024 * 1024,
+            ),
+        )),
     )?;
     let dark = if demo {
         !light

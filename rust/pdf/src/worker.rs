@@ -221,6 +221,14 @@ impl PdfWorker {
         limits: MemoryLimits,
         governor: MemoryGovernor,
     ) -> Result<Self> {
+        Self::start_with_cover_cache(library, limits, governor, None)
+    }
+    pub fn start_with_cover_cache(
+        library: &Path,
+        limits: MemoryLimits,
+        governor: MemoryGovernor,
+        cover_cache: Option<Arc<dyn yamantaka_domain::cover_cache::CoverImageCache>>,
+    ) -> Result<Self> {
         let library = library.to_owned();
         let (wake, receiver) = bounded(1);
         let (ready, wait) = bounded(1);
@@ -232,7 +240,14 @@ impl PdfWorker {
             .spawn(move || match crate::bindings::open(&library) {
                 Ok(pdfium) => {
                     let _ = ready.send(Ok(()));
-                    run(&pdfium, receiver, worker_scheduler, limits, worker_governor);
+                    run(
+                        &pdfium,
+                        receiver,
+                        worker_scheduler,
+                        limits,
+                        worker_governor,
+                        cover_cache,
+                    );
                 }
                 Err(error) => {
                     let _ = ready.send(Err(error));
@@ -603,6 +618,7 @@ fn run(
     scheduler: Arc<Mutex<Scheduler>>,
     limits: MemoryLimits,
     governor: MemoryGovernor,
+    cover_cache: Option<Arc<dyn yamantaka_domain::cover_cache::CoverImageCache>>,
 ) {
     let mut documents: HashMap<String, PdfDocument<'_>> = HashMap::new();
     let mut recency: Vec<String> = Vec::new();
@@ -698,6 +714,7 @@ fn run(
                         },
                         &cancel,
                         &governor,
+                        cover_cache.as_deref(),
                     )
                 };
                 reply.send(result);
