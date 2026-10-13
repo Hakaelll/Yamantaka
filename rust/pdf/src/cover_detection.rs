@@ -1,5 +1,4 @@
 use pdfium_render::prelude::*;
-use std::path::Path;
 use yamantaka_domain::{
     Cancellation, Failure, Result,
     cover_policy::{CoverMetrics, DetectedCover, MAX_COVER_CANDIDATES, choose},
@@ -9,19 +8,20 @@ use yamantaka_domain::{
 pub(crate) fn detect<'a>(
     pdfium: &'a Pdfium,
     existing: Option<&PdfDocument<'a>>,
-    id: &str,
-    path: &Path,
-    generation: u64,
+    source: crate::covers::CoverSource<'_>,
     cancel: &Cancellation,
     governor: &MemoryGovernor,
+    cache: Option<&dyn yamantaka_domain::cover_cache::CoverImageCache>,
 ) -> Result<DetectedCover> {
     cancel.check()?;
+    let cache = cache.filter(|_| existing.is_none());
+    let revision = cache.and_then(|cache| cache.identity(source.path, 0, cancel).ok());
     let opened;
     let document = if let Some(existing) = existing {
         existing
     } else {
         opened = pdfium
-            .load_pdf_from_file(path, None)
+            .load_pdf_from_file(source.path, None)
             .map_err(crate::worker::pdf_failure)?;
         &opened
     };
@@ -35,10 +35,10 @@ pub(crate) fn detect<'a>(
             pdfium,
             Some(document),
             crate::covers::CoverSource {
-                id: id.into(),
-                path,
+                id: source.id.clone(),
+                path: source.path,
                 page,
-                generation,
+                generation: source.generation,
             },
             cancel,
             governor,
@@ -65,14 +65,22 @@ pub(crate) fn detect<'a>(
         pdfium,
         Some(document),
         crate::covers::CoverSource {
-            id: id.into(),
-            path,
+            id: source.id.clone(),
+            path: source.path,
             page: choice.page,
-            generation,
+            generation: source.generation,
         },
         cancel,
         governor,
         None,
     )?;
+    if let (Some(cache), Some(revision)) = (cache, revision)
+        && cache.identity(source.path, 0, cancel).ok() == Some(revision)
+        && let Ok(identity) = cache.identity(source.path, choice.page, cancel)
+        && cache.identity(source.path, 0, cancel).ok() == Some(revision)
+    {
+        let _ = cache.save(identity, &image, cancel);
+    }
+    cancel.check()?;
     Ok(DetectedCover { image, choice })
 }

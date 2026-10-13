@@ -69,6 +69,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let mut db = if capture.is_some()
             && args.iter().any(|arg| {
                 arg == "--export-json"
+                    || arg == "--automatic-cover"
                     || arg == "--cover-picker-save"
                     || arg == "--cover-picker-cancel"
                     || arg == "--cover-picker-failed-save"
@@ -120,11 +121,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             ("The Geometry of Silence", "Study collection"),
         ];
         for (index, (title, author)) in names.iter().enumerate() {
-            let cover_fixture = args.iter().any(|arg| arg == "--pdf-covers").then(|| {
-                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
-                    "../../build/rust-fixtures/covers/cover-{index}.pdf"
-                ))
-            });
+            let automatic_first = index == 0 && args.iter().any(|arg| arg == "--automatic-cover");
+            let cover_fixture = if automatic_first {
+                Some(
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../build/rust-fixtures/automatic-cover.pdf"),
+                )
+            } else {
+                args.iter().any(|arg| arg == "--pdf-covers").then(|| {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
+                        "../../build/rust-fixtures/covers/cover-{index}.pdf"
+                    ))
+                })
+            };
             let document_path = cover_fixture.as_ref().unwrap_or(&fixture).canonicalize()?;
             let path = document_path.to_string_lossy().replace('\'', "''");
             let title = if index == 0
@@ -139,7 +148,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 title
             };
             let title = title.replace('\'', "''");
-            db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,reading_progress,last_page_index) VALUES('demo-{index}','{path}','demo-{index}','fixture.pdf','{title}','{author}',2,900,'2026-10-08','2026-10-08','2026-10-08','synthetic',{},0)",if index==0{0.5}else{0.0}))?;
+            let pages = if automatic_first { 7 } else { 2 };
+            let progress = if automatic_first {
+                4.0 / 7.0
+            } else if index == 0 {
+                0.5
+            } else {
+                0.0
+            };
+            let last = if automatic_first { 3 } else { 0 };
+            db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,reading_progress,last_page_index) VALUES('demo-{index}','{path}','demo-{index}','fixture.pdf','{title}','{author}',{pages},900,'2026-10-08','2026-10-08','2026-10-08','synthetic',{progress},{last})"))?;
+        }
+        if args.iter().any(|arg| arg == "--automatic-cover-manual") {
+            db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-08',1,'manual',4,'contain',0.7142857142857143);")?;
         }
         if args.iter().any(|arg| arg == "--cover-picker-failed-save") {
             db.execute_batch("CREATE TRIGGER synthetic_cover_rejection BEFORE INSERT ON document_covers BEGIN SELECT RAISE(ABORT,'synthetic cover save rejection'); END;")?;

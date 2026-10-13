@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='automatic-cover-dark'; args=@('--pdf-covers','--automatic-cover','--details') },
+    @{ name='automatic-cover-light-es'; args=@('--pdf-covers','--automatic-cover','--details','--light','--es','--reduce-motion') },
+    @{ name='automatic-cover-manual'; args=@('--pdf-covers','--automatic-cover','--automatic-cover-manual','--details') },
     @{ name='cover-picker-dark'; args=@('--pdf-covers','--cover-picker') },
     @{ name='cover-picker-light-es'; args=@('--pdf-covers','--cover-picker','--light','--es','--reduce-motion') },
     @{ name='cover-picker-saved'; args=@('--pdf-covers','--cover-picker-save','--details') },

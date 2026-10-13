@@ -1,5 +1,6 @@
 //! UI and FFI independent contracts and persisted domain semantics.
 pub mod annotations;
+pub mod automatic_cover;
 pub mod bookmarks;
 pub mod cover_cache;
 pub mod cover_policy;
@@ -181,6 +182,12 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    /// Returns false when a newer stored choice already owns the cover.
+    fn save_automatic_cover(&mut self, _choice: &automatic_cover::AutomaticCover) -> Result<bool> {
+        Err(Failure::Unsupported(
+            "Automatic PDF cover persistence".into(),
+        ))
+    }
     fn save_manual_cover(&mut self, _choice: &cover_selection::ManualCover) -> Result<()> {
         Err(Failure::Unsupported("Manual PDF cover selection".into()))
     }

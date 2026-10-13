@@ -207,6 +207,12 @@ struct ImportState {
     permit: Permit,
 }
 enum Pending {
+    AutomaticCover(
+        Document,
+        u64,
+        PdfTicket<yamantaka_domain::cover_policy::DetectedCover>,
+        Permit,
+    ),
     Cover(String, PdfTicket<Arc<RenderedPage>>, Permit),
     FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
@@ -241,6 +247,9 @@ enum Pending {
 impl Pending {
     fn register<'a>(&'a self, select: &mut Select<'a>) {
         match self {
+            Self::AutomaticCover(_, _, ticket, _) => {
+                select.recv(ticket.readiness());
+            }
             Self::FindDocument(scan, _) => {
                 select.recv(scan.ticket().readiness());
             }
@@ -272,6 +281,7 @@ impl Pending {
     }
     fn ready(&self) -> bool {
         match self {
+            Self::AutomaticCover(_, _, ticket, _) => ticket.is_ready(),
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
             Self::Cover(_, ticket, _) | Self::Render(ticket, _) => ticket.is_ready(),
@@ -285,6 +295,7 @@ impl Pending {
     }
     fn cancel(&self) {
         match self {
+            Self::AutomaticCover(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::FindDocument(scan, _) => scan.request.cancellation.cancel(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
@@ -758,12 +769,26 @@ impl Runtime {
                                     }
                                 }
                                 Action::Cover(id, path, generation, cancel) => {
-                                    let ticket = cancel.check()
-                                        .and_then(|_| repository.cover_source_page(&id))
-                                        .and_then(|page| engine.try_cover(id.clone(), path, page.unwrap_or(0), generation, cancel.clone()));
-                                    match ticket {
-                                        Ok(ticket) => pending.push(Pending::Cover(id, ticket, permit)),
-                                        Err(error) => emit(&events, &notify, Update::Cover(id, Err(error), cancel), permit),
+                                    let selected=cancel.check().and_then(|_|repository.cover_source_page(&id));
+                                    match selected {
+                                        Ok(Some(page)) => match engine.try_cover(id.clone(),path,page,generation,cancel.clone()) {
+                                            Ok(ticket)=>pending.push(Pending::Cover(id,ticket,permit)),
+                                            Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
+                                        },
+                                        Ok(None) => {
+                                            let automatic=repository.get(&id).and_then(|document| {
+                                                let document=document.ok_or_else(||Failure::Invalid("Cover document no longer exists".into()))?;
+                                                if document.path!=path || document.missing {return Err(Failure::Invalid("Cover source changed or is missing".into()));}
+                                                cancel.check()?;
+                                                let ticket=engine.try_detect_cover(id.clone(),path,generation,cancel.clone())?;
+                                                Ok((document,ticket))
+                                            });
+                                            match automatic {
+                                                Ok((document,ticket))=>pending.push(Pending::AutomaticCover(document,generation,ticket,permit)),
+                                                Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
+                                            }
+                                        },
+                                        Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
                                     }
                                 }
                                 Action::Render(key, priority, cancel) => {
@@ -893,6 +918,20 @@ impl Runtime {
                                 let cancel = ticket.cancellation.clone();
                                 let result = ticket.wait().and_then(|page| { cancel.check()?; Ok(page) });
                                 emit(&events, &notify, Update::Cover(id, result, cancel), permit);
+                            }
+                            Pending::AutomaticCover(document,generation,ticket,permit) => {
+                                let cancel=ticket.cancellation.clone();
+                                let id=document.id.clone();
+                                let path=document.path.clone();
+                                let result=ticket.wait().and_then(|detected| {cancel.check()?;crate::automatic_cover::complete(&mut repository,document,generation,detected)});
+                                match result {
+                                    Ok(crate::automatic_cover::CoverCompletion::Image(image))=>emit(&events,&notify,Update::Cover(id,Ok(image),cancel),permit),
+                                    Ok(crate::automatic_cover::CoverCompletion::StoredPage(page))=>match engine.try_cover(id.clone(),path,page,generation,cancel.clone()) {
+                                        Ok(ticket)=>pending.push(Pending::Cover(id,ticket,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
+                                    },
+                                    Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
+                                }
                             }
                             Pending::Render(ticket, permit) => {
                                 let cancel = ticket.cancellation.clone();

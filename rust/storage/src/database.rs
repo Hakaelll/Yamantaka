@@ -272,6 +272,12 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn save_automatic_cover(
+        &mut self,
+        choice: &yamantaka_domain::automatic_cover::AutomaticCover,
+    ) -> Result<bool> {
+        crate::automatic_cover::save(self, choice)
+    }
     fn save_manual_cover(
         &mut self,
         choice: &yamantaka_domain::cover_selection::ManualCover,

@@ -731,11 +731,15 @@ fn run(
                     crate::cover_detection::detect(
                         pdfium,
                         documents.get(&id),
-                        &id,
-                        &path,
-                        generation,
+                        crate::covers::CoverSource {
+                            id: id.clone(),
+                            path: &path,
+                            page: 0,
+                            generation,
+                        },
                         &cancel,
                         &governor,
+                        cover_cache.as_deref(),
                     )
                 };
                 reply.send(result);

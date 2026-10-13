@@ -6,6 +6,19 @@ from pathlib import Path
 from verify_rust_cover_picker import digest, pixel_chunks, read_json
 
 
+def verify_cache_records(cache, expected_count):
+    records = list(cache.glob("*.rgba"))
+    assert len(records) == expected_count, len(records)
+    for path in records:
+        data = path.read_bytes()
+        assert data[:8] == b"YMCOVER1" and len(data) >= 80
+        assert path.stem == data[8:40].hex()
+        width, height = struct.unpack_from("<II", data, 40)
+        assert 1 <= width <= 512 and 1 <= height <= 512
+        assert len(data) == 80 + width * height * 4
+        assert hashlib.sha256(data[40:48] + data[80:]).digest() == data[48:80]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
@@ -33,16 +46,7 @@ def main():
         assert set(covers["sourcePages"]) == {f"demo-{index}" for index in range(expected_count)}
         assert covers["sourcePages"]["demo-0"] == (1 if item["name"] == "pdf-saved-cover-page" else 0)
         cache = root / "build/demo-store/captures" / str(record["captureProcessId"]) / "cover-cache-v1"
-        records = list(cache.glob("*.rgba"))
-        assert len(records) == expected_count, (item["name"], len(records))
-        for path in records:
-            data = path.read_bytes()
-            assert data[:8] == b"YMCOVER1" and len(data) >= 80
-            assert path.stem == data[8:40].hex()
-            width, height = struct.unpack_from("<II", data, 40)
-            assert 1 <= width <= 512 and 1 <= height <= 512
-            assert len(data) == 80 + width * height * 4
-            assert hashlib.sha256(data[40:48] + data[80:]).digest() == data[48:80]
+        verify_cache_records(cache, expected_count)
         if published:
             published_item = next(c for c in published["captures"] if c["name"] == item["name"])
             assert digest(args.published / item["image"]) == published_item["publishedImageSha256"]
