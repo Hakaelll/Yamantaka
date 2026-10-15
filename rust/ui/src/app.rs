@@ -986,7 +986,7 @@ impl YamantakaApp {
                                     .max(100.0);
                                 let width = if compact {
                                     slot.min(
-                                        ((ui.available_height() - 83.0) / 1.34).clamp(110.0, 180.0),
+                                        ((ui.available_height() - book::CAPTION_HEIGHT - 5.0) / 1.34).clamp(110.0, 180.0),
                                     )
                                 } else {
                                     slot.min(228.0)
@@ -997,7 +997,7 @@ impl YamantakaApp {
                                         for document in row {
                                             let response = ui
                                                 .allocate_ui_with_layout(
-                                                    egui::vec2(slot, width * 1.34 + 78.0),
+                                                    egui::vec2(slot, width * 1.34 + book::CAPTION_HEIGHT),
                                                     egui::Layout::top_down(egui::Align::Center),
                                                     |ui| {
                                                         ui.push_id(&document.id, |ui| {

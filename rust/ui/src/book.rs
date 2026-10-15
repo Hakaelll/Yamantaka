@@ -7,6 +7,8 @@ use yamantaka_domain::Document;
 
 mod material;
 
+pub(crate) const CAPTION_HEIGHT: f32 = 102.0;
+
 #[derive(Clone)]
 pub(crate) struct PdfCover {
     pub texture: egui::TextureId,
@@ -141,8 +143,21 @@ fn cover_impl(
     caption: bool,
 ) -> Response {
     let height = width * 1.34;
+    let english = ui.ctx().data(|data| {
+        data.get_temp::<bool>(egui::Id::new("yamantaka-english"))
+            .unwrap_or(false)
+    });
+    let author = document
+        .author
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(if english {
+            "Author not specified"
+        } else {
+            "Autor sin especificar"
+        });
     let (rect, response) = ui.allocate_exact_size(
-        Vec2::new(width, height + if caption { 78.0 } else { 8.0 }),
+        Vec2::new(width, height + if caption { CAPTION_HEIGHT } else { 8.0 }),
         Sense::click(),
     );
     response.widget_info(|| {
@@ -151,9 +166,12 @@ fn cover_impl(
             ui.is_enabled(),
             selected,
             format!(
-                "{}, {} pages",
+                "{}, {}, {} {}, {:.0}%",
                 document.display_title(),
-                document.page_count
+                author,
+                document.page_count,
+                if english { "pages" } else { "páginas" },
+                document.reading_progress.clamp(0.0, 1.0) * 100.0,
             ),
         )
     });
@@ -620,35 +638,60 @@ fn cover_impl(
     }
     let title_rect = Rect::from_min_size(
         egui::pos2(rect.left() + 10.0, rect.top() + height + 5.0),
-        egui::vec2(width - 20.0, 36.0),
+        egui::vec2(width - 20.0, 42.0),
     );
     let mut title = egui::text::LayoutJob::simple(
         document.display_title().to_owned(),
-        FontId::proportional(15.0),
+        FontId::proportional(16.0),
         palette.ink,
         title_rect.width(),
     );
     title.wrap.max_rows = 2;
+    title.wrap.overflow_character = Some('…');
     painter.galley(title_rect.min, painter.layout_job(title), palette.ink);
+    let mut author_job = egui::text::LayoutJob::simple(
+        author.to_owned(),
+        FontId::proportional(13.0),
+        palette.secondary,
+        title_rect.width(),
+    );
+    author_job.wrap.max_rows = 1;
+    author_job.wrap.overflow_character = Some('…');
+    painter.galley(
+        egui::pos2(title_rect.left(), title_rect.bottom() + 3.0),
+        painter.layout_job(author_job),
+        palette.secondary,
+    );
     painter.text(
-        egui::pos2(title_rect.left(), rect.bottom() - 18.0),
+        egui::pos2(title_rect.left(), rect.bottom() - 20.0),
         egui::Align2::LEFT_CENTER,
         format!(
             "{} {}  ·  {}%",
             document.page_count,
-            if ui.ctx().data(|data| data
-                .get_temp::<bool>(egui::Id::new("yamantaka-english"))
-                .unwrap_or(false))
-            {
-                "pages"
-            } else {
-                "páginas"
-            },
+            if english { "pages" } else { "páginas" },
             (document.reading_progress * 100.0).round()
         ),
         FontId::proportional(12.0),
         palette.secondary,
     );
+    if document.reading_progress > 0.0 {
+        let track = Rect::from_min_size(
+            egui::pos2(title_rect.left(), rect.bottom() - 5.0),
+            egui::vec2(title_rect.width(), 2.0),
+        );
+        painter.rect_filled(track, 1.0, palette.line);
+        painter.rect_filled(
+            Rect::from_min_size(
+                track.min,
+                egui::vec2(
+                    track.width() * document.reading_progress.clamp(0.0, 1.0) as f32,
+                    track.height(),
+                ),
+            ),
+            1.0,
+            palette.accent,
+        );
+    }
     response
 }
 /// The six jackets share volume and physics, while type and artwork occupy

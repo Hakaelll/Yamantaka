@@ -270,8 +270,12 @@ library vertical inset is 18, or 10 when compact, with compact vertical gaps of 
 Columns derive from available width divided by 240, or 260 when compact. Equal
 slots are separated by the gallery gutter; normal covers cap at 228 points.
 Compact cover width is bounded by
-`min(slot, clamp((available_height - 83) / 1.34, 110, 180))`.
-Normal cover allocation is `width × (width × 1.34 + 78)` including catalogue text.
+`min(slot, clamp((available_height - CAPTION_HEIGHT - 5) / 1.34, 110, 180))`.
+Normal cover allocation is `width × (width × 1.34 + CAPTION_HEIGHT)`, with the
+shared caption height of 102 points. Captions reserve two title lines at 16
+points, a separate 13-point author line, page/progress metadata and a two-point
+progress track for started books. Long titles and authors truncate with ellipses;
+the semantic book button retains the full title, author, page count and progress.
 When the zoom-adjusted content width falls below 420, the cover collection becomes
 76-point jacket-and-title rows with explicit Read controls instead of the normal
 grid. Compact composition removes the continuity strip and exposes Resume in the
@@ -378,9 +382,14 @@ native fields use accent treatment. Search and filters have a Reset filters path
 
 ### Continuity and list rows
 
-The continuity surface contains an actual physical miniature, editorial document
-title, author, progress track and Continue reading action. Its progress track is
-100×3; compact composition moves Resume into the utility row. List rows are open
+The continuity surface contains a 42-point physical miniature, a 20-point
+editorial document title and a single secondary line combining author, page and
+progress. Its progress track is capped at 120×2 points. Insets are 16×8 points;
+the surface has a 10-point radius and no shadow. The Continue reading action
+sits alongside on wide layouts and below the text on narrower layouts. Compact
+composition moves Resume into the utility row. The user requested this smaller
+footprint in the [Taste review](docs/validation/rust-taste-ui-2026-10-15.md).
+List rows are open
 aligned content with separators, actual miniature in wide mode and independent
 Read/Details actions. Selected rows use raised fill; keyboard focus adds its own
 outline. Narrow rows wrap document context into a bounded two-line title region.
