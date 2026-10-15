@@ -6,7 +6,7 @@ use std::{
     },
 };
 use yamantaka_domain::{
-    Cancellation, RenderedPage, Result,
+    Cancellation, PdfEngine, RenderedPage, Result,
     cover_cache::{CoverCacheRequest, CoverImageCache},
     memory::MemoryGovernor,
     pdf_ticket::AsyncPdfEngine,
@@ -171,4 +171,112 @@ fn unwritable_cache_does_not_prevent_native_cover_delivery() {
     drop(image);
     drop(engine);
     assert_eq!(governor.usage().total, 0);
+}
+
+#[test]
+fn cached_cover_remains_available_when_both_native_readers_are_protected() {
+    let root = tempfile::tempdir().unwrap();
+    let (dll, path) = fixture();
+    let original = std::fs::read(&path).unwrap();
+    let governor = MemoryGovernor::default();
+    let cache = Arc::new(ObservedCache {
+        cache: CoverCache::new(root.path().into(), 4096 * 1024),
+        hits: AtomicUsize::new(0),
+    });
+    let engine = PdfWorker::start_with_cover_cache(
+        &dll,
+        MemoryLimits::default(),
+        governor.clone(),
+        Some(cache.clone()),
+    )
+    .unwrap();
+    let first = engine
+        .try_cover("seed".into(), path.clone(), 1, 1, Cancellation::default())
+        .unwrap()
+        .wait()
+        .unwrap();
+    let expected = first.pixels().to_vec();
+    drop(first);
+    for id in ["left", "right"] {
+        engine
+            .open(id.into(), path.clone(), None, Cancellation::default())
+            .unwrap();
+    }
+    engine
+        .set_visible_documents(&["left".into(), "right".into()])
+        .unwrap();
+    let cached = engine
+        .try_cover(
+            "library".into(),
+            path.clone(),
+            1,
+            2,
+            Cancellation::default(),
+        )
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(
+        (
+            cached.key.document_id.as_str(),
+            cached.key.page,
+            cached.key.generation
+        ),
+        ("library", 1, 2)
+    );
+    assert_eq!(cached.pixels(), expected);
+    assert_eq!(cache.hits.load(Ordering::SeqCst), 1);
+    for id in ["left", "right"] {
+        assert!(
+            !engine
+                .text(id.into(), 0, Cancellation::default())
+                .unwrap()
+                .is_empty()
+        );
+    }
+    assert!(
+        engine
+            .try_cover(
+                "cache-miss".into(),
+                path.clone(),
+                0,
+                3,
+                Cancellation::default()
+            )
+            .unwrap()
+            .wait()
+            .is_err()
+    );
+    drop(cached);
+    let record = std::fs::read_dir(root.path())
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    std::fs::write(record, b"damaged synthetic cache").unwrap();
+    assert!(
+        engine
+            .try_cover(
+                "corrupt-cache".into(),
+                path.clone(),
+                1,
+                4,
+                Cancellation::default()
+            )
+            .unwrap()
+            .wait()
+            .is_err()
+    );
+    for id in ["left", "right"] {
+        assert!(
+            !engine
+                .text(id.into(), 0, Cancellation::default())
+                .unwrap()
+                .is_empty()
+        );
+    }
+    drop(engine);
+    assert_eq!(governor.usage().total, 0);
+    assert_eq!(std::fs::read(path).unwrap(), original);
 }

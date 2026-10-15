@@ -723,11 +723,14 @@ fn run(
                 cancel,
                 reply,
             } => {
-                let result = if cancel.is_cancelled() {
-                    Err(Failure::Cancelled)
-                } else if !documents.contains_key(&id) && documents.len() >= MAX_HOT_DOCUMENTS {
-                    Err(hot_slots_protected())
-                } else {
+                let result = (|| {
+                    cancel.check()?;
+                    if let Some((old, handle)) =
+                        take_unprotected_victim(&mut documents, &recency, &scheduler, &id)?
+                    {
+                        drop(handle);
+                        clear_document_state(&old, &mut recency, &mut pages, &mut tiles, &mut text);
+                    }
                     crate::cover_detection::detect(
                         pdfium,
                         documents.get(&id),
@@ -741,7 +744,7 @@ fn run(
                         &governor,
                         cover_cache.as_deref(),
                     )
-                };
+                })();
                 reply.send(result);
             }
             Request::Cover {
@@ -752,25 +755,40 @@ fn run(
                 cancel,
                 reply,
             } => {
-                let result = if cancel.is_cancelled() {
-                    Err(Failure::Cancelled)
-                } else if !documents.contains_key(&id) && documents.len() >= MAX_HOT_DOCUMENTS {
-                    Err(hot_slots_protected())
-                } else {
+                let result = (|| {
+                    cancel.check()?;
+                    let source = super::covers::CoverSource {
+                        id: id.clone(),
+                        path: &path,
+                        page,
+                        generation,
+                    };
+                    if !documents.contains_key(&id)
+                        && documents.len() >= MAX_HOT_DOCUMENTS
+                        && let Some(cache) = cover_cache.as_deref()
+                        && let Ok(identity) = cache.identity(&path, page, &cancel)
+                        && let Some(image) = super::covers::load_cached(
+                            &source, cache, identity, &cancel, &governor,
+                        )?
+                    {
+                        return Ok(image);
+                    }
+                    cancel.check()?;
+                    if let Some((old, handle)) =
+                        take_unprotected_victim(&mut documents, &recency, &scheduler, &id)?
+                    {
+                        drop(handle);
+                        clear_document_state(&old, &mut recency, &mut pages, &mut tiles, &mut text);
+                    }
                     super::covers::render(
                         pdfium,
                         documents.get(&id),
-                        super::covers::CoverSource {
-                            id: id.clone(),
-                            path: &path,
-                            page,
-                            generation,
-                        },
+                        source,
                         &cancel,
                         &governor,
                         cover_cache.as_deref(),
                     )
-                };
+                })();
                 reply.send(result);
             }
             Request::Shutdown => {
@@ -796,33 +814,13 @@ fn run(
                     // the native hot-document limit also applies during opening.
                     // Pins can change after admission. Check again before any
                     // eviction; never exceed the two-handle native limit.
-                    let victim = {
-                        let state = scheduler.lock().unwrap();
-                        let protected = protected_documents(&state);
-                        if !documents.contains_key(&id) && documents.len() >= MAX_HOT_DOCUMENTS {
-                            let old = recency
-                                .iter()
-                                .find(|old| !protected.contains(*old))
-                                .cloned()
-                                .ok_or_else(hot_slots_protected)?;
-                            // Remove under the metadata lock so a new pin cannot
-                            // race the decision. Drop the native handle outside it.
-                            Some((old.clone(), documents.remove(&old)))
-                        } else {
-                            None
-                        }
-                    };
+                    let victim =
+                        take_unprotected_victim(&mut documents, &recency, &scheduler, &id)?;
                     documents.remove(&id);
-                    recency.retain(|old| old != &id);
-                    pages.retain(|key: &RenderKey| key.document_id != id);
-                    tiles.retain(|key: &RenderKey| key.document_id != id);
-                    text.retain(|key: &(String, u32)| key.0 != id);
+                    clear_document_state(&id, &mut recency, &mut pages, &mut tiles, &mut text);
                     if let Some((old, handle)) = victim {
                         drop(handle);
-                        recency.retain(|id| id != &old);
-                        pages.retain(|key: &RenderKey| key.document_id != old);
-                        tiles.retain(|key: &RenderKey| key.document_id != old);
-                        text.retain(|key: &(String, u32)| key.0 != old);
+                        clear_document_state(&old, &mut recency, &mut pages, &mut tiles, &mut text);
                     }
                     let opened = pdfium.load_pdf_from_file(
                         &path,
@@ -1181,15 +1179,48 @@ fn run(
                     documents.remove(&id)
                 };
                 drop(handle);
-                recency.retain(|old| old != &id);
-                pages.retain(|key: &RenderKey| key.document_id != id);
-                tiles.retain(|key: &RenderKey| key.document_id != id);
-                text.retain(|key: &(String, u32)| key.0 != id);
+                clear_document_state(&id, &mut recency, &mut pages, &mut tiles, &mut text);
                 reply.send(Ok(()));
             }
         }
     }
     // Documents drop before the borrowed Pdfium instance; outstanding native work finished.
+}
+
+fn take_unprotected_victim<'a>(
+    documents: &mut HashMap<String, PdfDocument<'a>>,
+    recency: &[String],
+    scheduler: &Arc<Mutex<Scheduler>>,
+    requested: &str,
+) -> Result<Option<(String, PdfDocument<'a>)>> {
+    if documents.contains_key(requested) || documents.len() < MAX_HOT_DOCUMENTS {
+        return Ok(None);
+    }
+    let state = scheduler.lock().unwrap();
+    let protected = protected_documents(&state);
+    let old = recency
+        .iter()
+        .find(|id| documents.contains_key(*id) && !protected.contains(*id))
+        .cloned()
+        .ok_or_else(hot_slots_protected)?;
+    // Select and detach under the pin lock; callers drop the handle before FFI.
+    let handle = documents
+        .remove(&old)
+        .expect("victim selected from live handles");
+    Ok(Some((old, handle)))
+}
+
+fn clear_document_state(
+    id: &str,
+    recency: &mut Vec<String>,
+    pages: &mut Cache<RenderKey, Arc<RenderedPage>>,
+    tiles: &mut Cache<RenderKey, Arc<RenderedPage>>,
+    text: &mut Cache<(String, u32), String>,
+) {
+    recency.retain(|old| old != id);
+    pages.retain(|key| key.document_id != id);
+    tiles.retain(|key| key.document_id != id);
+    text.retain(|key| key.0 != id);
 }
 
 /// Close/shutdown always win. At most eight foreground requests can bypass a

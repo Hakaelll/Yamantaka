@@ -12,6 +12,8 @@ The native library renders PDF imagery on its 3D books and honors saved source-p
 
 The picker also includes **Restore automatic cover**, which recomputes a selection while keeping the saved choice until replacement succeeds. A newer choice or a failed write prevents replacement. [Restoration verification](docs/validation/rust-cover-restore-2026-10-13.md) records transaction, race, recovery and native presentation checks.
 
+Cover loading shares the PDF worker with the reader. Verified cached pixels remain available while both reader slots are protected; native cover work can reclaim an unprotected warm slot. [Native admission verification](docs/validation/rust-cover-admission-2026-10-15.md) records the checks and remaining source-revision work.
+
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.

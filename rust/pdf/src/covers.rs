@@ -10,6 +10,33 @@ pub(crate) struct CoverSource<'a> {
     pub generation: u64,
 }
 
+pub(crate) fn load_cached(
+    source: &CoverSource<'_>,
+    cache: &dyn yamantaka_domain::cover_cache::CoverImageCache,
+    identity: [u8; 32],
+    cancel: &Cancellation,
+    governor: &MemoryGovernor,
+) -> Result<Option<Arc<RenderedPage>>> {
+    cancel.check()?;
+    let request = yamantaka_domain::cover_cache::CoverCacheRequest {
+        identity,
+        document: &source.id,
+        page: source.page,
+        generation: source.generation,
+    };
+    let result = match cache.load(request, governor, cancel) {
+        Ok(Some(image))
+            if cache.identity(source.path, source.page, cancel).ok() == Some(identity) =>
+        {
+            Some(image)
+        }
+        Err(Failure::MemoryBudget) => return Err(Failure::MemoryBudget),
+        _ => None,
+    };
+    cancel.check()?;
+    Ok(result)
+}
+
 pub(crate) fn render<'a>(
     pdfium: &'a Pdfium,
     existing: Option<&PdfDocument<'a>>,
@@ -23,22 +50,10 @@ pub(crate) fn render<'a>(
     // temporary opens, whose source identity is checked before and after render.
     let cache = cache.filter(|_| existing.is_none());
     let identity = cache.and_then(|cache| cache.identity(source.path, source.page, cancel).ok());
-    if let (Some(cache), Some(identity)) = (cache, identity) {
-        let request = yamantaka_domain::cover_cache::CoverCacheRequest {
-            identity,
-            document: &source.id,
-            page: source.page,
-            generation: source.generation,
-        };
-        match cache.load(request, governor, cancel) {
-            Ok(Some(image))
-                if cache.identity(source.path, source.page, cancel).ok() == Some(identity) =>
-            {
-                return Ok(image);
-            }
-            Err(Failure::MemoryBudget) => return Err(Failure::MemoryBudget),
-            _ => {}
-        }
+    if let (Some(cache), Some(identity)) = (cache, identity)
+        && let Some(image) = load_cached(&source, cache, identity, cancel, governor)?
+    {
+        return Ok(image);
     }
     cancel.check()?;
     // Temporary handles stay on the native owner and are dropped on every exit.
