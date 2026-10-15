@@ -35,6 +35,7 @@ fn persist(database: &mut Database, choice: &AutomaticCover, write: Write) -> Re
     if std::path::Path::new(&path) != document.path
         || fingerprint != document.fingerprint
         || count != document.page_count
+        || modified != choice.source_modified()
         || choice.page() >= count
     {
         return Err(Failure::Invalid(
@@ -130,6 +131,7 @@ mod tests {
         .unwrap();
         AutomaticCover::new(
             db.get("d").unwrap().unwrap(),
+            "2026-10-13".into(),
             CoverChoice {
                 page: 1,
                 score: 59.0,
@@ -191,6 +193,7 @@ mod tests {
             "UPDATE documents SET fingerprint='changed' WHERE id='d'",
             "UPDATE documents SET path='changed.pdf' WHERE id='d'",
             "UPDATE documents SET page_count=2 WHERE id='d'",
+            "UPDATE documents SET file_modified_at='changed' WHERE id='d'",
             "CREATE TRIGGER rejected BEFORE INSERT ON document_covers BEGIN SELECT RAISE(IGNORE); END;",
             "CREATE TRIGGER ignored_cache BEFORE UPDATE OF thumbnail_path ON documents BEGIN SELECT RAISE(IGNORE); END;",
             "CREATE TRIGGER aborted_cache BEFORE UPDATE OF thumbnail_path ON documents BEGIN SELECT RAISE(ABORT,'synthetic failure'); END;",

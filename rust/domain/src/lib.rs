@@ -6,6 +6,7 @@ pub mod cover_cache;
 pub mod cover_policy;
 pub mod cover_revision;
 pub mod cover_selection;
+pub mod cover_snapshot;
 pub mod external_uri;
 pub mod memory;
 pub mod outline;
@@ -183,6 +184,9 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn cover_snapshot(&self, _id: &str) -> Result<cover_snapshot::CoverSnapshot> {
+        Err(Failure::Unsupported("Cover source snapshot".into()))
+    }
     fn cover_revision(&self, _id: &str) -> Result<Option<cover_revision::CoverRevision>> {
         Err(Failure::Unsupported("Cover decision revision".into()))
     }

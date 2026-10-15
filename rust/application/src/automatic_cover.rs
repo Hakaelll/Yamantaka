@@ -13,12 +13,22 @@ pub(crate) fn complete(
     document: Document,
     generation: u64,
     detected: DetectedCover,
+    snapshot: yamantaka_domain::cover_snapshot::CoverSnapshot,
 ) -> Result<CoverCompletion> {
     if detected.image.key.generation != generation {
         return Err(Failure::Invalid("Stale automatic cover generation".into()));
     }
-    let choice = AutomaticCover::new(document, detected.choice, &detected.image)?;
-    if repository.save_automatic_cover(&choice)? {
+    let choice = AutomaticCover::new(
+        document,
+        snapshot.source_modified,
+        detected.choice,
+        &detected.image,
+    )?;
+    let saved = match snapshot.revision {
+        Some(revision) => repository.replace_automatic_cover(&choice, Some(revision))?,
+        None => repository.save_automatic_cover(&choice)?,
+    };
+    if saved {
         return Ok(CoverCompletion::Image(detected.image));
     }
     // A newer manual or automatic choice wins over background detection.
@@ -36,13 +46,18 @@ pub(crate) fn restore(
     document: Document,
     generation: u64,
     detected: DetectedCover,
-    expected: Option<yamantaka_domain::cover_revision::CoverRevision>,
+    expected: yamantaka_domain::cover_snapshot::CoverSnapshot,
 ) -> Result<Arc<RenderedPage>> {
     if detected.image.key.generation != generation {
         return Err(Failure::Invalid("Stale automatic cover generation".into()));
     }
-    let choice = AutomaticCover::new(document, detected.choice, &detected.image)?;
-    if !repository.replace_automatic_cover(&choice, expected)? {
+    let choice = AutomaticCover::new(
+        document,
+        expected.source_modified,
+        detected.choice,
+        &detected.image,
+    )?;
+    if !repository.replace_automatic_cover(&choice, expected.revision)? {
         return Err(Failure::Invalid(
             "Cover changed while restoring; reopen the picker".into(),
         ));
@@ -50,6 +65,8 @@ pub(crate) fn restore(
     Ok(detected.image)
 }
 
+#[cfg(test)]
+mod freshness_tests;
 #[cfg(test)]
 mod restore_tests;
 #[cfg(test)]

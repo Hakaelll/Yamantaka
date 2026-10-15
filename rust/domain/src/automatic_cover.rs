@@ -5,12 +5,18 @@ use crate::{
 
 pub struct AutomaticCover {
     document: Document,
+    source_modified: String,
     page: u32,
     confidence: f64,
     aspect: f64,
 }
 impl AutomaticCover {
-    pub fn new(document: Document, choice: CoverChoice, image: &RenderedPage) -> Result<Self> {
+    pub fn new(
+        document: Document,
+        source_modified: String,
+        choice: CoverChoice,
+        image: &RenderedPage,
+    ) -> Result<Self> {
         if choice.page >= document.page_count.min(MAX_COVER_CANDIDATES as u32)
             || !choice.score.is_finite()
             || !choice.confidence.is_finite()
@@ -32,6 +38,7 @@ impl AutomaticCover {
         }
         Ok(Self {
             document,
+            source_modified,
             page: choice.page,
             confidence: choice.confidence,
             aspect: (f64::from(image.width) / f64::from(image.height)).clamp(0.1, 10.0),
@@ -39,6 +46,9 @@ impl AutomaticCover {
     }
     pub fn document(&self) -> &Document {
         &self.document
+    }
+    pub fn source_modified(&self) -> &str {
+        &self.source_modified
     }
     pub fn page(&self) -> u32 {
         self.page
@@ -96,7 +106,9 @@ mod tests {
             score: 59.0,
             confidence: 0.79,
         };
-        let selected = AutomaticCover::new(document.clone(), valid, &image).unwrap();
+        let selected =
+            AutomaticCover::new(document.clone(), "source-date".into(), valid, &image).unwrap();
+        assert_eq!(selected.source_modified(), "source-date");
         assert_eq!(
             (selected.page(), selected.confidence(), selected.aspect()),
             (1, 0.79, 0.75)
@@ -116,15 +128,22 @@ mod tests {
             },
             CoverChoice { page: 6, ..valid },
         ] {
-            assert!(AutomaticCover::new(document.clone(), invalid, &image).is_err());
+            assert!(
+                AutomaticCover::new(document.clone(), "source-date".into(), invalid, &image)
+                    .is_err()
+            );
         }
         image.width = 2;
-        assert!(AutomaticCover::new(document.clone(), valid, &image).is_err());
+        assert!(
+            AutomaticCover::new(document.clone(), "source-date".into(), valid, &image).is_err()
+        );
         image.width = 3;
         image.key.document_id = "other".into();
-        assert!(AutomaticCover::new(document.clone(), valid, &image).is_err());
+        assert!(
+            AutomaticCover::new(document.clone(), "source-date".into(), valid, &image).is_err()
+        );
         image.key.document_id = "d".into();
         image.key.page = 0;
-        assert!(AutomaticCover::new(document, valid, &image).is_err());
+        assert!(AutomaticCover::new(document, "source-date".into(), valid, &image).is_err());
     }
 }

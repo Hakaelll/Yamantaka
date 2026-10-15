@@ -277,12 +277,32 @@ mod tests {
         let db = Database::in_memory_at(11).unwrap();
         db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('saved','synthetic.pdf','synthetic','synthetic.pdf',2,1,'now','now','now','synthetic');
             INSERT INTO document_covers VALUES('saved',1,'preserved-small','preserved-large','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z',1,'manual',4,'contain',0.75);").unwrap();
+        let escaped = path.to_string_lossy().replace('\'', "''");
+        db.execute_batch(&format!(
+            "UPDATE documents SET path='{escaped}' WHERE id='saved'"
+        ))
+        .unwrap();
         let worker = PdfWorker::start(
             &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
             MemoryLimits::default(),
         )
         .unwrap();
         let runtime = Runtime::start(db, worker, || {}).unwrap();
+        runtime
+            .submit(Action::Cover(
+                "saved".into(),
+                "synthetic.pdf".into(),
+                40,
+                Cancellation::default(),
+            ))
+            .unwrap();
+        assert!(matches!(
+            runtime
+                .updates
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .unwrap(),
+            Update::Cover(_, Err(_), _)
+        ));
         let cancel = Cancellation::default();
         runtime
             .submit(Action::Cover(

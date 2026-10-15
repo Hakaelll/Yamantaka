@@ -6,6 +6,7 @@ pub mod bookmarks;
 pub mod cover_cache;
 mod cover_revision;
 mod cover_selection;
+mod cover_snapshot;
 pub mod database;
 pub mod identity;
 pub mod migration;

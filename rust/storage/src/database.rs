@@ -272,6 +272,9 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn cover_snapshot(&self, id: &str) -> Result<yamantaka_domain::cover_snapshot::CoverSnapshot> {
+        crate::cover_snapshot::read(&self.connection, id)
+    }
     fn cover_revision(
         &self,
         id: &str,

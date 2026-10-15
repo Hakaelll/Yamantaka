@@ -164,6 +164,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         if args
             .iter()
+            .any(|arg| arg == "--automatic-cover-stale-version")
+        {
+            db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-08',0.79,'automatic',2,'contain',0.7142857142857143);")?;
+        }
+        if args
+            .iter()
+            .any(|arg| arg == "--automatic-cover-stale-source")
+        {
+            db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-07',0.79,'automatic',3,'contain',0.7142857142857143);")?;
+        }
+        if args
+            .iter()
             .any(|arg| arg == "--cover-picker-restore-failed")
         {
             db.execute_batch("CREATE TRIGGER synthetic_restore_rejection BEFORE UPDATE OF thumbnail_path ON documents WHEN OLD.id='demo-0' BEGIN SELECT RAISE(ABORT,'synthetic restore rejection'); END;")?;
