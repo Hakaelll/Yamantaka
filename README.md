@@ -12,7 +12,7 @@ The native library renders PDF imagery on its 3D books and honors saved source-p
 
 The picker also includes **Restore automatic cover**, which recomputes a selection while keeping the saved choice until replacement succeeds. A newer choice or a failed write prevents replacement. [Restoration verification](docs/validation/rust-cover-restore-2026-10-13.md) records transaction, race, recovery and native presentation checks.
 
-Cover loading shares the PDF worker with the reader. Verified cached pixels remain available while both reader slots are protected; native cover work can reclaim an unprotected warm slot. [Native admission verification](docs/validation/rust-cover-admission-2026-10-15.md) records the checks and remaining source-revision work.
+Cover loading shares the PDF worker with the reader. Verified cached pixels remain available while both reader slots are protected; native cover work can reclaim an unprotected warm slot. [Native admission verification](docs/validation/rust-cover-admission-2026-10-15.md) records those checks. The worker also [checks the requested path and source stamp before reusing a native handle](docs/validation/rust-cover-source-2026-10-15.md), preserving protected readers when a cover request targets a changed source.
 
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 

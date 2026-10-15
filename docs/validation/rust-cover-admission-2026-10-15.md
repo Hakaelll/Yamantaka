@@ -72,8 +72,9 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 
 ## Remaining acceptance
 
-Warm-handle file/path revision ownership and live invalidation of resident covers
-remain separate work. The requested document ID can still reuse an existing
-handle without a complete source-revision comparison. Physical DPI, Narrator,
+At this checkpoint, warm-handle file/path revision ownership remained separate
+work. The subsequent [source ownership check](rust-cover-source-2026-10-15.md)
+adds a bounded source-stamp comparison before cover reuse. Live invalidation
+of resident covers remains pending. Physical DPI, Narrator,
 paired performance traces and the remaining rewrite acceptance are unchanged.
 This is not a replacement release or a measured performance claim.

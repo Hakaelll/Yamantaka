@@ -1,4 +1,5 @@
 use crate::cache::Cache;
+use crate::source::{LoadedPdf, SourceStamp};
 use crossbeam_channel::{Receiver, Sender, bounded};
 use pdfium_render::prelude::*;
 use std::{
@@ -646,7 +647,7 @@ fn run(
     governor: MemoryGovernor,
     cover_cache: Option<Arc<dyn yamantaka_domain::cover_cache::CoverImageCache>>,
 ) {
-    let mut documents: HashMap<String, PdfDocument<'_>> = HashMap::new();
+    let mut documents: HashMap<String, LoadedPdf<'_>> = HashMap::new();
     let mut recency: Vec<String> = Vec::new();
     let mut pages = Cache::new(limits.pages);
     let mut tiles = Cache::new(limits.tiles);
@@ -725,15 +726,16 @@ fn run(
             } => {
                 let result = (|| {
                     cancel.check()?;
+                    let revision = SourceStamp::read(&path, &cancel)?;
                     if let Some((old, handle)) =
-                        take_unprotected_victim(&mut documents, &recency, &scheduler, &id)?
+                        take_cover_victim(&mut documents, &recency, &scheduler, &id, &revision)?
                     {
                         drop(handle);
                         clear_document_state(&old, &mut recency, &mut pages, &mut tiles, &mut text);
                     }
-                    crate::cover_detection::detect(
+                    let detected = crate::cover_detection::detect(
                         pdfium,
-                        documents.get(&id),
+                        documents.get(&id).map(|loaded| &loaded.document),
                         crate::covers::CoverSource {
                             id: id.clone(),
                             path: &path,
@@ -743,7 +745,9 @@ fn run(
                         &cancel,
                         &governor,
                         cover_cache.as_deref(),
-                    )
+                    )?;
+                    revision.verify(&path, &cancel)?;
+                    Ok(detected)
                 })();
                 reply.send(result);
             }
@@ -757,37 +761,44 @@ fn run(
             } => {
                 let result = (|| {
                     cancel.check()?;
+                    let revision = SourceStamp::read(&path, &cancel)?;
                     let source = super::covers::CoverSource {
                         id: id.clone(),
                         path: &path,
                         page,
                         generation,
                     };
-                    if !documents.contains_key(&id)
-                        && documents.len() >= MAX_HOT_DOCUMENTS
+                    let matching = documents
+                        .get(&id)
+                        .is_some_and(|loaded| loaded.source == revision);
+                    if !matching
+                        && (documents.contains_key(&id) || documents.len() >= MAX_HOT_DOCUMENTS)
                         && let Some(cache) = cover_cache.as_deref()
                         && let Ok(identity) = cache.identity(&path, page, &cancel)
                         && let Some(image) = super::covers::load_cached(
                             &source, cache, identity, &cancel, &governor,
                         )?
                     {
+                        revision.verify(&path, &cancel)?;
                         return Ok(image);
                     }
                     cancel.check()?;
                     if let Some((old, handle)) =
-                        take_unprotected_victim(&mut documents, &recency, &scheduler, &id)?
+                        take_cover_victim(&mut documents, &recency, &scheduler, &id, &revision)?
                     {
                         drop(handle);
                         clear_document_state(&old, &mut recency, &mut pages, &mut tiles, &mut text);
                     }
-                    super::covers::render(
+                    let image = super::covers::render(
                         pdfium,
-                        documents.get(&id),
+                        documents.get(&id).map(|loaded| &loaded.document),
                         source,
                         &cancel,
                         &governor,
                         cover_cache.as_deref(),
-                    )
+                    )?;
+                    revision.verify(&path, &cancel)?;
+                    Ok(image)
                 })();
                 reply.send(result);
             }
@@ -809,6 +820,7 @@ fn run(
                 let result = (|| {
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
+                    let source = SourceStamp::read(&path, &cancel)?;
                     // Remove stale caches even when the same ID is reopened for a
                     // changed file. Close a victim before opening the next handle:
                     // the native hot-document limit also applies during opening.
@@ -830,6 +842,7 @@ fn run(
                     // before metadata inspection or any terminal event.
                     drop(password);
                     let document = opened.map_err(pdf_failure)?;
+                    source.verify(&path, &cancel)?;
                     let info = InspectInfo {
                         pages: yamantaka_domain::pdf_pages::PdfPagesBuilder::new(
                             document.pages().len() as usize,
@@ -846,7 +859,14 @@ fn run(
                     };
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
-                    documents.insert(id.clone(), document);
+                    documents.insert(
+                        id.clone(),
+                        LoadedPdf {
+                            document,
+                            path,
+                            source,
+                        },
+                    );
                     recency.retain(|old| old != &id);
                     recency.push(id.clone());
                     Ok(info)
@@ -876,9 +896,10 @@ fn run(
                 let result = (|| {
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
-                    let document = documents
+                    let loaded = documents
                         .get(&id)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
+                    let document = &loaded.document;
                     let count = u32::try_from(document.pages().len())
                         .map_err(|_| Failure::Pdf("Invalid page count".into()))?;
                     let end = next_page.saturating_add(16).min(count);
@@ -895,6 +916,9 @@ fn run(
                         next_page += 1;
                     }
                     epoch_matches(&scheduler, &id, epoch)?;
+                    if next_page == count {
+                        loaded.source.verify(&loaded.path, &cancel)?;
+                    }
                     Ok(next_page == count)
                 })();
                 match result {
@@ -956,6 +980,7 @@ fn run(
                     }
                     let document = documents
                         .get(&key.document_id)
+                        .map(|loaded| &loaded.document)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
                     let page = document
                         .pages()
@@ -1047,6 +1072,7 @@ fn run(
                     }
                     let document = documents
                         .get(&id)
+                        .map(|loaded| &loaded.document)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
                     let page = document
                         .pages()
@@ -1078,6 +1104,7 @@ fn run(
                     epoch_matches(&scheduler, &id, epoch)?;
                     let document = documents
                         .get(&id)
+                        .map(|loaded| &loaded.document)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
                     crate::outline::read(document, &governor, || {
                         cancel.check()?;
@@ -1103,6 +1130,7 @@ fn run(
                     epoch_matches(&scheduler, &id, epoch)?;
                     let document = documents
                         .get(&id)
+                        .map(|loaded| &loaded.document)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
                     crate::text_geometry::read(document, page, &governor, || {
                         cancel.check()?;
@@ -1128,6 +1156,7 @@ fn run(
                     epoch_matches(&scheduler, &id, epoch)?;
                     let document = documents
                         .get(&id)
+                        .map(|loaded| &loaded.document)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
                     crate::links::read(document, page, &governor, || {
                         cancel.check()?;
@@ -1155,6 +1184,7 @@ fn run(
                     epoch_matches(&scheduler, &id, epoch)?;
                     let document = documents
                         .get(&id)
+                        .map(|loaded| &loaded.document)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
                     crate::find::read(document, page, &query, offset, &governor, || {
                         cancel.check()?;
@@ -1187,12 +1217,37 @@ fn run(
     // Documents drop before the borrowed Pdfium instance; outstanding native work finished.
 }
 
-fn take_unprotected_victim<'a>(
-    documents: &mut HashMap<String, PdfDocument<'a>>,
+fn take_cover_victim<'a>(
+    documents: &mut HashMap<String, LoadedPdf<'a>>,
     recency: &[String],
     scheduler: &Arc<Mutex<Scheduler>>,
     requested: &str,
-) -> Result<Option<(String, PdfDocument<'a>)>> {
+    source: &SourceStamp,
+) -> Result<Option<(String, LoadedPdf<'a>)>> {
+    if documents
+        .get(requested)
+        .is_some_and(|loaded| loaded.source != *source)
+    {
+        let state = scheduler.lock().unwrap();
+        if protected_documents(&state).contains(requested) {
+            return Err(crate::source::source_changed());
+        }
+        return Ok(Some((
+            requested.to_owned(),
+            documents
+                .remove(requested)
+                .expect("stale handle checked before detachment"),
+        )));
+    }
+    take_unprotected_victim(documents, recency, scheduler, requested)
+}
+
+fn take_unprotected_victim<'a>(
+    documents: &mut HashMap<String, LoadedPdf<'a>>,
+    recency: &[String],
+    scheduler: &Arc<Mutex<Scheduler>>,
+    requested: &str,
+) -> Result<Option<(String, LoadedPdf<'a>)>> {
     if documents.contains_key(requested) || documents.len() < MAX_HOT_DOCUMENTS {
         return Ok(None);
     }
