@@ -16,6 +16,8 @@ Cover loading shares the PDF worker with the reader. Verified cached pixels rema
 
 The reader uses a small first raster and retains it while refining after zoom or resize settles. Its navigator keeps the chosen width as content arrives, and background work no longer adds a processing row above the PDF. [Presentation verification](docs/validation/rust-reader-fluidity-2026-10-15.md) records native traces, tests and the remaining performance measurements.
 
+New imports clean embedded title and author fields, reject known tool labels and placeholders, and preserve the original metadata for later review. Search respects the same metadata precedence as the catalogue. [Import metadata verification](docs/validation/rust-import-metadata-2026-10-15.md) covers native PDFium imports and the remaining front-matter analysis work.
+
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.
@@ -91,6 +93,7 @@ Generate the synthetic PDF corpus with Python and the `reportlab`, `Pillow` and 
 
 ```powershell
 python ./tool/create_rust_pdf_fixtures.py
+python ./tool/create_rust_metadata_fixtures.py
 ./target/debug/yamantaka-rust.exe --demo
 ./target/debug/yamantaka-rust.exe --demo --light
 ./target/debug/yamantaka-rust.exe --demo --reader

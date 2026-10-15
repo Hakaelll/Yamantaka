@@ -8,6 +8,7 @@ pub mod cover_revision;
 pub mod cover_selection;
 pub mod cover_snapshot;
 pub mod external_uri;
+pub mod import_metadata;
 pub mod memory;
 pub mod outline;
 

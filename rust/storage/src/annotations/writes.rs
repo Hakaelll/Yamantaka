@@ -240,7 +240,7 @@ pub(super) fn refresh(
         params![document, page],
     )
     .map_err(storage)?;
-    db.execute("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT a.document_id,a.page_index,'annotation',COALESCE(d.title_override,d.source_title,d.title,d.file_name),COALESCE(a.selected_text,'') || ' ' || COALESCE(a.note,''),COALESCE((SELECT group_concat(t.name,' ') FROM annotation_tags at JOIN tags t ON t.id=at.tag_id WHERE at.annotation_id=a.id),'') FROM annotations a JOIN documents d ON d.id=a.document_id WHERE a.document_id=? AND a.page_index=? AND NOT EXISTS(SELECT 1 FROM search_index_state s WHERE s.document_id=d.id AND s.status='excluded')",params![document,page]).map_err(storage)?;
+    db.execute("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT a.document_id,a.page_index,'annotation',COALESCE(d.title_override,d.title,d.source_title,d.file_name),COALESCE(a.selected_text,'') || ' ' || COALESCE(a.note,''),COALESCE((SELECT group_concat(t.name,' ') FROM annotation_tags at JOIN tags t ON t.id=at.tag_id WHERE at.annotation_id=a.id),'') FROM annotations a JOIN documents d ON d.id=a.document_id WHERE a.document_id=? AND a.page_index=? AND NOT EXISTS(SELECT 1 FROM search_index_state s WHERE s.document_id=d.id AND s.status='excluded')",params![document,page]).map_err(storage)?;
     Ok(())
 }
 struct CreationContext<'a> {

@@ -51,7 +51,7 @@ fn verify_session(db: &Connection, session: &IndexSession) -> Result<()> {
     }
     Ok(())
 }
-const TITLE: &str = "COALESCE(d.title_override,d.source_title,d.title,d.file_name)";
+const TITLE: &str = "COALESCE(d.title_override,d.title,d.source_title,d.file_name)";
 /// Update one auxiliary entry inside the caller's bookmark transaction. This
 /// neither refreshes the catalogue nor changes an active PDF index revision.
 pub(crate) fn refresh_bookmark_page(
@@ -71,7 +71,7 @@ pub(crate) fn refresh_bookmark_page(
     db.execute(&format!("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT b.document_id,b.page_index,'bookmark',{TITLE},COALESCE(b.label,'') || ' página ' || CAST(b.page_index+1 AS TEXT),'' FROM bookmarks b JOIN documents d ON d.id=b.document_id WHERE b.document_id=? AND b.page_index=? AND NOT EXISTS(SELECT 1 FROM search_index_state s WHERE s.document_id=d.id AND s.status='excluded')"),params![id,page]).map_err(storage)?;
     Ok(())
 }
-const NEEDS_INDEX: &str = "(s.document_id IS NULL OR s.fingerprint<>d.fingerprint OR s.status IN ('pending','indexing','failed') OR s.indexed_pages<>d.page_count OR NOT EXISTS(SELECT 1 FROM library_search m WHERE m.document_id=d.id AND m.kind='metadata' AND m.title=COALESCE(d.title_override,d.source_title,d.title,d.file_name) AND m.body=COALESCE(d.author_override,d.source_author,d.author,'') || ' ' || d.file_name || ' ' || COALESCE((SELECT note FROM document_notes n WHERE n.document_id=d.id),'') AND m.tags=COALESCE((SELECT group_concat(t.name,' ') FROM document_tags dt JOIN tags t ON t.id=dt.tag_id WHERE dt.document_id=d.id),'')))";
+const NEEDS_INDEX: &str = "(s.document_id IS NULL OR s.fingerprint<>d.fingerprint OR s.status IN ('pending','indexing','failed') OR s.indexed_pages<>d.page_count OR NOT EXISTS(SELECT 1 FROM library_search m WHERE m.document_id=d.id AND m.kind='metadata' AND m.title=COALESCE(d.title_override,d.title,d.source_title,d.file_name) AND m.body=COALESCE(d.author_override,d.author,d.source_author,'') || ' ' || d.file_name || ' ' || COALESCE((SELECT note FROM document_notes n WHERE n.document_id=d.id),'') AND m.tags=COALESCE((SELECT group_concat(t.name,' ') FROM document_tags dt JOIN tags t ON t.id=dt.tag_id WHERE dt.document_id=d.id),'')))";
 fn metadata(db: &Connection, id: &str) -> Result<()> {
     db.execute("UPDATE library_search SET tags=COALESCE((SELECT group_concat(t.name,' ') FROM document_tags dt JOIN tags t ON t.id=dt.tag_id WHERE dt.document_id=?),'') WHERE document_id=? AND kind='pageText'",params![id,id]).map_err(storage)?;
     db.execute(&format!("UPDATE library_search SET title=(SELECT {TITLE} FROM documents d WHERE d.id=?) WHERE document_id=?"), params![id,id]).map_err(storage)?;
@@ -80,7 +80,7 @@ fn metadata(db: &Connection, id: &str) -> Result<()> {
         [id],
     )
     .map_err(storage)?;
-    db.execute(&format!("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT d.id,-1,'metadata',{TITLE},COALESCE(d.author_override,d.source_author,d.author,'') || ' ' || d.file_name || ' ' || COALESCE(n.note,''),COALESCE((SELECT group_concat(t.name,' ') FROM tags t JOIN document_tags dt ON dt.tag_id=t.id WHERE dt.document_id=d.id),'') FROM documents d LEFT JOIN document_notes n ON n.document_id=d.id WHERE d.id=?"), [id]).map_err(storage)?;
+    db.execute(&format!("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT d.id,-1,'metadata',{TITLE},COALESCE(d.author_override,d.author,d.source_author,'') || ' ' || d.file_name || ' ' || COALESCE(n.note,''),COALESCE((SELECT group_concat(t.name,' ') FROM tags t JOIN document_tags dt ON dt.tag_id=t.id WHERE dt.document_id=d.id),'') FROM documents d LEFT JOIN document_notes n ON n.document_id=d.id WHERE d.id=?"), [id]).map_err(storage)?;
     Ok(())
 }
 impl SearchRepository for Database {
@@ -362,7 +362,7 @@ impl SearchRepository for Database {
                 "INSERT INTO library_search SELECT dt.document_id,-1,'tag',{TITLE},'',t.name FROM document_tags dt JOIN tags t ON t.id=dt.tag_id JOIN documents d ON d.id=dt.document_id {eligible}"
             ),
             format!(
-                "INSERT INTO library_search SELECT d.id,-1,'relation',{TITLE},r.relation_type || ' ' || COALESCE(other.title_override,other.source_title,other.title,other.file_name),'' FROM document_relations r JOIN documents d ON d.id=r.source_document_id JOIN documents other ON other.id=r.target_document_id {eligible} WHERE NOT EXISTS(SELECT 1 FROM search_index_state target_state WHERE target_state.document_id=other.id AND target_state.status='excluded')"
+                "INSERT INTO library_search SELECT d.id,-1,'relation',{TITLE},r.relation_type || ' ' || COALESCE(other.title_override,other.title,other.source_title,other.file_name),'' FROM document_relations r JOIN documents d ON d.id=r.source_document_id JOIN documents other ON other.id=r.target_document_id {eligible} WHERE NOT EXISTS(SELECT 1 FROM search_index_state target_state WHERE target_state.document_id=other.id AND target_state.status='excluded')"
             ),
         ] {
             cancel.check()?;

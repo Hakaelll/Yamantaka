@@ -28,6 +28,50 @@ fn page(db: &mut Database, s: &mut IndexSession, p: u32, text: &str) {
 }
 
 #[test]
+fn current_metadata_precedes_raw_sources_and_changes_invalidate_the_metadata_index() {
+    let mut db = library();
+    db.execute_batch("UPDATE documents SET title='Validated optics',author='Reviewed institute',source_title='Raw processor title',source_author='Raw application',title_override=NULL,author_override=NULL,page_count=1 WHERE id='a'").unwrap();
+    let mut index = begin(&mut db, "a");
+    page(&mut db, &mut index, 0, "Synthetic page body");
+    let cancel = Cancellation::default();
+    db.finish_index(&mut index, IndexAccess::Enabled, &cancel)
+        .unwrap();
+    let document = yamantaka_domain::LibraryRepository::get(&db, "a")
+        .unwrap()
+        .unwrap();
+    let hits = db.search(&query("Validated"), &cancel).unwrap();
+    assert!(!hits.is_empty());
+    assert!(hits.iter().all(|hit| hit.title == document.display_title()));
+    assert!(!db.search(&query("institute"), &cancel).unwrap().is_empty());
+    assert!(db.search(&query("processor"), &cancel).unwrap().is_empty());
+    assert!(
+        db.search(&query("application"), &cancel)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        !db.index_candidates(None, 80, IndexAccess::Enabled, &cancel)
+            .unwrap()
+            .contains(&"a".into())
+    );
+    db.execute_batch("UPDATE documents SET title='Updated optics' WHERE id='a'")
+        .unwrap();
+    assert!(
+        db.index_candidates(None, 80, IndexAccess::Enabled, &cancel)
+            .unwrap()
+            .contains(&"a".into())
+    );
+    db.execute_batch("UPDATE documents SET title_override='Manual optics',author_override='Manual institute' WHERE id='a'").unwrap();
+    let mut index = begin(&mut db, "a");
+    page(&mut db, &mut index, 0, "Synthetic page body");
+    db.finish_index(&mut index, IndexAccess::Enabled, &cancel)
+        .unwrap();
+    let hits = db.search(&query("Manual"), &cancel).unwrap();
+    assert!(!hits.is_empty());
+    assert!(hits.iter().all(|hit| hit.title == "Manual optics"));
+}
+
+#[test]
 fn real_unicode_fts_filters_previews_and_relevance() {
     let mut db = library();
     let mut a = begin(&mut db, "a");

@@ -304,6 +304,7 @@ fn fallback_cancellation_wrong_document_and_failed_snapshot_do_not_write() {
 #[test]
 fn search_consent_exclusion_failure_and_active_index_state_are_independent() {
     let mut db = library();
+    db.execute_batch("UPDATE documents SET title='Reviewed title',source_title='Raw processor title' WHERE id='a'").unwrap();
     let governor = MemoryGovernor::default();
     let cancel = Cancellation::default();
     create(&mut db, &governor, false, false, IndexAccess::Disabled).unwrap();
@@ -312,6 +313,9 @@ fn search_consent_exclusion_failure_and_active_index_state_are_independent() {
         .begin_index("a", false, IndexAccess::Enabled, &cancel)
         .unwrap();
     create(&mut db, &governor, false, false, IndexAccess::Enabled).unwrap();
+    let indexed = hits(&db, "学习");
+    assert!(!indexed.is_empty());
+    assert!(indexed.iter().all(|hit| hit.title == "Reviewed title"));
     assert_eq!(
         db.index_state("a").unwrap().unwrap().indexed_pages,
         session.cursor

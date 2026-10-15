@@ -161,12 +161,13 @@ pub(crate) fn readonly(path: &Path) -> Result<Connection> {
 
 const PROJECTION: &str = "id,path,file_name,COALESCE(title_override,title,source_title),COALESCE(author_override,author,source_author),page_count,last_page_index,reading_progress,is_favorite,is_missing,fingerprint,thumbnail_path";
 fn document(row: &rusqlite::Row<'_>) -> rusqlite::Result<Document> {
+    let author: Option<String> = row.get(4)?;
     Ok(Document {
         id: row.get(0)?,
         path: row.get::<_, String>(1)?.into(),
         file_name: row.get(2)?,
         title: row.get(3)?,
-        author: row.get(4)?,
+        author: author.filter(|value| !value.trim().is_empty()),
         page_count: row.get(5)?,
         last_page_index: row.get(6)?,
         reading_progress: row.get(7)?,
@@ -355,10 +356,23 @@ impl LibraryRepository for Database {
             return Ok(id);
         }
         let metadata = path.metadata().map_err(storage)?;
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+        use yamantaka_domain::import_metadata::{self, MetadataValue};
+        let title = match import_metadata::title(document.info.title.as_deref(), &file_name) {
+            MetadataValue::Missing => None,
+            MetadataValue::Accepted(value) => Some(value),
+            MetadataValue::Rejected => Some(file_name.to_string()),
+        };
+        let author = match import_metadata::author(document.info.author.as_deref()) {
+            MetadataValue::Missing => None,
+            MetadataValue::Accepted(value) => Some(value),
+            // An explicit empty effective value prevents fallback to rejected raw metadata.
+            MetadataValue::Rejected => Some(String::new()),
+        };
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
         let fingerprint = crate::identity::legacy_fingerprint(&path)?;
-        self.connection.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,source_title,source_author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES(?1,?2,?3,?4,?5,?6,?5,?6,?7,?8,?9,?10,?10,?11)", params![id,path.to_string_lossy(),normalized,path.file_name().unwrap_or_default().to_string_lossy(),document.info.title,document.info.author,document.info.pages.len() as i64,metadata.len() as i64,chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),now,fingerprint]).map_err(storage)?;
+        self.connection.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,source_title,source_author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?12,?13)", params![id,path.to_string_lossy(),normalized,file_name,title,author,document.info.title,document.info.author,document.info.pages.len() as i64,metadata.len() as i64,chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),now,fingerprint]).map_err(storage)?;
         Ok(id)
     }
     fn query(&self, query: &LibraryQuery) -> Result<Vec<Document>> {

@@ -25,6 +25,8 @@ fn change(db: &mut Database, change: BookmarkChange, access: IndexAccess) -> Boo
 #[test]
 fn enabled_changes_are_immediate_and_do_not_require_pdf_indexing() {
     let mut db = library();
+    db.execute_batch("UPDATE documents SET source_title='Raw processor title' WHERE id='a'")
+        .unwrap();
     let page = change(
         &mut db,
         BookmarkChange::Save {
@@ -37,6 +39,7 @@ fn enabled_changes_are_immediate_and_do_not_require_pdf_indexing() {
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].document_id, "a");
     assert_eq!(result[0].page, Some(1));
+    assert_eq!(result[0].title, "Study");
     let id = page.entries[0].id.clone();
     change(
         &mut db,
