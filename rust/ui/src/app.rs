@@ -17,6 +17,7 @@ mod list;
 mod navigation;
 mod open_intent;
 mod opening;
+mod operations;
 mod outline;
 mod password;
 mod reader_controls;
@@ -24,6 +25,7 @@ mod reader_destination;
 mod reader_options;
 mod reader_toolbar;
 mod reader_viewport;
+mod render_plan;
 mod render_updates;
 mod restoration;
 mod search;
@@ -79,6 +81,7 @@ struct ReaderPage {
     cancel: Cancellation,
     image: Option<PageImage>,
     image_key: Option<RenderKey>,
+    plan: render_plan::RenderPlan,
 }
 impl PageImage {
     fn id(&self) -> egui::TextureId {
@@ -172,12 +175,14 @@ pub struct YamantakaApp {
     query_cancel: Cancellation,
     error: Option<String>,
     loading: bool,
+    importing: operations::BackgroundImport,
     activation: Receiver<Vec<PathBuf>>,
     _instance: Instance,
     _watch: ActivationWatch,
     capture: Option<PathBuf>,
     capture_requested: bool,
     capture_ready_since: Option<Instant>,
+    capture_render_events: Vec<serde_json::Value>,
     preview_reader: bool,
     logo: Option<TextureHandle>,
     preview_tilt: bool,
@@ -342,12 +347,14 @@ impl YamantakaApp {
             query_cancel: Cancellation::default(),
             error: None,
             loading: false,
+            importing: Default::default(),
             activation,
             _instance: instance,
             _watch: watch,
             capture,
             capture_requested: false,
             capture_ready_since: None,
+            capture_render_events: Vec::new(),
             preview_reader: false,
             logo: None,
             preview_tilt: false,
@@ -453,10 +460,11 @@ impl YamantakaApp {
         self.tabs.continuity.overridden = true;
         self.open_intent.leave_destination();
         self.password = None;
-        self.cancel.cancel();
-        self.cancel = Cancellation::default();
-        self.loading = true;
-        self.send(Action::Import(paths, self.cancel.clone()));
+        let cancel = self.importing.begin();
+        if let Err(error) = self.runtime.submit(Action::Import(paths, cancel.clone())) {
+            self.importing.finish(&cancel);
+            self.error = Some(error.to_string());
+        }
     }
     pub fn preview_reader(&mut self) {
         self.preview_reader = true;
@@ -1510,10 +1518,9 @@ impl App for YamantakaApp {
                 }
                 Update::Text(..) => {}
                 Update::Imported(_, cancel) => {
-                    if cancel.is_cancelled() {
+                    if !self.importing.finish(&cancel) {
                         continue;
                     }
-                    self.loading = false;
                     self.refresh();
                 }
                 Update::OpenFailed(document, error, cancel) => {
@@ -1554,6 +1561,16 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Failed(error, cancel) => {
+                    if cancel
+                        .as_ref()
+                        .is_some_and(|token| self.importing.finish(token))
+                    {
+                        if !matches!(error, yamantaka_domain::Failure::Cancelled) {
+                            self.error = Some(error.to_string());
+                        }
+                        self.refresh();
+                        continue;
+                    }
                     if let Some(token) = &cancel {
                         self.tabs.fail_preferences(token);
                         if self.tabs.fail_lookup(token) {
@@ -1901,23 +1918,6 @@ impl App for YamantakaApp {
                             });
                         });
                 }
-                if self.loading || self.opening.busy() || self.tabs.busy() {
-                    ui.horizontal(|ui| {
-                        ui.spinner();
-                        ui.label(self.tr("Procesando documentos…", "Working on your documents…"));
-                        if !self.tabs.closing.busy()
-                            && ui.button(self.tr("Cancelar", "Cancel")).clicked()
-                        {
-                            if self.opening.busy() || self.tabs.busy() {
-                                self.cancel_reader_opening();
-                            } else {
-                                self.cancel.cancel();
-                                self.loading = false;
-                            }
-                            self.refresh();
-                        }
-                    });
-                }
                 if self.demo {
                     egui::Panel::bottom("synthetic").show(ui, |ui| {
                         ui.label(
@@ -2003,6 +2003,7 @@ impl App for YamantakaApp {
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
                     && !self.loading
+                    && !self.importing.busy()
                     && self.opening.ready()
                     && self.tabs.ready()
                     && match self.preview_password_target {
@@ -2090,6 +2091,7 @@ impl App for YamantakaApp {
                         "readingGoal": self.goals.summary(),
                         "currentReaderPage":self.page,
                         "readerZoom":self.zoom,
+                        "readerRenderEvents":self.capture_render_events,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});

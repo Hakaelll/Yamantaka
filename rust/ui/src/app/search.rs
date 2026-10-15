@@ -114,6 +114,7 @@ impl YamantakaApp {
             theme::control(ui, label, Some(theme::Icon::Menu), false, false, p)
         };
         egui::Popup::menu(&response).show(|ui| {
+            self.operation_actions(ui, p);
             if theme::navigation(
                 ui,
                 self.tr("Diario de lectura", "Reading journal"),

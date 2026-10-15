@@ -138,17 +138,7 @@ impl YamantakaApp {
                         .show(ui, |ui| self.reader_panel_content(ui, info, p));
                 });
         } else {
-            egui::Panel::left("reader-panel")
-                .default_size(300.0)
-                .size_range(220.0..=500.0)
-                .show(ui, |ui| {
-                    ui.add_space(14.0);
-                    egui::ScrollArea::vertical()
-                        .id_salt("reader-navigator")
-                        .show(ui, |ui| {
-                            self.reader_panel_content(ui, info, p);
-                        });
-                });
+            navigator_panel(ui, |ui| self.reader_panel_content(ui, info, p));
         }
     }
 
@@ -445,6 +435,55 @@ impl YamantakaApp {
                 }
             });
         }
+    }
+}
+
+fn navigator_panel(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui)) {
+    egui::Panel::left("reader-panel")
+        .default_size(300.0)
+        .size_range(220.0..=500.0)
+        .resizable(true)
+        .show(ui, |ui| {
+            ui.add_space(14.0);
+            egui::ScrollArea::both()
+                .id_salt("reader-navigator")
+                .auto_shrink([false, false])
+                .show(ui, contents);
+        });
+}
+
+#[cfg(test)]
+mod panel_tests {
+    use super::*;
+
+    #[test]
+    fn asynchronous_navigator_content_does_not_resize_the_pdf_viewport() {
+        let context = egui::Context::default();
+        let mut viewports = Vec::new();
+        for width in [120.0, 450.0, 160.0, 200.0] {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1200.0, 800.0),
+                )),
+                ..Default::default()
+            };
+            let mut output = context.run_ui(input, |ui| {
+                navigator_panel(ui, |ui| {
+                    ui.add_sized(
+                        [width, 100.0],
+                        egui::Label::new("Synthetic navigator content"),
+                    );
+                });
+                viewports.push(ui.available_rect_before_wrap());
+            });
+            output.textures_delta.clear();
+        }
+        assert!(
+            viewports.iter().all(|rect| *rect == viewports[0]),
+            "Navigator content changed PDF geometry: {viewports:?}"
+        );
+        assert!(viewports[0].width() > 800.0);
     }
 }
 

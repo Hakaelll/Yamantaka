@@ -143,6 +143,7 @@ impl YamantakaApp {
 
     fn reader_options_content(&mut self, ui: &mut egui::Ui, p: Palette) {
         ui.set_max_width(280.0);
+        self.operation_actions(ui, p);
         if theme::navigation(
             ui,
             self.tr("Seleccionar texto", "Select text"),

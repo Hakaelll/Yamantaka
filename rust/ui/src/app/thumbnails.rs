@@ -237,6 +237,7 @@ impl YamantakaApp {
                             cancel: Cancellation::default(),
                             image: None,
                             image_key: None,
+                            plan: Default::default(),
                         });
                     if slot.requested.as_ref() != Some(&key) {
                         slot.cancel.cancel();
@@ -376,6 +377,7 @@ mod tests {
             cancel,
             image: None,
             image_key: None,
+            plan: Default::default(),
         }
     }
 

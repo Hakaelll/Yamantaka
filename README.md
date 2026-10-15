@@ -14,6 +14,8 @@ The picker also includes **Restore automatic cover**, which recomputes a selecti
 
 Cover loading shares the PDF worker with the reader. Verified cached pixels remain available while both reader slots are protected; native cover work can reclaim an unprotected warm slot. [Native admission verification](docs/validation/rust-cover-admission-2026-10-15.md) records those checks. The worker also [checks the requested path and source stamp before reusing a native handle](docs/validation/rust-cover-source-2026-10-15.md), preserving protected readers when a cover request targets a changed source.
 
+The reader uses a small first raster and retains it while refining after zoom or resize settles. Its navigator keeps the chosen width as content arrives, and background work no longer adds a processing row above the PDF. [Presentation verification](docs/validation/rust-reader-fluidity-2026-10-15.md) records native traces, tests and the remaining performance measurements.
+
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.

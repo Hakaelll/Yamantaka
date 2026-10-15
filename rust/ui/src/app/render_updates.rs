@@ -43,6 +43,14 @@ impl YamantakaApp {
             match replacement {
                 Ok(image) => {
                     if let Some(slot) = self.reader_pages.get_mut(&page.key.page) {
+                        if self.capture.is_some() && self.capture_render_events.len() < 128 {
+                            self.capture_render_events.push(serde_json::json!({
+                                "event":"installed","document":page.key.document_id,
+                                "page":page.key.page,"generation":page.key.generation,
+                                "rotation":page.key.rotation,"pixels":[page.width,page.height],
+                                "replacedImage":slot.image_key.is_some(),
+                            }));
+                        }
                         slot.image = Some(image);
                         slot.image_key = Some(page.key.clone());
                     }

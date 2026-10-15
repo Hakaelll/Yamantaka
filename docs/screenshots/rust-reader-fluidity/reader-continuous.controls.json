@@ -1,0 +1,469 @@
+{
+  "synthetic": true,
+  "captureProcessId": 9648,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Duplicate current reading",
+      "rect": [
+        228.40625,
+        8.40625,
+        268.40625,
+        48.40625
+      ],
+      "clip": [
+        18.0,
+        0.0,
+        1422.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Library",
+      "rect": [
+        18.0,
+        74.0,
+        111.84375,
+        114.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Previous page",
+      "rect": [
+        474.84375,
+        76.0,
+        514.84375,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Next page",
+      "rect": [
+        638.375,
+        76.0,
+        678.375,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom out",
+      "rect": [
+        702.375,
+        76.0,
+        742.375,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Zoom in",
+      "rect": [
+        808.5625,
+        76.0,
+        848.5625,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Fit page",
+      "rect": [
+        858.5625,
+        76.0,
+        898.5625,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Navigator",
+      "rect": [
+        1309.125,
+        76.0,
+        1422.0,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reading options",
+      "rect": [
+        1259.125,
+        76.0,
+        1299.125,
+        116.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Open external link…",
+      "rect": [
+        488.75,
+        230.625,
+        747.75,
+        249.125
+      ],
+      "clip": [
+        0.0,
+        152.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "libraryCovers": {
+    "resident": 0,
+    "ready": 0,
+    "pending": 0,
+    "source": "PDF selected page",
+    "sourcePages": {},
+    "maximumVisible": 16
+  },
+  "coverPicker": {
+    "open": false
+  },
+  "coverPickerDemo": {
+    "action": null,
+    "complete": false,
+    "saved": false
+  },
+  "documentFind": null,
+  "documentLinks": {
+    "residentPages": 2,
+    "readyPages": 2,
+    "internalLinks": 0,
+    "externalLinks": 1,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 0,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 0,
+      "text": "",
+      "tag": "",
+      "kind": null,
+      "review": null
+    },
+    "resident": 0,
+    "total": 0,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "residentPages": 2,
+    "readyPages": 2,
+    "marks": 0
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": false,
+    "count": 0,
+    "artifact": null
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 0,
+    "resident": 0,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": false,
+    "documents": 0
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": false,
+    "preferences": {
+      "document": "demo-0",
+      "zoom": 1.0,
+      "layout": "continuous",
+      "mode": "document",
+      "theme": "ivory",
+      "scroll": 24.0
+    }
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Off",
+    "pending": null,
+    "active": "37dc8783-740d-4a49-b232-317ebb523c5e",
+    "tabs": [
+      {
+        "id": "37dc8783-740d-4a49-b232-317ebb523c5e",
+        "document": "demo-0",
+        "page": 0,
+        "pinned": false,
+        "zoom": 1.0,
+        "zoomMode": "fitPage",
+        "rotation": 0,
+        "horizontalMargin": 32.0,
+        "verticalMargin": 24.0,
+        "scroll": 24.0
+      }
+    ]
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 0,
+  "readerZoom": 1.0,
+  "readerRenderEvents": [
+    {
+      "event": "submitted",
+      "document": "demo-0",
+      "page": 0,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        575,
+        768
+      ],
+      "target": [
+        693,
+        925
+      ],
+      "viewport": [
+        1440.0,
+        788.0
+      ],
+      "retainedImage": false
+    },
+    {
+      "event": "submitted",
+      "document": "demo-0",
+      "page": 1,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        768,
+        575
+      ],
+      "target": [
+        925,
+        693
+      ],
+      "viewport": [
+        1440.0,
+        788.0
+      ],
+      "retainedImage": false
+    },
+    {
+      "event": "installed",
+      "document": "demo-0",
+      "page": 0,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        575,
+        768
+      ],
+      "replacedImage": false
+    },
+    {
+      "event": "installed",
+      "document": "demo-0",
+      "page": 1,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        768,
+        575
+      ],
+      "replacedImage": false
+    },
+    {
+      "event": "submitted",
+      "document": "demo-0",
+      "page": 0,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        693,
+        925
+      ],
+      "target": [
+        693,
+        925
+      ],
+      "viewport": [
+        1440.0,
+        788.0
+      ],
+      "retainedImage": true
+    },
+    {
+      "event": "submitted",
+      "document": "demo-0",
+      "page": 1,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        925,
+        693
+      ],
+      "target": [
+        925,
+        693
+      ],
+      "viewport": [
+        1440.0,
+        788.0
+      ],
+      "retainedImage": true
+    },
+    {
+      "event": "installed",
+      "document": "demo-0",
+      "page": 0,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        693,
+        925
+      ],
+      "replacedImage": true
+    },
+    {
+      "event": "installed",
+      "document": "demo-0",
+      "page": 1,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        925,
+        693
+      ],
+      "replacedImage": true
+    }
+  ],
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 13822360,
+    "pages": 13789200,
+    "tiles": 0,
+    "text": 32984,
+    "other": 176,
+    "cpu": 8694160,
+    "gpu": 5128200,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."
+}

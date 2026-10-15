@@ -163,8 +163,22 @@ impl YamantakaApp {
                         cancel: Cancellation::default(),
                         image: None,
                         image_key: None,
+                        plan: Default::default(),
                     });
-                if slot.requested.as_ref() != Some(&key) && !self.render_retry {
+                let decision = slot.plan.next(
+                    &key,
+                    slot.image_key.as_ref(),
+                    slot.requested.as_ref(),
+                    Instant::now(),
+                );
+                if !self.render_retry
+                    && let Some(delay) = decision.wake_after
+                {
+                    ui.ctx().request_repaint_after(delay);
+                }
+                if !self.render_retry
+                    && let Some(key) = decision.request
+                {
                     slot.cancel.cancel();
                     slot.cancel = Cancellation::default();
                     match self.runtime.submit(Action::Render(
@@ -173,6 +187,15 @@ impl YamantakaApp {
                         slot.cancel.clone(),
                     )) {
                         Ok(()) => {
+                            if self.capture.is_some() && self.capture_render_events.len() < 128 {
+                                self.capture_render_events.push(serde_json::json!({
+                                    "event":"submitted", "document":key.document_id,
+                                    "page":key.page,"generation":key.generation,"rotation":key.rotation,
+                                    "pixels":[key.physical_width,key.physical_height],
+                                    "target":[physical[0],physical[1]],"viewport":viewport_size,
+                                    "retainedImage":slot.image_key.is_some(),
+                                }));
+                            }
                             slot.requested = Some(key.clone());
                             self.requested = Some(key);
                         }
@@ -214,12 +237,16 @@ impl YamantakaApp {
                     );
                 }
                 if let Some(image) = &slot.image {
-                    ui.painter().image(
+                    let rotation = slot
+                        .image_key
+                        .as_ref()
+                        .map_or(layout.rotation().degrees(), |key| key.rotation);
+                    ui.painter().add(render_plan::page_mesh(
                         image.id(),
                         paper,
-                        egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
-                        Color32::WHITE,
-                    );
+                        rotation,
+                        layout.rotation(),
+                    ));
                 } else {
                     ui.painter().rect_filled(paper, 1, Color32::WHITE);
                     ui.painter().text(
@@ -248,7 +275,7 @@ impl YamantakaApp {
                 && self
                     .reader_pages
                     .values()
-                    .any(|slot| slot.image_key != slot.requested);
+                    .any(|slot| !slot.plan.ready(slot.image_key.as_ref()));
             feedback = layout.anchor_at_scroll(&frame, anchor).ok();
         });
         if let Some(position) = feedback {
