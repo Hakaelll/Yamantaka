@@ -152,6 +152,7 @@ Generate the PDF fixtures and fetch PDFium first to run the native PDF suite. Te
 Current evidence is documented separately so dates and scopes remain explicit:
 
 - [Acceptance matrix](docs/architecture/rust-rewrite-parity.md): the source of truth for completion.
+- [Front-matter metadata evidence](docs/validation/rust-front-matter-2026-10-15.md): bounded text/geometry analysis with real PDFium tests for titles, explicit authors, conflicts, logos and rotations. Import, persistence and review controls are not yet connected to this component.
 - [Flutter baseline](docs/validation/flutter-baseline-2026-10-08.md): 330 tests and analysis executed on the reference implementation.
 - [Native gallery and settings validation](docs/validation/rust-visual-stage2.md): captures, control bounds and the bounded visual review.
 - [Protected reading validation](docs/validation/rust-password-opening-2026-10-09.md): ephemeral credential ownership, real PDFium retry tests and five native captures.
