@@ -10,7 +10,7 @@ use yamantaka_domain::memory::{GlobalMemoryLimits, MemoryGovernor};
 use yamantaka_domain::reader_preferences::{
     PageRotation, ReaderMode, ReaderPreferences, ReaderTheme, ZoomMode,
 };
-use yamantaka_domain::{LibraryRepository, PageLayout};
+use yamantaka_domain::{LibraryRepository, PageLayout, PdfEngine, pdf_ticket::AsyncPdfEngine};
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
 use yamantaka_storage::{Database, preferences::Preferences};
 use yamantaka_windows::{Activation, AppPaths, Instance};
@@ -78,6 +78,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     || arg == "--global-notes-export-json"
                     || arg == "--global-notes-export-markdown"
                     || arg == "--metadata-review"
+                    || arg == "--cover-capacity-retry"
             }) {
             std::fs::create_dir_all(&store).map_err(|_| {
                 yamantaka_domain::Failure::Storage("Synthetic export store could not open".into())
@@ -434,6 +435,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             theme::load_fonts(&cc.egui_ctx);
             theme::install(&cc.egui_ctx, dark);
             let notify = cc.egui_ctx.clone();
+            if demo && args.iter().any(|arg| arg == "--cover-capacity-retry") {
+                let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../build/rust-fixtures/textual.pdf");
+                for id in ["capacity-reader-a", "capacity-reader-b"] {
+                    engine.open(
+                        id.into(),
+                        source.clone(),
+                        None,
+                        yamantaka_domain::Cancellation::default(),
+                    )?;
+                }
+                engine.set_visible_documents(&[
+                    "capacity-reader-a".into(),
+                    "capacity-reader-b".into(),
+                ])?;
+            }
             let runtime = Runtime::start(database, engine, move || notify.request_repaint())?;
             let presenter = cc.wgpu_render_state.clone().map(|state| {
                 page_presenter::PagePresenter::new(state, governor.clone(), cc.egui_ctx.clone())
@@ -453,6 +470,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args.iter().any(|arg| arg == "--cover-capacity-retry") {
+                    app.preview_cover_capacity();
+                }
                 if args.iter().any(|arg| arg == "--metadata-review") {
                     app.preview_metadata(if args.iter().any(|arg| arg == "--metadata-reanalyze") {
                         "reanalyze"

@@ -50,6 +50,8 @@ pub const MAX_RENDER_DIMENSION: u32 = 16_384;
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Failure {
+    #[error("Native PDF slots are busy; retry after background work completes or a reader closes")]
+    NativeSlotsBusy,
     #[error("PDF text exceeds the requested work limit")]
     TextWorkLimit,
     #[error("Unsupported operation: {0}")]

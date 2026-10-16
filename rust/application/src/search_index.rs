@@ -78,6 +78,7 @@ struct Run {
 /// retained. Progress is a coalesced snapshot; it never creates an event queue.
 #[derive(Default)]
 pub struct SearchIndexController {
+    released_native: u64,
     progress: IndexProgress,
     dirty: bool,
     manual_paused: bool,
@@ -87,6 +88,9 @@ pub struct SearchIndexController {
     run: Option<Run>,
 }
 impl SearchIndexController {
+    pub fn released_native_revision(&self) -> u64 {
+        self.released_native
+    }
     pub fn progress(&self) -> &IndexProgress {
         &self.progress
     }
@@ -380,6 +384,9 @@ impl SearchIndexController {
                 }
                 Pending::Close(ticket) => {
                     let result = ticket_result(&ticket);
+                    if result.is_ok() {
+                        self.released_native = self.released_native.wrapping_add(1);
+                    }
                     let run = self.run.as_mut().unwrap();
                     if let Some(active) = run.active.take()
                         && active.cancel.is_cancelled()

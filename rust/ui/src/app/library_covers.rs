@@ -4,9 +4,13 @@ use super::*;
 pub(super) struct LibraryCovers {
     slots: HashMap<String, CoverSlot>,
     generation: u64,
+    capacity_preview: u8,
+    blocked_before_release: usize,
 }
 
 struct CoverSlot {
+    capacity_revision: u64,
+    waiting_for_capacity: bool,
     path: std::path::PathBuf,
     fingerprint: String,
     generation: u64,
@@ -17,11 +21,21 @@ struct CoverSlot {
 }
 impl LibraryCovers {
     pub(super) fn slots_ready(&self) -> bool {
-        self.slots.values().all(|slot| slot.finished)
+        self.slots.values().all(|slot| slot.finished) && matches!(self.capacity_preview, 0 | 3)
+    }
+}
+impl CoverSlot {
+    fn can_retry(&self, capacity_revision: u64) -> bool {
+        self.waiting_for_capacity && self.capacity_revision != capacity_revision
     }
 }
 
 impl YamantakaApp {
+    pub fn preview_cover_capacity(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.library_covers.capacity_preview = 1;
+        }
+    }
     pub(super) fn pump_library_covers(&mut self, ctx: &egui::Context) {
         if self.cover_picker.is_some() {
             return;
@@ -40,7 +54,17 @@ impl YamantakaApp {
             }
             keep
         });
+        let capacity_revision = self.runtime.pdf_capacity_revision();
         for document in requested {
+            if self
+                .library_covers
+                .slots
+                .get(&document.id)
+                .is_some_and(|slot| slot.can_retry(capacity_revision))
+                && let Some(old) = self.library_covers.slots.remove(&document.id)
+            {
+                old.cancel.cancel();
+            }
             if document.missing || self.library_covers.slots.contains_key(&document.id) {
                 continue;
             }
@@ -59,6 +83,8 @@ impl YamantakaApp {
                     self.library_covers.slots.insert(
                         document.id,
                         CoverSlot {
+                            capacity_revision,
+                            waiting_for_capacity: false,
                             path: document.path,
                             fingerprint: document.fingerprint,
                             generation,
@@ -75,6 +101,26 @@ impl YamantakaApp {
                 Err(_) => {}
             }
         }
+        if self.library_covers.capacity_preview == 1
+            && !self.library_covers.slots.is_empty()
+            && self
+                .library_covers
+                .slots
+                .values()
+                .all(|slot| slot.finished && slot.waiting_for_capacity)
+        {
+            self.library_covers.blocked_before_release = self.library_covers.slots.len();
+            self.library_covers.capacity_preview = 2;
+            self.send(Action::VisibleDocuments(Vec::new()));
+        } else if self.library_covers.capacity_preview == 2
+            && self
+                .library_covers
+                .slots
+                .values()
+                .all(|slot| slot.image.is_some() && !slot.waiting_for_capacity)
+        {
+            self.library_covers.capacity_preview = 3;
+        }
     }
     pub(super) fn accept_library_cover(
         &mut self,
@@ -90,6 +136,10 @@ impl YamantakaApp {
             return;
         }
         slot.finished = true;
+        if matches!(&result, Err(yamantaka_domain::Failure::NativeSlotsBusy)) {
+            slot.waiting_for_capacity = true;
+            return;
+        }
         let Ok(page) = result else {
             return;
         };
@@ -119,6 +169,7 @@ impl YamantakaApp {
     }
     pub(super) fn cover_summary(&self) -> serde_json::Value {
         serde_json::json!({"resident": self.library_covers.slots.len(),
+            "blockedBeforeRelease":self.library_covers.blocked_before_release,"capacityPreview":self.library_covers.capacity_preview,"capacityRevision":self.runtime.pdf_capacity_revision(),
             "ready":self.library_covers.slots.values().filter(|slot| slot.image.is_some()).count(),
             "pending":self.library_covers.slots.values().filter(|slot| !slot.finished).count(),
             "source":"PDF selected page","sourcePages":self.library_covers.slots.iter().filter_map(|(id,slot)| slot.source_page.map(|page|(id.clone(),page))).collect::<std::collections::BTreeMap<_,_>>(),"maximumVisible":16})
@@ -154,6 +205,8 @@ impl YamantakaApp {
         self.library_covers.slots.insert(
             document.id.clone(),
             CoverSlot {
+                capacity_revision: self.runtime.pdf_capacity_revision(),
+                waiting_for_capacity: false,
                 path: document.path.clone(),
                 fingerprint: document.fingerprint.clone(),
                 generation: self.library_covers.generation,

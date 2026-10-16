@@ -191,6 +191,7 @@ impl UpdateReceiver {
     }
 }
 pub struct Runtime {
+    pdf_capacity_revision: Arc<AtomicU64>,
     import_revision: Arc<AtomicU64>,
     index_progress: Arc<Mutex<IndexProgress>>,
     sender: Sender<Command>,
@@ -269,6 +270,7 @@ enum Pending {
     ),
     ImportScan(Box<ImportEnrichment>, ImportState),
     ImportClose(Box<NewDocument>, PdfTicket<()>, ImportState),
+    ImportAbort(Failure, PdfTicket<()>, ImportState),
 }
 impl Pending {
     fn register<'a>(&'a self, select: &mut Select<'a>) {
@@ -306,7 +308,9 @@ impl Pending {
             Self::ImportScan(scan, _) => {
                 select.recv(scan.ticket().readiness());
             }
-            Self::Close(_, ticket, _) | Self::ImportClose(_, ticket, _) => {
+            Self::Close(_, ticket, _)
+            | Self::ImportClose(_, ticket, _)
+            | Self::ImportAbort(_, ticket, _) => {
                 select.recv(ticket.readiness());
             }
         }
@@ -326,7 +330,9 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.is_ready(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.is_ready(),
             Self::ImportScan(scan, _) => scan.ticket().is_ready(),
-            Self::Close(_, ticket, _) | Self::ImportClose(_, ticket, _) => ticket.is_ready(),
+            Self::Close(_, ticket, _)
+            | Self::ImportClose(_, ticket, _)
+            | Self::ImportAbort(_, ticket, _) => ticket.is_ready(),
         }
     }
     fn cancel(&self) {
@@ -346,9 +352,9 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportScan(scan, _) => scan.ticket().cancellation.cancel(),
-            Self::Close(_, ticket, _) | Self::ImportClose(_, ticket, _) => {
-                ticket.cancellation.cancel()
-            }
+            Self::Close(_, ticket, _)
+            | Self::ImportClose(_, ticket, _)
+            | Self::ImportAbort(_, ticket, _) => ticket.cancellation.cancel(),
         }
     }
 }
@@ -367,6 +373,20 @@ fn queue_import_step(
             Ok(ticket) => pending.push(Pending::ImportClose(document, ticket, state)),
             Err(error) => import_failed(events, notify, error, state),
         },
+    }
+}
+fn close_failed_import(
+    engine: &impl AsyncPdfEngine,
+    id: String,
+    error: Failure,
+    state: ImportState,
+    pending: &mut Vec<Pending>,
+    events: &Sender<Event>,
+    notify: &impl Fn(),
+) {
+    match engine.try_close(id) {
+        Ok(ticket) => pending.push(Pending::ImportAbort(error, ticket, state)),
+        Err(error) => import_failed(events, notify, error, state),
     }
 }
 fn foreground_admissible(
@@ -495,6 +515,8 @@ impl Runtime {
         let progress_snapshot = index_progress.clone();
         let import_revision = Arc::new(AtomicU64::new(0));
         let import_progress = import_revision.clone();
+        let pdf_capacity_revision = Arc::new(AtomicU64::new(0));
+        let pdf_capacity = pdf_capacity_revision.clone();
         let handle = thread::Builder::new()
             .name("yamantaka-use-cases".into())
             .spawn(move || {
@@ -720,6 +742,7 @@ impl Runtime {
                                             }
                                             if let Some((_, token)) = awaiting_open.take() { token.cancel(); }
                                             visible = ids;
+                                            pdf_capacity.fetch_add(1,Ordering::Release);
                                             emit(
                                                 &events,
                                                 &notify,
@@ -818,7 +841,7 @@ impl Runtime {
                                     if matches {
                                         let ids = if cancel.is_cancelled() { visible.clone() } else { vec![id.clone()] };
                                         match engine.set_visible_documents(&ids) {
-                                            Ok(()) => { visible = ids; awaiting_open = None; }
+                                            Ok(()) => { visible = ids; awaiting_open = None; pdf_capacity.fetch_add(1,Ordering::Release); }
                                             Err(error) => { failed(&events, &notify, error, Some(cancel), permit); continue; }
                                         }
                                     }
@@ -850,7 +873,7 @@ impl Runtime {
                                     match result {
                                         Ok(ticket) => pending.push(Pending::Open(document, ticket, permit, revision)),
                                         Err(error) => {
-                                            let error = engine.set_visible_documents(&visible).err().unwrap_or(error);
+                                            let error = match engine.set_visible_documents(&visible) { Ok(()) => { pdf_capacity.fetch_add(1,Ordering::Release); error }, Err(error) => error };
                                             emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit);
                                         }
                                     }
@@ -1028,7 +1051,7 @@ impl Runtime {
                                     }
                                     Err(error) => {
                                         let error = if revision == open_revision && awaiting_open.is_none() {
-                                            engine.set_visible_documents(&visible).err().unwrap_or(error)
+                                            match engine.set_visible_documents(&visible) { Ok(()) => { pdf_capacity.fetch_add(1,Ordering::Release); error }, Err(error) => error }
                                         } else { error };
                                         emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit);
                                     }
@@ -1136,6 +1159,7 @@ impl Runtime {
                             Pending::Close(request, ticket, permit) => {
                                 let result=ticket.wait();
                                 if result.is_ok() {
+                                    pdf_capacity.fetch_add(1,Ordering::Release);
                                     visible.retain(|id|*id!=request.document);
                                     if awaiting_open.as_ref().is_some_and(|(id,_)|*id==request.document) && let Some((_,token))=awaiting_open.take() {token.cancel();}
                                 }
@@ -1144,9 +1168,9 @@ impl Runtime {
                             Pending::ImportOpen(path, id, ticket, state) => match ticket.wait() {
                                 Ok(info) => match engine.try_source_revision(id.clone(), state.cancel.clone()) {
                                     Ok(ticket) => pending.push(Pending::ImportSource(path,id,info,ticket,state)),
-                                    Err(error) => {let _=engine.try_close(id);import_failed(&events,&notify,error,state);}
+                                    Err(error) => close_failed_import(&engine,id,error,state,&mut pending,&events,&notify),
                                 },
-                                Err(error) => {let _=engine.try_close(id);import_failed(&events,&notify,error,state);}
+                                Err(error) => close_failed_import(&engine,id,error,state,&mut pending,&events,&notify),
                             },
                             Pending::ImportSource(path,id,info,ticket,state) => match ticket.wait() {
                                 Ok(source) => {
@@ -1154,7 +1178,7 @@ impl Runtime {
                                     let step=ImportEnrichment::start(&engine,id.clone(),document,state.reanalysis.as_ref().map(|target|&target.0),state.cancel.clone());
                                     queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
                                 }
-                                Err(error) => {let _=engine.try_close(id);import_failed(&events,&notify,error,state);}
+                                Err(error) => close_failed_import(&engine,id,error,state,&mut pending,&events,&notify),
                             },
                             Pending::ImportScan(scan,state) => {
                                 let id=scan.id.clone();
@@ -1162,13 +1186,15 @@ impl Runtime {
                                 queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
                             },
                             Pending::ImportClose(document,ticket,mut state) => {
+                                let closed=ticket.wait();
+                                if closed.is_ok() {pdf_capacity.fetch_add(1,Ordering::Release);}
                                 if let Some(target)=state.reanalysis.as_ref() {
                                     let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled}else{yamantaka_domain::search::IndexAccess::Disabled};
-                                    let result=ticket.wait().and_then(|()|state.cancel.check()).and_then(|()|repository.reanalyze_metadata(&target.0,&target.1,&document,access,&state.cancel));
+                                    let result=closed.and_then(|()|state.cancel.check()).and_then(|()|repository.reanalyze_metadata(&target.0,&target.1,&document,access,&state.cancel));
                                     emit(&events,&notify,Update::Metadata(crate::metadata_review::MetadataReply{document:target.0.document.clone(),writing:true,cancel:state.cancel,result}),state.permit);
                                     continue;
                                 }
-                                match ticket.wait().and_then(|()| {state.cancel.check()?;repository.import(&document)}) {
+                                match closed.and_then(|()| {state.cancel.check()?;repository.import(&document)}) {
                                     Ok(_) => {
                                         state.count+=1;
                                         import_progress.fetch_add(1,Ordering::Release);
@@ -1178,15 +1204,18 @@ impl Runtime {
                                     Err(error) => import_failed(&events,&notify,error,state),
                                 }
                             }
+                            Pending::ImportAbort(error,ticket,state)=>{
+                                let closed=ticket.wait();
+                                if closed.is_ok() {pdf_capacity.fetch_add(1,Ordering::Release);}
+                                import_failed(&events,&notify,closed.err().unwrap_or(error),state);
+                            }
                         }
                     }
-                    if index_cleanup.as_ref().is_some_and(PdfTicket::is_ready) {
-                        let _ = index_cleanup.take().unwrap().wait();
-                    }
+                    if index_cleanup.as_ref().is_some_and(PdfTicket::is_ready) && index_cleanup.take().unwrap().wait().is_ok() {pdf_capacity.fetch_add(1,Ordering::Release);notify();}
                     let native_admission_pending = pending.iter().any(|item| {
                         matches!(
                             item,
-                            Pending::Open(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..)
+                            Pending::Open(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
                         )
                     });
                     indexer.set_slot_available(
@@ -1196,9 +1225,11 @@ impl Runtime {
                             && visible.len() < yamantaka_domain::MAX_HOT_DOCUMENTS
                             && index_cleanup.is_none(),
                     );
+                    let released=indexer.released_native_revision();
                     if let Err(error) = indexer.step(&mut repository, &engine) {
                         index_cleanup = indexer.abort(&error, &engine).ok().flatten();
                     }
+                    if indexer.released_native_revision()!=released {pdf_capacity.fetch_add(1,Ordering::Release);notify();}
                     if let Some(progress) = indexer.take_progress() {
                         *progress_snapshot.lock().unwrap() = progress;
                         notify();
@@ -1244,6 +1275,7 @@ impl Runtime {
             })
             .map_err(|_| Failure::Storage("Use-case worker could not start".into()))?;
         Ok(Self {
+            pdf_capacity_revision,
             import_revision,
             index_progress,
             sender,
@@ -1261,6 +1293,9 @@ impl Runtime {
 
     pub fn import_revision(&self) -> u64 {
         self.import_revision.load(Ordering::Acquire)
+    }
+    pub fn pdf_capacity_revision(&self) -> u64 {
+        self.pdf_capacity_revision.load(Ordering::Acquire)
     }
     /// Blocking persistence barrier for shutdown/recovery, independent of UI event capacity.
     /// The caller must finalize activity first and retain these immutable commands on failure.

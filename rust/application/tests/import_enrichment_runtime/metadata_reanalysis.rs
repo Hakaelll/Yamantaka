@@ -65,6 +65,7 @@ fn real_actor_reanalyzes_while_the_original_reader_stays_open_and_manual_values_
         .submit(Action::ConfirmOpen(document.id.clone(), reader))
         .unwrap();
     assert!(matches!(wait(&runtime), Update::Committed(_, _)));
+    let capacity_before = runtime.pdf_capacity_revision();
     let cancel = Cancellation::default();
     runtime
         .submit(Action::ReanalyzeMetadata(
@@ -77,6 +78,7 @@ fn real_actor_reanalyzes_while_the_original_reader_stays_open_and_manual_values_
     };
     assert!(reply.cancel.same_request(&cancel) && reply.writing);
     let refreshed = reply.result.unwrap();
+    assert!(runtime.pdf_capacity_revision() > capacity_before);
     assert_ne!(refreshed.revision, expected.revision);
     assert_eq!(refreshed.title, "My geometry");
     assert_eq!(refreshed.author, "My author");

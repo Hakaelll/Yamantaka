@@ -9,6 +9,7 @@ use std::{
 use yamantaka_domain::{Cancellation, Failure, Result};
 
 pub(crate) struct LoadedPdf<'a> {
+    pub purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
     pub document: PdfDocument<'a>,
     pub path: PathBuf,
     pub source: SourceStamp,

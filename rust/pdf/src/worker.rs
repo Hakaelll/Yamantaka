@@ -340,7 +340,11 @@ impl PdfWorker {
                 "Background work cannot replace a protected reader".into(),
             ));
         }
-        if let Request::Open { id, .. } = &request
+        if let Request::Open {
+            id,
+            purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
+            ..
+        } = &request
             && scheduler.visible.len() == MAX_HOT_DOCUMENTS
             && !scheduler.visible.contains(id)
         {
@@ -731,16 +735,28 @@ fn run(
             let open_allowed = documents.len() < MAX_HOT_DOCUMENTS
                 || documents.keys().any(|id| !protected.contains(id))
                 || state.visible.len() == MAX_HOT_DOCUMENTS;
+            let background_allowed = documents.len() < MAX_HOT_DOCUMENTS
+                || documents.iter().any(|(id, loaded)| {
+                    !protected.contains(id)
+                        && loaded.purpose == yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader
+                });
             if let Some(index) = next_request(
                 &state.queue,
                 foreground_streak,
                 last_document.as_deref(),
                 |item| match item {
                     Request::Open {
-                        id, epoch, cancel, ..
+                        id,
+                        epoch,
+                        cancel,
+                        purpose,
+                        ..
                     } => {
-                        open_allowed
-                            || documents.contains_key(id)
+                        (if *purpose == yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader {
+                            open_allowed
+                        } else {
+                            background_allowed
+                        }) || documents.contains_key(id)
                             || cancel.is_cancelled()
                             || state.epochs.get(id) != Some(epoch)
                     }
@@ -901,8 +917,13 @@ fn run(
                     // the native hot-document limit also applies during opening.
                     // Pins can change after admission. Check again before any
                     // eviction; never exceed the two-handle native limit.
-                    let victim =
-                        take_unprotected_victim(&mut documents, &recency, &scheduler, &id)?;
+                    let victim = take_unprotected_victim(
+                        &mut documents,
+                        &recency,
+                        &scheduler,
+                        &id,
+                        purpose == yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
+                    )?;
                     documents.remove(&id);
                     clear_document_state(&id, &mut recency, &mut pages, &mut tiles, &mut text);
                     if let Some((old, handle)) = victim {
@@ -937,6 +958,7 @@ fn run(
                     documents.insert(
                         id.clone(),
                         LoadedPdf {
+                            purpose,
                             document,
                             path,
                             source,
@@ -1314,7 +1336,11 @@ fn take_cover_victim<'a>(
         .is_some_and(|loaded| loaded.source != *source)
     {
         let state = scheduler.lock().unwrap();
-        if protected_documents(&state).contains(requested) {
+        if protected_documents(&state).contains(requested)
+            || documents.get(requested).is_some_and(|loaded| {
+                loaded.purpose == yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background
+            })
+        {
             return Err(crate::source::source_changed());
         }
         return Ok(Some((
@@ -1324,7 +1350,7 @@ fn take_cover_victim<'a>(
                 .expect("stale handle checked before detachment"),
         )));
     }
-    take_unprotected_victim(documents, recency, scheduler, requested)
+    take_unprotected_victim(documents, recency, scheduler, requested, false)
 }
 
 fn take_unprotected_victim<'a>(
@@ -1332,6 +1358,7 @@ fn take_unprotected_victim<'a>(
     recency: &[String],
     scheduler: &Arc<Mutex<Scheduler>>,
     requested: &str,
+    allow_background: bool,
 ) -> Result<Option<(String, LoadedPdf<'a>)>> {
     if documents.contains_key(requested) || documents.len() < MAX_HOT_DOCUMENTS {
         return Ok(None);
@@ -1340,7 +1367,12 @@ fn take_unprotected_victim<'a>(
     let protected = protected_documents(&state);
     let old = recency
         .iter()
-        .find(|id| documents.contains_key(*id) && !protected.contains(*id))
+        .find(|id| {
+            documents.get(*id).is_some_and(|loaded| {
+                allow_background
+                    || loaded.purpose == yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader
+            }) && !protected.contains(*id)
+        })
         .cloned()
         .ok_or_else(hot_slots_protected)?;
     // Select and detach under the pin lock; callers drop the handle before FFI.
@@ -1383,7 +1415,7 @@ fn protected_documents(state: &Scheduler) -> HashSet<String> {
         .collect()
 }
 fn hot_slots_protected() -> Failure {
-    Failure::Pdf("Visible readers occupy the native PDF slots".into())
+    Failure::NativeSlotsBusy
 }
 fn next_request(
     queue: &[Request],

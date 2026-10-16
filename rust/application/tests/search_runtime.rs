@@ -114,6 +114,44 @@ impl AsyncPdfEngine for Engine {
 fn setup() -> (Runtime, Receiver<Native>, Receiver<()>) {
     setup_with_failure(false)
 }
+
+#[test]
+fn failed_import_waits_for_native_close_before_releasing_capacity_and_reporting_failure() {
+    let (runtime, native, _) = setup();
+    let cancel = Cancellation::default();
+    let before = runtime.pdf_capacity_revision();
+    runtime
+        .submit(Action::Import(
+            vec![PathBuf::from("synthetic.pdf")],
+            cancel.clone(),
+        ))
+        .unwrap();
+    let Native::Open(id, _, open) = next(&native) else {
+        panic!("Expected import open");
+    };
+    open.send(Ok(info())).unwrap();
+    let Native::Source(_, source) = next(&native) else {
+        panic!("Expected frozen source request");
+    };
+    source
+        .send(Err(yamantaka_domain::Failure::Pdf(
+            "Synthetic source failure".into(),
+        )))
+        .unwrap();
+    let Native::Close(closed, close) = next(&native) else {
+        panic!("Expected cleanup barrier");
+    };
+    assert_eq!(closed, id);
+    query_barrier(&runtime);
+    assert_eq!(runtime.pdf_capacity_revision(), before);
+    assert!(runtime.updates.try_recv().is_err());
+    close.send(Ok(())).unwrap();
+    assert!(
+        matches!(update(&runtime),Update::Failed(yamantaka_domain::Failure::Pdf(_),Some(token)) if token.same_request(&cancel))
+    );
+    assert!(runtime.pdf_capacity_revision() > before);
+    assert_eq!(runtime.import_revision(), 0);
+}
 fn setup_with_failure(broken_index: bool) -> (Runtime, Receiver<Native>, Receiver<()>) {
     let db = Database::in_memory_at(11).unwrap();
     db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,title,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES ('a','a.pdf','a.pdf','a.pdf','Astronomy',3,1,'now','now','now','fa');").unwrap();
