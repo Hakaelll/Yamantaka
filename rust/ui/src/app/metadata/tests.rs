@@ -11,6 +11,8 @@ fn editor() -> MetadataEditor {
         error: None,
         confirm_reset: false,
         saved: false,
+        analyzing: false,
+        analyzed: false,
     }
 }
 fn snapshot() -> MetadataReview {
@@ -20,12 +22,52 @@ fn snapshot() -> MetadataReview {
         title: "Current title".into(),
         author: "Current author".into(),
         source_title: Some("Raw title".into()),
+        automatic_title: Some("Current title".into()),
+        automatic_author: Some("Current author".into()),
         source_author: None,
         title_override: None,
         author_override: None,
         suggested_title: Some("Proposed title".into()),
         suggested_author: None,
     }
+}
+
+#[test]
+fn reanalysis_requires_a_clean_draft_and_retains_ownership_until_its_terminal_reply() {
+    let mut editor = editor();
+    let read = editor.read();
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: false,
+        cancel: read.cancel,
+        result: Ok(snapshot()),
+    });
+    editor.title = "Unsaved title".into();
+    assert!(editor.reanalyze().is_none());
+    editor.title = "Current title".into();
+    let (expected, cancel) = editor.reanalyze().unwrap();
+    assert_eq!(*expected, snapshot());
+    assert!(editor.analyzing);
+    assert!(editor.reanalyze().is_none());
+    cancel.cancel();
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: true,
+        cancel,
+        result: Err(yamantaka_domain::Failure::Cancelled),
+    });
+    assert!(!editor.analyzing && !editor.analyzed && !editor.saved);
+    assert_eq!(editor.title, "Current title");
+    let (_, cancel) = editor.reanalyze().unwrap();
+    let mut fresh = snapshot();
+    fresh.revision = "new analysis".into();
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: true,
+        cancel,
+        result: Ok(fresh),
+    });
+    assert!(editor.analyzed && !editor.analyzing && !editor.saved);
 }
 
 #[test]

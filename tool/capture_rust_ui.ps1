@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='metadata-reanalysis-dark'; args=@('--metadata-review','--metadata-reanalyze') },
+    @{ name='metadata-reanalysis-light-es'; args=@('--metadata-review','--metadata-reanalyze','--light','--es','--reduce-motion') },
+    @{ name='metadata-reanalysis-manual'; args=@('--metadata-review','--metadata-reanalyze','--metadata-reanalyze-manual') },
+    @{ name='metadata-reanalysis-limit'; args=@('--metadata-review','--metadata-reanalyze','--metadata-reanalyze-limit') },
+    @{ name='metadata-reanalysis-small-200'; args=@('--metadata-review','--metadata-reanalyze','--size=640x480','--text-scale=2') },
     @{ name='metadata-review-dark'; args=@('--metadata-review') },
     @{ name='metadata-review-light-es'; args=@('--metadata-review','--light','--es','--reduce-motion') },
     @{ name='metadata-review-small-200'; args=@('--metadata-review','--size=640x480','--text-scale=2') },

@@ -48,6 +48,8 @@ fn read_record(
             .or_else(|| value("sourceAuthor"))
             .unwrap_or_default(),
         source_title: value("sourceTitle"),
+        automatic_title: value("title").or_else(|| value("sourceTitle")),
+        automatic_author: value("author").or_else(|| value("sourceAuthor")),
         source_author: value("sourceAuthor"),
         title_override,
         author_override,

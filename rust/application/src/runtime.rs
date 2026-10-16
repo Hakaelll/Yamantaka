@@ -35,6 +35,10 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    ReanalyzeMetadata(
+        Box<yamantaka_domain::metadata_review::MetadataReview>,
+        Cancellation,
+    ),
     Metadata(Box<crate::metadata_review::MetadataRequest>),
     RestoreAutomaticCover(String, PathBuf, u64, Cancellation),
     CoverSourcePage(String, Cancellation),
@@ -210,6 +214,7 @@ struct ImportState {
     count: usize,
     cancel: Cancellation,
     permit: Permit,
+    reanalysis: Option<Box<(yamantaka_domain::metadata_review::MetadataReview, Document)>>,
 }
 enum Pending {
     RestoreCover(
@@ -370,7 +375,7 @@ fn foreground_admissible(
     awaiting: &Option<(String, Cancellation)>,
 ) -> bool {
     match action {
-        Action::Import(..) => {
+        Action::Import(..) | Action::ReanalyzeMetadata(..) => {
             awaiting.is_none() && !pending.iter().any(|item| matches!(item, Pending::Open(..)))
         }
         Action::Open(document, ..) => awaiting
@@ -407,6 +412,20 @@ fn failed(
     }
 }
 fn import_failed(events: &Sender<Event>, notify: &impl Fn(), error: Failure, state: ImportState) {
+    if let Some(target) = state.reanalysis {
+        emit(
+            events,
+            notify,
+            Update::Metadata(crate::metadata_review::MetadataReply {
+                document: target.0.document,
+                writing: true,
+                cancel: state.cancel,
+                result: Err(error),
+            }),
+            state.permit,
+        );
+        return;
+    }
     emit(
         events,
         notify,
@@ -522,6 +541,7 @@ impl Runtime {
                                 &action,
                                 Action::Open(..)
                                     | Action::Import(..)
+                                    | Action::ReanalyzeMetadata(..)
                                     | Action::VisibleDocuments(..)
                             )) || !foreground_admissible(&action, &pending, &awaiting_open)
                         {
@@ -941,6 +961,16 @@ impl Runtime {
                                         Err(error) => emit(&events,&notify,Update::ReaderClosed(request.reply(Err(error))),permit),
                                     }
                                 },
+                                Action::ReanalyzeMetadata(expected,cancel) => {
+                                    let source=cancel.check().and_then(|()|repository.metadata_review(&expected.document,&cancel)).and_then(|fresh| {
+                                        if fresh!=*expected {return Err(Failure::Invalid("Metadata changed; reload before analysis".into()));}
+                                        repository.get(&expected.document)?.filter(|d|!d.missing).ok_or_else(||Failure::Invalid("Metadata source is missing".into()))
+                                    });
+                                    match source {
+                                        Ok(document)=>advance_import(&engine,&repository,ImportState{paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
+                                        Err(error)=>emit(&events,&notify,Update::Metadata(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)}),permit),
+                                    }
+                                }
                                 Action::Import(paths, cancel) => advance_import(
                                     &engine,
                                     &repository,
@@ -949,6 +979,7 @@ impl Runtime {
                                         count: 0,
                                         cancel,
                                         permit,
+                                        reanalysis:None,
                                     },
                                     &mut pending,
                                     &events,
@@ -1120,7 +1151,7 @@ impl Runtime {
                             Pending::ImportSource(path,id,info,ticket,state) => match ticket.wait() {
                                 Ok(source) => {
                                     let document=Box::new(NewDocument {path,info,source,analysis:yamantaka_domain::front_matter::ImportAnalysis::NotRequested});
-                                    let step=ImportEnrichment::start(&engine,id.clone(),document,state.cancel.clone());
+                                    let step=ImportEnrichment::start(&engine,id.clone(),document,state.reanalysis.as_ref().map(|target|&target.0),state.cancel.clone());
                                     queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
                                 }
                                 Err(error) => {let _=engine.try_close(id);import_failed(&events,&notify,error,state);}
@@ -1131,6 +1162,12 @@ impl Runtime {
                                 queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
                             },
                             Pending::ImportClose(document,ticket,mut state) => {
+                                if let Some(target)=state.reanalysis.as_ref() {
+                                    let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled}else{yamantaka_domain::search::IndexAccess::Disabled};
+                                    let result=ticket.wait().and_then(|()|state.cancel.check()).and_then(|()|repository.reanalyze_metadata(&target.0,&target.1,&document,access,&state.cancel));
+                                    emit(&events,&notify,Update::Metadata(crate::metadata_review::MetadataReply{document:target.0.document.clone(),writing:true,cancel:state.cancel,result}),state.permit);
+                                    continue;
+                                }
                                 match ticket.wait().and_then(|()| {state.cancel.check()?;repository.import(&document)}) {
                                     Ok(_) => {
                                         state.count+=1;

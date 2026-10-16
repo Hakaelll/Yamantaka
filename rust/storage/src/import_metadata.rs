@@ -97,6 +97,7 @@ pub(crate) fn save(
     id: &str,
     fingerprint: &str,
     analysis: &ImportAnalysis,
+    manual: [bool; 2],
     now: &str,
 ) -> Result<()> {
     let (status, title, author, error, record) = match analysis {
@@ -109,8 +110,8 @@ pub(crate) fn save(
             json!({"version":1,"analyzerVersion":ENRICHMENT_ALGORITHM_VERSION,"error":reason.code()}),
         ),
         ImportAnalysis::Complete(evidence) => {
-            let title = proposal(&evidence.title);
-            let author = proposal(&evidence.author);
+            let title = (!manual[0]).then(|| proposal(&evidence.title)).flatten();
+            let author = (!manual[1]).then(|| proposal(&evidence.author)).flatten();
             let status = if title.is_some() || author.is_some() {
                 "review"
             } else if evidence.has_text {
@@ -127,14 +128,14 @@ pub(crate) fn save(
             )
         }
     };
-    if tx.execute("INSERT INTO document_enrichment(document_id,fingerprint,analyzer_version,status,suggested_title,suggested_author,analyzed_at,error_code) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![id,fingerprint,ENRICHMENT_ALGORITHM_VERSION,status,title,author,now,error]).map_err(storage)? !=1 {
+    if tx.execute("INSERT INTO document_enrichment(document_id,fingerprint,analyzer_version,status,suggested_title,suggested_author,analyzed_at,error_code) VALUES(?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT(document_id) DO UPDATE SET fingerprint=excluded.fingerprint,analyzer_version=excluded.analyzer_version,status=excluded.status,suggested_title=excluded.suggested_title,suggested_author=excluded.suggested_author,title_confidence=NULL,author_confidence=NULL,analyzed_at=excluded.analyzed_at,error_code=excluded.error_code",params![id,fingerprint,ENRICHMENT_ALGORITHM_VERSION,status,title,author,now,error]).map_err(storage)? !=1 {
         return Err(Failure::Storage("Imported metadata analysis was not saved".into()));
     }
     let key = format!("rust.frontMatterEvidence.v1:{id}");
     let encoded = serde_json::to_string(&record).map_err(storage)?;
     if tx
         .execute(
-            "INSERT INTO app_metadata(key,value,updated_at) VALUES(?1,?2,?3)",
+            "INSERT INTO app_metadata(key,value,updated_at) VALUES(?1,?2,?3) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
             params![key, encoded, now],
         )
         .map_err(storage)?
@@ -168,7 +169,8 @@ pub(crate) fn save(
             row.get(0)
         })
         .map_err(storage)?;
-    if saved != encoded {
+    let confidence_empty:bool=tx.query_row("SELECT title_confidence IS NULL AND author_confidence IS NULL FROM document_enrichment WHERE document_id=?",[id],|row|row.get(0)).map_err(storage)?;
+    if saved != encoded || !confidence_empty {
         return Err(Failure::Storage(
             "Imported metadata evidence changed before commit".into(),
         ));

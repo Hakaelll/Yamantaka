@@ -190,6 +190,16 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn reanalyze_metadata(
+        &mut self,
+        _expected: &metadata_review::MetadataReview,
+        _original: &Document,
+        _analyzed: &NewDocument,
+        _access: search::IndexAccess,
+        _cancel: &Cancellation,
+    ) -> Result<metadata_review::MetadataReview> {
+        Err(Failure::Unsupported("Metadata reanalysis".into()))
+    }
     fn metadata_review(
         &self,
         _document: &str,

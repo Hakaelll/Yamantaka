@@ -87,7 +87,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             Database::in_memory_at(11)?
         };
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(if protected {
+            .join(if args.iter().any(|arg| arg == "--metadata-reanalyze") {
+                if args.iter().any(|arg| arg == "--metadata-reanalyze-limit") {
+                    "../../build/rust-fixtures/front-matter-work-limit.pdf"
+                } else {
+                    "../../build/rust-fixtures/front-matter-missing.pdf"
+                }
+            } else if protected {
                 "../../build/rust-fixtures/protected.pdf"
             } else if args.iter().any(|arg| arg == "--links") {
                 if args.iter().any(|arg| arg == "--rejected-link") {
@@ -170,6 +176,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             if args.iter().any(|arg| arg == "--metadata-failed") {
                 db.execute_batch("CREATE TRIGGER synthetic_metadata_failure BEFORE UPDATE OF title_override ON documents BEGIN SELECT RAISE(ABORT,'Synthetic metadata save failure'); END;")?;
+            }
+            if args.iter().any(|arg| arg == "--metadata-reanalyze") {
+                let native_source = fixture.metadata()?;
+                let fingerprint = yamantaka_storage::identity::legacy_fingerprint(&fixture)?;
+                let modified =
+                    chrono::DateTime::<chrono::Utc>::from(native_source.modified()?).to_rfc3339();
+                let pages = if args.iter().any(|arg| arg == "--metadata-reanalyze-limit") {
+                    1
+                } else {
+                    2
+                };
+                db.execute_batch(&format!("UPDATE documents SET fingerprint='{fingerprint}',file_size={},file_modified_at='{modified}',page_count={pages} WHERE id='demo-0'; UPDATE document_enrichment SET fingerprint='{fingerprint}' WHERE document_id='demo-0';",native_source.len()))?;
+                if args.iter().any(|arg| arg == "--metadata-reanalyze-manual") {
+                    db.execute_batch("UPDATE documents SET title_override='Manual geometry',author_override='Manual author' WHERE id='demo-0'")?;
+                }
             }
         }
         if args
@@ -433,20 +454,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             if demo {
                 if args.iter().any(|arg| arg == "--metadata-review") {
-                    app.preview_metadata(
-                        if args
-                            .iter()
-                            .any(|arg| arg == "--metadata-save" || arg == "--metadata-failed")
-                        {
-                            "save"
-                        } else if args.iter().any(|arg| arg == "--metadata-reset") {
-                            "reset"
-                        } else if args.iter().any(|arg| arg == "--metadata-dismiss") {
-                            "dismiss"
-                        } else {
-                            "open"
-                        },
-                    );
+                    app.preview_metadata(if args.iter().any(|arg| arg == "--metadata-reanalyze") {
+                        "reanalyze"
+                    } else if args
+                        .iter()
+                        .any(|arg| arg == "--metadata-save" || arg == "--metadata-failed")
+                    {
+                        "save"
+                    } else if args.iter().any(|arg| arg == "--metadata-reset") {
+                        "reset"
+                    } else if args.iter().any(|arg| arg == "--metadata-dismiss") {
+                        "dismiss"
+                    } else {
+                        "open"
+                    });
                 }
                 if args.iter().any(|arg| arg == "--cover-picker") {
                     app.preview_cover_editor("open");

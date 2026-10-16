@@ -6,6 +6,8 @@ pub struct MetadataReview {
     pub revision: String,
     pub title: String,
     pub author: String,
+    pub automatic_title: Option<String>,
+    pub automatic_author: Option<String>,
     pub source_title: Option<String>,
     pub source_author: Option<String>,
     pub title_override: Option<String>,

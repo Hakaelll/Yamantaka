@@ -35,6 +35,7 @@ impl ImportEnrichment {
         engine: &impl AsyncPdfEngine,
         id: String,
         document: Box<NewDocument>,
+        previous: Option<&yamantaka_domain::metadata_review::MetadataReview>,
         cancel: Cancellation,
     ) -> ImportStep {
         let result = (|| {
@@ -49,8 +50,24 @@ impl ImportEnrichment {
                 .to_string_lossy();
             let scan = FrontMatter::new(
                 &file_name,
-                document.info.title.as_deref(),
-                document.info.author.as_deref(),
+                previous
+                    .and_then(|p| p.automatic_title.as_deref())
+                    .filter(|value| {
+                        matches!(
+                            yamantaka_domain::import_metadata::title(Some(value), &file_name),
+                            yamantaka_domain::import_metadata::MetadataValue::Accepted(_)
+                        )
+                    })
+                    .or(document.info.title.as_deref()),
+                previous
+                    .and_then(|p| p.automatic_author.as_deref())
+                    .filter(|value| {
+                        matches!(
+                            yamantaka_domain::import_metadata::author(Some(value)),
+                            yamantaka_domain::import_metadata::MetadataValue::Accepted(_)
+                        )
+                    })
+                    .or(document.info.author.as_deref()),
                 &governor,
             )?;
             let ticket = engine.try_text_geometry(

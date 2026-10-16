@@ -11,6 +11,8 @@ use yamantaka_domain::{
 };
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
 use yamantaka_storage::Database;
+#[path = "import_enrichment_runtime/metadata_reanalysis.rs"]
+mod metadata_reanalysis;
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")

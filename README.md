@@ -20,6 +20,8 @@ New imports clean embedded title and author fields, then analyze text and layout
 
 Open a book's details and choose **Title and author** to review proposals or enter your own corrections. **Save changes** stores manual values that take priority over future extraction. You can dismiss suggestions or explicitly restore automatic values. The editor preserves the original PDF metadata and refuses to overwrite a newer review. [Metadata editor verification](docs/validation/rust-metadata-review-2026-10-16.md) includes native captures, transaction checks, and search updates.
 
+**Analyze PDF again** refreshes the analysis in the background. It preserves accepted automatic values and manual corrections, presents conflicting text as proposals, and keeps the previous review if analysis fails. [Reanalysis verification](docs/validation/rust-metadata-reanalysis-2026-10-16.md) records native reader coexistence, source checks, rollback, and captures.
+
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.
@@ -155,8 +157,9 @@ Current evidence is documented separately so dates and scopes remain explicit:
 
 - [Acceptance matrix](docs/architecture/rust-rewrite-parity.md): the source of truth for completion.
 - [Front-matter metadata evidence](docs/validation/rust-front-matter-2026-10-15.md): bounded text and geometry analysis with real PDFium tests for titles, explicit authors, conflicts, logos, and rotations.
-- [Background import analysis](docs/validation/rust-import-analysis-2026-10-16.md): native import now persists that evidence and its proposals atomically, validates the source revision, and refreshes the catalogue after each commit. Reader requests take priority over analysis. The next checkpoint connects review controls; reanalysis remains pending.
-- [Native metadata review](docs/validation/rust-metadata-review-2026-10-16.md): review proposals, save manual title and author corrections, dismiss suggestions, or restore automatic values. Scoped replies, stale-review rejection, transactional search updates, and seven synthetic native captures verify this flow. Reanalysis remains pending.
+- [Background import analysis](docs/validation/rust-import-analysis-2026-10-16.md): native import persists evidence and proposals atomically, validates the source revision, and refreshes the catalogue after each commit. Reader requests take priority over analysis.
+- [Native metadata review](docs/validation/rust-metadata-review-2026-10-16.md): review proposals, save manual title and author corrections, dismiss suggestions, or restore automatic values. Scoped replies, stale-review rejection, transactional search updates, and seven synthetic native captures verify this flow.
+- [Native metadata reanalysis](docs/validation/rust-metadata-reanalysis-2026-10-16.md): rerun bounded analysis from the editor while preserving accepted values, manual corrections, and the previous result on failure. Native storage and actor tests plus five synthetic captures verify the connected flow.
 - [Flutter baseline](docs/validation/flutter-baseline-2026-10-08.md): 330 tests and analysis executed on the reference implementation.
 - [Native gallery and settings validation](docs/validation/rust-visual-stage2.md): captures, control bounds and the bounded visual review.
 - [Protected reading validation](docs/validation/rust-password-opening-2026-10-09.md): ephemeral credential ownership, real PDFium retry tests and five native captures.

@@ -273,6 +273,16 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn reanalyze_metadata(
+        &mut self,
+        expected: &yamantaka_domain::metadata_review::MetadataReview,
+        original: &Document,
+        analyzed: &NewDocument,
+        access: yamantaka_domain::search::IndexAccess,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::metadata_review::MetadataReview> {
+        crate::metadata_reanalysis::save(self, expected, original, analyzed, access, cancel)
+    }
     fn metadata_review(
         &self,
         document: &str,
@@ -381,7 +391,14 @@ impl LibraryRepository for Database {
         if transaction.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,source_title,source_author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?12,?13)", params![id,path.to_string_lossy(),normalized,file_name,title,author,document.info.title,document.info.author,document.info.pages.len() as i64,metadata.len() as i64,chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),now,fingerprint]).map_err(storage)? !=1 {
             return Err(Failure::Storage("Imported document was not saved".into()));
         }
-        crate::import_metadata::save(&transaction, &id, &fingerprint, &document.analysis, &now)?;
+        crate::import_metadata::save(
+            &transaction,
+            &id,
+            &fingerprint,
+            &document.analysis,
+            [false, false],
+            &now,
+        )?;
         let saved:serde_json::Value=transaction.query_row("SELECT json_object('path',path,'normalized',normalized_path,'file',file_name,'title',title,'author',author,'sourceTitle',source_title,'sourceAuthor',source_author,'pages',page_count,'size',file_size,'modified',file_modified_at,'fingerprint',fingerprint) FROM documents WHERE id=?",[&id],|row|row.get(0)).map_err(storage)?;
         let expected = serde_json::json!({"path":path.to_string_lossy(),"normalized":normalized,"file":file_name,"title":title,"author":author,"sourceTitle":document.info.title,"sourceAuthor":document.info.author,"pages":document.info.pages.len(),"size":metadata.len(),"modified":chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),"fingerprint":fingerprint});
         if saved != expected

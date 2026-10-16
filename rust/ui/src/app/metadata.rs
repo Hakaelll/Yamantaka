@@ -14,6 +14,8 @@ pub(super) struct MetadataEditor {
     error: Option<String>,
     confirm_reset: bool,
     saved: bool,
+    analyzing: bool,
+    analyzed: bool,
 }
 impl Drop for MetadataEditor {
     fn drop(&mut self) {
@@ -23,11 +25,29 @@ impl Drop for MetadataEditor {
     }
 }
 impl MetadataEditor {
+    fn clean_draft(&self) -> bool {
+        self.snapshot
+            .as_ref()
+            .is_some_and(|s| self.title == s.title && self.author == s.author)
+    }
+    fn reanalyze(&mut self) -> Option<(Box<MetadataReview>, Cancellation)> {
+        if self.pending.is_some() || !self.clean_draft() || self.document.missing {
+            return None;
+        }
+        let expected = Box::new(self.snapshot.clone()?);
+        let cancel = Cancellation::default();
+        self.pending = Some((cancel.clone(), true));
+        self.analyzing = true;
+        self.analyzed = false;
+        self.saved = false;
+        self.error = None;
+        Some((expected, cancel))
+    }
     pub(super) fn capture_ready(&self) -> bool {
         self.snapshot.is_some() && self.pending.is_none()
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"document":self.document.id,"title":self.title,"author":self.author,"snapshot":self.snapshot.as_ref().map(|s|serde_json::json!({"title":s.title,"author":s.author,"titleOverride":s.title_override,"authorOverride":s.author_override,"suggestedTitle":s.suggested_title,"suggestedAuthor":s.suggested_author})),"saved":self.saved,"error":self.error,"pending":self.pending.is_some()})
+        serde_json::json!({"document":self.document.id,"title":self.title,"author":self.author,"snapshot":self.snapshot.as_ref().map(|s|serde_json::json!({"title":s.title,"author":s.author,"titleOverride":s.title_override,"authorOverride":s.author_override,"suggestedTitle":s.suggested_title,"suggestedAuthor":s.suggested_author})),"saved":self.saved,"analyzing":self.analyzing,"analyzed":self.analyzed,"error":self.error,"pending":self.pending.is_some()})
     }
     fn read(&mut self) -> MetadataRequest {
         if let Some((cancel, false)) = self.pending.take() {
@@ -37,6 +57,7 @@ impl MetadataEditor {
         self.pending = Some((cancel.clone(), false));
         self.error = None;
         self.saved = false;
+        self.analyzed = false;
         MetadataRequest {
             document: self.document.id.clone(),
             change: MetadataChange::Read,
@@ -52,6 +73,7 @@ impl MetadataEditor {
         self.pending = Some((cancel.clone(), true));
         self.error = None;
         self.saved = false;
+        self.analyzed = false;
         Some(MetadataRequest {
             document: self.document.id.clone(),
             change: MetadataChange::Apply {
@@ -70,6 +92,7 @@ impl MetadataEditor {
             return None;
         }
         self.pending = None;
+        let analyzed = std::mem::take(&mut self.analyzing);
         match reply.result {
             Ok(snapshot) => {
                 self.title = snapshot.title.clone();
@@ -77,7 +100,8 @@ impl MetadataEditor {
                 self.snapshot = Some(snapshot.clone());
                 self.confirm_reset = false;
                 self.error = None;
-                self.saved = reply.writing;
+                self.saved = reply.writing && !analyzed;
+                self.analyzed = reply.writing && analyzed;
                 reply.writing.then_some(snapshot)
             }
             Err(error) => {
@@ -110,6 +134,15 @@ impl YamantakaApp {
         {
             if action == "open" {
                 self.metadata_preview = Some((action, 3));
+                return;
+            }
+            if action == "reanalyze" {
+                if let Some((expected, cancel)) =
+                    self.metadata.as_mut().and_then(MetadataEditor::reanalyze)
+                {
+                    self.metadata_preview = Some((action, 2));
+                    self.send_metadata_reanalysis(expected, cancel);
+                }
                 return;
             }
             let mutation = match action {
@@ -152,6 +185,8 @@ impl YamantakaApp {
             error: None,
             confirm_reset: false,
             saved: false,
+            analyzing: false,
+            analyzed: false,
         };
         let request = editor.read();
         self.metadata = Some(editor);
@@ -165,6 +200,20 @@ impl YamantakaApp {
             self.accept_metadata(MetadataReply {
                 document,
                 writing,
+                cancel,
+                result: Err(error),
+            });
+        }
+    }
+    fn send_metadata_reanalysis(&mut self, expected: Box<MetadataReview>, cancel: Cancellation) {
+        let document = expected.document.clone();
+        if let Err(error) = self
+            .runtime
+            .submit(Action::ReanalyzeMetadata(expected, cancel.clone()))
+        {
+            self.accept_metadata(MetadataReply {
+                document,
+                writing: true,
                 cancel,
                 result: Err(error),
             });
@@ -199,6 +248,7 @@ impl YamantakaApp {
         let ready = editor.snapshot.is_some() && editor.pending.is_none();
         let mut close = false;
         let mut request = None;
+        let mut reanalysis = None;
         egui::ScrollArea::vertical().id_salt("metadata-review").auto_shrink([false,false]).show(ui,|ui| {
             egui::Frame::new().inner_margin(egui::Margin::symmetric(if ui.available_width()>850.0 {42}else if compact {12}else{18},if compact {10}else{20})).show(ui,|ui| {
                 ui.set_width(ui.available_width().min(880.0));
@@ -242,6 +292,7 @@ impl YamantakaApp {
                     if editor.snapshot.as_ref().is_some_and(|s|s.suggested_title.is_some() || s.suggested_author.is_some()) && ui.add_enabled_ui(ready,|ui|theme::navigation(ui,self.tr("Descartar propuestas","Dismiss suggestions"),false,p)).inner.clicked() {request=editor.apply(MetadataMutation::DismissSuggestions);}
                 });
                 if editor.saved {ui.label(RichText::new(self.tr("Cambios guardados en la biblioteca.","Changes saved to the library.")).color(p.secondary));}
+                if editor.analyzed {ui.label(RichText::new(self.tr("Análisis actualizado. Tus correcciones manuales se han conservado.","Analysis updated. Your manual corrections have been preserved.")).color(p.secondary));}
                 if let Some(error)=editor.error.as_ref() {
                     ui.add_space(12.0);
                     ui.label(RichText::new(error).color(p.ink));
@@ -255,6 +306,10 @@ impl YamantakaApp {
                     for (label,value) in [(self.tr("Título","Title"),snapshot.source_title.as_deref()),(self.tr("Autor","Author"),snapshot.source_author.as_deref())] {
                         ui.label(RichText::new(format!("{label}: {}",value.filter(|s|!s.is_empty()).unwrap_or(self.tr("Sin especificar","Not specified")))).color(p.secondary));
                     }
+                    ui.add_space(12.0);
+                    if editor.analyzing {
+                        if theme::navigation(ui,self.tr("Cancelar análisis","Cancel analysis"),false,p).clicked() && let Some((cancel,_))=&editor.pending {cancel.cancel();}
+                    } else if ui.add_enabled_ui(ready && editor.clean_draft() && !editor.document.missing,|ui|theme::navigation(ui,self.tr("Volver a analizar el PDF","Analyze PDF again"),false,p)).inner.on_hover_text(self.tr("Guarda o descarta tu borrador antes de analizar. Las correcciones manuales se conservan.","Save or discard your draft before analysis. Manual corrections are preserved.")).clicked() {reanalysis=editor.reanalyze();}
                     if snapshot.title_override.is_some() || snapshot.author_override.is_some() {
                         ui.add_space(12.0);
                         ui.add_enabled_ui(ready,|ui| {
@@ -275,6 +330,9 @@ impl YamantakaApp {
         }
         if let Some(request) = request {
             self.send_metadata(request);
+        }
+        if let Some((expected, cancel)) = reanalysis {
+            self.send_metadata_reanalysis(expected, cancel);
         }
     }
 }
