@@ -14,6 +14,7 @@ mod library_covers;
 mod library_intro;
 mod links;
 mod list;
+mod metadata;
 mod navigation;
 mod open_intent;
 mod opening;
@@ -96,6 +97,8 @@ pub struct YamantakaApp {
     global_notes: global_notes::GlobalNotes,
     history: history::HistoryState,
     goals: goals::GoalState,
+    metadata: Option<metadata::MetadataEditor>,
+    metadata_preview: Option<(&'static str, u8)>,
     open_intent: open_intent::OpenIntent,
     opening: opening::ReaderOpening,
     tabs: tabs::TabState,
@@ -326,6 +329,8 @@ impl YamantakaApp {
             global_notes: Default::default(),
             history: Default::default(),
             goals: Default::default(),
+            metadata: None,
+            metadata_preview: None,
             annotations: Default::default(),
             annotation_export: Default::default(),
             annotation_paint: Default::default(),
@@ -1747,6 +1752,7 @@ impl App for YamantakaApp {
                         self.error = Some(error.to_string());
                     }
                 }
+                Update::Metadata(reply) => self.accept_metadata(reply),
                 Update::ReadingGoal(reply) => self.accept_goal(reply),
                 Update::ReadingSessionDeleted(reply) => self.accept_history_delete(reply),
                 Update::ReadingHistory(reply) => {
@@ -1756,6 +1762,7 @@ impl App for YamantakaApp {
             }
         }
         self.advance_cover_picker_preview();
+        self.advance_metadata_preview();
         self.advance_replacement_preview();
         self.advance_tab_preview();
         self.advance_bulk_tab_preview();
@@ -1940,6 +1947,7 @@ impl App for YamantakaApp {
                 if matches!(self.surface, Surface::Library)
                     && self.inspector
                     && self.cover_picker.is_none()
+                    && self.metadata.is_none()
                 {
                     egui::Panel::bottom("document-details")
                         .default_size(148.0)
@@ -1949,6 +1957,7 @@ impl App for YamantakaApp {
                 egui::CentralPanel::default()
                     .frame(egui::Frame::new().fill(p.canvas))
                     .show(ui, |ui| match self.surface {
+                        Surface::Library if self.metadata.is_some() => self.metadata_view(ui),
                         Surface::Library if self.cover_picker.is_some() => {
                             self.cover_picker_view(ui)
                         }
@@ -2001,7 +2010,9 @@ impl App for YamantakaApp {
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
                     && self.restoration.ready()
-                    && (!matches!(self.surface, Surface::Library) || !self.inspector || self.goals.ready())
+                    && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.goals.ready())
+                    && self.metadata_preview.is_none_or(|(_,stage)|stage==3)
+                    && self.metadata.as_ref().is_none_or(|editor|editor.capture_ready())
                     && self.library_covers.slots_ready()
                     && self.cover_picker_capture_ready()
                     && self.cover_picker.as_ref().is_none_or(|picker|picker.capture_ready())
@@ -2086,6 +2097,7 @@ impl App for YamantakaApp {
                         "libraryCovers":self.cover_summary(),
                         "coverPicker":self.cover_picker_summary(),
                         "coverPickerDemo":self.cover_picker_demo_summary(),
+                        "metadataReview":self.metadata.as_ref().map(|editor|editor.summary()),
                         "documentFind":self.find.capture_summary(),
                         "documentLinks":self.links.capture_summary(),
                         "pageText": if self.selection.enabled { self.selection.text_state(self.page).map(text::TextState::capture_summary) } else { Some(self.text.capture_summary()) },

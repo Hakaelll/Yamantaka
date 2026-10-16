@@ -52,6 +52,13 @@ fn verify_session(db: &Connection, session: &IndexSession) -> Result<()> {
     Ok(())
 }
 const TITLE: &str = "COALESCE(d.title_override,d.title,d.source_title,d.file_name)";
+pub(crate) fn refresh_metadata(db: &Connection, id: &str) -> Result<()> {
+    let excluded: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM search_index_state WHERE document_id=? AND status='excluded')",[id],|row|row.get(0)).map_err(storage)?;
+    if !excluded {
+        metadata(db, id)?;
+    }
+    Ok(())
+}
 /// Update one auxiliary entry inside the caller's bookmark transaction. This
 /// neither refreshes the catalogue nor changes an active PDF index revision.
 pub(crate) fn refresh_bookmark_page(

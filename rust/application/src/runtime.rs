@@ -35,6 +35,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    Metadata(Box<crate::metadata_review::MetadataRequest>),
     RestoreAutomaticCover(String, PathBuf, u64, Cancellation),
     CoverSourcePage(String, Cancellation),
     PreviewCover(String, PathBuf, u32, u64, Cancellation),
@@ -94,6 +95,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    Metadata(crate::metadata_review::MetadataReply),
     CoverSourcePage(String, Result<Option<u32>>, Cancellation),
     ManualCover(crate::manual_cover::ManualCoverReply),
     Cover(String, Result<Arc<RenderedPage>>, Cancellation),
@@ -529,6 +531,10 @@ impl Runtime {
                             match action {
                                 Action::ReadingHistory(request) => emit(&events, &notify, Update::ReadingHistory(request.execute(&repository)), permit),
                                 Action::DeleteReadingSession(request) => emit(&events,&notify,Update::ReadingSessionDeleted(request.execute(&mut repository)),permit),
+                                Action::Metadata(request) => {
+                                    let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled} else {yamantaka_domain::search::IndexAccess::Disabled};
+                                    emit(&events,&notify,Update::Metadata(request.execute(&mut repository,access)),permit);
+                                }
                                 Action::ReadingGoal(request) => emit(&events,&notify,Update::ReadingGoal(request.execute(&mut repository)),permit),
                                 Action::TrimReadingHistory(limit, cancel) => {
                                     let result = repository.trim_reading_history(limit, &cancel);

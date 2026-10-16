@@ -77,6 +77,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     || arg == "--export-markdown"
                     || arg == "--global-notes-export-json"
                     || arg == "--global-notes-export-markdown"
+                    || arg == "--metadata-review"
             }) {
             std::fs::create_dir_all(&store).map_err(|_| {
                 yamantaka_domain::Failure::Storage("Synthetic export store could not open".into())
@@ -161,6 +162,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         if args.iter().any(|arg| arg == "--automatic-cover-manual") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-08',1,'manual',4,'contain',0.7142857142857143);")?;
+        }
+        if args.iter().any(|arg| arg == "--metadata-review") {
+            db.execute_batch("UPDATE documents SET source_title='Untitled',source_author='Unknown' WHERE id='demo-0'; INSERT INTO document_enrichment(document_id,fingerprint,analyzer_version,status,suggested_title,suggested_author) VALUES('demo-0','synthetic',2,'review','Geometry of Light','Ada Lovelace');")?;
+            if args.iter().any(|arg| arg == "--metadata-reset") {
+                db.execute_batch("UPDATE documents SET title_override='Manual geometry',author_override='Manual author' WHERE id='demo-0'")?;
+            }
+            if args.iter().any(|arg| arg == "--metadata-failed") {
+                db.execute_batch("CREATE TRIGGER synthetic_metadata_failure BEFORE UPDATE OF title_override ON documents BEGIN SELECT RAISE(ABORT,'Synthetic metadata save failure'); END;")?;
+            }
         }
         if args
             .iter()
@@ -422,6 +432,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args.iter().any(|arg| arg == "--metadata-review") {
+                    app.preview_metadata(
+                        if args
+                            .iter()
+                            .any(|arg| arg == "--metadata-save" || arg == "--metadata-failed")
+                        {
+                            "save"
+                        } else if args.iter().any(|arg| arg == "--metadata-reset") {
+                            "reset"
+                        } else if args.iter().any(|arg| arg == "--metadata-dismiss") {
+                            "dismiss"
+                        } else {
+                            "open"
+                        },
+                    );
+                }
                 if args.iter().any(|arg| arg == "--cover-picker") {
                     app.preview_cover_editor("open");
                 }

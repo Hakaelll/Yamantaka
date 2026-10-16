@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='metadata-review-dark'; args=@('--metadata-review') },
+    @{ name='metadata-review-light-es'; args=@('--metadata-review','--light','--es','--reduce-motion') },
+    @{ name='metadata-review-small-200'; args=@('--metadata-review','--size=640x480','--text-scale=2') },
+    @{ name='metadata-review-saved'; args=@('--metadata-review','--metadata-save') },
+    @{ name='metadata-review-dismissed'; args=@('--metadata-review','--metadata-dismiss') },
+    @{ name='metadata-review-reset'; args=@('--metadata-review','--metadata-reset') },
+    @{ name='metadata-review-failed'; args=@('--metadata-review','--metadata-failed') },
     @{ name='cover-refresh-version'; args=@('--pdf-covers','--automatic-cover','--automatic-cover-stale-version','--details') },
     @{ name='cover-refresh-source'; args=@('--pdf-covers','--automatic-cover','--automatic-cover-stale-source','--details','--light','--es','--reduce-motion') },
     @{ name='cover-refresh-manual'; args=@('--pdf-covers','--automatic-cover','--automatic-cover-manual','--details') },

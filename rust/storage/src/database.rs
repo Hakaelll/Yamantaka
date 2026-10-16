@@ -273,6 +273,22 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn metadata_review(
+        &self,
+        document: &str,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::metadata_review::MetadataReview> {
+        crate::metadata_review::read(&self.connection, document, cancel)
+    }
+    fn change_metadata(
+        &mut self,
+        expected: &yamantaka_domain::metadata_review::MetadataReview,
+        change: &yamantaka_domain::metadata_review::MetadataMutation,
+        access: yamantaka_domain::search::IndexAccess,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::metadata_review::MetadataReview> {
+        crate::metadata_review::change(self, expected, change, access, cancel)
+    }
     fn cover_snapshot(&self, id: &str) -> Result<yamantaka_domain::cover_snapshot::CoverSnapshot> {
         crate::cover_snapshot::read(&self.connection, id)
     }

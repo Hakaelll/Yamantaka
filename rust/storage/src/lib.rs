@@ -10,6 +10,7 @@ mod cover_snapshot;
 pub mod database;
 pub mod identity;
 mod import_metadata;
+mod metadata_review;
 pub mod migration;
 pub mod preferences;
 pub mod reader_continuity;

@@ -1,0 +1,113 @@
+use super::*;
+
+fn editor() -> MetadataEditor {
+    let document:Document=serde_json::from_value(serde_json::json!({"id":"a","path":"a.pdf","file_name":"a.pdf","title":"Current title","author":"Current author","page_count":2,"last_page_index":0,"reading_progress":0.0,"favorite":false,"missing":false,"fingerprint":"fa","thumbnail_path":null})).unwrap();
+    MetadataEditor {
+        document,
+        snapshot: None,
+        pending: None,
+        title: "Current title".into(),
+        author: "Current author".into(),
+        error: None,
+        confirm_reset: false,
+        saved: false,
+    }
+}
+fn snapshot() -> MetadataReview {
+    MetadataReview {
+        document: "a".into(),
+        revision: "revision-1".into(),
+        title: "Current title".into(),
+        author: "Current author".into(),
+        source_title: Some("Raw title".into()),
+        source_author: None,
+        title_override: None,
+        author_override: None,
+        suggested_title: Some("Proposed title".into()),
+        suggested_author: None,
+    }
+}
+
+#[test]
+fn obsolete_read_and_wrong_operation_cannot_replace_a_newer_editor_draft() {
+    let mut editor = editor();
+    let old = editor.read();
+    let current = editor.read();
+    assert!(old.cancel.is_cancelled());
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: false,
+        cancel: old.cancel,
+        result: Ok(snapshot()),
+    });
+    assert!(editor.snapshot.is_none());
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: true,
+        cancel: current.cancel.clone(),
+        result: Ok(snapshot()),
+    });
+    assert!(editor.snapshot.is_none());
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: false,
+        cancel: current.cancel,
+        result: Ok(snapshot()),
+    });
+    assert!(editor.capture_ready());
+    editor.title = "My own title".into();
+    let request = editor
+        .apply(MetadataMutation::Save(
+            ManualMetadata::new(&editor.title, &editor.author).unwrap(),
+        ))
+        .unwrap();
+    assert!(editor.apply(MetadataMutation::ResetOverrides).is_none());
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: true,
+        cancel: request.cancel,
+        result: Err(yamantaka_domain::Failure::Storage(
+            "Synthetic failure".into(),
+        )),
+    });
+    assert_eq!(editor.title, "My own title");
+    assert_eq!(editor.author, "Current author");
+    assert!(editor.pending.is_none());
+    assert!(editor.error.is_some());
+    assert!(!editor.saved);
+    assert_eq!(editor.snapshot.as_ref().unwrap().title, "Current title");
+}
+
+#[test]
+fn only_the_matching_successful_save_updates_snapshot_and_confirms_persistence() {
+    let mut editor = editor();
+    let read = editor.read();
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: false,
+        cancel: read.cancel,
+        result: Ok(snapshot()),
+    });
+    let request = editor.apply(MetadataMutation::DismissSuggestions).unwrap();
+    let mut saved = snapshot();
+    saved.revision = "revision-2".into();
+    saved.suggested_title = None;
+    editor.accept(MetadataReply {
+        document: "another".into(),
+        writing: true,
+        cancel: request.cancel.clone(),
+        result: Ok(saved.clone()),
+    });
+    assert!(editor.pending.is_some());
+    assert_eq!(
+        editor.accept(MetadataReply {
+            document: "a".into(),
+            writing: true,
+            cancel: request.cancel,
+            result: Ok(saved.clone())
+        }),
+        Some(saved.clone())
+    );
+    assert_eq!(editor.snapshot, Some(saved));
+    assert!(editor.saved);
+}

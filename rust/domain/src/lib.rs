@@ -11,6 +11,7 @@ pub mod external_uri;
 pub mod front_matter;
 pub mod import_metadata;
 pub mod memory;
+pub mod metadata_review;
 pub mod outline;
 
 use serde::{Deserialize, Serialize};
@@ -189,6 +190,22 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn metadata_review(
+        &self,
+        _document: &str,
+        _cancel: &Cancellation,
+    ) -> Result<metadata_review::MetadataReview> {
+        Err(Failure::Unsupported("Metadata review".into()))
+    }
+    fn change_metadata(
+        &mut self,
+        _expected: &metadata_review::MetadataReview,
+        _change: &metadata_review::MetadataMutation,
+        _access: search::IndexAccess,
+        _cancel: &Cancellation,
+    ) -> Result<metadata_review::MetadataReview> {
+        Err(Failure::Unsupported("Metadata corrections".into()))
+    }
     fn cover_snapshot(&self, _id: &str) -> Result<cover_snapshot::CoverSnapshot> {
         Err(Failure::Unsupported("Cover source snapshot".into()))
     }

@@ -133,6 +133,16 @@ impl YamantakaApp {
                                 {
                                     self.begin_cover_picker(document.clone());
                                 }
+                                if theme::navigation(
+                                    ui,
+                                    self.tr("Título y autor", "Title and author"),
+                                    false,
+                                    p,
+                                )
+                                .clicked()
+                                {
+                                    self.begin_metadata_editor(document.clone());
+                                }
                                 if theme::navigation(ui, "Explorer", false, p).clicked()
                                     && let Err(error) = yamantaka_windows::reveal(&document.path)
                                 {

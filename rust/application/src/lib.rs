@@ -6,6 +6,7 @@ mod automatic_cover;
 pub mod document_find;
 mod import_enrichment;
 pub mod manual_cover;
+pub mod metadata_review;
 pub mod reader_close;
 pub mod reader_continuity;
 pub mod reading_sessions;
