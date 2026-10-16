@@ -31,7 +31,12 @@ fn analyze(name: &str) -> (EnrichmentEvidence, MemoryGovernor) {
     .unwrap();
     for page in 0..info.pages.len().min(6) as u32 {
         let text = worker
-            .try_text_geometry("source".into(), page, cancel.clone())
+            .try_text_geometry(
+                "source".into(),
+                page,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::FrontMatter,
+                cancel.clone(),
+            )
             .unwrap()
             .wait()
             .unwrap();

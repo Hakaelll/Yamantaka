@@ -93,7 +93,12 @@ fn native_unicode_character_ranges_crop_rotations_and_retained_memory() {
             )
             .unwrap();
         let page = worker
-            .try_text_geometry("study".into(), 0, Cancellation::default())
+            .try_text_geometry(
+                "study".into(),
+                0,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+                Cancellation::default(),
+            )
             .unwrap()
             .wait()
             .unwrap();
@@ -125,7 +130,12 @@ fn native_unicode_character_ranges_crop_rotations_and_retained_memory() {
             }
         }
         let empty = worker
-            .try_text_geometry("study".into(), 1, Cancellation::default())
+            .try_text_geometry(
+                "study".into(),
+                1,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+                Cancellation::default(),
+            )
             .unwrap()
             .wait()
             .unwrap();
@@ -220,14 +230,24 @@ fn cancellation_invalid_page_and_budget_failure_release_all_text_work() {
     cancel.cancel();
     assert!(matches!(
         worker
-            .try_text_geometry("study".into(), 0, cancel)
+            .try_text_geometry(
+                "study".into(),
+                0,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+                cancel
+            )
             .unwrap()
             .wait(),
         Err(Failure::Cancelled)
     ));
     assert!(
         worker
-            .try_text_geometry("study".into(), 9, Cancellation::default())
+            .try_text_geometry(
+                "study".into(),
+                9,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+                Cancellation::default()
+            )
             .unwrap()
             .wait()
             .is_err()
@@ -239,7 +259,12 @@ fn cancellation_invalid_page_and_budget_failure_release_all_text_work() {
     });
     assert!(matches!(
         worker
-            .try_text_geometry("study".into(), 0, Cancellation::default())
+            .try_text_geometry(
+                "study".into(),
+                0,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+                Cancellation::default()
+            )
             .unwrap()
             .wait(),
         Err(Failure::MemoryBudget)
@@ -248,7 +273,12 @@ fn cancellation_invalid_page_and_budget_failure_release_all_text_work() {
     governor.set_limits(GlobalMemoryLimits::default());
     assert_eq!(
         worker
-            .try_text_geometry("study".into(), 0, Cancellation::default())
+            .try_text_geometry(
+                "study".into(),
+                0,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+                Cancellation::default()
+            )
             .unwrap()
             .wait()
             .unwrap()
@@ -281,7 +311,12 @@ fn oversized_native_text_is_rejected_before_character_vector_allocation() {
         )
         .unwrap();
     let result = worker
-        .try_text_geometry("study".into(), 0, Cancellation::default())
+        .try_text_geometry(
+            "study".into(),
+            0,
+            yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+            Cancellation::default(),
+        )
         .unwrap()
         .wait();
     let diagnostic = result
@@ -289,12 +324,17 @@ fn oversized_native_text_is_rejected_before_character_vector_allocation() {
         .map(|page| page.characters().len())
         .map_err(|error| error.to_string());
     assert!(
-        matches!(result, Err(Failure::Pdf(message)) if message.contains("character work limit")),
+        matches!(result, Err(Failure::TextWorkLimit)),
         "{diagnostic:?}"
     );
     assert_eq!(governor.usage().text, 0);
     let empty = worker
-        .try_text_geometry("study".into(), 1, Cancellation::default())
+        .try_text_geometry(
+            "study".into(),
+            1,
+            yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+            Cancellation::default(),
+        )
         .unwrap()
         .wait()
         .unwrap();
@@ -317,7 +357,12 @@ fn cropped_out_characters_keep_text_without_inventing_selection_geometry() {
         )
         .unwrap();
     let page = worker
-        .try_text_geometry("study".into(), 0, Cancellation::default())
+        .try_text_geometry(
+            "study".into(),
+            0,
+            yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+            Cancellation::default(),
+        )
         .unwrap()
         .wait()
         .unwrap();

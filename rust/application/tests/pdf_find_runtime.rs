@@ -51,6 +51,7 @@ impl AsyncPdfEngine for HeldFind {
         _: String,
         _: PathBuf,
         _: Option<PdfPassword>,
+        _purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
         _: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         unused()

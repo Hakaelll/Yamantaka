@@ -8,11 +8,43 @@ pub fn legacy_fingerprint(path: &Path) -> Result<String> {
     let size = file.metadata().map_err(storage)?.len();
     let mut bytes = Vec::with_capacity(65536);
     file.take(65536).read_to_end(&mut bytes).map_err(storage)?;
-    let partial = format!("{:x}", Sha256::digest(bytes));
-    Ok(format!(
+    Ok(fingerprint_from_head(size, Sha256::digest(bytes).into()))
+}
+
+pub(crate) fn fingerprint_from_head(size: u64, head: [u8; 32]) -> String {
+    let digest: sha2::digest::Output<Sha256> = head.into();
+    let partial = format!("{digest:x}");
+    format!(
         "{:x}",
         Sha256::digest(format!("{size}:{partial}").as_bytes())
-    ))
+    )
+}
+
+pub(crate) fn verify_import_source(
+    path: &Path,
+    source: &yamantaka_domain::source_revision::SourceRevision,
+) -> Result<String> {
+    let unchanged = || -> Result<()> {
+        let metadata = path.metadata().map_err(storage)?;
+        if path != source.canonical_path
+            || metadata.len() != source.size
+            || metadata.modified().map_err(storage)? != source.modified
+        {
+            return Err(yamantaka_domain::Failure::Invalid(
+                "PDF source changed during import".into(),
+            ));
+        }
+        Ok(())
+    };
+    unchanged()?;
+    let fingerprint = legacy_fingerprint(path)?;
+    if fingerprint != fingerprint_from_head(source.size, source.head_sha256) {
+        return Err(yamantaka_domain::Failure::Invalid(
+            "PDF source changed during import".into(),
+        ));
+    }
+    unchanged()?;
+    Ok(fingerprint)
 }
 
 pub fn full_sha256(path: &Path, cancellation: &Cancellation) -> Result<String> {

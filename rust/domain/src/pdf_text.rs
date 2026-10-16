@@ -3,6 +3,21 @@ use std::ops::Range;
 
 pub const MAX_PAGE_TEXT_CHARACTERS: usize = 128_000;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextGeometryPurpose {
+    Reader,
+    FrontMatter,
+}
+
+impl TextGeometryPurpose {
+    pub fn character_limit(self) -> usize {
+        match self {
+            Self::Reader => MAX_PAGE_TEXT_CHARACTERS,
+            Self::FrontMatter => 16_000,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct TextCharacter {
     pub bytes: Range<u32>,

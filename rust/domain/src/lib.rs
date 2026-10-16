@@ -31,6 +31,7 @@ pub mod reader_tabs;
 pub mod reading_activity;
 pub mod reading_sessions;
 pub mod search;
+pub mod source_revision;
 pub mod text_selection;
 use std::{
     path::PathBuf,
@@ -48,6 +49,8 @@ pub const MAX_RENDER_DIMENSION: u32 = 16_384;
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Failure {
+    #[error("PDF text exceeds the requested work limit")]
+    TextWorkLimit,
     #[error("Unsupported operation: {0}")]
     Unsupported(String),
     #[error("Storage operation failed: {0}")]
@@ -240,6 +243,8 @@ pub trait LibraryRepository {
 pub struct NewDocument {
     pub path: PathBuf,
     pub info: PdfInfo,
+    pub source: source_revision::SourceRevision,
+    pub analysis: front_matter::ImportAnalysis,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

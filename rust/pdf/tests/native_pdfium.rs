@@ -39,7 +39,13 @@ fn visible_readers_survive_background_eviction_and_two_pins_reject_extra_opens()
         .unwrap();
     assert!(
         engine
-            .try_open("extra".into(), fixture("textual.pdf"), None, cancel.clone())
+            .try_open(
+                "extra".into(),
+                fixture("textual.pdf"),
+                None,
+                yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
+                cancel.clone()
+            )
             .is_err()
     );
     // Reopening a protected ID remains admissible, even with both slots pinned.
@@ -552,6 +558,7 @@ fn admitted_async_tickets_complete_once_and_shutdown_joins_with_replies_undraine
             "async".into(),
             fixture("textual.pdf"),
             None,
+            yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
             Cancellation::default(),
         )
         .unwrap()
@@ -621,6 +628,7 @@ fn concurrent_long_document_inspections_finish_before_hot_handle_eviction() {
                     format!("long-{id}"),
                     fixture("5000-pages.pdf"),
                     None,
+                    yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
                     Cancellation::default(),
                 )
                 .unwrap()

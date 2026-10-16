@@ -22,6 +22,10 @@ mod reading_sessions;
 mod review_export;
 
 enum Native {
+    Source(
+        Cancellation,
+        Sender<Result<yamantaka_domain::source_revision::SourceRevision>>,
+    ),
     Open(String, Cancellation, Sender<Result<PdfInfo>>),
     Text(u32, Cancellation, Sender<Result<String>>),
     Outline(
@@ -52,6 +56,15 @@ impl PdfEngine for Engine {
     }
 }
 impl AsyncPdfEngine for Engine {
+    fn try_source_revision(
+        &self,
+        _id: String,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<yamantaka_domain::source_revision::SourceRevision>> {
+        let (sender, ticket) = PdfTicket::channel(5, 1, cancel.clone());
+        self.0.try_send(Native::Source(cancel, sender)).unwrap();
+        Ok(ticket)
+    }
     fn set_visible_documents(&self, ids: &[String]) -> Result<()> {
         self.1.lock().unwrap().push(ids.to_vec());
         Ok(())
@@ -61,6 +74,7 @@ impl AsyncPdfEngine for Engine {
         id: String,
         _: PathBuf,
         _: Option<yamantaka_domain::PdfPassword>,
+        _purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         let (send, ticket) = PdfTicket::channel(1, 1, cancel.clone());
@@ -778,7 +792,10 @@ fn import_waits_for_ui_confirmation_without_blocking_catalogue_queries() {
         .canonicalize()
         .unwrap();
     runtime
-        .submit(Action::Import(vec![fixture], Cancellation::default()))
+        .submit(Action::Import(
+            vec![fixture.clone()],
+            Cancellation::default(),
+        ))
         .unwrap();
     runtime
         .submit(Action::Query(Default::default(), Cancellation::default()))
@@ -794,6 +811,20 @@ fn import_waits_for_ui_confirmation_without_blocking_catalogue_queries() {
         panic!("deferred import open")
     };
     reply.send(Ok(info())).unwrap();
+    let Native::Source(cancel, reply) = next(&native) else {
+        panic!("import source snapshot")
+    };
+    assert!(!cancel.is_cancelled());
+    use sha2::{Digest, Sha256};
+    let bytes = std::fs::read(&fixture).unwrap();
+    reply
+        .send(Ok(yamantaka_domain::source_revision::SourceRevision {
+            canonical_path: fixture.clone(),
+            size: bytes.len() as u64,
+            modified: fixture.metadata().unwrap().modified().unwrap(),
+            head_sha256: Sha256::digest(&bytes[..bytes.len().min(65536)]).into(),
+        }))
+        .unwrap();
     let Native::Close(_, reply) = next(&native) else {
         panic!("import inspection close")
     };
@@ -911,7 +942,9 @@ fn foreground_open_waits_for_index_close_and_indexing_resumes_without_late_text(
     let Native::Open(id, _, send) = next(&native) else {
         panic!("expected index resume")
     };
-    assert_eq!(id, index_id);
+    assert!(id.starts_with("index-"));
+    assert_ne!(id, index_id);
+    let resumed_id = id;
     send.send(Ok(info())).unwrap();
     for expected in [1, 2] {
         let Native::Text(page, _, send) = next(&native) else {
@@ -920,9 +953,10 @@ fn foreground_open_waits_for_index_close_and_indexing_resumes_without_late_text(
         assert_eq!(page, expected);
         send.send(Ok("Resumed study".into())).unwrap();
     }
-    let Native::Close(_, send) = next(&native) else {
+    let Native::Close(id, send) = next(&native) else {
         panic!("expected final close")
     };
+    assert_eq!(id, resumed_id);
     send.send(Ok(())).unwrap();
     phase(&runtime, &notified, IndexPhase::Completed);
     for (text, count) in [("Committed", 1), ("Obsolete", 0), ("Resumed", 2)] {
@@ -981,6 +1015,9 @@ fn two_visible_slots_pause_indexing_and_cancelled_import_releases_its_reservatio
     close.send(Ok(())).unwrap();
     // The cancelled importer must never open its PDF; the next request resumes
     // indexing. Cancel and complete this run before dropping the runtime.
+    assert!(
+        matches!(update(&runtime),Update::Failed(yamantaka_domain::Failure::Cancelled,Some(token)) if token.same_request(&import_cancel))
+    );
     let Native::Open(id, _, send) = next(&native) else {
         panic!("expected resumed index")
     };

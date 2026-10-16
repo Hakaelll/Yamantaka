@@ -4,12 +4,14 @@ pub mod annotation_export;
 pub mod annotations;
 mod automatic_cover;
 pub mod document_find;
+mod import_enrichment;
 pub mod manual_cover;
 pub mod reader_close;
 pub mod reader_continuity;
 pub mod reading_sessions;
 pub mod runtime;
 pub mod search_index;
+mod temporary_document;
 
 pub enum Command {
     Query(LibraryQuery),

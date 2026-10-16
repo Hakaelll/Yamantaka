@@ -11,6 +11,30 @@ use crate::{
 };
 
 pub const MAX_FRONT_MATTER_PAGES: u32 = 6;
+pub const ENRICHMENT_ALGORITHM_VERSION: u32 = 2;
+
+pub enum ImportAnalysis {
+    NotRequested,
+    Complete(Box<EnrichmentEvidence>),
+    Unavailable(AnalysisFailure),
+}
+
+#[derive(Clone, Copy)]
+pub enum AnalysisFailure {
+    Unavailable,
+    MemoryBudget,
+    TextWorkLimit,
+}
+
+impl AnalysisFailure {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Unavailable => "front_matter_unavailable",
+            Self::MemoryBudget => "front_matter_memory_budget",
+            Self::TextWorkLimit => "front_matter_work_limit",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidenceKind {

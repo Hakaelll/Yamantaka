@@ -23,6 +23,14 @@ pub(crate) struct SourceStamp {
 }
 
 impl SourceStamp {
+    pub fn snapshot(&self) -> yamantaka_domain::source_revision::SourceRevision {
+        yamantaka_domain::source_revision::SourceRevision {
+            canonical_path: self.canonical.clone(),
+            size: self.size,
+            modified: self.modified,
+            head_sha256: self.head,
+        }
+    }
     pub fn read(path: &Path, cancel: &Cancellation) -> Result<Self> {
         cancel.check()?;
         let canonical = path.canonicalize().map_err(source_error)?;

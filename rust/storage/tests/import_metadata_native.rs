@@ -2,6 +2,7 @@ use rusqlite::Connection;
 use std::{fs, path::PathBuf};
 use yamantaka_domain::{
     Cancellation, LibraryQuery, LibraryRepository, NewDocument, PdfEngine,
+    pdf_ticket::AsyncPdfEngine,
     search::{IndexAccess, SearchQuery, SearchRepository},
 };
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
@@ -38,6 +39,12 @@ fn native_import_filters_tool_metadata_preserves_sources_and_keeps_manual_choice
     let import = NewDocument {
         path: source.clone(),
         info,
+        source: worker
+            .try_source_revision("import".into(), Cancellation::default())
+            .unwrap()
+            .wait()
+            .unwrap(),
+        analysis: yamantaka_domain::front_matter::ImportAnalysis::NotRequested,
     };
     let id = library.import(&import).unwrap();
     let document = library.get(&id).unwrap().unwrap();
@@ -141,6 +148,12 @@ fn native_import_preserves_unicode_organizations_and_legitimate_short_titles() {
             .import(&NewDocument {
                 path: source.clone(),
                 info,
+                source: worker
+                    .try_source_revision(fixture.into(), Cancellation::default())
+                    .unwrap()
+                    .wait()
+                    .unwrap(),
+                analysis: yamantaka_domain::front_matter::ImportAnalysis::NotRequested,
             })
             .unwrap();
         let document = library.get(&id).unwrap().unwrap();

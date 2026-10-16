@@ -9,6 +9,7 @@ mod cover_selection;
 mod cover_snapshot;
 pub mod database;
 pub mod identity;
+mod import_metadata;
 pub mod migration;
 pub mod preferences;
 pub mod reader_continuity;

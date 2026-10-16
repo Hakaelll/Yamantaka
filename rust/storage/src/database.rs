@@ -357,22 +357,25 @@ impl LibraryRepository for Database {
         }
         let metadata = path.metadata().map_err(storage)?;
         let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-        use yamantaka_domain::import_metadata::{self, MetadataValue};
-        let title = match import_metadata::title(document.info.title.as_deref(), &file_name) {
-            MetadataValue::Missing => None,
-            MetadataValue::Accepted(value) => Some(value),
-            MetadataValue::Rejected => Some(file_name.to_string()),
-        };
-        let author = match import_metadata::author(document.info.author.as_deref()) {
-            MetadataValue::Missing => None,
-            MetadataValue::Accepted(value) => Some(value),
-            // An explicit empty effective value prevents fallback to rejected raw metadata.
-            MetadataValue::Rejected => Some(String::new()),
-        };
+        let (title, author) = crate::import_metadata::effective(document, &file_name);
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
-        let fingerprint = crate::identity::legacy_fingerprint(&path)?;
-        self.connection.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,source_title,source_author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?12,?13)", params![id,path.to_string_lossy(),normalized,file_name,title,author,document.info.title,document.info.author,document.info.pages.len() as i64,metadata.len() as i64,chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),now,fingerprint]).map_err(storage)?;
+        let fingerprint = crate::identity::verify_import_source(&path, &document.source)?;
+        let transaction = self.connection.transaction().map_err(storage)?;
+        if transaction.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,source_title,source_author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?12,?13)", params![id,path.to_string_lossy(),normalized,file_name,title,author,document.info.title,document.info.author,document.info.pages.len() as i64,metadata.len() as i64,chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),now,fingerprint]).map_err(storage)? !=1 {
+            return Err(Failure::Storage("Imported document was not saved".into()));
+        }
+        crate::import_metadata::save(&transaction, &id, &fingerprint, &document.analysis, &now)?;
+        let saved:serde_json::Value=transaction.query_row("SELECT json_object('path',path,'normalized',normalized_path,'file',file_name,'title',title,'author',author,'sourceTitle',source_title,'sourceAuthor',source_author,'pages',page_count,'size',file_size,'modified',file_modified_at,'fingerprint',fingerprint) FROM documents WHERE id=?",[&id],|row|row.get(0)).map_err(storage)?;
+        let expected = serde_json::json!({"path":path.to_string_lossy(),"normalized":normalized,"file":file_name,"title":title,"author":author,"sourceTitle":document.info.title,"sourceAuthor":document.info.author,"pages":document.info.pages.len(),"size":metadata.len(),"modified":chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),"fingerprint":fingerprint});
+        if saved != expected
+            || crate::identity::verify_import_source(&path, &document.source)? != fingerprint
+        {
+            return Err(Failure::Storage(
+                "Imported metadata changed before commit".into(),
+            ));
+        }
+        transaction.commit().map_err(storage)?;
         Ok(id)
     }
     fn query(&self, query: &LibraryQuery) -> Result<Vec<Document>> {

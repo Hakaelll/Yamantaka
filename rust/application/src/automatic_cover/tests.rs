@@ -83,9 +83,10 @@ impl AsyncPdfEngine for Gate {
         id: String,
         path: PathBuf,
         password: Option<PdfPassword>,
+        _purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
-        self.native.try_open(id, path, password, cancel)
+        self.native.try_open(id, path, password, _purpose, cancel)
     }
     fn try_render(
         &self,

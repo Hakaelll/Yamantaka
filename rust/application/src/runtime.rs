@@ -3,6 +3,7 @@ use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
+use crate::import_enrichment::{ImportEnrichment, ImportStep};
 use crate::reader_close::{ReaderCloseReply, ReaderCloseRequest};
 use crate::reader_continuity::{ContinuityReply, ContinuityRequest, ContinuityWriter};
 use crate::reading_sessions::deletion::{ReadingSessionDeleteReply, ReadingSessionDeleteRequest};
@@ -17,7 +18,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
     thread::{self, JoinHandle},
     time::Duration,
@@ -184,6 +185,7 @@ impl UpdateReceiver {
     }
 }
 pub struct Runtime {
+    import_revision: Arc<AtomicU64>,
     index_progress: Arc<Mutex<IndexProgress>>,
     sender: Sender<Command>,
     shutdown: Sender<RuntimeControl>,
@@ -251,7 +253,15 @@ enum Pending {
     ),
     Close(ReaderCloseRequest, PdfTicket<()>, Permit),
     ImportOpen(PathBuf, String, PdfTicket<PdfInfo>, ImportState),
-    ImportClose(PathBuf, PdfInfo, PdfTicket<()>, ImportState),
+    ImportSource(
+        PathBuf,
+        String,
+        PdfInfo,
+        PdfTicket<yamantaka_domain::source_revision::SourceRevision>,
+        ImportState,
+    ),
+    ImportScan(Box<ImportEnrichment>, ImportState),
+    ImportClose(Box<NewDocument>, PdfTicket<()>, ImportState),
 }
 impl Pending {
     fn register<'a>(&'a self, select: &mut Select<'a>) {
@@ -283,7 +293,13 @@ impl Pending {
             Self::PageLinks(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
-            Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
+            Self::ImportSource(_, _, _, ticket, _) => {
+                select.recv(ticket.readiness());
+            }
+            Self::ImportScan(scan, _) => {
+                select.recv(scan.ticket().readiness());
+            }
+            Self::Close(_, ticket, _) | Self::ImportClose(_, ticket, _) => {
                 select.recv(ticket.readiness());
             }
         }
@@ -301,7 +317,9 @@ impl Pending {
             Self::FindPage(_, ticket, _) => ticket.is_ready(),
             Self::PageLinks(_, _, ticket, _) => ticket.is_ready(),
             Self::TextGeometry(_, _, ticket, _) => ticket.is_ready(),
-            Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => ticket.is_ready(),
+            Self::ImportSource(_, _, _, ticket, _) => ticket.is_ready(),
+            Self::ImportScan(scan, _) => scan.ticket().is_ready(),
+            Self::Close(_, ticket, _) | Self::ImportClose(_, ticket, _) => ticket.is_ready(),
         }
     }
     fn cancel(&self) {
@@ -319,10 +337,29 @@ impl Pending {
             Self::FindPage(_, ticket, _) => ticket.cancellation.cancel(),
             Self::PageLinks(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::TextGeometry(_, _, ticket, _) => ticket.cancellation.cancel(),
-            Self::Close(_, ticket, _) | Self::ImportClose(_, _, ticket, _) => {
+            Self::ImportSource(_, _, _, ticket, _) => ticket.cancellation.cancel(),
+            Self::ImportScan(scan, _) => scan.ticket().cancellation.cancel(),
+            Self::Close(_, ticket, _) | Self::ImportClose(_, ticket, _) => {
                 ticket.cancellation.cancel()
             }
         }
+    }
+}
+fn queue_import_step(
+    engine: &impl AsyncPdfEngine,
+    id: String,
+    step: ImportStep,
+    state: ImportState,
+    pending: &mut Vec<Pending>,
+    events: &Sender<Event>,
+    notify: &impl Fn(),
+) {
+    match step {
+        ImportStep::Pending(scan) => pending.push(Pending::ImportScan(scan, state)),
+        ImportStep::Ready(document) => match engine.try_close(id) {
+            Ok(ticket) => pending.push(Pending::ImportClose(document, ticket, state)),
+            Err(error) => import_failed(events, notify, error, state),
+        },
     }
 }
 fn foreground_admissible(
@@ -367,23 +404,44 @@ fn failed(
         emit(events, notify, Update::Failed(error, cancel), permit);
     }
 }
+fn import_failed(events: &Sender<Event>, notify: &impl Fn(), error: Failure, state: ImportState) {
+    emit(
+        events,
+        notify,
+        Update::Failed(error, Some(state.cancel)),
+        state.permit,
+    );
+}
 fn advance_import<E: AsyncPdfEngine>(
     engine: &E,
+    repository: &impl LibraryRepository,
     mut state: ImportState,
     pending: &mut Vec<Pending>,
     events: &Sender<Event>,
     notify: &impl Fn(),
-    import_sequence: &mut u64,
 ) {
     if state.cancel.is_cancelled() {
+        import_failed(events, notify, Failure::Cancelled, state);
         return;
     }
     if let Some(path) = state.paths.pop_front() {
-        *import_sequence = import_sequence.wrapping_add(1);
-        let id = format!("import-{}", *import_sequence);
-        match engine.try_open(id.clone(), path.clone(), None, state.cancel.clone()) {
+        let reserved = crate::temporary_document::reserve(repository, "rust-import");
+        let id = match reserved {
+            Ok(id) => id,
+            Err(error) => {
+                import_failed(events, notify, error, state);
+                return;
+            }
+        };
+        match engine.try_open(
+            id.clone(),
+            path.clone(),
+            None,
+            yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background,
+            state.cancel.clone(),
+        ) {
             Ok(ticket) => pending.push(Pending::ImportOpen(path, id, ticket, state)),
-            Err(error) => failed(events, notify, error, Some(state.cancel), state.permit),
+            Err(error) => import_failed(events, notify, error, state),
         }
     } else {
         emit(
@@ -414,13 +472,14 @@ impl Runtime {
         let (shutdown, stop) = bounded::<RuntimeControl>(1);
         let index_progress = Arc::new(Mutex::new(IndexProgress::default()));
         let progress_snapshot = index_progress.clone();
+        let import_revision = Arc::new(AtomicU64::new(0));
+        let import_progress = import_revision.clone();
         let handle = thread::Builder::new()
             .name("yamantaka-use-cases".into())
             .spawn(move || {
                 let mut pending: Vec<Pending> = Vec::new();
                 let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
-                let mut import_sequence = 0;
                 let mut indexer = SearchIndexController::default();
                 let mut index_cleanup: Option<PdfTicket<()>> = None;
                 let mut deferred: VecDeque<Command> = VecDeque::new();
@@ -760,7 +819,7 @@ impl Runtime {
                                     }
                                     if let Some((_, token)) = awaiting_open.take() { token.cancel(); }
                                     let result = engine.set_visible_documents(&protected).and_then(|()| engine.try_open(
-                                        document.id.clone(), document.path.clone(), password, cancel.clone(),
+                                        document.id.clone(), document.path.clone(), password,yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader, cancel.clone(),
                                     ));
                                     match result {
                                         Ok(ticket) => pending.push(Pending::Open(document, ticket, permit, revision)),
@@ -819,7 +878,7 @@ impl Runtime {
                                     }
                                 }
                                 Action::TextGeometry(id, page, cancel) => {
-                                    match engine.try_text_geometry(id.clone(), page, cancel.clone()) {
+                                    match engine.try_text_geometry(id.clone(), page, yamantaka_domain::pdf_text::TextGeometryPurpose::Reader, cancel.clone()) {
                                         Ok(ticket) => pending.push(Pending::TextGeometry(id, page, ticket, permit)),
                                         Err(error) => emit(&events, &notify, Update::TextGeometryFailed(id, page, error, cancel), permit),
                                     }
@@ -878,6 +937,7 @@ impl Runtime {
                                 },
                                 Action::Import(paths, cancel) => advance_import(
                                     &engine,
+                                    &repository,
                                     ImportState {
                                         paths: paths.into(),
                                         count: 0,
@@ -887,7 +947,6 @@ impl Runtime {
                                     &mut pending,
                                     &events,
                                     &notify,
-                                    &mut import_sequence,
                                 ),
                             }
                         }
@@ -1046,52 +1105,34 @@ impl Runtime {
                                 emit(&events,&notify,Update::ReaderClosed(request.reply(result)),permit);
                             },
                             Pending::ImportOpen(path, id, ticket, state) => match ticket.wait() {
-                                Ok(info) => match engine.try_close(id) {
-                                    Ok(close) => {
-                                        pending.push(Pending::ImportClose(path, info, close, state))
-                                    }
-                                    Err(error) => failed(
-                                        &events,
-                                        &notify,
-                                        error,
-                                        Some(state.cancel),
-                                        state.permit,
-                                    ),
+                                Ok(info) => match engine.try_source_revision(id.clone(), state.cancel.clone()) {
+                                    Ok(ticket) => pending.push(Pending::ImportSource(path,id,info,ticket,state)),
+                                    Err(error) => {let _=engine.try_close(id);import_failed(&events,&notify,error,state);}
                                 },
-                                Err(error) => {
-                                    let _ = engine.try_close(id);
-                                    failed(
-                                        &events,
-                                        &notify,
-                                        error,
-                                        Some(state.cancel),
-                                        state.permit,
-                                    );
-                                }
+                                Err(error) => {let _=engine.try_close(id);import_failed(&events,&notify,error,state);}
                             },
-                            Pending::ImportClose(path, info, ticket, mut state) => {
-                                match ticket.wait().and_then(|()| {
-                                    state.cancel.check()?;
-                                    repository.import(&NewDocument { path, info })
-                                }) {
+                            Pending::ImportSource(path,id,info,ticket,state) => match ticket.wait() {
+                                Ok(source) => {
+                                    let document=Box::new(NewDocument {path,info,source,analysis:yamantaka_domain::front_matter::ImportAnalysis::NotRequested});
+                                    let step=ImportEnrichment::start(&engine,id.clone(),document,state.cancel.clone());
+                                    queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
+                                }
+                                Err(error) => {let _=engine.try_close(id);import_failed(&events,&notify,error,state);}
+                            },
+                            Pending::ImportScan(scan,state) => {
+                                let id=scan.id.clone();
+                                let step=(*scan).advance(&engine);
+                                queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
+                            },
+                            Pending::ImportClose(document,ticket,mut state) => {
+                                match ticket.wait().and_then(|()| {state.cancel.check()?;repository.import(&document)}) {
                                     Ok(_) => {
-                                        state.count += 1;
-                                        advance_import(
-                                            &engine,
-                                            state,
-                                            &mut pending,
-                                            &events,
-                                            &notify,
-                                            &mut import_sequence,
-                                        );
+                                        state.count+=1;
+                                        import_progress.fetch_add(1,Ordering::Release);
+                                        notify();
+                                        advance_import(&engine,&repository,state,&mut pending,&events,&notify);
                                     }
-                                    Err(error) => failed(
-                                        &events,
-                                        &notify,
-                                        error,
-                                        Some(state.cancel),
-                                        state.permit,
-                                    ),
+                                    Err(error) => import_failed(&events,&notify,error,state),
                                 }
                             }
                         }
@@ -1102,7 +1143,7 @@ impl Runtime {
                     let native_admission_pending = pending.iter().any(|item| {
                         matches!(
                             item,
-                            Pending::Open(..) | Pending::ImportOpen(..) | Pending::ImportClose(..)
+                            Pending::Open(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..)
                         )
                     });
                     indexer.set_slot_available(
@@ -1160,6 +1201,7 @@ impl Runtime {
             })
             .map_err(|_| Failure::Storage("Use-case worker could not start".into()))?;
         Ok(Self {
+            import_revision,
             index_progress,
             sender,
             shutdown,
@@ -1172,6 +1214,10 @@ impl Runtime {
     /// Coalesced bounded snapshot; reading it never queries SQL or PDFium.
     pub fn index_progress(&self) -> IndexProgress {
         self.index_progress.lock().unwrap().clone()
+    }
+
+    pub fn import_revision(&self) -> u64 {
+        self.import_revision.load(Ordering::Acquire)
     }
     /// Blocking persistence barrier for shutdown/recovery, independent of UI event capacity.
     /// The caller must finalize activity first and retain these immutable commands on failure.
@@ -1497,6 +1543,7 @@ mod tests {
             id: String,
             path: PathBuf,
             password: Option<yamantaka_domain::PdfPassword>,
+            _purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
             cancel: Cancellation,
         ) -> Result<PdfTicket<PdfInfo>> {
             let result = self.open(id, path, password, cancel.clone());
@@ -1668,9 +1715,10 @@ mod tests {
             id: String,
             path: PathBuf,
             password: Option<yamantaka_domain::PdfPassword>,
+            _purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
             cancel: Cancellation,
         ) -> Result<PdfTicket<PdfInfo>> {
-            Engine.try_open(id, path, password, cancel)
+            Engine.try_open(id, path, password, _purpose, cancel)
         }
         fn try_render(
             &self,

@@ -53,6 +53,7 @@ impl AsyncPdfEngine for HeldText {
         _: String,
         _: PathBuf,
         _: Option<PdfPassword>,
+        _purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
         _: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         unused()
@@ -75,6 +76,7 @@ impl AsyncPdfEngine for HeldText {
         &self,
         id: String,
         page: u32,
+        _: yamantaka_domain::pdf_text::TextGeometryPurpose,
         cancel: Cancellation,
     ) -> Result<PdfTicket<Arc<PdfPageText>>> {
         if self.reject {

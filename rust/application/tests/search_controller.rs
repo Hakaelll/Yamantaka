@@ -98,6 +98,7 @@ impl AsyncPdfEngine for Engine {
         _: String,
         _: PathBuf,
         _: Option<yamantaka_domain::PdfPassword>,
+        _purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         let (sender, ticket) = PdfTicket::channel(1, 1, cancel.clone());

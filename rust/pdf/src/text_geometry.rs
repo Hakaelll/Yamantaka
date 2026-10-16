@@ -9,6 +9,7 @@ use yamantaka_domain::{
 pub(crate) fn read(
     document: &PdfDocument<'_>,
     page: u32,
+    character_limit: usize,
     governor: &MemoryGovernor,
     check_current: impl Fn() -> Result<()>,
 ) -> Result<Arc<PdfPageText>> {
@@ -30,10 +31,8 @@ pub(crate) fn read(
     let native_text = native_page.text().map_err(crate::worker::pdf_failure)?;
     let count = usize::try_from(native_text.len())
         .map_err(|_| Failure::Pdf("PDF character count is invalid".into()))?;
-    if count > MAX_PAGE_TEXT_CHARACTERS {
-        return Err(Failure::Pdf(
-            "PDF text exceeds the character work limit".into(),
-        ));
+    if count > character_limit.min(MAX_PAGE_TEXT_CHARACTERS) {
+        return Err(Failure::TextWorkLimit);
     }
     // The SDK's character collection also allocates one i32 index per character.
     let working_bytes = count

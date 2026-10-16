@@ -380,9 +380,14 @@ impl YamantakaApp {
         }
     }
     fn refresh(&mut self) {
-        self.query_cancel.cancel();
-        self.query_cancel = Cancellation::default();
-        self.send(Action::Query(
+        if let Err(error) = self.try_refresh() {
+            self.error = Some(error.to_string());
+        }
+    }
+    fn try_refresh(&mut self) -> yamantaka_domain::Result<()> {
+        let import_revision = self.runtime.import_revision();
+        let cancel = Cancellation::default();
+        self.runtime.submit(Action::Query(
             LibraryQuery {
                 text: self.query.clone(),
                 favorites_only: self.favorites,
@@ -393,8 +398,12 @@ impl YamantakaApp {
                 offset: self.offset,
                 ..Default::default()
             },
-            self.query_cancel.clone(),
-        ));
+            cancel.clone(),
+        ))?;
+        self.query_cancel.cancel();
+        self.query_cancel = cancel;
+        self.importing.mark_refreshed(import_revision);
+        Ok(())
     }
     fn reset_render_request(&mut self) {
         self.requested = None;
@@ -1751,6 +1760,7 @@ impl App for YamantakaApp {
         self.advance_tab_preview();
         self.advance_bulk_tab_preview();
         self.retire_closed_reader();
+        self.poll_import_progress(ctx);
         self.sync_reading_session(ctx);
         self.pump_reader_continuity(ctx);
         if self.demo

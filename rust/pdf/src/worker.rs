@@ -60,6 +60,12 @@ struct InspectInfo {
     author: Option<String>,
 }
 enum Request {
+    SourceRevision {
+        id: String,
+        epoch: u64,
+        cancel: Cancellation,
+        reply: Reply<yamantaka_domain::source_revision::SourceRevision>,
+    },
     DetectCover {
         id: String,
         path: PathBuf,
@@ -80,6 +86,7 @@ enum Request {
         epoch: u64,
         path: PathBuf,
         password: Option<yamantaka_domain::PdfPassword>,
+        purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
         cancel: Cancellation,
         reply: Reply<PdfInfo>,
     },
@@ -87,6 +94,7 @@ enum Request {
         id: String,
         epoch: u64,
         next_page: u32,
+        purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
         info: InspectInfo,
         cancel: Cancellation,
         reply: Reply<PdfInfo>,
@@ -114,6 +122,7 @@ enum Request {
         id: String,
         epoch: u64,
         page: u32,
+        purpose: yamantaka_domain::pdf_text::TextGeometryPurpose,
         cancel: Cancellation,
         reply: Reply<Arc<yamantaka_domain::pdf_text::PdfPageText>>,
     },
@@ -144,6 +153,7 @@ impl Request {
     fn document_id(&self) -> Option<&str> {
         match self {
             Self::DetectCover { id, .. }
+            | Self::SourceRevision { id, .. }
             | Self::Cover { id, .. }
             | Self::Open { id, .. }
             | Self::Inspect { id, .. }
@@ -160,14 +170,21 @@ impl Request {
     fn priority(&self) -> u8 {
         match self {
             Self::Shutdown | Self::Close { .. } => 0,
-            Self::Open { .. } | Self::Inspect { .. } => 1,
+            Self::SourceRevision { .. } => 1,
+            Self::Open { purpose, .. } | Self::Inspect { purpose, .. } => match purpose {
+                yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader => 1,
+                yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background => 7,
+            },
             Self::Cover { .. } | Self::DetectCover { .. } => 7,
             Self::Render { priority, .. } => 2 + *priority as u8,
             Self::Text { .. }
             | Self::Outline { .. }
             | Self::FindPage { .. }
-            | Self::PageLinks { .. }
-            | Self::TextGeometry { .. } => 4,
+            | Self::PageLinks { .. } => 4,
+            Self::TextGeometry { purpose, .. } => match purpose {
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Reader => 4,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::FrontMatter => 7,
+            },
         }
     }
 }
@@ -312,6 +329,17 @@ impl PdfWorker {
         if scheduler.shutdown {
             return Err(stopped());
         }
+        if let Request::Open {
+            id,
+            purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background,
+            ..
+        } = &request
+            && protected_documents(&scheduler).contains(id)
+        {
+            return Err(Failure::Invalid(
+                "Background work cannot replace a protected reader".into(),
+            ));
+        }
         if let Request::Open { id, .. } = &request
             && scheduler.visible.len() == MAX_HOT_DOCUMENTS
             && !scheduler.visible.contains(id)
@@ -391,6 +419,24 @@ fn stopped() -> Failure {
     Failure::Pdf("PDF worker stopped".into())
 }
 impl AsyncPdfEngine for PdfWorker {
+    fn memory_governor(&self) -> Option<MemoryGovernor> {
+        Some(PdfWorker::memory_governor(self))
+    }
+    fn try_source_revision(
+        &self,
+        id: String,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<yamantaka_domain::source_revision::SourceRevision>> {
+        let epoch = self.epoch(&id, false);
+        let (reply, ticket) = self.reply(epoch, cancel.clone(), false)?;
+        self.enqueue(Request::SourceRevision {
+            id,
+            epoch,
+            cancel,
+            reply,
+        })?;
+        Ok(ticket)
+    }
     fn try_detect_cover(
         &self,
         id: String,
@@ -430,6 +476,7 @@ impl AsyncPdfEngine for PdfWorker {
         id: String,
         path: PathBuf,
         password: Option<yamantaka_domain::PdfPassword>,
+        purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         let (reply, mut ticket) = self.reply(0, cancel.clone(), false)?;
@@ -440,6 +487,7 @@ impl AsyncPdfEngine for PdfWorker {
             epoch,
             path,
             password,
+            purpose,
             cancel,
             reply,
         })?;
@@ -518,6 +566,7 @@ impl AsyncPdfEngine for PdfWorker {
         &self,
         id: String,
         page: u32,
+        purpose: yamantaka_domain::pdf_text::TextGeometryPurpose,
         cancel: Cancellation,
     ) -> Result<PdfTicket<Arc<yamantaka_domain::pdf_text::PdfPageText>>> {
         let epoch = self.epoch(&id, false);
@@ -526,6 +575,7 @@ impl AsyncPdfEngine for PdfWorker {
             id,
             epoch,
             page,
+            purpose,
             cancel,
             reply,
         })?;
@@ -578,7 +628,14 @@ impl PdfEngine for PdfWorker {
         password: Option<yamantaka_domain::PdfPassword>,
         cancel: Cancellation,
     ) -> Result<PdfInfo> {
-        self.try_open(id, path, password, cancel)?.wait()
+        self.try_open(
+            id,
+            path,
+            password,
+            yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
+            cancel,
+        )?
+        .wait()
     }
     fn render(
         &self,
@@ -624,6 +681,7 @@ fn fail_request(request: Request) {
         }
         Request::Cover { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::DetectCover { reply, .. } => reply.send(Err(Failure::Cancelled)),
+        Request::SourceRevision { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Text { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Outline { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::FindPage { reply, .. } => reply.send(Err(Failure::Cancelled)),
@@ -717,6 +775,22 @@ fn run(
             0
         };
         match request {
+            Request::SourceRevision {
+                id,
+                epoch,
+                cancel,
+                reply,
+            } => {
+                let result = (|| {
+                    cancel.check()?;
+                    epoch_matches(&scheduler, &id, epoch)?;
+                    let loaded = documents
+                        .get(&id)
+                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
+                    Ok(loaded.source.snapshot())
+                })();
+                reply.send(result);
+            }
             Request::DetectCover {
                 id,
                 path,
@@ -814,6 +888,7 @@ fn run(
                 epoch,
                 path,
                 password,
+                purpose,
                 cancel,
                 reply,
             } => {
@@ -878,6 +953,7 @@ fn run(
                         id,
                         epoch,
                         next_page: 0,
+                        purpose,
                         info,
                         cancel,
                         reply,
@@ -889,6 +965,7 @@ fn run(
                 id,
                 epoch,
                 mut next_page,
+                purpose,
                 mut info,
                 cancel,
                 reply,
@@ -931,6 +1008,7 @@ fn run(
                         id,
                         epoch,
                         next_page,
+                        purpose,
                         info,
                         cancel,
                         reply,
@@ -1122,6 +1200,7 @@ fn run(
                 id,
                 epoch,
                 page,
+                purpose,
                 cancel,
                 reply,
             } => {
@@ -1132,10 +1211,16 @@ fn run(
                         .get(&id)
                         .map(|loaded| &loaded.document)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
-                    crate::text_geometry::read(document, page, &governor, || {
-                        cancel.check()?;
-                        epoch_matches(&scheduler, &id, epoch)
-                    })
+                    crate::text_geometry::read(
+                        document,
+                        page,
+                        purpose.character_limit(),
+                        &governor,
+                        || {
+                            cancel.check()?;
+                            epoch_matches(&scheduler, &id, epoch)
+                        },
+                    )
                 })();
                 reply.send(
                     cancel
@@ -1287,9 +1372,12 @@ fn protected_documents(state: &Scheduler) -> HashSet<String> {
         .iter()
         .cloned()
         .chain(state.queue.iter().filter_map(|request| match request {
-            Request::Inspect { id, epoch, .. } if state.epochs.get(id) == Some(epoch) => {
-                Some(id.clone())
-            }
+            Request::Inspect {
+                id,
+                epoch,
+                purpose: yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
+                ..
+            } if state.epochs.get(id) == Some(epoch) => Some(id.clone()),
             _ => None,
         }))
         .collect()
@@ -1354,6 +1442,113 @@ fn memory_failure(error: MemoryError) -> Failure {
 mod tests {
     use super::*;
     #[test]
+    fn background_inspection_and_text_yield_to_visible_pages_and_reader_opening() {
+        use yamantaka_domain::{pdf_text::TextGeometryPurpose, pdf_ticket::PdfOpenPurpose};
+        let worker = worker();
+        let background = worker
+            .try_open(
+                "background".into(),
+                "background.pdf".into(),
+                None,
+                PdfOpenPurpose::Background,
+                Cancellation::default(),
+            )
+            .unwrap();
+        {
+            let mut state = worker.0.scheduler.lock().unwrap();
+            let Request::Open {
+                id,
+                epoch,
+                purpose,
+                cancel,
+                reply,
+                ..
+            } = state.queue.remove(0)
+            else {
+                panic!("Expected background opening")
+            };
+            state.queue.push(Request::Inspect {
+                id,
+                epoch,
+                purpose,
+                next_page: 0,
+                info: InspectInfo {
+                    pages: yamantaka_domain::pdf_pages::PdfPagesBuilder::new(1, &worker.0.governor)
+                        .unwrap(),
+                    title: None,
+                    author: None,
+                },
+                cancel,
+                reply,
+            });
+        }
+        let text = worker
+            .try_text_geometry(
+                "background".into(),
+                0,
+                TextGeometryPurpose::FrontMatter,
+                Cancellation::default(),
+            )
+            .unwrap();
+        let page = worker
+            .try_render(key("reader"), Priority::Visible, Cancellation::default())
+            .unwrap();
+        let reader = worker
+            .try_open(
+                "reader".into(),
+                "reader.pdf".into(),
+                None,
+                PdfOpenPurpose::Reader,
+                Cancellation::default(),
+            )
+            .unwrap();
+        let mut state = worker.0.scheduler.lock().unwrap();
+        assert!(!protected_documents(&state).contains("background"));
+        assert_eq!(next_request(&state.queue, 0, None, |_| true), Some(3));
+        state.queue.remove(3);
+        assert_eq!(next_request(&state.queue, 0, None, |_| true), Some(2));
+        state.queue.remove(2);
+        assert_eq!(next_request(&state.queue, 0, None, |_| true), Some(0));
+        drop(state);
+        drop((background, text, page, reader));
+    }
+
+    #[test]
+    fn denied_background_replacement_preserves_reader_epoch_and_pending_requests() {
+        use yamantaka_domain::pdf_ticket::PdfOpenPurpose;
+        let worker = worker();
+        let reader = worker
+            .try_open(
+                "reader".into(),
+                "reader.pdf".into(),
+                None,
+                PdfOpenPurpose::Reader,
+                Cancellation::default(),
+            )
+            .unwrap();
+        worker.set_visible_documents(&["reader".into()]).unwrap();
+        let page = worker
+            .try_render(key("reader"), Priority::Visible, Cancellation::default())
+            .unwrap();
+        assert!(
+            worker
+                .try_open(
+                    "reader".into(),
+                    "other.pdf".into(),
+                    None,
+                    PdfOpenPurpose::Background,
+                    Cancellation::default()
+                )
+                .is_err()
+        );
+        let state = worker.0.scheduler.lock().unwrap();
+        assert_eq!(state.epochs.get("reader"), Some(&reader.epoch));
+        assert_eq!(page.epoch, reader.epoch);
+        assert_eq!(state.queue.len(), 2);
+        drop(state);
+        drop((reader, page));
+    }
+    #[test]
     fn invalid_pin_sets_and_denied_opens_preserve_scheduler_state_and_capacity() {
         let worker = worker();
         worker
@@ -1373,6 +1568,7 @@ mod tests {
                         "background".into(),
                         PathBuf::new(),
                         None,
+                        yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
                         Cancellation::default()
                     )
                     .is_err()
@@ -1390,6 +1586,7 @@ mod tests {
                 "background".into(),
                 PathBuf::new(),
                 None,
+                yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
                 Cancellation::default(),
             )
             .unwrap();
@@ -1496,11 +1693,23 @@ mod tests {
     fn opening_epoch_rejects_old_results_and_failed_admission_does_not_invalidate() {
         let worker = worker();
         let first = worker
-            .try_open("a".into(), "a.pdf".into(), None, Cancellation::default())
+            .try_open(
+                "a".into(),
+                "a.pdf".into(),
+                None,
+                yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
+                Cancellation::default(),
+            )
             .unwrap();
         let epoch = first.epoch;
         let second = worker
-            .try_open("a".into(), "b.pdf".into(), None, Cancellation::default())
+            .try_open(
+                "a".into(),
+                "b.pdf".into(),
+                None,
+                yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
+                Cancellation::default(),
+            )
             .unwrap();
         assert!(epoch_matches(&worker.0.scheduler, "a", epoch).is_err());
         assert!(second.epoch > epoch);
@@ -1513,7 +1722,13 @@ mod tests {
             .collect();
         assert!(
             worker
-                .try_open("a".into(), "c.pdf".into(), None, Cancellation::default())
+                .try_open(
+                    "a".into(),
+                    "c.pdf".into(),
+                    None,
+                    yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader,
+                    Cancellation::default()
+                )
                 .is_err()
         );
         assert!(epoch_matches(&worker.0.scheduler, "a", second.epoch).is_ok());

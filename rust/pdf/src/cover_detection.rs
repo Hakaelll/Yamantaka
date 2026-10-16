@@ -44,7 +44,13 @@ pub(crate) fn detect<'a>(
             governor,
             None,
         )?;
-        let text = match crate::text_geometry::read(document, page, governor, || cancel.check()) {
+        let text = match crate::text_geometry::read(
+            document,
+            page,
+            yamantaka_domain::pdf_text::MAX_PAGE_TEXT_CHARACTERS,
+            governor,
+            || cancel.check(),
+        ) {
             Ok(text) => Some(text),
             Err(error @ (Failure::Cancelled | Failure::MemoryBudget)) => return Err(error),
             Err(_) => None,

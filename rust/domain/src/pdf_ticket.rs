@@ -59,7 +59,23 @@ impl<T> PdfTicket<T> {
         select.try_ready().is_ok()
     }
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PdfOpenPurpose {
+    Reader,
+    Background,
+}
+
 pub trait AsyncPdfEngine: PdfEngine {
+    fn memory_governor(&self) -> Option<crate::memory::MemoryGovernor> {
+        None
+    }
+    fn try_source_revision(
+        &self,
+        _id: String,
+        _cancel: Cancellation,
+    ) -> Result<PdfTicket<crate::source_revision::SourceRevision>> {
+        Err(crate::Failure::Unsupported("PDF source revision".into()))
+    }
     fn try_detect_cover(
         &self,
         _id: String,
@@ -90,6 +106,7 @@ pub trait AsyncPdfEngine: PdfEngine {
         id: String,
         path: PathBuf,
         password: Option<crate::PdfPassword>,
+        purpose: PdfOpenPurpose,
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>>;
     fn try_render(
@@ -111,6 +128,7 @@ pub trait AsyncPdfEngine: PdfEngine {
         &self,
         _id: String,
         _page: u32,
+        _purpose: crate::pdf_text::TextGeometryPurpose,
         _cancel: Cancellation,
     ) -> Result<PdfTicket<Arc<crate::pdf_text::PdfPageText>>> {
         Err(crate::Failure::Unsupported("PDF text geometry".into()))

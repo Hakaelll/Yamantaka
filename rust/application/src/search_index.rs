@@ -455,8 +455,8 @@ impl SearchIndexController {
         if document.missing || !repository.needs_index(&id)? {
             return Ok(true);
         }
+        let native_id = crate::temporary_document::reserve(repository, "index")?;
         let session = repository.begin_index(&id, true, IndexAccess::Enabled, &run.cancel)?;
-        let native_id = format!("index-{}-{}", self.progress.generation, id);
         self.progress.current_document = Some(id);
         self.progress.current_page = session.cursor;
         self.progress.total_pages = session.page_count;
@@ -467,7 +467,13 @@ impl SearchIndexController {
             native_id: native_id.clone(),
             cancel: native_cancel.clone(),
         });
-        match engine.try_open(native_id, document.path, None, native_cancel) {
+        match engine.try_open(
+            native_id,
+            document.path,
+            None,
+            yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background,
+            native_cancel,
+        ) {
             Ok(ticket) => run.pending = Some(Pending::Open(ticket)),
             Err(error) => {
                 self.record_failure(repository, &error)?;

@@ -16,7 +16,7 @@ Cover loading shares the PDF worker with the reader. Verified cached pixels rema
 
 The reader uses a small first raster and retains it while refining after zoom or resize settles. Its navigator keeps the chosen width as content arrives, and background work no longer adds a processing row above the PDF. [Presentation verification](docs/validation/rust-reader-fluidity-2026-10-15.md) records native traces, tests and the remaining performance measurements.
 
-New imports clean embedded title and author fields, reject known tool labels and placeholders, and preserve the original metadata for later review. Search respects the same metadata precedence as the catalogue. [Import metadata verification](docs/validation/rust-import-metadata-2026-10-15.md) covers native PDFium imports and the remaining front-matter analysis work.
+New imports clean embedded title and author fields, then analyze text and layout on up to six opening pages in the background. An unambiguous explicit byline can fill a missing author. Visual titles and conflicting values remain saved proposals, with their source page and bounds. The original metadata stays available, and search follows the catalogue's metadata precedence. Each committed document becomes queryable before the batch finishes. [Import analysis verification](docs/validation/rust-import-analysis-2026-10-16.md) records native tests, source checks, cancellation, and remaining review controls.
 
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.
 
@@ -152,7 +152,8 @@ Generate the PDF fixtures and fetch PDFium first to run the native PDF suite. Te
 Current evidence is documented separately so dates and scopes remain explicit:
 
 - [Acceptance matrix](docs/architecture/rust-rewrite-parity.md): the source of truth for completion.
-- [Front-matter metadata evidence](docs/validation/rust-front-matter-2026-10-15.md): bounded text/geometry analysis with real PDFium tests for titles, explicit authors, conflicts, logos and rotations. Import, persistence and review controls are not yet connected to this component.
+- [Front-matter metadata evidence](docs/validation/rust-front-matter-2026-10-15.md): bounded text and geometry analysis with real PDFium tests for titles, explicit authors, conflicts, logos, and rotations.
+- [Background import analysis](docs/validation/rust-import-analysis-2026-10-16.md): native import now persists that evidence and its proposals atomically, validates the source revision, and refreshes the catalogue after each commit. Reader requests take priority over analysis. Review and reanalysis controls remain pending.
 - [Flutter baseline](docs/validation/flutter-baseline-2026-10-08.md): 330 tests and analysis executed on the reference implementation.
 - [Native gallery and settings validation](docs/validation/rust-visual-stage2.md): captures, control bounds and the bounded visual review.
 - [Protected reading validation](docs/validation/rust-password-opening-2026-10-09.md): ephemeral credential ownership, real PDFium retry tests and five native captures.

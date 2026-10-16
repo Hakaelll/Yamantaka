@@ -3,9 +3,13 @@ use super::*;
 #[derive(Default)]
 pub(super) struct BackgroundImport {
     pending: Option<Cancellation>,
+    catalogue_revision: u64,
 }
 
 impl BackgroundImport {
+    pub(super) fn mark_refreshed(&mut self, revision: u64) {
+        self.catalogue_revision = revision;
+    }
     pub(super) fn busy(&self) -> bool {
         self.pending.is_some()
     }
@@ -43,6 +47,18 @@ impl Drop for BackgroundImport {
 }
 
 impl YamantakaApp {
+    pub(super) fn poll_import_progress(&mut self, ctx: &egui::Context) {
+        if self.runtime.import_revision() == self.importing.catalogue_revision {
+            return;
+        }
+        match self.try_refresh() {
+            Ok(()) => {}
+            Err(yamantaka_domain::Failure::QueueFull) => {
+                ctx.request_repaint_after(Duration::from_millis(100))
+            }
+            Err(error) => self.error = Some(error.to_string()),
+        }
+    }
     pub(super) fn operation_actions(&mut self, ui: &mut egui::Ui, p: Palette) {
         if self.importing.pending.is_some()
             && theme::navigation(

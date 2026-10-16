@@ -8,11 +8,13 @@ publish.workspace = true
 chrono.workspace = true
 yamantaka-domain.workspace = true
 serde_json.workspace = true
+uuid.workspace = true
 crossbeam-channel.workspace = true
 [lints]
 workspace = true
 
 [dev-dependencies]
+sha2.workspace = true
 rusqlite.workspace = true
 yamantaka-storage.workspace = true
 yamantaka-pdf.workspace = true

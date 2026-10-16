@@ -61,6 +61,14 @@ for rotation in (90, 180, 270):
         page.rotate(rotation)
     writer.write(path)
     records.append({"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+path = root / "front-matter-work-limit.pdf"
+pdf = canvas.Canvas(str(path), pagesize=(600, 800), invariant=1)
+pdf.setTitle("Native work limit")
+pdf.setAuthor("Known Institute")
+pdf.drawString(20, 700, "word " * 4000)
+pdf.showPage()
+pdf.save()
+records.append({"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
 (root / "metadata-manifest.json").write_text(
     json.dumps({"synthetic": True, "files": records}, indent=2), encoding="utf-8"
 )
