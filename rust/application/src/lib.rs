@@ -1,4 +1,5 @@
 //! Presentation commands dispatch only through use cases.
+mod cover_job;
 use yamantaka_domain::{Document, LibraryQuery, LibraryRepository, Result};
 pub mod annotation_export;
 pub mod annotations;

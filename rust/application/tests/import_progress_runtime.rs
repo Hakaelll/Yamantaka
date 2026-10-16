@@ -19,12 +19,20 @@ use yamantaka_domain::{
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
 use yamantaka_storage::Database;
 
+type HeldGeometry = (
+    PdfTicket<Arc<PdfPageText>>,
+    Sender<Result<Arc<PdfPageText>>>,
+);
+
 type HeldReply = Arc<Mutex<Option<Sender<Result<PdfInfo>>>>>;
 struct HeldSecondOpen {
     worker: PdfWorker,
     opens: AtomicUsize,
     held: HeldReply,
     entered: Sender<()>,
+    first_text: Mutex<Option<Sender<HeldGeometry>>>,
+    cover_attempts: Arc<AtomicUsize>,
+    covers_before_second_open: Arc<AtomicUsize>,
 }
 
 impl PdfEngine for HeldSecondOpen {
@@ -75,6 +83,10 @@ impl AsyncPdfEngine for HeldSecondOpen {
         cancel: Cancellation,
     ) -> Result<PdfTicket<PdfInfo>> {
         if self.opens.fetch_add(1, Ordering::AcqRel) == 1 {
+            self.covers_before_second_open.store(
+                self.cover_attempts.load(Ordering::Acquire),
+                Ordering::Release,
+            );
             let (reply, ticket) = PdfTicket::channel(99, 1, cancel);
             *self.held.lock().unwrap() = Some(reply);
             self.entered.try_send(()).unwrap();
@@ -94,6 +106,17 @@ impl AsyncPdfEngine for HeldSecondOpen {
     fn try_text(&self, id: String, page: u32, cancel: Cancellation) -> Result<PdfTicket<String>> {
         self.worker.try_text(id, page, cancel)
     }
+    fn try_cover(
+        &self,
+        id: String,
+        path: PathBuf,
+        page: u32,
+        generation: u64,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<RenderedPage>>> {
+        self.cover_attempts.fetch_add(1, Ordering::AcqRel);
+        self.worker.try_cover(id, path, page, generation, cancel)
+    }
     fn try_close(&self, id: String) -> Result<PdfTicket<()>> {
         self.worker.try_close(id)
     }
@@ -104,7 +127,16 @@ impl AsyncPdfEngine for HeldSecondOpen {
         purpose: TextGeometryPurpose,
         cancel: Cancellation,
     ) -> Result<PdfTicket<Arc<PdfPageText>>> {
-        self.worker.try_text_geometry(id, page, purpose, cancel)
+        let native = self
+            .worker
+            .try_text_geometry(id, page, purpose, cancel.clone())?;
+        if let Some(held) = self.first_text.lock().unwrap().take() {
+            let (sender, ticket) = PdfTicket::channel(100, 1, cancel);
+            held.send((native, sender)).unwrap();
+            Ok(ticket)
+        } else {
+            Ok(native)
+        }
     }
 }
 
@@ -125,6 +157,9 @@ fn a_committed_import_is_queryable_and_editable_while_the_next_native_open_is_he
         opens: AtomicUsize::new(0),
         held: held.clone(),
         entered,
+        first_text: Mutex::new(None),
+        cover_attempts: Arc::new(AtomicUsize::new(0)),
+        covers_before_second_open: Arc::new(AtomicUsize::new(0)),
     };
     let runtime = Runtime::start(
         Database::open(&temporary.path().join("library.sqlite3")).unwrap(),
@@ -199,4 +234,135 @@ fn a_committed_import_is_queryable_and_editable_while_the_next_native_open_is_he
     assert!(documents[0].favorite);
     drop(runtime);
     assert_eq!(governor.usage().total, 0);
+}
+
+#[test]
+fn a_waiting_native_cover_is_retried_before_the_next_import_open() {
+    use yamantaka_application::cover_source::CoverSource;
+    use yamantaka_domain::LibraryRepository;
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let temporary = tempfile::tempdir().unwrap();
+    let worker = PdfWorker::start(
+        &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
+        MemoryLimits::default(),
+    )
+    .unwrap();
+    let governor = worker.memory_governor();
+    let reader_path = root
+        .join("build/rust-fixtures/textual.pdf")
+        .canonicalize()
+        .unwrap();
+    let cover_path = root
+        .join("build/rust-fixtures/automatic-cover.pdf")
+        .canonicalize()
+        .unwrap();
+    let first_path = root
+        .join("build/rust-fixtures/front-matter-missing.pdf")
+        .canonicalize()
+        .unwrap();
+    let second_path = root
+        .join("build/rust-fixtures/front-matter-conflict.pdf")
+        .canonicalize()
+        .unwrap();
+    let originals = [
+        reader_path.clone(),
+        cover_path.clone(),
+        first_path.clone(),
+        second_path.clone(),
+    ]
+    .map(|path| {
+        let bytes = std::fs::read(&path).unwrap();
+        (path, bytes)
+    });
+    let reader = worker
+        .open("reader".into(), reader_path, None, Cancellation::default())
+        .unwrap();
+    let database = Database::open(&temporary.path().join("library.sqlite3")).unwrap();
+    let escaped = cover_path.to_string_lossy().replace('\'', "''");
+    database.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('cover','{escaped}','cover','fixture.pdf',7,1,'now','now','now','synthetic'); INSERT INTO document_covers VALUES('cover',0,'','','old','old',1,'manual',1,'contain',0.75)")).unwrap();
+    let cover = database.get("cover").unwrap().unwrap();
+    let held = Arc::new(Mutex::new(None));
+    let (entered, waiting) = bounded(1);
+    let (hold_text, texts) = bounded(1);
+    let cover_attempts = Arc::new(AtomicUsize::new(0));
+    let covers_before_second_open = Arc::new(AtomicUsize::new(0));
+    let engine = HeldSecondOpen {
+        worker,
+        opens: AtomicUsize::new(0),
+        held: held.clone(),
+        entered,
+        first_text: Mutex::new(Some(hold_text)),
+        cover_attempts: cover_attempts.clone(),
+        covers_before_second_open: covers_before_second_open.clone(),
+    };
+    let runtime = Runtime::start(database, engine, || {}).unwrap();
+    runtime
+        .submit(Action::VisibleDocuments(vec!["reader".into()]))
+        .unwrap();
+    assert!(matches!(
+        runtime
+            .updates
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap(),
+        Update::Committed(_, WriteKind::VisibleDocuments)
+    ));
+    let importing = Cancellation::default();
+    runtime
+        .submit(Action::Import(
+            vec![first_path, second_path],
+            importing.clone(),
+        ))
+        .unwrap();
+    let (native_text, release) = texts.recv_timeout(Duration::from_secs(10)).unwrap();
+    let cover_cancel = Cancellation::default();
+    runtime
+        .submit(Action::Cover(
+            CoverSource::capture(&cover),
+            10,
+            cover_cancel.clone(),
+        ))
+        .unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while runtime.waiting_covers() != 1 {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "Real native capacity never parked the cover"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(cover_attempts.load(Ordering::Acquire), 1);
+    assert_eq!(runtime.import_revision(), 0);
+    release.send(native_text.wait()).unwrap();
+    waiting.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(
+        covers_before_second_open.load(Ordering::Acquire),
+        2,
+        "A waiting cover must be submitted before the next import open"
+    );
+    assert_eq!(runtime.import_revision(), 1);
+    assert!(
+        matches!(runtime.updates.recv_timeout(Duration::from_secs(10)).unwrap(),Update::Cover(id,Ok(image),token) if id=="cover" && image.key.page==0 && image.key.generation==10 && token.same_request(&cover_cancel))
+    );
+    runtime
+        .submit(Action::Text("reader".into(), 0, Cancellation::default()))
+        .unwrap();
+    assert!(
+        matches!(runtime.updates.recv_timeout(Duration::from_secs(5)).unwrap(),Update::Text(id,0,text,_) if id=="reader" && text.contains("Yamantaka Rust"))
+    );
+    importing.cancel();
+    held.lock()
+        .unwrap()
+        .take()
+        .unwrap()
+        .send(Err(Failure::Cancelled))
+        .unwrap();
+    assert!(
+        matches!(runtime.updates.recv_timeout(Duration::from_secs(5)).unwrap(),Update::Failed(Failure::Cancelled,Some(token)) if token.same_request(&importing))
+    );
+    drop(reader);
+    drop(runtime);
+    assert_eq!(governor.usage().total, 0);
+    for (path, bytes) in originals {
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
+    }
 }

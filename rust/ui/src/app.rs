@@ -521,6 +521,7 @@ impl YamantakaApp {
             return;
         }
         self.cover_picker = None;
+        self.runtime.wake();
         if !matches!(surface, Surface::Reader) {
             self.tabs.leave_destination();
             self.restoration.clear();

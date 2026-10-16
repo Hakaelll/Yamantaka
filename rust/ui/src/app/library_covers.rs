@@ -10,8 +10,6 @@ pub(super) struct LibraryCovers {
 }
 
 struct CoverSlot {
-    capacity_revision: u64,
-    waiting_for_capacity: bool,
     path: std::path::PathBuf,
     fingerprint: String,
     page_count: u32,
@@ -26,12 +24,6 @@ impl LibraryCovers {
         self.slots.values().all(|slot| slot.finished) && matches!(self.capacity_preview, 0 | 3)
     }
 }
-impl CoverSlot {
-    fn can_retry(&self, capacity_revision: u64) -> bool {
-        self.waiting_for_capacity && self.capacity_revision != capacity_revision
-    }
-}
-
 impl YamantakaApp {
     pub fn preview_cover_capacity(&mut self) {
         if self.demo && self.capture.is_some() {
@@ -46,6 +38,7 @@ impl YamantakaApp {
             data.remove_temp::<Vec<Document>>(egui::Id::new("pdf-cover-requests"))
                 .unwrap_or_default()
         });
+        let mut cancelled = false;
         self.library_covers.slots.retain(|id, slot| {
             let keep = requested.iter().any(|doc| {
                 &doc.id == id
@@ -56,21 +49,15 @@ impl YamantakaApp {
             });
             if !keep {
                 slot.cancel.cancel();
+                cancelled = true;
                 ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(id)));
             }
             keep
         });
-        let capacity_revision = self.runtime.pdf_capacity_revision();
+        if cancelled {
+            self.runtime.wake();
+        }
         for document in requested {
-            if self
-                .library_covers
-                .slots
-                .get(&document.id)
-                .is_some_and(|slot| slot.can_retry(capacity_revision))
-                && let Some(old) = self.library_covers.slots.remove(&document.id)
-            {
-                old.cancel.cancel();
-            }
             if document.missing || self.library_covers.slots.contains_key(&document.id) {
                 continue;
             }
@@ -88,8 +75,6 @@ impl YamantakaApp {
                     self.library_covers.slots.insert(
                         document.id,
                         CoverSlot {
-                            capacity_revision,
-                            waiting_for_capacity: false,
                             path: document.path,
                             fingerprint: document.fingerprint,
                             page_count: document.page_count,
@@ -109,11 +94,7 @@ impl YamantakaApp {
         }
         if self.library_covers.capacity_preview == 1
             && !self.library_covers.slots.is_empty()
-            && self
-                .library_covers
-                .slots
-                .values()
-                .all(|slot| slot.finished && slot.waiting_for_capacity)
+            && self.runtime.waiting_covers() == self.library_covers.slots.len()
         {
             self.library_covers.blocked_before_release = self.library_covers.slots.len();
             self.library_covers.capacity_preview = 2;
@@ -123,7 +104,7 @@ impl YamantakaApp {
                 .library_covers
                 .slots
                 .values()
-                .all(|slot| slot.image.is_some() && !slot.waiting_for_capacity)
+                .all(|slot| slot.image.is_some())
         {
             self.library_covers.capacity_preview = 3;
         }
@@ -142,10 +123,6 @@ impl YamantakaApp {
             return;
         }
         slot.finished = true;
-        if matches!(&result, Err(yamantaka_domain::Failure::NativeSlotsBusy)) {
-            slot.waiting_for_capacity = true;
-            return;
-        }
         let Ok(page) = result else {
             return;
         };
@@ -191,6 +168,7 @@ impl YamantakaApp {
     ) {
         if let Some(old) = self.library_covers.slots.remove(&document.id) {
             old.cancel.cancel();
+            self.runtime.wake();
         }
         let dimensions = if aspect > 1.0 {
             [512, (512.0 / aspect).round() as u32]
@@ -213,8 +191,6 @@ impl YamantakaApp {
         self.library_covers.slots.insert(
             document.id.clone(),
             CoverSlot {
-                capacity_revision: self.runtime.pdf_capacity_revision(),
-                waiting_for_capacity: false,
                 path: document.path.clone(),
                 fingerprint: document.fingerprint.clone(),
                 page_count: document.page_count,
@@ -229,6 +205,7 @@ impl YamantakaApp {
     pub(super) fn invalidate_library_cover(&mut self, ctx: &egui::Context, id: &str) {
         if let Some(slot) = self.library_covers.slots.remove(id) {
             slot.cancel.cancel();
+            self.runtime.wake();
         }
         ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(id)));
     }

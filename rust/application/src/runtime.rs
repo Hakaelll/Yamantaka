@@ -2,7 +2,8 @@ use crate::annotation_export::worker::{AnnotationExportReply, AnnotationExportRe
 use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
-use crate::cover_source::{CoverFrame, CoverSource};
+use crate::cover_job::{CoverJob, CoverStep};
+use crate::cover_source::CoverSource;
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
 use crate::import_enrichment::{ImportEnrichment, ImportStep};
 use crate::reader_close::{ReaderCloseReply, ReaderCloseRequest};
@@ -193,6 +194,8 @@ impl UpdateReceiver {
 }
 pub struct Runtime {
     pdf_capacity_revision: Arc<AtomicU64>,
+    waiting_covers: Arc<AtomicUsize>,
+    wake: Sender<()>,
     import_revision: Arc<AtomicU64>,
     index_progress: Arc<Mutex<IndexProgress>>,
     sender: Sender<Command>,
@@ -219,21 +222,6 @@ struct ImportState {
     reanalysis: Option<Box<(yamantaka_domain::metadata_review::MetadataReview, Document)>>,
 }
 enum Pending {
-    RestoreCover(
-        Document,
-        u64,
-        yamantaka_domain::cover_snapshot::CoverSnapshot,
-        PdfTicket<yamantaka_domain::cover_policy::DetectedCover>,
-        Permit,
-    ),
-    AutomaticCover(
-        Document,
-        u64,
-        yamantaka_domain::cover_snapshot::CoverSnapshot,
-        PdfTicket<yamantaka_domain::cover_policy::DetectedCover>,
-        Permit,
-    ),
-    Cover(CoverFrame, PdfTicket<Arc<RenderedPage>>, Permit),
     FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(PdfTicket<Arc<RenderedPage>>, Permit),
@@ -276,16 +264,13 @@ enum Pending {
 impl Pending {
     fn register<'a>(&'a self, select: &mut Select<'a>) {
         match self {
-            Self::AutomaticCover(_, _, _, ticket, _) | Self::RestoreCover(_, _, _, ticket, _) => {
-                select.recv(ticket.readiness());
-            }
             Self::FindDocument(scan, _) => {
                 select.recv(scan.ticket().readiness());
             }
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
-            Self::Cover(_, ticket, _) | Self::Render(ticket, _) => {
+            Self::Render(ticket, _) => {
                 select.recv(ticket.readiness());
             }
             Self::Text(_, _, ticket, _) => {
@@ -318,12 +303,9 @@ impl Pending {
     }
     fn ready(&self) -> bool {
         match self {
-            Self::AutomaticCover(_, _, _, ticket, _) | Self::RestoreCover(_, _, _, ticket, _) => {
-                ticket.is_ready()
-            }
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
-            Self::Cover(_, ticket, _) | Self::Render(ticket, _) => ticket.is_ready(),
+            Self::Render(ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
             Self::Outline(_, ticket, _) => ticket.is_ready(),
             Self::FindPage(_, ticket, _) => ticket.is_ready(),
@@ -338,14 +320,11 @@ impl Pending {
     }
     fn cancel(&self) {
         match self {
-            Self::AutomaticCover(_, _, _, ticket, _) | Self::RestoreCover(_, _, _, ticket, _) => {
-                ticket.cancellation.cancel()
-            }
             Self::FindDocument(scan, _) => scan.request.cancellation.cancel(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
-            Self::Cover(_, ticket, _) | Self::Render(ticket, _) => ticket.cancellation.cancel(),
+            Self::Render(ticket, _) => ticket.cancellation.cancel(),
             Self::Text(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::Outline(_, ticket, _) => ticket.cancellation.cancel(),
             Self::FindPage(_, ticket, _) => ticket.cancellation.cancel(),
@@ -512,6 +491,9 @@ impl Runtime {
         let (sender, commands) = bounded::<Command>(CAPACITY * 2);
         let (events, updates) = bounded(CAPACITY * 2);
         let (shutdown, stop) = bounded::<RuntimeControl>(1);
+        let (wake, wakeups) = bounded::<()>(1);
+        let waiting_covers = Arc::new(AtomicUsize::new(0));
+        let waiting_snapshot = waiting_covers.clone();
         let index_progress = Arc::new(Mutex::new(IndexProgress::default()));
         let progress_snapshot = index_progress.clone();
         let import_revision = Arc::new(AtomicU64::new(0));
@@ -522,6 +504,7 @@ impl Runtime {
             .name("yamantaka-use-cases".into())
             .spawn(move || {
                 let mut pending: Vec<Pending> = Vec::new();
+                let mut covers: Vec<(Box<CoverJob>, Permit)> = Vec::new();
                 let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut indexer = SearchIndexController::default();
@@ -532,6 +515,7 @@ impl Runtime {
                 let mut open_revision = 0u64;
                 let mut awaiting_open: Option<(String, Cancellation)> = None;
                 loop {
+                    let _ = wakeups.try_recv();
                     match stop.try_recv() {
                         Ok(RuntimeControl::Stop) => break,
                         Ok(RuntimeControl::PersistContinuity(revision, tabs, completed)) => {
@@ -884,33 +868,8 @@ impl Runtime {
                                     emit(&events,&notify,Update::CoverSourcePage(id,result,cancel),permit);
                                 }
                                 Action::SaveManualCover(request) => emit(&events,&notify,Update::ManualCover(request.execute(&mut repository)),permit),
-                                Action::PreviewCover(source,page,generation,cancel) => {
-                                    let id=source.id().to_owned();
-                                    match cancel.check().and_then(|()|source.read(&repository)).and_then(|_|engine.try_cover(id.clone(),source.path(),page,generation,cancel.clone())) {
-                                        Ok(ticket) => pending.push(Pending::Cover(CoverFrame::new(source,page,generation,None),ticket,permit)),
-                                        Err(error) => emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
-                                    }
-                                }
-                                Action::Cover(source, generation, cancel) => {
-                                    let id=source.id().to_owned();let path=source.path();
-                                    let selected=cancel.check().and_then(|_| {
-                                        let document=source.read(&repository)?;
-                                        Ok((document,repository.cover_snapshot(&id)?))
-                                    });
-                                    match selected {
-                                        Ok((_,snapshot @ yamantaka_domain::cover_snapshot::CoverSnapshot {plan: yamantaka_domain::cover_snapshot::CoverPlan::Render(page), ..})) => match engine.try_cover(id.clone(),path,page,generation,cancel.clone()) {
-                                            Ok(ticket)=>pending.push(Pending::Cover(CoverFrame::new(source,page,generation,Some(snapshot)),ticket,permit)),
-                                            Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
-                                        },
-                                        Ok((document,snapshot)) => {
-                                            match cancel.check().and_then(|_|engine.try_detect_cover(id.clone(),path,generation,cancel.clone())) {
-                                                Ok(ticket)=>pending.push(Pending::AutomaticCover(document,generation,snapshot,ticket,permit)),
-                                                Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
-                                            }
-                                        },
-                                        Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
-                                    }
-                                }
+                                Action::PreviewCover(source,page,generation,cancel) => covers.push((CoverJob::preview(source,page,generation,cancel),permit)),
+                                Action::Cover(source,generation,cancel) => covers.push((CoverJob::library(source,generation,cancel),permit)),
                                 Action::Render(key, priority, cancel) => {
                                     match engine.try_render(key, priority, cancel.clone())
                                     {
@@ -961,15 +920,9 @@ impl Runtime {
                                     Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
                                 },
                                 Action::RestoreAutomaticCover(source,generation,cancel) => {
-                                    let id=source.id().to_owned();let path=source.path();
-                                    let started=cancel.check().and_then(|_|source.read(&repository)).and_then(|document| {
-                                        let expected=repository.cover_snapshot(&id)?;
-                                        cancel.check()?;
-                                        let ticket=engine.try_detect_cover(id.clone(),path,generation,cancel.clone())?;
-                                        Ok((document,expected,ticket))
-                                    });
-                                    match started {
-                                        Ok((document,expected,ticket))=>pending.push(Pending::RestoreCover(document,generation,expected,ticket,permit)),
+                                    let id=source.id().to_owned();
+                                    match CoverJob::restore(source,generation,cancel.clone(),&repository) {
+                                        Ok(job)=>covers.push((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
                                     }
                                 },
@@ -1016,6 +969,7 @@ impl Runtime {
                         let (_, permit) = export.take().unwrap();
                         emit(&events, &notify, Update::AnnotationExport(reply), permit);
                     }
+                    let mut next_imports = Vec::new();
                     let mut index = 0;
                     while index < pending.len() {
                         if !pending[index].ready() {
@@ -1056,34 +1010,6 @@ impl Runtime {
                                         } else { error };
                                         emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit);
                                     }
-                                }
-                            }
-                            Pending::Cover(frame, ticket, permit) => {
-                                let id=frame.id().to_owned();
-                                let cancel = ticket.cancellation.clone();
-                                let result = ticket.wait().and_then(|page| frame.finish(&repository,page,&cancel));
-                                emit(&events, &notify, Update::Cover(id, result, cancel), permit);
-                            }
-                            Pending::RestoreCover(document,generation,expected,ticket,permit) => {
-                                let source=CoverSource::capture(&document);
-                                let cancel=ticket.cancellation.clone();
-                                let id=document.id.clone();
-                                let result=ticket.wait().and_then(|detected| {cancel.check()?;source.read(&repository)?;crate::automatic_cover::restore(&mut repository,document,generation,detected,expected)});
-                                emit(&events,&notify,Update::Cover(id,result,cancel),permit);
-                            }
-                            Pending::AutomaticCover(document,generation,snapshot,ticket,permit) => {
-                                let source=CoverSource::capture(&document);
-                                let cancel=ticket.cancellation.clone();
-                                let id=document.id.clone();
-                                let path=document.path.clone();
-                                let result=ticket.wait().and_then(|detected| {cancel.check()?;source.read(&repository)?;crate::automatic_cover::complete(&mut repository,document,generation,detected,snapshot)});
-                                match result {
-                                    Ok(crate::automatic_cover::CoverCompletion::Image(image))=>emit(&events,&notify,Update::Cover(id,Ok(image),cancel),permit),
-                                    Ok(crate::automatic_cover::CoverCompletion::StoredPage(page))=>match source.read(&repository).and_then(|_|repository.cover_snapshot(&id)).and_then(|snapshot|engine.try_cover(id.clone(),path,page,generation,cancel.clone()).map(|ticket|(snapshot,ticket))) {
-                                        Ok((snapshot,ticket))=>pending.push(Pending::Cover(CoverFrame::new(source,page,generation,Some(snapshot)),ticket,permit)),
-                                        Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
-                                    },
-                                    Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
                                 }
                             }
                             Pending::Render(ticket, permit) => {
@@ -1203,7 +1129,7 @@ impl Runtime {
                                         state.count+=1;
                                         import_progress.fetch_add(1,Ordering::Release);
                                         notify();
-                                        advance_import(&engine,&repository,state,&mut pending,&events,&notify);
+                                        next_imports.push(state);
                                     }
                                     Err(error) => import_failed(&events,&notify,error,state),
                                 }
@@ -1215,8 +1141,33 @@ impl Runtime {
                             }
                         }
                     }
+                    let capacity=pdf_capacity.load(Ordering::Acquire);
+                    let mut cover_index=0;
+                    while cover_index<covers.len() {
+                        // At most two transitions let a late busy reply observe a
+                        // release before the next import is admitted.
+                        let mut finished=false;
+                        for _ in 0..2 {
+                            if !covers[cover_index].0.ready(capacity) {break;}
+                            let (job,permit)=covers.remove(cover_index);
+                            match job.advance(&mut repository,&engine,capacity) {
+                                CoverStep::Pending(job)=>covers.insert(cover_index,(job,permit)),
+                                CoverStep::Finished(id,result,cancel)=>{
+                                    emit(&events,&notify,Update::Cover(id,result,cancel),permit);
+                                    finished=true;
+                                    break;
+                                }
+                            }
+                        }
+                        if !finished {cover_index+=1;}
+                    }
+                    let waiting=covers.iter().filter(|(job,_)|job.waiting()).count();
+                    if waiting_snapshot.swap(waiting,Ordering::AcqRel)!=waiting {notify();}
+                    for state in next_imports {
+                        advance_import(&engine,&repository,state,&mut pending,&events,&notify);
+                    }
                     if index_cleanup.as_ref().is_some_and(PdfTicket::is_ready) && index_cleanup.take().unwrap().wait().is_ok() {pdf_capacity.fetch_add(1,Ordering::Release);notify();}
-                    let native_admission_pending = pending.iter().any(|item| {
+                    let native_admission_pending = !covers.is_empty() || pending.iter().any(|item| {
                         matches!(
                             item,
                             Pending::Open(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
@@ -1240,7 +1191,8 @@ impl Runtime {
                     }
                     // A blocking select sleeps while idle and wakes on actual command
                     // or PDF completion. SQL is never held behind native rendering.
-                    if !commands.is_empty()
+                    if covers.iter().any(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
+                        || !commands.is_empty()
                         || indexer.needs_step()
                         || (deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open))
                             && indexer.native_document_id().is_none()
@@ -1251,12 +1203,14 @@ impl Runtime {
                     let mut select = Select::new();
                     select.recv(&stop);
                     select.recv(&commands);
+                    select.recv(&wakeups);
                     if let Some((job, _)) = &export {
                         job.register(&mut select);
                     }
                     for item in &pending {
                         item.register(&mut select);
                     }
+                    for (job,_) in &covers {job.register(&mut select);}
                     indexer.register_readiness(&mut select);
                     if let Some(ticket) = &index_cleanup {
                         select.recv(ticket.readiness());
@@ -1267,6 +1221,8 @@ impl Runtime {
                     item.cancel();
                 }
                 if let Some((_, token)) = awaiting_open.take() { token.cancel(); }
+                for (job,_) in &covers {job.cancel();}
+                drop(covers);
                 drop(pending); // Drop tickets before engine join; no UI draining required.
                 drop(export); // Cancel and join file work before releasing the actor.
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
@@ -1279,6 +1235,8 @@ impl Runtime {
             })
             .map_err(|_| Failure::Storage("Use-case worker could not start".into()))?;
         Ok(Self {
+            waiting_covers,
+            wake,
             pdf_capacity_revision,
             import_revision,
             index_progress,
@@ -1297,6 +1255,13 @@ impl Runtime {
 
     pub fn import_revision(&self) -> u64 {
         self.import_revision.load(Ordering::Acquire)
+    }
+    pub fn waiting_covers(&self) -> usize {
+        self.waiting_covers.load(Ordering::Acquire)
+    }
+    /// Wake parked work after cancelling its token without submitting a command.
+    pub fn wake(&self) {
+        let _ = self.wake.try_send(());
     }
     pub fn pdf_capacity_revision(&self) -> u64 {
         self.pdf_capacity_revision.load(Ordering::Acquire)

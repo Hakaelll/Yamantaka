@@ -6,7 +6,7 @@ use yamantaka_domain::{
 
 pub(crate) enum CoverCompletion {
     Image(Arc<RenderedPage>),
-    StoredPage(u32),
+    RetrySelection,
 }
 pub(crate) fn complete(
     repository: &mut impl LibraryRepository,
@@ -34,7 +34,7 @@ pub(crate) fn complete(
     // A newer manual or automatic choice wins over background detection.
     match repository.cover_source_page(&choice.document().id)? {
         Some(page) if page == choice.page() => Ok(CoverCompletion::Image(detected.image)),
-        Some(page) => Ok(CoverCompletion::StoredPage(page)),
+        Some(_) => Ok(CoverCompletion::RetrySelection),
         None => Err(Failure::Invalid(
             "Cover choice changed during completion".into(),
         )),
@@ -65,6 +65,8 @@ pub(crate) fn restore(
     Ok(detected.image)
 }
 
+#[cfg(test)]
+mod coordination_tests;
 #[cfg(test)]
 mod freshness_tests;
 #[cfg(test)]

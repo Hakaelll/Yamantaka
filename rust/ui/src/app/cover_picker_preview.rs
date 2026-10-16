@@ -53,6 +53,7 @@ impl YamantakaApp {
                         }
                         "cancel" => {
                             self.cover_picker = None;
+                            self.runtime.wake();
                             self.cover_picker_demo.stage = 4;
                         }
                         _ => self.cover_picker_demo.stage = 4,

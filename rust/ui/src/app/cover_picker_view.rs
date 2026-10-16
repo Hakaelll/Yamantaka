@@ -18,7 +18,7 @@ impl YamantakaApp {
         let p = Palette::new(self.dark);
         let compact = ui.ctx().content_rect().height() < 650.0;
         let mut actions = PickerActions::default();
-        let busy = picker.saving.is_some();
+        let can_close = picker.can_close();
         egui::ScrollArea::vertical()
             .id_salt("cover-picker-view")
             .auto_shrink([false, false])
@@ -40,7 +40,7 @@ impl YamantakaApp {
                         if compact {
                             ui.horizontal_top(|ui| {
                                 actions.close |= ui
-                                    .add_enabled_ui(!busy, |ui| {
+                                    .add_enabled_ui(picker.can_close(), |ui| {
                                         theme::icon_button(
                                             ui,
                                             self.tr("Volver a la biblioteca", "Back to library"),
@@ -75,7 +75,7 @@ impl YamantakaApp {
                             });
                         } else {
                             actions.close |= ui
-                                .add_enabled_ui(!busy, |ui| {
+                                .add_enabled_ui(picker.can_close(), |ui| {
                                     theme::control(
                                         ui,
                                         self.tr("Volver a la biblioteca", "Back to library"),
@@ -147,8 +147,13 @@ impl YamantakaApp {
                         }
                     });
             });
-        actions.close |= !busy && ui.input(|input| input.key_pressed(egui::Key::Escape));
+        actions.close |= can_close && ui.input(|input| input.key_pressed(egui::Key::Escape));
         if actions.close {
+            if picker.restoring {
+                self.invalidate_library_cover(ui.ctx(), &picker.document.id);
+            }
+            drop(picker);
+            self.runtime.wake();
             return;
         }
         let retry_read = actions.retry && !picker.loaded;
@@ -367,7 +372,7 @@ impl YamantakaApp {
                 .inner
                 .clicked();
             actions.close |= ui
-                .add_enabled_ui(!busy, |ui| {
+                .add_enabled_ui(picker.can_close(), |ui| {
                     theme::control(ui, self.tr("Cancelar", "Cancel"), None, false, false, p)
                 })
                 .inner

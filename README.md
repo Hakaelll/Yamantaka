@@ -14,7 +14,7 @@ The picker also includes **Restore automatic cover**, which recomputes a selecti
 
 Cover loading shares the PDF worker with the reader. Verified cached pixels remain available while both reader slots are protected; native cover work can reclaim an unprotected warm slot. [Native admission verification](docs/validation/rust-cover-admission-2026-10-15.md) records those checks. The worker also [checks the requested path and source stamp before reusing a native handle](docs/validation/rust-cover-source-2026-10-15.md), preserving protected readers when a cover request targets a changed source.
 
-Cover work now preserves active background analysis handles. If native slots are busy, the library retries waiting covers after a confirmed release or a reader pin change. [Capacity recovery verification](docs/validation/rust-cover-capacity-2026-10-16.md) records the native eviction regression and ten-cover recovery in both themes.
+Cover work preserves active background analysis handles. The coordinator retains waiting requests and retries them after confirmed releases, before admitting the next imported file. New manual choices retain priority, and waiting previews and restoration can be cancelled. [Capacity recovery verification](docs/validation/rust-cover-capacity-2026-10-16.md) and [coordination verification](docs/validation/rust-cover-coordination-2026-10-16.md) record native ownership, ordering, and recovery checks.
 
 Cover requests now carry the displayed PDF source identity. Late results are rejected if the catalogue source or saved cover selection changed, and resident textures also check page count. [Source-check verification](docs/validation/rust-cover-source-2026-10-16.md) records native race and cancellation tests.
 

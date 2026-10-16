@@ -28,9 +28,17 @@ impl Drop for CoverPicker {
         if let Some(token) = &self.preview {
             token.cancel();
         }
+        if self.restoring
+            && let Some(token) = &self.saving
+        {
+            token.cancel();
+        }
     }
 }
 impl CoverPicker {
+    pub(super) fn can_close(&self) -> bool {
+        self.saving.is_none() || self.restoring
+    }
     pub(super) fn ready(&self) -> bool {
         self.loading.is_none()
             && self.preview.is_none()
@@ -77,6 +85,7 @@ impl YamantakaApp {
             aspect: None,
             error: result.err(),
         });
+        self.runtime.wake();
         self.surface = Surface::Library;
     }
     pub(super) fn preview_cover_picker(&mut self) {
@@ -254,5 +263,51 @@ impl YamantakaApp {
             }
             None => serde_json::json!({"open":false}),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn picker(saving: Cancellation, restoring: bool) -> CoverPicker {
+        let document: Document = serde_json::from_value(serde_json::json!({"id":"a","path":"a.pdf","file_name":"a.pdf","title":"A","author":null,"page_count":2,"last_page_index":0,"reading_progress":0.0,"favorite":false,"missing":false,"fingerprint":"fa","thumbnail_path":null})).unwrap();
+        CoverPicker {
+            document,
+            page: 0,
+            generation: 1,
+            loaded: true,
+            save_failed: false,
+            restore_failed: false,
+            restore_committed: false,
+            restoring,
+            loading: None,
+            preview: None,
+            saving: Some(saving),
+            image: None,
+            image_page: None,
+            aspect: None,
+            error: None,
+        }
+    }
+    #[test]
+    fn a_pending_restore_can_be_closed_and_cancels_its_scopes_without_cancelling_a_manual_write() {
+        let manual = Cancellation::default();
+        let saving = picker(manual.clone(), false);
+        assert!(!saving.can_close());
+        drop(saving);
+        assert!(!manual.is_cancelled());
+        let restore = Cancellation::default();
+        let preview = Cancellation::default();
+        let loading = Cancellation::default();
+        let independent = Cancellation::default();
+        let mut restoring = picker(restore.clone(), true);
+        restoring.preview = Some(preview.clone());
+        restoring.loading = Some(loading.clone());
+        assert!(restoring.can_close());
+        drop(restoring);
+        assert!(restore.is_cancelled());
+        assert!(preview.is_cancelled());
+        assert!(loading.is_cancelled());
+        assert!(!independent.is_cancelled());
     }
 }
