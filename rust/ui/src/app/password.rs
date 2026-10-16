@@ -180,6 +180,7 @@ impl YamantakaApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yamantaka_application::cover_source::CoverSource;
     use yamantaka_domain::{Failure, LibraryRepository};
     use yamantaka_pdf::{MemoryLimits, PdfWorker};
     use yamantaka_storage::Database;
@@ -220,7 +221,7 @@ mod tests {
         }
         runtime
             .submit(Action::Open(
-                document,
+                document.clone(),
                 Some(PdfPassword::from("fixture-password")),
                 Cancellation::default(),
             ))
@@ -232,8 +233,7 @@ mod tests {
         let cover_token = Cancellation::default();
         runtime
             .submit(Action::Cover(
-                "protected".into(),
-                path.clone(),
+                CoverSource::capture(&document),
                 99,
                 cover_token.clone(),
             ))

@@ -2,6 +2,7 @@ use crate::annotation_export::worker::{AnnotationExportReply, AnnotationExportRe
 use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
+use crate::cover_source::{CoverFrame, CoverSource};
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
 use crate::import_enrichment::{ImportEnrichment, ImportStep};
 use crate::reader_close::{ReaderCloseReply, ReaderCloseRequest};
@@ -40,11 +41,11 @@ pub enum Action {
         Cancellation,
     ),
     Metadata(Box<crate::metadata_review::MetadataRequest>),
-    RestoreAutomaticCover(String, PathBuf, u64, Cancellation),
+    RestoreAutomaticCover(CoverSource, u64, Cancellation),
     CoverSourcePage(String, Cancellation),
-    PreviewCover(String, PathBuf, u32, u64, Cancellation),
+    PreviewCover(CoverSource, u32, u64, Cancellation),
     SaveManualCover(Box<crate::manual_cover::ManualCoverRequest>),
-    Cover(String, PathBuf, u64, Cancellation),
+    Cover(CoverSource, u64, Cancellation),
     ReaderContinuity(Box<ContinuityRequest>),
     ReadingHistory(Box<ReadingHistoryRequest>),
     TrimReadingHistory(usize, Cancellation),
@@ -232,7 +233,7 @@ enum Pending {
         PdfTicket<yamantaka_domain::cover_policy::DetectedCover>,
         Permit,
     ),
-    Cover(String, PdfTicket<Arc<RenderedPage>>, Permit),
+    Cover(CoverFrame, PdfTicket<Arc<RenderedPage>>, Permit),
     FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(PdfTicket<Arc<RenderedPage>>, Permit),
@@ -883,21 +884,22 @@ impl Runtime {
                                     emit(&events,&notify,Update::CoverSourcePage(id,result,cancel),permit);
                                 }
                                 Action::SaveManualCover(request) => emit(&events,&notify,Update::ManualCover(request.execute(&mut repository)),permit),
-                                Action::PreviewCover(id,path,page,generation,cancel) => {
-                                    match engine.try_cover(id.clone(),path,page,generation,cancel.clone()) {
-                                        Ok(ticket) => pending.push(Pending::Cover(id,ticket,permit)),
+                                Action::PreviewCover(source,page,generation,cancel) => {
+                                    let id=source.id().to_owned();
+                                    match cancel.check().and_then(|()|source.read(&repository)).and_then(|_|engine.try_cover(id.clone(),source.path(),page,generation,cancel.clone())) {
+                                        Ok(ticket) => pending.push(Pending::Cover(CoverFrame::new(source,page,generation,None),ticket,permit)),
                                         Err(error) => emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
                                     }
                                 }
-                                Action::Cover(id, path, generation, cancel) => {
+                                Action::Cover(source, generation, cancel) => {
+                                    let id=source.id().to_owned();let path=source.path();
                                     let selected=cancel.check().and_then(|_| {
-                                        let document=repository.get(&id)?.ok_or_else(||Failure::Invalid("Cover document no longer exists".into()))?;
-                                        if document.path!=path || document.missing {return Err(Failure::Invalid("Cover source changed or is missing".into()));}
+                                        let document=source.read(&repository)?;
                                         Ok((document,repository.cover_snapshot(&id)?))
                                     });
                                     match selected {
-                                        Ok((_,yamantaka_domain::cover_snapshot::CoverSnapshot {plan: yamantaka_domain::cover_snapshot::CoverPlan::Render(page), ..})) => match engine.try_cover(id.clone(),path,page,generation,cancel.clone()) {
-                                            Ok(ticket)=>pending.push(Pending::Cover(id,ticket,permit)),
+                                        Ok((_,snapshot @ yamantaka_domain::cover_snapshot::CoverSnapshot {plan: yamantaka_domain::cover_snapshot::CoverPlan::Render(page), ..})) => match engine.try_cover(id.clone(),path,page,generation,cancel.clone()) {
+                                            Ok(ticket)=>pending.push(Pending::Cover(CoverFrame::new(source,page,generation,Some(snapshot)),ticket,permit)),
                                             Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
                                         },
                                         Ok((document,snapshot)) => {
@@ -958,10 +960,9 @@ impl Runtime {
                                     Ok(ticket) => pending.push(Pending::Outline(id, ticket, permit)),
                                     Err(error) => emit(&events, &notify, Update::OutlineFailed(id, error, cancel), permit),
                                 },
-                                Action::RestoreAutomaticCover(id,path,generation,cancel) => {
-                                    let started=cancel.check().and_then(|_|repository.get(&id)).and_then(|document| {
-                                        let document=document.ok_or_else(||Failure::Invalid("Cover document no longer exists".into()))?;
-                                        if document.path!=path || document.missing {return Err(Failure::Invalid("Cover source changed or is missing".into()));}
+                                Action::RestoreAutomaticCover(source,generation,cancel) => {
+                                    let id=source.id().to_owned();let path=source.path();
+                                    let started=cancel.check().and_then(|_|source.read(&repository)).and_then(|document| {
                                         let expected=repository.cover_snapshot(&id)?;
                                         cancel.check()?;
                                         let ticket=engine.try_detect_cover(id.clone(),path,generation,cancel.clone())?;
@@ -1057,26 +1058,29 @@ impl Runtime {
                                     }
                                 }
                             }
-                            Pending::Cover(id, ticket, permit) => {
+                            Pending::Cover(frame, ticket, permit) => {
+                                let id=frame.id().to_owned();
                                 let cancel = ticket.cancellation.clone();
-                                let result = ticket.wait().and_then(|page| { cancel.check()?; Ok(page) });
+                                let result = ticket.wait().and_then(|page| frame.finish(&repository,page,&cancel));
                                 emit(&events, &notify, Update::Cover(id, result, cancel), permit);
                             }
                             Pending::RestoreCover(document,generation,expected,ticket,permit) => {
+                                let source=CoverSource::capture(&document);
                                 let cancel=ticket.cancellation.clone();
                                 let id=document.id.clone();
-                                let result=ticket.wait().and_then(|detected| {cancel.check()?;crate::automatic_cover::restore(&mut repository,document,generation,detected,expected)});
+                                let result=ticket.wait().and_then(|detected| {cancel.check()?;source.read(&repository)?;crate::automatic_cover::restore(&mut repository,document,generation,detected,expected)});
                                 emit(&events,&notify,Update::Cover(id,result,cancel),permit);
                             }
                             Pending::AutomaticCover(document,generation,snapshot,ticket,permit) => {
+                                let source=CoverSource::capture(&document);
                                 let cancel=ticket.cancellation.clone();
                                 let id=document.id.clone();
                                 let path=document.path.clone();
-                                let result=ticket.wait().and_then(|detected| {cancel.check()?;crate::automatic_cover::complete(&mut repository,document,generation,detected,snapshot)});
+                                let result=ticket.wait().and_then(|detected| {cancel.check()?;source.read(&repository)?;crate::automatic_cover::complete(&mut repository,document,generation,detected,snapshot)});
                                 match result {
                                     Ok(crate::automatic_cover::CoverCompletion::Image(image))=>emit(&events,&notify,Update::Cover(id,Ok(image),cancel),permit),
-                                    Ok(crate::automatic_cover::CoverCompletion::StoredPage(page))=>match engine.try_cover(id.clone(),path,page,generation,cancel.clone()) {
-                                        Ok(ticket)=>pending.push(Pending::Cover(id,ticket,permit)),
+                                    Ok(crate::automatic_cover::CoverCompletion::StoredPage(page))=>match source.read(&repository).and_then(|_|repository.cover_snapshot(&id)).and_then(|snapshot|engine.try_cover(id.clone(),path,page,generation,cancel.clone()).map(|ticket|(snapshot,ticket))) {
+                                        Ok((snapshot,ticket))=>pending.push(Pending::Cover(CoverFrame::new(source,page,generation,Some(snapshot)),ticket,permit)),
                                         Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),
                                     },
                                     Err(error)=>emit(&events,&notify,Update::Cover(id,Err(error),cancel),permit),

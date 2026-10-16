@@ -76,8 +76,15 @@ def main():
         if name in ("cover-picker-saved", "cover-picker-cancelled", "cover-picker-failed-save"):
             database = root / "build/demo-store/captures" / str(record["captureProcessId"]) / "export-preview.sqlite3"
             with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as connection:
-                row = connection.execute("SELECT source_page_index,selection_mode,page_aspect_ratio,small_thumbnail_path,large_thumbnail_path FROM document_covers WHERE document_id='demo-0'").fetchone()
-                assert row == ((1, "manual", 0.75, "", "") if demo["saved"] else None), (name, row)
+                row = connection.execute("SELECT source_page_index,selection_mode,page_aspect_ratio,small_thumbnail_path,large_thumbnail_path,algorithm_version FROM document_covers WHERE document_id='demo-0'").fetchone()
+                expected_row = {
+                    "cover-picker-saved": (1, "manual", 0.75, "", "", 1),
+                    # Returning to the library runs automatic detection. Cancelling
+                    # must not save the previewed page as a manual selection.
+                    "cover-picker-cancelled": (0, "automatic", 0.75, "", "", 3),
+                    "cover-picker-failed-save": None,
+                }[name]
+                assert row == expected_row, (name, row)
                 if demo["saved"]:
                     assert connection.execute("SELECT thumbnail_path FROM documents WHERE id='demo-0'").fetchone() == (None,)
         if published:

@@ -1,3 +1,4 @@
+use crate::cover_source::CoverSource;
 use crate::{
     manual_cover::ManualCoverRequest,
     runtime::{Action, Runtime, Update},
@@ -45,9 +46,12 @@ pub(super) fn receive(runtime: &Runtime) -> Update {
         .unwrap()
 }
 
+type RenderReply = crossbeam_channel::Sender<Result<Arc<RenderedPage>>>;
+
 pub(super) struct Gate {
     pub(super) native: PdfWorker,
     pub(super) ready: std::sync::mpsc::Sender<crossbeam_channel::Sender<Result<DetectedCover>>>,
+    pub(super) render_ready: Option<std::sync::mpsc::Sender<RenderReply>>,
 }
 impl PdfEngine for Gate {
     fn open(
@@ -110,7 +114,13 @@ impl AsyncPdfEngine for Gate {
         generation: u64,
         cancel: Cancellation,
     ) -> Result<PdfTicket<Arc<RenderedPage>>> {
-        self.native.try_cover(id, path, page, generation, cancel)
+        if let Some(ready) = &self.render_ready {
+            let (sender, ticket) = PdfTicket::channel(1, 0, cancel);
+            ready.send(sender).unwrap();
+            Ok(ticket)
+        } else {
+            self.native.try_cover(id, path, page, generation, cancel)
+        }
     }
     fn try_detect_cover(
         &self,
@@ -144,8 +154,7 @@ fn actor_persists_automatic_choice_then_restarts_using_saved_page_and_cache() {
     let cancel = Cancellation::default();
     runtime
         .submit(Action::Cover(
-            doc.id.clone(),
-            pdf.clone(),
+            CoverSource::capture(&doc),
             10,
             cancel.clone(),
         ))
@@ -183,14 +192,14 @@ fn actor_persists_automatic_choice_then_restarts_using_saved_page_and_cache() {
         Gate {
             native: worker,
             ready,
+            render_ready: None,
         },
         || {},
     )
     .unwrap();
     restarted
         .submit(Action::Cover(
-            doc.id,
-            pdf.clone(),
+            CoverSource::capture(&doc),
             20,
             Cancellation::default(),
         ))
@@ -231,14 +240,14 @@ fn manual_choice_wins_over_delayed_detection_and_actor_renders_its_page() {
         Gate {
             native: worker,
             ready,
+            render_ready: None,
         },
         || {},
     )
     .unwrap();
     runtime
         .submit(Action::Cover(
-            doc.id.clone(),
-            pdf,
+            CoverSource::capture(&doc),
             10,
             Cancellation::default(),
         ))
@@ -279,13 +288,18 @@ fn cancellation_before_completion_and_failed_storage_keep_original_selection_sta
             Gate {
                 native: worker,
                 ready,
+                render_ready: None,
             },
             || {},
         )
         .unwrap();
         let cancel = Cancellation::default();
         runtime
-            .submit(Action::Cover(doc.id, pdf, 10, cancel.clone()))
+            .submit(Action::Cover(
+                CoverSource::capture(&doc),
+                10,
+                cancel.clone(),
+            ))
             .unwrap();
         let sender = requests.recv_timeout(Duration::from_secs(5)).unwrap();
         if !fail_storage {

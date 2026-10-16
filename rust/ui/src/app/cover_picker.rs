@@ -1,4 +1,5 @@
 use super::*;
+use yamantaka_application::cover_source::CoverSource;
 use yamantaka_application::manual_cover::{ManualCoverReply, ManualCoverRequest};
 use yamantaka_domain::{Failure, RenderedPage, cover_selection::ManualCover};
 
@@ -97,8 +98,7 @@ impl YamantakaApp {
         };
         let cancel = Cancellation::default();
         match self.runtime.submit(Action::PreviewCover(
-            picker.document.id.clone(),
-            picker.document.path.clone(),
+            CoverSource::capture(&picker.document),
             picker.page,
             generation,
             cancel.clone(),

@@ -1,4 +1,5 @@
 use super::*;
+use yamantaka_application::cover_source::CoverSource;
 
 #[derive(Default)]
 pub(super) struct LibraryCovers {
@@ -13,6 +14,7 @@ struct CoverSlot {
     waiting_for_capacity: bool,
     path: std::path::PathBuf,
     fingerprint: String,
+    page_count: u32,
     generation: u64,
     cancel: Cancellation,
     image: Option<PageImage>,
@@ -46,7 +48,11 @@ impl YamantakaApp {
         });
         self.library_covers.slots.retain(|id, slot| {
             let keep = requested.iter().any(|doc| {
-                &doc.id == id && doc.path == slot.path && doc.fingerprint == slot.fingerprint
+                &doc.id == id
+                    && doc.path == slot.path
+                    && doc.fingerprint == slot.fingerprint
+                    && doc.page_count == slot.page_count
+                    && !doc.missing
             });
             if !keep {
                 slot.cancel.cancel();
@@ -73,8 +79,7 @@ impl YamantakaApp {
             };
             let cancel = Cancellation::default();
             match self.runtime.submit(Action::Cover(
-                document.id.clone(),
-                document.path.clone(),
+                CoverSource::capture(&document),
                 generation,
                 cancel.clone(),
             )) {
@@ -87,6 +92,7 @@ impl YamantakaApp {
                             waiting_for_capacity: false,
                             path: document.path,
                             fingerprint: document.fingerprint,
+                            page_count: document.page_count,
                             generation,
                             cancel,
                             image: None,
@@ -161,6 +167,7 @@ impl YamantakaApp {
                         size: [page.width, page.height],
                         path: slot.path.clone(),
                         fingerprint: slot.fingerprint.clone(),
+                        page_count: slot.page_count,
                     },
                 )
             });
@@ -198,6 +205,7 @@ impl YamantakaApp {
                     size: dimensions,
                     path: document.path.clone(),
                     fingerprint: document.fingerprint.clone(),
+                    page_count: document.page_count,
                 },
             )
         });
@@ -209,6 +217,7 @@ impl YamantakaApp {
                 waiting_for_capacity: false,
                 path: document.path.clone(),
                 fingerprint: document.fingerprint.clone(),
+                page_count: document.page_count,
                 generation: self.library_covers.generation,
                 cancel: Cancellation::default(),
                 image: Some(image),
@@ -254,8 +263,7 @@ mod tests {
         let preview = Cancellation::default();
         runtime
             .submit(Action::PreviewCover(
-                "picker".into(),
-                path.clone(),
+                CoverSource::capture(&document),
                 1,
                 19,
                 preview.clone(),
@@ -305,8 +313,7 @@ mod tests {
         assert!(reply.cancel.same_request(&save));
         runtime
             .submit(Action::Cover(
-                "picker".into(),
-                path.clone(),
+                CoverSource::capture(&document),
                 20,
                 Cancellation::default(),
             ))
@@ -330,6 +337,7 @@ mod tests {
         let db = Database::in_memory_at(11).unwrap();
         db.execute_batch("INSERT INTO documents(id,path,normalized_path,file_name,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('saved','synthetic.pdf','synthetic','synthetic.pdf',2,1,'now','now','now','synthetic');
             INSERT INTO document_covers VALUES('saved',1,'preserved-small','preserved-large','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z',1,'manual',4,'contain',0.75);").unwrap();
+        let stale_document = db.get("saved").unwrap().unwrap();
         let escaped = path.to_string_lossy().replace('\'', "''");
         db.execute_batch(&format!(
             "UPDATE documents SET path='{escaped}' WHERE id='saved'"
@@ -340,11 +348,11 @@ mod tests {
             MemoryLimits::default(),
         )
         .unwrap();
+        let document = db.get("saved").unwrap().unwrap();
         let runtime = Runtime::start(db, worker, || {}).unwrap();
         runtime
             .submit(Action::Cover(
-                "saved".into(),
-                "synthetic.pdf".into(),
+                CoverSource::capture(&stale_document),
                 40,
                 Cancellation::default(),
             ))
@@ -359,8 +367,7 @@ mod tests {
         let cancel = Cancellation::default();
         runtime
             .submit(Action::Cover(
-                "saved".into(),
-                path.clone(),
+                CoverSource::capture(&document),
                 41,
                 cancel.clone(),
             ))

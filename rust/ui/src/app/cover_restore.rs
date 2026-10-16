@@ -1,4 +1,5 @@
 use super::*;
+use yamantaka_application::cover_source::CoverSource;
 use yamantaka_domain::{Failure, RenderedPage};
 
 impl YamantakaApp {
@@ -14,8 +15,7 @@ impl YamantakaApp {
         };
         let cancel = Cancellation::default();
         match self.runtime.submit(Action::RestoreAutomaticCover(
-            picker.document.id.clone(),
-            picker.document.path.clone(),
+            CoverSource::capture(&picker.document),
             generation,
             cancel.clone(),
         )) {

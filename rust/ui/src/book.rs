@@ -15,6 +15,7 @@ pub(crate) struct PdfCover {
     pub size: [u32; 2],
     pub path: std::path::PathBuf,
     pub fingerprint: String,
+    pub page_count: u32,
 }
 pub(crate) fn cover_id(id: &str) -> egui::Id {
     egui::Id::new(("pdf-cover-surface", id))
@@ -227,7 +228,12 @@ fn cover_impl(
     let pdf_cover = ui
         .ctx()
         .data(|data| data.get_temp::<PdfCover>(cover_id(&document.id)))
-        .filter(|cover| cover.path == document.path && cover.fingerprint == document.fingerprint);
+        .filter(|cover| {
+            cover.path == document.path
+                && cover.fingerprint == document.fingerprint
+                && cover.page_count == document.page_count
+                && !document.missing
+        });
     let depth = (width * 0.13).clamp(12.0, 30.0);
     let project = |point| physics.project(point, depth * 0.5, book);
     let painter = ui.painter();

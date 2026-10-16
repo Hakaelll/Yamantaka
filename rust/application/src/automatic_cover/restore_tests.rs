@@ -1,4 +1,5 @@
 use super::tests::{Gate, receive, selection, setup};
+use crate::cover_source::CoverSource;
 use crate::{
     manual_cover::ManualCoverRequest,
     runtime::{Action, Runtime, Update},
@@ -32,14 +33,14 @@ fn restoration_keeps_manual_metadata_until_detection_and_then_commits_the_automa
         Gate {
             native: worker,
             ready,
+            render_ready: None,
         },
         || {},
     )
     .unwrap();
     runtime
         .submit(Action::RestoreAutomaticCover(
-            doc.id,
-            pdf.clone(),
+            CoverSource::capture(&doc),
             10,
             Cancellation::default(),
         ))
@@ -71,14 +72,14 @@ fn newer_manual_choice_defeats_pending_explicit_restoration() {
         Gate {
             native: worker,
             ready,
+            render_ready: None,
         },
         || {},
     )
     .unwrap();
     runtime
         .submit(Action::RestoreAutomaticCover(
-            doc.id.clone(),
-            pdf,
+            CoverSource::capture(&doc),
             10,
             Cancellation::default(),
         ))
@@ -117,6 +118,7 @@ fn cancelled_failed_native_and_failed_storage_restoration_preserve_the_previous_
             Gate {
                 native: worker,
                 ready,
+                render_ready: None,
             },
             || {},
         )
@@ -124,8 +126,7 @@ fn cancelled_failed_native_and_failed_storage_restoration_preserve_the_previous_
         let cancel = Cancellation::default();
         runtime
             .submit(Action::RestoreAutomaticCover(
-                doc.id,
-                pdf,
+                CoverSource::capture(&doc),
                 10,
                 cancel.clone(),
             ))

@@ -70,4 +70,6 @@ mod freshness_tests;
 #[cfg(test)]
 mod restore_tests;
 #[cfg(test)]
+mod source_tests;
+#[cfg(test)]
 mod tests;

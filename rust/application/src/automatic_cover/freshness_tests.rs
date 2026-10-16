@@ -1,4 +1,5 @@
 use super::tests::{Gate, receive, selection, setup};
+use crate::cover_source::CoverSource;
 use crate::{
     manual_cover::ManualCoverRequest,
     runtime::{Action, Runtime, Update},
@@ -31,8 +32,7 @@ fn outdated_version_source_date_and_page_are_redetected_by_the_real_worker() {
         let runtime = Runtime::start(db, worker, || {}).unwrap();
         runtime
             .submit(Action::Cover(
-                doc.id,
-                pdf.clone(),
+                CoverSource::capture(&doc),
                 10,
                 Cancellation::default(),
             ))
@@ -60,7 +60,7 @@ fn fresh_automatic_and_old_manual_decisions_bypass_detection_and_remain_unchange
     for manual in [false, true] {
         let root = tempfile::tempdir().unwrap();
         let dbpath = root.path().join("library.sqlite3");
-        let (db, doc, pdf, dll) = setup(&dbpath);
+        let (db, doc, _pdf, dll) = setup(&dbpath);
         seed(&db);
         db.execute_batch(if manual {
             "UPDATE document_covers SET selection_mode='manual',source_modified_at='old'"
@@ -76,12 +76,17 @@ fn fresh_automatic_and_old_manual_decisions_bypass_detection_and_remain_unchange
             Gate {
                 native: worker,
                 ready,
+                render_ready: None,
             },
             || {},
         )
         .unwrap();
         runtime
-            .submit(Action::Cover(doc.id, pdf, 10, Cancellation::default()))
+            .submit(Action::Cover(
+                CoverSource::capture(&doc),
+                10,
+                Cancellation::default(),
+            ))
             .unwrap();
         assert!(matches!(receive(&runtime), Update::Cover(_, Ok(image), _) if image.key.page == 0));
         assert!(matches!(
@@ -121,13 +126,18 @@ fn delayed_refresh_keeps_old_decisions_and_respects_races_cancellation_and_write
             Gate {
                 native: worker,
                 ready,
+                render_ready: None,
             },
             || {},
         )
         .unwrap();
         let cancel = Cancellation::default();
         runtime
-            .submit(Action::Cover(doc.id.clone(), pdf, 10, cancel.clone()))
+            .submit(Action::Cover(
+                CoverSource::capture(&doc),
+                10,
+                cancel.clone(),
+            ))
             .unwrap();
         let sender = requests.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(

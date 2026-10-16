@@ -3,6 +3,7 @@ use yamantaka_domain::{Document, LibraryQuery, LibraryRepository, Result};
 pub mod annotation_export;
 pub mod annotations;
 mod automatic_cover;
+pub mod cover_source;
 pub mod document_find;
 mod import_enrichment;
 pub mod manual_cover;
