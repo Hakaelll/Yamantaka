@@ -146,6 +146,10 @@ impl Drop for FolderImport {
 }
 
 #[cfg(test)]
+#[path = "folder_import/recovery_test.rs"]
+mod recovery_test;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::runtime::{Action, Runtime, Update};
@@ -153,7 +157,7 @@ mod tests {
     use yamantaka_domain::LibraryQuery;
     use yamantaka_pdf::{MemoryLimits, PdfWorker};
     use yamantaka_storage::{Database, identity::full_sha256};
-    fn folder_result(runtime: &Runtime) -> Result<usize> {
+    pub(super) fn folder_result(runtime: &Runtime) -> Result<usize> {
         loop {
             match runtime
                 .updates
@@ -169,7 +173,7 @@ mod tests {
             }
         }
     }
-    fn documents(runtime: &Runtime) -> Vec<String> {
+    pub(super) fn documents(runtime: &Runtime) -> Vec<String> {
         let cancel = Cancellation::default();
         runtime
             .submit(Action::Query(LibraryQuery::default(), cancel.clone()))
@@ -276,6 +280,32 @@ mod tests {
             .submit(Action::ImportFolder(selected.clone(), cancelled))
             .unwrap();
         assert!(matches!(folder_result(&runtime), Err(Failure::Cancelled)));
+        runtime.submit(Action::PendingImports).unwrap();
+        let paused = loop {
+            if let Update::PendingImports(result) = runtime
+                .updates
+                .recv_timeout(Duration::from_secs(10))
+                .unwrap()
+            {
+                break result.unwrap();
+            }
+        };
+        assert_eq!(paused.len(), 1);
+        assert_eq!(paused[0].completed, 0);
+        runtime
+            .submit(Action::DiscardImport(paused[0].id.clone()))
+            .unwrap();
+        loop {
+            if let Update::PendingImports(result) = runtime
+                .updates
+                .recv_timeout(Duration::from_secs(10))
+                .unwrap()
+            {
+                assert!(result.unwrap().is_empty());
+                break;
+            }
+        }
+
         runtime
             .submit(Action::ImportFolder(
                 temp.path().join("does-not-exist"),
@@ -286,6 +316,7 @@ mod tests {
         assert_eq!(documents(&runtime).len(), 3);
         drop(runtime);
         assert_eq!(governor.usage().total, 0);
+        super::recovery_test::verify(&root, &paths);
         for (path, original) in paths.iter().zip(originals) {
             assert_eq!(
                 full_sha256(path, &Cancellation::default()).unwrap(),

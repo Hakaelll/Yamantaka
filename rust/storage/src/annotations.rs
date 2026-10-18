@@ -356,7 +356,10 @@ impl AnnotationRepository for Database {
         connection
             .busy_timeout(std::time::Duration::from_secs(3))
             .map_err(|_| Failure::Storage("Annotation export reader could not open".into()))?;
-        Ok(Box::new(Database { connection }))
+        Ok(Box::new(Database {
+            connection,
+            import_journal: Default::default(),
+        }))
     }
 
     fn publish_annotation_export(

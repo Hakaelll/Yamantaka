@@ -10,6 +10,7 @@ pub mod cover_snapshot;
 pub mod external_uri;
 pub mod front_matter;
 pub mod import_metadata;
+pub mod import_recovery;
 pub mod memory;
 pub mod metadata_review;
 pub mod outline;
@@ -196,6 +197,30 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn pending_imports(&self) -> Result<Vec<import_recovery::PendingImport>> {
+        Ok(Vec::new())
+    }
+    fn queue_import(&mut self, _source: &import_recovery::ImportSource) -> Result<Option<String>> {
+        Ok(None)
+    }
+    fn resume_import(&self, _id: &str) -> Result<import_recovery::ImportSource> {
+        Err(Failure::Unsupported("Import recovery".into()))
+    }
+    fn import_already_committed(&self, _job: &str, _path: &std::path::Path) -> Result<bool> {
+        Ok(false)
+    }
+    fn checkpoint_import(
+        &mut self,
+        _job: &str,
+        _path: &std::path::Path,
+        _document: &str,
+    ) -> Result<()> {
+        Ok(())
+    }
+    fn remove_import(&mut self, _id: &str) -> Result<()> {
+        Err(Failure::Unsupported("Import recovery".into()))
+    }
+
     fn metadata_source(
         &self,
         _expected: &metadata_review::MetadataReview,

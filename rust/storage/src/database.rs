@@ -24,6 +24,7 @@ pub const MIGRATIONS: [&str; 11] = [
 
 pub struct Database {
     pub(crate) connection: Connection,
+    pub(crate) import_journal: std::cell::RefCell<Option<Connection>>,
 }
 impl Database {
     pub fn open(path: &Path) -> Result<Self> {
@@ -39,13 +40,19 @@ impl Database {
         }
         migrate(&mut connection, SCHEMA_VERSION)?;
         validate(&connection)?;
-        Ok(Self { connection })
+        Ok(Self {
+            connection,
+            import_journal: Default::default(),
+        })
     }
     pub fn in_memory_at(target: u32) -> Result<Self> {
         let mut connection = Connection::open_in_memory().map_err(storage)?;
         configure(&connection)?;
         migrate(&mut connection, target)?;
-        Ok(Self { connection })
+        Ok(Self {
+            connection,
+            import_journal: Default::default(),
+        })
     }
     pub fn execute_batch(&self, sql: &str) -> Result<()> {
         self.connection.execute_batch(sql).map_err(storage)
@@ -273,6 +280,28 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn pending_imports(&self) -> Result<Vec<yamantaka_domain::import_recovery::PendingImport>> {
+        crate::import_recovery::pending(self)
+    }
+    fn queue_import(
+        &mut self,
+        source: &yamantaka_domain::import_recovery::ImportSource,
+    ) -> Result<Option<String>> {
+        crate::import_recovery::queue(self, source).map(Some)
+    }
+    fn resume_import(&self, id: &str) -> Result<yamantaka_domain::import_recovery::ImportSource> {
+        crate::import_recovery::resume(self, id)
+    }
+    fn import_already_committed(&self, job: &str, path: &Path) -> Result<bool> {
+        crate::import_recovery::committed(self, job, path)
+    }
+    fn checkpoint_import(&mut self, job: &str, path: &Path, document: &str) -> Result<()> {
+        crate::import_recovery::checkpoint(self, job, path, document)
+    }
+    fn remove_import(&mut self, id: &str) -> Result<()> {
+        crate::import_recovery::remove(self, id)
+    }
+
     fn reanalyze_metadata(
         &mut self,
         expected: &yamantaka_domain::metadata_review::MetadataReview,

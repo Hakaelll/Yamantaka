@@ -10,6 +10,7 @@ mod cover_snapshot;
 pub mod database;
 pub mod identity;
 mod import_metadata;
+mod import_recovery;
 mod metadata_reanalysis;
 mod metadata_review;
 mod metadata_source;

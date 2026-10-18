@@ -62,9 +62,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         // Captures have their own instance identity so QA does not forward to
         // or interfere with a demonstration window the user is reviewing.
         if capture.is_some() {
-            store = store.join("captures").join(std::process::id().to_string());
+            store = store.join("captures").join(format!(
+                "{}-{}",
+                std::process::id(),
+                uuid::Uuid::new_v4()
+            ));
         } else if args.iter().any(|arg| arg == "--demo-window") {
-            store = store.join("previews").join(std::process::id().to_string());
+            store = store.join("previews").join(format!(
+                "{}-{}",
+                std::process::id(),
+                uuid::Uuid::new_v4()
+            ));
         }
         let mut db = if capture.is_some()
             && args.iter().any(|arg| {
@@ -78,6 +86,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     || arg == "--global-notes-export-json"
                     || arg == "--global-notes-export-markdown"
                     || arg == "--metadata-review"
+                    || arg == "--import-recovery"
                     || arg == "--cover-capacity-retry"
             }) {
             std::fs::create_dir_all(&store).map_err(|_| {
@@ -178,6 +187,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     "UPDATE documents SET fingerprint='{fingerprint}' WHERE id='demo-0'"
                 ))?;
             }
+        }
+        if capture.is_some() && args.iter().any(|arg| arg == "--import-recovery") {
+            let first = db.get("demo-0")?.unwrap();
+            let second = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../build/rust-fixtures/front-matter-wrapped-title.pdf")
+                .canonicalize()?;
+            let source = yamantaka_domain::import_recovery::ImportSource::Files(vec![
+                first.path.clone(),
+                second,
+            ])
+            .absolute()?;
+            let job = db.queue_import(&source)?.unwrap();
+            db.checkpoint_import(&job, &first.path, &first.id)?;
+            drop(db);
+            db = Database::open(&store.join("export-preview.sqlite3"))?;
         }
         if args.iter().any(|arg| arg == "--automatic-cover-manual") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-08',1,'manual',4,'contain',0.7142857142857143);")?;
@@ -744,6 +768,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--search-excluded") {
                     app.preview_search_action("exclude");
                 }
+            }
+            if demo && args.iter().any(|arg| arg == "--import-recovery") {
+                app.preview_import_recovery(if args.iter().any(|arg| arg == "--resume-import") {
+                    1
+                } else if args.iter().any(|arg| arg == "--discard-import") {
+                    2
+                } else {
+                    0
+                });
             }
             if demo && args.iter().any(|arg| arg == "--folder-import") {
                 let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

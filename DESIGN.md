@@ -312,7 +312,10 @@ from 180 to 500. PDF page appearance comes from the actual document texture.
 The Tools menu includes Import folder and the existing Cancel import action.
 Its contents scroll within the remaining viewport height, preserving access to
 secondary destinations at enlarged text. Folder import uses the existing quiet
-background workflow and never adds a permanent progress strip.
+background workflow and never adds a permanent progress strip. Pending imports
+appear as a Tools submenu only when work is paused. Its bounded, scrollable list
+shows the source label, confirmed count and Resume/Discard actions. Discard keeps
+catalogued books. Startup leaves the work paused; recovery adds no global banner.
 
 ## Elevation & Depth
 

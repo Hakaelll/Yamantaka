@@ -39,6 +39,9 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    PendingImports,
+    ResumeImport(String, Cancellation),
+    DiscardImport(String),
     CompareFiles(Box<ComparisonRequest>),
     ReanalyzeMetadata(
         Box<yamantaka_domain::metadata_review::MetadataReview>,
@@ -106,6 +109,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    PendingImports(Result<Vec<yamantaka_domain::import_recovery::PendingImport>>),
     FileComparison(Box<ComparisonReply>),
     Metadata(Box<crate::metadata_review::MetadataReply>),
     MetadataSource(crate::metadata_source::MetadataSourceReply),
@@ -214,6 +218,7 @@ pub struct Runtime {
 }
 enum RuntimeControl {
     Stop,
+    FlushImportIntents(Sender<Result<()>>),
     PersistContinuity(
         u64,
         Box<yamantaka_domain::reader_tabs::DocumentTabs>,
@@ -222,6 +227,7 @@ enum RuntimeControl {
     PersistSessions(Vec<ReadingSessionRequest>, usize, Sender<Result<()>>),
 }
 struct ImportState {
+    job: Option<String>,
     folder: Option<Box<FolderImport>>,
     paths: std::collections::VecDeque<PathBuf>,
     count: usize,
@@ -230,6 +236,7 @@ struct ImportState {
     reanalysis: Option<Box<(yamantaka_domain::metadata_review::MetadataReview, Document)>>,
 }
 enum Pending {
+    ImportReady(ImportState),
     ImportFolder(Box<FolderImport>, ImportState),
     FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
@@ -271,8 +278,24 @@ enum Pending {
     ImportAbort(Failure, PdfTicket<()>, ImportState),
 }
 impl Pending {
+    fn import_state(&self) -> Option<&ImportState> {
+        match self {
+            Self::ImportReady(state)
+            | Self::ImportFolder(_, state)
+            | Self::ImportOpen(_, _, _, state)
+            | Self::ImportSource(_, _, _, _, state)
+            | Self::ImportScan(_, state)
+            | Self::ImportClose(_, _, state)
+            | Self::ImportAbort(_, _, state) => Some(state),
+            _ => None,
+        }
+    }
+    fn import_job(&self) -> Option<&str> {
+        self.import_state().and_then(|state| state.job.as_deref())
+    }
     fn register<'a>(&'a self, select: &mut Select<'a>) {
         match self {
+            Self::ImportReady(_) => {}
             Self::ImportFolder(folder, _) => folder.register(select),
             Self::FindDocument(scan, _) => {
                 select.recv(scan.ticket().readiness());
@@ -313,6 +336,7 @@ impl Pending {
     }
     fn ready(&self) -> bool {
         match self {
+            Self::ImportReady(_) => true,
             Self::ImportFolder(folder, state) => state.cancel.is_cancelled() || folder.ready(),
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
@@ -331,7 +355,7 @@ impl Pending {
     }
     fn cancel(&self) {
         match self {
-            Self::ImportFolder(_, state) => state.cancel.cancel(),
+            Self::ImportReady(state) | Self::ImportFolder(_, state) => state.cancel.cancel(),
             Self::FindDocument(scan, _) => scan.request.cancellation.cancel(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
@@ -390,6 +414,21 @@ fn foreground_admissible(
     awaiting: &Option<(String, Cancellation)>,
 ) -> bool {
     match action {
+        Action::PendingImports => !pending.iter().any(|item| {
+            item.import_state()
+                .is_some_and(|state| state.job.is_some() && state.cancel.is_cancelled())
+        }),
+        Action::DiscardImport(id) => !pending.iter().any(|item| {
+            item.import_state().is_some_and(|state| {
+                state.job.as_deref() == Some(id) && state.cancel.is_cancelled()
+            })
+        }),
+        Action::ResumeImport(id, _) => {
+            awaiting.is_none()
+                && !pending
+                    .iter()
+                    .any(|item| matches!(item, Pending::Open(..)) || item.import_job() == Some(id))
+        }
         Action::Import(..) | Action::ImportFolder(..) | Action::ReanalyzeMetadata(..) => {
             awaiting.is_none() && !pending.iter().any(|item| matches!(item, Pending::Open(..)))
         }
@@ -472,9 +511,117 @@ fn open_import(
         Err(error) => import_failed(events, notify, error, state),
     }
 }
+fn prepare_import_intent(
+    repository: &mut impl LibraryRepository,
+    source: yamantaka_domain::import_recovery::ImportSource,
+    cancel: Cancellation,
+) -> std::result::Result<Action, (Failure, Cancellation)> {
+    use yamantaka_domain::import_recovery::ImportSource;
+    let result = (|| {
+        let source = source.absolute()?;
+        Ok(match repository.queue_import(&source)? {
+            Some(id) => Action::ResumeImport(id, cancel.clone()),
+            None => match source {
+                ImportSource::Files(paths) => Action::Import(paths, cancel.clone()),
+                ImportSource::Folder(root) => Action::ImportFolder(root, cancel.clone()),
+            },
+        })
+    })();
+    result.map_err(|error| (error, cancel))
+}
+fn prepare_action(
+    repository: &mut impl LibraryRepository,
+    action: Action,
+) -> std::result::Result<Action, (Failure, Cancellation)> {
+    use yamantaka_domain::import_recovery::ImportSource;
+    match action {
+        Action::Import(paths, cancel) => {
+            prepare_import_intent(repository, ImportSource::Files(paths), cancel)
+        }
+        Action::ImportFolder(root, cancel) => {
+            prepare_import_intent(repository, ImportSource::Folder(root), cancel)
+        }
+        action => Ok(action),
+    }
+}
+fn flush_import_intents(
+    repository: &mut impl LibraryRepository,
+    deferred: &mut VecDeque<Command>,
+    commands: &Receiver<Command>,
+) -> Result<()> {
+    let mut result = Ok(());
+    for command in commands.try_iter() {
+        let Command { action, permit } = command;
+        match prepare_action(repository, action) {
+            Ok(action) => deferred.push_back(Command { action, permit }),
+            Err((Failure::Cancelled, _)) => {}
+            Err((error, _)) => {
+                if result.is_ok() {
+                    result = Err(error);
+                }
+            }
+        }
+    }
+    result
+}
+struct StartImport {
+    source: yamantaka_domain::import_recovery::ImportSource,
+    job: Option<String>,
+    cancel: Cancellation,
+}
+fn start_import(
+    engine: &impl AsyncPdfEngine,
+    repository: &mut impl LibraryRepository,
+    request: StartImport,
+    permit: Permit,
+    pending: &mut Vec<Pending>,
+    events: &Sender<Event>,
+    notify: &impl Fn(),
+) {
+    use yamantaka_domain::import_recovery::ImportSource;
+    let prepared = request
+        .cancel
+        .check()
+        .and_then(|()| request.source.absolute())
+        .and_then(|source| {
+            let job = request.job;
+            let (folder, paths) = match source {
+                ImportSource::Files(paths) => (None, paths.into()),
+                ImportSource::Folder(root) => (
+                    Some(Box::new(FolderImport::start(root, request.cancel.clone())?)),
+                    VecDeque::new(),
+                ),
+            };
+            Ok((job, folder, paths))
+        });
+    match prepared {
+        Ok((job, folder, paths)) => advance_import(
+            engine,
+            repository,
+            ImportState {
+                job,
+                folder,
+                paths,
+                count: 0,
+                cancel: request.cancel,
+                permit,
+                reanalysis: None,
+            },
+            pending,
+            events,
+            notify,
+        ),
+        Err(error) => emit(
+            events,
+            notify,
+            Update::Failed(error, Some(request.cancel)),
+            permit,
+        ),
+    }
+}
 fn advance_import<E: AsyncPdfEngine>(
     engine: &E,
-    repository: &impl LibraryRepository,
+    repository: &mut impl LibraryRepository,
     mut state: ImportState,
     pending: &mut Vec<Pending>,
     events: &Sender<Event>,
@@ -484,9 +631,31 @@ fn advance_import<E: AsyncPdfEngine>(
         import_failed(events, notify, Failure::Cancelled, state);
         return;
     }
-    if let Some(path) = state.paths.pop_front() {
-        let reserved = crate::temporary_document::reserve(repository, "rust-import");
-        let id = match reserved {
+    let mut skipped = 0;
+    while let Some(path) = state.paths.pop_front() {
+        if let Some(job) = &state.job {
+            match repository.import_already_committed(job, &path) {
+                Ok(true) => {
+                    state.count += 1;
+                    skipped += 1;
+                    if skipped == 64 && !state.paths.is_empty() {
+                        pending.push(Pending::ImportReady(state));
+                        return;
+                    }
+                    if state.cancel.is_cancelled() {
+                        import_failed(events, notify, Failure::Cancelled, state);
+                        return;
+                    }
+                    continue;
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    import_failed(events, notify, error, state);
+                    return;
+                }
+            }
+        }
+        let id = match crate::temporary_document::reserve(repository, "rust-import") {
             Ok(id) => id,
             Err(error) => {
                 import_failed(events, notify, error, state);
@@ -494,13 +663,21 @@ fn advance_import<E: AsyncPdfEngine>(
             }
         };
         open_import(engine, path, id, state, pending, events, notify);
-    } else if let Some(folder) = state.folder.take() {
+        return;
+    }
+    if let Some(folder) = state.folder.take() {
         if let Err(error) = folder.request_next() {
             import_failed(events, notify, error, state);
         } else {
             pending.push(Pending::ImportFolder(folder, state));
         }
     } else {
+        if let Some(job) = &state.job
+            && let Err(error) = repository.remove_import(job)
+        {
+            import_failed(events, notify, error, state);
+            return;
+        }
         emit(
             events,
             notify,
@@ -509,6 +686,7 @@ fn advance_import<E: AsyncPdfEngine>(
         );
     }
 }
+
 impl Runtime {
     pub fn start<
         R: LibraryRepository
@@ -555,6 +733,9 @@ impl Runtime {
                     if wakeups.try_recv().is_ok() {engine.wake_cancelled();}
                     match stop.try_recv() {
                         Ok(RuntimeControl::Stop) => break,
+                        Ok(RuntimeControl::FlushImportIntents(completed)) => {
+                            let _ = completed.try_send(flush_import_intents(&mut repository,&mut deferred,&commands));
+                        }
                         Ok(RuntimeControl::PersistContinuity(revision, tabs, completed)) => {
                             let _ = completed.try_send(continuity.save(&mut repository, revision, &tabs));
                         }
@@ -580,10 +761,15 @@ impl Runtime {
                         commands.try_recv().ok()
                     };
                     if let Some(Command { action, permit }) = command {
+                        let action = match prepare_action(&mut repository,action) {
+                            Ok(action)=>action,
+                            Err((error,cancel))=>{emit(&events,&notify,Update::Failed(error,Some(cancel)),permit);continue;}
+                        };
                         if (index_busy
                             && matches!(
                                 &action,
                                 Action::Open(..)
+                                    | Action::ResumeImport(..)
                                     | Action::ImportFolder(..)
                                     | Action::Import(..)
                                     | Action::ReanalyzeMetadata(..)
@@ -996,34 +1182,30 @@ impl Runtime {
                                         repository.get(&expected.document)?.filter(|d|!d.missing).ok_or_else(||Failure::Invalid("Metadata source is missing".into()))
                                     });
                                     match source {
-                                        Ok(document)=>advance_import(&engine,&repository,ImportState{folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
+                                        Ok(document)=>advance_import(&engine,&mut repository,ImportState{job:None,folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
                                         Err(error)=>emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)})),permit),
                                     }
                                 }
-                                Action::ImportFolder(root,cancel) => {
-                                    match FolderImport::start(root,cancel.clone()) {
-                                        Ok(folder) => advance_import(&engine,&repository,ImportState {
-                                            folder:Some(Box::new(folder)),paths:VecDeque::new(),count:0,
-                                            cancel,permit,reanalysis:None,
-                                        },&mut pending,&events,&notify),
-                                        Err(error) => emit(&events,&notify,Update::Failed(error,Some(cancel)),permit),
+                                Action::PendingImports => emit(&events,&notify,Update::PendingImports(repository.pending_imports()),permit),
+                                Action::DiscardImport(id) => {
+                                    let result = if pending.iter().any(|item|item.import_job()==Some(&id)) {Err(Failure::QueueFull)}
+                                        else {repository.remove_import(&id)};
+                                    emit(&events,&notify,Update::PendingImports(result.and_then(|()|repository.pending_imports())),permit);
+                                }
+                                Action::ResumeImport(id,cancel) => {
+                                    let source = if pending.iter().any(|item|item.import_job()==Some(&id)) {Err(Failure::QueueFull)}
+                                        else {cancel.check().and_then(|()|repository.resume_import(&id))};
+                                    match source {
+                                        Ok(source)=>start_import(&engine,&mut repository,StartImport{source,job:Some(id),cancel},permit,&mut pending,&events,&notify),
+                                        Err(error)=>emit(&events,&notify,Update::Failed(error,Some(cancel)),permit),
                                     }
                                 }
-                                Action::Import(paths, cancel) => advance_import(
-                                    &engine,
-                                    &repository,
-                                    ImportState {
-                                        folder: None,
-                                        paths: paths.into(),
-                                        count: 0,
-                                        cancel,
-                                        permit,
-                                        reanalysis:None,
-                                    },
-                                    &mut pending,
-                                    &events,
-                                    &notify,
-                                ),
+                                Action::ImportFolder(root,cancel) => start_import(&engine,&mut repository,StartImport {
+                                    source:yamantaka_domain::import_recovery::ImportSource::Folder(root),job:None,cancel,
+                                },permit,&mut pending,&events,&notify),
+                                Action::Import(paths,cancel) => start_import(&engine,&mut repository,StartImport {
+                                    source:yamantaka_domain::import_recovery::ImportSource::Files(paths),job:None,cancel,
+                                },permit,&mut pending,&events,&notify),
                             }
                         }
                     }
@@ -1161,6 +1343,7 @@ impl Runtime {
                                 }
                                 emit(&events,&notify,Update::ReaderClosed(request.reply(result)),permit);
                             },
+                            Pending::ImportReady(state) => next_imports.push(state),
                             Pending::ImportFolder(folder,mut state) => {
                                 let result = state.cancel.check().and_then(|()|folder.receive());
                                 match result {
@@ -1201,7 +1384,12 @@ impl Runtime {
                                     emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:target.0.document.clone(),writing:true,cancel:state.cancel,result})),state.permit);
                                     continue;
                                 }
-                                match closed.and_then(|()| {state.cancel.check()?;repository.import(&document)}) {
+                                match closed.and_then(|()| {
+                                    state.cancel.check()?;
+                                    let id=repository.import(&document)?;
+                                    if let Some(job)=&state.job {repository.checkpoint_import(job,&document.path,&id)?;}
+                                    Ok(id)
+                                }) {
                                     Ok(_) => {
                                         state.count+=1;
                                         import_progress.fetch_add(1,Ordering::Release);
@@ -1241,13 +1429,13 @@ impl Runtime {
                     let waiting=covers.iter().filter(|(job,_)|job.waiting()).count();
                     if waiting_snapshot.swap(waiting,Ordering::AcqRel)!=waiting {notify();}
                     for state in next_imports {
-                        advance_import(&engine,&repository,state,&mut pending,&events,&notify);
+                        advance_import(&engine,&mut repository,state,&mut pending,&events,&notify);
                     }
                     if index_cleanup.as_ref().is_some_and(PdfTicket::is_ready) && index_cleanup.take().unwrap().wait().is_ok() {pdf_capacity.fetch_add(1,Ordering::Release);notify();}
                     let native_admission_pending = !covers.is_empty() || pending.iter().any(|item| {
                         matches!(
                             item,
-                            Pending::Open(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
+                            Pending::Open(..) | Pending::ImportReady(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
                         )
                     });
                     indexer.set_slot_available(
@@ -1268,7 +1456,8 @@ impl Runtime {
                     }
                     // A blocking select sleeps while idle and wakes on actual command
                     // or PDF completion. SQL is never held behind native rendering.
-                    if covers.iter().any(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
+                    if pending.iter().any(|item|matches!(item,Pending::ImportReady(_)))
+                        || covers.iter().any(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
                         || !commands.is_empty()
                         || indexer.needs_step()
                         || (deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open))
@@ -1294,6 +1483,9 @@ impl Runtime {
                         select.recv(ticket.readiness());
                     }
                     select.ready();
+                }
+                if flush_import_intents(&mut repository,&mut deferred,&commands).is_err() {
+                    eprintln!("Pending import intent could not be saved during shutdown");
                 }
                 for item in &pending {
                     item.cancel();
@@ -1326,6 +1518,18 @@ impl Runtime {
             updates: UpdateReceiver(updates),
             handle: Some(handle),
         })
+    }
+    pub fn flush_import_recovery(&self) -> Result<()> {
+        let (send, receive) = bounded(1);
+        self.shutdown
+            .send_timeout(
+                RuntimeControl::FlushImportIntents(send),
+                Duration::from_secs(5),
+            )
+            .map_err(|_| Failure::Storage("Import recovery flush could not be scheduled".into()))?;
+        receive
+            .recv_timeout(Duration::from_secs(15))
+            .map_err(|_| Failure::Storage("Import recovery flush did not finish".into()))?
     }
     /// Coalesced bounded snapshot; reading it never queries SQL or PDFium.
     pub fn index_progress(&self) -> IndexProgress {

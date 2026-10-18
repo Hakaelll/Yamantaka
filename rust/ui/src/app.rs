@@ -372,6 +372,7 @@ impl YamantakaApp {
             reader_options_section: 0,
         };
         app.refresh();
+        app.send(Action::PendingImports);
         app.begin_reader_continuity();
         if app.search.enabled {
             app.send(Action::Index(
@@ -480,7 +481,7 @@ impl YamantakaApp {
         self.password = None;
         let cancel = self.importing.begin();
         if let Err(error) = self.runtime.submit(Action::Import(paths, cancel.clone())) {
-            self.importing.finish(&cancel);
+            self.importing.submission_failed(&cancel);
             self.error = Some(error.to_string());
         }
     }
@@ -493,7 +494,7 @@ impl YamantakaApp {
             .runtime
             .submit(Action::ImportFolder(root, cancel.clone()))
         {
-            self.importing.finish(&cancel);
+            self.importing.submission_failed(&cancel);
             self.error = Some(error.to_string());
         }
     }
@@ -1372,6 +1373,7 @@ impl App for YamantakaApp {
         }
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
+                Update::PendingImports(result) => self.importing.accept_recovery(result),
                 Update::FileComparison(reply) => self.file_comparison.accept(*reply),
                 Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
                 Update::AnnotationMarks(reply) => self.annotation_paint.accept(reply),
@@ -1572,6 +1574,7 @@ impl App for YamantakaApp {
                     if !self.importing.finish(&cancel) {
                         continue;
                     }
+                    self.send(Action::PendingImports);
                     self.refresh();
                 }
                 Update::OpenFailed(document, error, cancel) => {
@@ -1619,6 +1622,7 @@ impl App for YamantakaApp {
                         if !matches!(error, yamantaka_domain::Failure::Cancelled) {
                             self.error = Some(error.to_string());
                         }
+                        self.send(Action::PendingImports);
                         self.refresh();
                         continue;
                     }
@@ -1889,6 +1893,7 @@ impl App for YamantakaApp {
         self.apply_global_note_preview();
         self.apply_annotation_export_preview();
         self.update_file_comparison();
+        self.apply_import_recovery_preview();
         let dropped = ctx.input(|i| {
             i.raw
                 .dropped_files
@@ -2064,6 +2069,7 @@ impl App for YamantakaApp {
                     && self.thumbnail_preview_page.is_none()
                     && !self.loading
                     && !self.importing.busy()
+                    && self.importing.recovery_ready()
                     && self.opening.ready()
                     && self.tabs.ready()
                     && match self.preview_password_target {
@@ -2145,6 +2151,7 @@ impl App for YamantakaApp {
                         "annotationPaint":self.annotation_paint.capture_summary(),
                         "annotationExport":self.annotation_export.capture_summary(),
                         "fileComparison":self.file_comparison.summary(),
+                        "importRecovery":self.importing.recovery_summary(),
                         "globalNotes":self.global_notes.summary(),
                         "readingHistory": self.history.summary(),
                         "readingRestoration": self.restoration_summary(),
@@ -2172,6 +2179,13 @@ impl App for YamantakaApp {
         }
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        if let Err(error) = self.runtime.flush_import_recovery() {
+            eprintln!("{error}");
+            yamantaka_windows::show_startup_error(self.tr(
+                "No se han podido guardar todas las selecciones de importación pendientes. Abre Yamantaka y vuelve a seleccionar esos archivos o carpetas.",
+                "Some pending import choices could not be saved. Reopen Yamantaka and select those files or folders again.",
+            ));
+        }
         if let Err(error) = self.persist_reader_continuity_on_close() {
             eprintln!("{error}");
         }
