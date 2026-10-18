@@ -42,6 +42,8 @@ No account is required. Documents and library data stay on your computer. The pr
 
 The library no longer reserves a full-width Continue reading strip. Resume sits beside the filters, or in the utility row on short windows. The reader uses a single quiet control row; zoom, fit and open readings remain in Reading options. See [the compact chrome checkpoint](docs/validation/rust-quiet-chrome-2026-10-18.md).
 
+To check a possible duplicate, open a book's details and choose **Compare with another PDF**. Yamantaka compares the complete contents in the background using SHA-256. You can cancel the check; both originals remain unchanged. The result applies to that comparison and does not merge documents. [File comparison verification](docs/validation/rust-file-comparison-2026-10-18.md) describes the source guards and remaining duplicate-management work.
+
 ## The experience
 
 - **An immersive library.** PDF-derived covers with connected boards, spines, page blocks and a damped response to the pointer. Six procedural cover families provide a fallback when an image is unavailable. Reduced motion retains a static volume.
@@ -153,7 +155,7 @@ UI components dispatch commands and receive state. They do not execute SQL or ca
 
 ## Validation
 
-The current Rust suite contains 50 essential tests, reduced from 536 at the owner's request. It retains migration, backup, rollback, original-file, native cancellation, password, rendering, and metadata checks. Older checkpoint reports record the larger suites that existed on their dates. Removed tests remain recoverable in Git. Run the retained checks for the affected work; large capture matrices are not part of every edit.
+The current Rust suite contains 52 essential tests, following a reduction from 536 at the owner's request. It retains migration, backup, rollback, original-file, native cancellation, password, rendering, and metadata checks. Older checkpoint reports record the larger suites that existed on their dates. Removed tests remain recoverable in Git. Run the retained checks for the affected work; large capture matrices are not part of every edit.
 
 Run the Rust checks from the repository root:
 

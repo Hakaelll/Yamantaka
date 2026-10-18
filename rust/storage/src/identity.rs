@@ -11,14 +11,7 @@ pub fn legacy_fingerprint(path: &Path) -> Result<String> {
     Ok(fingerprint_from_head(size, Sha256::digest(bytes).into()))
 }
 
-pub(crate) fn fingerprint_from_head(size: u64, head: [u8; 32]) -> String {
-    let digest: sha2::digest::Output<Sha256> = head.into();
-    let partial = format!("{digest:x}");
-    format!(
-        "{:x}",
-        Sha256::digest(format!("{size}:{partial}").as_bytes())
-    )
-}
+use yamantaka_domain::source_revision::legacy_fingerprint as fingerprint_from_head;
 
 pub(crate) fn verify_import_source(
     path: &Path,

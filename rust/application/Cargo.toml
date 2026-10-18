@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 [dependencies]
+sha2.workspace = true
 chrono.workspace = true
 yamantaka-domain.workspace = true
 serde_json.workspace = true
@@ -14,7 +15,6 @@ crossbeam-channel.workspace = true
 workspace = true
 
 [dev-dependencies]
-sha2.workspace = true
 rusqlite.workspace = true
 yamantaka-storage.workspace = true
 yamantaka-pdf.workspace = true

@@ -6,6 +6,7 @@ mod cover_picker_preview;
 mod cover_picker_view;
 mod cover_restore;
 mod details;
+mod file_comparison;
 mod find;
 mod global_notes;
 mod goals;
@@ -158,6 +159,7 @@ pub struct YamantakaApp {
     bookmarks: bookmarks::BookmarkState,
     annotations: annotations::AnnotationState,
     annotation_export: annotations::export::ExportState,
+    file_comparison: file_comparison::ComparisonState,
     annotation_paint: annotations::paint::AnnotationPaint,
     annotation_preview: u8,
     annotation_multi_preview: bool,
@@ -332,6 +334,7 @@ impl YamantakaApp {
             metadata_preview: None,
             annotations: Default::default(),
             annotation_export: Default::default(),
+            file_comparison: Default::default(),
             annotation_paint: Default::default(),
             annotation_preview: 0,
             annotation_multi_preview: false,
@@ -1351,6 +1354,7 @@ impl App for YamantakaApp {
         }
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
+                Update::FileComparison(reply) => self.file_comparison.accept(*reply),
                 Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
                 Update::AnnotationMarks(reply) => self.annotation_paint.accept(reply),
                 Update::Annotations(reply) => {
@@ -1866,6 +1870,7 @@ impl App for YamantakaApp {
         self.apply_annotation_tag_preview();
         self.apply_global_note_preview();
         self.apply_annotation_export_preview();
+        self.update_file_comparison();
         let dropped = ctx.input(|i| {
             i.raw
                 .dropped_files
@@ -2021,6 +2026,7 @@ impl App for YamantakaApp {
                     && self.reader_destination.is_none()
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
+                    && self.file_comparison.ready()
                     && (!matches!(self.surface, Surface::Notes) || self.global_notes.ready())
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
@@ -2120,6 +2126,7 @@ impl App for YamantakaApp {
                         "annotations":self.annotation_capture_summary(),
                         "annotationPaint":self.annotation_paint.capture_summary(),
                         "annotationExport":self.annotation_export.capture_summary(),
+                        "fileComparison":self.file_comparison.summary(),
                         "globalNotes":self.global_notes.summary(),
                         "readingHistory": self.history.summary(),
                         "readingRestoration": self.restoration_summary(),
@@ -2153,6 +2160,7 @@ impl App for YamantakaApp {
         if let Err(error) = self.persist_reading_sessions_on_close() {
             eprintln!("{error}");
         }
+        self.file_comparison.cancel();
         self.annotation_export.cancel();
         self.global_notes.cancel();
         self.links.clear();

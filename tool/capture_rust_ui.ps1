@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='compare-pdf-identical'; args=@('--pdf-covers','--compare-pdf') },
+    @{ name='compare-pdf-different-es'; args=@('--pdf-covers','--compare-different','--light','--es','--reduce-motion') },
     @{ name='cover-capacity-retry-dark'; args=@('--pdf-covers','--cover-capacity-retry') },
     @{ name='cover-capacity-retry-light-es'; args=@('--pdf-covers','--cover-capacity-retry','--light','--es','--reduce-motion') },
     @{ name='metadata-reanalysis-dark'; args=@('--metadata-review','--metadata-reanalyze') },

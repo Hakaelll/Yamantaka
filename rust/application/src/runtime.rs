@@ -5,6 +5,7 @@ use crate::annotations::{
 use crate::cover_job::{CoverJob, CoverStep};
 use crate::cover_source::CoverSource;
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
+use crate::file_comparison::{ComparisonJob, ComparisonReply, ComparisonRequest};
 use crate::import_enrichment::{ImportEnrichment, ImportStep};
 use crate::reader_close::{ReaderCloseReply, ReaderCloseRequest};
 use crate::reader_continuity::{ContinuityReply, ContinuityRequest, ContinuityWriter};
@@ -37,6 +38,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    CompareFiles(Box<ComparisonRequest>),
     ReanalyzeMetadata(
         Box<yamantaka_domain::metadata_review::MetadataReview>,
         Cancellation,
@@ -102,6 +104,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    FileComparison(Box<ComparisonReply>),
     Metadata(Box<crate::metadata_review::MetadataReply>),
     MetadataSource(crate::metadata_source::MetadataSourceReply),
     CoverSourcePage(String, Result<Option<u32>>, Cancellation),
@@ -527,6 +530,7 @@ impl Runtime {
                 let mut covers: Vec<(Box<CoverJob>, Permit)> = Vec::new();
                 let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
+                let mut comparison: Option<(ComparisonJob, Permit)> = None;
                 let mut indexer = SearchIndexController::default();
                 let mut index_cleanup: Option<PdfTicket<()>> = None;
                 let mut deferred: VecDeque<Command> = VecDeque::new();
@@ -593,6 +597,19 @@ impl Runtime {
                                     Update::ReadingSession(request.execute(&mut repository)), permit,
                                 ),
                                 Action::Shutdown => break,
+                                Action::CompareFiles(request) => {
+                                    let document = request.document.clone();
+                                    let candidate = request.candidate.clone();
+                                    let cancel = request.cancel.clone();
+                                    let result = if comparison.is_some() { Err(Failure::QueueFull) }
+                                        else { ComparisonJob::start(*request, &repository) };
+                                    match result {
+                                        Ok(job) => comparison = Some((job,permit)),
+                                        Err(error) => emit(&events,&notify,Update::FileComparison(Box::new(
+                                            ComparisonReply {document,candidate,result:Err(error),cancel}
+                                        )),permit),
+                                    }
+                                }
                                 Action::AnnotationExport(request) => {
                                     let scope = request.scope();
                                     let cancel = request.cancel.clone();
@@ -990,6 +1007,10 @@ impl Runtime {
                         let (_, permit) = export.take().unwrap();
                         emit(&events, &notify, Update::AnnotationExport(reply), permit);
                     }
+                    if let Some(reply) = comparison.as_mut().and_then(|(job,_)|job.poll(&repository)) {
+                        let (_,permit) = comparison.take().unwrap();
+                        emit(&events,&notify,Update::FileComparison(Box::new(reply)),permit);
+                    }
                     let mut next_imports = Vec::new();
                     let mut index = 0;
                     while index < pending.len() {
@@ -1231,6 +1252,7 @@ impl Runtime {
                     if let Some((job, _)) = &export {
                         job.register(&mut select);
                     }
+                    if let Some((job,_)) = &comparison { job.register(&mut select); }
                     for item in &pending {
                         item.register(&mut select);
                     }
@@ -1249,6 +1271,7 @@ impl Runtime {
                 drop(covers);
                 drop(pending); // Drop tickets before engine join; no UI draining required.
                 drop(export); // Cancel and join file work before releasing the actor.
+                drop(comparison);
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
                     let _ = ticket.wait();
                 }

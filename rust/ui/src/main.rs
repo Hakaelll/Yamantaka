@@ -168,6 +168,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             };
             let last = if automatic_first { 3 } else { 0 };
             db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,reading_progress,last_page_index) VALUES('demo-{index}','{path}','demo-{index}','fixture.pdf','{title}','{author}',{pages},900,'2026-10-08','2026-10-08','2026-10-08','synthetic',{progress},{last})"))?;
+            if index == 0
+                && args
+                    .iter()
+                    .any(|arg| arg == "--compare-pdf" || arg == "--compare-different")
+            {
+                let fingerprint = yamantaka_storage::identity::legacy_fingerprint(&document_path)?;
+                db.execute_batch(&format!(
+                    "UPDATE documents SET fingerprint='{fingerprint}' WHERE id='demo-0'"
+                ))?;
+            }
         }
         if args.iter().any(|arg| arg == "--automatic-cover-manual") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-08',1,'manual',4,'contain',0.7142857142857143);")?;
@@ -567,6 +577,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--details"),
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
+                if args
+                    .iter()
+                    .any(|arg| arg == "--compare-pdf" || arg == "--compare-different")
+                {
+                    app.preview_file_comparison(
+                        args.iter().any(|arg| arg == "--compare-different"),
+                    );
+                }
                 if args.iter().any(|arg| arg == "--annotation-many") {
                     app.preview_annotation_list();
                 }
