@@ -107,13 +107,6 @@ impl YamantakaApp {
         }
     }
 
-    pub(super) fn set_reader_fit(&mut self, mode: ZoomMode) {
-        if let Some(mut preferences) = self.reader_preferences.clone() {
-            preferences.zoom_mode = mode;
-            self.apply_reader_preferences(preferences);
-        }
-    }
-
     pub(super) fn reader_options_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
         ui.set_min_width(264.0);
         ui.menu_button(

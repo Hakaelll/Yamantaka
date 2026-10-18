@@ -35,10 +35,12 @@ No account is required. Documents and library data stay on your computer. The pr
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.
 
 <p align="center">
-  <img src="docs/screenshots/rust-taste-ui/pdf-covers-dark.png" alt="Native Yamantaka library with PDF-derived 3D books, author captions and a compact continue-reading strip; synthetic PDF collection" width="1100" />
+  <img src="docs/screenshots/rust-quiet-chrome/pdf-covers-tilted.png" alt="Native Yamantaka library with PDF-derived 3D books, author captions and a discreet continue-reading action; synthetic PDF collection" width="1100" />
 </p>
 
 *Native Windows capture of an isolated synthetic study collection. The capture demonstrates the current gallery; it is not a photograph of a personal library or proof of complete feature parity.*
+
+The library no longer reserves a full-width Continue reading strip. Resume sits beside the filters, or in the utility row on short windows. The reader uses a single quiet control row; zoom, fit and open readings remain in Reading options. See [the compact chrome checkpoint](docs/validation/rust-quiet-chrome-2026-10-18.md).
 
 ## The experience
 

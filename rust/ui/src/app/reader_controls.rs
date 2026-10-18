@@ -8,8 +8,7 @@ impl YamantakaApp {
         p: Palette,
     ) {
         egui::Frame::new()
-            .fill(p.surface)
-            .inner_margin(egui::Margin::symmetric(18, 8))
+            .inner_margin(egui::Margin::symmetric(8, 2))
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
                 ui.horizontal(|ui| {
@@ -73,6 +72,7 @@ impl YamantakaApp {
                     {
                         self.step_reader(true);
                     }
+                    ui.add_space((ui.available_width() - 82.0).max(0.0));
                     let options = theme::icon_button(
                         ui,
                         self.tr("Opciones de lectura", "Reading options"),

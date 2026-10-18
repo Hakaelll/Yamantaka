@@ -236,7 +236,7 @@ provide contextual emphasis; no global line-height or tracking scale is establis
 - **Title:** reader document context; list and constrained catalogue titles use 16 points.
 - **Body:** catalogue labels and supporting interface text.
 - **Label / small / cover metadata:** controls, quiet context and page/progress summaries.
-- **Editorial:** continuity document title at 20 points and inspection title at 22.
+- **Editorial:** inspection title at 22 points; book titles remain the library focus.
 - **Jacket:** families 0, 3 and 5 use the bold jacket face; families 1, 2 and 4 use editorial type.
 
 Settings has a contextual 38-point heading, with 20 points in cramped composition;
@@ -278,8 +278,9 @@ progress track for started books. Long titles and authors truncate with ellipses
 the semantic book button retains the full title, author, page count and progress.
 When the zoom-adjusted content width falls below 420, the cover collection becomes
 76-point jacket-and-title rows with explicit Read controls instead of the normal
-grid. Compact composition removes the continuity strip and exposes Resume in the
-utility band. Normal continuity uses the actual 42-point physical miniature.
+grid. Continue reading is a secondary action beside the library filters. Compact
+composition keeps the existing Resume action in the utility band. Neither layout
+reserves a separate continuity strip.
 
 Search requests 40-point height; it spans its row on narrow layouts. Filters move
 into a labeled semantic vector menu below 420 content width. View and inspector
@@ -299,12 +300,11 @@ layouts wrap category controls horizontally; cramped layouts below 420 use one
 category menu. Theme choices sit beside each other from 460 available points,
 otherwise stack. All four categories remain reachable.
 
-The reader uses one toolbar with 18×8 insets and a centered PDF surface in a
-two-axis scroll area. Below 420 zoom-adjusted content width, the toolbar becomes
-a single 40-point row: Library, previous page, a 64×40 page/total field, next page,
-Reading options and page-text toggle, separated by 2-point gaps. Reading options
-holds zoom, fit-page, history and saved A/B positions; wider toolbars retain their
-direct controls. Its optional page-text panel defaults to 280 and ranges
+The reader uses one quiet, unfilled row with 8×2 insets at every width: Library,
+previous page, a 64×40 page/total field, next page, Reading options and the reading
+navigator. Options and navigator align to the right when space permits. The row
+uses 2-point gaps and 4 points of separation above the document. Reading options
+contains zoom, fit, open readings, history and saved A/B positions. Its optional page-text panel defaults to 280 and ranges
 from 180 to 500. PDF page appearance comes from the actual document texture.
 
 **The Stable Collection Rule.** Inspection opens below the library; preserve gallery width rather than shifting its columns sideways.
@@ -382,13 +382,11 @@ native fields use accent treatment. Search and filters have a Reset filters path
 
 ### Continuity and list rows
 
-The continuity surface contains a 42-point physical miniature, a 20-point
-editorial document title and a single secondary line combining author, page and
-progress. Its progress track is capped at 120×2 points. Insets are 16×8 points;
-the surface has a 10-point radius and no shadow. The Continue reading action
-sits alongside on wide layouts and below the text on narrower layouts. Compact
-composition moves Resume into the utility row. The user requested this smaller
-footprint in the [Taste review](docs/validation/rust-taste-ui-2026-10-15.md).
+Continue reading sits beside the filters as a transparent secondary action,
+with an arrow-only version below 1100 points of content width. Its tooltip shows
+the document title, current page and percentage. Short windows keep the existing
+Resume action in the utility band, avoiding duplicate controls. There is no
+separate continuity card, miniature or progress track above the collection.
 List rows are open
 aligned content with separators, actual miniature in wide mode and independent
 Read/Details actions. Selected rows use raised fill; keyboard focus adds its own

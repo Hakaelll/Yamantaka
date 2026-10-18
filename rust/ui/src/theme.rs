@@ -168,7 +168,6 @@ pub enum Icon {
     Panel,
     Minus,
     Plus,
-    Fit,
     Sort,
 }
 
@@ -255,12 +254,6 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
                 egui::StrokeKind::Inside,
             );
             line(v(-2.0, -5.0), v(-2.0, 5.0));
-        }
-        Icon::Fit => {
-            for (x, y) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
-                line(v(x * 6.0, y * 2.0), v(x * 6.0, y * 6.0));
-                line(v(x * 6.0, y * 6.0), v(x * 2.0, y * 6.0));
-            }
         }
         Icon::Settings => {
             for n in 0..8 {

@@ -24,7 +24,6 @@ mod password;
 mod reader_controls;
 mod reader_destination;
 mod reader_options;
-mod reader_toolbar;
 mod reader_viewport;
 mod render_plan;
 mod render_updates;
@@ -907,6 +906,9 @@ impl YamantakaApp {
                         let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only,p);
                         egui::Popup::menu(&response).show(|ui|self.library_filters(ui,p));
                     }else{self.library_filters(ui,p);}
+                    if !compact {
+                        self.reading_shortcut(ui, p);
+                    }
                     let labelled = ui.available_width() > 900.0;
                     let view_width = if labelled { 300.0 } else { 140.0 };
                     ui.add_space((ui.available_size_before_wrap().x - view_width - 10.0).max(0.0));
@@ -981,15 +983,6 @@ impl YamantakaApp {
                     );
                 });
                 ui.add_space(if compact { 4.0 } else { 12.0 });
-                if let Some(document) = self
-                    .documents
-                    .iter()
-                    .find(|doc| doc.reading_progress > 0.0)
-                    .cloned()
-                    && !compact
-                {
-                    self.reading_feature(ui, &document, p);
-                }
                 if self.documents.is_empty() {
                     let filtered=!self.query.is_empty()||self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only;
                     ui.add_space(if compact{18.0}else{36.0});
@@ -1300,12 +1293,8 @@ impl YamantakaApp {
             return;
         };
         self.sync_tab_context();
-        if ui.ctx().content_rect().width() < 420.0 {
-            self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
-        } else {
-            self.reader_toolbar(ui, &document, &info, p);
-        }
-        ui.add_space(16.0);
+        self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
+        ui.add_space(4.0);
         self.selection_toolbar(ui, p);
         self.reader_panel(ui, &document, &info, p);
         if self.panel && ui.ctx().content_rect().width() < 620.0 {
