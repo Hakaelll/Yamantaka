@@ -138,6 +138,10 @@ pub fn flutter_closed() -> Result<bool> {
     }
 }
 
+pub fn pick_pdf_folder() -> Option<PathBuf> {
+    rfd::FileDialog::new().pick_folder()
+}
+
 pub fn pick_pdf() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .add_filter("PDF", &["pdf"])

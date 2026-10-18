@@ -745,6 +745,30 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_search_action("exclude");
                 }
             }
+            if demo && args.iter().any(|arg| arg == "--folder-import") {
+                let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../build/rust-fixtures/folder-import");
+                std::fs::create_dir_all(root.join("nested/empty"))?;
+                for (source, target) in [
+                    ("textual", "first.pdf"),
+                    ("front-matter-missing", "nested/second.PDF"),
+                    ("front-matter-wrapped-title", "nested/third.pdf"),
+                ] {
+                    std::fs::copy(
+                        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .join(format!("../../build/rust-fixtures/{source}.pdf")),
+                        root.join(target),
+                    )?;
+                }
+                std::fs::write(
+                    root.join("nested/ignored.txt"),
+                    b"Synthetic folder import fixture",
+                )?;
+                app.import_folder(root);
+            }
+            if demo && args.iter().any(|arg| arg == "--tools-menu") {
+                app.preview_tools_menu();
+            }
             if !initial.is_empty() {
                 app.import(initial);
             }

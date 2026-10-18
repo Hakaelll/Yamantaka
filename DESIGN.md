@@ -309,6 +309,11 @@ from 180 to 500. PDF page appearance comes from the actual document texture.
 
 **The Stable Collection Rule.** Inspection opens below the library; preserve gallery width rather than shifting its columns sideways.
 
+The Tools menu includes Import folder and the existing Cancel import action.
+Its contents scroll within the remaining viewport height, preserving access to
+secondary destinations at enlarged text. Folder import uses the existing quiet
+background workflow and never adds a permanent progress strip.
+
 ## Elevation & Depth
 
 Interface depth comes from tonal layering and restrained boundaries. Books use

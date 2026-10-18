@@ -7,6 +7,7 @@ mod automatic_cover;
 pub mod cover_source;
 pub mod document_find;
 pub mod file_comparison;
+mod folder_import;
 mod import_enrichment;
 pub mod manual_cover;
 pub mod metadata_review;

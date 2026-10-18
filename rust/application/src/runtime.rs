@@ -6,6 +6,7 @@ use crate::cover_job::{CoverJob, CoverStep};
 use crate::cover_source::CoverSource;
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
 use crate::file_comparison::{ComparisonJob, ComparisonReply, ComparisonRequest};
+use crate::folder_import::FolderImport;
 use crate::import_enrichment::{ImportEnrichment, ImportStep};
 use crate::reader_close::{ReaderCloseReply, ReaderCloseRequest};
 use crate::reader_continuity::{ContinuityReply, ContinuityRequest, ContinuityWriter};
@@ -78,6 +79,7 @@ pub enum Action {
         Cancellation,
     ),
     Import(Vec<PathBuf>, Cancellation),
+    ImportFolder(PathBuf, Cancellation),
     Render(RenderKey, Priority, Cancellation),
     Navigate(String, u32),
     Text(String, u32, Cancellation),
@@ -220,6 +222,7 @@ enum RuntimeControl {
     PersistSessions(Vec<ReadingSessionRequest>, usize, Sender<Result<()>>),
 }
 struct ImportState {
+    folder: Option<Box<FolderImport>>,
     paths: std::collections::VecDeque<PathBuf>,
     count: usize,
     cancel: Cancellation,
@@ -227,6 +230,7 @@ struct ImportState {
     reanalysis: Option<Box<(yamantaka_domain::metadata_review::MetadataReview, Document)>>,
 }
 enum Pending {
+    ImportFolder(Box<FolderImport>, ImportState),
     FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(PdfTicket<Arc<RenderedPage>>, Permit),
@@ -269,6 +273,7 @@ enum Pending {
 impl Pending {
     fn register<'a>(&'a self, select: &mut Select<'a>) {
         match self {
+            Self::ImportFolder(folder, _) => folder.register(select),
             Self::FindDocument(scan, _) => {
                 select.recv(scan.ticket().readiness());
             }
@@ -308,6 +313,7 @@ impl Pending {
     }
     fn ready(&self) -> bool {
         match self {
+            Self::ImportFolder(folder, state) => state.cancel.is_cancelled() || folder.ready(),
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
             Self::Render(ticket, _) => ticket.is_ready(),
@@ -325,6 +331,7 @@ impl Pending {
     }
     fn cancel(&self) {
         match self {
+            Self::ImportFolder(_, state) => state.cancel.cancel(),
             Self::FindDocument(scan, _) => scan.request.cancellation.cancel(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
@@ -383,7 +390,7 @@ fn foreground_admissible(
     awaiting: &Option<(String, Cancellation)>,
 ) -> bool {
     match action {
-        Action::Import(..) | Action::ReanalyzeMetadata(..) => {
+        Action::Import(..) | Action::ImportFolder(..) | Action::ReanalyzeMetadata(..) => {
             awaiting.is_none() && !pending.iter().any(|item| matches!(item, Pending::Open(..)))
         }
         Action::Open(document, ..) => awaiting
@@ -487,6 +494,12 @@ fn advance_import<E: AsyncPdfEngine>(
             }
         };
         open_import(engine, path, id, state, pending, events, notify);
+    } else if let Some(folder) = state.folder.take() {
+        if let Err(error) = folder.request_next() {
+            import_failed(events, notify, error, state);
+        } else {
+            pending.push(Pending::ImportFolder(folder, state));
+        }
     } else {
         emit(
             events,
@@ -571,6 +584,7 @@ impl Runtime {
                             && matches!(
                                 &action,
                                 Action::Open(..)
+                                    | Action::ImportFolder(..)
                                     | Action::Import(..)
                                     | Action::ReanalyzeMetadata(..)
                                     | Action::VisibleDocuments(..)
@@ -982,14 +996,24 @@ impl Runtime {
                                         repository.get(&expected.document)?.filter(|d|!d.missing).ok_or_else(||Failure::Invalid("Metadata source is missing".into()))
                                     });
                                     match source {
-                                        Ok(document)=>advance_import(&engine,&repository,ImportState{paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
+                                        Ok(document)=>advance_import(&engine,&repository,ImportState{folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
                                         Err(error)=>emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)})),permit),
+                                    }
+                                }
+                                Action::ImportFolder(root,cancel) => {
+                                    match FolderImport::start(root,cancel.clone()) {
+                                        Ok(folder) => advance_import(&engine,&repository,ImportState {
+                                            folder:Some(Box::new(folder)),paths:VecDeque::new(),count:0,
+                                            cancel,permit,reanalysis:None,
+                                        },&mut pending,&events,&notify),
+                                        Err(error) => emit(&events,&notify,Update::Failed(error,Some(cancel)),permit),
                                     }
                                 }
                                 Action::Import(paths, cancel) => advance_import(
                                     &engine,
                                     &repository,
                                     ImportState {
+                                        folder: None,
                                         paths: paths.into(),
                                         count: 0,
                                         cancel,
@@ -1137,6 +1161,14 @@ impl Runtime {
                                 }
                                 emit(&events,&notify,Update::ReaderClosed(request.reply(result)),permit);
                             },
+                            Pending::ImportFolder(folder,mut state) => {
+                                let result = state.cancel.check().and_then(|()|folder.receive());
+                                match result {
+                                    Ok(Some(path)) => {state.folder=Some(folder);state.paths.push_back(path);next_imports.push(state);}
+                                    Ok(None) => {drop(folder);next_imports.push(state);}
+                                    Err(error) => import_failed(&events,&notify,error,state),
+                                }
+                            }
                             Pending::ImportOpen(path, id, ticket, state) => match ticket.wait() {
                                 Ok(info) => match engine.try_source_revision(id.clone(), state.cancel.clone()) {
                                     Ok(ticket) => pending.push(Pending::ImportSource(path,id,info,ticket,state)),
@@ -1215,7 +1247,7 @@ impl Runtime {
                     let native_admission_pending = !covers.is_empty() || pending.iter().any(|item| {
                         matches!(
                             item,
-                            Pending::Open(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
+                            Pending::Open(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
                         )
                     });
                     indexer.set_slot_available(

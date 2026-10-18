@@ -180,6 +180,7 @@ pub struct YamantakaApp {
     error: Option<String>,
     loading: bool,
     importing: operations::BackgroundImport,
+    preview_tools_menu: bool,
     activation: Receiver<Vec<PathBuf>>,
     _instance: Instance,
     _watch: ActivationWatch,
@@ -355,6 +356,7 @@ impl YamantakaApp {
             error: None,
             loading: false,
             importing: Default::default(),
+            preview_tools_menu: false,
             activation,
             _instance: instance,
             _watch: watch,
@@ -481,6 +483,22 @@ impl YamantakaApp {
             self.importing.finish(&cancel);
             self.error = Some(error.to_string());
         }
+    }
+    pub fn import_folder(&mut self, root: PathBuf) {
+        self.tabs.continuity.overridden = true;
+        self.open_intent.leave_destination();
+        self.password = None;
+        let cancel = self.importing.begin();
+        if let Err(error) = self
+            .runtime
+            .submit(Action::ImportFolder(root, cancel.clone()))
+        {
+            self.importing.finish(&cancel);
+            self.error = Some(error.to_string());
+        }
+    }
+    pub fn preview_tools_menu(&mut self) {
+        self.preview_tools_menu = self.demo && self.capture.is_some();
     }
     pub fn preview_reader(&mut self) {
         self.preview_reader = true;
@@ -2111,7 +2129,7 @@ impl App for YamantakaApp {
                     let controls=ctx.data(|data|data.get_temp::<Vec<theme::ControlBounds>>(egui::Id::new("capture-controls")).unwrap_or_default());
                     let controls:Vec<_>=controls.into_iter().map(|item|serde_json::json!({"label":item.label,"rect":rect(item.rect),"clip":rect(item.clip),"enabled":item.enabled})).collect();
                     let usage = self.governor.usage();
-                    let record=serde_json::json!({"synthetic":self.demo,"captureProcessId":std::process::id(),"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
+                    let record=serde_json::json!({"synthetic":self.demo,"libraryDocumentCount":self.count,"captureProcessId":std::process::id(),"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
                         "readingSession":self.session_capture_summary(),
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),

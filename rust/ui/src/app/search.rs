@@ -113,57 +113,86 @@ impl YamantakaApp {
         } else {
             theme::control(ui, label, Some(theme::Icon::Menu), false, false, p)
         };
-        egui::Popup::menu(&response).show(|ui| {
-            self.operation_actions(ui, p);
-            if theme::navigation(
-                ui,
-                self.tr("Diario de lectura", "Reading journal"),
-                matches!(self.surface, Surface::History),
-                p,
-            )
-            .clicked()
-            {
-                self.show_history();
-                ui.close();
-            }
-            if theme::navigation(
-                ui,
-                self.tr("Notas de la biblioteca", "Library notes"),
-                matches!(self.surface, Surface::Notes),
-                p,
-            )
-            .clicked()
-            {
-                self.show_global_notes();
-                ui.close();
-            }
-            if theme::control(
-                ui,
-                self.tr("Búsqueda global", "Global search"),
-                Some(theme::Icon::Search),
-                matches!(self.surface, Surface::Search),
-                false,
-                p,
-            )
-            .on_hover_text("Ctrl+Shift+F")
-            .clicked()
-            {
-                self.show_search();
-                ui.close();
-            }
-            if theme::control(
-                ui,
-                self.tr("Ajustes", "Settings"),
-                Some(theme::Icon::Settings),
-                matches!(self.surface, Surface::Settings),
-                false,
-                p,
-            )
-            .clicked()
-            {
-                self.show_surface(Surface::Settings);
-                ui.close();
-            }
+        let mut popup = egui::Popup::menu(&response);
+        if self.preview_tools_menu {
+            popup = popup.open(true);
+        }
+        popup.show(|ui| {
+            let height = (ui.ctx().content_rect().bottom() - ui.cursor().top() - 12.0).max(40.0);
+            egui::ScrollArea::vertical()
+                .max_height(height)
+                .show(ui, |ui| {
+                    self.operation_actions(ui, p);
+                    if theme::navigation(
+                        ui,
+                        self.tr("Importar carpeta…", "Import folder…"),
+                        false,
+                        p,
+                    )
+                    .on_hover_text(self.tr(
+                        "Añadir los PDF de una carpeta y sus subcarpetas.",
+                        "Add PDFs from a folder and its subfolders.",
+                    ))
+                    .clicked()
+                    {
+                        ui.close();
+                        if let Some(root) = yamantaka_windows::pick_pdf_folder() {
+                            self.import_folder(root);
+                        }
+                    }
+                    if theme::navigation(
+                        ui,
+                        self.tr("Diario de lectura", "Reading journal"),
+                        matches!(self.surface, Surface::History),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_history();
+                        ui.close();
+                    }
+                    if theme::navigation(
+                        ui,
+                        self.tr("Notas de la biblioteca", "Library notes"),
+                        matches!(self.surface, Surface::Notes),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_global_notes();
+                        ui.close();
+                    }
+                    if theme::control(
+                        ui,
+                        self.tr("Búsqueda global", "Global search"),
+                        Some(theme::Icon::Search),
+                        matches!(self.surface, Surface::Search),
+                        false,
+                        p,
+                    )
+                    .on_hover_text("Ctrl+Shift+F")
+                    .clicked()
+                    {
+                        self.show_search();
+                        ui.close();
+                    }
+                    if theme::control(
+                        ui,
+                        self.tr("Ajustes", "Settings"),
+                        Some(theme::Icon::Settings),
+                        matches!(self.surface, Surface::Settings),
+                        false,
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_surface(Surface::Settings);
+                        ui.close();
+                    }
+                    if self.preview_tools_menu && self.text_scale >= 2.0 {
+                        ui.scroll_to_cursor(Some(egui::Align::Max));
+                    }
+                });
         });
     }
     pub(super) fn show_search(&mut self) {
