@@ -66,6 +66,9 @@ pub enum PdfOpenPurpose {
 }
 
 pub trait AsyncPdfEngine: PdfEngine {
+    /// Reconsider cancelled requests that are waiting for native capacity.
+    /// Implementations with no dormant native queue need no additional wakeup.
+    fn wake_cancelled(&self) {}
     fn memory_governor(&self) -> Option<crate::memory::MemoryGovernor> {
         None
     }

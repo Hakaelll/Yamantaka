@@ -163,3 +163,148 @@ fn a_third_background_open_waits_for_release_without_replacing_either_active_ana
     drop(worker);
     assert_eq!(governor.usage().total, 0);
 }
+
+#[test]
+fn reader_preemption_reports_a_retryable_missing_source_and_text_owner() {
+    let root = root();
+    let worker = PdfWorker::start(
+        &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
+        MemoryLimits::default(),
+    )
+    .unwrap();
+    let governor = worker.memory_governor();
+    let background = root.join("build/rust-fixtures/front-matter-missing.pdf");
+    let reader = root.join("build/rust-fixtures/textual.pdf");
+    let original = fs::read(&background).unwrap();
+    let info = worker
+        .try_open(
+            "analysis".into(),
+            background.clone(),
+            None,
+            PdfOpenPurpose::Background,
+            Cancellation::default(),
+        )
+        .unwrap()
+        .wait()
+        .unwrap();
+    let first = worker
+        .open(
+            "first-reader".into(),
+            reader.clone(),
+            None,
+            Cancellation::default(),
+        )
+        .unwrap();
+    worker
+        .set_visible_documents(&["first-reader".into()])
+        .unwrap();
+    let second = worker
+        .open(
+            "second-reader".into(),
+            reader,
+            None,
+            Cancellation::default(),
+        )
+        .unwrap();
+    worker
+        .set_visible_documents(&["first-reader".into(), "second-reader".into()])
+        .unwrap();
+    assert!(matches!(
+        worker
+            .try_source_revision("analysis".into(), Cancellation::default())
+            .unwrap()
+            .wait(),
+        Err(Failure::NativeDocumentUnavailable)
+    ));
+    assert!(matches!(
+        worker
+            .try_text_geometry(
+                "analysis".into(),
+                1,
+                TextGeometryPurpose::FrontMatter,
+                Cancellation::default()
+            )
+            .unwrap()
+            .wait(),
+        Err(Failure::NativeDocumentUnavailable)
+    ));
+    assert!(
+        worker
+            .text("first-reader".into(), 0, Cancellation::default())
+            .unwrap()
+            .contains("Yamantaka Rust")
+    );
+    assert!(
+        worker
+            .text("second-reader".into(), 0, Cancellation::default())
+            .unwrap()
+            .contains("Yamantaka Rust")
+    );
+    drop((info, first, second));
+    drop(worker);
+    assert_eq!(governor.usage().total, 0);
+    assert_eq!(fs::read(background).unwrap(), original);
+}
+
+#[test]
+fn cancellation_wakes_a_background_open_waiting_behind_two_readers() {
+    let root = root();
+    let worker = PdfWorker::start(
+        &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
+        MemoryLimits::default(),
+    )
+    .unwrap();
+    let governor = worker.memory_governor();
+    let reader = root.join("build/rust-fixtures/textual.pdf");
+    let first = worker
+        .open(
+            "first-reader".into(),
+            reader.clone(),
+            None,
+            Cancellation::default(),
+        )
+        .unwrap();
+    let second = worker
+        .open(
+            "second-reader".into(),
+            reader,
+            None,
+            Cancellation::default(),
+        )
+        .unwrap();
+    worker
+        .set_visible_documents(&["first-reader".into(), "second-reader".into()])
+        .unwrap();
+    let cancel = Cancellation::default();
+    let waiting = worker
+        .try_open(
+            "analysis".into(),
+            root.join("build/rust-fixtures/front-matter-missing.pdf"),
+            None,
+            PdfOpenPurpose::Background,
+            cancel.clone(),
+        )
+        .unwrap();
+    // A reader request acts as a barrier after native admission. The open remains
+    // queued because both handles are pinned when the worker goes back to sleep.
+    assert!(
+        worker
+            .text("first-reader".into(), 0, Cancellation::default())
+            .unwrap()
+            .contains("Yamantaka Rust")
+    );
+    assert!(!waiting.is_ready());
+    cancel.cancel();
+    worker.wake_cancelled();
+    assert!(matches!(
+        waiting
+            .readiness()
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .unwrap(),
+        Err(Failure::Cancelled)
+    ));
+    drop(waiting);
+    drop((first, second));
+    drop(worker);
+    assert_eq!(governor.usage().total, 0);
+}

@@ -308,7 +308,7 @@ impl YamantakaApp {
                     }
                     ui.add_space(12.0);
                     if editor.analyzing {
-                        if theme::navigation(ui,self.tr("Cancelar análisis","Cancel analysis"),false,p).clicked() && let Some((cancel,_))=&editor.pending {cancel.cancel();}
+                        if theme::navigation(ui,self.tr("Cancelar análisis","Cancel analysis"),false,p).clicked() && let Some((cancel,_))=&editor.pending {cancel.cancel();self.runtime.wake();}
                     } else if ui.add_enabled_ui(ready && editor.clean_draft() && !editor.document.missing,|ui|theme::navigation(ui,self.tr("Volver a analizar el PDF","Analyze PDF again"),false,p)).inner.on_hover_text(self.tr("Guarda o descarta tu borrador antes de analizar. Las correcciones manuales se conservan.","Save or discard your draft before analysis. Manual corrections are preserved.")).clicked() {reanalysis=editor.reanalyze();}
                     if snapshot.title_override.is_some() || snapshot.author_override.is_some() {
                         ui.add_space(12.0);

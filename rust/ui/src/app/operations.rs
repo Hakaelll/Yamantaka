@@ -70,6 +70,7 @@ impl YamantakaApp {
             .clicked()
         {
             self.importing.cancel();
+            self.runtime.wake();
             self.refresh();
             ui.close();
         }

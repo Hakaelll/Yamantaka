@@ -423,6 +423,9 @@ fn stopped() -> Failure {
     Failure::Pdf("PDF worker stopped".into())
 }
 impl AsyncPdfEngine for PdfWorker {
+    fn wake_cancelled(&self) {
+        let _ = self.0.wake.try_send(());
+    }
     fn memory_governor(&self) -> Option<MemoryGovernor> {
         Some(PdfWorker::memory_governor(self))
     }
@@ -802,7 +805,7 @@ fn run(
                     epoch_matches(&scheduler, &id, epoch)?;
                     let loaded = documents
                         .get(&id)
-                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
+                        .ok_or(Failure::NativeDocumentUnavailable)?;
                     Ok(loaded.source.snapshot())
                 })();
                 reply.send(result);
@@ -1232,7 +1235,7 @@ fn run(
                     let document = documents
                         .get(&id)
                         .map(|loaded| &loaded.document)
-                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
+                        .ok_or(Failure::NativeDocumentUnavailable)?;
                     crate::text_geometry::read(
                         document,
                         page,

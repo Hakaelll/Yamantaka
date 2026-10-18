@@ -1,14 +1,24 @@
+use crossbeam_channel::Select;
 use std::sync::Arc;
 use yamantaka_domain::{
-    Cancellation, Failure, NewDocument,
+    Cancellation, Failure, NewDocument, PdfInfo,
     front_matter::{AnalysisFailure, FrontMatter, ImportAnalysis, MAX_FRONT_MATTER_PAGES},
     pdf_text::{PdfPageText, TextGeometryPurpose},
-    pdf_ticket::{AsyncPdfEngine, PdfTicket},
+    pdf_ticket::{AsyncPdfEngine, PdfOpenPurpose, PdfTicket},
+    source_revision::SourceRevision,
 };
 
 pub(crate) enum ImportStep {
     Pending(Box<ImportEnrichment>),
     Ready(Box<NewDocument>),
+    Failed(Failure),
+}
+
+enum Work {
+    RequestPage,
+    Text(PdfTicket<Arc<PdfPageText>>),
+    Reopen(PdfTicket<PdfInfo>),
+    Source(PdfTicket<SourceRevision>),
 }
 
 pub(crate) struct ImportEnrichment {
@@ -16,7 +26,7 @@ pub(crate) struct ImportEnrichment {
     document: Box<NewDocument>,
     page: u32,
     scan: FrontMatter,
-    ticket: PdfTicket<Arc<PdfPageText>>,
+    work: Work,
     cancel: Cancellation,
 }
 
@@ -70,89 +80,164 @@ impl ImportEnrichment {
                     .or(document.info.author.as_deref()),
                 &governor,
             )?;
-            let ticket = engine.try_text_geometry(
-                id.clone(),
-                0,
-                TextGeometryPurpose::FrontMatter,
-                cancel.clone(),
-            )?;
-            Ok((scan, ticket))
+            Ok(scan)
         })();
         match result {
-            Ok((scan, ticket)) => ImportStep::Pending(Box::new(Self {
+            Ok(scan) => Box::new(Self {
                 id,
                 document,
                 page: 0,
                 scan,
-                ticket,
+                work: Work::RequestPage,
                 cancel,
-            })),
+            })
+            .request_page(engine),
             Err(error) => unavailable(document, error),
         }
     }
 
-    pub fn ticket(&self) -> &PdfTicket<Arc<PdfPageText>> {
-        &self.ticket
-    }
-
-    pub fn advance(self, engine: &impl AsyncPdfEngine) -> ImportStep {
-        let Self {
-            id,
-            mut document,
-            page,
-            mut scan,
-            ticket,
-            cancel,
-        } = self;
-        let observed = (|| {
-            let text = ticket.wait()?;
-            cancel.check()?;
-            if text.page() != page {
-                return Err(Failure::Invalid(
-                    "Metadata text belongs to another page".into(),
-                ));
-            }
-            let geometry =
-                document.info.pages.get(page as usize).ok_or_else(|| {
-                    Failure::Invalid("Metadata page is outside the document".into())
-                })?;
-            scan.observe(&text, geometry.coordinates(), &cancel)
-        })();
-        if let Err(error) = observed {
-            return unavailable(document, error);
+    pub fn ready(&self) -> bool {
+        match &self.work {
+            Work::RequestPage => true,
+            Work::Text(ticket) => ticket.is_ready(),
+            Work::Reopen(ticket) => ticket.is_ready(),
+            Work::Source(ticket) => ticket.is_ready(),
         }
-        let next = page + 1;
-        if next
-            < document
-                .info
-                .pages
-                .len()
-                .min(MAX_FRONT_MATTER_PAGES as usize) as u32
-        {
-            match engine.try_text_geometry(
-                id.clone(),
-                next,
-                TextGeometryPurpose::FrontMatter,
-                cancel.clone(),
-            ) {
-                Ok(ticket) => ImportStep::Pending(Box::new(Self {
-                    id,
-                    document,
-                    page: next,
-                    scan,
-                    ticket,
-                    cancel,
-                })),
-                Err(error) => unavailable(document, error),
+    }
+    pub fn register<'a>(&'a self, select: &mut Select<'a>) {
+        match &self.work {
+            Work::RequestPage => {}
+            Work::Text(ticket) => {
+                select.recv(ticket.readiness());
             }
-        } else {
-            match scan.finish(&cancel) {
-                Ok(evidence) => {
-                    document.analysis = ImportAnalysis::Complete(Box::new(evidence));
-                    ImportStep::Ready(document)
+            Work::Reopen(ticket) => {
+                select.recv(ticket.readiness());
+            }
+            Work::Source(ticket) => {
+                select.recv(ticket.readiness());
+            }
+        }
+    }
+    pub fn cancel(&self) {
+        self.cancel.cancel();
+    }
+    fn request_page(mut self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
+        if let Err(error) = self.cancel.check() {
+            return ImportStep::Failed(error);
+        }
+        match engine.try_text_geometry(
+            self.id.clone(),
+            self.page,
+            TextGeometryPurpose::FrontMatter,
+            self.cancel.clone(),
+        ) {
+            Ok(ticket) => {
+                self.work = Work::Text(ticket);
+                ImportStep::Pending(self)
+            }
+            Err(Failure::NativeDocumentUnavailable) => self.reopen(engine),
+            Err(error) => unavailable(self.document, error),
+        }
+    }
+    fn reopen(mut self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
+        if let Err(error) = self.cancel.check() {
+            return ImportStep::Failed(error);
+        }
+        match engine.try_open(
+            self.id.clone(),
+            self.document.path.clone(),
+            None,
+            PdfOpenPurpose::Background,
+            self.cancel.clone(),
+        ) {
+            Ok(ticket) => {
+                self.work = Work::Reopen(ticket);
+                ImportStep::Pending(self)
+            }
+            Err(error) => ImportStep::Failed(error),
+        }
+    }
+    pub fn advance(mut self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
+        if let Err(error) = self.cancel.check() {
+            return ImportStep::Failed(error);
+        }
+        match std::mem::replace(&mut self.work, Work::RequestPage) {
+            Work::RequestPage => self.request_page(engine),
+            Work::Text(ticket) => {
+                let observed = (|| {
+                    let text = ticket.wait()?;
+                    self.cancel.check()?;
+                    if text.page() != self.page {
+                        return Err(Failure::Invalid(
+                            "Metadata text belongs to another page".into(),
+                        ));
+                    }
+                    let geometry = self
+                        .document
+                        .info
+                        .pages
+                        .get(self.page as usize)
+                        .ok_or_else(|| {
+                            Failure::Invalid("Metadata page is outside the document".into())
+                        })?;
+                    self.scan
+                        .observe(&text, geometry.coordinates(), &self.cancel)
+                })();
+                match observed {
+                    Err(Failure::NativeDocumentUnavailable) => return self.reopen(engine),
+                    Err(error) => return unavailable(self.document, error),
+                    Ok(()) => {}
                 }
-                Err(error) => unavailable(document, error),
+                let next = self.page + 1;
+                if next
+                    < self
+                        .document
+                        .info
+                        .pages
+                        .len()
+                        .min(MAX_FRONT_MATTER_PAGES as usize) as u32
+                {
+                    self.page = next;
+                    self.request_page(engine)
+                } else {
+                    match self.scan.finish(&self.cancel) {
+                        Ok(evidence) => {
+                            self.document.analysis = ImportAnalysis::Complete(Box::new(evidence));
+                            ImportStep::Ready(self.document)
+                        }
+                        Err(error) => unavailable(self.document, error),
+                    }
+                }
             }
+            Work::Reopen(ticket) => match ticket.wait() {
+                Ok(info) => {
+                    if info.pages[..] != self.document.info.pages[..] {
+                        return ImportStep::Failed(Failure::Invalid(
+                            "Reopened metadata source has different page geometry".into(),
+                        ));
+                    }
+                    match engine.try_source_revision(self.id.clone(), self.cancel.clone()) {
+                        Ok(ticket) => {
+                            self.work = Work::Source(ticket);
+                            ImportStep::Pending(self)
+                        }
+                        Err(Failure::NativeDocumentUnavailable) => self.reopen(engine),
+                        Err(error) => ImportStep::Failed(error),
+                    }
+                }
+                Err(Failure::NativeSlotsBusy | Failure::NativeDocumentUnavailable) => {
+                    self.reopen(engine)
+                }
+                Err(error) => ImportStep::Failed(error),
+            },
+            Work::Source(ticket) => match ticket.wait() {
+                Ok(source) if source == self.document.source => self.request_page(engine),
+                Ok(_) => ImportStep::Failed(Failure::Invalid(
+                    "Metadata source changed while analysis was interrupted".into(),
+                )),
+                Err(Failure::NativeDocumentUnavailable) => self.reopen(engine),
+                Err(error) => ImportStep::Failed(error),
+            },
         }
     }
 }

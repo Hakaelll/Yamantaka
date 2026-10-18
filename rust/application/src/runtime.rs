@@ -292,7 +292,7 @@ impl Pending {
                 select.recv(ticket.readiness());
             }
             Self::ImportScan(scan, _) => {
-                select.recv(scan.ticket().readiness());
+                scan.register(select);
             }
             Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
@@ -312,7 +312,7 @@ impl Pending {
             Self::PageLinks(_, _, ticket, _) => ticket.is_ready(),
             Self::TextGeometry(_, _, ticket, _) => ticket.is_ready(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.is_ready(),
-            Self::ImportScan(scan, _) => scan.ticket().is_ready(),
+            Self::ImportScan(scan, _) => scan.ready(),
             Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
             | Self::ImportAbort(_, ticket, _) => ticket.is_ready(),
@@ -331,7 +331,7 @@ impl Pending {
             Self::PageLinks(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::TextGeometry(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.cancellation.cancel(),
-            Self::ImportScan(scan, _) => scan.ticket().cancellation.cancel(),
+            Self::ImportScan(scan, _) => scan.cancel(),
             Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
             | Self::ImportAbort(_, ticket, _) => ticket.cancellation.cancel(),
@@ -349,6 +349,9 @@ fn queue_import_step(
 ) {
     match step {
         ImportStep::Pending(scan) => pending.push(Pending::ImportScan(scan, state)),
+        ImportStep::Failed(error) => {
+            close_failed_import(engine, id, error, state, pending, events, notify)
+        }
         ImportStep::Ready(document) => match engine.try_close(id) {
             Ok(ticket) => pending.push(Pending::ImportClose(document, ticket, state)),
             Err(error) => import_failed(events, notify, error, state),
@@ -433,6 +436,30 @@ fn import_failed(events: &Sender<Event>, notify: &impl Fn(), error: Failure, sta
         state.permit,
     );
 }
+fn open_import(
+    engine: &impl AsyncPdfEngine,
+    path: PathBuf,
+    id: String,
+    state: ImportState,
+    pending: &mut Vec<Pending>,
+    events: &Sender<Event>,
+    notify: &impl Fn(),
+) {
+    if let Err(error) = state.cancel.check() {
+        import_failed(events, notify, error, state);
+        return;
+    }
+    match engine.try_open(
+        id.clone(),
+        path.clone(),
+        None,
+        yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background,
+        state.cancel.clone(),
+    ) {
+        Ok(ticket) => pending.push(Pending::ImportOpen(path, id, ticket, state)),
+        Err(error) => import_failed(events, notify, error, state),
+    }
+}
 fn advance_import<E: AsyncPdfEngine>(
     engine: &E,
     repository: &impl LibraryRepository,
@@ -454,16 +481,7 @@ fn advance_import<E: AsyncPdfEngine>(
                 return;
             }
         };
-        match engine.try_open(
-            id.clone(),
-            path.clone(),
-            None,
-            yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background,
-            state.cancel.clone(),
-        ) {
-            Ok(ticket) => pending.push(Pending::ImportOpen(path, id, ticket, state)),
-            Err(error) => import_failed(events, notify, error, state),
-        }
+        open_import(engine, path, id, state, pending, events, notify);
     } else {
         emit(
             events,
@@ -515,7 +533,7 @@ impl Runtime {
                 let mut open_revision = 0u64;
                 let mut awaiting_open: Option<(String, Cancellation)> = None;
                 loop {
-                    let _ = wakeups.try_recv();
+                    if wakeups.try_recv().is_ok() {engine.wake_cancelled();}
                     match stop.try_recv() {
                         Ok(RuntimeControl::Stop) => break,
                         Ok(RuntimeControl::PersistContinuity(revision, tabs, completed)) => {
@@ -1098,8 +1116,10 @@ impl Runtime {
                             Pending::ImportOpen(path, id, ticket, state) => match ticket.wait() {
                                 Ok(info) => match engine.try_source_revision(id.clone(), state.cancel.clone()) {
                                     Ok(ticket) => pending.push(Pending::ImportSource(path,id,info,ticket,state)),
+                                    Err(Failure::NativeDocumentUnavailable)=>open_import(&engine,path,id,state,&mut pending,&events,&notify),
                                     Err(error) => close_failed_import(&engine,id,error,state,&mut pending,&events,&notify),
                                 },
+                                Err(Failure::NativeSlotsBusy|Failure::NativeDocumentUnavailable)=>open_import(&engine,path,id,state,&mut pending,&events,&notify),
                                 Err(error) => close_failed_import(&engine,id,error,state,&mut pending,&events,&notify),
                             },
                             Pending::ImportSource(path,id,info,ticket,state) => match ticket.wait() {
@@ -1108,11 +1128,12 @@ impl Runtime {
                                     let step=ImportEnrichment::start(&engine,id.clone(),document,state.reanalysis.as_ref().map(|target|&target.0),state.cancel.clone());
                                     queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
                                 }
+                                Err(Failure::NativeDocumentUnavailable)=>open_import(&engine,path,id,state,&mut pending,&events,&notify),
                                 Err(error) => close_failed_import(&engine,id,error,state,&mut pending,&events,&notify),
                             },
                             Pending::ImportScan(scan,state) => {
                                 let id=scan.id.clone();
-                                let step=(*scan).advance(&engine);
+                                let step=scan.advance(&engine);
                                 queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
                             },
                             Pending::ImportClose(document,ticket,mut state) => {
