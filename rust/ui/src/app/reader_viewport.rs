@@ -249,13 +249,6 @@ impl YamantakaApp {
                     ));
                 } else {
                     ui.painter().rect_filled(paper, 1, Color32::WHITE);
-                    ui.painter().text(
-                        paper.center(),
-                        egui::Align2::CENTER_CENTER,
-                        visible.page + 1,
-                        egui::FontId::proportional(18.0),
-                        Color32::from_rgb(100, 100, 109),
-                    );
                 }
                 self.paint_annotations(ui, visible.page, paper, layout.rotation());
                 self.paint_find_matches(ui, visible.page, paper, layout.rotation(), p);
