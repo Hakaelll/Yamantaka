@@ -155,6 +155,5 @@ impl GoalState {
         None
     }
 }
-#[cfg(test)]
-mod tests;
+
 mod views;

@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Clone)]
 pub(super) struct Line {
     pub text: String,
     pub bounds: NormalizedPageRect,
@@ -15,38 +16,92 @@ pub(super) struct PageAnalysis {
     pub lines: Vec<Line>,
     pub front_matter: bool,
 }
+
+pub(super) struct TitleBlock {
+    pub line: Line,
+    pub height: f64,
+}
+
+fn title_text(text: &str) -> bool {
+    byline(text).is_none()
+        && matches!(
+            import_metadata::title(Some(text), ""),
+            MetadataValue::Accepted(_)
+        )
+        && !matches!(
+            normalized(text).as_str(),
+            "contents"
+                | "table of contents"
+                | "índice"
+                | "indice"
+                | "copyright"
+                | "publication statement"
+        )
+}
+
+fn continues(previous: &Line, next: &Line) -> bool {
+    let height = previous.height().max(next.height());
+    let gap = next.layout.min()[1] - previous.layout.max()[1];
+    let center = |line: &Line| (line.layout.min()[0] + line.layout.max()[0]) * 0.5;
+    previous.height().min(next.height()) >= height * 0.6
+        && (-height * 0.15..=height * 1.25).contains(&gap)
+        && ((center(previous) - center(next)).abs() <= 0.06
+            || (previous.layout.min()[0] - next.layout.min()[0]).abs() <= 0.025)
+}
+
 impl PageAnalysis {
-    pub fn prominent_title(&self) -> Option<&Line> {
+    pub fn prominent_title(&self) -> Option<TitleBlock> {
         let mut heights: Vec<_> = self.lines.iter().map(Line::height).collect();
         heights.sort_by(f64::total_cmp);
         let typical = *heights.get(heights.len().saturating_sub(1) / 2)?;
-        self.lines
-            .iter()
-            .filter(|line| {
-                let top = line.layout.min()[1];
-                top < 0.6
-                    && line.height() >= 0.025
-                    && line.height() >= typical * 1.5
-                    && line.text.chars().count() <= 120
-                    && line.text.split_whitespace().count() <= 16
-                    && byline(&line.text).is_none()
-                    && matches!(
-                        import_metadata::title(Some(&line.text), ""),
-                        MetadataValue::Accepted(_)
-                    )
-                    && !matches!(
-                        normalized(&line.text).as_str(),
-                        "contents" | "table of contents" | "índice" | "indice" | "copyright"
-                    )
-            })
-            .min_by(
-                |left, right| match (self.byline_gap(left), self.byline_gap(right)) {
-                    (Some(left), Some(right)) => left.total_cmp(&right),
-                    (Some(_), None) => std::cmp::Ordering::Less,
-                    (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => right.height().total_cmp(&left.height()),
-                },
-            )
+        let mut blocks = Vec::new();
+        let mut index = 0;
+        while index < self.lines.len() {
+            let first = &self.lines[index];
+            index += 1;
+            if first.layout.min()[1] >= 0.6 || first.height() < 0.018 || !title_text(&first.text) {
+                continue;
+            }
+            let mut line = first.clone();
+            let mut previous = first;
+            let mut count = 1;
+            let mut height = first.height();
+            while count < 4 && index < self.lines.len() {
+                let next = &self.lines[index];
+                if next.layout.max()[1] > 0.6
+                    || !title_text(&next.text)
+                    || !continues(previous, next)
+                    || line.text.chars().count() + next.text.chars().count() + 1 > 240
+                {
+                    break;
+                }
+                line.text.push(' ');
+                line.text.push_str(&next.text);
+                line.bounds = union(Some(line.bounds), next.bounds).ok()?;
+                line.layout = union(Some(line.layout), next.layout).ok()?;
+                height += next.height();
+                count += 1;
+                index += 1;
+                previous = next;
+            }
+            height /= f64::from(count);
+            let prominent = height >= 0.025 && height >= typical * 1.5;
+            let sparse_block = count >= 2
+                && self.lines.len() <= 12
+                && first.layout.min()[1] < 0.35
+                && height >= typical * 0.6;
+            if (prominent || sparse_block) && line.text.split_whitespace().count() <= 40 {
+                blocks.push(TitleBlock { line, height });
+            }
+        }
+        blocks.into_iter().min_by(|left, right| {
+            match (self.byline_gap(&left.line), self.byline_gap(&right.line)) {
+                (Some(left), Some(right)) => left.total_cmp(&right),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => right.height.total_cmp(&left.height),
+            }
+        })
     }
 
     fn byline_gap(&self, title: &Line) -> Option<f64> {
@@ -72,7 +127,12 @@ impl PageAnalysis {
         title: Option<&'a Line>,
     ) -> impl Iterator<Item = &'a Line> {
         self.lines.iter().filter(move |line| {
-            line.layout.min()[1] < 0.8
+            line.layout.min()[1]
+                < if labeled_byline(&line.text) {
+                    0.94
+                } else {
+                    0.8
+                }
                 && line.text.chars().count() <= 140
                 && byline(&line.text).is_some_and(|value| !value.is_empty())
                 && (title.is_some_and(|title| line.height() <= title.height() * 0.8)
@@ -222,6 +282,9 @@ pub(super) fn byline(text: &str) -> Option<&str> {
     let lower = text.to_lowercase();
     for prefix in [
         "written by ",
+        "compiled by ",
+        "compilado por ",
+        "compilada por ",
         "author: ",
         "autor: ",
         "autora: ",
@@ -237,7 +300,15 @@ pub(super) fn byline(text: &str) -> Option<&str> {
 
 fn labeled_byline(text: &str) -> bool {
     let lower = text.to_lowercase();
-    ["written by ", "author: ", "autor: ", "autora: "]
-        .iter()
-        .any(|prefix| lower.starts_with(prefix))
+    [
+        "written by ",
+        "compiled by ",
+        "compilado por ",
+        "compilada por ",
+        "author: ",
+        "autor: ",
+        "autora: ",
+    ]
+    .iter()
+    .any(|prefix| lower.starts_with(prefix))
 }

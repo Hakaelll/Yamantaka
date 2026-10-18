@@ -61,13 +61,17 @@ impl ImportEnrichment {
             let scan = FrontMatter::new(
                 &file_name,
                 previous
-                    .and_then(|p| p.automatic_title.as_deref())
-                    .filter(|value| {
+                    .filter(|previous| {
                         matches!(
-                            yamantaka_domain::import_metadata::title(Some(value), &file_name),
+                            yamantaka_domain::import_metadata::catalogue_title(
+                                previous.automatic_title.as_deref(),
+                                previous.source_title.as_deref(),
+                                &file_name
+                            ),
                             yamantaka_domain::import_metadata::MetadataValue::Accepted(_)
                         )
                     })
+                    .and_then(|p| p.automatic_title.as_deref())
                     .or(document.info.title.as_deref()),
                 previous
                     .and_then(|p| p.automatic_author.as_deref())

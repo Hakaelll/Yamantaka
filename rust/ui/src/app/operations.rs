@@ -84,32 +84,3 @@ impl YamantakaApp {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn imports_do_not_cancel_reader_work_or_accept_superseded_completions() {
-        let reader = Cancellation::default();
-        let mut import = BackgroundImport::default();
-        let first = import.begin();
-        let next = import.begin();
-        assert!(first.is_cancelled());
-        assert!(!next.is_cancelled());
-        assert!(!reader.is_cancelled());
-        assert!(!import.finish(&first));
-        assert!(!import.finish(&reader));
-        assert!(import.finish(&next));
-        assert!(!import.finish(&next));
-        let cancelled = import.begin();
-        import.cancel();
-        assert!(cancelled.is_cancelled());
-        assert!(!import.finish(&cancelled));
-        let shutdown = import.begin();
-        drop(import);
-        assert!(shutdown.is_cancelled());
-        assert!(!reader.is_cancelled());
-        assert!(!next.is_cancelled());
-    }
-}

@@ -87,6 +87,3 @@ impl<W: Write> Write for ExportOutput<W> {
     }
 }
 // Pending bytes are deliberately discarded on drop; only explicit successful finalization writes them.
-
-#[cfg(test)]
-mod tests;

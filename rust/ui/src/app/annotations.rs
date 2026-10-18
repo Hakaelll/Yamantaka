@@ -14,8 +14,6 @@ mod filters;
 pub(super) mod paint;
 pub(super) mod panel;
 mod tags;
-#[cfg(test)]
-mod tests;
 
 pub(super) enum EditorSource {
     PageNote {

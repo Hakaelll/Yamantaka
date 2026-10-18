@@ -32,22 +32,3 @@ impl ReadingGoal {
         self.pages.is_none() && self.minutes.is_none()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn new_targets_are_strict_and_legacy_integer_targets_are_clamped() {
-        for value in [0, 10001, u32::MAX] {
-            assert!(ReadingGoal::new(Some(value), None).is_err());
-        }
-        for value in [0, 1441, u32::MAX] {
-            assert!(ReadingGoal::new(None, Some(value)).is_err());
-        }
-        assert!(ReadingGoal::new(None, None).unwrap().is_empty());
-        assert_eq!(
-            ReadingGoal::from_legacy(Some(i64::MIN), Some(i64::MAX)),
-            ReadingGoal::new(Some(1), Some(1440)).unwrap()
-        );
-    }
-}

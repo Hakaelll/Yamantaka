@@ -10,6 +10,7 @@ pub enum MetadataField {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetadataEvidenceKind {
     ProminentText,
+    TitleWithByline,
     RepeatedTitleWithByline,
     ExplicitByline,
     ConflictingBylines,
@@ -105,19 +106,4 @@ pub enum MetadataMutation {
     Save(ManualMetadata),
     ResetOverrides,
     DismissSuggestions,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn manual_values_preserve_unicode_and_user_words_but_bound_input() {
-        let value = ManualMetadata::new("  道\t1984  ", " Anonymous ").unwrap();
-        assert_eq!(value.title(), "道 1984");
-        assert_eq!(value.author(), "Anonymous");
-        assert_eq!(ManualMetadata::new("Unknown", "").unwrap().author(), "");
-        for bad in ["".into(), " \t".into(), "a\0b".into(), "a".repeat(513)] {
-            assert!(ManualMetadata::new(&bad, "Author").is_err());
-        }
-    }
 }

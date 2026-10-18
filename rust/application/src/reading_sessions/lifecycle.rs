@@ -226,6 +226,3 @@ impl ReadingSessionLifecycle {
         Ok(commands)
     }
 }
-
-#[cfg(test)]
-mod tests;

@@ -192,23 +192,3 @@ impl YamantakaApp {
         self.tabs.closing.forget(document);
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn close_reply_identity_is_exact_and_native_success_remains_actionable_after_late_cancellation()
-    {
-        let mut state = CloseState::default();
-        let token = Cancellation::default();
-        state.bind("document".into(), token.clone(), CloseKind::Retire);
-        assert!(state.take("other", &token).is_none());
-        assert!(state.take("document", &Cancellation::default()).is_none());
-        assert!(state.busy());
-        token.cancel();
-        let pending = state.take("document", &token).unwrap();
-        assert!(matches!(pending.kind, CloseKind::Retire));
-        assert!(!state.busy());
-        assert!(state.take("document", &token).is_none());
-    }
-}

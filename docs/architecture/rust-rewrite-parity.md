@@ -5,6 +5,13 @@ Status at 2026-10-09: **in progress, not a replacement release**. Flutter checkp
 until every mandatory row has executed evidence. A native gallery/reader section
 is insufficient to satisfy the supplied specification.
 
+Validation scope changed on 2026-10-18 at the owner's request: the Rust suite
+now retains 50 essential tests instead of 536. Historical reports describe
+their original checkpoints, including tests subsequently removed. This reduction
+does not upgrade any acceptance status. See
+`../validation/rust-reading-refinement-2026-10-18.md` for retained coverage,
+multi-line title extraction, hidden reading controls, and current limitations.
+
 `Verified` means a named current Rust test ran. `Partial` means real Rust behavior
 exists but the complete capability has not passed. `Pending` is not implemented
 or has no acceptance evidence. The existing Flutter implementation has now passed

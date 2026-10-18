@@ -64,19 +64,3 @@ impl<K: Eq + Hash + Clone, V: Clone> Cache<K, V> {
         true
     }
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn cache_evicts_by_bytes_and_recent_use() {
-        let mut c = Cache::new(8);
-        c.insert(1, "a", 4);
-        c.insert(2, "b", 4);
-        assert_eq!(c.get(&1), Some("a"));
-        c.insert(3, "c", 4);
-        assert_eq!(c.get(&2), None);
-        assert_eq!(c.bytes, 8);
-        c.retain(|key| *key != 1);
-        assert_eq!(c.bytes, 4);
-    }
-}

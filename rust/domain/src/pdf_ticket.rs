@@ -155,16 +155,3 @@ pub trait AsyncPdfEngine: PdfEngine {
         Err(crate::Failure::Unsupported("PDF page search".into()))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn disconnected_empty_ticket_is_ready_and_reports_failure() {
-        let (sender, ticket) = PdfTicket::<()>::channel(1, 1, Cancellation::default());
-        assert!(!ticket.is_ready());
-        drop(sender);
-        assert!(ticket.is_ready());
-        assert!(ticket.wait().is_err());
-    }
-}

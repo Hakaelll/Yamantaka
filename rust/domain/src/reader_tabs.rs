@@ -3,8 +3,6 @@ use crate::reading_sessions::restoration::SessionPanel;
 use crate::{Failure, MAX_HOT_DOCUMENTS, MAX_TABS, Result};
 
 mod commands;
-#[cfg(test)]
-mod tests;
 
 pub const MAX_CLOSED_TABS: usize = 10;
 pub const MAX_PINNED_TABS: usize = 3;

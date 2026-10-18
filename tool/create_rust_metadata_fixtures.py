@@ -81,6 +81,25 @@ pdf.drawString(100, 595, "By Ada Lovelace")
 pdf.showPage()
 pdf.save()
 records.append({"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+for name, blanks in [("front-matter-wrapped-title", 0), ("front-matter-wrapped-title-later", 1)]:
+    path = root / f"{name}.pdf"
+    pdf = canvas.Canvas(str(path), pagesize=(600, 800), invariant=1)
+    pdf.setTitle("Microsoft Word - title-page.docx")
+    pdf.setAuthor("Ada Lovelace")
+    for _ in range(blanks):
+        pdf.showPage()
+    pdf.setFont("Helvetica", 18)
+    for index, line in enumerate(("Atlas of Regional Libraries", "Volume Four: Reading Rooms", "and Study Collections")):
+        pdf.drawCentredString(300, 680 - index * 24, line)
+    pdf.drawCentredString(300, 100, "Compiled by Ada Lovelace")
+    pdf.drawCentredString(300, 76, "A synthetic edition, 2026")
+    pdf.showPage()
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(50, 750, "Atlas of Regional Libraries")
+    pdf.drawString(50, 725, "Publication statement")
+    pdf.showPage()
+    pdf.save()
+    records.append({"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
 (root / "metadata-manifest.json").write_text(
     json.dumps({"synthetic": True, "files": records}, indent=2), encoding="utf-8"
 )

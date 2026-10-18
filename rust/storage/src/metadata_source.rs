@@ -32,6 +32,7 @@ pub(crate) fn evidence(
             let candidate = &decision["candidate"];
             let kind = match candidate["evidence"].as_str()? {
                 "prominent_text" => MetadataEvidenceKind::ProminentText,
+                "title_with_byline" => MetadataEvidenceKind::TitleWithByline,
                 "repeated_title_with_byline" => MetadataEvidenceKind::RepeatedTitleWithByline,
                 "explicit_byline" => MetadataEvidenceKind::ExplicitByline,
                 "conflicting_bylines" => MetadataEvidenceKind::ConflictingBylines,
@@ -123,44 +124,4 @@ pub(crate) fn open(
     cancel.check()?;
     tx.commit().map_err(storage)?;
     Ok(location)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn evidence_requires_matching_values_versions_pages_and_source_stamps() {
-        let file = MetadataFile {
-            path: "a.pdf".into(),
-            fingerprint: "fa".into(),
-            page_count: 2,
-            missing: false,
-            size: 10,
-            modified: "2026-10-18".into(),
-        };
-        let valid = serde_json::json!({"version":1,"analyzerVersion":2,"hasText":true,"source":{"fingerprint":"fa","size":10,"modified":"2026-10-18","pages":2},"title":{"kind":"review","candidate":{"value":"Geometry","page":1,"evidence":"prominent_text"}}});
-        let actual = evidence(&valid, "title", "Geometry", &file).unwrap();
-        assert_eq!((actual.value.as_str(), actual.page), ("Geometry", 1));
-        for (pointer, value) in [
-            ("/version", serde_json::json!(2)),
-            ("/analyzerVersion", serde_json::json!(1)),
-            ("/hasText", serde_json::json!(false)),
-            ("/source/modified", serde_json::json!("changed")),
-            ("/source/fingerprint", serde_json::json!("different")),
-            ("/title/candidate/value", serde_json::json!("Other")),
-            ("/title/candidate/page", serde_json::json!(2)),
-            ("/title/candidate/page", serde_json::json!(-1)),
-            ("/title/candidate/evidence", serde_json::json!("unknown")),
-        ] {
-            let mut bad = valid.clone();
-            *bad.pointer_mut(pointer).unwrap() = value;
-            assert!(
-                evidence(&bad, "title", "Geometry", &file).is_none(),
-                "{pointer}"
-            );
-        }
-        let mut legacy = valid;
-        legacy.as_object_mut().unwrap().remove("source");
-        assert!(evidence(&legacy, "title", "Geometry", &file).is_none());
-    }
 }

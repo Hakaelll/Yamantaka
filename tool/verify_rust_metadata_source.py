@@ -72,7 +72,7 @@ def verify(directory, executable, source_hash_file):
         assert row["fingerprint"] == fingerprint
         assert evidence["source"] == {"fingerprint": fingerprint, "size": len(data),
                                       "modified": row["file_modified_at"], "pages": 2}
-        assert evidence["version"] == 1 and evidence["analyzerVersion"] == 2 and evidence["hasText"]
+        assert evidence["version"] == 1 and evidence["analyzerVersion"] == 3 and evidence["hasText"]
         for field, value in (("title", "Geometry of Light"), ("author", "Ada Lovelace")):
             assert evidence[field]["candidate"]["value"] == value
             assert evidence[field]["candidate"]["page"] == 1

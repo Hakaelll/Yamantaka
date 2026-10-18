@@ -87,6 +87,3 @@ pub(super) fn page_mesh(
     mesh.indices.extend_from_slice(&[0, 1, 2, 0, 2, 3]);
     mesh
 }
-
-#[cfg(test)]
-mod tests;

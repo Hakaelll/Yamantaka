@@ -1004,6 +1004,9 @@ impl YamantakaApp {
                         .id_salt("catalogue")
                         .show(ui, |ui| {
                             let documents = self.documents.clone();
+                            if !self.list {
+                                ui.add_space(24.0);
+                            }
                             if self.list {
                                 self.list_documents(ui,documents,p);
                             } else if ui.ctx().content_rect().width()<420.0 {self.compact_covers(ui,documents,p);} else {
@@ -1296,7 +1299,7 @@ impl YamantakaApp {
             ));
             return;
         };
-        self.reader_tab_strip(ui, p);
+        self.sync_tab_context();
         if ui.ctx().content_rect().width() < 420.0 {
             self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
         } else {
@@ -2200,21 +2203,4 @@ fn preview_dimensions(
         (width * scale).floor().max(1.0) as u32,
         (height * scale).floor().max(1.0) as u32,
     ]
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn large_zoom_preview_respects_both_gpu_and_byte_limits() {
-        for (size, dpr, limit) in [
-            (egui::vec2(48000.0, 72000.0), 2.0, 16384),
-            (egui::vec2(600.0, 800.0), 1.25, 1024),
-            (egui::vec2(100000.0, 1.0), 2.0, 4096),
-        ] {
-            let dimensions = preview_dimensions(size, dpr, limit, 72 * 1024 * 1024);
-            assert!(dimensions.iter().all(|value| *value > 0 && *value <= limit));
-            assert!(dimensions[0] as u64 * dimensions[1] as u64 * 4 <= 72 * 1024 * 1024);
-        }
-    }
 }

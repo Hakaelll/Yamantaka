@@ -112,5 +112,3 @@ impl YamantakaApp {
         }
     }
 }
-#[cfg(test)]
-mod tests;

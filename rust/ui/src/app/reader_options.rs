@@ -116,6 +116,15 @@ impl YamantakaApp {
 
     pub(super) fn reader_options_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
         ui.set_min_width(264.0);
+        ui.menu_button(
+            format!(
+                "{} ({})",
+                self.tr("Lecturas abiertas", "Open readings"),
+                self.tabs.model.tabs().len()
+            ),
+            |ui| self.reader_documents_menu(ui),
+        );
+        ui.separator();
         ui.horizontal(|ui| {
             for (index, es, en) in [
                 (0, "Lectura", "Reading"),

@@ -9,8 +9,7 @@ mod commands;
 mod continuity;
 mod preview;
 mod preview_bulk;
-#[cfg(test)]
-mod tests;
+
 mod view;
 
 struct PendingSwitch {

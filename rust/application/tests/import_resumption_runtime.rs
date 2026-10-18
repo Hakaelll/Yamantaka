@@ -273,14 +273,10 @@ fn run(operation: Operation, outcome: Outcome) {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(
-            title,
-            if expected.is_some() {
-                None
-            } else {
-                Some("Geometry of Light".into())
-            }
-        );
+        assert!(title.is_none());
+        if expected.is_none() {
+            assert_eq!(imported.display_title(), "Geometry of Light");
+        }
         let evidence: String = connection
             .query_row(
                 "SELECT value FROM app_metadata WHERE key=?",

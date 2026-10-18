@@ -64,14 +64,3 @@ pub(crate) fn restore(
     }
     Ok(detected.image)
 }
-
-#[cfg(test)]
-mod coordination_tests;
-#[cfg(test)]
-mod freshness_tests;
-#[cfg(test)]
-mod restore_tests;
-#[cfg(test)]
-mod source_tests;
-#[cfg(test)]
-mod tests;

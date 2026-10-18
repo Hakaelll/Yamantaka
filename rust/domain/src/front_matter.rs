@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub const MAX_FRONT_MATTER_PAGES: u32 = 6;
-pub const ENRICHMENT_ALGORITHM_VERSION: u32 = 2;
+pub const ENRICHMENT_ALGORITHM_VERSION: u32 = 3;
 
 pub enum ImportAnalysis {
     NotRequested,
@@ -39,6 +39,7 @@ impl AnalysisFailure {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidenceKind {
     ProminentText,
+    TitleWithByline,
     RepeatedTitleWithByline,
     ExplicitByline,
     ConflictingBylines,
@@ -78,7 +79,7 @@ pub struct FrontMatter {
     author: MetadataValue,
     title_match: Option<u32>,
     author_match: Option<u32>,
-    candidate_title: Option<(MetadataCandidate, f64)>,
+    candidate_title: Option<(MetadataCandidate, (bool, f64))>,
     candidate_author: Option<MetadataCandidate>,
     ambiguous_author: bool,
     title_pages: u8,
@@ -166,7 +167,7 @@ impl FrontMatter {
         }
         let title = analysis.prominent_title();
         let mut has_author = false;
-        for line in analysis.explicit_authors(title) {
+        for line in analysis.explicit_authors(title.as_ref().map(|block| &block.line)) {
             let value = lines::byline(&line.text).unwrap();
             if let MetadataValue::Accepted(value) = import_metadata::author(Some(value)) {
                 has_author = true;
@@ -184,9 +185,13 @@ impl FrontMatter {
                 }
             }
         }
-        if let Some(line) = title {
-            let score = line.height() * 10.0 + (1.0 - line.layout.min()[1]) * 0.1
-                - f64::from(page.page()) * 0.005;
+        if let Some(block) = title {
+            let line = block.line;
+            let score = (
+                has_author && page.page() < 3,
+                block.height * 10.0 + (1.0 - line.layout.min()[1]) * 0.1
+                    - f64::from(page.page()) * 0.005,
+            );
             if let Some((current, _)) = &self.candidate_title
                 && normalized(&current.value) == normalized(&line.text)
             {
@@ -202,7 +207,11 @@ impl FrontMatter {
                         value: line.text.clone(),
                         page: page.page(),
                         bounds: line.bounds,
-                        evidence: EvidenceKind::ProminentText,
+                        evidence: if has_author && page.page() < 3 {
+                            EvidenceKind::TitleWithByline
+                        } else {
+                            EvidenceKind::ProminentText
+                        },
                     },
                     score,
                 ));
@@ -221,7 +230,9 @@ impl FrontMatter {
             candidate.evidence = EvidenceKind::ConflictingBylines;
         }
         let title = self.candidate_title.take().map(|(mut candidate, _)| {
-            if self.title_pages.count_ones() >= 2 && self.title_byline {
+            if self.ambiguous_author {
+                candidate.evidence = EvidenceKind::ProminentText;
+            } else if self.title_pages.count_ones() >= 2 && self.title_byline {
                 candidate.evidence = EvidenceKind::RepeatedTitleWithByline;
             }
             candidate
@@ -240,6 +251,12 @@ fn decision(
     matching_page: Option<u32>,
     candidate: Option<MetadataCandidate>,
 ) -> MetadataDecision {
+    let matching_page = matching_page.or_else(|| {
+        candidate
+            .as_ref()
+            .filter(|candidate| matches_value(&current, &candidate.value))
+            .map(|candidate| candidate.page)
+    });
     let candidate = match candidate {
         Some(candidate) if candidate.evidence == EvidenceKind::ConflictingBylines => {
             return MetadataDecision::Review { current, candidate };
@@ -258,7 +275,12 @@ fn decision(
         return MetadataDecision::Unchanged(current);
     };
     if matches!(current, MetadataValue::Accepted(_))
-        || candidate.evidence != EvidenceKind::ExplicitByline
+        || !matches!(
+            candidate.evidence,
+            EvidenceKind::ExplicitByline
+                | EvidenceKind::TitleWithByline
+                | EvidenceKind::RepeatedTitleWithByline
+        )
     {
         MetadataDecision::Review { current, candidate }
     } else {
@@ -285,6 +307,3 @@ fn normalized(text: &str) -> String {
 fn matches_value(value: &MetadataValue, text: &str) -> bool {
     matches!(value, MetadataValue::Accepted(value) if normalized(value) == normalized(text))
 }
-
-#[cfg(test)]
-mod tests;

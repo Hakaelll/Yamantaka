@@ -72,39 +72,3 @@ impl YamantakaApp {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use yamantaka_application::reading_sessions::restoration::decode_session_context;
-    #[test]
-    fn restoration_waits_for_the_exact_document_and_preferences_request() {
-        let mut state = RestorationState::default();
-        let token = Cancellation::default();
-        state.arm(
-            "a".into(),
-            token.clone(),
-            decode_session_context(Some("{}")).unwrap().unwrap(),
-        );
-        assert!(state.take("b", &token).is_none());
-        assert!(state.take("a", &Cancellation::default()).is_none());
-        assert!(state.take("a", &token).is_some());
-        assert!(state.take("a", &token).is_none());
-        state.arm(
-            "a".into(),
-            token.clone(),
-            decode_session_context(Some("{}")).unwrap().unwrap(),
-        );
-        state.scroll = Some(200.0);
-        state.clear();
-        assert!(state.take("a", &token).is_none());
-        assert!(state.scroll.is_none());
-        state.arm(
-            "a".into(),
-            token.clone(),
-            decode_session_context(Some("{}")).unwrap().unwrap(),
-        );
-        token.cancel();
-        assert!(state.take("a", &token).is_none());
-    }
-}

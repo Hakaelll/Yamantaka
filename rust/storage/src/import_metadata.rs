@@ -56,7 +56,7 @@ fn candidate(candidate: &MetadataCandidate) -> Value {
     json!({"value":candidate.value,"page":candidate.page,
     "bounds":[candidate.bounds.min(),candidate.bounds.max()],
     "evidence":match candidate.evidence {
-        EvidenceKind::ProminentText=>"prominent_text",EvidenceKind::RepeatedTitleWithByline=>"repeated_title_with_byline",
+        EvidenceKind::ProminentText=>"prominent_text",EvidenceKind::TitleWithByline=>"title_with_byline",EvidenceKind::RepeatedTitleWithByline=>"repeated_title_with_byline",
         EvidenceKind::ExplicitByline=>"explicit_byline",EvidenceKind::ConflictingBylines=>"conflicting_bylines",
     }})
 }

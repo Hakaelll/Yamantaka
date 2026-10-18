@@ -86,10 +86,8 @@ fn reanalysis_replaces_evidence_and_preserves_manual_metadata_topics_and_reading
             &cancel,
         )
         .unwrap();
-    assert_eq!(
-        refreshed.suggested_title.as_deref(),
-        Some("Geometry of Light")
-    );
+    assert_eq!(refreshed.title, "Geometry of Light");
+    assert!(refreshed.suggested_title.is_none());
     assert_ne!(before.revision, refreshed.revision);
     let corrected = db
         .change_metadata(
@@ -122,6 +120,47 @@ fn reanalysis_replaces_evidence_and_preserves_manual_metadata_topics_and_reading
     drop(analyzed);
     drop(worker);
     assert_eq!(governor.usage().total, 0);
+}
+
+#[test]
+fn reanalysis_upgrades_a_generated_filename_but_preserves_manual_corrections() {
+    let worker = engine();
+    let path = root().join("build/rust-fixtures/front-matter-wrapped-title.pdf");
+    let original = fs::read(&path).unwrap();
+    let analyzed = analyze(&worker, &path);
+    let cancel = Cancellation::default();
+    let mut db = Database::in_memory_at(11).unwrap();
+    let id = db.import(&analyzed).unwrap();
+    let expected_title =
+        "Atlas of Regional Libraries Volume Four: Reading Rooms and Study Collections";
+    assert_eq!(
+        db.get(&id).unwrap().unwrap().display_title(),
+        expected_title
+    );
+    db.execute_batch("UPDATE documents SET title=file_name,title_override='My corrected title',author_override='My corrected author'").unwrap();
+    let before = db.metadata_review(&id, &cancel).unwrap();
+    assert!(!matches!(
+        yamantaka_domain::import_metadata::catalogue_title(
+            before.automatic_title.as_deref(),
+            before.source_title.as_deref(),
+            path.file_name().unwrap().to_str().unwrap()
+        ),
+        yamantaka_domain::import_metadata::MetadataValue::Accepted(_)
+    ));
+    let document = db.get(&id).unwrap().unwrap();
+    let after = db
+        .reanalyze_metadata(
+            &before,
+            &document,
+            &analyzed,
+            IndexAccess::Disabled,
+            &cancel,
+        )
+        .unwrap();
+    assert_eq!(after.title, "My corrected title");
+    assert_eq!(after.author, "My corrected author");
+    assert_eq!(after.automatic_title.as_deref(), Some(expected_title));
+    assert_eq!(fs::read(path).unwrap(), original);
 }
 
 #[test]

@@ -69,7 +69,11 @@ pub(crate) fn save(
     let (title, author) = crate::import_metadata::effective(analyzed, &file_name);
     for (baseline, analyzed) in [
         (
-            yamantaka_domain::import_metadata::title(before.automatic_title.as_deref(), &file_name),
+            yamantaka_domain::import_metadata::catalogue_title(
+                before.automatic_title.as_deref(),
+                before.source_title.as_deref(),
+                &file_name,
+            ),
             &title,
         ),
         (

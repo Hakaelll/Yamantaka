@@ -49,7 +49,7 @@ def verify(directory, source_hash_file):
         else:
             import json
             record = json.loads(evidence[0])
-            assert record["analyzerVersion"] == 2 and record["hasText"]
+            assert record["analyzerVersion"] == 3 and record["hasText"]
             assert record["title"]["kind"] == "review" and record["author"]["kind"] == "review"
             assert record["title"]["candidate"]["value"] == "Geometry of Light"
             assert record["author"]["candidate"]["value"] == "Ada Lovelace"

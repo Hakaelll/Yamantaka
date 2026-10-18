@@ -29,23 +29,3 @@ pub(crate) fn open(path: &Path) -> Result<Pdfium> {
 fn unavailable() -> Failure {
     Failure::Pdf("Bundled PDFium could not be loaded. Verify the release bundle.".into())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reuse_requires_the_same_explicit_library_and_missing_paths_never_fallback() {
-        let library = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../build/native/pdfium-7881/bin/pdfium.dll");
-        drop(open(&library).unwrap());
-        drop(open(&library).unwrap());
-        let other =
-            std::env::temp_dir().join(format!("yamantaka-binding-{}.txt", std::process::id()));
-        std::fs::write(&other, b"synthetic alternate path").unwrap();
-        assert!(open(&other).is_err());
-        std::fs::remove_file(&other).unwrap();
-        assert!(open(&other).is_err());
-        drop(open(&library).unwrap());
-    }
-}

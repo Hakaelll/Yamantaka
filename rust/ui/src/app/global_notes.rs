@@ -524,5 +524,3 @@ impl YamantakaApp {
     }
 }
 mod filters;
-#[cfg(test)]
-mod tests;

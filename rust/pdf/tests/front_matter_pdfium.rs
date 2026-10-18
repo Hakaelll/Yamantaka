@@ -52,12 +52,35 @@ fn analyze(name: &str) -> (EnrichmentEvidence, MemoryGovernor) {
 }
 
 #[test]
-fn repeated_prominent_title_is_proposed_and_an_explicit_byline_can_fill_missing_author() {
+fn wrapped_cover_titles_replace_rejected_tool_metadata_on_the_first_or_second_page() {
+    for (name, page) in [
+        ("front-matter-wrapped-title", 0),
+        ("front-matter-wrapped-title-later", 1),
+    ] {
+        let (result, governor) = analyze(name);
+        let MetadataDecision::Autofill(title) = &result.title else {
+            panic!(
+                "Expected complete cover title instead of a filename: {:?}",
+                result.title
+            );
+        };
+        assert_eq!(
+            title.value,
+            "Atlas of Regional Libraries Volume Four: Reading Rooms and Study Collections"
+        );
+        assert_eq!(title.page, page);
+        assert!(
+            matches!(&result.author, MetadataDecision::Unchanged(MetadataValue::Accepted(value)) | MetadataDecision::Corroborated { value, .. } if value == "Ada Lovelace")
+        );
+        drop(result);
+        assert_eq!(governor.usage().total, 0);
+    }
+}
+
+#[test]
+fn repeated_title_and_explicit_byline_fill_missing_metadata() {
     let (result, governor) = analyze("front-matter-missing");
-    let MetadataDecision::Review {
-        candidate: title, ..
-    } = &result.title
-    else {
+    let MetadataDecision::Autofill(title) = &result.title else {
         panic!("Expected repeated title evidence")
     };
     assert_eq!(title.value, "Geometry of Light");
@@ -95,7 +118,7 @@ fn conflicting_plausible_metadata_is_proposed_for_review_instead_of_overwritten(
 }
 
 #[test]
-fn matching_metadata_beats_a_larger_publisher_logo_and_single_visual_titles_need_review() {
+fn matching_metadata_beats_a_publisher_logo_and_a_title_with_byline_can_fill_missing_values() {
     let (result, governor) = analyze("front-matter-logo");
     assert!(
         matches!(&result.title, MetadataDecision::Corroborated {value,page:0} if value == "Geometry of Light")
@@ -107,7 +130,7 @@ fn matching_metadata_beats_a_larger_publisher_logo_and_single_visual_titles_need
     assert_eq!(governor.usage().total, 0);
     let (result, governor) = analyze("front-matter-single");
     assert!(
-        matches!(&result.title, MetadataDecision::Review {candidate,..} if candidate.value == "Geometry of Light")
+        matches!(&result.title, MetadataDecision::Autofill(candidate) if candidate.value == "Geometry of Light")
     );
     assert!(
         matches!(&result.author, MetadataDecision::Autofill(candidate) if candidate.value == "Ada Lovelace")
@@ -151,7 +174,7 @@ fn intrinsic_page_rotation_does_not_change_textual_title_and_author_decisions() 
     for rotation in [90, 180, 270] {
         let (result, governor) = analyze(&format!("front-matter-rotated-{rotation}"));
         assert!(
-            matches!(&result.title, MetadataDecision::Review {candidate,..} if candidate.value == "Geometry of Light"),
+            matches!(&result.title, MetadataDecision::Autofill(candidate) if candidate.value == "Geometry of Light"),
             "Title changed at {rotation} degrees: {:?}",
             result.title
         );
@@ -169,7 +192,7 @@ fn intrinsic_page_rotation_does_not_change_textual_title_and_author_decisions() 
 fn a_repeated_large_logo_does_not_replace_the_nearby_title_when_metadata_is_missing() {
     let (result, governor) = analyze("front-matter-logo-missing");
     assert!(
-        matches!(&result.title, MetadataDecision::Review {candidate,..} if candidate.value == "Geometry of Light")
+        matches!(&result.title, MetadataDecision::Autofill(candidate) if candidate.value == "Geometry of Light")
     );
     drop(result);
     assert_eq!(governor.usage().total, 0);

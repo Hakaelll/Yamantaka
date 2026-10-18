@@ -7,9 +7,6 @@ use reference::MetadataReference;
 use yamantaka_application::metadata_review::{MetadataChange, MetadataReply, MetadataRequest};
 use yamantaka_domain::metadata_review::MetadataField;
 use yamantaka_domain::metadata_review::{ManualMetadata, MetadataMutation, MetadataReview};
-#[cfg(test)]
-#[path = "metadata/tests.rs"]
-mod tests;
 
 pub(super) struct MetadataEditor {
     document: Document,

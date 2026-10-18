@@ -20,7 +20,7 @@ Cover requests now carry the displayed PDF source identity. Late results are rej
 
 The reader uses a small first raster and retains it while refining after zoom or resize settles. Its navigator keeps the chosen width as content arrives, and background work no longer adds a processing row above the PDF. [Presentation verification](docs/validation/rust-reader-fluidity-2026-10-15.md) records native traces, tests and the remaining performance measurements.
 
-New imports clean embedded title and author fields, then analyze text and layout on up to six opening pages in the background. An unambiguous explicit byline can fill a missing author. Visual titles and conflicting values remain saved proposals, with their source page and bounds. The original metadata stays available, and search follows the catalogue's metadata precedence. Each committed document becomes queryable before the batch finishes. [Import analysis verification](docs/validation/rust-import-analysis-2026-10-16.md) records native tests, source checks, cancellation, and remaining review controls.
+New imports clean embedded title and author fields, then analyze text and layout on up to six opening pages in the background. Supported title blocks and explicit bylines can fill missing or rejected metadata. The detector joins aligned title lines and gives early cover evidence priority over later running headers. Conflicting accepted values remain saved proposals, with their source page and bounds. The original metadata stays available, and manual corrections retain priority. Each committed document becomes queryable before the batch finishes. [Title detection and reading refinements](docs/validation/rust-reading-refinement-2026-10-18.md) describes the current detector and validation scope.
 
 Open a book's details and choose **Title and author** to review proposals or enter your own corrections. **Save changes** stores manual values that take priority over future extraction. You can dismiss suggestions or explicitly restore automatic values. The editor preserves the original PDF metadata and refuses to overwrite a newer review. [Metadata editor verification](docs/validation/rust-metadata-review-2026-10-16.md) includes native captures, transaction checks, and search updates.
 
@@ -150,6 +150,8 @@ The workspace keeps presentation, persistence and native rendering separate:
 UI components dispatch commands and receive state. They do not execute SQL or call PDFium directly. Native PDF handles remain on one worker; GPU resources have explicit lifetimes. Initial global category limits are 72 MiB for pages, 24 MiB for tiles and 8 MiB for text. Complete live-resource coverage and device-loss recovery remain acceptance tasks.
 
 ## Validation
+
+The current Rust suite contains 50 essential tests, reduced from 536 at the owner's request. It retains migration, backup, rollback, original-file, native cancellation, password, rendering, and metadata checks. Older checkpoint reports record the larger suites that existed on their dates. Removed tests remain recoverable in Git. Run the retained checks for the affected work; large capture matrices are not part of every edit.
 
 Run the Rust checks from the repository root:
 

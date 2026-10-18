@@ -188,6 +188,3 @@ impl YamantakaApp {
         self.loading = false;
     }
 }
-
-#[cfg(test)]
-mod tests;

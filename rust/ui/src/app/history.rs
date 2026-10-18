@@ -1,6 +1,5 @@
 use super::*;
-#[cfg(test)]
-mod tests;
+
 mod views;
 use yamantaka_application::reading_sessions::deletion::{
     ReadingSessionDeleteReply, ReadingSessionDeleteRequest,

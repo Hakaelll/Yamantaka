@@ -94,6 +94,10 @@ impl YamantakaApp {
                         );
                         ui.label(
                             RichText::new(match evidence.kind {
+                                MetadataEvidenceKind::TitleWithByline => self.tr(
+                                    "Título de portada acompañado de una firma",
+                                    "Cover title accompanied by a byline",
+                                ),
                                 MetadataEvidenceKind::ProminentText => self
                                     .tr("Texto destacado del documento", "Prominent document text"),
                                 MetadataEvidenceKind::RepeatedTitleWithByline => self.tr(
