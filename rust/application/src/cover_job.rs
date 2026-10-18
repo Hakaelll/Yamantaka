@@ -68,7 +68,7 @@ impl CoverJob {
         repository: &impl LibraryRepository,
     ) -> Result<Box<Self>> {
         cancel.check()?;
-        source.read(repository)?;
+        source.read(repository, &cancel)?;
         let expected = repository.cover_snapshot(source.id())?;
         Ok(Box::new(Self {
             source,
@@ -110,7 +110,7 @@ impl CoverJob {
         capacity: u64,
     ) -> Result<()> {
         self.cancel.check()?;
-        let document = self.source.read(repository)?;
+        let document = self.source.read(repository, &self.cancel)?;
         let admission = match &self.intent {
             Intent::Preview(page) => Admission::Render(*page, None),
             Intent::Library => {
@@ -186,7 +186,7 @@ impl CoverJob {
                     admitted_at = revision;
                     let detected = ticket.wait()?;
                     self.cancel.check()?;
-                    self.source.read(repository)?;
+                    self.source.read(repository, &self.cancel)?;
                     let result = match &self.intent {
                         Intent::Restore(_) => automatic_cover::restore(
                             repository,

@@ -196,6 +196,14 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn metadata_source(
+        &self,
+        _expected: &metadata_review::MetadataReview,
+        _field: metadata_review::MetadataField,
+        _cancel: &Cancellation,
+    ) -> Result<metadata_review::MetadataLocation> {
+        Err(Failure::Unsupported("Metadata source page".into()))
+    }
     fn reanalyze_metadata(
         &mut self,
         _expected: &metadata_review::MetadataReview,

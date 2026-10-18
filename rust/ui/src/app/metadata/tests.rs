@@ -5,6 +5,8 @@ fn editor() -> MetadataEditor {
     MetadataEditor {
         document,
         snapshot: None,
+        reference: MetadataReference::default(),
+        source_pending: None,
         pending: None,
         title: "Current title".into(),
         author: "Current author".into(),
@@ -13,10 +15,21 @@ fn editor() -> MetadataEditor {
         saved: false,
         analyzing: false,
         analyzed: false,
+        source_opened: false,
     }
 }
 fn snapshot() -> MetadataReview {
     MetadataReview {
+        file: yamantaka_domain::metadata_review::MetadataFile {
+            path: "a.pdf".into(),
+            fingerprint: "fa".into(),
+            page_count: 2,
+            missing: false,
+            size: 1,
+            modified: "now".into(),
+        },
+        title_evidence: None,
+        author_evidence: None,
         document: "a".into(),
         revision: "revision-1".into(),
         title: "Current title".into(),
@@ -30,6 +43,51 @@ fn snapshot() -> MetadataReview {
         suggested_title: Some("Proposed title".into()),
         suggested_author: None,
     }
+}
+
+#[test]
+fn opening_evidence_requires_a_saved_draft_and_serializes_editor_operations() {
+    use yamantaka_domain::metadata_review::{MetadataEvidence, MetadataEvidenceKind};
+    let mut editor = editor();
+    let mut review = snapshot();
+    review.title_evidence = Some(MetadataEvidence {
+        value: "Proposed title".into(),
+        page: 1,
+        kind: MetadataEvidenceKind::ProminentText,
+    });
+    let read = editor.read();
+    editor.accept(MetadataReply {
+        document: "a".into(),
+        writing: false,
+        cancel: read.cancel,
+        result: Ok(review.clone()),
+    });
+    assert!(editor.source_request(MetadataField::Author).is_none());
+    editor.title = "Unsaved title".into();
+    assert!(editor.source_request(MetadataField::Title).is_none());
+    assert_eq!(editor.title, "Unsaved title");
+    editor.title = review.title.clone();
+    let request = editor.source_request(MetadataField::Title).unwrap();
+    assert_eq!(*request.expected, review);
+    assert!(!request.cancel.is_cancelled());
+    assert!(editor.source_request(MetadataField::Title).is_none());
+    assert!(editor.apply(MetadataMutation::DismissSuggestions).is_none());
+    assert!(editor.reanalyze().is_none());
+    editor.read();
+    assert!(request.cancel.is_cancelled());
+    assert!(editor.source_pending.is_none());
+}
+
+#[test]
+fn closing_editor_cancels_source_and_native_preview_requests() {
+    let mut editor = editor();
+    let source = Cancellation::default();
+    let preview = Cancellation::default();
+    editor.source_pending = Some((MetadataField::Title, source.clone()));
+    editor.reference.pending = Some(preview.clone());
+    drop(editor);
+    assert!(source.is_cancelled());
+    assert!(preview.is_cancelled());
 }
 
 #[test]

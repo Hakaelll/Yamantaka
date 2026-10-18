@@ -15,7 +15,11 @@ impl YamantakaApp {
                 ui.horizontal_wrapped(|ui| {
                     if theme::control(
                         ui,
-                        self.tr("Biblioteca", "Library"),
+                        if self.metadata_return_available() {
+                            self.tr("Volver a los metadatos", "Back to metadata")
+                        } else {
+                            self.tr("Biblioteca", "Library")
+                        },
                         Some(theme::Icon::Left),
                         false,
                         false,

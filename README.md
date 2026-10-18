@@ -26,6 +26,8 @@ Open a book's details and choose **Title and author** to review proposals or ent
 
 **Analyze PDF again** refreshes the analysis in the background. It preserves accepted automatic values and manual corrections, presents conflicting text as proposals, and keeps the previous review if analysis fails. [Reanalysis verification](docs/validation/rust-metadata-reanalysis-2026-10-16.md) records native reader coexistence, source checks, rollback, and captures.
 
+The editor now shows a real PDF reference beside your library values. **Compare page** reveals the evidence for a proposal. **Open page N in reader** checks the saved review and PDF source before opening that page, and **Back to metadata** returns to the editor. Unsaved drafts stay protected. Older evidence needs reanalysis before page links become available. [Metadata reference verification](docs/validation/rust-metadata-reference-2026-10-18.md) records source checks, navigation ownership, narrow layouts, and native captures.
+
 If opening a reader interrupts background analysis, it resumes at the interrupted page after verifying the PDF source again. Changed files are rejected, and cancellation preserves the previous metadata review. [Resumption verification](docs/validation/rust-import-resumption-2026-10-18.md) records real reader-preemption, source-change, and cancellation tests.
 
 No account is required. Documents and library data stay on your computer. The product is designed to operate without telemetry or network access during normal use.

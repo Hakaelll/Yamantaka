@@ -12,6 +12,7 @@ pub mod identity;
 mod import_metadata;
 mod metadata_reanalysis;
 mod metadata_review;
+mod metadata_source;
 pub mod migration;
 pub mod preferences;
 pub mod reader_continuity;

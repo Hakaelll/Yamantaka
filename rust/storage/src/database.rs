@@ -283,6 +283,14 @@ impl LibraryRepository for Database {
     ) -> Result<yamantaka_domain::metadata_review::MetadataReview> {
         crate::metadata_reanalysis::save(self, expected, original, analyzed, access, cancel)
     }
+    fn metadata_source(
+        &self,
+        expected: &yamantaka_domain::metadata_review::MetadataReview,
+        field: yamantaka_domain::metadata_review::MetadataField,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::metadata_review::MetadataLocation> {
+        crate::metadata_source::open(self, expected, field, cancel)
+    }
     fn metadata_review(
         &self,
         document: &str,

@@ -1,0 +1,482 @@
+{
+  "synthetic": true,
+  "captureProcessId": 18628,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Library",
+      "rect": [
+        156.21875,
+        8.0,
+        250.0625,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Reader",
+      "rect": [
+        260.0625,
+        8.0,
+        330.90625,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Tools",
+      "rect": [
+        1322.28125,
+        8.0,
+        1406.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Add PDFs",
+      "rect": [
+        1200.5,
+        8.0,
+        1312.28125,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Back to library",
+      "rect": [
+        42.0,
+        92.40625,
+        82.0,
+        132.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Use this title",
+      "rect": [
+        67.0,
+        445.40625,
+        171.125,
+        485.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Compare page 2",
+      "rect": [
+        181.125,
+        445.40625,
+        311.71875,
+        485.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Use this author",
+      "rect": [
+        67.0,
+        649.40625,
+        188.34375,
+        689.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Compare page 2",
+      "rect": [
+        198.34375,
+        649.40625,
+        328.9375,
+        689.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Save changes",
+      "rect": [
+        67.0,
+        725.40625,
+        178.375,
+        765.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Dismiss suggestions",
+      "rect": [
+        188.375,
+        725.40625,
+        340.5,
+        765.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Analyze PDF again",
+      "rect": [
+        42.0,
+        856.40625,
+        183.875,
+        896.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Title",
+      "rect": [
+        1031.0,
+        263.0,
+        1085.1875,
+        303.0
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Author",
+      "rect": [
+        1095.1875,
+        263.0,
+        1165.875,
+        303.0
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Open page 2 in reader",
+      "rect": [
+        1031.0,
+        701.375,
+        1221.90625,
+        741.375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "libraryCovers": {
+    "resident": 0,
+    "blockedBeforeRelease": 0,
+    "capacityPreview": 0,
+    "capacityRevision": 2,
+    "ready": 0,
+    "pending": 0,
+    "source": "PDF selected page",
+    "sourcePages": {},
+    "maximumVisible": 16
+  },
+  "coverPicker": {
+    "open": false
+  },
+  "coverPickerDemo": {
+    "action": null,
+    "complete": false,
+    "saved": false
+  },
+  "metadataReview": {
+    "document": "demo-0",
+    "title": "On the Nature of Things",
+    "author": "Lucretius",
+    "snapshot": {
+      "title": "On the Nature of Things",
+      "author": "Lucretius",
+      "titleOverride": null,
+      "authorOverride": null,
+      "suggestedTitle": "Geometry of Light",
+      "suggestedAuthor": "Ada Lovelace"
+    },
+    "saved": false,
+    "analyzing": false,
+    "analyzed": true,
+    "error": null,
+    "pending": false,
+    "sourcePending": false,
+    "sourceOpened": true,
+    "reference": {
+      "page": 1,
+      "pending": false,
+      "error": false,
+      "evidencePage": 1
+    }
+  },
+  "documentFind": null,
+  "documentLinks": {
+    "residentPages": 0,
+    "readyPages": 0,
+    "internalLinks": 0,
+    "externalLinks": 0,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 0,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 0,
+      "text": "",
+      "tag": "",
+      "kind": null,
+      "review": null
+    },
+    "resident": 0,
+    "total": 0,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "residentPages": 0,
+    "readyPages": 0,
+    "marks": 0
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": false,
+    "count": 0,
+    "artifact": null
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 0,
+    "resident": 0,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": false,
+    "documents": 0
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": false,
+    "preferences": {
+      "document": "demo-0",
+      "zoom": 1.0,
+      "layout": "single",
+      "mode": "document",
+      "theme": "ivory",
+      "scroll": 0.0
+    }
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Off",
+    "pending": null,
+    "active": "f118c69b-08f8-4da0-830f-939d27a0a0f2",
+    "tabs": [
+      {
+        "id": "f118c69b-08f8-4da0-830f-939d27a0a0f2",
+        "document": "demo-0",
+        "page": 1,
+        "pinned": false,
+        "zoom": 1.0,
+        "zoomMode": "fitPage",
+        "rotation": 0,
+        "horizontalMargin": 32.0,
+        "verticalMargin": 24.0,
+        "scroll": 0.0
+      }
+    ]
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 1,
+  "readerZoom": 1.0,
+  "readerRenderEvents": [
+    {
+      "event": "submitted",
+      "document": "demo-0",
+      "page": 1,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        575,
+        768
+      ],
+      "target": [
+        693,
+        925
+      ],
+      "viewport": [
+        1440.0,
+        788.0
+      ],
+      "retainedImage": false
+    },
+    {
+      "event": "installed",
+      "document": "demo-0",
+      "page": 1,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        575,
+        768
+      ],
+      "replacedImage": false
+    }
+  ],
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 4351472,
+    "pages": 4319232,
+    "tiles": 0,
+    "text": 32064,
+    "other": 176,
+    "cpu": 1798640,
+    "gpu": 2552832,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."
+}

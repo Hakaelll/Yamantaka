@@ -30,6 +30,56 @@ fn imported(runtime: &Runtime, path: PathBuf) -> yamantaka_domain::Document {
 }
 
 #[test]
+fn evidence_preview_rejects_a_changed_physical_pdf_even_when_the_catalogue_is_unchanged() {
+    use yamantaka_application::cover_source::CoverSource;
+    use yamantaka_domain::metadata_review::MetadataField;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("source.pdf");
+    let original = fs::read(source("front-matter-evidence-later")).unwrap();
+    fs::write(&path, &original).unwrap();
+    let worker = worker();
+    let governor = worker.memory_governor();
+    let runtime = Runtime::start(Database::in_memory_at(11).unwrap(), worker, || {}).unwrap();
+    let document = imported(&runtime, path.clone());
+    let review = read(&runtime, &document.id);
+    assert_eq!(review.title_evidence.as_ref().unwrap().page, 1);
+    let reference = CoverSource::metadata_evidence(&document, &review, MetadataField::Title);
+    for generation in [1, 2] {
+        if generation == 2 {
+            let mut changed = original.clone();
+            changed.extend_from_slice(b"\n% Synthetic source replacement\n");
+            fs::write(&path, changed).unwrap();
+        }
+        runtime
+            .submit(Action::PreviewCover(
+                reference.clone(),
+                1,
+                generation,
+                Cancellation::default(),
+            ))
+            .unwrap();
+        let Update::Cover(id, result, _) = wait(&runtime) else {
+            panic!("Expected preview result")
+        };
+        assert_eq!(id, document.id);
+        if generation == 1 {
+            let image = result.unwrap();
+            assert_eq!(image.key.page, 1);
+            assert_eq!(image.key.generation, 1);
+        } else {
+            assert!(matches!(result, Err(Failure::Invalid(_))));
+        }
+    }
+    assert_eq!(read(&runtime, &document.id), review);
+    drop(runtime);
+    assert_eq!(governor.usage().total, 0);
+    assert_eq!(
+        fs::read(source("front-matter-evidence-later")).unwrap(),
+        original
+    );
+}
+
+#[test]
 fn real_actor_reanalyzes_while_the_original_reader_stays_open_and_manual_values_win() {
     let dir = tempfile::tempdir().unwrap();
     let database = dir.path().join("catalogue.sqlite3");

@@ -42,6 +42,7 @@ pub enum Action {
         Cancellation,
     ),
     Metadata(Box<crate::metadata_review::MetadataRequest>),
+    MetadataSource(Box<crate::metadata_source::MetadataSourceRequest>),
     RestoreAutomaticCover(CoverSource, u64, Cancellation),
     CoverSourcePage(String, Cancellation),
     PreviewCover(CoverSource, u32, u64, Cancellation),
@@ -101,7 +102,8 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
-    Metadata(crate::metadata_review::MetadataReply),
+    Metadata(Box<crate::metadata_review::MetadataReply>),
+    MetadataSource(crate::metadata_source::MetadataSourceReply),
     CoverSourcePage(String, Result<Option<u32>>, Cancellation),
     ManualCover(crate::manual_cover::ManualCoverReply),
     Cover(String, Result<Arc<RenderedPage>>, Cancellation),
@@ -419,12 +421,12 @@ fn import_failed(events: &Sender<Event>, notify: &impl Fn(), error: Failure, sta
         emit(
             events,
             notify,
-            Update::Metadata(crate::metadata_review::MetadataReply {
+            Update::Metadata(Box::new(crate::metadata_review::MetadataReply {
                 document: target.0.document,
                 writing: true,
                 cancel: state.cancel,
                 result: Err(error),
-            }),
+            })),
             state.permit,
         );
         return;
@@ -576,9 +578,10 @@ impl Runtime {
                             match action {
                                 Action::ReadingHistory(request) => emit(&events, &notify, Update::ReadingHistory(request.execute(&repository)), permit),
                                 Action::DeleteReadingSession(request) => emit(&events,&notify,Update::ReadingSessionDeleted(request.execute(&mut repository)),permit),
+                                Action::MetadataSource(request)=>emit(&events,&notify,Update::MetadataSource(request.execute(&repository)),permit),
                                 Action::Metadata(request) => {
                                     let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled} else {yamantaka_domain::search::IndexAccess::Disabled};
-                                    emit(&events,&notify,Update::Metadata(request.execute(&mut repository,access)),permit);
+                                    emit(&events,&notify,Update::Metadata(Box::new(request.execute(&mut repository,access))),permit);
                                 }
                                 Action::ReadingGoal(request) => emit(&events,&notify,Update::ReadingGoal(request.execute(&mut repository)),permit),
                                 Action::TrimReadingHistory(limit, cancel) => {
@@ -963,7 +966,7 @@ impl Runtime {
                                     });
                                     match source {
                                         Ok(document)=>advance_import(&engine,&repository,ImportState{paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
-                                        Err(error)=>emit(&events,&notify,Update::Metadata(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)}),permit),
+                                        Err(error)=>emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)})),permit),
                                     }
                                 }
                                 Action::Import(paths, cancel) => advance_import(
@@ -1142,7 +1145,7 @@ impl Runtime {
                                 if let Some(target)=state.reanalysis.as_ref() {
                                     let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled}else{yamantaka_domain::search::IndexAccess::Disabled};
                                     let result=closed.and_then(|()|state.cancel.check()).and_then(|()|repository.reanalyze_metadata(&target.0,&target.1,&document,access,&state.cancel));
-                                    emit(&events,&notify,Update::Metadata(crate::metadata_review::MetadataReply{document:target.0.document.clone(),writing:true,cancel:state.cancel,result}),state.permit);
+                                    emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:target.0.document.clone(),writing:true,cancel:state.cancel,result})),state.permit);
                                     continue;
                                 }
                                 match closed.and_then(|()| {state.cancel.check()?;repository.import(&document)}) {

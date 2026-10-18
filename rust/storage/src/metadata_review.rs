@@ -14,14 +14,14 @@ pub(crate) fn read(
 ) -> Result<MetadataReview> {
     read_record(db, document, cancel).map(|(review, _)| review)
 }
-fn read_record(
+pub(crate) fn read_record(
     db: &Connection,
     document: &str,
     cancel: &Cancellation,
 ) -> Result<(MetadataReview, serde_json::Value)> {
     cancel.check()?;
     let encoded: Option<Option<String>> = db.query_row(
-        "SELECT CASE WHEN length(CAST(record AS BLOB))<=65536 THEN record ELSE NULL END FROM (SELECT json_object('fingerprint',d.fingerprint,'file',d.file_name,'title',d.title,'author',d.author,'sourceTitle',d.source_title,'sourceAuthor',d.source_author,'titleOverride',d.title_override,'authorOverride',d.author_override,'analysisFingerprint',e.fingerprint,'version',e.analyzer_version,'status',e.status,'suggestedTitle',e.suggested_title,'suggestedAuthor',e.suggested_author,'analyzedAt',e.analyzed_at,'error',e.error_code,'evidence',a.value) AS record FROM documents d LEFT JOIN document_enrichment e ON e.document_id=d.id LEFT JOIN app_metadata a ON a.key='rust.frontMatterEvidence.v1:'||d.id WHERE d.id=?)",
+        "SELECT CASE WHEN length(CAST(record AS BLOB))<=65536 THEN record ELSE NULL END FROM (SELECT json_object('path',d.path,'pages',d.page_count,'missing',d.is_missing,'size',d.file_size,'modified',d.file_modified_at,'fingerprint',d.fingerprint,'file',d.file_name,'title',d.title,'author',d.author,'sourceTitle',d.source_title,'sourceAuthor',d.source_author,'titleOverride',d.title_override,'authorOverride',d.author_override,'analysisFingerprint',e.fingerprint,'version',e.analyzer_version,'status',e.status,'suggestedTitle',e.suggested_title,'suggestedAuthor',e.suggested_author,'analyzedAt',e.analyzed_at,'error',e.error_code,'evidence',a.value) AS record FROM documents d LEFT JOIN document_enrichment e ON e.document_id=d.id LEFT JOIN app_metadata a ON a.key='rust.frontMatterEvidence.v1:'||d.id WHERE d.id=?)",
         [document], |row| row.get(0)).optional().map_err(storage)?;
     let encoded = encoded
         .ok_or_else(|| Failure::Invalid("Document is absent from the library".into()))?
@@ -32,8 +32,26 @@ fn read_record(
     let author_override = value("authorOverride");
     let current_analysis =
         row["fingerprint"] == row["analysisFingerprint"] && row["status"] == "review";
-    let result = MetadataReview {
+    let file = yamantaka_domain::metadata_review::MetadataFile {
+        path: value("path").unwrap_or_default().into(),
+        fingerprint: value("fingerprint").unwrap_or_default(),
+        page_count: u32::try_from(
+            row["pages"]
+                .as_u64()
+                .ok_or_else(|| Failure::Invalid("Invalid metadata page count".into()))?,
+        )
+        .map_err(storage)?,
+        missing: row["missing"].as_i64() != Some(0),
+        size: row["size"]
+            .as_u64()
+            .ok_or_else(|| Failure::Invalid("Invalid metadata source size".into()))?,
+        modified: value("modified").unwrap_or_default(),
+    };
+    let mut result = MetadataReview {
         document: document.into(),
+        file,
+        title_evidence: None,
+        author_evidence: None,
         revision: format!("{:x}", Sha256::digest(encoded.as_bytes())),
         title: title_override
             .clone()
@@ -56,6 +74,24 @@ fn read_record(
         suggested_title: current_analysis.then(|| value("suggestedTitle")).flatten(),
         suggested_author: current_analysis.then(|| value("suggestedAuthor")).flatten(),
     };
+    if row["fingerprint"] == row["analysisFingerprint"]
+        && row["version"] == yamantaka_domain::front_matter::ENRICHMENT_ALGORITHM_VERSION
+        && let Some(encoded) = row["evidence"].as_str().filter(|s| s.len() <= 65536)
+        && let Ok(evidence) = serde_json::from_str::<serde_json::Value>(encoded)
+    {
+        result.title_evidence = crate::metadata_source::evidence(
+            &evidence,
+            "title",
+            result.suggested_title.as_deref().unwrap_or(&result.title),
+            &result.file,
+        );
+        result.author_evidence = crate::metadata_source::evidence(
+            &evidence,
+            "author",
+            result.suggested_author.as_deref().unwrap_or(&result.author),
+            &result.file,
+        );
+    }
     cancel.check()?;
     Ok((result, row))
 }

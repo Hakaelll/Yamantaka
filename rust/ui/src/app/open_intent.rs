@@ -13,6 +13,7 @@ pub(super) struct OpenIntent {
     lookup_cancel: Cancellation,
     lookup: Option<(String, OpenTarget)>,
     pending_page: Option<(String, u32)>,
+    inherited_navigation: Option<(String, yamantaka_domain::reader::ReaderNavigation)>,
     reveal_reader: bool,
 }
 
@@ -61,9 +62,26 @@ impl OpenIntent {
     pub fn begin_open(&mut self) {
         self.leave_destination();
         self.pending_page = None;
+        self.inherited_navigation = None;
         self.reveal_reader = true;
     }
 
+    pub fn inherit_navigation(
+        &mut self,
+        id: String,
+        navigation: yamantaka_domain::reader::ReaderNavigation,
+    ) {
+        self.inherited_navigation = Some((id, navigation));
+    }
+    pub fn take_navigation(
+        &mut self,
+        id: &str,
+    ) -> Option<yamantaka_domain::reader::ReaderNavigation> {
+        self.inherited_navigation
+            .take()
+            .filter(|(target, _)| target == id)
+            .map(|(_, nav)| nav)
+    }
     pub fn set_page(&mut self, id: String, page: u32) {
         self.pending_page = Some((id, page));
     }
@@ -97,6 +115,31 @@ mod tests {
     use super::*;
     use yamantaka_application::reading_sessions::restoration::decode_session_context;
     use yamantaka_domain::reader_preferences::ReaderPreferences;
+
+    #[test]
+    fn source_navigation_retains_history_and_marks_and_transfers_once() {
+        use yamantaka_domain::reader::{MarkSlot, ReaderNavigation};
+        let mut intent = OpenIntent::default();
+        let mut navigation = ReaderNavigation::new(10, 0).unwrap();
+        navigation.go_to_page(4);
+        navigation.capture_mark(MarkSlot::A);
+        navigation.go_to_page(7);
+        intent.begin_open();
+        intent.inherit_navigation("a".into(), navigation);
+        let mut restored = intent.take_navigation("a").unwrap();
+        assert!(restored.go_to_page(1));
+        assert!(restored.back());
+        assert_eq!(restored.position().page(), 7);
+        assert!(restored.jump_to_mark(MarkSlot::A));
+        assert_eq!(restored.position().page(), 4);
+        assert!(intent.take_navigation("a").is_none());
+        intent.inherit_navigation("a".into(), restored.clone());
+        assert!(intent.take_navigation("b").is_none());
+        assert!(intent.take_navigation("a").is_none());
+        intent.inherit_navigation("a".into(), restored);
+        intent.begin_open();
+        assert!(intent.take_navigation("a").is_none());
+    }
 
     #[test]
     fn context_lookup_rejects_an_unrelated_token_and_transfers_once() {

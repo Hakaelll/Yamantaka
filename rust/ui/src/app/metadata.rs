@@ -1,5 +1,11 @@
 use super::*;
+mod form;
+mod panel;
+mod reference;
+mod view;
+use reference::MetadataReference;
 use yamantaka_application::metadata_review::{MetadataChange, MetadataReply, MetadataRequest};
+use yamantaka_domain::metadata_review::MetadataField;
 use yamantaka_domain::metadata_review::{ManualMetadata, MetadataMutation, MetadataReview};
 #[cfg(test)]
 #[path = "metadata/tests.rs"]
@@ -8,6 +14,8 @@ mod tests;
 pub(super) struct MetadataEditor {
     document: Document,
     snapshot: Option<MetadataReview>,
+    reference: MetadataReference,
+    source_pending: Option<(MetadataField, Cancellation)>,
     pending: Option<(Cancellation, bool)>,
     title: String,
     author: String,
@@ -16,9 +24,13 @@ pub(super) struct MetadataEditor {
     saved: bool,
     analyzing: bool,
     analyzed: bool,
+    source_opened: bool,
 }
 impl Drop for MetadataEditor {
     fn drop(&mut self) {
+        if let Some((_, cancel)) = &self.source_pending {
+            cancel.cancel();
+        }
         if let Some((cancel, false)) = &self.pending {
             cancel.cancel();
         }
@@ -31,7 +43,11 @@ impl MetadataEditor {
             .is_some_and(|s| self.title == s.title && self.author == s.author)
     }
     fn reanalyze(&mut self) -> Option<(Box<MetadataReview>, Cancellation)> {
-        if self.pending.is_some() || !self.clean_draft() || self.document.missing {
+        if self.pending.is_some()
+            || self.source_pending.is_some()
+            || !self.clean_draft()
+            || self.document.missing
+        {
             return None;
         }
         let expected = Box::new(self.snapshot.clone()?);
@@ -44,12 +60,18 @@ impl MetadataEditor {
         Some((expected, cancel))
     }
     pub(super) fn capture_ready(&self) -> bool {
-        self.snapshot.is_some() && self.pending.is_none()
+        self.snapshot.is_some()
+            && self.pending.is_none()
+            && self.source_pending.is_none()
+            && self.reference.pending.is_none()
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"document":self.document.id,"title":self.title,"author":self.author,"snapshot":self.snapshot.as_ref().map(|s|serde_json::json!({"title":s.title,"author":s.author,"titleOverride":s.title_override,"authorOverride":s.author_override,"suggestedTitle":s.suggested_title,"suggestedAuthor":s.suggested_author})),"saved":self.saved,"analyzing":self.analyzing,"analyzed":self.analyzed,"error":self.error,"pending":self.pending.is_some()})
+        serde_json::json!({"document":self.document.id,"title":self.title,"author":self.author,"snapshot":self.snapshot.as_ref().map(|s|serde_json::json!({"title":s.title,"author":s.author,"titleOverride":s.title_override,"authorOverride":s.author_override,"suggestedTitle":s.suggested_title,"suggestedAuthor":s.suggested_author})),"saved":self.saved,"analyzing":self.analyzing,"analyzed":self.analyzed,"error":self.error,"pending":self.pending.is_some(),"sourcePending":self.source_pending.is_some(),"sourceOpened":self.source_opened,"reference":{"page":self.reference.page,"pending":self.reference.pending.is_some(),"error":self.reference.error.is_some(),"evidencePage":self.snapshot.as_ref().and_then(|s|s.evidence(self.reference.field)).map(|e|e.page)}})
     }
     fn read(&mut self) -> MetadataRequest {
+        if let Some((_, cancel)) = self.source_pending.take() {
+            cancel.cancel();
+        }
         if let Some((cancel, false)) = self.pending.take() {
             cancel.cancel();
         }
@@ -65,7 +87,7 @@ impl MetadataEditor {
         }
     }
     fn apply(&mut self, mutation: MetadataMutation) -> Option<MetadataRequest> {
-        if self.pending.is_some() {
+        if self.pending.is_some() || self.source_pending.is_some() {
             return None;
         }
         let expected = self.snapshot.clone()?;
@@ -95,6 +117,10 @@ impl MetadataEditor {
         let analyzed = std::mem::take(&mut self.analyzing);
         match reply.result {
             Ok(snapshot) => {
+                self.document.path = snapshot.file.path.clone();
+                self.document.fingerprint = snapshot.file.fingerprint.clone();
+                self.document.page_count = snapshot.file.page_count;
+                self.document.missing = snapshot.file.missing;
                 self.title = snapshot.title.clone();
                 self.author = snapshot.author.clone();
                 self.snapshot = Some(snapshot.clone());
@@ -136,7 +162,15 @@ impl YamantakaApp {
                 self.metadata_preview = Some((action, 3));
                 return;
             }
-            if action == "reanalyze" {
+            if matches!(
+                action,
+                "reanalyze"
+                    | "source"
+                    | "source-return"
+                    | "source-draft"
+                    | "source-stale"
+                    | "reference"
+            ) {
                 if let Some((expected, cancel)) =
                     self.metadata.as_mut().and_then(MetadataEditor::reanalyze)
                 {
@@ -172,8 +206,81 @@ impl YamantakaApp {
                 .as_ref()
                 .is_some_and(MetadataEditor::capture_ready)
         {
+            if matches!(action, "source" | "source-return" | "source-stale") {
+                if action == "source-stale"
+                    && let Some(snapshot) = self
+                        .metadata
+                        .as_ref()
+                        .and_then(|editor| editor.snapshot.clone())
+                {
+                    self.send(Action::Metadata(Box::new(MetadataRequest {
+                        document: snapshot.document.clone(),
+                        change: MetadataChange::Apply {
+                            expected: Box::new(snapshot),
+                            mutation: MetadataMutation::Save(
+                                ManualMetadata::new("Newer title", "Newer author").unwrap(),
+                            ),
+                        },
+                        cancel: Cancellation::default(),
+                    })));
+                }
+                self.request_metadata_source(MetadataField::Title);
+                self.metadata_preview = Some((action, 4));
+            } else {
+                if action == "reference"
+                    && let Some(editor) = self.metadata.as_mut()
+                {
+                    editor.reference.reveal = true;
+                }
+                if action == "source-draft"
+                    && let Some(editor) = self.metadata.as_mut()
+                {
+                    editor.title = "My unsaved geometry".into();
+                }
+                self.metadata_preview = Some((action, 3));
+            }
+        } else if stage == 4
+            && action == "source-stale"
+            && self
+                .metadata
+                .as_ref()
+                .is_some_and(|editor| editor.error.is_some() && editor.source_pending.is_none())
+        {
+            self.metadata_preview = Some((action, 3));
+        } else if stage == 4
+            && self.metadata.as_ref().is_some_and(|editor| {
+                self.active
+                    .as_ref()
+                    .is_some_and(|(doc, _)| doc.id == editor.document.id)
+                    && editor
+                        .snapshot
+                        .as_ref()
+                        .and_then(|s| s.title_evidence.as_ref())
+                        .is_some_and(|e| e.page == self.page)
+            })
+            && !self.loading
+            && !self.opening.busy()
+            && !self.reader_pages.is_empty()
+        {
+            if action == "source-return" {
+                self.show_surface(Surface::Library);
+            }
             self.metadata_preview = Some((action, 3));
         }
+    }
+    pub(super) fn metadata_return_available(&self) -> bool {
+        self.metadata.as_ref().is_some_and(|editor| {
+            editor.source_opened
+                && self
+                    .active
+                    .as_ref()
+                    .is_some_and(|(document, _)| document.id == editor.document.id)
+        })
+    }
+    pub(super) fn metadata_source_context(&self) -> bool {
+        self.metadata
+            .as_ref()
+            .is_some_and(|editor| editor.source_opened)
     }
     pub(super) fn begin_metadata_editor(&mut self, document: Document) {
         let mut editor = MetadataEditor {
@@ -181,12 +288,15 @@ impl YamantakaApp {
             author: document.author.clone().unwrap_or_default(),
             document,
             snapshot: None,
+            reference: MetadataReference::default(),
+            source_pending: None,
             pending: None,
             error: None,
             confirm_reset: false,
             saved: false,
             analyzing: false,
             analyzed: false,
+            source_opened: false,
         };
         let request = editor.read();
         self.metadata = Some(editor);
@@ -236,103 +346,6 @@ impl YamantakaApp {
                 }
             }
             self.refresh();
-        }
-    }
-    pub(super) fn metadata_view(&mut self, ui: &mut egui::Ui) {
-        let Some(mut editor) = self.metadata.take() else {
-            return;
-        };
-        let p = Palette::new(self.dark);
-        let compact = ui.ctx().content_rect().height() < 500.0;
-        let writing = editor.pending.as_ref().is_some_and(|(_, writing)| *writing);
-        let ready = editor.snapshot.is_some() && editor.pending.is_none();
-        let mut close = false;
-        let mut request = None;
-        let mut reanalysis = None;
-        egui::ScrollArea::vertical().id_salt("metadata-review").auto_shrink([false,false]).show(ui,|ui| {
-            egui::Frame::new().inner_margin(egui::Margin::symmetric(if ui.available_width()>850.0 {42}else if compact {12}else{18},if compact {10}else{20})).show(ui,|ui| {
-                ui.set_width(ui.available_width().min(880.0));
-                ui.horizontal_top(|ui| {
-                    close=ui.add_enabled_ui(!writing,|ui|theme::icon_button(ui,self.tr("Volver a la biblioteca","Back to library"),theme::Icon::Left,p)).inner.clicked();
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new(self.tr("Título y autor","Title and author")).font(egui::FontId::new(if compact {20.0}else{26.0},egui::FontFamily::Name("Editorial".into()))));
-                        ui.add(egui::Label::new(RichText::new(&editor.document.file_name).size(13.0).color(p.secondary)).truncate());
-                    });
-                });
-                ui.add_space(if compact {8.0}else{18.0});
-                ui.add(egui::Label::new(RichText::new(if compact {self.tr("Edita tu biblioteca sin modificar el PDF.","Edit your library without changing the PDF.")}else{self.tr("Tus correcciones tienen prioridad sobre el análisis automático. El PDF original se conserva intacto.","Your corrections take priority over automatic analysis. The original PDF stays unchanged.")}).color(p.secondary)).wrap());
-                ui.add_space(if compact {8.0}else{18.0});
-                ui.add_enabled_ui(ready,|ui| {
-                    let title_label=ui.label(self.tr("Título","Title"));
-                    if ui.add(egui::TextEdit::singleline(&mut editor.title).id_salt("metadata-title").desired_width(f32::INFINITY).char_limit(512)).labelled_by(title_label.id).changed() {editor.saved=false;}
-                    if let Some(proposal)=editor.snapshot.as_ref().and_then(|s|s.suggested_title.as_ref()) {
-                        ui.horizontal_wrapped(|ui| {
-                            ui.label(RichText::new(format!("{}: {proposal}",self.tr("Propuesta","Suggestion"))).color(p.accent));
-                            if theme::navigation(ui,self.tr("Usar este título","Use this title"),false,p).clicked() {editor.title=proposal.clone();editor.saved=false;}
-                        });
-                    }
-                    ui.add_space(16.0);
-                    let author_label=ui.label(self.tr("Autor","Author"));
-                    if ui.add(egui::TextEdit::singleline(&mut editor.author).id_salt("metadata-author").desired_width(f32::INFINITY).char_limit(512)).labelled_by(author_label.id).changed() {editor.saved=false;}
-                    if let Some(proposal)=editor.snapshot.as_ref().and_then(|s|s.suggested_author.as_ref()) {
-                        ui.horizontal_wrapped(|ui| {
-                            ui.label(RichText::new(format!("{}: {proposal}",self.tr("Propuesta","Suggestion"))).color(p.accent));
-                            if theme::navigation(ui,self.tr("Usar este autor","Use this author"),false,p).clicked() {editor.author=proposal.clone();editor.saved=false;}
-                        });
-                    }
-                });
-                ui.add_space(22.0);
-                ui.horizontal_wrapped(|ui| {
-                    if ui.add_enabled_ui(ready,|ui|theme::control(ui,self.tr("Guardar cambios","Save changes"),None,false,true,p)).inner.clicked() {
-                        match ManualMetadata::new(&editor.title,&editor.author) {
-                            Ok(value)=>request=editor.apply(MetadataMutation::Save(value)),
-                            Err(error)=>editor.error=Some(error.to_string()),
-                        }
-                    }
-                    if editor.snapshot.as_ref().is_some_and(|s|s.suggested_title.is_some() || s.suggested_author.is_some()) && ui.add_enabled_ui(ready,|ui|theme::navigation(ui,self.tr("Descartar propuestas","Dismiss suggestions"),false,p)).inner.clicked() {request=editor.apply(MetadataMutation::DismissSuggestions);}
-                });
-                if editor.saved {ui.label(RichText::new(self.tr("Cambios guardados en la biblioteca.","Changes saved to the library.")).color(p.secondary));}
-                if editor.analyzed {ui.label(RichText::new(self.tr("Análisis actualizado. Tus correcciones manuales se han conservado.","Analysis updated. Your manual corrections have been preserved.")).color(p.secondary));}
-                if let Some(error)=editor.error.as_ref() {
-                    ui.add_space(12.0);
-                    ui.label(RichText::new(error).color(p.ink));
-                    if editor.pending.is_none() && theme::navigation(ui,self.tr("Volver a consultar","Reload metadata"),false,p).clicked() {request=Some(editor.read());}
-                }
-                if let Some(snapshot)=editor.snapshot.clone() {
-                    ui.add_space(28.0);
-                    ui.separator();
-                    ui.add_space(12.0);
-                    ui.label(RichText::new(self.tr("Datos incluidos en el PDF","Embedded PDF metadata")).size(14.0));
-                    for (label,value) in [(self.tr("Título","Title"),snapshot.source_title.as_deref()),(self.tr("Autor","Author"),snapshot.source_author.as_deref())] {
-                        ui.label(RichText::new(format!("{label}: {}",value.filter(|s|!s.is_empty()).unwrap_or(self.tr("Sin especificar","Not specified")))).color(p.secondary));
-                    }
-                    ui.add_space(12.0);
-                    if editor.analyzing {
-                        if theme::navigation(ui,self.tr("Cancelar análisis","Cancel analysis"),false,p).clicked() && let Some((cancel,_))=&editor.pending {cancel.cancel();self.runtime.wake();}
-                    } else if ui.add_enabled_ui(ready && editor.clean_draft() && !editor.document.missing,|ui|theme::navigation(ui,self.tr("Volver a analizar el PDF","Analyze PDF again"),false,p)).inner.on_hover_text(self.tr("Guarda o descarta tu borrador antes de analizar. Las correcciones manuales se conservan.","Save or discard your draft before analysis. Manual corrections are preserved.")).clicked() {reanalysis=editor.reanalyze();}
-                    if snapshot.title_override.is_some() || snapshot.author_override.is_some() {
-                        ui.add_space(12.0);
-                        ui.add_enabled_ui(ready,|ui| {
-                            if editor.confirm_reset {
-                                ui.label(self.tr("Se eliminarán tus correcciones manuales de título y autor.","Your manual title and author corrections will be removed."));
-                                ui.horizontal_wrapped(|ui| {
-                                    if theme::navigation(ui,self.tr("Restablecer valores automáticos","Restore automatic values"),false,p).clicked() {request=editor.apply(MetadataMutation::ResetOverrides);}
-                                    if theme::navigation(ui,self.tr("Cancelar","Cancel"),false,p).clicked() {editor.confirm_reset=false;}
-                                });
-                            } else if theme::navigation(ui,self.tr("Restablecer valores automáticos…","Restore automatic values…"),false,p).clicked() {editor.confirm_reset=true;}
-                        });
-                    }
-                }
-            });
-        });
-        if !close {
-            self.metadata = Some(editor);
-        }
-        if let Some(request) = request {
-            self.send_metadata(request);
-        }
-        if let Some((expected, cancel)) = reanalysis {
-            self.send_metadata_reanalysis(expected, cancel);
         }
     }
 }

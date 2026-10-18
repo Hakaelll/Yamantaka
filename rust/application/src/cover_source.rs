@@ -2,6 +2,7 @@ use std::{path::PathBuf, sync::Arc};
 use yamantaka_domain::{
     Cancellation, Document, Failure, LibraryRepository, RenderedPage, Result,
     cover_snapshot::CoverSnapshot,
+    metadata_review::{MetadataField, MetadataReview},
 };
 
 #[derive(Clone)]
@@ -11,6 +12,7 @@ pub struct CoverSource {
     fingerprint: String,
     pages: u32,
     missing: bool,
+    metadata: Option<Box<(MetadataReview, MetadataField)>>,
 }
 impl CoverSource {
     pub fn capture(document: &Document) -> Self {
@@ -20,7 +22,17 @@ impl CoverSource {
             fingerprint: document.fingerprint.clone(),
             pages: document.page_count,
             missing: document.missing,
+            metadata: None,
         }
+    }
+    pub fn metadata_evidence(
+        document: &Document,
+        review: &MetadataReview,
+        field: MetadataField,
+    ) -> Self {
+        let mut source = Self::capture(document);
+        source.metadata = Some(Box::new((review.clone(), field)));
+        source
     }
     pub(crate) fn id(&self) -> &str {
         &self.id
@@ -28,7 +40,12 @@ impl CoverSource {
     pub(crate) fn path(&self) -> PathBuf {
         self.path.clone()
     }
-    pub(crate) fn read(&self, repository: &impl LibraryRepository) -> Result<Document> {
+    pub(crate) fn read(
+        &self,
+        repository: &impl LibraryRepository,
+        cancel: &Cancellation,
+    ) -> Result<Document> {
+        cancel.check()?;
         let document = repository
             .get(&self.id)?
             .ok_or_else(|| Failure::Invalid("Cover document no longer exists".into()))?;
@@ -42,6 +59,12 @@ impl CoverSource {
             return Err(Failure::Invalid(
                 "Cover source changed; refresh the document before retrying".into(),
             ));
+        }
+        if let Some(guard) = &self.metadata {
+            if guard.0.document != self.id {
+                return Err(Failure::Invalid("Metadata preview document changed".into()));
+            }
+            repository.metadata_source(&guard.0, guard.1, cancel)?;
         }
         Ok(document)
     }
@@ -77,7 +100,7 @@ impl CoverFrame {
         cancel: &Cancellation,
     ) -> Result<Arc<RenderedPage>> {
         cancel.check()?;
-        self.source.read(repository)?;
+        self.source.read(repository, cancel)?;
         if let Some(snapshot) = &self.selection
             && repository.cover_snapshot(self.id())? != *snapshot
         {

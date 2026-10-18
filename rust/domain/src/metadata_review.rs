@@ -1,4 +1,42 @@
-use crate::{Failure, Result};
+use crate::{Document, Failure, Result};
+use std::path::PathBuf;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetadataField {
+    Title,
+    Author,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetadataEvidenceKind {
+    ProminentText,
+    RepeatedTitleWithByline,
+    ExplicitByline,
+    ConflictingBylines,
+    Corroborated,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MetadataEvidence {
+    pub value: String,
+    pub page: u32,
+    pub kind: MetadataEvidenceKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MetadataFile {
+    pub path: PathBuf,
+    pub fingerprint: String,
+    pub page_count: u32,
+    pub missing: bool,
+    pub size: u64,
+    pub modified: String,
+}
+
+pub struct MetadataLocation {
+    pub document: Document,
+    pub page: u32,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MetadataReview {
@@ -14,6 +52,18 @@ pub struct MetadataReview {
     pub author_override: Option<String>,
     pub suggested_title: Option<String>,
     pub suggested_author: Option<String>,
+    pub file: MetadataFile,
+    pub title_evidence: Option<MetadataEvidence>,
+    pub author_evidence: Option<MetadataEvidence>,
+}
+
+impl MetadataReview {
+    pub fn evidence(&self, field: MetadataField) -> Option<&MetadataEvidence> {
+        match field {
+            MetadataField::Title => self.title_evidence.as_ref(),
+            MetadataField::Author => self.author_evidence.as_ref(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -100,7 +100,7 @@ pub(crate) fn save(
     manual: [bool; 2],
     now: &str,
 ) -> Result<()> {
-    let (status, title, author, error, record) = match analysis {
+    let (status, title, author, error, mut record) = match analysis {
         ImportAnalysis::NotRequested => return Ok(()),
         ImportAnalysis::Unavailable(reason) => (
             "failed",
@@ -128,6 +128,15 @@ pub(crate) fn save(
             )
         }
     };
+    let (size, modified, pages): (i64, String, u32) = tx
+        .query_row(
+            "SELECT file_size,file_modified_at,page_count FROM documents WHERE id=?",
+            [id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(storage)?;
+    record["source"] =
+        json!({"fingerprint":fingerprint,"size":size,"modified":modified,"pages":pages});
     if tx.execute("INSERT INTO document_enrichment(document_id,fingerprint,analyzer_version,status,suggested_title,suggested_author,analyzed_at,error_code) VALUES(?1,?2,?3,?4,?5,?6,?7,?8) ON CONFLICT(document_id) DO UPDATE SET fingerprint=excluded.fingerprint,analyzer_version=excluded.analyzer_version,status=excluded.status,suggested_title=excluded.suggested_title,suggested_author=excluded.suggested_author,title_confidence=NULL,author_confidence=NULL,analyzed_at=excluded.analyzed_at,error_code=excluded.error_code",params![id,fingerprint,ENRICHMENT_ALGORITHM_VERSION,status,title,author,now,error]).map_err(storage)? !=1 {
         return Err(Failure::Storage("Imported metadata analysis was not saved".into()));
     }

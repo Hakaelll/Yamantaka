@@ -513,6 +513,14 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        if matches!(surface, Surface::Library)
+            && matches!(self.surface, Surface::Reader)
+            && self.metadata_source_context()
+            && !self.metadata_return_available()
+        {
+            self.metadata = None;
+        }
+
         if self
             .cover_picker
             .as_ref()
@@ -1446,7 +1454,17 @@ impl App for YamantakaApp {
                         .unwrap_or(document.last_page_index)
                         .min(info.pages.len().saturating_sub(1) as u32);
                     let count = u32::try_from(info.pages.len()).unwrap_or(0);
-                    let navigation = match ReaderNavigation::new(count, page) {
+                    let navigation = match self
+                        .open_intent
+                        .take_navigation(&document.id)
+                        .filter(|nav| nav.page_count() == count)
+                        .map(|mut nav| {
+                            nav.go_to_page(page);
+                            nav
+                        })
+                        .map(Ok)
+                        .unwrap_or_else(|| ReaderNavigation::new(count, page))
+                    {
                         Ok(navigation) => navigation,
                         Err(error) => {
                             self.error = Some(error.to_string());
@@ -1512,6 +1530,9 @@ impl App for YamantakaApp {
                         .accept(&id, page, &cancel, Err(error.to_string()));
                 }
                 Update::Cover(id, result, cancel) => {
+                    if self.accept_metadata_reference(ctx, &id, &result, &cancel) {
+                        continue;
+                    }
                     if !self.accept_cover_picker_image(ctx, &id, &result, &cancel) {
                         self.accept_library_cover(ctx, &id, result, &cancel);
                     }
@@ -1519,6 +1540,7 @@ impl App for YamantakaApp {
                 Update::CoverSourcePage(id, result, cancel) => {
                     self.accept_cover_source_page(&id, result, &cancel)
                 }
+                Update::MetadataSource(reply) => self.accept_metadata_source(reply),
                 Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::TextGeometry(id, payload, cancel) => {
@@ -1753,7 +1775,7 @@ impl App for YamantakaApp {
                         self.error = Some(error.to_string());
                     }
                 }
-                Update::Metadata(reply) => self.accept_metadata(reply),
+                Update::Metadata(reply) => self.accept_metadata(*reply),
                 Update::ReadingGoal(reply) => self.accept_goal(reply),
                 Update::ReadingSessionDeleted(reply) => self.accept_history_delete(reply),
                 Update::ReadingHistory(reply) => {

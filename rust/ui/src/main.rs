@@ -89,7 +89,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         };
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join(if args.iter().any(|arg| arg == "--metadata-reanalyze") {
-                if args.iter().any(|arg| arg == "--metadata-reanalyze-limit") {
+                if args.iter().any(|arg| arg == "--metadata-evidence-later") {
+                    "../../build/rust-fixtures/front-matter-evidence-later.pdf"
+                } else if args.iter().any(|arg| arg == "--metadata-reanalyze-limit") {
                     "../../build/rust-fixtures/front-matter-work-limit.pdf"
                 } else {
                     "../../build/rust-fixtures/front-matter-missing.pdf"
@@ -474,20 +476,32 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_cover_capacity();
                 }
                 if args.iter().any(|arg| arg == "--metadata-review") {
-                    app.preview_metadata(if args.iter().any(|arg| arg == "--metadata-reanalyze") {
-                        "reanalyze"
-                    } else if args
-                        .iter()
-                        .any(|arg| arg == "--metadata-save" || arg == "--metadata-failed")
-                    {
-                        "save"
-                    } else if args.iter().any(|arg| arg == "--metadata-reset") {
-                        "reset"
-                    } else if args.iter().any(|arg| arg == "--metadata-dismiss") {
-                        "dismiss"
-                    } else {
-                        "open"
-                    });
+                    app.preview_metadata(
+                        if args.iter().any(|arg| arg == "--metadata-source-stale") {
+                            "source-stale"
+                        } else if args.iter().any(|arg| arg == "--metadata-source-open") {
+                            "source"
+                        } else if args.iter().any(|arg| arg == "--metadata-source-return") {
+                            "source-return"
+                        } else if args.iter().any(|arg| arg == "--metadata-source-draft") {
+                            "source-draft"
+                        } else if args.iter().any(|arg| arg == "--metadata-reference-visible") {
+                            "reference"
+                        } else if args.iter().any(|arg| arg == "--metadata-reanalyze") {
+                            "reanalyze"
+                        } else if args
+                            .iter()
+                            .any(|arg| arg == "--metadata-save" || arg == "--metadata-failed")
+                        {
+                            "save"
+                        } else if args.iter().any(|arg| arg == "--metadata-reset") {
+                            "reset"
+                        } else if args.iter().any(|arg| arg == "--metadata-dismiss") {
+                            "dismiss"
+                        } else {
+                            "open"
+                        },
+                    );
                 }
                 if args.iter().any(|arg| arg == "--cover-picker") {
                     app.preview_cover_editor("open");

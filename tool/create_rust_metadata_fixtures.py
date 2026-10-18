@@ -69,6 +69,18 @@ pdf.drawString(20, 700, "word " * 4000)
 pdf.showPage()
 pdf.save()
 records.append({"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+path = root / "front-matter-evidence-later.pdf"
+pdf = canvas.Canvas(str(path), pagesize=(600, 800), invariant=1)
+pdf.setTitle("Untitled")
+pdf.setAuthor("Unknown")
+pdf.showPage()
+pdf.setFont("Helvetica", 36)
+pdf.drawString(90, 640, "Geometry of Light")
+pdf.setFont("Helvetica", 16)
+pdf.drawString(100, 595, "By Ada Lovelace")
+pdf.showPage()
+pdf.save()
+records.append({"file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
 (root / "metadata-manifest.json").write_text(
     json.dumps({"synthetic": True, "files": records}, indent=2), encoding="utf-8"
 )
