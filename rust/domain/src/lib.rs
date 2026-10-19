@@ -39,6 +39,7 @@ pub mod reading_sessions;
 pub mod relocation;
 pub mod search;
 pub mod source_revision;
+pub mod tags;
 pub mod text_selection;
 use std::{
     path::PathBuf,
@@ -209,6 +210,17 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn tags(&self, _query: &tags::TagQuery, _cancel: &Cancellation) -> Result<tags::TagPage> {
+        Err(Failure::Unsupported("Library tags".into()))
+    }
+    fn change_tag(
+        &mut self,
+        _change: &tags::TagChange,
+        _access: search::IndexAccess,
+        _cancel: &Cancellation,
+    ) -> Result<String> {
+        Err(Failure::Unsupported("Library tag changes".into()))
+    }
     fn collections(
         &self,
         _query: &collections::CollectionQuery,

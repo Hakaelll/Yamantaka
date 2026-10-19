@@ -130,6 +130,9 @@ pub(crate) fn migrate(connection: &mut Connection, target: u32) -> Result<()> {
             tx.execute_batch(statement).map_err(storage)?;
         }
     }
+    if target >= 2 {
+        tx.execute_batch("CREATE INDEX IF NOT EXISTS idx_rust_document_tags_tag ON document_tags(tag_id,document_id); CREATE INDEX IF NOT EXISTS idx_rust_annotation_tags_tag ON annotation_tags(tag_id,annotation_id); CREATE INDEX IF NOT EXISTS idx_rust_tags_name ON tags(name COLLATE NOCASE,id);").map_err(storage)?;
+    }
     validate(&tx)?;
     tx.commit().map_err(storage)
 }
@@ -325,6 +328,21 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn tags(
+        &self,
+        query: &yamantaka_domain::tags::TagQuery,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::tags::TagPage> {
+        self.tag_page(query, cancel)
+    }
+    fn change_tag(
+        &mut self,
+        change: &yamantaka_domain::tags::TagChange,
+        access: yamantaka_domain::search::IndexAccess,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<String> {
+        self.apply_tag(change, access, cancel)
+    }
     fn collections(
         &self,
         query: &yamantaka_domain::collections::CollectionQuery,

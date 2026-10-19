@@ -13,7 +13,7 @@ fn target(db: &Connection, document: &str, id: &str) -> Result<u32> {
     .map_err(storage)?
     .ok_or_else(|| Failure::Invalid("Annotation no longer belongs to this document".into()))
 }
-fn ensure_tag(db: &Connection, tag: &str, now: &str) -> Result<String> {
+pub(crate) fn ensure_tag(db: &Connection, tag: &str, now: &str) -> Result<String> {
     let tag = tag.trim();
     if tag.is_empty() || tag.len() > 4096 {
         return Err(Failure::Invalid(

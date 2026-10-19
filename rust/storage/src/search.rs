@@ -52,6 +52,32 @@ fn verify_session(db: &Connection, session: &IndexSession) -> Result<()> {
     Ok(())
 }
 const TITLE: &str = "COALESCE(d.title_override,d.title,d.source_title,d.file_name)";
+pub(crate) fn refresh_document_tags(db: &Connection, id: &str, access: IndexAccess) -> Result<()> {
+    let excluded:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM search_index_state WHERE document_id=? AND status='excluded')",[id],|row|row.get(0)).map_err(storage)?;
+    if excluded {
+        return Ok(());
+    }
+    if access == IndexAccess::Disabled {
+        let cached: bool = db
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM library_search WHERE document_id=?)",
+                [id],
+                |row| row.get(0),
+            )
+            .map_err(storage)?;
+        if !cached {
+            return Ok(());
+        }
+    }
+    db.execute(
+        "DELETE FROM library_search WHERE document_id=? AND kind='tag'",
+        [id],
+    )
+    .map_err(storage)?;
+    metadata(db, id)?;
+    db.execute(&format!("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT d.id,-1,'tag',{TITLE},'',t.name FROM document_tags dt JOIN tags t ON t.id=dt.tag_id JOIN documents d ON d.id=dt.document_id WHERE d.id=?"),[id]).map_err(storage)?;
+    Ok(())
+}
 pub(crate) fn refresh_metadata(db: &Connection, id: &str) -> Result<()> {
     let excluded: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM search_index_state WHERE document_id=? AND status='excluded')",[id],|row|row.get(0)).map_err(storage)?;
     if !excluded {

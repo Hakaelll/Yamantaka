@@ -23,4 +23,5 @@ pub mod reader_continuity;
 pub mod reader_preferences;
 pub mod reading_sessions;
 pub mod search;
+mod tags;
 pub use database::Database;
