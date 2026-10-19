@@ -2,6 +2,7 @@
 pub mod annotations;
 pub mod automatic_cover;
 pub mod bookmarks;
+pub mod collections;
 pub mod cover_cache;
 pub mod cover_policy;
 pub mod cover_revision;
@@ -201,6 +202,20 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn collections(
+        &self,
+        _query: &collections::CollectionQuery,
+        _cancel: &Cancellation,
+    ) -> Result<collections::CollectionPage> {
+        Err(Failure::Unsupported("Collections".into()))
+    }
+    fn change_collection(
+        &mut self,
+        _change: &collections::CollectionChange,
+        _cancel: &Cancellation,
+    ) -> Result<String> {
+        Err(Failure::Unsupported("Collection changes".into()))
+    }
     fn registered_import_path(&self, _path: &std::path::Path) -> Result<Option<String>> {
         Err(Failure::Unsupported("Registered import path".into()))
     }

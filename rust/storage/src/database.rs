@@ -286,6 +286,20 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn collections(
+        &self,
+        query: &yamantaka_domain::collections::CollectionQuery,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::collections::CollectionPage> {
+        self.collection_page(query, cancel)
+    }
+    fn change_collection(
+        &mut self,
+        change: &yamantaka_domain::collections::CollectionChange,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<String> {
+        self.apply_collection(change, cancel)
+    }
     fn registered_import_path(&self, path: &Path) -> Result<Option<String>> {
         crate::identity::registered_document(&self.connection, path)
     }

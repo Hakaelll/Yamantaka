@@ -1,4 +1,6 @@
 use std::fs;
+#[path = "support/collections.rs"]
+mod collection_verification;
 use yamantaka_domain::{Cancellation, LibraryQuery, LibraryRepository};
 use yamantaka_storage::{
     Database,
@@ -130,6 +132,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     let saved = db.get("original").unwrap().unwrap();
     assert_eq!(saved.last_page_index, 6);
     assert_eq!(saved.reading_progress, 1.0);
+    collection_verification::verify(&mut db);
 }
 
 #[test]

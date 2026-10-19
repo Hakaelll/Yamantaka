@@ -3,6 +3,7 @@ pub mod annotations;
 mod automatic_cover;
 pub mod backup;
 pub mod bookmarks;
+mod collections;
 pub mod cover_cache;
 mod cover_revision;
 mod cover_selection;
