@@ -71,6 +71,23 @@ impl HashedFile {
         result.verify()?;
         Ok(result)
     }
+    pub(crate) fn reference(
+        &self,
+        source: &yamantaka_domain::source_revision::SourceRevision,
+    ) -> Result<yamantaka_domain::source_revision::FullSourceHash> {
+        self.verify()?;
+        if self.path != source.canonical_path
+            || self.size != source.size
+            || self.modified != source.modified
+            || self.head != source.head_sha256
+        {
+            return Err(changed());
+        }
+        Ok(yamantaka_domain::source_revision::FullSourceHash {
+            source: source.clone(),
+            digest: self.digest,
+        })
+    }
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }

@@ -1,3 +1,5 @@
+#[path = "support/import.rs"]
+mod verified_import;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -73,7 +75,7 @@ fn native_page_evidence_opens_the_later_page_without_changing_library_decisions(
     let original = fs::read(&path).unwrap();
     let analyzed = analyze(&worker, &path);
     let mut db = Database::in_memory_at(11).unwrap();
-    let id = db.import(&analyzed).unwrap();
+    let id = verified_import::save(&mut db, &analyzed).unwrap();
     let cancel = Cancellation::default();
     let review = db.metadata_review(&id, &cancel).unwrap();
     assert_eq!(
@@ -141,7 +143,7 @@ fn stale_catalogue_frames_cancelled_requests_and_changed_files_cannot_open_evide
         let analyzed = analyze(&worker, &fixture);
         let db = Database::in_memory_at(11).unwrap();
         let mut db = db;
-        let id = db.import(&analyzed).unwrap();
+        let id = verified_import::save(&mut db, &analyzed).unwrap();
         let review = db.metadata_review(&id, &Cancellation::default()).unwrap();
         db.execute_batch(change).unwrap();
         assert!(
@@ -157,7 +159,7 @@ fn stale_catalogue_frames_cancelled_requests_and_changed_files_cannot_open_evide
     fs::write(&copy, &original).unwrap();
     let analyzed = analyze(&worker, &copy);
     let mut db = Database::in_memory_at(11).unwrap();
-    let id = db.import(&analyzed).unwrap();
+    let id = verified_import::save(&mut db, &analyzed).unwrap();
     let review = db.metadata_review(&id, &Cancellation::default()).unwrap();
     let cancel = Cancellation::default();
     cancel.cancel();

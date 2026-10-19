@@ -3,6 +3,56 @@ use sha2::{Digest, Sha256};
 use std::{fs::File, io::Read, path::Path};
 use yamantaka_domain::{Cancellation, Result};
 
+pub(crate) fn registered_document(
+    connection: &rusqlite::Connection,
+    path: &Path,
+) -> Result<Option<String>> {
+    if !path.is_absolute() {
+        return Err(yamantaka_domain::Failure::Invalid(
+            "Import path must be absolute".into(),
+        ));
+    }
+    let normalized = path
+        .to_str()
+        .ok_or_else(|| {
+            yamantaka_domain::Failure::Invalid(
+                "Import path is not valid Unicode; choose another file name".into(),
+            )
+        })?
+        .to_lowercase();
+    let legacy = if let Some(unc) = normalized.strip_prefix(r"\\?\unc\") {
+        format!(r"\\{unc}")
+    } else {
+        normalized
+            .strip_prefix(r"\\?\")
+            .unwrap_or(&normalized)
+            .to_owned()
+    };
+    let verbatim = if normalized.starts_with(r"\\?\") {
+        normalized.clone()
+    } else if let Some(unc) = normalized.strip_prefix(r"\\") {
+        format!(r"\\?\unc\{unc}")
+    } else {
+        format!(r"\\?\{normalized}")
+    };
+    let ids = connection
+        .prepare("SELECT id FROM documents WHERE normalized_path IN (?1,?2,?3) ORDER BY id LIMIT 2")
+        .map_err(storage)?
+        .query_map(rusqlite::params![normalized, legacy, verbatim], |row| {
+            row.get::<_, String>(0)
+        })
+        .map_err(storage)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(storage)?;
+    if ids.len() > 1 {
+        return Err(yamantaka_domain::Failure::Invalid(
+            "More than one document uses this source path; review the library before importing"
+                .into(),
+        ));
+    }
+    Ok(ids.into_iter().next())
+}
+
 pub fn legacy_fingerprint(path: &Path) -> Result<String> {
     let file = File::open(path).map_err(storage)?;
     let size = file.metadata().map_err(storage)?.len();

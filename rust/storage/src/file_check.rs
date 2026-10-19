@@ -274,3 +274,33 @@ pub(crate) fn relocate(
     tx.commit().map_err(storage)?;
     Ok(())
 }
+
+pub(crate) fn save_import_reference(
+    main: &Connection,
+    cached: &RefCell<Option<Connection>>,
+    id: &str,
+    document: &yamantaka_domain::NewDocument,
+    digest: &[u8; 32],
+) -> Result<()> {
+    let file = CataloguedFile {
+        path: document.source.canonical_path.clone(),
+        fingerprint: yamantaka_domain::source_revision::legacy_fingerprint(
+            document.source.size,
+            document.source.head_sha256,
+        ),
+        page_count: u32::try_from(document.info.pages.len()).map_err(storage)?,
+        missing: false,
+        size: document.source.size,
+        modified: chrono::DateTime::<chrono::Utc>::from(document.source.modified).to_rfc3339(),
+    };
+    save_reference(main, cached, id, &file, &file, digest)
+}
+pub(crate) fn remove_import_reference(database: &Database, id: &str) -> Result<()> {
+    let mut cached = database.file_checks.borrow_mut();
+    if let Some(cached) = cached.as_mut() {
+        cached
+            .execute("DELETE FROM file_hashes WHERE document_id=?", [id])
+            .map_err(cache_error)?;
+    }
+    Ok(())
+}

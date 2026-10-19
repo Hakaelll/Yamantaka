@@ -316,6 +316,7 @@ mod tests {
         assert_eq!(documents(&runtime).len(), 3);
         drop(runtime);
         assert_eq!(governor.usage().total, 0);
+        crate::import_hash::verification_test::verify(&root);
         super::recovery_test::verify(&root, &paths);
         for (path, original) in paths.iter().zip(originals) {
             assert_eq!(

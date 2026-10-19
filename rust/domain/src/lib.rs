@@ -201,6 +201,10 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn registered_import_path(&self, _path: &std::path::Path) -> Result<Option<String>> {
+        Err(Failure::Unsupported("Registered import path".into()))
+    }
+
     fn file_check_upper_bound(&self) -> Result<Option<String>> {
         Err(Failure::Unsupported("Library file verification".into()))
     }
@@ -335,7 +339,12 @@ pub trait LibraryRepository {
     ) -> Result<()> {
         Err(Failure::Unsupported("Saving reader preferences".into()))
     }
-    fn import(&mut self, document: &NewDocument) -> Result<String>;
+    fn import(
+        &mut self,
+        document: &NewDocument,
+        reference: &source_revision::FullSourceHash,
+        cancel: &Cancellation,
+    ) -> Result<String>;
 }
 pub struct NewDocument {
     pub path: PathBuf,

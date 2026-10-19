@@ -6,6 +6,7 @@ pub(super) struct CheckState {
     pending: Option<(String, Cancellation)>,
     outcome: Option<FileCheckReply>,
     preview: bool,
+    import_preview: bool,
     capture_mode: bool,
 }
 impl CheckState {
@@ -16,7 +17,7 @@ impl CheckState {
         self.outcome = None;
     }
     pub(super) fn ready(&self) -> bool {
-        self.pending.is_none() && !self.preview
+        self.pending.is_none() && !self.preview && !self.import_preview
     }
     pub(super) fn accept(&mut self, reply: FileCheckReply) {
         if self.pending.as_ref().is_some_and(|(id, cancel)| {
@@ -42,6 +43,12 @@ impl CheckState {
     }
 }
 impl YamantakaApp {
+    pub fn preview_import_reference(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.file_check.import_preview = true;
+            self.file_check.capture_mode = true;
+        }
+    }
     pub fn preview_file_check(&mut self) {
         if self.demo && self.capture.is_some() {
             self.inspector = true;
@@ -67,6 +74,21 @@ impl YamantakaApp {
                 .cloned()
         {
             self.file_check.preview = false;
+            self.start_file_check(&document);
+        }
+        if self.file_check.import_preview
+            && !self.importing.busy()
+            && let Some(document) = self
+                .documents
+                .iter()
+                .find(|document| {
+                    document.file_name == "first.pdf" && !document.id.starts_with("demo-")
+                })
+                .cloned()
+        {
+            self.file_check.import_preview = false;
+            self.inspector = true;
+            self.selected = Some(document.id.clone());
             self.start_file_check(&document);
         }
     }

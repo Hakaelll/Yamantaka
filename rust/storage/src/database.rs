@@ -286,6 +286,10 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn registered_import_path(&self, path: &Path) -> Result<Option<String>> {
+        crate::identity::registered_document(&self.connection, path)
+    }
+
     fn file_check_upper_bound(&self) -> Result<Option<String>> {
         self.connection
             .query_row("SELECT max(id) FROM documents", [], |row| row.get(0))
@@ -450,51 +454,13 @@ impl LibraryRepository for Database {
     ) -> Result<()> {
         crate::reader_preferences::save(self, document_id, preferences)
     }
-    fn import(&mut self, document: &NewDocument) -> Result<String> {
-        let path = std::fs::canonicalize(&document.path).map_err(storage)?;
-        let normalized = path.to_string_lossy().to_lowercase();
-        use rusqlite::OptionalExtension;
-        if let Some(id) = self
-            .connection
-            .query_row(
-                "SELECT id FROM documents WHERE normalized_path=?",
-                [&normalized],
-                |r| r.get::<_, String>(0),
-            )
-            .optional()
-            .map_err(storage)?
-        {
-            return Ok(id);
-        }
-        let metadata = path.metadata().map_err(storage)?;
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-        let (title, author) = crate::import_metadata::effective(document, &file_name);
-        let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
-        let fingerprint = crate::identity::verify_import_source(&path, &document.source)?;
-        let transaction = self.connection.transaction().map_err(storage)?;
-        if transaction.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,source_title,source_author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?12,?13)", params![id,path.to_string_lossy(),normalized,file_name,title,author,document.info.title,document.info.author,document.info.pages.len() as i64,metadata.len() as i64,chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),now,fingerprint]).map_err(storage)? !=1 {
-            return Err(Failure::Storage("Imported document was not saved".into()));
-        }
-        crate::import_metadata::save(
-            &transaction,
-            &id,
-            &fingerprint,
-            &document.analysis,
-            [false, false],
-            &now,
-        )?;
-        let saved:serde_json::Value=transaction.query_row("SELECT json_object('path',path,'normalized',normalized_path,'file',file_name,'title',title,'author',author,'sourceTitle',source_title,'sourceAuthor',source_author,'pages',page_count,'size',file_size,'modified',file_modified_at,'fingerprint',fingerprint) FROM documents WHERE id=?",[&id],|row|row.get(0)).map_err(storage)?;
-        let expected = serde_json::json!({"path":path.to_string_lossy(),"normalized":normalized,"file":file_name,"title":title,"author":author,"sourceTitle":document.info.title,"sourceAuthor":document.info.author,"pages":document.info.pages.len(),"size":metadata.len(),"modified":chrono::DateTime::<chrono::Utc>::from(metadata.modified().map_err(storage)?).to_rfc3339(),"fingerprint":fingerprint});
-        if saved != expected
-            || crate::identity::verify_import_source(&path, &document.source)? != fingerprint
-        {
-            return Err(Failure::Storage(
-                "Imported metadata changed before commit".into(),
-            ));
-        }
-        transaction.commit().map_err(storage)?;
-        Ok(id)
+    fn import(
+        &mut self,
+        document: &NewDocument,
+        reference: &yamantaka_domain::source_revision::FullSourceHash,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<String> {
+        crate::import_document::save(self, document, reference, cancel)
     }
     fn query(&self, query: &LibraryQuery) -> Result<Vec<Document>> {
         let (filter, mut values) = filter(query);

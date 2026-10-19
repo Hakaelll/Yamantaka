@@ -931,6 +931,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     b"Synthetic folder import fixture",
                 )?;
                 app.import_folder(root);
+                if args.iter().any(|arg| arg == "--import-reference") {
+                    app.preview_import_reference();
+                }
             }
             if demo && args.iter().any(|arg| arg == "--tools-menu") {
                 app.preview_tools_menu();

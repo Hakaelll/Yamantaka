@@ -1,3 +1,5 @@
+#[path = "support/import.rs"]
+mod verified_import;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -74,7 +76,7 @@ fn reanalysis_replaces_evidence_and_preserves_manual_metadata_topics_and_reading
     let analyzed = analyze(&worker, &source);
     let cancel = Cancellation::default();
     let mut db = Database::in_memory_at(11).unwrap();
-    let id = db.import(&analyzed).unwrap();
+    let id = verified_import::save(&mut db, &analyzed).unwrap();
     let original = db.get(&id).unwrap().unwrap();
     let before = db.metadata_review(&id, &cancel).unwrap();
     let refreshed = db
@@ -130,7 +132,7 @@ fn reanalysis_upgrades_a_generated_filename_but_preserves_manual_corrections() {
     let analyzed = analyze(&worker, &path);
     let cancel = Cancellation::default();
     let mut db = Database::in_memory_at(11).unwrap();
-    let id = db.import(&analyzed).unwrap();
+    let id = verified_import::save(&mut db, &analyzed).unwrap();
     let expected_title =
         "Atlas of Regional Libraries Volume Four: Reading Rooms and Study Collections";
     assert_eq!(
@@ -176,7 +178,7 @@ fn old_metadata_or_changed_native_source_cannot_commit_reanalysis() {
     let analyzed = analyze(&worker, &source);
     let cancel = Cancellation::default();
     let mut db = Database::in_memory_at(11).unwrap();
-    let id = db.import(&analyzed).unwrap();
+    let id = verified_import::save(&mut db, &analyzed).unwrap();
     let original = db.get(&id).unwrap().unwrap();
     db.execute_batch(&format!(
         "UPDATE documents SET title='Accepted automatic title' WHERE id='{id}'"
@@ -234,7 +236,7 @@ fn ignored_or_failed_reanalysis_writes_restore_the_entire_previous_review() {
         "CREATE TRIGGER broken BEFORE UPDATE ON app_metadata BEGIN SELECT RAISE(ABORT,'Synthetic reanalysis failure'); END;",
     ] {
         let mut db = Database::in_memory_at(11).unwrap();
-        let id = db.import(&analyzed).unwrap();
+        let id = verified_import::save(&mut db, &analyzed).unwrap();
         let original = db.get(&id).unwrap().unwrap();
         let before = db.metadata_review(&id, &cancel).unwrap();
         db.execute_batch(trigger).unwrap();

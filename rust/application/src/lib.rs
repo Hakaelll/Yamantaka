@@ -11,6 +11,7 @@ pub mod file_comparison;
 mod file_digest;
 mod folder_import;
 mod import_enrichment;
+mod import_hash;
 pub mod library_check;
 pub mod manual_cover;
 pub mod metadata_review;

@@ -9,6 +9,13 @@ pub struct SourceRevision {
     pub head_sha256: [u8; 32],
 }
 
+/// A full digest bound to the same native source revision as imported metadata.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FullSourceHash {
+    pub source: SourceRevision,
+    pub digest: [u8; 32],
+}
+
 /// Legacy identity preserves migrated references; it does not prove full equality.
 pub fn legacy_fingerprint(size: u64, head: [u8; 32]) -> String {
     use sha2::{Digest, Sha256};

@@ -1,3 +1,5 @@
+#[path = "../../storage/tests/support/import.rs"]
+mod verified_import;
 use crossbeam_channel::bounded;
 use std::{
     path::PathBuf,
@@ -36,7 +38,7 @@ fn cancelled_import_reopen_finishes_without_unpinning_either_reader() {
     run(Operation::Import, Outcome::Cancel);
 }
 #[test]
-fn a_source_replaced_while_import_analysis_waits_is_not_catalogued() {
+fn an_import_source_cannot_be_replaced_while_analysis_waits() {
     run(Operation::Import, Outcome::SourceChanged);
 }
 #[test]
@@ -97,14 +99,16 @@ fn run(operation: Operation, outcome: Outcome) {
             .wait()
             .unwrap();
         worker.close("seed".into()).unwrap();
-        let id = database
-            .import(&NewDocument {
+        let id = verified_import::save(
+            &mut database,
+            &NewDocument {
                 path: target.clone(),
                 info,
                 source,
                 analysis: ImportAnalysis::NotRequested,
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
         database.execute_batch("UPDATE documents SET title_override='My geometry',author_override='My author' WHERE id NOT IN ('reader-a','reader-b')").unwrap();
         Some(
             database
@@ -172,8 +176,15 @@ fn run(operation: Operation, outcome: Outcome) {
     );
     let mut target_bytes = originals[0].clone();
     if outcome == Outcome::SourceChanged {
-        target_bytes.extend_from_slice(b"\n% Synthetic replacement while analysis waits\n");
-        std::fs::write(&target, &target_bytes).unwrap();
+        let mut changed = target_bytes.clone();
+        changed.extend_from_slice(b"\n% Synthetic replacement while analysis waits\n");
+        let result = std::fs::write(&target, &changed);
+        if operation == Operation::Import {
+            assert_eq!(result.unwrap_err().raw_os_error(), Some(32));
+        } else {
+            result.unwrap();
+            target_bytes = changed;
+        }
     }
     if outcome == Outcome::Cancel {
         cancel.cancel();
@@ -207,7 +218,8 @@ fn run(operation: Operation, outcome: Outcome) {
         }
     }
     let result = wait(&runtime);
-    let succeeds = matches!(outcome, Outcome::Resume | Outcome::PreemptAgain);
+    let succeeds = matches!(outcome, Outcome::Resume | Outcome::PreemptAgain)
+        || operation == Operation::Import && outcome == Outcome::SourceChanged;
     if let Some(expected) = &expected {
         let Update::Metadata(reply) = result else {
             panic!("Expected a scoped metadata result");
@@ -277,6 +289,21 @@ fn run(operation: Operation, outcome: Outcome) {
         if expected.is_none() {
             assert_eq!(imported.display_title(), "Geometry of Light");
         }
+        let reference = catalogue
+            .file_snapshot(&imported.id)
+            .unwrap()
+            .digest
+            .unwrap();
+        let actual =
+            yamantaka_storage::identity::full_sha256(&target, &Cancellation::default()).unwrap();
+        assert_eq!(
+            reference
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            actual
+        );
+
         let evidence: String = connection
             .query_row(
                 "SELECT value FROM app_metadata WHERE key=?",
@@ -288,6 +315,25 @@ fn run(operation: Operation, outcome: Outcome) {
         assert_eq!(evidence["title"]["candidate"]["page"], 0);
     } else if expected.is_none() {
         assert!(!documents.iter().any(|d| d.path == target));
+    }
+    if succeeds && operation == Operation::Import {
+        let revision = runtime.import_revision();
+        for _ in opened.try_iter() {}
+        runtime
+            .submit(Action::Import(
+                vec![target.clone()],
+                Cancellation::default(),
+            ))
+            .unwrap();
+        assert!(matches!(wait(&runtime), Update::Imported(1, _)));
+        assert_eq!(runtime.import_revision(), revision);
+        assert!(
+            matches!(
+                opened.try_recv(),
+                Err(crossbeam_channel::TryRecvError::Empty)
+            ),
+            "A registered path must not reopen PDFium"
+        );
     }
     runtime
         .submit(Action::Text("reader-a".into(), 0, Cancellation::default()))
@@ -305,7 +351,7 @@ fn run(operation: Operation, outcome: Outcome) {
 }
 
 #[test]
-fn losing_the_initial_source_owner_reloads_page_info_before_binding_a_new_source() {
+fn the_import_read_guard_survives_losing_and_reloading_the_initial_native_owner() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let dir = tempfile::tempdir().unwrap();
     let dbpath = dir.path().join("library.sqlite3");
@@ -373,9 +419,13 @@ fn losing_the_initial_source_owner_reloads_page_info_before_binding_a_new_source
     source.reply.send(lost).unwrap();
     requested(&opened, &source.id);
     assert_eq!(runtime.import_revision(), 0);
-    // No source snapshot has been accepted yet. A replacement must supply both
-    // fresh page metadata and a matching snapshot, never the old two-page info.
-    std::fs::write(&target, &originals[3]).unwrap();
+    // The application guard survives native eviction, even before its first snapshot.
+    assert_eq!(
+        std::fs::write(&target, &originals[3])
+            .unwrap_err()
+            .raw_os_error(),
+        Some(32)
+    );
     visible(&runtime, &["reader-a"]);
     assert!(matches!(wait(&runtime),Update::Imported(1,token) if token.same_request(&cancel)));
     let connection = rusqlite::Connection::open(&dbpath).unwrap();
@@ -386,13 +436,13 @@ fn losing_the_initial_source_owner_reloads_page_info_before_binding_a_new_source
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .unwrap();
-    assert_eq!(pages_count, 7);
-    assert_eq!(u64::try_from(size).unwrap(), originals[3].len() as u64);
-    assert_eq!(*pages.lock().unwrap(), vec![0, 1, 2, 3, 4, 5]);
+    assert_eq!(pages_count, 2);
+    assert_eq!(u64::try_from(size).unwrap(), originals[0].len() as u64);
+    assert_eq!(*pages.lock().unwrap(), vec![0, 1]);
     drop(runtime);
     drop(control);
     assert_eq!(governor.usage().total, 0);
-    assert_eq!(std::fs::read(&target).unwrap(), originals[3]);
+    assert_eq!(std::fs::read(&target).unwrap(), originals[0]);
     for (path, original) in fixtures.iter().zip(originals) {
         assert_eq!(std::fs::read(path).unwrap(), original);
     }

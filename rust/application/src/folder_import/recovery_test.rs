@@ -49,6 +49,8 @@ pub(super) fn verify(root: &Path, paths: &[PathBuf]) {
     drop(first_runtime);
     let mut db = Database::open(&database).unwrap();
     let first = db.query(&LibraryQuery::default()).unwrap().remove(0);
+    assert!(db.file_snapshot(&first.id).unwrap().digest.is_some());
+
     let job = db.queue_import(&source).unwrap().unwrap();
     db.checkpoint_import(&job, &paths[0], &first.id).unwrap();
     assert_eq!(db.pending_imports().unwrap()[0].completed, 1);
