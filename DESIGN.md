@@ -500,3 +500,5 @@ library filter row. Creation from a book assigns atomically and then shows that
 exact tag, with an explicit return to all tags. Tag and collection forms clamp
 to available width and stack controls on narrow windows; recorded native control
 bounds enforce that controls stay inside their horizontal clip.
+
+Library multiselection uses the existing filter row, never a separate persistent action bar. Its count opens a bounded, scrollable menu; narrow layouts use a checkbox icon with the full accessible name. When books are selected, favorite actions come first. A running write puts cancellation first. Selection keeps the projected violet cover outline and marker, list rows use raised fill and a marker, and keyboard focus retains its independent outline. The inspector cursor does not stand in for the multiselection set.

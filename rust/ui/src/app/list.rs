@@ -83,10 +83,11 @@ impl YamantakaApp {
         let height = if wide { 92.0 } else { 184.0 };
         let (row, _) = ui.allocate_exact_size(egui::vec2(width, height), Sense::hover());
         // No hidden book meshes, texture work, animation IDs or text galleys.
-        if !ui.is_rect_visible(row) {
+        if !ui.is_rect_visible(row) && self.library_selection.focus.as_deref() != Some(&document.id)
+        {
             return;
         }
-        let selected = self.selected.as_deref() == Some(document.id.as_str());
+        let selected = self.library_selection.model.contains(&document.id);
         let progress = if document.reading_progress.is_finite() {
             document.reading_progress.clamp(0.0, 1.0) as f32
         } else {
@@ -199,15 +200,15 @@ impl YamantakaApp {
             let cover_rect =
                 Rect::from_min_size(row.min + egui::vec2(8.0, 5.0), egui::vec2(54.0, 82.0));
             let mut cover_ui = bounded_child(ui, "miniature", cover_rect);
-            let cover = book::miniature(&mut cover_ui, document, 54.0, self.reduced_motion, p);
-            if cover.clicked() {
-                self.selected = Some(document.id.clone());
-            }
-            if cover.double_clicked()
-                || cover.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))
-            {
-                self.open(document.clone());
-            }
+            let cover = book::miniature(
+                &mut cover_ui,
+                document,
+                54.0,
+                selected,
+                self.reduced_motion,
+                p,
+            );
+            self.library_book_response(ui, &cover, document);
             cover
                 .on_hover_text(&semantic_label)
                 .context_menu(|ui| self.list_context_menu(ui, document, p));
@@ -342,14 +343,7 @@ impl YamantakaApp {
             );
             self.list_actions(ui, document, action_rect, p);
         }
-        if response.clicked() {
-            self.selected = Some(document.id.clone());
-        }
-        if response.double_clicked()
-            || response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))
-        {
-            self.open(document.clone());
-        }
+        self.library_book_response(ui, &response, document);
         response
             .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text(format!(
@@ -417,7 +411,13 @@ impl YamantakaApp {
         } else {
             self.tr("Añadir a favoritos", "Add to favorites")
         };
-        if theme::navigation(ui, favorite, document.favorite, p).clicked() {
+        if ui
+            .add_enabled_ui(!self.library_selection.writing(), |ui| {
+                theme::navigation(ui, favorite, document.favorite, p)
+            })
+            .inner
+            .clicked()
+        {
             self.send(Action::Favorite(document.id.clone(), !document.favorite));
             self.refresh();
             ui.close();

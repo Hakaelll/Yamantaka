@@ -9,19 +9,19 @@ impl YamantakaApp {
         documents: Vec<Document>,
         p: Palette,
     ) {
+        self.library_selection.columns = 1;
         for document in documents {
             ui.push_id(("compact-jacket", &document.id), |ui| {
                 ui.horizontal_top(|ui| {
-                    let response = book::miniature(ui, &document, 76.0, self.reduced_motion, p);
-                    if response.clicked() {
-                        self.selected = Some(document.id.clone());
-                    }
-                    if response.double_clicked()
-                        || response.has_focus()
-                            && ui.input(|input| input.key_pressed(egui::Key::Enter))
-                    {
-                        self.open(document.clone());
-                    }
+                    let response = book::miniature(
+                        ui,
+                        &document,
+                        76.0,
+                        self.library_selection.model.contains(&document.id),
+                        self.reduced_motion,
+                        p,
+                    );
+                    self.library_book_response(ui, &response, &document);
                     response.on_hover_text(document.display_title());
                     let width = ui.available_width();
                     ui.allocate_ui_with_layout(

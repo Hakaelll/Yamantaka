@@ -13,6 +13,7 @@ pub mod file_check;
 pub mod front_matter;
 pub mod import_metadata;
 pub mod import_recovery;
+pub mod library_selection;
 pub mod library_smart_view;
 pub use library_smart_view::LibrarySmartView;
 pub mod memory;

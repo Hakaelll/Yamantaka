@@ -117,6 +117,7 @@ pub fn miniature(
     ui: &mut egui::Ui,
     document: &Document,
     width: f32,
+    selected: bool,
     reduced_motion: bool,
     palette: Palette,
 ) -> Response {
@@ -124,7 +125,7 @@ pub fn miniature(
         ui,
         document,
         width,
-        false,
+        selected,
         reduced_motion,
         palette,
         None,

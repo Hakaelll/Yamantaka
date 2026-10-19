@@ -566,12 +566,16 @@ impl LibraryRepository for Database {
             .map_err(storage)
     }
     fn set_favorite(&mut self, id: &str, favorite: bool) -> Result<()> {
-        self.connection
+        let changed = self
+            .connection
             .execute(
                 "UPDATE documents SET is_favorite=? WHERE id=?",
                 params![favorite, id],
             )
             .map_err(storage)?;
+        if changed == 0 {
+            return Err(Failure::Invalid("Document no longer exists".into()));
+        }
         Ok(())
     }
     fn save_position(&mut self, id: &str, page: u32) -> Result<()> {

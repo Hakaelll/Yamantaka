@@ -169,6 +169,7 @@ pub enum Icon {
     Minus,
     Plus,
     Sort,
+    Check,
 }
 
 pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Color32) {
@@ -176,6 +177,16 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
     let v = |x, y| center + egui::vec2(x, y);
     let line = |a, b| painter.line_segment([a, b], s);
     match icon {
+        Icon::Check => {
+            painter.rect_stroke(
+                egui::Rect::from_center_size(center, egui::vec2(13.0, 13.0)),
+                2.0,
+                s,
+                egui::StrokeKind::Inside,
+            );
+            line(v(-3.5, 0.0), v(-0.5, 3.0));
+            line(v(-0.5, 3.0), v(4.0, -3.0));
+        }
         Icon::Menu => {
             for y in [-4.5, 0.0, 4.5] {
                 line(v(-6.0, y), v(6.0, y));

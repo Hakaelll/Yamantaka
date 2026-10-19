@@ -6,7 +6,7 @@ until every mandatory row has executed evidence. A native gallery/reader section
 is insufficient to satisfy the supplied specification.
 
 Validation scope changed on 2026-10-18 at the owner's request: the Rust suite
-now retains 54 essential tests after the reduction from 536. Historical reports describe
+retained 54 essential tests after the reduction from 536; one focused selection/bulk-favorites regression brings the current source count to 55. Historical reports describe
 their original checkpoints, including tests subsequently removed. This reduction
 does not upgrade any acceptance status. See
 `../validation/rust-reading-refinement-2026-10-18.md` for retained coverage,
@@ -55,6 +55,8 @@ That baseline does not establish paired UI/GPU performance or a Flutter window c
 | Full Windows Release bundle/manifest/hashes/licenses/SBOM/instructions/results | package_windows.ps1 | pinned Cargo/toolchain and PDFium fetch hashes | Pending: final parity gate and release |
 
 Library filter recovery now shares active-state detection and reset across the compact menu, toolbar and empty state. A completed zero-result smart view and the shared reset operation have native synthetic evidence in [the filter recovery report](../validation/rust-library-filters-2026-10-19.md). This does not complete multiselection, bulk operations or physical interaction acceptance.
+
+Page-scoped multiselection and bulk favorite/unfavorite are now connected across covers, compact covers and list rows. The actor yields between individual writes and reports saved, failed and unattempted targets. See [selection and bulk favorites](../validation/rust-library-selection-2026-10-20.md). Bulk tags, collections, archive, cover regeneration and removal, along with broader keyboard/accessibility acceptance, remain pending.
 
 ## Excluded claims
 

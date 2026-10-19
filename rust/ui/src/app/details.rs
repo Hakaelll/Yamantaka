@@ -113,17 +113,21 @@ impl YamantakaApp {
                                 {
                                     self.open(document.clone());
                                 }
-                                if theme::navigation(
-                                    ui,
-                                    if document.favorite {
-                                        self.tr("Quitar favorito", "Unfavorite")
-                                    } else {
-                                        self.tr("Favorito", "Favorite")
-                                    },
-                                    document.favorite,
-                                    p,
-                                )
-                                .clicked()
+                                if ui
+                                    .add_enabled_ui(!self.library_selection.writing(), |ui| {
+                                        theme::navigation(
+                                            ui,
+                                            if document.favorite {
+                                                self.tr("Quitar favorito", "Unfavorite")
+                                            } else {
+                                                self.tr("Favorito", "Favorite")
+                                            },
+                                            document.favorite,
+                                            p,
+                                        )
+                                    })
+                                    .inner
+                                    .clicked()
                                 {
                                     self.send(Action::Favorite(
                                         document.id.clone(),

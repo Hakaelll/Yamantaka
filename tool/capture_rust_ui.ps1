@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='library-selection-covers'; args=@('--pdf-covers','--library-selection') },
+    @{ name='library-selection-list-es'; args=@('--pdf-covers','--library-selection','--list','--es','--light','--reduce-motion') },
+    @{ name='library-selection-small-200'; args=@('--pdf-covers','--library-selection','--size=640x480','--text-scale=2') },
+    @{ name='library-selection-menu-small-200'; args=@('--pdf-covers','--library-selection','--selection-menu','--size=640x480','--text-scale=2') },
+    @{ name='library-selection-favorites'; args=@('--pdf-covers','--library-selection','--selection-favorite') },
     @{ name='filters-empty-smart'; args=@('--smart-view=missing') },
     @{ name='filters-reset-smart-es'; args=@('--pdf-covers','--smart-view=missing','--reset-library-filters','--es','--light','--reduce-motion') },
     @{ name='tags-manager'; args=@('--pdf-covers','--library-tags') },
@@ -244,6 +249,8 @@ $cases = @(
     @{ name='reader-options-small-200'; args=@('--reader','--reader-options','--size=640x480','--text-scale=2') },
     @{ name='reader-small-200'; args=@('--reader','--size=640x480','--text-scale=2') }
 )
+$duplicateCases = @($cases | Group-Object -Property name | Where-Object { $_.Count -gt 1 })
+if ($duplicateCases.Count -gt 0) { throw 'Capture case names must be unique before any process is launched.' }
 if ($CaseNames.Count -gt 0) {
     foreach ($requestedCase in $CaseNames) {
         if ($requestedCase -notin $cases.name) { throw "Unknown capture case: $requestedCase" }
@@ -270,6 +277,18 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    if ($case.name -like 'library-selection-*') {
+        if (-not $controls.libraryQueryLoaded -or $controls.librarySelection.writing -or $null -ne $controls.librarySelection.preview) { throw 'Library selection preview has not completed.' }
+        if ($case.name -eq 'library-selection-favorites') {
+            if ($controls.librarySelection.ids.Count -ne 0 -or $controls.libraryVisibleFavorites -ne 3 -or $controls.librarySelection.verifiedFavoriteTargets.Count -ne 3) { throw 'Bulk favorite targets or persisted results are incorrect.' }
+        } elseif ($controls.librarySelection.ids.Count -ne 3) { throw 'Range and additive gestures must leave three selected books.' }
+        if ($case.name -eq 'library-selection-small-200') {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Selection (3)')
+        } elseif ($case.name -eq 'library-selection-menu-small-200') {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Add to favorites','Remove from favorites')
+        }
+
+    }
     if ($case.name -eq 'filters-empty-smart') {
         if (-not $controls.libraryQueryLoaded -or -not $controls.libraryFiltersActive -or $controls.libraryDocumentCount -ne 0 -or $controls.smartView -ne 'missing') {
             throw 'The empty smart view must finish its query and retain its active filter.'

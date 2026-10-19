@@ -17,6 +17,7 @@ mod history;
 mod library_check;
 mod library_covers;
 mod library_intro;
+mod library_selection;
 mod links;
 mod list;
 mod metadata;
@@ -194,6 +195,7 @@ pub struct YamantakaApp {
     requested: Option<RenderKey>,
     render_retry: bool,
     cancel: Cancellation,
+    library_selection: library_selection::SelectionState,
     query_cancel: Cancellation,
     library_loaded: bool,
     error: Option<String>,
@@ -387,6 +389,7 @@ impl YamantakaApp {
             requested: None,
             render_retry: false,
             cancel: Cancellation::default(),
+            library_selection: Default::default(),
             query_cancel: Cancellation::default(),
             library_loaded: false,
             error: None,
@@ -593,6 +596,8 @@ impl YamantakaApp {
         if self.demo && self.capture.is_some() {
             self.list = true;
             self.selected = Some("demo-0".into());
+            self.library_selection.model.all(&["demo-0".into()]);
+            self.library_selection.model.mode = false;
             self.preview_list_focus = true;
         }
     }
@@ -1006,6 +1011,7 @@ impl YamantakaApp {
                     if !compact {
                         self.reading_shortcut(ui, p);
                     }
+                    self.library_selection_control(ui, p);
                     let labelled = ui.available_width() > 900.0;
                     let view_width = if labelled { 300.0 } else { 140.0 };
                     ui.add_space((ui.available_size_before_wrap().x - view_width - 10.0).max(0.0));
@@ -1098,12 +1104,14 @@ impl YamantakaApp {
                                 ui.add_space(24.0);
                             }
                             if self.list {
+                                self.library_selection.columns=1;
                                 self.list_documents(ui,documents,p);
                             } else if ui.ctx().content_rect().width()<420.0 {self.compact_covers(ui,documents,p);} else {
                                 let columns = (ui.available_width()
                                     / if compact { 260.0 } else { 240.0 })
                                 .floor()
                                 .max(1.0) as usize;
+                                self.library_selection.columns=columns;
                                 let gap = 36.0;
                                 let slot = ((ui.available_width() - gap * (columns - 1) as f32)
                                     / columns as f32)
@@ -1129,8 +1137,7 @@ impl YamantakaApp {
                                                                 ui,
                                                                 document,
                                                                 width,
-                                                                self.selected.as_deref()
-                                                                    == Some(&document.id),
+                                                                self.library_selection.model.contains(&document.id),
                                                                 self.reduced_motion,
                                                                 p,
                                                                 if self.preview_tilt
@@ -1146,15 +1153,7 @@ impl YamantakaApp {
                                                     },
                                                 )
                                                 .inner;
-                                            if response.clicked() {
-                                                self.selected = Some(document.id.clone());
-                                            }
-                                            if response.double_clicked()
-                                                || response.has_focus()
-                                                    && ui.input(|i| i.key_pressed(egui::Key::Enter))
-                                            {
-                                                self.open(document.clone());
-                                            }
+                                            self.library_book_response(ui,&response,document);
                                             response.context_menu(|ui| {
                                                 if ui
                                                     .button(
@@ -1180,12 +1179,12 @@ impl YamantakaApp {
                                                     ui.close();
                                                 }
                                                 if ui
-                                                    .button(
+                                                    .add_enabled(!self.library_selection.writing(), egui::Button::new(
                                                         self.tr(
                                                             "Cambiar favorito",
                                                             "Toggle favorite",
                                                         ),
-                                                    )
+                                                    ))
                                                     .clicked()
                                                 {
                                                     self.send(Action::Favorite(
@@ -1402,6 +1401,7 @@ impl App for YamantakaApp {
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
                 Update::PendingImports(result) => self.importing.accept_recovery(result),
+                Update::SelectionFavorited(reply) => self.accept_selection_favorite(*reply),
                 Update::LibraryChecked(reply) => {
                     self.library_check.accept(*reply);
                     self.refresh();
@@ -1455,6 +1455,9 @@ impl App for YamantakaApp {
                     }
                     self.library_loaded = true;
                     self.documents = documents;
+                    self.library_selection
+                        .model
+                        .retain(&self.library_page_ids());
                     self.count = count;
                     if self.inspector && self.selected.is_none() {
                         self.selected = self.documents.first().map(|doc| doc.id.clone());
@@ -1914,6 +1917,7 @@ impl App for YamantakaApp {
             &ctx,
             self.password.is_some() || self.links.confirmation_open(),
         );
+        self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
             &ctx,
             self.password.is_some() || self.links.confirmation_open(),
@@ -1947,6 +1951,7 @@ impl App for YamantakaApp {
         self.apply_global_note_preview();
         self.apply_annotation_export_preview();
         self.update_file_comparison();
+        self.update_library_selection_preview();
         self.update_tag_preview();
         self.update_collection_preview();
         self.update_cache_maintenance();
@@ -2112,6 +2117,7 @@ impl App for YamantakaApp {
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
+                    && self.library_selection.ready()
                     && self.library_tags.ready()
                     && self.collections.ready()
                     && self.cache_maintenance.ready()
@@ -2232,6 +2238,8 @@ impl App for YamantakaApp {
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
+                    record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();
+                    record["librarySelection"]=self.library_selection.summary();
                     record["libraryFiltersActive"]=self.library_has_filters().into();
                     record["libraryQueryLoaded"]=self.library_loaded.into();
                     record["smartView"]=self.smart_view.map(|view|view.key()).into();
@@ -2271,6 +2279,7 @@ impl App for YamantakaApp {
         }
         self.library_check.cancel();
         self.relocation.cancel();
+        self.library_selection.cancel();
         self.library_tags.cancel();
         self.collections.cancel();
         self.cache_maintenance.cancel();

@@ -50,6 +50,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    FavoriteSelection(Box<crate::library_favorites::FavoriteRequest>),
     Tags(yamantaka_domain::tags::TagQuery, Cancellation),
     ChangeTag(Box<yamantaka_domain::tags::TagChange>, Cancellation),
     Collections(yamantaka_domain::collections::CollectionQuery, Cancellation),
@@ -131,6 +132,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    SelectionFavorited(Box<crate::library_favorites::FavoriteReply>),
     Tags(Result<yamantaka_domain::tags::TagPage>, Cancellation),
     TagChanged(Result<String>, Cancellation),
     Collections(
@@ -833,6 +835,7 @@ impl Runtime {
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
                 let mut cache_maintenance: Option<(CacheMaintenanceJob, Permit)> = None;
+                let mut favorite_selection:Option<(crate::library_favorites::FavoriteJob,Permit)> = None;
                 let mut library_check:Option<(LibraryCheckJob,Permit)> = None;
                 let mut relocation: Option<(RelocationJob,Permit)> = None;
                 let mut file_check: Option<(FileCheckJob,Permit)> = None;
@@ -1210,6 +1213,14 @@ impl Runtime {
                                         Err(error) => failed(&events, &notify, error, None, permit),
                                     }
                                 }
+                                Action::FavoriteSelection(request) => {
+                                    let cancel=request.cancel.clone();
+                                    let result=if favorite_selection.is_some() {Err(Failure::QueueFull)} else {crate::library_favorites::FavoriteJob::start(*request)};
+                                    match result {
+                                        Ok(job)=>favorite_selection=Some((job,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::SelectionFavorited(Box::new(crate::library_favorites::FavoriteReply {cancel,result:Err(error)})),permit),
+                                    }
+                                }
                                 Action::Favorite(id, value) => {
                                     match repository.set_favorite(&id, value) {
                                         Ok(()) => emit(
@@ -1392,6 +1403,11 @@ impl Runtime {
                     if let Some(reply)=relocation.as_mut().and_then(|(job,_)|job.poll(&mut repository)) {
                         let (_,permit)=relocation.take().unwrap();
                         emit(&events,&notify,Update::FileRelocated(Box::new(reply)),permit);
+                    }
+                    if let Some((job,_))=&mut favorite_selection
+                        && job.step(&mut repository) {
+                        let (job,permit)=favorite_selection.take().unwrap();
+                        emit(&events,&notify,Update::SelectionFavorited(Box::new(job.reply())),permit);
                     }
                     if let Some((job,_))=&mut library_check {
                         let before=job.progress();let finished=job.step(&mut repository);let progress=job.progress();
@@ -1669,6 +1685,7 @@ impl Runtime {
                         || covers.iter().any(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
                         || !commands.is_empty()
                         || (pending.iter().any(|item|matches!(item,Pending::ImportHashReady(..))) && !pending.iter().any(|item|matches!(item,Pending::ImportHash(..))))
+                        || favorite_selection.is_some()
                         || indexer.needs_step()
                         || library_check.as_ref().is_some_and(|(job,_)|job.needs_step())
                         || (deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open))

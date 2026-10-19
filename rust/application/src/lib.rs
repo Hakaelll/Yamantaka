@@ -14,6 +14,7 @@ mod folder_import;
 mod import_enrichment;
 mod import_hash;
 pub mod library_check;
+pub mod library_favorites;
 pub mod manual_cover;
 pub mod metadata_review;
 pub mod metadata_source;

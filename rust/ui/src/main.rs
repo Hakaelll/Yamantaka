@@ -731,6 +731,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--reset-library-filters") {
                     app.preview_reset_library_filters();
                 }
+                if args.iter().any(|arg| arg == "--library-selection") {
+                    app.preview_library_selection(
+                        args.iter().any(|arg| arg == "--selection-favorite"),
+                        args.iter().any(|arg| arg == "--selection-menu"),
+                    );
+                }
                 if args.iter().any(|arg| arg == "--library-tags") {
                     app.preview_tags(u8::from(args.iter().any(|arg| arg == "--tag-filter")));
                 }
