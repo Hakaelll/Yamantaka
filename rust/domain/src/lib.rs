@@ -13,6 +13,8 @@ pub mod file_check;
 pub mod front_matter;
 pub mod import_metadata;
 pub mod import_recovery;
+pub mod library_smart_view;
+pub use library_smart_view::LibrarySmartView;
 pub mod memory;
 pub mod metadata_review;
 pub mod outline;
@@ -163,6 +165,9 @@ pub enum SortDirection {
 
 #[derive(Debug, Clone)]
 pub struct LibraryQuery {
+    pub smart_view: Option<LibrarySmartView>,
+    /// One instant shared by the count and page of a rolling recent view.
+    pub reference_time: std::time::SystemTime,
     pub text: String,
     pub favorites_only: bool,
     pub missing_only: bool,
@@ -184,6 +189,8 @@ pub struct LibraryQuery {
 impl Default for LibraryQuery {
     fn default() -> Self {
         Self {
+            smart_view: None,
+            reference_time: std::time::SystemTime::now(),
             text: String::new(),
             favorites_only: false,
             missing_only: false,

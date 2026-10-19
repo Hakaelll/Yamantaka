@@ -197,7 +197,7 @@ fn pattern(text: &str) -> String {
 }
 // All data values are bound; SQL fragments below are controlled by domain enums.
 // EXISTS keeps a document unique even when several selected memberships match.
-fn filter(query: &LibraryQuery) -> (String, Vec<Value>) {
+fn filter(query: &LibraryQuery) -> Result<(String, Vec<Value>)> {
     let mut sql = String::from(" WHERE (?=0 OR is_favorite=1) AND (?=0 OR is_missing=1)");
     let mut values = vec![
         Value::Integer(i64::from(query.favorites_only)),
@@ -216,6 +216,45 @@ fn filter(query: &LibraryQuery) -> (String, Vec<Value>) {
         }
         LibraryReadingState::NotStarted => sql.push_str(" AND reading_progress<=0"),
         LibraryReadingState::Completed => sql.push_str(" AND reading_progress>=1"),
+    }
+    if let Some(view) = query.smart_view {
+        use yamantaka_domain::LibrarySmartView;
+        match view {
+            LibrarySmartView::InProgress => {
+                sql.push_str(" AND reading_progress>0 AND reading_progress<0.995")
+            }
+            LibrarySmartView::NotStarted => sql.push_str(" AND reading_progress<=0"),
+            LibrarySmartView::Finished => sql.push_str(" AND reading_progress>=0.995"),
+            LibrarySmartView::Annotated => sql.push_str(
+                " AND EXISTS(SELECT 1 FROM annotations a WHERE a.document_id=documents.id)",
+            ),
+            LibrarySmartView::Bookmarked => sql.push_str(
+                " AND EXISTS(SELECT 1 FROM bookmarks b WHERE b.document_id=documents.id)",
+            ),
+            LibrarySmartView::Missing => sql.push_str(" AND is_missing=1"),
+            LibrarySmartView::RecentlyOpened | LibrarySmartView::RecentlyAdded => {
+                let invalid = || {
+                    Failure::Invalid(
+                        "Recent-view reference time is outside the supported range".into(),
+                    )
+                };
+                let elapsed = query
+                    .reference_time
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|_| invalid())?;
+                let seconds = i64::try_from(elapsed.as_secs()).map_err(|_| invalid())?;
+                let cutoff = chrono::DateTime::from_timestamp(seconds, elapsed.subsec_nanos())
+                    .and_then(|now| now.checked_sub_signed(chrono::Duration::days(14)))
+                    .ok_or_else(invalid)?;
+                let column = if view == LibrarySmartView::RecentlyOpened {
+                    "last_opened_at"
+                } else {
+                    "added_at"
+                };
+                sql.push_str(&format!(" AND julianday({column})>=julianday(?)"));
+                values.push(Value::Text(cutoff.to_rfc3339()));
+            }
+        }
     }
     let authors: Vec<_> = query
         .authors
@@ -259,7 +298,7 @@ fn filter(query: &LibraryQuery) -> (String, Vec<Value>) {
         let escaped = pattern(text);
         values.extend((0..5).map(|_| Value::Text(escaped.clone())));
     }
-    (sql, values)
+    Ok((sql, values))
 }
 
 fn placeholders(count: usize) -> String {
@@ -477,7 +516,7 @@ impl LibraryRepository for Database {
         crate::import_document::save(self, document, reference, cancel)
     }
     fn query(&self, query: &LibraryQuery) -> Result<Vec<Document>> {
-        let (filter, mut values) = filter(query);
+        let (filter, mut values) = filter(query)?;
         let sql = format!(
             "SELECT {PROJECTION} FROM documents{filter} ORDER BY {} LIMIT ? OFFSET ?",
             order(query),
@@ -498,7 +537,7 @@ impl LibraryRepository for Database {
             .map_err(storage)
     }
     fn count(&self, query: &LibraryQuery) -> Result<u64> {
-        let (filter, values) = filter(query);
+        let (filter, values) = filter(query)?;
         self.connection
             .query_row(
                 &format!("SELECT COUNT(*) FROM documents{filter}"),

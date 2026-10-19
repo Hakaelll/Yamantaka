@@ -482,3 +482,11 @@ creation use labelled fields. Pending writes retain the layout and disable only
 their controls. The active collection uses the library's existing filter row and
 clear/reset actions. The manager scrolls at narrow widths and 200% text; the book
 gallery and reader keep their established composition.
+
+
+Smart views share the existing State control rather than adding another library
+row. The popover separates Reading state and Smart views, keeps selected states
+visible and gives recent views a last-14-days tooltip. Its scroll area and the
+compact parent menu remain bounded by the viewport. The active view changes the
+control label and participates in the existing reset feedback. Gallery covers,
+physics and reader chrome keep their established composition.

@@ -1,6 +1,8 @@
 use std::fs;
 #[path = "support/collections.rs"]
 mod collection_verification;
+#[path = "support/smart_views.rs"]
+mod smart_view_verification;
 use yamantaka_domain::{Cancellation, LibraryQuery, LibraryRepository};
 use yamantaka_storage::{
     Database,
@@ -133,6 +135,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     assert_eq!(saved.last_page_index, 6);
     assert_eq!(saved.reading_progress, 1.0);
     collection_verification::verify(&mut db);
+    smart_view_verification::verify(&mut db);
 }
 
 #[test]

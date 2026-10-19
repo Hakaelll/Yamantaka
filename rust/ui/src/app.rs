@@ -39,6 +39,7 @@ mod selection;
 mod sessions;
 mod settings;
 mod shortcuts;
+mod smart_views;
 mod tabs;
 mod text;
 mod thumbnails;
@@ -170,6 +171,8 @@ pub struct YamantakaApp {
     file_check: file_check::CheckState,
     cache_maintenance: cache_maintenance::CacheState,
     collections: collections::CollectionState,
+    smart_view: Option<yamantaka_domain::LibrarySmartView>,
+    smart_menu_preview: bool,
     library_check: library_check::CheckState,
     relocation: relocation::RelocationState,
     annotation_paint: annotations::paint::AnnotationPaint,
@@ -293,6 +296,11 @@ impl YamantakaApp {
             password_attempted: false,
             preview_password_action: None,
             preview_password_target: None,
+            smart_view: preferences
+                .get("librarySmartView")
+                .and_then(serde_json::Value::as_str)
+                .and_then(yamantaka_domain::LibrarySmartView::from_key),
+            smart_menu_preview: false,
             collections: collections::CollectionState::new(&preferences),
             runtime,
             preferences,
@@ -423,6 +431,7 @@ impl YamantakaApp {
         self.runtime.submit(Action::Query(
             LibraryQuery {
                 text: self.query.clone(),
+                smart_view: self.smart_view,
                 favorites_only: self.favorites,
                 reading_state: self.reading_state,
                 sort: self.sort,
@@ -489,6 +498,12 @@ impl YamantakaApp {
             ("libraryInspector", self.inspector.into()),
             ("libraryMissingOnly", self.missing_only.into()),
             ("libraryModifiedOnly", self.modified_only.into()),
+            (
+                "librarySmartView",
+                self.smart_view
+                    .map(|view| serde_json::Value::from(view.key()))
+                    .unwrap_or(serde_json::Value::Null),
+            ),
             (
                 "libraryCollection",
                 self.collections
@@ -906,10 +921,10 @@ impl YamantakaApp {
                                     RichText::new(format!(
                                         "{} {}",
                                         self.count,
-                                        self.tr(
+                                        if self.count==1 {self.tr("documento en tu colección","document in your collection")} else {self.tr(
                                             "documentos en tu colección",
                                             "documents in your collection"
-                                        )
+                                        )}
                                     ))
                                     .color(p.secondary)
                                     .size(13.0),
@@ -962,8 +977,14 @@ impl YamantakaApp {
                 ui.add_space(if compact { 4.0 } else { 12.0 });
                 ui.horizontal_wrapped(|ui| {
                     if ui.ctx().content_rect().width()<420.0 {
-                        let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only||self.modified_only||self.collections.filter.is_some(),p);
-                        egui::Popup::menu(&response).show(|ui|self.library_filters(ui,p));
+                        let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only||self.modified_only||self.collections.filter.is_some()||self.smart_view.is_some(),p);
+                        let mut popup=egui::Popup::menu(&response);
+                        if self.smart_menu_preview {popup=popup.open(true);}
+                        popup.show(|ui| {
+                            let height=(ui.ctx().content_rect().bottom()-ui.cursor().top()-12.0).max(40.0);
+                            ui.set_max_height(height);
+                            egui::ScrollArea::vertical().id_salt("compact-library-filters").max_height(height).show(ui,|ui|self.library_filters(ui,p));
+                        });
                     }else{self.library_filters(ui,p);}
                     if !compact {
                         self.reading_shortcut(ui, p);
@@ -1201,12 +1222,13 @@ impl YamantakaApp {
         if theme::navigation(
             ui,
             self.tr("Todos los libros", "All books"),
-            !self.favorites && self.collections.filter.is_none(),
+            !self.favorites && self.collections.filter.is_none() && self.smart_view.is_none(),
             p,
         )
         .clicked()
         {
             self.favorites = false;
+            self.smart_view = None;
             self.clear_collection_filter();
             self.offset = 0;
             self.refresh();
@@ -1216,61 +1238,7 @@ impl YamantakaApp {
             self.offset = 0;
             self.refresh();
         }
-        let status = self.tr(
-            match self.reading_state {
-                LibraryReadingState::All => "Estado",
-                LibraryReadingState::InProgress => "En lectura",
-                LibraryReadingState::NotStarted => "Por leer",
-                LibraryReadingState::Completed => "Terminados",
-            },
-            match self.reading_state {
-                LibraryReadingState::All => "State",
-                LibraryReadingState::InProgress => "Reading",
-                LibraryReadingState::NotStarted => "Unread",
-                LibraryReadingState::Completed => "Finished",
-            },
-        );
-        let response = theme::navigation(
-            ui,
-            status,
-            self.reading_state != LibraryReadingState::All
-                || self.missing_only
-                || self.modified_only,
-            p,
-        );
-        egui::Popup::menu(&response).show(|ui| {
-            for (state, es, en) in [
-                (
-                    LibraryReadingState::All,
-                    "Cualquier estado",
-                    "Any reading state",
-                ),
-                (LibraryReadingState::InProgress, "En lectura", "Reading"),
-                (LibraryReadingState::NotStarted, "Por leer", "Unread"),
-                (LibraryReadingState::Completed, "Terminados", "Finished"),
-            ] {
-                if theme::navigation(ui, self.tr(es, en), self.reading_state == state, p).clicked()
-                {
-                    self.reading_state = state;
-                    self.offset = 0;
-                    self.refresh();
-                    ui.close();
-                }
-            }
-            ui.separator();
-            let label = self
-                .tr("Solo archivos ausentes", "Only missing files")
-                .to_owned();
-            if ui.checkbox(&mut self.missing_only, label).changed() {
-                self.offset = 0;
-                self.refresh();
-            }
-            let label = self.tr("Solo archivos modificados", "Modified files only");
-            if ui.checkbox(&mut self.modified_only, label).changed() {
-                self.offset = 0;
-                self.refresh();
-            }
-        });
+        self.library_state_filter(ui, p);
         let sort_name = self.tr(
             match self.sort {
                 LibrarySort::LastOpened => "Recientes",
@@ -1336,7 +1304,8 @@ impl YamantakaApp {
             || self.reading_state != LibraryReadingState::All
             || self.missing_only
             || self.modified_only
-            || self.collections.filter.is_some())
+            || self.collections.filter.is_some()
+            || self.smart_view.is_some())
             && theme::navigation(
                 ui,
                 self.tr("Restablecer filtros", "Reset filters"),
@@ -1346,6 +1315,7 @@ impl YamantakaApp {
             .clicked()
         {
             self.query.clear();
+            self.smart_view = None;
             self.clear_collection_filter();
             self.reading_state = LibraryReadingState::All;
             self.missing_only = false;
@@ -2248,6 +2218,7 @@ impl App for YamantakaApp {
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
+                    record["smartView"]=self.smart_view.map(|view|view.key()).into();
                     record["collections"]=self.collections.summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["fileCheck"]=self.file_check.summary();
