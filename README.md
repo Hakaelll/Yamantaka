@@ -115,6 +115,23 @@ The default compositor uses DirectX 12. A separately checked OpenGL route is ava
 
 A finished Release bundle must include `pdfium.dll` beside the executable. Do not copy only the executable out of a bundle. The final bundle, hashes, SBOM, notices and installation instructions will be added after the parity and validation gates pass.
 
+### Development storage
+
+Frozen verification executables accumulate independently of the application and
+its document caches. Inspect obsolete copies with:
+
+```powershell
+./tool/prune_rust_checkpoints.ps1
+```
+
+Add `-Apply` to remove the reviewed candidates. The tool retains the newest two
+checkpoint executables and every running Yamantaka executable. It only considers
+untracked `yamantaka-*.exe` files directly inside `build/verification`; source,
+PDFs, databases, demo stores and compiler dependencies are outside its scope.
+Run it on the Windows host so process paths can be inspected.
+[Cleanup verification](docs/validation/rust-checkpoint-cleanup-2026-10-19.md)
+records the executed cleanup and its limits.
+
 ### Isolated visual collection
 
 Generate the synthetic PDF corpus with Python and the `reportlab`, `Pillow` and `pypdf` packages, then open the demo:
