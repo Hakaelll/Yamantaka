@@ -20,6 +20,7 @@ pub struct BulkRequest {
     pub action: BulkAction,
     pub cancel: Cancellation,
 }
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct BulkReport {
     pub succeeded: Vec<String>,
     pub failed: Vec<String>,
@@ -35,19 +36,25 @@ pub(crate) struct BulkJob {
     succeeded: Vec<String>,
     failed: Vec<String>,
 }
+pub(crate) fn normalize_ids(ids: Vec<String>) -> Result<Vec<String>> {
+    if ids.is_empty()
+        || ids.len() > MAX_LIBRARY_PAGE
+        || ids.iter().any(|id| id.trim().is_empty() || id.len() > 4096)
+    {
+        return Err(Failure::Invalid(
+            "Select between one and 80 catalogue books".into(),
+        ));
+    }
+    let mut unique = Vec::with_capacity(ids.len());
+    for id in ids {
+        if !unique.contains(&id) {
+            unique.push(id);
+        }
+    }
+    Ok(unique)
+}
 impl BulkJob {
     pub(crate) fn start(mut request: BulkRequest) -> Result<Self> {
-        if request.ids.is_empty()
-            || request.ids.len() > MAX_LIBRARY_PAGE
-            || request
-                .ids
-                .iter()
-                .any(|id| id.trim().is_empty() || id.len() > 4096)
-        {
-            return Err(Failure::Invalid(
-                "Select between one and 80 catalogue books".into(),
-            ));
-        }
         let valid = |id: &str| !id.trim().is_empty() && id.len() <= 4096;
         let target_valid = match &request.action {
             BulkAction::Tag(id) => valid(id),
@@ -61,13 +68,7 @@ impl BulkJob {
                 "Choose a valid organization target".into(),
             ));
         }
-        let mut unique = Vec::with_capacity(request.ids.len());
-        for id in request.ids {
-            if !unique.contains(&id) {
-                unique.push(id);
-            }
-        }
-        request.ids = unique;
+        request.ids = normalize_ids(request.ids)?;
         Ok(Self {
             request,
             next: 0,

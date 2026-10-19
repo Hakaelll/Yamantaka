@@ -50,6 +50,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    RegenerateCovers(Box<crate::cover_regeneration::RegenerationRequest>),
     BulkSelection(Box<crate::library_bulk::BulkRequest>),
     Tags(yamantaka_domain::tags::TagQuery, Cancellation),
     ChangeTag(Box<yamantaka_domain::tags::TagChange>, Cancellation),
@@ -245,6 +246,8 @@ pub struct Runtime {
     import_revision: Arc<AtomicU64>,
     index_progress: Arc<Mutex<IndexProgress>>,
     library_check_progress: Arc<Mutex<Option<LibraryCheckSnapshot>>>,
+    cover_regeneration_progress:
+        Arc<Mutex<Option<crate::cover_regeneration::RegenerationSnapshot>>>,
     sender: Sender<Command>,
     shutdown: Sender<RuntimeControl>,
     outstanding: Arc<AtomicUsize>,
@@ -820,6 +823,8 @@ impl Runtime {
         let waiting_snapshot = waiting_covers.clone();
         let index_progress = Arc::new(Mutex::new(IndexProgress::default()));
         let progress_snapshot = index_progress.clone();
+        let cover_regeneration_progress = Arc::new(Mutex::new(None));
+        let cover_regeneration_snapshot = cover_regeneration_progress.clone();
         let library_check_progress = Arc::new(Mutex::new(None));
         let library_check_snapshot = library_check_progress.clone();
         let import_revision = Arc::new(AtomicU64::new(0));
@@ -835,6 +840,7 @@ impl Runtime {
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
                 let mut cache_maintenance: Option<(CacheMaintenanceJob, Permit)> = None;
+                let mut cover_regeneration:Option<(crate::cover_regeneration::RegenerationJob,Permit)>=None;
                 let mut bulk_selection:Option<(crate::library_bulk::BulkJob,Permit)> = None;
                 let mut library_check:Option<(LibraryCheckJob,Permit)> = None;
                 let mut relocation: Option<(RelocationJob,Permit)> = None;
@@ -1213,9 +1219,17 @@ impl Runtime {
                                         Err(error) => failed(&events, &notify, error, None, permit),
                                     }
                                 }
+                                Action::RegenerateCovers(request)=> {
+                                    let cancel=request.cancel.clone();
+                                    let result=if cover_regeneration.is_some() || bulk_selection.is_some() {Err(Failure::QueueFull)} else {crate::cover_regeneration::RegenerationJob::start(*request,&repository)};
+                                    match result {
+                                        Ok(job)=> {*cover_regeneration_snapshot.lock().unwrap()=Some(job.snapshot(false));notify();cover_regeneration=Some((job,permit));},
+                                        Err(error)=>emit(&events,&notify,Update::SelectionOrganized(Box::new(crate::library_bulk::BulkReply{cancel,result:Err(error)})),permit),
+                                    }
+                                }
                                 Action::BulkSelection(request) => {
                                     let cancel=request.cancel.clone();
-                                    let result=if bulk_selection.is_some() {Err(Failure::QueueFull)} else {crate::library_bulk::BulkJob::start(*request)};
+                                    let result=if bulk_selection.is_some() || cover_regeneration.is_some() {Err(Failure::QueueFull)} else {crate::library_bulk::BulkJob::start(*request)};
                                     match result {
                                         Ok(job)=>bulk_selection=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::SelectionOrganized(Box::new(crate::library_bulk::BulkReply {cancel,result:Err(error)})),permit),
@@ -1631,6 +1645,23 @@ impl Runtime {
                         }
                     }
                     let capacity=pdf_capacity.load(Ordering::Acquire);
+                    if let Some((job,_))=&mut cover_regeneration {
+                        let before=job.snapshot(false);
+                        let mut finished=false;
+                        for _ in 0..2 {
+                            if !job.ready(capacity) {break;}
+                            finished=job.advance(&mut repository,&engine,capacity);
+                            if finished {break;}
+                        }
+                        let progress=job.snapshot(finished);
+                        if finished || progress.report!=before.report || progress.waiting_for_capacity!=before.waiting_for_capacity {
+                            *cover_regeneration_snapshot.lock().unwrap()=Some(progress);notify();
+                        }
+                        if finished {
+                            let (job,permit)=cover_regeneration.take().unwrap();
+                            emit(&events,&notify,Update::SelectionOrganized(Box::new(job.reply())),permit);
+                        }
+                    }
                     let mut cover_index=0;
                     while cover_index<covers.len() {
                         // At most two transitions let a late busy reply observe a
@@ -1650,14 +1681,14 @@ impl Runtime {
                         }
                         if !finished {cover_index+=1;}
                     }
-                    let waiting=covers.iter().filter(|(job,_)|job.waiting()).count();
+                    let waiting=covers.iter().filter(|(job,_)|job.waiting()).count()+usize::from(cover_regeneration.as_ref().is_some_and(|(job,_)|job.waiting()));
                     if waiting_snapshot.swap(waiting,Ordering::AcqRel)!=waiting {notify();}
                     for state in next_imports {
                         advance_import(&engine,&mut repository,state,&mut pending,&events,&notify);
                     }
                     admit_import_hash(&engine,&mut pending,&events,&notify);
                     if index_cleanup.as_ref().is_some_and(PdfTicket::is_ready) && index_cleanup.take().unwrap().wait().is_ok() {pdf_capacity.fetch_add(1,Ordering::Release);notify();}
-                    let native_admission_pending = !covers.is_empty() || pending.iter().any(|item| {
+                    let native_admission_pending = cover_regeneration.is_some() || !covers.is_empty() || pending.iter().any(|item| {
                         matches!(
                             item,
                             Pending::Open(..) | Pending::ImportReady(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
@@ -1685,6 +1716,7 @@ impl Runtime {
                         || covers.iter().any(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
                         || !commands.is_empty()
                         || (pending.iter().any(|item|matches!(item,Pending::ImportHashReady(..))) && !pending.iter().any(|item|matches!(item,Pending::ImportHash(..))))
+                        || cover_regeneration.as_ref().is_some_and(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
                         || bulk_selection.is_some()
                         || indexer.needs_step()
                         || library_check.as_ref().is_some_and(|(job,_)|job.needs_step())
@@ -1706,6 +1738,7 @@ impl Runtime {
                     if let Some((job,_)) = &file_check {job.register(&mut select);}
                     if let Some((job,_)) = &relocation {job.register(&mut select);}
                     if let Some((job,_)) = &library_check {job.register(&mut select);}
+                    if let Some((job,_)) = &cover_regeneration {job.register(&mut select);}
                     for item in &pending {
                         item.register(&mut select);
                     }
@@ -1732,6 +1765,7 @@ impl Runtime {
                 drop(file_check);
                 drop(relocation);
                 drop(library_check);
+                drop(cover_regeneration);
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
                     let _ = ticket.wait();
                 }
@@ -1748,6 +1782,7 @@ impl Runtime {
             import_revision,
             index_progress,
             library_check_progress,
+            cover_regeneration_progress,
             sender,
             shutdown,
             outstanding: Arc::new(AtomicUsize::new(0)),
@@ -1769,6 +1804,11 @@ impl Runtime {
             .map_err(|_| Failure::Storage("Import recovery flush did not finish".into()))?
     }
     /// Coalesced bounded snapshot; reading it never queries SQL or PDFium.
+    pub fn cover_regeneration_progress(
+        &self,
+    ) -> Option<crate::cover_regeneration::RegenerationSnapshot> {
+        self.cover_regeneration_progress.lock().unwrap().clone()
+    }
     pub fn library_check_progress(&self) -> Option<LibraryCheckSnapshot> {
         self.library_check_progress.lock().unwrap().clone()
     }

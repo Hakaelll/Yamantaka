@@ -5,6 +5,7 @@ pub mod annotation_export;
 pub mod annotations;
 mod automatic_cover;
 pub mod cache_maintenance;
+pub mod cover_regeneration;
 pub mod cover_source;
 pub mod document_find;
 pub mod file_check;

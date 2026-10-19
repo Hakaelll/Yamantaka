@@ -58,6 +58,8 @@ Library filter recovery now shares active-state detection and reset across the c
 
 Page-scoped multiselection supports favorite/unfavorite, document tag assignment, collection add/remove and archive through one typed cooperative job. Target pickers use scoped actor reads, search and pages of 80; the archive adapter creates/reuses Archivado and atomically adds each document. Native query readback, rollback and compact/long-name evidence are recorded in [bulk library organization](../validation/rust-bulk-organization-2026-10-20.md), extending the [selection checkpoint](../validation/rust-library-selection-2026-10-20.md). Bulk cover regeneration/removal and broader keyboard, concurrency, performance and accessibility acceptance remain pending.
 
+Bulk automatic-cover regeneration now has a bounded actor coordinator with frozen per-document revisions, native-ticket/capacity readiness, partial cancellation and real-PDFium evidence. See [the runtime report](../validation/rust-bulk-cover-runtime-2026-10-20.md). It is not connected to the selection menu yet; confirmation, old-image retention/live refresh and physical interaction acceptance remain pending. This does not complete the bulk-cover row.
+
 ## Excluded claims
 
 Printing: `docs/adr/ADR-0002-printing.md` is a contract/proposal. Secondary reader

@@ -225,4 +225,5 @@ fn page_selection_and_bulk_operations_keep_fixed_targets_and_partial_results() {
         .unwrap();
     assert_eq!(db.get("a").unwrap().unwrap().display_title(), "My title");
     assert_eq!(db.get("a").unwrap().unwrap().reading_progress, 0.5);
+    crate::cover_regeneration::verification_test::verify();
 }

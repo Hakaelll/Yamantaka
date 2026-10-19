@@ -70,14 +70,23 @@ impl CoverJob {
         cancel.check()?;
         source.read(repository, &cancel)?;
         let expected = repository.cover_snapshot(source.id())?;
-        Ok(Box::new(Self {
+        Ok(Self::restore_snapshot(source, generation, cancel, expected))
+    }
+    pub(crate) fn restore_snapshot(
+        source: CoverSource,
+        generation: u64,
+        cancel: Cancellation,
+        expected: CoverSnapshot,
+    ) -> Box<Self> {
+        Box::new(Self {
             source,
             generation,
             cancel,
             intent: Intent::Restore(expected),
             work: Work::Start,
-        }))
+        })
     }
+
     pub fn waiting(&self) -> bool {
         matches!(self.work, Work::Waiting(_))
     }
