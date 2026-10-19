@@ -52,6 +52,17 @@ fn unique(db: &Connection, clean: &str, except: &str) -> Result<()> {
     }
     Ok(())
 }
+fn create(db: &Connection, value: &str, icon: &str) -> Result<String> {
+    let clean = name(value)?;
+    unique(db, clean, "")?;
+    if !["folder", "study", "reference", "archive", "star"].contains(&icon) {
+        return Err(invalid("Unknown collection icon"));
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = revision_after(None);
+    db.execute("INSERT INTO collections(id,name,normalized_name,icon,sort_order,is_pinned,created_at,updated_at) SELECT ?,?,?,?,COALESCE(MAX(sort_order),-1)+1,0,?,? FROM collections",params![id,clean,clean.to_lowercase(),icon,now,now]).map_err(storage)?;
+    Ok(id)
+}
 fn revision_after(previous: Option<&str>) -> String {
     let mut now = chrono::Utc::now();
     if let Some(previous) =
@@ -141,15 +152,27 @@ impl Database {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(storage)?;
         let id = match change {
-            CollectionChange::Create { name: value, icon } => {
+            CollectionChange::Create { name, icon } => create(&tx, name, icon)?,
+            CollectionChange::EnsureForDocument {
+                name: value,
+                icon,
+                document,
+            } => {
+                exists(&tx, document)?;
                 let clean = name(value)?;
-                unique(&tx, clean, "")?;
-                if !["folder", "study", "reference", "archive", "star"].contains(&icon.as_str()) {
-                    return Err(invalid("Unknown collection icon"));
-                }
-                let id = uuid::Uuid::new_v4().to_string();
-                let now = revision_after(None);
-                tx.execute("INSERT INTO collections(id,name,normalized_name,icon,sort_order,is_pinned,created_at,updated_at) SELECT ?,?,?,?,COALESCE(MAX(sort_order),-1)+1,0,?,? FROM collections",params![id,clean,clean.to_lowercase(),icon,now,now]).map_err(storage)?;
+                let existing = tx
+                    .query_row(
+                        "SELECT id FROM collections WHERE normalized_name=?",
+                        [clean.to_lowercase()],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .optional()
+                    .map_err(storage)?;
+                let id = match existing {
+                    Some(id) => id,
+                    None => create(&tx, clean, icon)?,
+                };
+                tx.execute("INSERT OR IGNORE INTO collection_documents(collection_id,document_id,added_at) VALUES(?,?,?)",params![id,document,revision_after(None)]).map_err(storage)?;
                 id
             }
             CollectionChange::Rename {

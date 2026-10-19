@@ -36,7 +36,7 @@ impl YamantakaApp {
                 if let Some(document)=&self.library_tags.context {quiet(ui,&format!("{} {}",self.tr("Organizar:","Organize:"),document.display_title()),p);}
                 else {quiet(ui,self.tr("Conecta tus lecturas con etiquetas compartidas.","Connect your readings with shared tags."),p);}
                 ui.add_space(if cramped {16.0} else {28.0});
-                ui.add_enabled_ui(self.library_tags.writing.is_none(),|ui| {
+                ui.add_enabled_ui(self.library_tags.writing.is_none() && !self.library_selection.writing(),|ui| {
                     let label=ui.label(self.tr("Nombre de la etiqueta","Tag name"));
                     ui.with_layout(controls_layout,|ui| {
                         let response=ui.add_sized([ui.available_width().min(400.0),36.0],egui::TextEdit::singleline(&mut self.library_tags.draft).char_limit(60).background_color(p.surface).margin(egui::vec2(10.0,8.0))).labelled_by(label.id);
@@ -73,9 +73,9 @@ impl YamantakaApp {
                 if self.library_tags.failed||self.library_tags.write_failed {
                     Self::file_status_label(ui,self.tr("No se pudo completar la operación. Revisa el nombre y actualiza antes de reintentar.","The operation could not finish. Check the name and refresh before retrying."),p);
                 }
-                if self.library_tags.writing.is_some() {quiet(ui,self.tr("Guardando cambios…","Saving changes…"),p);}
+                if self.library_tags.writing.is_some() || self.library_selection.writing() {quiet(ui,self.tr("Guardando cambios…","Saving changes…"),p);}
                 ui.add_space(16.0);ui.separator();
-                let busy=self.library_tags.writing.is_some()||self.library_tags.pending.is_some()||self.library_tags.failed;
+                let busy=self.library_selection.writing()||self.library_tags.writing.is_some()||self.library_tags.pending.is_some()||self.library_tags.failed;
                 let entries=self.library_tags.entries.clone();
                 for tag in &entries {
                     ui.push_id(&tag.id,|ui| {

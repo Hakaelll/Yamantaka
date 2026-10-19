@@ -289,11 +289,20 @@ pub fn control(
     primary: bool,
     p: Palette,
 ) -> egui::Response {
-    control_impl(ui, label, symbol, selected, primary, false, p)
+    control_impl(ui, label, symbol, selected, primary, ControlLabel::Text, p)
 }
 
 pub fn icon_button(ui: &mut egui::Ui, label: &str, symbol: Icon, p: Palette) -> egui::Response {
-    control_impl(ui, label, Some(symbol), false, false, true, p).on_hover_text(label)
+    control_impl(
+        ui,
+        label,
+        Some(symbol),
+        false,
+        false,
+        ControlLabel::IconOnly,
+        p,
+    )
+    .on_hover_text(label)
 }
 
 pub fn icon_toggle(
@@ -303,11 +312,49 @@ pub fn icon_toggle(
     selected: bool,
     p: Palette,
 ) -> egui::Response {
-    control_impl(ui, label, Some(symbol), selected, false, true, p).on_hover_text(label)
+    control_impl(
+        ui,
+        label,
+        Some(symbol),
+        selected,
+        false,
+        ControlLabel::IconOnly,
+        p,
+    )
+    .on_hover_text(label)
 }
 
 pub fn primary_icon(ui: &mut egui::Ui, label: &str, symbol: Icon, p: Palette) -> egui::Response {
-    control_impl(ui, label, Some(symbol), false, true, true, p).on_hover_text(label)
+    control_impl(
+        ui,
+        label,
+        Some(symbol),
+        false,
+        true,
+        ControlLabel::IconOnly,
+        p,
+    )
+    .on_hover_text(label)
+}
+
+enum ControlLabel {
+    Text,
+    IconOnly,
+    Bounded(f32),
+}
+
+pub fn bounded_navigation(ui: &mut egui::Ui, label: &str, p: Palette) -> egui::Response {
+    let width = ui.available_width();
+    control_impl(
+        ui,
+        label,
+        None,
+        false,
+        false,
+        ControlLabel::Bounded(width),
+        p,
+    )
+    .on_hover_text(label)
 }
 
 fn control_impl(
@@ -316,23 +363,42 @@ fn control_impl(
     symbol: Option<Icon>,
     selected: bool,
     primary: bool,
-    icon_only: bool,
+    label_style: ControlLabel,
     p: Palette,
 ) -> egui::Response {
-    let galley = ui.painter().layout_no_wrap(
-        if icon_only {
-            String::new()
-        } else {
-            label.to_owned()
-        },
-        FontId::proportional(14.0),
-        Color32::PLACEHOLDER,
-    );
+    let icon_only = matches!(label_style, ControlLabel::IconOnly);
+    let limit = if let ControlLabel::Bounded(width) = label_style {
+        Some(width)
+    } else {
+        None
+    };
+    let galley = if let Some(width) = limit {
+        let mut job = egui::text::LayoutJob::simple(
+            label.to_owned(),
+            FontId::proportional(14.0),
+            Color32::PLACEHOLDER,
+            (width - 28.0).max(1.0),
+        );
+        job.wrap.max_rows = 1;
+        job.wrap.break_anywhere = true;
+        ui.painter().layout_job(job)
+    } else {
+        ui.painter().layout_no_wrap(
+            if icon_only {
+                String::new()
+            } else {
+                label.to_owned()
+            },
+            FontId::proportional(14.0),
+            Color32::PLACEHOLDER,
+        )
+    };
     let width = if icon_only {
         40.0
     } else {
         (galley.size().x + if symbol.is_some() { 52.0 } else { 28.0 }).max(40.0)
     };
+    let width = limit.map_or(width, |limit| width.min(limit));
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 40.0), egui::Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), selected, label)

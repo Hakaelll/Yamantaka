@@ -22,7 +22,7 @@ impl YamantakaApp {
                     quiet(ui,&format!("{} {}",self.tr("Organizar:","Organize:"),document.display_title()),p);
                 } else {quiet(ui,self.tr("Reúne tus lecturas por tema o proyecto.","Keep readings together by subject or project."),p);}
                 ui.add_space(if cramped {16.0} else {28.0});
-                ui.add_enabled_ui(self.collections.writing.is_none(),|ui| {
+                ui.add_enabled_ui(self.collections.writing.is_none() && !self.library_selection.writing(),|ui| {
                     let label=ui.label(self.tr("Nueva colección","New collection"));
                     ui.with_layout(controls_layout,|ui| {
                         let width=ui.available_width().min(400.0);
@@ -45,8 +45,8 @@ impl YamantakaApp {
                     ui.add_space(12.0);
                     Self::file_status_label(ui,self.tr("No se pudo completar la operación. Revisa el nombre y actualiza antes de reintentar.","The operation could not finish. Check the name and refresh before retrying."),p);
                 }
-                let busy=self.collections.writing.is_some() || self.collections.pending.is_some() || self.collections.failed;
-                if self.collections.writing.is_some() {quiet(ui,self.tr("Guardando cambios…","Saving changes…"),p);}
+                let busy=self.library_selection.writing() || self.collections.writing.is_some() || self.collections.pending.is_some() || self.collections.failed;
+                if self.collections.writing.is_some() || self.library_selection.writing() {quiet(ui,self.tr("Guardando cambios…","Saving changes…"),p);}
                 ui.add_space(16.0);ui.separator();
                 let entries=self.collections.entries.clone();
                 for entry in &entries {

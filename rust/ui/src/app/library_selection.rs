@@ -1,10 +1,16 @@
+mod menu;
+mod preview;
 use super::*;
-use yamantaka_application::library_favorites::{FavoriteReply, FavoriteRequest};
+use yamantaka_application::library_bulk::{BulkAction, BulkReply, BulkRequest};
 use yamantaka_domain::library_selection::LibrarySelection;
+struct PendingBulk {
+    cancel: Cancellation,
+    action: BulkAction,
+}
 #[derive(Default)]
 pub(super) struct SelectionState {
     pub model: LibrarySelection,
-    pending: Option<Cancellation>,
+    pending: Option<PendingBulk>,
     notice: Option<String>,
     pub(super) focus: Option<String>,
     pub columns: usize,
@@ -22,7 +28,7 @@ impl SelectionState {
     }
     pub(super) fn cancel(&self) {
         if let Some(cancel) = &self.pending {
-            cancel.cancel();
+            cancel.cancel.cancel();
         }
     }
     pub(super) fn summary(&self) -> serde_json::Value {
@@ -64,7 +70,8 @@ impl YamantakaApp {
         let modifiers = ui.input(|input| input.modifiers);
         let keyboard_allowed = !egui::Popup::is_any_open(ui.ctx())
             && self.password.is_none()
-            && !self.links.confirmation_open();
+            && !self.links.confirmation_open()
+            && self.bulk_picker.is_none();
         if response.has_focus() && keyboard_allowed {
             if ui.input_mut(|input| input.consume_key(egui::Modifiers::CTRL, egui::Key::A))
                 && self.library_selection.pending.is_none()
@@ -124,6 +131,7 @@ impl YamantakaApp {
         if !matches!(self.surface, Surface::Library)
             || self.password.is_some()
             || self.links.confirmation_open()
+            || self.bulk_picker.is_some()
             || ctx.egui_wants_keyboard_input()
             || egui::Popup::is_any_open(ctx)
             || self.library_selection.pending.is_some()
@@ -137,131 +145,54 @@ impl YamantakaApp {
             self.library_selection.model.clear();
         }
     }
-    pub(super) fn library_selection_control(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let count = self.library_selection.model.ids().len();
-        let label = if count > 0 {
-            format!("{} ({count})", self.tr("Selección", "Selection"))
-        } else if self.library_selection.notice.is_some() {
-            self.tr("Resultado", "Result").to_owned()
-        } else {
-            self.tr("Seleccionar", "Select").to_owned()
-        };
-        let compact = ui.ctx().content_rect().width() < 420.0;
-        let active = self.library_selection.model.mode || count > 0;
-        let response=if compact {theme::icon_toggle(ui,&label,theme::Icon::Check,active,p)} else {theme::navigation(ui,&label,active,p)}
-            .on_hover_text(self.tr("Ctrl + clic para alternar; Mayús + clic para un intervalo. La selección pertenece a esta página.","Ctrl-click to toggle; Shift-click for a range. Selection belongs to this page."));
-        let mut popup = egui::Popup::menu(&response);
-        if self.library_selection.preview_menu {
-            popup = popup.open(true);
-        }
-        popup.show(|ui| {
-            ui.set_max_width((ui.ctx().content_rect().width() - 24.0).max(160.0));
-            egui::ScrollArea::vertical()
-                .id_salt("library-selection-menu")
-                .max_height((ui.ctx().content_rect().height() - 24.0).max(40.0))
-                .show(ui, |ui| {
-                    if compact {
-                        ui.label(&label);
-                    }
-                    let busy = self.library_selection.pending.is_some();
-                    if busy {
-                        ui.label(self.tr("Guardando favoritos…", "Saving favorites…"));
-                        if theme::navigation(
-                            ui,
-                            self.tr("Cancelar pendientes", "Cancel remaining"),
-                            false,
-                            p,
-                        )
-                        .clicked()
-                        {
-                            self.library_selection.cancel();
-                        }
-                    } else if count > 0 {
-                        for (value, es, en) in [
-                            (true, "Añadir a favoritos", "Add to favorites"),
-                            (false, "Quitar de favoritos", "Remove from favorites"),
-                        ] {
-                            if theme::navigation(ui, self.tr(es, en), false, p).clicked() {
-                                self.favorite_library_selection(value);
-                                ui.close();
-                            }
-                        }
-                    }
-                    if let Some(notice) = &self.library_selection.notice {
-                        ui.label(notice);
-                    }
-                    if count > 0 || busy || self.library_selection.notice.is_some() {
-                        ui.separator();
-                    }
-                    ui.add_enabled_ui(!busy, |ui| {
-                        let label = self.tr("Modo de selección", "Selection mode");
-                        let mut mode = self.library_selection.model.mode;
-                        if ui.checkbox(&mut mode, label).changed() {
-                            if !mode {
-                                self.library_selection.model.clear();
-                            } else {
-                                self.library_selection.model.mode = true;
-                            }
-                        }
-                        if theme::navigation(
-                            ui,
-                            self.tr("Seleccionar esta página", "Select this page"),
-                            false,
-                            p,
-                        )
-                        .clicked()
-                        {
-                            self.library_selection.model.all(&self.library_page_ids());
-                            ui.close();
-                        }
-                        if theme::navigation(
-                            ui,
-                            self.tr("Limpiar selección", "Clear selection"),
-                            false,
-                            p,
-                        )
-                        .clicked()
-                        {
-                            self.library_selection.model.clear();
-                            self.library_selection.notice = None;
-                            ui.close();
-                        }
-                    });
-                });
-        });
-    }
-    fn favorite_library_selection(&mut self, value: bool) {
-        if self.library_selection.pending.is_some() || self.library_selection.model.ids().is_empty()
-        {
-            return;
+    pub(super) fn submit_library_bulk(&mut self, action: BulkAction, ids: Vec<String>) -> bool {
+        if self.library_selection.pending.is_some() || ids.is_empty() {
+            return false;
         }
         let cancel = Cancellation::default();
         match self
             .runtime
-            .submit(Action::FavoriteSelection(Box::new(FavoriteRequest {
-                ids: self.library_selection.model.ids().to_vec(),
-                value,
+            .submit(Action::BulkSelection(Box::new(BulkRequest {
+                ids,
+                action: action.clone(),
                 cancel: cancel.clone(),
             }))) {
             Ok(()) => {
-                self.library_selection.pending = Some(cancel);
+                self.library_selection.pending = Some(PendingBulk { cancel, action });
                 self.library_selection.notice = None;
+                true
             }
-            Err(error) => self.library_selection.notice = Some(error.to_string()),
+            Err(error) => {
+                self.library_selection.notice = Some(error.to_string());
+                false
+            }
         }
     }
-    pub(super) fn accept_selection_favorite(&mut self, reply: FavoriteReply) {
+    pub(super) fn accept_library_bulk(&mut self, reply: BulkReply) {
         if !self
             .library_selection
             .pending
             .as_ref()
-            .is_some_and(|cancel| cancel.same_request(&reply.cancel))
+            .is_some_and(|cancel| cancel.cancel.same_request(&reply.cancel))
         {
             return;
         }
-        self.library_selection.pending = None;
+        let pending = self.library_selection.pending.take().unwrap();
         match reply.result {
             Ok(report) => {
+                match pending.action {
+                    BulkAction::Tag(_) => {
+                        self.bulk_tags_changed();
+                        if self.search.enabled {
+                            self.send(Action::IndexStatistics);
+                        }
+                    }
+                    BulkAction::Collection { .. } | BulkAction::Archive => {
+                        self.bulk_collections_changed()
+                    }
+                    BulkAction::Favorite(_) => {}
+                }
+
                 let message = format!(
                     "{}: {} · {}: {} · {}: {}",
                     self.tr("Guardados", "Saved"),
@@ -283,50 +214,6 @@ impl YamantakaApp {
                 self.refresh();
             }
             Err(error) => self.library_selection.notice = Some(error.to_string()),
-        }
-    }
-    pub fn preview_library_selection(&mut self, favorite: bool, menu: bool) {
-        if self.demo && self.capture.is_some() {
-            self.library_selection.preview = Some(0);
-            self.library_selection.preview_favorite = favorite;
-            self.library_selection.preview_menu = menu;
-        }
-    }
-    pub(super) fn update_library_selection_preview(&mut self) {
-        if !self.library_loaded || self.library_selection.pending.is_some() {
-            return;
-        }
-        match self.library_selection.preview {
-            Some(0) if self.documents.len() >= 4 => {
-                let page = self.documents.clone();
-                self.select_library_book(&page[0], egui::Modifiers::CTRL);
-                self.select_library_book(&page[2], egui::Modifiers::SHIFT);
-                self.select_library_book(&page[1], egui::Modifiers::CTRL);
-                self.select_library_book(&page[3], egui::Modifiers::CTRL);
-                assert_eq!(
-                    self.library_selection.model.ids(),
-                    &[page[0].id.clone(), page[2].id.clone(), page[3].id.clone()]
-                );
-                if self.library_selection.preview_favorite {
-                    self.library_selection.preview_targets =
-                        self.library_selection.model.ids().to_vec();
-                    self.favorite_library_selection(true);
-                    self.library_selection.preview = Some(1);
-                } else {
-                    self.library_selection.preview = None;
-                }
-            }
-            Some(1) => {
-                assert!(self.library_selection.model.ids().is_empty());
-                for doc in &self.documents {
-                    assert_eq!(
-                        doc.favorite,
-                        self.library_selection.preview_targets.contains(&doc.id)
-                    );
-                }
-                self.library_selection.preview = None;
-            }
-            _ => {}
         }
     }
 }

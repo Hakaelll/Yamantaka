@@ -35,6 +35,11 @@ impl From<&Collection> for CollectionRevision {
 }
 #[derive(Clone)]
 pub enum CollectionChange {
+    EnsureForDocument {
+        name: String,
+        icon: String,
+        document: String,
+    },
     Create {
         name: String,
         icon: String,

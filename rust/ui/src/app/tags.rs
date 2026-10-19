@@ -80,6 +80,13 @@ impl Drop for TagState {
     }
 }
 impl YamantakaApp {
+    pub(super) fn bulk_tags_changed(&mut self) {
+        self.library_tags.loaded = false;
+        if matches!(self.surface, Surface::Tags) {
+            self.load_tags();
+        }
+    }
+
     pub(super) fn show_tags(&mut self, document: Option<Document>) {
         self.show_surface(Surface::Tags);
         if !matches!(self.surface, Surface::Tags) {

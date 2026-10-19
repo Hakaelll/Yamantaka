@@ -420,6 +420,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if capture.is_some() && args.iter().any(|arg| arg == "--library-tags") {
             db.execute_batch("INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('legacy-study','Study','study','violet','2026-10-19','2026-10-19'); INSERT INTO annotations(id,document_id,page_index,type,color,document_fingerprint,created_at,updated_at) VALUES('tag-annotation','demo-0',0,'note','violet','synthetic','2026-10-19','2026-10-19'); INSERT INTO annotation_tags(annotation_id,tag_id) VALUES('tag-annotation','legacy-study');")?;
         }
+        if capture.is_some()
+            && args.iter().any(|arg| {
+                arg.to_str()
+                    .is_some_and(|value| value.starts_with("--bulk-organization="))
+            })
+        {
+            for index in 0..80 {
+                db.execute_batch(&format!("INSERT INTO collections(id,name,normalized_name,icon,sort_order,is_pinned,created_at,updated_at) VALUES('bulk-c-{index}','Example collection {index:03}','example collection {index:03}','folder',{index},0,'2026-10-20','2026-10-20'); INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('bulk-t-{index}','Example tag {index:03}','example tag {index:03}','violet','2026-10-20','2026-10-20');"))?;
+            }
+            db.execute_batch("INSERT INTO collections(id,name,normalized_name,icon,sort_order,is_pinned,created_at,updated_at) VALUES('bulk-study-collection','Study','study','study',80,0,'2026-10-20','2026-10-20'); INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('bulk-study-tag','Study','study','violet','2026-10-20','2026-10-20'); INSERT INTO annotations(id,document_id,page_index,type,color,document_fingerprint,created_at,updated_at) VALUES('bulk-note','demo-0',0,'note','violet','synthetic','2026-10-20','2026-10-20'); INSERT INTO annotation_tags(annotation_id,tag_id) VALUES('bulk-note','bulk-study-tag');")?;
+            if args.iter().any(|arg| arg == "--bulk-long-target") {
+                db.execute_batch("UPDATE tags SET name='Study — littérature française, manuscrits et annotations',normalized_name='study — littérature française, manuscrits et annotations' WHERE id='bulk-study-tag'")?;
+            }
+            if args.iter().any(|arg| arg == "--bulk-organization=remove") {
+                db.execute_batch("INSERT INTO collection_documents(collection_id,document_id,added_at) SELECT 'bulk-study-collection',id,'2026-10-20' FROM documents WHERE id IN ('demo-0','demo-1','demo-2','demo-3')")?;
+            }
+        }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
             db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
@@ -736,6 +753,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         args.iter().any(|arg| arg == "--selection-favorite"),
                         args.iter().any(|arg| arg == "--selection-menu"),
                     );
+                }
+                if let Some(mode) = args
+                    .iter()
+                    .filter_map(|arg| arg.to_str())
+                    .find_map(|value| value.strip_prefix("--bulk-organization="))
+                {
+                    app.preview_bulk_organization(mode);
                 }
                 if args.iter().any(|arg| arg == "--library-tags") {
                     app.preview_tags(u8::from(args.iter().any(|arg| arg == "--tag-filter")));

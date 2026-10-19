@@ -1,5 +1,6 @@
 mod annotations;
 mod bookmarks;
+mod bulk_picker;
 mod cache_maintenance;
 mod collections;
 mod compact;
@@ -195,6 +196,9 @@ pub struct YamantakaApp {
     requested: Option<RenderKey>,
     render_retry: bool,
     cancel: Cancellation,
+    bulk_organization_preview: Option<bulk_picker::OrganizationPreview>,
+    bulk_organization_verified: Option<serde_json::Value>,
+    bulk_picker: Option<bulk_picker::BulkPicker>,
     library_selection: library_selection::SelectionState,
     query_cancel: Cancellation,
     library_loaded: bool,
@@ -389,6 +393,9 @@ impl YamantakaApp {
             requested: None,
             render_retry: false,
             cancel: Cancellation::default(),
+            bulk_organization_preview: None,
+            bulk_organization_verified: None,
+            bulk_picker: None,
             library_selection: Default::default(),
             query_cancel: Cancellation::default(),
             library_loaded: false,
@@ -1401,7 +1408,7 @@ impl App for YamantakaApp {
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
                 Update::PendingImports(result) => self.importing.accept_recovery(result),
-                Update::SelectionFavorited(reply) => self.accept_selection_favorite(*reply),
+                Update::SelectionOrganized(reply) => self.accept_library_bulk(*reply),
                 Update::LibraryChecked(reply) => {
                     self.library_check.accept(*reply);
                     self.refresh();
@@ -1416,9 +1423,21 @@ impl App for YamantakaApp {
                         self.refresh();
                     }
                 }
-                Update::Tags(result, cancel) => self.accept_tags(result, cancel),
+                Update::Tags(result, cancel) => {
+                    if self.bulk_target_matches(&cancel) {
+                        self.accept_bulk_tags(result);
+                    } else {
+                        self.accept_tags(result, cancel);
+                    }
+                }
                 Update::TagChanged(result, cancel) => self.accept_tag_change(result, cancel),
-                Update::Collections(result, cancel) => self.accept_collections(result, cancel),
+                Update::Collections(result, cancel) => {
+                    if self.bulk_target_matches(&cancel) {
+                        self.accept_bulk_collections(result);
+                    } else {
+                        self.accept_collections(result, cancel);
+                    }
+                }
                 Update::CollectionChanged(result, cancel) => {
                     self.accept_collection_change(result, cancel)
                 }
@@ -1915,12 +1934,12 @@ impl App for YamantakaApp {
         self.poll_search(&ctx);
         self.selection.keyboard_input(
             &ctx,
-            self.password.is_some() || self.links.confirmation_open(),
+            self.password.is_some() || self.links.confirmation_open() || self.bulk_picker.is_some(),
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
             &ctx,
-            self.password.is_some() || self.links.confirmation_open(),
+            self.password.is_some() || self.links.confirmation_open() || self.bulk_picker.is_some(),
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -1952,6 +1971,7 @@ impl App for YamantakaApp {
         self.apply_annotation_export_preview();
         self.update_file_comparison();
         self.update_library_selection_preview();
+        self.update_bulk_organization_preview();
         self.update_tag_preview();
         self.update_collection_preview();
         self.update_cache_maintenance();
@@ -2080,6 +2100,7 @@ impl App for YamantakaApp {
                     });
             });
         });
+        self.bulk_target_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
         self.pump_library_covers(&ctx);
@@ -2117,6 +2138,8 @@ impl App for YamantakaApp {
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
+                    && self.bulk_organization_preview.is_none()
+                    && self.bulk_picker.as_ref().is_none_or(|picker|picker.ready())
                     && self.library_selection.ready()
                     && self.library_tags.ready()
                     && self.collections.ready()
@@ -2238,6 +2261,8 @@ impl App for YamantakaApp {
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
+                    record["bulkOrganization"]=self.bulk_organization_verified.clone().unwrap_or(serde_json::Value::Null);
+                    record["bulkTargetPicker"]=self.bulk_picker_summary();
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();
                     record["librarySelection"]=self.library_selection.summary();
                     record["libraryFiltersActive"]=self.library_has_filters().into();

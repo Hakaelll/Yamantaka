@@ -71,6 +71,13 @@ impl Drop for CollectionState {
     }
 }
 impl YamantakaApp {
+    pub(super) fn bulk_collections_changed(&mut self) {
+        self.collections.loaded = false;
+        if matches!(self.surface, Surface::Collections) {
+            self.load_collections();
+        }
+    }
+
     pub(super) fn show_collections(&mut self, document: Option<Document>) {
         self.show_surface(Surface::Collections);
         if !matches!(self.surface, Surface::Collections) {

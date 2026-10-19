@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='bulk-tags-long-small-200'; args=@('--pdf-covers','--bulk-organization=tag-picker','--bulk-long-target','--size=640x480','--text-scale=2','--reduce-motion') },
+    @{ name='bulk-tags-picker-small-200'; args=@('--pdf-covers','--bulk-organization=tag-picker','--size=640x480','--text-scale=2','--light','--es','--reduce-motion') },
+    @{ name='bulk-collections-picker'; args=@('--pdf-covers','--bulk-organization=collection-picker') },
+    @{ name='bulk-tags-applied'; args=@('--pdf-covers','--bulk-organization=tag','--light','--es','--reduce-motion') },
+    @{ name='bulk-collections-applied'; args=@('--pdf-covers','--bulk-organization=collection') },
+    @{ name='bulk-collections-removed'; args=@('--pdf-covers','--bulk-organization=remove') },
+    @{ name='bulk-archive-applied'; args=@('--pdf-covers','--bulk-organization=archive','--light','--es','--reduce-motion') },
     @{ name='library-selection-covers'; args=@('--pdf-covers','--library-selection') },
     @{ name='library-selection-list-es'; args=@('--pdf-covers','--library-selection','--list','--es','--light','--reduce-motion') },
     @{ name='library-selection-small-200'; args=@('--pdf-covers','--library-selection','--size=640x480','--text-scale=2') },
@@ -277,6 +284,21 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    if ($case.name -match '^bulk-(tags|collections|archive)-') {
+        if (-not $controls.libraryQueryLoaded -or $controls.librarySelection.writing -or $controls.bulkOrganization.selected -ne 3) { throw 'Bulk organization did not reach its verified terminal state.' }
+        if ($case.name -like '*picker*' -or $case.name -eq 'bulk-tags-long-small-200') {
+            if (-not $controls.bulkTargetPicker.open -or $controls.bulkTargetPicker.busy -or $controls.bulkTargetPicker.failed -or $controls.bulkTargetPicker.total -ne 81 -or $controls.bulkTargetPicker.offset -ne 80 -or $controls.bulkTargetPicker.visible -ne 1) { throw 'The picker must resolve its target on the second bounded page.' }
+            $visibleTarget = if ($case.name -eq 'bulk-tags-long-small-200') { 'Study — littérature française, manuscrits et annotations · 0 books' } elseif ($case.args -contains '--es') { 'Study · 0 libros' } else { 'Study · 0 books' }
+            $visibleCancel = if ($case.args -contains '--es') { 'Cancelar' } else { 'Cancel' }
+            $visiblePrevious = if ($case.args -contains '--es') { 'Anterior' } else { 'Previous' }
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($visibleTarget,$visibleCancel,$visiblePrevious)
+
+        } else {
+            $expectedMembers = if ($case.name -eq 'bulk-collections-removed') { 1 } else { 3 }
+            if ($controls.bulkTargetPicker.open -or $controls.bulkOrganization.members -ne $expectedMembers -or $controls.libraryDocumentCount -ne $expectedMembers -or $controls.librarySelection.ids.Count -ne 0) { throw 'Bulk organization membership or filtered readback is incorrect.' }
+            if ($case.name -eq 'bulk-tags-applied' -and $controls.bulkOrganization.annotationUses -ne 1) { throw 'Document tag assignment must preserve the existing annotation membership.' }
+        }
+    }
     if ($case.name -like 'library-selection-*') {
         if (-not $controls.libraryQueryLoaded -or $controls.librarySelection.writing -or $null -ne $controls.librarySelection.preview) { throw 'Library selection preview has not completed.' }
         if ($case.name -eq 'library-selection-favorites') {
