@@ -28,7 +28,11 @@ impl YamantakaApp {
                     }
                     let busy = self.library_selection.pending.is_some();
                     if busy {
-                        ui.label(self.tr("Guardando selección…", "Saving selection…"));
+                        if let Some(progress) = self.cover_batch_progress() {
+                            ui.label(progress);
+                        } else {
+                            ui.label(self.tr("Guardando selección…", "Saving selection…"));
+                        }
                         if theme::navigation(
                             ui,
                             self.tr("Cancelar pendientes", "Cancel remaining"),
@@ -38,6 +42,7 @@ impl YamantakaApp {
                         .clicked()
                         {
                             self.library_selection.cancel();
+                            self.runtime.wake();
                         }
                     } else if count > 0 {
                         for (value, es, en) in [
@@ -75,6 +80,17 @@ impl YamantakaApp {
                                 self.open_bulk_picker(kind);
                                 ui.close();
                             }
+                        }
+                        if theme::navigation(
+                            ui,
+                            self.tr("Regenerar portadas…", "Regenerate covers…"),
+                            false,
+                            p,
+                        )
+                        .clicked()
+                        {
+                            self.open_cover_batch_review();
+                            ui.close();
                         }
                         if theme::navigation(ui, self.tr("Archivar", "Archive"), false, p)
                             .on_hover_text(self.tr(

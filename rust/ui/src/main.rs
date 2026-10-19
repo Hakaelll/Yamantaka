@@ -303,6 +303,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             drop(db);
             db = Database::open(&store.join("export-preview.sqlite3"))?;
         }
+        if args.iter().any(|arg| {
+            arg.to_str()
+                .is_some_and(|value| value.starts_with("--bulk-covers="))
+        }) {
+            db.execute_batch("INSERT INTO document_covers SELECT id,1,'','','2026-10-20','2026-10-08',1,'manual',1,'contain',0.75 FROM documents WHERE id IN ('demo-0','demo-1','demo-2');")?;
+        }
         if args.iter().any(|arg| arg == "--automatic-cover-manual") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-08',1,'manual',4,'contain',0.7142857142857143);")?;
         }
@@ -747,6 +753,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--reset-library-filters") {
                     app.preview_reset_library_filters();
+                }
+                if let Some(mode) = args
+                    .iter()
+                    .filter_map(|arg| arg.to_str())
+                    .find_map(|value| value.strip_prefix("--bulk-covers="))
+                {
+                    app.preview_cover_batch(mode);
                 }
                 if args.iter().any(|arg| arg == "--library-selection") {
                     app.preview_library_selection(

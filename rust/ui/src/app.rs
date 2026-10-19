@@ -1934,12 +1934,18 @@ impl App for YamantakaApp {
         self.poll_search(&ctx);
         self.selection.keyboard_input(
             &ctx,
-            self.password.is_some() || self.links.confirmation_open() || self.bulk_picker.is_some(),
+            self.password.is_some()
+                || self.links.confirmation_open()
+                || self.bulk_picker.is_some()
+                || self.cover_batch_review_open(),
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
             &ctx,
-            self.password.is_some() || self.links.confirmation_open() || self.bulk_picker.is_some(),
+            self.password.is_some()
+                || self.links.confirmation_open()
+                || self.bulk_picker.is_some()
+                || self.cover_batch_review_open(),
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -1971,6 +1977,7 @@ impl App for YamantakaApp {
         self.apply_annotation_export_preview();
         self.update_file_comparison();
         self.update_library_selection_preview();
+        self.update_cover_batch_preview(&ctx);
         self.update_bulk_organization_preview();
         self.update_tag_preview();
         self.update_collection_preview();
@@ -2100,6 +2107,8 @@ impl App for YamantakaApp {
                     });
             });
         });
+        self.update_cover_batch_progress();
+        self.cover_batch_review_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);

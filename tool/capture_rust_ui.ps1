@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='bulk-covers-review'; args=@('--pdf-covers','--bulk-covers=review') },
+    @{ name='bulk-covers-review-small-200'; args=@('--pdf-covers','--bulk-covers=review','--light','--es','--size=640x480','--text-scale=2','--reduce-motion') },
+    @{ name='bulk-covers-applied'; args=@('--pdf-covers','--bulk-covers=apply') },
+    @{ name='bulk-covers-pressure-es'; args=@('--pdf-covers','--bulk-covers=pressure','--light','--es','--reduce-motion') },
     @{ name='bulk-tags-long-small-200'; args=@('--pdf-covers','--bulk-organization=tag-picker','--bulk-long-target','--size=640x480','--text-scale=2','--reduce-motion') },
     @{ name='bulk-tags-picker-small-200'; args=@('--pdf-covers','--bulk-organization=tag-picker','--size=640x480','--text-scale=2','--light','--es','--reduce-motion') },
     @{ name='bulk-collections-picker'; args=@('--pdf-covers','--bulk-organization=collection-picker') },
@@ -284,6 +288,19 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    if ($case.name -like 'bulk-covers-*') {
+        $coverResult = $controls.libraryCovers.bulkRegeneration
+        if ($null -eq $coverResult -or $coverResult.targets.Count -ne 3 -or $controls.librarySelection.writing -or $controls.libraryCovers.paused -ne 0) { throw 'Bulk cover preview has not reached its verified state.' }
+        if ($case.name -like '*review*') {
+            if (-not $coverResult.review -or -not $coverResult.oldImagesKept -or $controls.librarySelection.ids.Count -ne 3) { throw 'Cover review must preserve all selected covers.' }
+            $cancelLabel = if ($case.args -contains '--es') { 'Cancelar' } else { 'Cancel' }
+            $applyLabel = if ($case.args -contains '--es') { 'Regenerar' } else { 'Regenerate' }
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($cancelLabel,$applyLabel)
+        } else {
+            if ($coverResult.review -or -not $coverResult.newImages -or $coverResult.manualPageBefore -ne 1 -or $coverResult.automaticPageAfter -ne 0 -or $controls.libraryCovers.deferredUploads -ne 0) { throw 'Regeneration must replace the persisted manual page and visible image.' }
+            if ($case.name -eq 'bulk-covers-pressure-es' -and -not $coverResult.pressureRecovery) { throw 'Expected recovery after governed GPU capacity was restored.' }
+        }
+    }
     if ($case.name -match '^bulk-(tags|collections|archive)-') {
         if (-not $controls.libraryQueryLoaded -or $controls.librarySelection.writing -or $controls.bulkOrganization.selected -ne 3) { throw 'Bulk organization did not reach its verified terminal state.' }
         if ($case.name -like '*picker*' -or $case.name -eq 'bulk-tags-long-small-200') {

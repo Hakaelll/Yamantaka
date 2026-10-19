@@ -1,10 +1,14 @@
+mod preview;
 use super::*;
 use yamantaka_application::cover_source::CoverSource;
 
 #[derive(Default)]
 pub(super) struct LibraryCovers {
     slots: HashMap<String, CoverSlot>,
+    preview: Option<preview::CoverBatchPreview>,
+    verified: Option<serde_json::Value>,
     generation: u64,
+    paused: std::collections::HashSet<String>,
     capacity_preview: u8,
     blocked_before_release: usize,
 }
@@ -18,10 +22,37 @@ struct CoverSlot {
     image: Option<PageImage>,
     finished: bool,
     source_page: Option<u32>,
+    refresh_requested: bool,
+    deferred: Option<(Arc<yamantaka_domain::RenderedPage>, u64)>,
 }
 impl LibraryCovers {
+    pub(super) fn pause(&mut self, ids: &[String]) {
+        for id in ids {
+            self.paused.insert(id.clone());
+            if let Some(slot) = self.slots.get_mut(id) {
+                slot.cancel.cancel();
+                slot.finished = true;
+                slot.refresh_requested = false;
+                slot.deferred = None;
+            }
+        }
+    }
+    pub(super) fn resume(&mut self, ids: &[String]) {
+        for id in ids {
+            if self.paused.remove(id)
+                && let Some(slot) = self.slots.get_mut(id)
+            {
+                slot.refresh_requested = true;
+            }
+        }
+    }
     pub(super) fn slots_ready(&self) -> bool {
-        self.slots.values().all(|slot| slot.finished) && matches!(self.capacity_preview, 0 | 3)
+        self.preview.is_none()
+            && self
+                .slots
+                .values()
+                .all(|slot| slot.finished && !slot.refresh_requested)
+            && matches!(self.capacity_preview, 0 | 3)
     }
 }
 impl YamantakaApp {
@@ -57,8 +88,28 @@ impl YamantakaApp {
         if cancelled {
             self.runtime.wake();
         }
+        let epoch = self.governor.capacity_epoch();
+        if let Some(presenter) = &mut self.presenter {
+            for (id, slot) in &mut self.library_covers.slots {
+                if slot
+                    .deferred
+                    .as_ref()
+                    .is_some_and(|(_, observed)| *observed != epoch)
+                {
+                    let (page, _) = slot.deferred.take().unwrap();
+                    upload_cover(ctx, presenter, slot, id, page, epoch);
+                }
+            }
+        }
         for document in requested {
-            if document.missing || self.library_covers.slots.contains_key(&document.id) {
+            if document.missing
+                || self.library_covers.paused.contains(&document.id)
+                || self
+                    .library_covers
+                    .slots
+                    .get(&document.id)
+                    .is_some_and(|slot| !slot.refresh_requested)
+            {
                 continue;
             }
             let Some(generation) = self.library_covers.generation.checked_add(1) else {
@@ -72,19 +123,30 @@ impl YamantakaApp {
             )) {
                 Ok(()) => {
                     self.library_covers.generation = generation;
-                    self.library_covers.slots.insert(
-                        document.id,
-                        CoverSlot {
-                            path: document.path,
-                            fingerprint: document.fingerprint,
-                            page_count: document.page_count,
-                            generation,
-                            cancel,
-                            image: None,
-                            finished: false,
-                            source_page: None,
-                        },
-                    );
+                    if let Some(slot) = self.library_covers.slots.get_mut(&document.id) {
+                        slot.cancel.cancel();
+                        slot.generation = generation;
+                        slot.cancel = cancel;
+                        slot.finished = false;
+                        slot.refresh_requested = false;
+                        slot.deferred = None;
+                    } else {
+                        self.library_covers.slots.insert(
+                            document.id,
+                            CoverSlot {
+                                path: document.path,
+                                fingerprint: document.fingerprint,
+                                page_count: document.page_count,
+                                generation,
+                                cancel,
+                                image: None,
+                                finished: false,
+                                source_page: None,
+                                refresh_requested: false,
+                                deferred: None,
+                            },
+                        );
+                    }
                 }
                 Err(yamantaka_domain::Failure::QueueFull) => {
                     ctx.request_repaint_after(std::time::Duration::from_millis(100))
@@ -134,25 +196,17 @@ impl YamantakaApp {
         let Some(presenter) = &mut self.presenter else {
             return;
         };
-        if let Ok(texture) = presenter.upload(&page) {
-            slot.source_page = Some(page.key.page);
-            ctx.data_mut(|data| {
-                data.insert_temp(
-                    book::cover_id(id),
-                    book::PdfCover {
-                        texture: texture.id(),
-                        size: [page.width, page.height],
-                        path: slot.path.clone(),
-                        fingerprint: slot.fingerprint.clone(),
-                        page_count: slot.page_count,
-                    },
-                )
-            });
-            slot.image = Some(PageImage::Native(texture));
-        }
+        upload_cover(
+            ctx,
+            presenter,
+            slot,
+            id,
+            page,
+            self.governor.capacity_epoch(),
+        );
     }
     pub(super) fn cover_summary(&self) -> serde_json::Value {
-        serde_json::json!({"resident": self.library_covers.slots.len(),
+        serde_json::json!({"resident": self.library_covers.slots.len(),"bulkRegeneration": self.library_covers.verified,"paused": self.library_covers.paused.len(),"deferredUploads":self.library_covers.slots.values().filter(|slot|slot.deferred.is_some()).count(),
             "blockedBeforeRelease":self.library_covers.blocked_before_release,"capacityPreview":self.library_covers.capacity_preview,"capacityRevision":self.runtime.pdf_capacity_revision(),
             "ready":self.library_covers.slots.values().filter(|slot| slot.image.is_some()).count(),
             "pending":self.library_covers.slots.values().filter(|slot| !slot.finished).count(),
@@ -199,6 +253,8 @@ impl YamantakaApp {
                 image: Some(image),
                 finished: true,
                 source_page: Some(page),
+                refresh_requested: false,
+                deferred: None,
             },
         );
     }
@@ -208,5 +264,40 @@ impl YamantakaApp {
             self.runtime.wake();
         }
         ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(id)));
+    }
+}
+
+fn upload_cover(
+    ctx: &egui::Context,
+    presenter: &mut PagePresenter,
+    slot: &mut CoverSlot,
+    id: &str,
+    page: Arc<yamantaka_domain::RenderedPage>,
+    epoch: u64,
+) {
+    match presenter.upload(&page) {
+        Ok(texture) => {
+            slot.source_page = Some(page.key.page);
+            ctx.data_mut(|data| {
+                data.insert_temp(
+                    book::cover_id(id),
+                    book::PdfCover {
+                        texture: texture.id(),
+                        size: [page.width, page.height],
+                        path: slot.path.clone(),
+                        fingerprint: slot.fingerprint.clone(),
+                        page_count: slot.page_count,
+                    },
+                )
+            });
+            slot.image = Some(PageImage::Native(texture));
+            slot.finished = true;
+        }
+        Err(yamantaka_domain::Failure::MemoryBudget) => {
+            // One governed CPU image per visible slot waits for released capacity.
+            slot.deferred = Some((page, epoch));
+            slot.finished = false;
+        }
+        Err(_) => slot.finished = true,
     }
 }

@@ -1,3 +1,4 @@
+mod covers;
 mod menu;
 mod preview;
 use super::*;
@@ -5,12 +6,24 @@ use yamantaka_application::library_bulk::{BulkAction, BulkReply, BulkRequest};
 use yamantaka_domain::library_selection::LibrarySelection;
 struct PendingBulk {
     cancel: Cancellation,
-    action: BulkAction,
+    action: PendingAction,
+}
+enum PendingAction {
+    Data(BulkAction),
+    Covers {
+        ids: Vec<String>,
+        refreshed: std::collections::HashSet<String>,
+    },
+}
+struct CoverReview {
+    ids: Vec<String>,
+    focus_cancel: bool,
 }
 #[derive(Default)]
 pub(super) struct SelectionState {
     pub model: LibrarySelection,
     pending: Option<PendingBulk>,
+    cover_review: Option<CoverReview>,
     notice: Option<String>,
     pub(super) focus: Option<String>,
     pub columns: usize,
@@ -71,7 +84,8 @@ impl YamantakaApp {
         let keyboard_allowed = !egui::Popup::is_any_open(ui.ctx())
             && self.password.is_none()
             && !self.links.confirmation_open()
-            && self.bulk_picker.is_none();
+            && self.bulk_picker.is_none()
+            && self.library_selection.cover_review.is_none();
         if response.has_focus() && keyboard_allowed {
             if ui.input_mut(|input| input.consume_key(egui::Modifiers::CTRL, egui::Key::A))
                 && self.library_selection.pending.is_none()
@@ -132,6 +146,7 @@ impl YamantakaApp {
             || self.password.is_some()
             || self.links.confirmation_open()
             || self.bulk_picker.is_some()
+            || self.library_selection.cover_review.is_some()
             || ctx.egui_wants_keyboard_input()
             || egui::Popup::is_any_open(ctx)
             || self.library_selection.pending.is_some()
@@ -158,7 +173,10 @@ impl YamantakaApp {
                 cancel: cancel.clone(),
             }))) {
             Ok(()) => {
-                self.library_selection.pending = Some(PendingBulk { cancel, action });
+                self.library_selection.pending = Some(PendingBulk {
+                    cancel,
+                    action: PendingAction::Data(action),
+                });
                 self.library_selection.notice = None;
                 true
             }
@@ -178,19 +196,23 @@ impl YamantakaApp {
             return;
         }
         let pending = self.library_selection.pending.take().unwrap();
+        if let PendingAction::Covers { ids, .. } = &pending.action {
+            self.library_covers.resume(ids);
+        }
         match reply.result {
             Ok(report) => {
                 match pending.action {
-                    BulkAction::Tag(_) => {
+                    PendingAction::Data(BulkAction::Tag(_)) => {
                         self.bulk_tags_changed();
                         if self.search.enabled {
                             self.send(Action::IndexStatistics);
                         }
                     }
-                    BulkAction::Collection { .. } | BulkAction::Archive => {
+                    PendingAction::Data(BulkAction::Collection { .. } | BulkAction::Archive) => {
                         self.bulk_collections_changed()
                     }
-                    BulkAction::Favorite(_) => {}
+                    PendingAction::Data(BulkAction::Favorite(_)) | PendingAction::Covers { .. } => {
+                    }
                 }
 
                 let message = format!(

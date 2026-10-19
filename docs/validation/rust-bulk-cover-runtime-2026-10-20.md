@@ -1,6 +1,8 @@
 # Bulk cover regeneration runtime
 
-Date: 2026-10-20. Scope: actor/native coordination for automatic cover regeneration. The current UI does not invoke this action. Selection-menu wiring, explicit confirmation and live pixel replacement remain pending; this checkpoint is not a completed user-facing bulk-cover feature or a replacement release.
+Date: 2026-10-20. Scope: actor/native coordination for automatic cover regeneration. At this runtime checkpoint the UI did not invoke this action. Selection-menu wiring, explicit confirmation and live pixel replacement were pending; this checkpoint is not a completed user-facing bulk-cover feature or a replacement release.
+
+Follow-up: [the native UI checkpoint](rust-bulk-cover-ui-2026-10-20.md) connects the action and verifies retained-image replacement, including governed GPU-capacity recovery. The evidence below describes the preceding runtime checkpoint.
 
 ## Implemented contract
 
