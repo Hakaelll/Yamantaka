@@ -3,6 +3,10 @@ use super::*;
 const CATEGORY_KEY: &str = "settings-category";
 
 impl YamantakaApp {
+    pub(super) fn preview_storage(&mut self, ctx: &egui::Context) {
+        ctx.data_mut(|data| data.insert_temp(egui::Id::new(CATEGORY_KEY), 4_usize));
+        self.show_surface(Surface::Settings);
+    }
     pub fn preview_privacy(&mut self, ctx: &egui::Context) {
         if self.demo && self.capture.is_some() {
             ctx.data_mut(|data| data.insert_temp(egui::Id::new(CATEGORY_KEY), 3_usize));
@@ -17,7 +21,7 @@ impl YamantakaApp {
             .ctx()
             .data_mut(|data| data.get_temp::<usize>(egui::Id::new(CATEGORY_KEY)))
             .unwrap_or(0)
-            .min(3);
+            .min(4);
         let mut changed = false;
         egui::ScrollArea::vertical()
             .id_salt("settings-page")
@@ -57,10 +61,20 @@ impl YamantakaApp {
                             ui.horizontal_wrapped(|ui| {
                                 theme::display(ui, self.tr("Ajustes", "Settings"), 20.0);
                                 let label = self.tr(
-                                    ["Apariencia", "Accesibilidad", "Idioma", "Privacidad"]
-                                        [category],
-                                    ["Appearance", "Accessibility", "Language", "Privacy"]
-                                        [category],
+                                    [
+                                        "Apariencia",
+                                        "Accesibilidad",
+                                        "Idioma",
+                                        "Privacidad",
+                                        "Almacenamiento",
+                                    ][category],
+                                    [
+                                        "Appearance",
+                                        "Accessibility",
+                                        "Language",
+                                        "Privacy",
+                                        "Storage",
+                                    ][category],
                                 );
                                 let response = theme::navigation(ui, label, true, p);
                                 egui::Popup::menu(&response).show(|ui| {
@@ -120,6 +134,7 @@ impl YamantakaApp {
             self.tr("Accesibilidad", "Accessibility"),
             self.tr("Idioma", "Language"),
             self.tr("Privacidad", "Privacy"),
+            self.tr("Almacenamiento", "Storage"),
         ];
         let mut choices = |ui: &mut egui::Ui| {
             for (index, label) in labels.iter().enumerate() {
@@ -317,6 +332,7 @@ impl YamantakaApp {
                     "Document titles and content keep their original language.",
                 ), p);
             }
+            4 => self.cache_maintenance_settings(ui, p),
             _ => {
                 if !cramped {
                     section_title(ui, self.tr("Privacidad", "Privacy"));
@@ -410,7 +426,7 @@ impl YamantakaApp {
                 }
             }
         }
-        if category != 3 {
+        if category < 3 {
             ui.add_space(28.0);
             ui.separator();
             ui.add_space(14.0);
@@ -427,12 +443,12 @@ impl YamantakaApp {
     }
 }
 
-fn section_title(ui: &mut egui::Ui, title: &str) {
+pub(super) fn section_title(ui: &mut egui::Ui, title: &str) {
     theme::display(ui, title, 28.0);
     ui.add_space(6.0);
 }
 
-fn quiet(ui: &mut egui::Ui, text: &str, p: Palette) {
+pub(super) fn quiet(ui: &mut egui::Ui, text: &str, p: Palette) {
     ui.add(egui::Label::new(RichText::new(text).color(p.secondary)).wrap());
 }
 

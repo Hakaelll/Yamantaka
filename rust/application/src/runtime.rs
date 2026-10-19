@@ -2,6 +2,9 @@ use crate::annotation_export::worker::{AnnotationExportReply, AnnotationExportRe
 use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
+use crate::cache_maintenance::{
+    CacheMaintenanceJob, CacheMaintenanceReply, CacheMaintenanceRequest,
+};
 use crate::cover_job::{CoverJob, CoverStep};
 use crate::cover_source::CoverSource;
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
@@ -47,6 +50,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    MaintainCoverCache(Box<CacheMaintenanceRequest>),
     CheckLibrary(Box<LibraryCheckRequest>),
     RelocateFile(Box<RelocationRequest>),
     CheckFile(Box<FileCheckRequest>),
@@ -120,6 +124,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    CoverCacheMaintained(Box<CacheMaintenanceReply>),
     LibraryChecked(Box<LibraryCheckReply>),
     FileRelocated(Box<RelocationReply>),
     FileChecked(Box<FileCheckReply>),
@@ -813,6 +818,7 @@ impl Runtime {
                 let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
+                let mut cache_maintenance: Option<(CacheMaintenanceJob, Permit)> = None;
                 let mut library_check:Option<(LibraryCheckJob,Permit)> = None;
                 let mut relocation: Option<(RelocationJob,Permit)> = None;
                 let mut file_check: Option<(FileCheckJob,Permit)> = None;
@@ -913,6 +919,16 @@ impl Runtime {
                                     match result {
                                         Ok(job)=>relocation=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::FileRelocated(Box::new(RelocationReply {document,cancel,result:Err(error)})),permit),
+                                    }
+                                }
+                                Action::MaintainCoverCache(request) => {
+                                    let operation=request.operation; let cancel=request.cancel.clone();
+                                    let result=if cache_maintenance.is_some() {Err(Failure::QueueFull)}
+                                        else {engine.cover_cache_handle().ok_or_else(|| Failure::Unsupported("Cover cache maintenance".into()))
+                                            .and_then(|cache| CacheMaintenanceJob::start(*request,cache))};
+                                    match result {
+                                        Ok(job)=>cache_maintenance=Some((job,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::CoverCacheMaintained(Box::new(CacheMaintenanceReply{operation,cancel,result:Err(error)})),permit),
                                     }
                                 }
                                 Action::CheckFile(request) => {
@@ -1356,6 +1372,10 @@ impl Runtime {
                             emit(&events,&notify,Update::LibraryChecked(Box::new(job.reply())),permit);
                         }
                     }
+                    if let Some(reply)=cache_maintenance.as_mut().and_then(|(job,_)|job.poll()) {
+                        let (_,permit)=cache_maintenance.take().unwrap();
+                        emit(&events,&notify,Update::CoverCacheMaintained(Box::new(reply)),permit);
+                    }
                     if let Some(reply)=file_check.as_mut().and_then(|(job,_)|job.poll(&mut repository)) {
                         let (_,permit)=file_check.take().unwrap();
                         emit(&events,&notify,Update::FileChecked(Box::new(reply)),permit);
@@ -1633,6 +1653,7 @@ impl Runtime {
                     if let Some((job, _)) = &export {
                         job.register(&mut select);
                     }
+                    if let Some((job,_)) = &cache_maintenance { job.register(&mut select); }
                     if let Some((job,_)) = &comparison { job.register(&mut select); }
                     if let Some((job,_)) = &file_check {job.register(&mut select);}
                     if let Some((job,_)) = &relocation {job.register(&mut select);}
@@ -1658,6 +1679,7 @@ impl Runtime {
                 drop(covers);
                 drop(pending); // Drop tickets before engine join; no UI draining required.
                 drop(export); // Cancel and join file work before releasing the actor.
+                drop(cache_maintenance);
                 drop(comparison);
                 drop(file_check);
                 drop(relocation);

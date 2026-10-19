@@ -66,6 +66,12 @@ pub enum PdfOpenPurpose {
 }
 
 pub trait AsyncPdfEngine: PdfEngine {
+    fn cover_cache_handle(
+        &self,
+    ) -> Option<std::sync::Arc<dyn crate::cover_cache::CoverImageCache>> {
+        None
+    }
+
     /// Reconsider cancelled requests that are waiting for native capacity.
     /// Implementations with no dormant native queue need no additional wakeup.
     fn wake_cancelled(&self) {}

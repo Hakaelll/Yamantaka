@@ -1,5 +1,6 @@
 mod annotations;
 mod bookmarks;
+mod cache_maintenance;
 mod compact;
 mod cover_picker;
 mod cover_picker_preview;
@@ -165,6 +166,7 @@ pub struct YamantakaApp {
     annotation_export: annotations::export::ExportState,
     file_comparison: file_comparison::ComparisonState,
     file_check: file_check::CheckState,
+    cache_maintenance: cache_maintenance::CacheState,
     library_check: library_check::CheckState,
     relocation: relocation::RelocationState,
     annotation_paint: annotations::paint::AnnotationPaint,
@@ -349,6 +351,7 @@ impl YamantakaApp {
             annotation_export: Default::default(),
             file_comparison: Default::default(),
             file_check: Default::default(),
+            cache_maintenance: Default::default(),
             library_check: Default::default(),
             relocation: Default::default(),
             annotation_paint: Default::default(),
@@ -1414,6 +1417,7 @@ impl App for YamantakaApp {
                         self.refresh();
                     }
                 }
+                Update::CoverCacheMaintained(reply) => self.cache_maintenance.accept(*reply),
                 Update::FileChecked(reply) => {
                     self.file_check.accept(*reply);
                     self.refresh();
@@ -1937,6 +1941,7 @@ impl App for YamantakaApp {
         self.apply_global_note_preview();
         self.apply_annotation_export_preview();
         self.update_file_comparison();
+        self.update_cache_maintenance();
         self.update_file_check();
         self.update_relocation();
         self.update_library_check();
@@ -2097,6 +2102,7 @@ impl App for YamantakaApp {
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
+                    && self.cache_maintenance.ready()
                     && self.file_check.ready()
                     && self.library_check.ready()
                     && self.relocation.ready()
@@ -2214,6 +2220,7 @@ impl App for YamantakaApp {
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
+                    record["coverCache"]=self.cache_maintenance.summary();
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
                     record["libraryCheck"]=self.library_check.summary();
@@ -2247,6 +2254,7 @@ impl App for YamantakaApp {
         }
         self.library_check.cancel();
         self.relocation.cancel();
+        self.cache_maintenance.cancel();
         self.file_check.cancel();
         self.file_comparison.cancel();
         self.annotation_export.cancel();

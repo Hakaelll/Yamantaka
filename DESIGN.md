@@ -462,3 +462,13 @@ Missing-source relocation stays inside the scrollable document inspector. Locate
 Library-wide source checks live in Tools → Check library files. Its submenu contains the current phase, outcome counts, cancellation or restart, and missing/changed catalogue shortcuts. The popup may grow to its available viewport height; overflow scrolls inside it. The gallery keeps its normal chrome. Modified sources join the existing composable State filters and Reset filters behavior.
 
 New-import content verification stays in the background import flow. It adds no progress row, modal or persistent gallery chrome. A later Check file result uses the existing inspector status to confirm the imported reference. Registered paths reuse their document without reopening the metadata analysis flow.
+
+
+Storage settings use the existing Operate layout and category navigation. Cover
+cache size, image count and explicit Calculate size / Free cover cache actions
+stay inside the settings content. A local Cancel action replaces those controls
+while work is active. No gallery or reader progress bar is introduced. Cleanup
+results report bytes removed and preserve an unknown remaining size after
+cancellation. Narrow layouts reduce the heading and scroll the actions; synthetic
+200% text captures focus the measured size and actions through that same scroll
+area. The saved PDF page choice and resident cover textures remain in place.

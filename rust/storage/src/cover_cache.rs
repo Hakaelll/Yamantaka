@@ -12,6 +12,10 @@ use yamantaka_domain::{
     memory::{MemoryCategory, MemoryGovernor, TrackedBytesBuilder},
 };
 
+mod maintenance;
+#[cfg(test)]
+mod maintenance_test;
+
 const MAGIC: &[u8; 8] = b"YMCOVER1";
 const HEADER: usize = 80;
 const MAX_PIXELS: usize = 512 * 512 * 4;
@@ -84,6 +88,14 @@ impl CoverCache {
     }
 }
 impl CoverImageCache for CoverCache {
+    fn maintain(
+        &self,
+        operation: yamantaka_domain::cover_cache::CoverCacheOperation,
+        cancel: &Cancellation,
+    ) -> Result<yamantaka_domain::cover_cache::CoverCacheReport> {
+        self.maintain_images(operation, cancel)
+    }
+
     fn identity(&self, path: &Path, page: u32, cancel: &Cancellation) -> Result<[u8; 32]> {
         cancel.check()?;
         let canonical = path.canonicalize().map_err(storage)?;
@@ -134,10 +146,9 @@ impl CoverImageCache for CoverCache {
             .load(std::sync::atomic::Ordering::Acquire)
             && self.root.is_dir()
         {
-            let _guard = self
-                .writer
-                .lock()
-                .map_err(|_| Failure::Storage("Cover cache writer stopped".into()))?;
+            let Some(_guard) = self.try_writer()? else {
+                return Ok(None);
+            };
             if !self
                 .checked_quota
                 .load(std::sync::atomic::Ordering::Acquire)
@@ -219,10 +230,9 @@ impl CoverImageCache for CoverCache {
         if self.limit < (HEADER + image.pixels().len()) as u64 {
             return Ok(());
         }
-        let _guard = self
-            .writer
-            .lock()
-            .map_err(|_| Failure::Storage("Cover cache writer stopped".into()))?;
+        let Some(_guard) = self.try_writer()? else {
+            return Ok(());
+        };
         fs::create_dir_all(&self.root).map_err(storage)?;
         let mut temporary = tempfile::NamedTempFile::new_in(&self.root).map_err(storage)?;
         temporary.write_all(MAGIC).map_err(storage)?;

@@ -490,11 +490,29 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         governor.clone(),
         Some(std::sync::Arc::new(
             yamantaka_storage::cover_cache::CoverCache::new(
-                cover_cache_root,
+                cover_cache_root.clone(),
                 cache_megabytes * 1024 * 1024,
             ),
         )),
     )?;
+    if demo && capture.is_some() && args.iter().any(|arg| arg == "--cache-maintenance") {
+        let fixture =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/rust-fixtures/textual.pdf");
+        let cover = engine
+            .try_cover(
+                "cache-fixture".into(),
+                fixture,
+                1,
+                0,
+                yamantaka_domain::Cancellation::default(),
+            )?
+            .wait()?;
+        drop(cover);
+        std::fs::write(
+            cover_cache_root.join("notes.txt"),
+            b"Synthetic neighboring file preserved by cache cleanup",
+        )?;
+    }
     let dark = if demo {
         !light
     } else {
@@ -692,6 +710,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--sessions-preview") {
                     app.preview_sessions();
+                }
+                if args.iter().any(|arg| arg == "--cache-maintenance") {
+                    app.preview_cover_cache(
+                        &cc.egui_ctx,
+                        args.iter().any(|arg| arg == "--clear-cover-cache"),
+                    );
                 }
                 if args.iter().any(|arg| arg == "--privacy") {
                     app.preview_privacy(&cc.egui_ctx);

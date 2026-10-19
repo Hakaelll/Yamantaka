@@ -197,6 +197,7 @@ struct Scheduler {
     shutdown: bool,
 }
 struct Inner {
+    cover_cache: Option<Arc<dyn yamantaka_domain::cover_cache::CoverImageCache>>,
     wake: Sender<()>,
     scheduler: Arc<Mutex<Scheduler>>,
     handle: Mutex<Option<JoinHandle<()>>>,
@@ -255,6 +256,7 @@ impl PdfWorker {
         governor: MemoryGovernor,
         cover_cache: Option<Arc<dyn yamantaka_domain::cover_cache::CoverImageCache>>,
     ) -> Result<Self> {
+        let maintenance_cache = cover_cache.clone();
         let library = library.to_owned();
         let (wake, receiver) = bounded(1);
         let (ready, wait) = bounded(1);
@@ -285,6 +287,7 @@ impl PdfWorker {
             return Err(error);
         }
         Ok(Self(Arc::new(Inner {
+            cover_cache: maintenance_cache,
             wake,
             scheduler,
             handle: Mutex::new(Some(handle)),
@@ -423,6 +426,12 @@ fn stopped() -> Failure {
     Failure::Pdf("PDF worker stopped".into())
 }
 impl AsyncPdfEngine for PdfWorker {
+    fn cover_cache_handle(
+        &self,
+    ) -> Option<Arc<dyn yamantaka_domain::cover_cache::CoverImageCache>> {
+        self.0.cover_cache.clone()
+    }
+
     fn wake_cancelled(&self) {
         let _ = self.0.wake.try_send(());
     }
