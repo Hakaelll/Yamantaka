@@ -133,6 +133,17 @@ impl YamantakaApp {
                         self.show_collections(None);
                         ui.close();
                     }
+                    if theme::navigation(
+                        ui,
+                        self.tr("Etiquetas", "Tags"),
+                        matches!(self.surface, Surface::Tags),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_tags(None);
+                        ui.close();
+                    }
                     self.library_check_menu(ui, p);
                     self.operation_actions(ui, p);
                     if theme::navigation(

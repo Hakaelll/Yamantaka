@@ -193,6 +193,16 @@ impl YamantakaApp {
                         {
                             self.show_collections(Some(document.clone()));
                         }
+                        if theme::navigation(
+                            ui,
+                            self.tr("Organizar etiquetas", "Organize tags"),
+                            false,
+                            p,
+                        )
+                        .clicked()
+                        {
+                            self.show_tags(Some(document.clone()));
+                        }
                         self.reading_goal(ui, &document);
                         ui.add_space(8.0);
                         let path = display_path(&document.path);

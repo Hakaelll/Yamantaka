@@ -1,3 +1,5 @@
+pub const MAX_TAG_FILTERS: usize = 80;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tag {
     pub id: String,
@@ -9,7 +11,8 @@ pub struct Tag {
 }
 #[derive(Clone, Debug, Default)]
 pub struct TagQuery {
-    pub id: Option<String>,
+    /// An empty set queries all tags; a nonempty set resolves at most 80 IDs.
+    pub ids: Vec<String>,
     pub text: String,
     pub document: Option<String>,
     pub offset: usize,
@@ -22,6 +25,10 @@ pub struct TagPage {
 pub enum TagChange {
     Ensure {
         name: String,
+    },
+    EnsureForDocument {
+        name: String,
+        document: String,
     },
     SetMembership {
         tag: String,

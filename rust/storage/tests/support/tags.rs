@@ -7,7 +7,7 @@ use yamantaka_storage::Database;
 fn tag(db: &Database, id: &str) -> Tag {
     db.tags(
         &TagQuery {
-            id: Some(id.into()),
+            ids: vec![id.into()],
             document: Some("d".into()),
             ..Default::default()
         },
@@ -44,6 +44,29 @@ pub fn verify(db: &mut Database) {
         )
         .unwrap();
     assert_eq!(shared, "legacy-shared");
+    assert!(
+        db.change_tag(
+            &TagChange::EnsureForDocument {
+                name: "Transient tag".into(),
+                document: "missing".into()
+            },
+            IndexAccess::Disabled,
+            &cancel
+        )
+        .is_err()
+    );
+    assert_eq!(
+        db.tags(
+            &TagQuery {
+                text: "Transient tag".into(),
+                ..Default::default()
+            },
+            &cancel
+        )
+        .unwrap()
+        .total,
+        0
+    );
     let row = tag(db, &shared);
     assert_eq!(
         (
@@ -99,6 +122,18 @@ pub fn verify(db: &mut Database) {
         document: "d".into(),
         included,
     };
+    assert_eq!(
+        db.change_tag(
+            &TagChange::EnsureForDocument {
+                name: "shared".into(),
+                document: "d".into()
+            },
+            IndexAccess::Disabled,
+            &cancel
+        )
+        .unwrap(),
+        shared
+    );
     db.change_tag(&membership(&shared, true), IndexAccess::Disabled, &cancel)
         .unwrap();
     db.change_tag(&membership(&shared, true), IndexAccess::Disabled, &cancel)
@@ -227,6 +262,57 @@ pub fn verify(db: &mut Database) {
     );
     let last = second.entries.last().unwrap();
     assert_eq!(tag(db, &last.id).id, last.id);
+    let batch = db
+        .tags(
+            &TagQuery {
+                ids: vec![last.id.clone(), local.clone(), "missing".into()],
+                ..Default::default()
+            },
+            &cancel,
+        )
+        .unwrap();
+    assert_eq!((batch.total, batch.entries.len()), (2, 2));
+    assert!(
+        db.tags(
+            &TagQuery {
+                ids: vec![local.clone(); 81],
+                ..Default::default()
+            },
+            &cancel
+        )
+        .is_err()
+    );
+    db.change_tag(
+        &TagChange::SetMembership {
+            tag: shared.clone(),
+            document: "b".into(),
+            included: true,
+        },
+        IndexAccess::Disabled,
+        &cancel,
+    )
+    .unwrap();
+    let any = LibraryQuery {
+        tag_ids: vec![shared.clone(), local.clone()],
+        ..Default::default()
+    };
+    let mut ids: Vec<_> = db
+        .query(&any)
+        .unwrap()
+        .into_iter()
+        .map(|doc| doc.id)
+        .collect();
+    ids.sort();
+    assert_eq!(ids, vec!["b", "d"]);
+    assert_eq!(db.count(&any).unwrap(), 2);
+    assert_eq!(
+        db.count(&LibraryQuery {
+            tag_ids: vec![local.clone(), excluded],
+            ..Default::default()
+        })
+        .unwrap(),
+        1
+    );
     let after = db.get("original").unwrap().unwrap();
     assert_eq!(
         (

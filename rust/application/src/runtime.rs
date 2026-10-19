@@ -50,6 +50,8 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    Tags(yamantaka_domain::tags::TagQuery, Cancellation),
+    ChangeTag(Box<yamantaka_domain::tags::TagChange>, Cancellation),
     Collections(yamantaka_domain::collections::CollectionQuery, Cancellation),
     ChangeCollection(
         Box<yamantaka_domain::collections::CollectionChange>,
@@ -129,6 +131,8 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    Tags(Result<yamantaka_domain::tags::TagPage>, Cancellation),
+    TagChanged(Result<String>, Cancellation),
     Collections(
         Result<yamantaka_domain::collections::CollectionPage>,
         Cancellation,
@@ -930,6 +934,15 @@ impl Runtime {
                                         Ok(job)=>relocation=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::FileRelocated(Box::new(RelocationReply {document,cancel,result:Err(error)})),permit),
                                     }
+                                }
+                                Action::Tags(query,cancel)=> {
+                                    let result=repository.tags(&query,&cancel);
+                                    emit(&events,&notify,Update::Tags(result,cancel),permit);
+                                }
+                                Action::ChangeTag(change,cancel)=> {
+                                    let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled} else {yamantaka_domain::search::IndexAccess::Disabled};
+                                    let result=repository.change_tag(&change,access,&cancel);
+                                    emit(&events,&notify,Update::TagChanged(result,cancel),permit);
                                 }
                                 Action::Collections(query,cancel)=> {
                                     let result=repository.collections(&query,&cancel);

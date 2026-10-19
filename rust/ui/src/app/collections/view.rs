@@ -5,9 +5,14 @@ impl YamantakaApp {
     pub(in crate::app) fn collections_view(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark);
         let cramped = ui.available_width() < 700.0;
+        let controls_layout = if cramped {
+            egui::Layout::top_down(egui::Align::Min)
+        } else {
+            egui::Layout::left_to_right(egui::Align::Center)
+        };
         egui::ScrollArea::vertical().id_salt("collection-manager").animated(!self.reduced_motion).show(ui,|ui| {
             egui::Frame::new().inner_margin(egui::Margin::same(if cramped {16} else {40})).show(ui,|ui| {
-                ui.set_max_width(1100.0);
+                ui.set_max_width(ui.available_width().min(1100.0));
                 ui.horizontal_wrapped(|ui| {
                     theme::display(ui,self.tr("Colecciones","Collections"),if cramped {26.0} else {38.0});
                     if theme::navigation(ui,self.tr("Volver a la biblioteca","Back to library"),false,p).clicked() {self.show_surface(Surface::Library);}
@@ -19,7 +24,7 @@ impl YamantakaApp {
                 ui.add_space(if cramped {16.0} else {28.0});
                 ui.add_enabled_ui(self.collections.writing.is_none(),|ui| {
                     let label=ui.label(self.tr("Nueva colección","New collection"));
-                    ui.horizontal_wrapped(|ui| {
+                    ui.with_layout(controls_layout,|ui| {
                         let width=ui.available_width().min(400.0);
                         ui.add_sized([width,36.0],egui::TextEdit::singleline(&mut self.collections.draft).char_limit(60).background_color(p.surface).margin(egui::vec2(10.0,8.0))).labelled_by(label.id);
                         let enabled=!self.collections.draft.trim().is_empty() && self.collections.draft.trim().encode_utf16().count()<=60;
@@ -30,7 +35,7 @@ impl YamantakaApp {
                 });
                 ui.add_space(24.0);
                 let label=ui.label(self.tr("Buscar colecciones","Search collections"));
-                ui.horizontal_wrapped(|ui| {
+                ui.with_layout(controls_layout,|ui| {
                     if ui.add_sized([ui.available_width().min(400.0),36.0],egui::TextEdit::singleline(&mut self.collections.query.text).char_limit(256).background_color(p.surface).margin(egui::vec2(10.0,8.0))).labelled_by(label.id).changed() {
                         self.collections.query.offset=0;self.load_collections();
                     }
@@ -103,7 +108,7 @@ impl YamantakaApp {
                     ui.label(self.tr("No hay colecciones que coincidan.","No matching collections."));
                 }
                 ui.add_space(14.0);
-                ui.horizontal_wrapped(|ui| {
+                ui.with_layout(controls_layout,|ui| {
                     let offset=self.collections.query.offset;
                     if ui.add_enabled_ui(!busy && offset>0,|ui|theme::navigation(ui,self.tr("Anterior","Previous"),false,p)).inner.clicked() {self.collections.query.offset=offset.saturating_sub(80);self.load_collections();}
                     let first=if self.collections.total==0 {0} else {offset+1};

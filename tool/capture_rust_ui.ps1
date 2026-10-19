@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='tags-manager'; args=@('--pdf-covers','--library-tags') },
+    @{ name='tags-filter-es'; args=@('--pdf-covers','--library-tags','--tag-filter','--es','--light','--reduce-motion') },
+    @{ name='tags-small-200'; args=@('--pdf-covers','--library-tags','--size=640x480','--text-scale=2') },
     @{ name='smart-annotated'; args=@('--pdf-covers','--smart-view=annotated') },
     @{ name='smart-recent-es'; args=@('--pdf-covers','--smart-view=recentlyOpened','--es','--light','--reduce-motion') },
     @{ name='smart-menu-small-200'; args=@('--pdf-covers','--smart-view=annotated','--smart-menu','--size=640x480','--text-scale=2') },
@@ -265,6 +268,15 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    if ($case.name -match '^(tags|collections)-(manager|small-200)$') {
+        $visibleLabels = @()
+        if ($case.name -eq 'tags-small-200') {
+            $visibleLabels = if ($case.args -contains '--es') { @('En este libro: Study','Filtrar biblioteca: Study') } else { @('On this book: Study','Filter library: Study') }
+        } elseif ($case.name -eq 'collections-small-200') {
+            $visibleLabels = if ($case.args -contains '--es') { @('Ver libros','Acciones de colección') } else { @('View books','Collection actions') }
+        }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $visibleLabels
+    }
     $export = $null
     if ($controls.annotationExport.artifact) {
         $artifactName = [string]$controls.annotationExport.artifact

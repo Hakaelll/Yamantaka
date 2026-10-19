@@ -417,6 +417,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         {
             db.execute_batch("UPDATE documents SET added_at='2000-01-01T00:00:00Z',last_opened_at=''; UPDATE documents SET added_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),last_opened_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='demo-0'; INSERT INTO annotations(id,document_id,page_index,type,color,document_fingerprint,created_at,updated_at) VALUES('smart-a','demo-0',0,'note','violet','synthetic','2026-10-19','2026-10-19'),('smart-b','demo-0',1,'note','violet','synthetic','2026-10-19','2026-10-19'); INSERT INTO bookmarks(id,document_id,page_index,created_at,updated_at) VALUES('smart-a','demo-0',0,'2026-10-19','2026-10-19'),('smart-b','demo-0',1,'2026-10-19','2026-10-19');")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--library-tags") {
+            db.execute_batch("INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('legacy-study','Study','study','violet','2026-10-19','2026-10-19'); INSERT INTO annotations(id,document_id,page_index,type,color,document_fingerprint,created_at,updated_at) VALUES('tag-annotation','demo-0',0,'note','violet','synthetic','2026-10-19','2026-10-19'); INSERT INTO annotation_tags(annotation_id,tag_id) VALUES('tag-annotation','legacy-study');")?;
+        }
         let mut reading = ReaderPreferences::new("demo-0");
         if args.iter().any(|arg| arg == "--bookmarks") {
             db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
@@ -724,6 +727,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .and_then(|value| value.strip_prefix("--smart-view="))
                 }) {
                     app.preview_smart_view(key, args.iter().any(|arg| arg == "--smart-menu"));
+                }
+                if args.iter().any(|arg| arg == "--library-tags") {
+                    app.preview_tags(u8::from(args.iter().any(|arg| arg == "--tag-filter")));
                 }
                 if args.iter().any(|arg| arg == "--collections") {
                     app.preview_collections(

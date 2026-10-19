@@ -490,3 +490,13 @@ visible and gives recent views a last-14-days tooltip. Its scroll area and the
 compact parent menu remain bounded by the viewport. The active view changes the
 control label and participates in the existing reset feedback. Gallery covers,
 physics and reader chrome keep their established composition.
+
+
+Tags are a dedicated Operate surface in Tools and in document details. Row color
+marks identify stored colors; name, independent book/annotation counts and
+separate assignment/filter checkboxes keep their meanings distinct. Multi-tag
+filters match any selected tag and use one compact control in the existing
+library filter row. Creation from a book assigns atomically and then shows that
+exact tag, with an explicit return to all tags. Tag and collection forms clamp
+to available width and stack controls on narrow windows; recorded native control
+bounds enforce that controls stay inside their horizontal clip.
