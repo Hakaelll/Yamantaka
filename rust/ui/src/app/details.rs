@@ -170,6 +170,7 @@ impl YamantakaApp {
                                 )
                                 .clicked()
                                 {
+                                    self.relocation.cancel();
                                     self.file_check.cancel();
                                     self.file_comparison.cancel();
                                     self.inspector = false;
@@ -180,6 +181,7 @@ impl YamantakaApp {
                         ui.separator();
                         ui.add_space(6.0);
                         self.file_check_details(ui, &document, p);
+                        self.relocation_details(ui, &document, p);
                         self.file_comparison_details(ui, &document, p);
                         self.reading_goal(ui, &document);
                         ui.add_space(8.0);

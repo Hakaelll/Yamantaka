@@ -59,6 +59,17 @@ pub(crate) fn refresh_metadata(db: &Connection, id: &str) -> Result<()> {
     }
     Ok(())
 }
+/// Expire derived text and any active indexing revision after a source move.
+/// Existing exclusions survive, and an unindexed document stays opt-in.
+pub(crate) fn source_relocated(db: &Connection, id: &str) -> Result<()> {
+    let previous = state(db, id)?;
+    db.execute("DELETE FROM library_search WHERE document_id=?", [id])
+        .map_err(storage)?;
+    if let Some(previous) = previous {
+        db.execute("UPDATE search_index_state SET status=CASE WHEN status='excluded' THEN 'excluded' ELSE 'pending' END,indexed_pages=0,updated_at=?1,error_code=NULL WHERE document_id=?2",params![revision(&previous.updated_at),id]).map_err(storage)?;
+    }
+    Ok(())
+}
 /// Update one auxiliary entry inside the caller's bookmark transaction. This
 /// neither refreshes the catalogue nor changes an active PDF index revision.
 pub(crate) fn refresh_bookmark_page(

@@ -1,0 +1,10 @@
+Origin: native screenshot of the Yamantaka Rust executable, not an AI-generated image.
+Captured with tool/capture_rust_ui.ps1; isolated synthetic study collection; PDF source is the repository's generated acceptance fixture. Write scenarios may use an isolated file-backed synthetic store. No personal library was opened.
+Case: relocation-mismatch
+Arguments: --demo --pdf-covers --relocate --relocation-mismatch
+Capture UTC: 10/19/2026 10:56:21
+Executable SHA-256: 883EF214DB0477C5FD090501014044FDAE05B39EAC0A0CBEDAA1EC9A5032EA48
+Original PNG SHA-256: 484FA38911979ECA2ED7AFD714C71E04D2F578B9FB98A0A77626ED8C6591FED7
+Logical viewport: 0, 0, 1440, 960
+Pixels per logical point: 1.25
+See capture-manifest.json for exact source hashes and conditions. These captures do not certify physical monitor DPI, Narrator, full functional parity or whole-rewrite acceptance.

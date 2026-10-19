@@ -17,6 +17,7 @@ pub mod metadata_source;
 pub mod reader_close;
 pub mod reader_continuity;
 pub mod reading_sessions;
+pub mod relocation;
 pub mod runtime;
 pub mod search_index;
 mod temporary_document;

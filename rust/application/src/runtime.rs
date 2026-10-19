@@ -16,6 +16,7 @@ use crate::reading_sessions::goals::{ReadingGoalReply, ReadingGoalRequest};
 use crate::reading_sessions::{
     ReadingHistoryReply, ReadingHistoryRequest, ReadingSessionReply, ReadingSessionRequest,
 };
+use crate::relocation::{RelocationJob, RelocationReply, RelocationRequest};
 use crate::search_index::{IndexCommand, IndexProgress, SearchIndexController};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Select, Sender, TryRecvError, bounded};
 use std::{
@@ -40,6 +41,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    RelocateFile(Box<RelocationRequest>),
     CheckFile(Box<FileCheckRequest>),
     PendingImports,
     ResumeImport(String, Cancellation),
@@ -111,6 +113,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    FileRelocated(Box<RelocationReply>),
     FileChecked(Box<FileCheckReply>),
     PendingImports(Result<Vec<yamantaka_domain::import_recovery::PendingImport>>),
     FileComparison(Box<ComparisonReply>),
@@ -725,6 +728,7 @@ impl Runtime {
                 let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
+                let mut relocation: Option<(RelocationJob,Permit)> = None;
                 let mut file_check: Option<(FileCheckJob,Permit)> = None;
                 let mut indexer = SearchIndexController::default();
                 let mut index_cleanup: Option<PdfTicket<()>> = None;
@@ -801,6 +805,16 @@ impl Runtime {
                                     Update::ReadingSession(request.execute(&mut repository)), permit,
                                 ),
                                 Action::Shutdown => break,
+                                Action::RelocateFile(request) => {
+                                    let document=request.document().to_owned();let cancel=request.cancel.clone();
+                                    let occupied=visible.contains(&document) || awaiting_open.as_ref().is_some_and(|(id,_)|id==&document)
+                                        || pending.iter().any(|item|matches!(item,Pending::Open(doc,..) if doc.id==document));
+                                    let result=if relocation.is_some() {Err(Failure::QueueFull)} else if occupied {Err(Failure::Invalid("Close the document before relocating its source".into()))} else {RelocationJob::start(*request,&repository)};
+                                    match result {
+                                        Ok(job)=>relocation=Some((job,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::FileRelocated(Box::new(RelocationReply {document,cancel,result:Err(error)})),permit),
+                                    }
+                                }
                                 Action::CheckFile(request) => {
                                     let document=request.document.clone();let cancel=request.cancel.clone();
                                     let result=if file_check.is_some() {Err(Failure::QueueFull)} else {FileCheckJob::start(*request,&repository)};
@@ -1225,6 +1239,13 @@ impl Runtime {
                         let (_, permit) = export.take().unwrap();
                         emit(&events, &notify, Update::AnnotationExport(reply), permit);
                     }
+                    if let Some((job,_))=&relocation
+                        && (visible.iter().any(|id|id==job.document()) || awaiting_open.as_ref().is_some_and(|(id,_)|id==job.document())
+                            || pending.iter().any(|item|matches!(item,Pending::Open(doc,..) if doc.id==job.document()))) {job.cancel();}
+                    if let Some(reply)=relocation.as_mut().and_then(|(job,_)|job.poll(&mut repository)) {
+                        let (_,permit)=relocation.take().unwrap();
+                        emit(&events,&notify,Update::FileRelocated(Box::new(reply)),permit);
+                    }
                     if let Some(reply)=file_check.as_mut().and_then(|(job,_)|job.poll(&mut repository)) {
                         let (_,permit)=file_check.take().unwrap();
                         emit(&events,&notify,Update::FileChecked(Box::new(reply)),permit);
@@ -1491,6 +1512,7 @@ impl Runtime {
                     }
                     if let Some((job,_)) = &comparison { job.register(&mut select); }
                     if let Some((job,_)) = &file_check {job.register(&mut select);}
+                    if let Some((job,_)) = &relocation {job.register(&mut select);}
                     for item in &pending {
                         item.register(&mut select);
                     }
@@ -1514,6 +1536,7 @@ impl Runtime {
                 drop(export); // Cancel and join file work before releasing the actor.
                 drop(comparison);
                 drop(file_check);
+                drop(relocation);
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
                     let _ = ticket.wait();
                 }

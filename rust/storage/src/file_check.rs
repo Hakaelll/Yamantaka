@@ -156,16 +156,14 @@ pub(crate) fn apply(
             let mut file = expected.file.clone();
             file.modified = modified.clone();
             file.missing = false;
-            let key = source_key(&file);
-            // Keep current and previous keys across a failed main commit; prune older versions.
-            cache(&transaction, cached, |store| {
-                let previous = source_key(&expected.file);
-                let update = store.transaction().map_err(cache_error)?;
-                update.execute("INSERT INTO file_hashes VALUES(?1,?2,?3) ON CONFLICT(document_id,source_key) DO UPDATE SET digest=excluded.digest",params![expected.document,key.as_slice(),digest.as_slice()]).map_err(cache_error)?;
-                update.execute("DELETE FROM file_hashes WHERE document_id=?1 AND source_key NOT IN (?2,?3)",params![expected.document,key.as_slice(),previous.as_slice()]).map_err(cache_error)?;
-                update.commit().map_err(cache_error)?;
-                Ok(())
-            })?;
+            save_reference(
+                &transaction,
+                cached,
+                &expected.document,
+                &expected.file,
+                &file,
+                digest,
+            )?;
             transaction
                 .execute(
                     "UPDATE documents SET is_missing=0,file_modified_at=?1 WHERE id=?2",
@@ -178,4 +176,92 @@ pub(crate) fn apply(
     cancel.check()?;
     transaction.commit().map_err(storage)?;
     Ok(result)
+}
+
+fn save_reference(
+    main: &Connection,
+    cached: &RefCell<Option<Connection>>,
+    document: &str,
+    previous: &CataloguedFile,
+    current: &CataloguedFile,
+    digest: &[u8; 32],
+) -> Result<()> {
+    let key = source_key(current);
+    let previous = source_key(previous);
+    cache(main, cached, |store| {
+        let update = store.transaction().map_err(cache_error)?;
+        update.execute("INSERT INTO file_hashes VALUES(?1,?2,?3) ON CONFLICT(document_id,source_key) DO UPDATE SET digest=excluded.digest",params![document,key.as_slice(),digest.as_slice()]).map_err(cache_error)?;
+        // Preserve the old key if the independent main transaction fails.
+        update
+            .execute(
+                "DELETE FROM file_hashes WHERE document_id=?1 AND source_key NOT IN (?2,?3)",
+                params![document, key.as_slice(), previous.as_slice()],
+            )
+            .map_err(cache_error)?;
+        update.commit().map_err(cache_error)?;
+        Ok(())
+    })
+}
+pub(crate) fn relocate(
+    database: &mut Database,
+    plan: &yamantaka_domain::relocation::RelocationPlan,
+    cancel: &yamantaka_domain::Cancellation,
+) -> Result<()> {
+    cancel.check()?;
+    let expected = &plan.expected;
+    let candidate = &plan.candidate;
+    if !expected.file.missing
+        || candidate.missing
+        || candidate.size != expected.file.size
+        || candidate.page_count != expected.file.page_count
+        || candidate.fingerprint != expected.file.fingerprint
+        || expected.digest.is_some_and(|digest| digest != plan.digest)
+        || !candidate.path.is_absolute()
+        || candidate.path.to_str().is_none()
+    {
+        return Err(Failure::Invalid("Invalid relocation candidate".into()));
+    }
+    chrono::DateTime::parse_from_rfc3339(&candidate.modified)
+        .map_err(|_| Failure::Invalid("Invalid relocation date".into()))?;
+    let cached = &database.file_checks;
+    let tx = database
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(storage)?;
+    if snapshot(&tx, cached, &expected.document)? != *expected {
+        return Err(Failure::Invalid(
+            "The source record changed; review again".into(),
+        ));
+    }
+    let normalized = candidate.path.to_string_lossy().to_lowercase();
+    let legacy = if let Some(unc) = normalized.strip_prefix(r"\\?\unc\") {
+        format!(r"\\{unc}")
+    } else {
+        normalized
+            .strip_prefix(r"\\?\")
+            .unwrap_or(&normalized)
+            .to_owned()
+    };
+    let occupied:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM documents WHERE id<>?1 AND (normalized_path IN (?2,?3) OR lower(path) IN (?2,?3)))",params![expected.document,normalized,legacy],|row|row.get(0)).map_err(storage)?;
+    if occupied {
+        return Err(Failure::DestinationOccupied);
+    }
+    save_reference(
+        &tx,
+        cached,
+        &expected.document,
+        &expected.file,
+        candidate,
+        &plan.digest,
+    )?;
+    let filename = candidate
+        .path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| Failure::Invalid("Invalid file name".into()))?;
+    tx.execute("UPDATE documents SET path=?1,normalized_path=?2,file_name=?3,file_modified_at=?4,is_missing=0 WHERE id=?5",params![candidate.path.to_string_lossy(),normalized,filename,candidate.modified,expected.document]).map_err(storage)?;
+    crate::search::source_relocated(&tx, &expected.document)?;
+    cancel.check()?;
+    tx.commit().map_err(storage)?;
+    Ok(())
 }

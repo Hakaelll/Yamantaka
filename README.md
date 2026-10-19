@@ -48,6 +48,8 @@ Interrupted imports now appear under **Tools → Pending imports**. Choose **Res
 
 Open a book's details and choose **Check file** to inspect its current source in the background. The first successful check saves a full-content reference. Later checks can detect changes beyond the legacy partial fingerprint, mark a missing source and restore its availability when the same file returns. Manual metadata and reading data stay saved. See [file verification](docs/validation/rust-file-check-2026-10-19.md).
 
+For a missing source, run **Details → Check file**, then **Locate PDF…**. Review the selected file and choose **Update location**. Saved full references require a complete SHA-256 match; older libraries with only a partial fingerprint show that limitation before confirmation. The existing document keeps its identity, reading data and manual choices. See [source relocation verification](docs/validation/rust-relocation-2026-10-19.md).
+
 To check a possible duplicate, open a book's details and choose **Compare with another PDF**. Yamantaka compares the complete contents in the background using SHA-256. You can cancel the check; both originals remain unchanged. The result applies to that comparison and does not merge documents. [File comparison verification](docs/validation/rust-file-comparison-2026-10-18.md) describes the source guards and remaining duplicate-management work.
 
 ## The experience

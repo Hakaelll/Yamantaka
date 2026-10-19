@@ -87,6 +87,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     || arg == "--global-notes-export-markdown"
                     || arg == "--metadata-review"
                     || arg == "--file-check"
+                    || arg == "--relocate"
                     || arg == "--import-recovery"
                     || arg == "--cover-capacity-retry"
             }) {
@@ -189,7 +190,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 ))?;
             }
         }
-        if capture.is_some() && args.iter().any(|arg| arg == "--file-check") {
+        if capture.is_some()
+            && args
+                .iter()
+                .any(|arg| arg == "--file-check" || arg == "--relocate")
+        {
             let original = db.get("demo-0")?.unwrap();
             let copy = store.join("file-check.pdf");
             std::fs::copy(&original.path, &copy)?;
@@ -200,10 +205,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let encoded = path.to_string_lossy().replace('\'', "''");
             let normalized = path.to_string_lossy().to_lowercase().replace('\'', "''");
             db.execute_batch(&format!("UPDATE documents SET path='{encoded}',normalized_path='{normalized}',file_size={},file_modified_at='{modified}',fingerprint='{fingerprint}' WHERE id='demo-0'",metadata.len()))?;
-            if args
-                .iter()
-                .any(|arg| arg == "--file-changed" || arg == "--file-restored")
-            {
+            if args.iter().any(|arg| {
+                arg == "--file-changed"
+                    || arg == "--file-restored"
+                    || (arg == "--relocate" && !args.iter().any(|arg| arg == "--relocation-legacy"))
+            }) {
                 let hex = yamantaka_storage::identity::full_sha256(
                     &path,
                     &yamantaka_domain::Cancellation::default(),
@@ -236,6 +242,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if args.iter().any(|arg| arg == "--file-restored") {
                 db.execute_batch("UPDATE documents SET is_missing=1 WHERE id='demo-0'")?;
             }
+        }
+        if capture.is_some() && args.iter().any(|arg| arg == "--relocate") {
+            let original = db.get("demo-0")?.unwrap();
+            let candidate = store.join("relocated.pdf");
+            std::fs::rename(&original.path, &candidate)?;
+            if args.iter().any(|arg| arg == "--relocation-mismatch") {
+                use std::io::{Seek, SeekFrom, Write};
+                let mut file = std::fs::OpenOptions::new().write(true).open(&candidate)?;
+                file.seek(SeekFrom::End(-1))?;
+                file.write_all(b"!")?;
+            }
+            db.execute_batch("UPDATE documents SET is_missing=1 WHERE id='demo-0'")?;
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--import-recovery") {
             let first = db.get("demo-0")?.unwrap();
@@ -547,8 +565,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 ctx.request_repaint();
             })?;
             let mut app = app::YamantakaApp::new(
-                runtime, prefs, store, dark, english, demo, settings, capture, rx, instance, watch,
-                governor, presenter,
+                runtime,
+                prefs,
+                store.clone(),
+                dark,
+                english,
+                demo,
+                settings,
+                capture,
+                rx,
+                instance,
+                watch,
+                governor,
+                presenter,
             );
             cc.egui_ctx.set_zoom_factor(app.text_scale());
             if tilt {
@@ -817,6 +846,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--search-excluded") {
                     app.preview_search_action("exclude");
                 }
+            }
+            if demo && args.iter().any(|arg| arg == "--relocate") {
+                app.preview_relocation(
+                    store.join("relocated.pdf"),
+                    args.iter().any(|arg| arg == "--relocation-confirm"),
+                );
             }
             if demo && args.iter().any(|arg| arg == "--file-check") {
                 app.preview_file_check();

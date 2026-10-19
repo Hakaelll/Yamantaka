@@ -71,6 +71,9 @@ impl HashedFile {
         result.verify()?;
         Ok(result)
     }
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
     pub(crate) fn digest(&self) -> [u8; 32] {
         self.digest
     }

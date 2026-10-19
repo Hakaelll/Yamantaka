@@ -456,3 +456,5 @@ bounded to the actual book rectangle rather than its whole catalogue cell.
 - **Don't** replace the physical books with generic flat cards.
 - **Don't** treat panel HTML/CSS examples or settings diagrams as native screenshots.
 - **Don't** claim whole-rewrite, Narrator, physical-DPI or full QUALITY BAR approval from these captures.
+
+Missing-source relocation stays inside the scrollable document inspector. Locate PDF opens the native picker; selection produces a review rather than a write. A complete-reference match and a legacy partial match use distinct explanatory copy, followed by Update location and Cancel. The selected file name is visible and its full path is available on hover. No additional global toolbar or gallery overlay is introduced.

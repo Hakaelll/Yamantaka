@@ -27,6 +27,7 @@ mod reader_controls;
 mod reader_destination;
 mod reader_options;
 mod reader_viewport;
+mod relocation;
 mod render_plan;
 mod render_updates;
 mod restoration;
@@ -162,6 +163,7 @@ pub struct YamantakaApp {
     annotation_export: annotations::export::ExportState,
     file_comparison: file_comparison::ComparisonState,
     file_check: file_check::CheckState,
+    relocation: relocation::RelocationState,
     annotation_paint: annotations::paint::AnnotationPaint,
     annotation_preview: u8,
     annotation_multi_preview: bool,
@@ -339,6 +341,7 @@ impl YamantakaApp {
             annotation_export: Default::default(),
             file_comparison: Default::default(),
             file_check: Default::default(),
+            relocation: Default::default(),
             annotation_paint: Default::default(),
             annotation_preview: 0,
             annotation_multi_preview: false,
@@ -1377,6 +1380,16 @@ impl App for YamantakaApp {
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
                 Update::PendingImports(result) => self.importing.accept_recovery(result),
+                Update::FileRelocated(reply) => {
+                    let applied = matches!(
+                        reply.result,
+                        Ok(yamantaka_application::relocation::RelocationOutcome::Applied)
+                    );
+                    self.relocation.accept(*reply);
+                    if applied {
+                        self.refresh();
+                    }
+                }
                 Update::FileChecked(reply) => {
                     self.file_check.accept(*reply);
                     self.refresh();
@@ -1901,6 +1914,7 @@ impl App for YamantakaApp {
         self.apply_annotation_export_preview();
         self.update_file_comparison();
         self.update_file_check();
+        self.update_relocation();
         self.apply_import_recovery_preview();
         let dropped = ctx.input(|i| {
             i.raw
@@ -2059,6 +2073,7 @@ impl App for YamantakaApp {
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
                     && self.file_check.ready()
+                    && self.relocation.ready()
                     && (!matches!(self.surface, Surface::Notes) || self.global_notes.ready())
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
@@ -2174,6 +2189,7 @@ impl App for YamantakaApp {
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
                     record["fileCheck"]=self.file_check.summary();
+                    record["relocation"]=self.relocation.summary();
                     let bytes=serde_json::to_vec_pretty(&record).map_err(|error|image::ImageError::IoError(std::io::Error::other(error)))?;
                     std::fs::write(path.with_extension("controls.json"),bytes).map_err(image::ImageError::IoError)
                 });
@@ -2202,6 +2218,7 @@ impl App for YamantakaApp {
         if let Err(error) = self.persist_reading_sessions_on_close() {
             eprintln!("{error}");
         }
+        self.relocation.cancel();
         self.file_check.cancel();
         self.file_comparison.cancel();
         self.annotation_export.cancel();

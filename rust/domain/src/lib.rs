@@ -33,6 +33,7 @@ pub mod reader_preferences;
 pub mod reader_tabs;
 pub mod reading_activity;
 pub mod reading_sessions;
+pub mod relocation;
 pub mod search;
 pub mod source_revision;
 pub mod text_selection;
@@ -198,6 +199,14 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn relocate_file(
+        &mut self,
+        _plan: &relocation::RelocationPlan,
+        _cancel: &Cancellation,
+    ) -> Result<()> {
+        Err(Failure::Unsupported("File relocation".into()))
+    }
+
     fn file_snapshot(&self, _id: &str) -> Result<file_check::FileSnapshot> {
         Err(Failure::Unsupported("File verification".into()))
     }

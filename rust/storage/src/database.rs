@@ -283,6 +283,14 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn relocate_file(
+        &mut self,
+        plan: &yamantaka_domain::relocation::RelocationPlan,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<()> {
+        crate::file_check::relocate(self, plan, cancel)
+    }
+
     fn file_snapshot(&self, id: &str) -> Result<yamantaka_domain::file_check::FileSnapshot> {
         crate::file_check::read(self, id)
     }
