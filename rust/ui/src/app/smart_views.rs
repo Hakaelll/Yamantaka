@@ -1,6 +1,49 @@
 use super::*;
 use yamantaka_domain::LibrarySmartView;
 impl YamantakaApp {
+    pub(super) fn library_has_filters(&self) -> bool {
+        !self.query.trim().is_empty()
+            || self.favorites
+            || self.reading_state != LibraryReadingState::All
+            || self.missing_only
+            || self.modified_only
+            || self.collections.filter.is_some()
+            || self.smart_view.is_some()
+            || !self.library_tags.filters.is_empty()
+    }
+    pub(super) fn reset_library_filters(&mut self) {
+        self.query.clear();
+        self.smart_view = None;
+        self.clear_tag_filters();
+        self.clear_collection_filter();
+        self.reading_state = LibraryReadingState::All;
+        self.missing_only = false;
+        self.modified_only = false;
+        self.favorites = false;
+        self.offset = 0;
+        self.refresh();
+        self.persist_library_state();
+    }
+    pub fn preview_reset_library_filters(&mut self) {
+        if !self.demo || self.capture.is_none() {
+            return;
+        }
+        self.query = "Synthetic filter".into();
+        self.favorites = true;
+        self.reading_state = LibraryReadingState::Completed;
+        self.missing_only = true;
+        self.modified_only = true;
+        self.smart_view = Some(LibrarySmartView::Missing);
+        self.collections.filter = Some(("synthetic-empty".into(), "Empty collection".into()));
+        self.library_tags.filters = vec![("synthetic-empty".into(), "Empty tag".into())];
+        self.offset = 80;
+        let sort = (self.sort, self.sort_direction);
+        assert!(self.library_has_filters());
+        self.reset_library_filters();
+        assert!(!self.library_has_filters());
+        assert_eq!(self.offset, 0);
+        assert_eq!((self.sort, self.sort_direction), sort);
+    }
     pub fn preview_smart_view(&mut self, key: &str, menu: bool) {
         if self.demo && self.capture.is_some() {
             self.smart_view = LibrarySmartView::from_key(key);

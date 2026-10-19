@@ -728,6 +728,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }) {
                     app.preview_smart_view(key, args.iter().any(|arg| arg == "--smart-menu"));
                 }
+                if args.iter().any(|arg| arg == "--reset-library-filters") {
+                    app.preview_reset_library_filters();
+                }
                 if args.iter().any(|arg| arg == "--library-tags") {
                     app.preview_tags(u8::from(args.iter().any(|arg| arg == "--tag-filter")));
                 }

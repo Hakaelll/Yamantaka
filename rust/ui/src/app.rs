@@ -195,6 +195,7 @@ pub struct YamantakaApp {
     render_retry: bool,
     cancel: Cancellation,
     query_cancel: Cancellation,
+    library_loaded: bool,
     error: Option<String>,
     loading: bool,
     importing: operations::BackgroundImport,
@@ -387,6 +388,7 @@ impl YamantakaApp {
             render_retry: false,
             cancel: Cancellation::default(),
             query_cancel: Cancellation::default(),
+            library_loaded: false,
             error: None,
             loading: false,
             importing: Default::default(),
@@ -457,6 +459,7 @@ impl YamantakaApp {
         ))?;
         self.query_cancel.cancel();
         self.query_cancel = cancel;
+        self.library_loaded = false;
         self.importing.mark_refreshed(import_revision);
         Ok(())
     }
@@ -991,7 +994,7 @@ impl YamantakaApp {
                 ui.add_space(if compact { 4.0 } else { 12.0 });
                 ui.horizontal_wrapped(|ui| {
                     if ui.ctx().content_rect().width()<420.0 {
-                        let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only||self.modified_only||self.collections.filter.is_some()||self.smart_view.is_some()||!self.library_tags.filters.is_empty(),p);
+                        let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.library_has_filters(),p);
                         let mut popup=egui::Popup::menu(&response);
                         if self.smart_menu_preview {popup=popup.open(true);}
                         popup.show(|ui| {
@@ -1078,13 +1081,13 @@ impl YamantakaApp {
                 });
                 ui.add_space(if compact { 4.0 } else { 12.0 });
                 if self.documents.is_empty() {
-                    let filtered=!self.query.is_empty()||self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only||self.modified_only;
+                    let filtered=self.library_has_filters();
                     ui.add_space(if compact{18.0}else{36.0});
                     theme::display(ui,if filtered{self.tr("No hay libros que coincidan","No matching books")}else{self.tr("Un lugar para tus próximas lecturas","A place for your next reads")},28.0);
                     ui.label(RichText::new(if filtered{self.tr("Prueba otro título o restablece los filtros para ver tu colección.","Try another title or reset the filters to see your collection.")}else{self.tr("Añade tus PDF o arrástralos a esta ventana para empezar.","Add your PDFs or drag them into this window to begin.")}).color(p.secondary));
                     ui.add_space(12.0);
                     if filtered {
-                        if theme::control(ui,self.tr("Restablecer filtros","Reset filters"),None,false,true,p).clicked(){self.query.clear();self.favorites=false;self.reading_state=LibraryReadingState::All;self.missing_only=false;self.modified_only=false;self.offset=0;self.refresh();}
+                        if theme::control(ui,self.tr("Restablecer filtros","Reset filters"),None,false,true,p).clicked(){self.reset_library_filters();}
                     } else if theme::control(ui,self.tr("Elegir documentos","Choose documents"),Some(theme::Icon::Add),false,true,p).clicked() && let Some(paths)=yamantaka_windows::pick_pdfs(){self.import(paths);}
                 } else {
                     egui::ScrollArea::vertical()
@@ -1318,14 +1321,7 @@ impl YamantakaApp {
                 }
             }
         });
-        if (!self.query.is_empty()
-            || self.favorites
-            || self.reading_state != LibraryReadingState::All
-            || self.missing_only
-            || self.modified_only
-            || self.collections.filter.is_some()
-            || self.smart_view.is_some()
-            || !self.library_tags.filters.is_empty())
+        if self.library_has_filters()
             && theme::navigation(
                 ui,
                 self.tr("Restablecer filtros", "Reset filters"),
@@ -1334,16 +1330,7 @@ impl YamantakaApp {
             )
             .clicked()
         {
-            self.query.clear();
-            self.smart_view = None;
-            self.clear_tag_filters();
-            self.clear_collection_filter();
-            self.reading_state = LibraryReadingState::All;
-            self.missing_only = false;
-            self.modified_only = false;
-            self.favorites = false;
-            self.offset = 0;
-            self.refresh();
+            self.reset_library_filters();
         }
     }
     fn reader(&mut self, ui: &mut egui::Ui) {
@@ -1463,9 +1450,10 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Library(documents, count, cancel) => {
-                    if cancel.is_cancelled() {
+                    if cancel.is_cancelled() || !self.query_cancel.same_request(&cancel) {
                         continue;
                     }
+                    self.library_loaded = true;
                     self.documents = documents;
                     self.count = count;
                     if self.inspector && self.selected.is_none() {
@@ -2092,7 +2080,7 @@ impl App for YamantakaApp {
         self.pump_library_covers(&ctx);
         if let Some(path) = &self.capture {
             if !self.capture_requested {
-                let ready = !self.documents.is_empty()
+                let ready = self.library_loaded
                     && (!matches!(self.surface, Surface::Reader)
                         || (!self.panel && self.reader_panel_tab != outline::ReaderPanelTab::Find)
                         || match self.reader_panel_tab {
@@ -2244,6 +2232,8 @@ impl App for YamantakaApp {
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
+                    record["libraryFiltersActive"]=self.library_has_filters().into();
+                    record["libraryQueryLoaded"]=self.library_loaded.into();
                     record["smartView"]=self.smart_view.map(|view|view.key()).into();
                     record["libraryTags"]=self.library_tags.summary();
                     record["collections"]=self.collections.summary();

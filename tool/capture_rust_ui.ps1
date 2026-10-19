@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='filters-empty-smart'; args=@('--smart-view=missing') },
+    @{ name='filters-reset-smart-es'; args=@('--pdf-covers','--smart-view=missing','--reset-library-filters','--es','--light','--reduce-motion') },
     @{ name='tags-manager'; args=@('--pdf-covers','--library-tags') },
     @{ name='tags-filter-es'; args=@('--pdf-covers','--library-tags','--tag-filter','--es','--light','--reduce-motion') },
     @{ name='tags-small-200'; args=@('--pdf-covers','--library-tags','--size=640x480','--text-scale=2') },
@@ -268,6 +270,17 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    if ($case.name -eq 'filters-empty-smart') {
+        if (-not $controls.libraryQueryLoaded -or -not $controls.libraryFiltersActive -or $controls.libraryDocumentCount -ne 0 -or $controls.smartView -ne 'missing') {
+            throw 'The empty smart view must finish its query and retain its active filter.'
+        }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Reset filters')
+    } elseif ($case.name -eq 'filters-reset-smart-es') {
+        if (-not $controls.libraryQueryLoaded -or $controls.libraryFiltersActive -or $controls.libraryDocumentCount -ne 10 -or $null -ne $controls.smartView) {
+            throw 'Reset must clear every filter and return the ten synthetic books.'
+        }
+    }
+
     if ($case.name -match '^(tags|collections)-(manager|small-200)$') {
         $visibleLabels = @()
         if ($case.name -eq 'tags-small-200') {

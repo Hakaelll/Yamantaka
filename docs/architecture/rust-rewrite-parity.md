@@ -54,6 +54,8 @@ That baseline does not establish paired UI/GPU performance or a Flutter window c
 | Physical DPI100/125/150/175/200/Narrator/multi-monitor | TESTING.md, accessibility docs | no physical certification claimed | Pending |
 | Full Windows Release bundle/manifest/hashes/licenses/SBOM/instructions/results | package_windows.ps1 | pinned Cargo/toolchain and PDFium fetch hashes | Pending: final parity gate and release |
 
+Library filter recovery now shares active-state detection and reset across the compact menu, toolbar and empty state. A completed zero-result smart view and the shared reset operation have native synthetic evidence in [the filter recovery report](../validation/rust-library-filters-2026-10-19.md). This does not complete multiselection, bulk operations or physical interaction acceptance.
+
 ## Excluded claims
 
 Printing: `docs/adr/ADR-0002-printing.md` is a contract/proposal. Secondary reader
