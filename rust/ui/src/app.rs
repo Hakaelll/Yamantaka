@@ -12,6 +12,7 @@ mod find;
 mod global_notes;
 mod goals;
 mod history;
+mod library_check;
 mod library_covers;
 mod library_intro;
 mod links;
@@ -128,6 +129,7 @@ pub struct YamantakaApp {
     sort: LibrarySort,
     sort_direction: SortDirection,
     missing_only: bool,
+    modified_only: bool,
     list: bool,
     offset: usize,
     selected: Option<String>,
@@ -163,6 +165,7 @@ pub struct YamantakaApp {
     annotation_export: annotations::export::ExportState,
     file_comparison: file_comparison::ComparisonState,
     file_check: file_check::CheckState,
+    library_check: library_check::CheckState,
     relocation: relocation::RelocationState,
     annotation_paint: annotations::paint::AnnotationPaint,
     annotation_preview: u8,
@@ -266,6 +269,10 @@ impl YamantakaApp {
             .get("libraryMissingOnly")
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
+        let modified_only = preferences
+            .get("libraryModifiedOnly")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
         let mut app = Self {
             search: search::SearchState::new(
                 preferences
@@ -303,6 +310,7 @@ impl YamantakaApp {
             sort,
             sort_direction,
             missing_only,
+            modified_only,
             list,
             offset: 0,
             selected: None,
@@ -341,6 +349,7 @@ impl YamantakaApp {
             annotation_export: Default::default(),
             file_comparison: Default::default(),
             file_check: Default::default(),
+            library_check: Default::default(),
             relocation: Default::default(),
             annotation_paint: Default::default(),
             annotation_preview: 0,
@@ -411,6 +420,7 @@ impl YamantakaApp {
                 sort: self.sort,
                 sort_direction: self.sort_direction,
                 missing_only: self.missing_only,
+                modified_only: self.modified_only,
                 offset: self.offset,
                 ..Default::default()
             },
@@ -469,6 +479,7 @@ impl YamantakaApp {
             ),
             ("libraryInspector", self.inspector.into()),
             ("libraryMissingOnly", self.missing_only.into()),
+            ("libraryModifiedOnly", self.modified_only.into()),
         ];
         let mut changed = false;
         for (key, value) in state {
@@ -931,7 +942,7 @@ impl YamantakaApp {
                 ui.add_space(if compact { 4.0 } else { 12.0 });
                 ui.horizontal_wrapped(|ui| {
                     if ui.ctx().content_rect().width()<420.0 {
-                        let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only,p);
+                        let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only||self.modified_only,p);
                         egui::Popup::menu(&response).show(|ui|self.library_filters(ui,p));
                     }else{self.library_filters(ui,p);}
                     if !compact {
@@ -1012,13 +1023,13 @@ impl YamantakaApp {
                 });
                 ui.add_space(if compact { 4.0 } else { 12.0 });
                 if self.documents.is_empty() {
-                    let filtered=!self.query.is_empty()||self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only;
+                    let filtered=!self.query.is_empty()||self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only||self.modified_only;
                     ui.add_space(if compact{18.0}else{36.0});
                     theme::display(ui,if filtered{self.tr("No hay libros que coincidan","No matching books")}else{self.tr("Un lugar para tus próximas lecturas","A place for your next reads")},28.0);
                     ui.label(RichText::new(if filtered{self.tr("Prueba otro título o restablece los filtros para ver tu colección.","Try another title or reset the filters to see your collection.")}else{self.tr("Añade tus PDF o arrástralos a esta ventana para empezar.","Add your PDFs or drag them into this window to begin.")}).color(p.secondary));
                     ui.add_space(12.0);
                     if filtered {
-                        if theme::control(ui,self.tr("Restablecer filtros","Reset filters"),None,false,true,p).clicked(){self.query.clear();self.favorites=false;self.reading_state=LibraryReadingState::All;self.missing_only=false;self.offset=0;self.refresh();}
+                        if theme::control(ui,self.tr("Restablecer filtros","Reset filters"),None,false,true,p).clicked(){self.query.clear();self.favorites=false;self.reading_state=LibraryReadingState::All;self.missing_only=false;self.modified_only=false;self.offset=0;self.refresh();}
                     } else if theme::control(ui,self.tr("Elegir documentos","Choose documents"),Some(theme::Icon::Add),false,true,p).clicked() && let Some(paths)=yamantaka_windows::pick_pdfs(){self.import(paths);}
                 } else {
                     egui::ScrollArea::vertical()
@@ -1200,7 +1211,9 @@ impl YamantakaApp {
         let response = theme::navigation(
             ui,
             status,
-            self.reading_state != LibraryReadingState::All || self.missing_only,
+            self.reading_state != LibraryReadingState::All
+                || self.missing_only
+                || self.modified_only,
             p,
         );
         egui::Popup::menu(&response).show(|ui| {
@@ -1227,6 +1240,11 @@ impl YamantakaApp {
                 .tr("Solo archivos ausentes", "Only missing files")
                 .to_owned();
             if ui.checkbox(&mut self.missing_only, label).changed() {
+                self.offset = 0;
+                self.refresh();
+            }
+            let label = self.tr("Solo archivos modificados", "Modified files only");
+            if ui.checkbox(&mut self.modified_only, label).changed() {
                 self.offset = 0;
                 self.refresh();
             }
@@ -1294,7 +1312,8 @@ impl YamantakaApp {
         if (!self.query.is_empty()
             || self.favorites
             || self.reading_state != LibraryReadingState::All
-            || self.missing_only)
+            || self.missing_only
+            || self.modified_only)
             && theme::navigation(
                 ui,
                 self.tr("Restablecer filtros", "Reset filters"),
@@ -1306,6 +1325,7 @@ impl YamantakaApp {
             self.query.clear();
             self.reading_state = LibraryReadingState::All;
             self.missing_only = false;
+            self.modified_only = false;
             self.favorites = false;
             self.offset = 0;
             self.refresh();
@@ -1380,6 +1400,10 @@ impl App for YamantakaApp {
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
                 Update::PendingImports(result) => self.importing.accept_recovery(result),
+                Update::LibraryChecked(reply) => {
+                    self.library_check.accept(*reply);
+                    self.refresh();
+                }
                 Update::FileRelocated(reply) => {
                     let applied = matches!(
                         reply.result,
@@ -1915,6 +1939,7 @@ impl App for YamantakaApp {
         self.update_file_comparison();
         self.update_file_check();
         self.update_relocation();
+        self.update_library_check();
         self.apply_import_recovery_preview();
         let dropped = ctx.input(|i| {
             i.raw
@@ -2073,6 +2098,7 @@ impl App for YamantakaApp {
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
                     && self.file_check.ready()
+                    && self.library_check.ready()
                     && self.relocation.ready()
                     && (!matches!(self.surface, Surface::Notes) || self.global_notes.ready())
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
@@ -2190,6 +2216,7 @@ impl App for YamantakaApp {
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
+                    record["libraryCheck"]=self.library_check.summary();
                     let bytes=serde_json::to_vec_pretty(&record).map_err(|error|image::ImageError::IoError(std::io::Error::other(error)))?;
                     std::fs::write(path.with_extension("controls.json"),bytes).map_err(image::ImageError::IoError)
                 });
@@ -2218,6 +2245,7 @@ impl App for YamantakaApp {
         if let Err(error) = self.persist_reading_sessions_on_close() {
             eprintln!("{error}");
         }
+        self.library_check.cancel();
         self.relocation.cancel();
         self.file_check.cancel();
         self.file_comparison.cancel();

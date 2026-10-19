@@ -1,0 +1,504 @@
+{
+  "synthetic": true,
+  "libraryDocumentCount": 1,
+  "captureProcessId": 1984,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Biblioteca",
+      "rect": [
+        156.21875,
+        8.0,
+        268.5,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Herramientas",
+      "rect": [
+        1271.375,
+        8.0,
+        1406.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Comprobar ahora",
+      "rect": [
+        920.8125,
+        265.1875,
+        1058.34375,
+        305.1875
+      ],
+      "clip": [
+        0.0,
+        55.0,
+        1440.0,
+        948.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Ver ausentes",
+      "rect": [
+        920.8125,
+        315.1875,
+        1026.875,
+        355.1875
+      ],
+      "clip": [
+        0.0,
+        55.0,
+        1440.0,
+        948.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Ver modificados",
+      "rect": [
+        920.8125,
+        365.1875,
+        1048.28125,
+        405.1875
+      ],
+      "clip": [
+        0.0,
+        55.0,
+        1440.0,
+        948.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Importar carpeta…",
+      "rect": [
+        1236.8125,
+        105.1875,
+        1378.59375,
+        145.1875
+      ],
+      "clip": [
+        0.0,
+        55.0,
+        1440.0,
+        345.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Diario de lectura",
+      "rect": [
+        1236.8125,
+        155.1875,
+        1366.6875,
+        195.1875
+      ],
+      "clip": [
+        0.0,
+        55.0,
+        1440.0,
+        345.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Notas de la biblioteca",
+      "rect": [
+        1236.8125,
+        205.1875,
+        1399.375,
+        245.1875
+      ],
+      "clip": [
+        0.0,
+        55.0,
+        1440.0,
+        345.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Búsqueda global",
+      "rect": [
+        1236.8125,
+        255.1875,
+        1391.96875,
+        295.1875
+      ],
+      "clip": [
+        0.0,
+        55.0,
+        1440.0,
+        345.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Ajustes",
+      "rect": [
+        1236.8125,
+        305.1875,
+        1333.09375,
+        345.1875
+      ],
+      "clip": [
+        0.0,
+        55.0,
+        1440.0,
+        345.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Añadir PDF",
+      "rect": [
+        1140.46875,
+        8.0,
+        1261.375,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Todos los libros",
+      "rect": [
+        42.0,
+        185.59375,
+        165.78125,
+        225.59375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Favoritos",
+      "rect": [
+        175.78125,
+        185.59375,
+        259.3125,
+        225.59375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Estado",
+      "rect": [
+        269.3125,
+        185.59375,
+        338.65625,
+        225.59375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Recientes",
+      "rect": [
+        348.65625,
+        185.59375,
+        459.0625,
+        225.59375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Restablecer filtros",
+      "rect": [
+        469.0625,
+        185.59375,
+        606.5,
+        225.59375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Lista",
+      "rect": [
+        1308.21875,
+        185.59375,
+        1388.0,
+        225.59375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Portadas",
+      "rect": [
+        1192.65625,
+        185.59375,
+        1298.21875,
+        225.59375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Detalles",
+      "rect": [
+        1081.59375,
+        185.59375,
+        1182.65625,
+        225.59375
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "libraryCovers": {
+    "resident": 1,
+    "blockedBeforeRelease": 0,
+    "capacityPreview": 0,
+    "capacityRevision": 0,
+    "ready": 1,
+    "pending": 0,
+    "source": "PDF selected page",
+    "sourcePages": {
+      "demo-1": 0
+    },
+    "maximumVisible": 16
+  },
+  "coverPicker": {
+    "open": false
+  },
+  "coverPickerDemo": {
+    "action": null,
+    "complete": false,
+    "saved": false
+  },
+  "metadataReview": null,
+  "documentFind": null,
+  "documentLinks": {
+    "residentPages": 0,
+    "readyPages": 0,
+    "internalLinks": 0,
+    "externalLinks": 0,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 0,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 0,
+      "text": "",
+      "tag": "",
+      "kind": null,
+      "review": null
+    },
+    "resident": 0,
+    "total": 0,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "residentPages": 0,
+    "readyPages": 0,
+    "marks": 0
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": false,
+    "count": 0,
+    "artifact": null
+  },
+  "fileComparison": {
+    "pending": false,
+    "equal": null,
+    "failed": false
+  },
+  "importRecovery": {
+    "pendingJobs": 0,
+    "loaded": true,
+    "unavailable": false,
+    "completed": 0
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 0,
+    "resident": 0,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": false,
+    "documents": 0
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": false,
+    "preferences": null
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Off",
+    "pending": null,
+    "active": null,
+    "tabs": []
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 0,
+  "readerZoom": 1.0,
+  "readerRenderEvents": [],
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 786432,
+    "pages": 786432,
+    "tiles": 0,
+    "text": 0,
+    "other": 0,
+    "cpu": 0,
+    "gpu": 786432,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered.",
+  "fileCheck": {
+    "pending": false,
+    "state": null
+  },
+  "relocation": {
+    "pending": false,
+    "review": false,
+    "exact": null,
+    "applied": false,
+    "failed": false
+  },
+  "libraryCheck": {
+    "pending": false,
+    "phase": "Completed",
+    "checked": 10,
+    "available": 6,
+    "missing": 1,
+    "changed": 1,
+    "unverifiable": 1,
+    "failed": 1,
+    "error": false
+  }
+}

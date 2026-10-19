@@ -203,4 +203,5 @@ pub(crate) fn verify(
     assert_eq!(governor.usage().total, 0);
     assert_eq!(fs::read(&document.path).unwrap(), original);
     crate::relocation::verification_test::verify(db, root, governor);
+    crate::library_check::verification_test::verify(root, governor);
 }

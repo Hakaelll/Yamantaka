@@ -9,6 +9,10 @@ use crate::file_check::{FileCheckJob, FileCheckReply, FileCheckRequest};
 use crate::file_comparison::{ComparisonJob, ComparisonReply, ComparisonRequest};
 use crate::folder_import::FolderImport;
 use crate::import_enrichment::{ImportEnrichment, ImportStep};
+use crate::library_check::{
+    LibraryCheckJob, LibraryCheckPhase, LibraryCheckProgress, LibraryCheckReply,
+    LibraryCheckRequest, LibraryCheckSnapshot,
+};
 use crate::reader_close::{ReaderCloseReply, ReaderCloseRequest};
 use crate::reader_continuity::{ContinuityReply, ContinuityRequest, ContinuityWriter};
 use crate::reading_sessions::deletion::{ReadingSessionDeleteReply, ReadingSessionDeleteRequest};
@@ -41,6 +45,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    CheckLibrary(Box<LibraryCheckRequest>),
     RelocateFile(Box<RelocationRequest>),
     CheckFile(Box<FileCheckRequest>),
     PendingImports,
@@ -113,6 +118,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    LibraryChecked(Box<LibraryCheckReply>),
     FileRelocated(Box<RelocationReply>),
     FileChecked(Box<FileCheckReply>),
     PendingImports(Result<Vec<yamantaka_domain::import_recovery::PendingImport>>),
@@ -215,6 +221,7 @@ pub struct Runtime {
     wake: Sender<()>,
     import_revision: Arc<AtomicU64>,
     index_progress: Arc<Mutex<IndexProgress>>,
+    library_check_progress: Arc<Mutex<Option<LibraryCheckSnapshot>>>,
     sender: Sender<Command>,
     shutdown: Sender<RuntimeControl>,
     outstanding: Arc<AtomicUsize>,
@@ -716,6 +723,8 @@ impl Runtime {
         let waiting_snapshot = waiting_covers.clone();
         let index_progress = Arc::new(Mutex::new(IndexProgress::default()));
         let progress_snapshot = index_progress.clone();
+        let library_check_progress = Arc::new(Mutex::new(None));
+        let library_check_snapshot = library_check_progress.clone();
         let import_revision = Arc::new(AtomicU64::new(0));
         let import_progress = import_revision.clone();
         let pdf_capacity_revision = Arc::new(AtomicU64::new(0));
@@ -728,6 +737,7 @@ impl Runtime {
                 let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
+                let mut library_check:Option<(LibraryCheckJob,Permit)> = None;
                 let mut relocation: Option<(RelocationJob,Permit)> = None;
                 let mut file_check: Option<(FileCheckJob,Permit)> = None;
                 let mut indexer = SearchIndexController::default();
@@ -805,11 +815,25 @@ impl Runtime {
                                     Update::ReadingSession(request.execute(&mut repository)), permit,
                                 ),
                                 Action::Shutdown => break,
+                                Action::CheckLibrary(request) => {
+                                    let cancel=request.cancel.clone();
+                                    let result=if library_check.is_some() || file_check.is_some() || relocation.is_some() {Err(Failure::QueueFull)} else {LibraryCheckJob::start(*request,&repository)};
+                                    match result {
+                                        Ok(job)=>{
+                                            *library_check_snapshot.lock().unwrap()=Some(LibraryCheckSnapshot {cancel:cancel.clone(),progress:job.progress()});
+                                            notify();library_check=Some((job,permit));
+                                        }
+                                        Err(error)=>{
+                                            let (phase,error)=if matches!(error,Failure::Cancelled) {(LibraryCheckPhase::Cancelled,None)} else {(LibraryCheckPhase::Failed,Some(error))};
+                                            emit(&events,&notify,Update::LibraryChecked(Box::new(LibraryCheckReply {cancel,progress:LibraryCheckProgress {phase,..Default::default()},error})),permit);
+                                        }
+                                    }
+                                }
                                 Action::RelocateFile(request) => {
                                     let document=request.document().to_owned();let cancel=request.cancel.clone();
                                     let occupied=visible.contains(&document) || awaiting_open.as_ref().is_some_and(|(id,_)|id==&document)
                                         || pending.iter().any(|item|matches!(item,Pending::Open(doc,..) if doc.id==document));
-                                    let result=if relocation.is_some() {Err(Failure::QueueFull)} else if occupied {Err(Failure::Invalid("Close the document before relocating its source".into()))} else {RelocationJob::start(*request,&repository)};
+                                    let result=if relocation.is_some() || library_check.is_some() {Err(Failure::QueueFull)} else if occupied {Err(Failure::Invalid("Close the document before relocating its source".into()))} else {RelocationJob::start(*request,&repository)};
                                     match result {
                                         Ok(job)=>relocation=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::FileRelocated(Box::new(RelocationReply {document,cancel,result:Err(error)})),permit),
@@ -817,7 +841,7 @@ impl Runtime {
                                 }
                                 Action::CheckFile(request) => {
                                     let document=request.document.clone();let cancel=request.cancel.clone();
-                                    let result=if file_check.is_some() {Err(Failure::QueueFull)} else {FileCheckJob::start(*request,&repository)};
+                                    let result=if file_check.is_some() || library_check.is_some() {Err(Failure::QueueFull)} else {FileCheckJob::start(*request,&repository)};
                                     match result {
                                         Ok(job)=>file_check=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::FileChecked(Box::new(FileCheckReply{document,result:Err(error),cancel})),permit),
@@ -1246,6 +1270,16 @@ impl Runtime {
                         let (_,permit)=relocation.take().unwrap();
                         emit(&events,&notify,Update::FileRelocated(Box::new(reply)),permit);
                     }
+                    if let Some((job,_))=&mut library_check {
+                        let before=job.progress();let finished=job.step(&mut repository);let progress=job.progress();
+                        if progress!=before {
+                            *library_check_snapshot.lock().unwrap()=Some(LibraryCheckSnapshot {cancel:job.cancel().clone(),progress});notify();
+                        }
+                        if finished {
+                            let (mut job,permit)=library_check.take().unwrap();
+                            emit(&events,&notify,Update::LibraryChecked(Box::new(job.reply())),permit);
+                        }
+                    }
                     if let Some(reply)=file_check.as_mut().and_then(|(job,_)|job.poll(&mut repository)) {
                         let (_,permit)=file_check.take().unwrap();
                         emit(&events,&notify,Update::FileChecked(Box::new(reply)),permit);
@@ -1497,6 +1531,7 @@ impl Runtime {
                         || covers.iter().any(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
                         || !commands.is_empty()
                         || indexer.needs_step()
+                        || library_check.as_ref().is_some_and(|(job,_)|job.needs_step())
                         || (deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open))
                             && indexer.native_document_id().is_none()
                             && index_cleanup.is_none())
@@ -1513,6 +1548,7 @@ impl Runtime {
                     if let Some((job,_)) = &comparison { job.register(&mut select); }
                     if let Some((job,_)) = &file_check {job.register(&mut select);}
                     if let Some((job,_)) = &relocation {job.register(&mut select);}
+                    if let Some((job,_)) = &library_check {job.register(&mut select);}
                     for item in &pending {
                         item.register(&mut select);
                     }
@@ -1537,6 +1573,7 @@ impl Runtime {
                 drop(comparison);
                 drop(file_check);
                 drop(relocation);
+                drop(library_check);
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
                     let _ = ticket.wait();
                 }
@@ -1552,6 +1589,7 @@ impl Runtime {
             pdf_capacity_revision,
             import_revision,
             index_progress,
+            library_check_progress,
             sender,
             shutdown,
             outstanding: Arc::new(AtomicUsize::new(0)),
@@ -1573,6 +1611,9 @@ impl Runtime {
             .map_err(|_| Failure::Storage("Import recovery flush did not finish".into()))?
     }
     /// Coalesced bounded snapshot; reading it never queries SQL or PDFium.
+    pub fn library_check_progress(&self) -> Option<LibraryCheckSnapshot> {
+        self.library_check_progress.lock().unwrap().clone()
+    }
     pub fn index_progress(&self) -> IndexProgress {
         self.index_progress.lock().unwrap().clone()
     }

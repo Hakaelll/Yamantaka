@@ -165,6 +165,7 @@ pub struct LibraryQuery {
     pub text: String,
     pub favorites_only: bool,
     pub missing_only: bool,
+    pub modified_only: bool,
     pub include_missing: bool,
     pub reading_state: LibraryReadingState,
     pub sort: LibrarySort,
@@ -185,6 +186,7 @@ impl Default for LibraryQuery {
             text: String::new(),
             favorites_only: false,
             missing_only: false,
+            modified_only: false,
             include_missing: true,
             reading_state: LibraryReadingState::All,
             sort: LibrarySort::LastOpened,
@@ -199,6 +201,13 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn file_check_upper_bound(&self) -> Result<Option<String>> {
+        Err(Failure::Unsupported("Library file verification".into()))
+    }
+    fn file_check_page(&self, _after: Option<&str>, _upper: &str) -> Result<Vec<Document>> {
+        Err(Failure::Unsupported("Library file verification".into()))
+    }
+
     fn relocate_file(
         &mut self,
         _plan: &relocation::RelocationPlan,

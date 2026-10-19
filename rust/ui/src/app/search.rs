@@ -122,6 +122,7 @@ impl YamantakaApp {
             egui::ScrollArea::vertical()
                 .max_height(height)
                 .show(ui, |ui| {
+                    self.library_check_menu(ui, p);
                     self.operation_actions(ui, p);
                     if theme::navigation(
                         ui,
@@ -189,7 +190,10 @@ impl YamantakaApp {
                         self.show_surface(Surface::Settings);
                         ui.close();
                     }
-                    if self.preview_tools_menu && self.text_scale >= 2.0 {
+                    if self.preview_tools_menu
+                        && self.text_scale >= 2.0
+                        && !self.library_check.capture_mode
+                    {
                         ui.scroll_to_cursor(Some(egui::Align::Max));
                     }
                 });

@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='library-check-summary'; args=@('--pdf-covers','--library-check') },
+    @{ name='library-check-modified-es'; args=@('--pdf-covers','--library-check','--library-check-modified','--es','--light','--reduce-motion') },
+    @{ name='library-check-cancelled'; args=@('--pdf-covers','--library-check','--library-check-cancel') },
+    @{ name='library-check-small-200'; args=@('--pdf-covers','--library-check','--size=640x480','--text-scale=2') },
     @{ name='relocation-review'; args=@('--pdf-covers','--relocate') },
     @{ name='relocation-saved-es'; args=@('--pdf-covers','--relocate','--relocation-confirm','--es','--light','--reduce-motion') },
     @{ name='relocation-mismatch'; args=@('--pdf-covers','--relocate','--relocation-mismatch') },

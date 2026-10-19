@@ -203,6 +203,9 @@ fn filter(query: &LibraryQuery) -> (String, Vec<Value>) {
         Value::Integer(i64::from(query.favorites_only)),
         Value::Integer(i64::from(query.missing_only)),
     ];
+    if query.modified_only {
+        sql.push_str(" AND is_modified=1");
+    }
     if !query.include_missing {
         sql.push_str(" AND is_missing=0");
     }
@@ -283,6 +286,28 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn file_check_upper_bound(&self) -> Result<Option<String>> {
+        self.connection
+            .query_row("SELECT max(id) FROM documents", [], |row| row.get(0))
+            .map_err(storage)
+    }
+    fn file_check_page(&self, after: Option<&str>, upper: &str) -> Result<Vec<Document>> {
+        let (predicate, values) = match after {
+            Some(after) => ("id>? AND id<=?", vec![after, upper]),
+            None => ("id<=?", vec![upper]),
+        };
+        let sql = format!(
+            "SELECT {PROJECTION} FROM documents WHERE {predicate} ORDER BY id LIMIT {MAX_LIBRARY_PAGE}"
+        );
+        self.connection
+            .prepare(&sql)
+            .map_err(storage)?
+            .query_map(params_from_iter(values), document)
+            .map_err(storage)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(storage)
+    }
+
     fn relocate_file(
         &mut self,
         plan: &yamantaka_domain::relocation::RelocationPlan,

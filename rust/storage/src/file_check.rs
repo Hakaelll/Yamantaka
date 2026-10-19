@@ -139,12 +139,13 @@ pub(crate) fn apply(
             "File record changed; refresh and verify again".into(),
         ));
     }
+    let validated = chrono::Utc::now().to_rfc3339();
     match &result {
         FileCheckResult::Missing => {
             transaction
                 .execute(
-                    "UPDATE documents SET is_missing=1 WHERE id=?",
-                    [&expected.document],
+                    "UPDATE documents SET is_missing=1,last_validated_at=?1 WHERE id=?2",
+                    params![validated, expected.document],
                 )
                 .map_err(storage)?;
         }
@@ -166,12 +167,20 @@ pub(crate) fn apply(
             )?;
             transaction
                 .execute(
-                    "UPDATE documents SET is_missing=0,file_modified_at=?1 WHERE id=?2",
-                    params![modified, expected.document],
+                    "UPDATE documents SET is_missing=0,is_modified=0,file_modified_at=?1,last_validated_at=?2 WHERE id=?3",
+                    params![modified, validated, expected.document],
                 )
                 .map_err(storage)?;
         }
-        FileCheckResult::Changed | FileCheckResult::Unverifiable => {}
+        FileCheckResult::Changed => {
+            transaction
+                .execute(
+                    "UPDATE documents SET is_modified=1,last_validated_at=?1 WHERE id=?2",
+                    params![validated, expected.document],
+                )
+                .map_err(storage)?;
+        }
+        FileCheckResult::Unverifiable => {}
     }
     cancel.check()?;
     transaction.commit().map_err(storage)?;
@@ -259,7 +268,7 @@ pub(crate) fn relocate(
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| Failure::Invalid("Invalid file name".into()))?;
-    tx.execute("UPDATE documents SET path=?1,normalized_path=?2,file_name=?3,file_modified_at=?4,is_missing=0 WHERE id=?5",params![candidate.path.to_string_lossy(),normalized,filename,candidate.modified,expected.document]).map_err(storage)?;
+    tx.execute("UPDATE documents SET path=?1,normalized_path=?2,file_name=?3,file_modified_at=?4,is_missing=0,is_modified=0,last_validated_at=?5 WHERE id=?6",params![candidate.path.to_string_lossy(),normalized,filename,candidate.modified,chrono::Utc::now().to_rfc3339(),expected.document]).map_err(storage)?;
     crate::search::source_relocated(&tx, &expected.document)?;
     cancel.check()?;
     tx.commit().map_err(storage)?;

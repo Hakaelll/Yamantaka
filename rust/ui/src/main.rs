@@ -88,6 +88,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     || arg == "--metadata-review"
                     || arg == "--file-check"
                     || arg == "--relocate"
+                    || arg == "--library-check"
                     || arg == "--import-recovery"
                     || arg == "--cover-capacity-retry"
             }) {
@@ -241,6 +242,38 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             if args.iter().any(|arg| arg == "--file-restored") {
                 db.execute_batch("UPDATE documents SET is_missing=1 WHERE id='demo-0'")?;
+            }
+        }
+        if capture.is_some() && args.iter().any(|arg| arg == "--library-check") {
+            for (index, document) in db.query(&Default::default())?.into_iter().enumerate() {
+                let path = store.join(format!("library-check-{index}.pdf"));
+                std::fs::copy(&document.path, &path)?;
+                let path = path.canonicalize()?;
+                let metadata = path.metadata()?;
+                let modified =
+                    chrono::DateTime::<chrono::Utc>::from(metadata.modified()?).to_rfc3339();
+                let fingerprint = yamantaka_storage::identity::legacy_fingerprint(&path)?;
+                let encoded = path.to_string_lossy().replace('\'', "''");
+                let normalized = path.to_string_lossy().to_lowercase().replace('\'', "''");
+                db.execute_batch(&format!("UPDATE documents SET path='{encoded}',normalized_path='{normalized}',file_size={},file_modified_at='{modified}',fingerprint='{fingerprint}' WHERE id='{}'",metadata.len(),document.id))?;
+                match index {
+                    0 => std::fs::remove_file(&path)?,
+                    1 => {
+                        use std::io::{Seek, SeekFrom, Write};
+                        let mut file = std::fs::OpenOptions::new().write(true).open(&path)?;
+                        file.seek(SeekFrom::End(-1))?;
+                        file.write_all(b"!")?;
+                    }
+                    2 => db.execute_batch(&format!(
+                        "UPDATE documents SET file_modified_at='unknown' WHERE id='{}'",
+                        document.id
+                    ))?,
+                    3 => {
+                        std::fs::remove_file(&path)?;
+                        std::fs::create_dir(&path)?;
+                    }
+                    _ => {}
+                }
             }
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--relocate") {
@@ -846,6 +879,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--search-excluded") {
                     app.preview_search_action("exclude");
                 }
+            }
+            if demo && args.iter().any(|arg| arg == "--library-check") {
+                app.preview_library_check(
+                    if args.iter().any(|arg| arg == "--library-check-cancel") {
+                        1
+                    } else if args.iter().any(|arg| arg == "--library-check-missing") {
+                        2
+                    } else if args.iter().any(|arg| arg == "--library-check-modified") {
+                        3
+                    } else {
+                        0
+                    },
+                );
             }
             if demo && args.iter().any(|arg| arg == "--relocate") {
                 app.preview_relocation(
