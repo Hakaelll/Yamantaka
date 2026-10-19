@@ -177,6 +177,34 @@ pub fn verify(db: &mut Database) {
             .all(|entry| second.entries.iter().all(|other| entry.id != other.id))
     );
     let late = second.entries.last().unwrap();
+    let lookup = db
+        .collections(
+            &CollectionQuery {
+                id: Some(late.id.clone()),
+                ..Default::default()
+            },
+            &cancel,
+        )
+        .unwrap();
+    assert_eq!(
+        (
+            lookup.total,
+            lookup.entries.len(),
+            lookup.entries[0].id.as_str()
+        ),
+        (1, 1, late.id.as_str())
+    );
+    let absent = db
+        .collections(
+            &CollectionQuery {
+                id: Some("no-such-collection".into()),
+                ..Default::default()
+            },
+            &cancel,
+        )
+        .unwrap();
+    assert_eq!(absent.total, 0);
+    assert!(absent.entries.is_empty());
     db.change_collection(
         &CollectionChange::Pin {
             expected: late.into(),

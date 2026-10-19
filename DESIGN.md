@@ -472,3 +472,13 @@ results report bytes removed and preserve an unknown remaining size after
 cancellation. Narrow layouts reduce the heading and scroll the actions; synthetic
 200% text captures focus the measured size and actions through that same scroll
 area. The saved PDF page choice and resident cover textures remain in place.
+
+
+Collections are an Operate surface reached from Tools, with no persistent
+navigation rail. The same manager gains membership checkboxes when opened from
+a document's details. Flat rows keep names, member counts, pin state and View
+books together; rename and reviewed deletion stay local to the row. Search and
+creation use labelled fields. Pending writes retain the layout and disable only
+their controls. The active collection uses the library's existing filter row and
+clear/reset actions. The manager scrolls at narrow widths and 200% text; the book
+gallery and reader keep their established composition.

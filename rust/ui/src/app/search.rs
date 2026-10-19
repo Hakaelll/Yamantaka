@@ -122,6 +122,17 @@ impl YamantakaApp {
             egui::ScrollArea::vertical()
                 .max_height(height)
                 .show(ui, |ui| {
+                    if theme::navigation(
+                        ui,
+                        self.tr("Colecciones", "Collections"),
+                        matches!(self.surface, Surface::Collections),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_collections(None);
+                        ui.close();
+                    }
                     self.library_check_menu(ui, p);
                     self.operation_actions(ui, p);
                     if theme::navigation(

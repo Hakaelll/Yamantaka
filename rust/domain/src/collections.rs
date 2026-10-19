@@ -11,6 +11,7 @@ pub struct Collection {
 }
 #[derive(Clone, Debug, Default)]
 pub struct CollectionQuery {
+    pub id: Option<String>,
     pub text: String,
     pub document: Option<String>,
     pub offset: usize,
@@ -32,6 +33,7 @@ impl From<&Collection> for CollectionRevision {
         }
     }
 }
+#[derive(Clone)]
 pub enum CollectionChange {
     Create {
         name: String,

@@ -1,0 +1,381 @@
+{
+  "synthetic": true,
+  "libraryDocumentCount": 10,
+  "captureProcessId": 11604,
+  "viewport": [
+    0.0,
+    0.0,
+    320.0,
+    240.0
+  ],
+  "pixelsPerPoint": 2.5,
+  "controls": [
+    {
+      "label": "Library",
+      "rect": [
+        52.0,
+        4.0,
+        92.0,
+        44.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Add PDFs",
+      "rect": [
+        102.0,
+        4.0,
+        142.0,
+        44.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Tools",
+      "rect": [
+        152.0,
+        4.0,
+        192.0,
+        44.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Back to library",
+      "rect": [
+        151.625,
+        -279.1875,
+        267.46875,
+        -239.1875
+      ],
+      "clip": [
+        0.0,
+        58.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Create",
+      "rect": [
+        426.0,
+        -145.1875,
+        518.03125,
+        -105.1875
+      ],
+      "clip": [
+        0.0,
+        58.0,
+        320.0,
+        220.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Refresh",
+      "rect": [
+        426.0,
+        -41.1875,
+        499.71875,
+        -1.1875
+      ],
+      "clip": [
+        0.0,
+        58.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "View books",
+      "rect": [
+        164.21875,
+        118.8125,
+        263.125,
+        158.8125
+      ],
+      "clip": [
+        0.0,
+        58.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Collection actions",
+      "rect": [
+        273.125,
+        118.8125,
+        313.125,
+        158.8125
+      ],
+      "clip": [
+        0.0,
+        58.0,
+        320.0,
+        220.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Previous",
+      "rect": [
+        16.0,
+        212.8125,
+        96.1875,
+        252.8125
+      ],
+      "clip": [
+        0.0,
+        58.0,
+        320.0,
+        220.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Next",
+      "rect": [
+        154.8125,
+        212.8125,
+        211.78125,
+        252.8125
+      ],
+      "clip": [
+        0.0,
+        58.0,
+        320.0,
+        220.0
+      ],
+      "enabled": false
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "libraryCovers": {
+    "resident": 0,
+    "blockedBeforeRelease": 0,
+    "capacityPreview": 0,
+    "capacityRevision": 0,
+    "ready": 0,
+    "pending": 0,
+    "source": "PDF selected page",
+    "sourcePages": {},
+    "maximumVisible": 16
+  },
+  "coverPicker": {
+    "open": false
+  },
+  "coverPickerDemo": {
+    "action": null,
+    "complete": false,
+    "saved": false
+  },
+  "metadataReview": null,
+  "documentFind": null,
+  "documentLinks": {
+    "residentPages": 0,
+    "readyPages": 0,
+    "internalLinks": 0,
+    "externalLinks": 0,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 0,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 0,
+      "text": "",
+      "tag": "",
+      "kind": null,
+      "review": null
+    },
+    "resident": 0,
+    "total": 0,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "residentPages": 0,
+    "readyPages": 0,
+    "marks": 0
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": false,
+    "count": 0,
+    "artifact": null
+  },
+  "fileComparison": {
+    "pending": false,
+    "equal": null,
+    "failed": false
+  },
+  "importRecovery": {
+    "pendingJobs": 0,
+    "loaded": true,
+    "unavailable": false,
+    "completed": 0
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 0,
+    "resident": 0,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": false,
+    "documents": 0
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": false,
+    "preferences": null
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Off",
+    "pending": null,
+    "active": null,
+    "tabs": []
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 0,
+  "readerZoom": 1.0,
+  "readerRenderEvents": [],
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 0,
+    "pages": 0,
+    "tiles": 0,
+    "text": 0,
+    "other": 0,
+    "cpu": 0,
+    "gpu": 0,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered.",
+  "collections": {
+    "loaded": true,
+    "failed": false,
+    "total": 1,
+    "visible": 1,
+    "assigned": 1,
+    "pinned": 1,
+    "filter": null,
+    "filterChecked": false,
+    "confirmDelete": false,
+    "busy": false
+  },
+  "coverCache": {
+    "pending": false,
+    "failed": false,
+    "files": null,
+    "bytes": null,
+    "preserved": null,
+    "removedFiles": null,
+    "removedBytes": null,
+    "failedFiles": null,
+    "cancelled": null
+  },
+  "fileCheck": {
+    "pending": false,
+    "state": null
+  },
+  "relocation": {
+    "pending": false,
+    "review": false,
+    "exact": null,
+    "applied": false,
+    "failed": false
+  },
+  "libraryCheck": {
+    "pending": false,
+    "phase": "Idle",
+    "checked": 0,
+    "available": 0,
+    "missing": 0,
+    "changed": 0,
+    "unverifiable": 0,
+    "failed": 0,
+    "error": false
+  }
+}

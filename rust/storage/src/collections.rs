@@ -87,17 +87,24 @@ impl Database {
         let total = self
             .connection
             .query_row(
-                "SELECT count(*) FROM collections WHERE name LIKE ? ESCAPE '\\'",
-                [&pattern],
+                "SELECT count(*) FROM collections WHERE (?1 IS NULL OR id=?1) AND name LIKE ?2 ESCAPE '\\'",
+                params![query.id,pattern],
                 |row| row.get::<_, i64>(0),
             )
             .map_err(storage)?;
-        let mut statement=self.connection.prepare("SELECT c.id,c.name,c.icon,c.sort_order,c.is_pinned,c.updated_at,(SELECT count(*) FROM collection_documents m WHERE m.collection_id=c.id),EXISTS(SELECT 1 FROM collection_documents m WHERE m.collection_id=c.id AND m.document_id=?) FROM collections c WHERE c.name LIKE ? ESCAPE '\\' ORDER BY c.is_pinned DESC,c.sort_order,c.name COLLATE NOCASE,c.id LIMIT ? OFFSET ?").map_err(storage)?;
+        let mut statement=self.connection.prepare("SELECT c.id,c.name,c.icon,c.sort_order,c.is_pinned,c.updated_at,(SELECT count(*) FROM collection_documents m WHERE m.collection_id=c.id),EXISTS(SELECT 1 FROM collection_documents m WHERE m.collection_id=c.id AND m.document_id=?) FROM collections c WHERE c.name LIKE ? ESCAPE '\\' AND (? IS NULL OR c.id=?) ORDER BY c.is_pinned DESC,c.sort_order,c.name COLLATE NOCASE,c.id LIMIT ? OFFSET ?").map_err(storage)?;
         let offset = i64::try_from(query.offset)
             .map_err(|_| invalid("Collection page offset is too large"))?;
         let rows = statement
             .query_map(
-                params![query.document, pattern, MAX_LIBRARY_PAGE as i64, offset],
+                params![
+                    query.document,
+                    pattern,
+                    query.id,
+                    query.id,
+                    MAX_LIBRARY_PAGE as i64,
+                    offset
+                ],
                 |row| {
                     Ok(Collection {
                         id: row.get(0)?,

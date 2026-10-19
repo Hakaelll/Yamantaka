@@ -183,6 +183,16 @@ impl YamantakaApp {
                         self.file_check_details(ui, &document, p);
                         self.relocation_details(ui, &document, p);
                         self.file_comparison_details(ui, &document, p);
+                        if theme::navigation(
+                            ui,
+                            self.tr("Organizar en colecciones", "Organize in collections"),
+                            false,
+                            p,
+                        )
+                        .clicked()
+                        {
+                            self.show_collections(Some(document.clone()));
+                        }
                         self.reading_goal(ui, &document);
                         ui.add_space(8.0);
                         let path = display_path(&document.path);

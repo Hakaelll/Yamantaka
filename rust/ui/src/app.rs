@@ -1,6 +1,7 @@
 mod annotations;
 mod bookmarks;
 mod cache_maintenance;
+mod collections;
 mod compact;
 mod cover_picker;
 mod cover_picker_preview;
@@ -76,6 +77,7 @@ enum Surface {
     Library,
     Reader,
     Settings,
+    Collections,
 }
 enum PageImage {
     Native(PageTexture),
@@ -167,6 +169,7 @@ pub struct YamantakaApp {
     file_comparison: file_comparison::ComparisonState,
     file_check: file_check::CheckState,
     cache_maintenance: cache_maintenance::CacheState,
+    collections: collections::CollectionState,
     library_check: library_check::CheckState,
     relocation: relocation::RelocationState,
     annotation_paint: annotations::paint::AnnotationPaint,
@@ -290,6 +293,7 @@ impl YamantakaApp {
             password_attempted: false,
             preview_password_action: None,
             preview_password_target: None,
+            collections: collections::CollectionState::new(&preferences),
             runtime,
             preferences,
             sessions: Default::default(),
@@ -389,6 +393,7 @@ impl YamantakaApp {
             preview_reader_options: false,
             reader_options_section: 0,
         };
+        app.check_collection_filter();
         app.refresh();
         app.send(Action::PendingImports);
         app.begin_reader_continuity();
@@ -424,6 +429,7 @@ impl YamantakaApp {
                 sort_direction: self.sort_direction,
                 missing_only: self.missing_only,
                 modified_only: self.modified_only,
+                collection_id: self.collections.filter.as_ref().map(|(id, _)| id.clone()),
                 offset: self.offset,
                 ..Default::default()
             },
@@ -483,6 +489,14 @@ impl YamantakaApp {
             ("libraryInspector", self.inspector.into()),
             ("libraryMissingOnly", self.missing_only.into()),
             ("libraryModifiedOnly", self.modified_only.into()),
+            (
+                "libraryCollection",
+                self.collections
+                    .filter
+                    .as_ref()
+                    .map(|(id, name)| serde_json::json!({"id":id,"name":name}))
+                    .unwrap_or(serde_json::Value::Null),
+            ),
         ];
         let mut changed = false;
         for (key, value) in state {
@@ -574,6 +588,9 @@ impl YamantakaApp {
         if !matches!(surface, Surface::Reader) {
             self.tabs.leave_destination();
             self.restoration.clear();
+        }
+        if matches!(self.surface, Surface::Collections) {
+            self.collections.leave();
         }
         if matches!(self.surface, Surface::Notes) {
             self.global_notes.leave();
@@ -945,7 +962,7 @@ impl YamantakaApp {
                 ui.add_space(if compact { 4.0 } else { 12.0 });
                 ui.horizontal_wrapped(|ui| {
                     if ui.ctx().content_rect().width()<420.0 {
-                        let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only||self.modified_only,p);
+                        let response=theme::icon_toggle(ui,self.tr("Filtros y orden","Filters and sorting"),theme::Icon::Sort,self.favorites||self.reading_state!=LibraryReadingState::All||self.missing_only||self.modified_only||self.collections.filter.is_some(),p);
                         egui::Popup::menu(&response).show(|ui|self.library_filters(ui,p));
                     }else{self.library_filters(ui,p);}
                     if !compact {
@@ -1180,15 +1197,17 @@ impl YamantakaApp {
         self.persist_library_state();
     }
     fn library_filters(&mut self, ui: &mut egui::Ui, p: Palette) {
+        self.collection_filter(ui, p);
         if theme::navigation(
             ui,
             self.tr("Todos los libros", "All books"),
-            !self.favorites,
+            !self.favorites && self.collections.filter.is_none(),
             p,
         )
         .clicked()
         {
             self.favorites = false;
+            self.clear_collection_filter();
             self.offset = 0;
             self.refresh();
         }
@@ -1316,7 +1335,8 @@ impl YamantakaApp {
             || self.favorites
             || self.reading_state != LibraryReadingState::All
             || self.missing_only
-            || self.modified_only)
+            || self.modified_only
+            || self.collections.filter.is_some())
             && theme::navigation(
                 ui,
                 self.tr("Restablecer filtros", "Reset filters"),
@@ -1326,6 +1346,7 @@ impl YamantakaApp {
             .clicked()
         {
             self.query.clear();
+            self.clear_collection_filter();
             self.reading_state = LibraryReadingState::All;
             self.missing_only = false;
             self.modified_only = false;
@@ -1416,6 +1437,10 @@ impl App for YamantakaApp {
                     if applied {
                         self.refresh();
                     }
+                }
+                Update::Collections(result, cancel) => self.accept_collections(result, cancel),
+                Update::CollectionChanged(result, cancel) => {
+                    self.accept_collection_change(result, cancel)
                 }
                 Update::CoverCacheMaintained(reply) => self.cache_maintenance.accept(*reply),
                 Update::FileChecked(reply) => {
@@ -1941,6 +1966,7 @@ impl App for YamantakaApp {
         self.apply_global_note_preview();
         self.apply_annotation_export_preview();
         self.update_file_comparison();
+        self.update_collection_preview();
         self.update_cache_maintenance();
         self.update_file_check();
         self.update_relocation();
@@ -2059,6 +2085,7 @@ impl App for YamantakaApp {
                         Surface::Library => self.library(ui),
                         Surface::Reader => self.reader(ui),
                         Surface::Settings => self.settings(ui),
+                        Surface::Collections => self.collections_view(ui),
                         Surface::Search => self.global_search(ui),
                         Surface::Notes => self.global_notes_panel(ui),
                         Surface::History => self.history_panel(ui),
@@ -2102,6 +2129,7 @@ impl App for YamantakaApp {
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
+                    && self.collections.ready()
                     && self.cache_maintenance.ready()
                     && self.file_check.ready()
                     && self.library_check.ready()
@@ -2220,6 +2248,7 @@ impl App for YamantakaApp {
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
+                    record["collections"]=self.collections.summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
@@ -2254,6 +2283,7 @@ impl App for YamantakaApp {
         }
         self.library_check.cancel();
         self.relocation.cancel();
+        self.collections.cancel();
         self.cache_maintenance.cancel();
         self.file_check.cancel();
         self.file_comparison.cancel();

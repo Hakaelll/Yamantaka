@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='collections-manager'; args=@('--pdf-covers','--collections') },
+    @{ name='collections-filter-es'; args=@('--pdf-covers','--collections','--collection-filter','--es','--light','--reduce-motion') },
+    @{ name='collections-delete-review'; args=@('--pdf-covers','--collections','--collection-delete-review') },
+    @{ name='collections-small-200'; args=@('--pdf-covers','--collections','--size=640x480','--text-scale=2') },
     @{ name='cover-cache-dark'; args=@('--settings','--cache-maintenance') },
     @{ name='cover-cache-cleared-es'; args=@('--settings','--cache-maintenance','--clear-cover-cache','--light','--es','--reduce-motion') },
     @{ name='cover-cache-small-200'; args=@('--settings','--cache-maintenance','--size=640x480','--text-scale=2') },

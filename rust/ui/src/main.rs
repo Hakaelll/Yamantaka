@@ -711,6 +711,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--sessions-preview") {
                     app.preview_sessions();
                 }
+                if args.iter().any(|arg| arg == "--collections") {
+                    app.preview_collections(
+                        if args.iter().any(|arg| arg == "--collection-filter") {
+                            1
+                        } else if args.iter().any(|arg| arg == "--collection-delete-review") {
+                            2
+                        } else {
+                            0
+                        },
+                    );
+                }
                 if args.iter().any(|arg| arg == "--cache-maintenance") {
                     app.preview_cover_cache(
                         &cc.egui_ctx,

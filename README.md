@@ -182,7 +182,7 @@ Generate the PDF fixtures and fetch PDFium first to run the native PDF suite. Te
 Current evidence is documented separately so dates and scopes remain explicit:
 
 - [Acceptance matrix](docs/architecture/rust-rewrite-parity.md): the source of truth for completion.
-- [Collection storage](docs/validation/rust-collections-storage-2026-10-19.md): bounded pages and atomic collection changes on v11. Native collection management is not yet exposed in the UI.
+- [Native collections](docs/validation/rust-collections-ui-2026-10-19.md): Tools → Collections supports creation, search, pinning, renaming and reviewed deletion. Organize a book from its details, then use View books to filter the library. Collection reorder and bulk organization remain pending.
 - [Front-matter metadata evidence](docs/validation/rust-front-matter-2026-10-15.md): bounded text and geometry analysis with real PDFium tests for titles, explicit authors, conflicts, logos, and rotations.
 - [Background import analysis](docs/validation/rust-import-analysis-2026-10-16.md): native import persists evidence and proposals atomically, validates the source revision, and refreshes the catalogue after each commit. Reader requests take priority over analysis.
 - [Native metadata review](docs/validation/rust-metadata-review-2026-10-16.md): review proposals, save manual title and author corrections, dismiss suggestions, or restore automatic values. Scoped replies, stale-review rejection, transactional search updates, and seven synthetic native captures verify this flow.

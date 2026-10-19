@@ -50,6 +50,11 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    Collections(yamantaka_domain::collections::CollectionQuery, Cancellation),
+    ChangeCollection(
+        Box<yamantaka_domain::collections::CollectionChange>,
+        Cancellation,
+    ),
     MaintainCoverCache(Box<CacheMaintenanceRequest>),
     CheckLibrary(Box<LibraryCheckRequest>),
     RelocateFile(Box<RelocationRequest>),
@@ -124,6 +129,11 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    Collections(
+        Result<yamantaka_domain::collections::CollectionPage>,
+        Cancellation,
+    ),
+    CollectionChanged(Result<String>, Cancellation),
     CoverCacheMaintained(Box<CacheMaintenanceReply>),
     LibraryChecked(Box<LibraryCheckReply>),
     FileRelocated(Box<RelocationReply>),
@@ -920,6 +930,14 @@ impl Runtime {
                                         Ok(job)=>relocation=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::FileRelocated(Box::new(RelocationReply {document,cancel,result:Err(error)})),permit),
                                     }
+                                }
+                                Action::Collections(query,cancel)=> {
+                                    let result=repository.collections(&query,&cancel);
+                                    emit(&events,&notify,Update::Collections(result,cancel),permit);
+                                }
+                                Action::ChangeCollection(change,cancel)=> {
+                                    let result=repository.change_collection(&change,&cancel);
+                                    emit(&events,&notify,Update::CollectionChanged(result,cancel),permit);
                                 }
                                 Action::MaintainCoverCache(request) => {
                                     let operation=request.operation; let cancel=request.cancel.clone();
