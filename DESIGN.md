@@ -405,8 +405,9 @@ outline. Narrow rows wrap document context into a bounded two-line title region.
 The bottom tray has wrapped document title, author, reading position, Read,
 Favorite, Explorer and Close actions, followed by original-file context. Internal
 insets are 24×12. It adds vertical inspection space without changing gallery width. The Compare with another PDF action and its cancel/result state stay inside this
-scrollable tray. A comparison never adds a global progress banner or changes
-collection width. Result text uses the secondary foreground and wraps with the
+scrollable tray. Check file and its cancellation/result use the same local flow.
+Both result labels have an explicit bounded width and wrap at enlarged text.
+Neither operation adds a global progress banner or changes collection width. Result text uses the secondary foreground and wraps with the
 available inspector width.
 
 ### Settings theme choices and fields

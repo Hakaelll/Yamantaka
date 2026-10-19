@@ -8,6 +8,7 @@ mod cover_revision;
 mod cover_selection;
 mod cover_snapshot;
 pub mod database;
+mod file_check;
 pub mod identity;
 mod import_metadata;
 mod import_recovery;

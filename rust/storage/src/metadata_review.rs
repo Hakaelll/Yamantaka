@@ -32,7 +32,7 @@ pub(crate) fn read_record(
     let author_override = value("authorOverride");
     let current_analysis =
         row["fingerprint"] == row["analysisFingerprint"] && row["status"] == "review";
-    let file = yamantaka_domain::metadata_review::MetadataFile {
+    let file = yamantaka_domain::source_revision::CataloguedFile {
         path: value("path").unwrap_or_default().into(),
         fingerprint: value("fingerprint").unwrap_or_default(),
         page_count: u32::try_from(

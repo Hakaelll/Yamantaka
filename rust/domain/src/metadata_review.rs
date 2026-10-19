@@ -1,5 +1,5 @@
+use crate::source_revision::CataloguedFile;
 use crate::{Document, Failure, Result};
-use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetadataField {
@@ -24,16 +24,6 @@ pub struct MetadataEvidence {
     pub kind: MetadataEvidenceKind,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MetadataFile {
-    pub path: PathBuf,
-    pub fingerprint: String,
-    pub page_count: u32,
-    pub missing: bool,
-    pub size: u64,
-    pub modified: String,
-}
-
 pub struct MetadataLocation {
     pub document: Document,
     pub page: u32,
@@ -53,7 +43,7 @@ pub struct MetadataReview {
     pub author_override: Option<String>,
     pub suggested_title: Option<String>,
     pub suggested_author: Option<String>,
-    pub file: MetadataFile,
+    pub file: CataloguedFile,
     pub title_evidence: Option<MetadataEvidence>,
     pub author_evidence: Option<MetadataEvidence>,
 }

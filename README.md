@@ -46,6 +46,8 @@ To import a folder, choose **Tools → Import folder…**. Yamantaka scans its s
 
 Interrupted imports now appear under **Tools → Pending imports**. Choose **Resume** to continue or **Discard** to forget that job while keeping saved books. Recovery stores file selections or a folder root in a separate SQLite sidecar, with a checkpoint after each committed document. Startup leaves pending work paused. See [import recovery verification](docs/validation/rust-import-recovery-2026-10-18.md).
 
+Open a book's details and choose **Check file** to inspect its current source in the background. The first successful check saves a full-content reference. Later checks can detect changes beyond the legacy partial fingerprint, mark a missing source and restore its availability when the same file returns. Manual metadata and reading data stay saved. See [file verification](docs/validation/rust-file-check-2026-10-19.md).
+
 To check a possible duplicate, open a book's details and choose **Compare with another PDF**. Yamantaka compares the complete contents in the background using SHA-256. You can cancel the check; both originals remain unchanged. The result applies to that comparison and does not merge documents. [File comparison verification](docs/validation/rust-file-comparison-2026-10-18.md) describes the source guards and remaining duplicate-management work.
 
 ## The experience

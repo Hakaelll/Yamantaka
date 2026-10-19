@@ -1,17 +1,13 @@
 //! Read-only, cancellable whole-file comparison outside the repository actor.
+use crate::file_digest::HashedFile;
 use crossbeam_channel::{Receiver, Select, TryRecvError, bounded};
-use sha2::{Digest, Sha256};
 use std::{
-    fs::{File, OpenOptions},
-    io::Read,
-    path::{Path, PathBuf},
+    path::PathBuf,
     thread::{self, JoinHandle},
-    time::SystemTime,
 };
 use yamantaka_domain::{
     Cancellation, Document, Failure, LibraryRepository, Result,
     memory::{MemoryCategory, MemoryGovernor, TrackedBytesBuilder},
-    source_revision::legacy_fingerprint,
 };
 
 pub struct ComparisonRequest {
@@ -43,81 +39,7 @@ impl ComparisonRequest {
 fn changed() -> Failure {
     Failure::Invalid("Comparison source changed; refresh and compare again".into())
 }
-fn io_error(_: std::io::Error) -> Failure {
-    Failure::Storage(
-        "Could not read PDF for comparison; check access and close other editors".into(),
-    )
-}
-struct HashedFile {
-    file: File,
-    path: PathBuf,
-    requested_path: PathBuf,
-    size: u64,
-    modified: SystemTime,
-    digest: [u8; 32],
-    head: [u8; 32],
-}
-impl HashedFile {
-    fn read(path: &Path, buffer: &mut [u8], cancel: &Cancellation) -> Result<Self> {
-        cancel.check()?;
-        let requested_path = path.to_owned();
-        let path = path.canonicalize().map_err(io_error)?;
-        let mut options = OpenOptions::new();
-        options.read(true);
-        // Deny concurrent writes/deletion while the proof is computed and delivered.
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::OpenOptionsExt;
-            options.share_mode(1);
-        }
-        let mut file = options.open(&path).map_err(io_error)?;
-        let before = file.metadata().map_err(io_error)?;
-        if !before.is_file() {
-            return Err(Failure::Invalid("Comparison requires regular files".into()));
-        }
-        let modified = before.modified().map_err(io_error)?;
-        let mut hash = Sha256::new();
-        let mut head = Sha256::new();
-        let mut count = 0u64;
-        loop {
-            cancel.check()?;
-            let read = file.read(buffer).map_err(io_error)?;
-            if read == 0 {
-                break;
-            }
-            let head_bytes = (65536u64.saturating_sub(count)).min(read as u64) as usize;
-            head.update(&buffer[..head_bytes]);
-            hash.update(&buffer[..read]);
-            count = count.checked_add(read as u64).ok_or_else(changed)?;
-        }
-        if count != before.len() {
-            return Err(changed());
-        }
-        let result = Self {
-            file,
-            path,
-            requested_path,
-            size: count,
-            modified,
-            digest: hash.finalize().into(),
-            head: head.finalize().into(),
-        };
-        result.verify()?;
-        Ok(result)
-    }
-    fn verify(&self) -> Result<()> {
-        let held = self.file.metadata().map_err(io_error)?;
-        let current = self.path.metadata().map_err(io_error)?;
-        if self.requested_path.canonicalize().map_err(io_error)? != self.path
-            || [held, current]
-                .iter()
-                .any(|m| m.len() != self.size || m.modified().ok() != Some(self.modified))
-        {
-            return Err(changed());
-        }
-        Ok(())
-    }
-}
+
 struct Proof {
     left: HashedFile,
     right: HashedFile,
@@ -132,7 +54,7 @@ impl Proof {
             buffer.as_mut_slice(),
             &request.cancel,
         )?;
-        if legacy_fingerprint(left.size, left.head) != request.document.fingerprint {
+        if left.fingerprint() != request.document.fingerprint {
             return Err(changed());
         }
         let right = HashedFile::read(&request.candidate, buffer.as_mut_slice(), &request.cancel)?;
@@ -143,7 +65,7 @@ impl Proof {
     fn equal(&self) -> Result<bool> {
         self.left.verify()?;
         self.right.verify()?;
-        Ok(self.left.size == self.right.size && self.left.digest == self.right.digest)
+        Ok(self.left.size() == self.right.size() && self.left.digest() == self.right.digest())
     }
 }
 pub(crate) struct ComparisonJob {
@@ -216,6 +138,7 @@ impl Drop for ComparisonJob {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use yamantaka_storage::{Database, identity};
     fn setup() -> (tempfile::TempDir, Database, Document) {
         let dir = tempfile::tempdir().unwrap();
@@ -223,14 +146,17 @@ mod tests {
         let mut bytes = vec![b'a'; 65536];
         bytes.extend_from_slice(b"original tail");
         std::fs::write(&path, &bytes).unwrap();
-        let db = Database::in_memory_at(11).unwrap();
+        let db = Database::open(&dir.path().join("library.sqlite3")).unwrap();
         let escaped = path
             .canonicalize()
             .unwrap()
             .to_string_lossy()
             .replace('\'', "''");
         let fingerprint = identity::legacy_fingerprint(&path).unwrap();
-        db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('book','{escaped}','book','original.pdf','A book',2,65549,'2026-10-18','2026-10-18','2026-10-18','{fingerprint}')")).unwrap();
+        let modified =
+            chrono::DateTime::<chrono::Utc>::from(path.metadata().unwrap().modified().unwrap())
+                .to_rfc3339();
+        db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('book','{escaped}','book','original.pdf','A book',2,65549,'{modified}','2026-10-18','2026-10-18','{fingerprint}')")).unwrap();
         let document = db.get("book").unwrap().unwrap();
         (dir, db, document)
     }
@@ -256,7 +182,7 @@ mod tests {
     }
     #[test]
     fn background_comparison_rejects_partial_hash_collision_and_confirms_full_copy() {
-        let (dir, db, document) = setup();
+        let (dir, mut db, document) = setup();
         let candidate = dir.path().join("candidate.pdf");
         let governor = MemoryGovernor::new(Default::default());
         let mut bytes = std::fs::read(&document.path).unwrap();
@@ -282,6 +208,7 @@ mod tests {
             std::fs::read(&document.path).unwrap(),
             std::fs::read(&candidate).unwrap()
         );
+        crate::file_check::verification_test::verify(&mut db, &document, dir.path(), &governor);
     }
     #[test]
     fn cancellation_and_catalogue_replacement_cannot_publish_exact_confirmation() {

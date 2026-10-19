@@ -8,6 +8,7 @@ pub mod cover_revision;
 pub mod cover_selection;
 pub mod cover_snapshot;
 pub mod external_uri;
+pub mod file_check;
 pub mod front_matter;
 pub mod import_metadata;
 pub mod import_recovery;
@@ -197,6 +198,18 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    fn file_snapshot(&self, _id: &str) -> Result<file_check::FileSnapshot> {
+        Err(Failure::Unsupported("File verification".into()))
+    }
+    fn apply_file_check(
+        &mut self,
+        _expected: &file_check::FileSnapshot,
+        _result: file_check::FileCheckResult,
+        _cancel: &Cancellation,
+    ) -> Result<file_check::FileCheckResult> {
+        Err(Failure::Unsupported("File verification".into()))
+    }
+
     fn pending_imports(&self) -> Result<Vec<import_recovery::PendingImport>> {
         Ok(Vec::new())
     }

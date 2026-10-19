@@ -86,6 +86,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     || arg == "--global-notes-export-json"
                     || arg == "--global-notes-export-markdown"
                     || arg == "--metadata-review"
+                    || arg == "--file-check"
                     || arg == "--import-recovery"
                     || arg == "--cover-capacity-retry"
             }) {
@@ -186,6 +187,54 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 db.execute_batch(&format!(
                     "UPDATE documents SET fingerprint='{fingerprint}' WHERE id='demo-0'"
                 ))?;
+            }
+        }
+        if capture.is_some() && args.iter().any(|arg| arg == "--file-check") {
+            let original = db.get("demo-0")?.unwrap();
+            let copy = store.join("file-check.pdf");
+            std::fs::copy(&original.path, &copy)?;
+            let path = copy.canonicalize()?;
+            let metadata = path.metadata()?;
+            let modified = chrono::DateTime::<chrono::Utc>::from(metadata.modified()?).to_rfc3339();
+            let fingerprint = yamantaka_storage::identity::legacy_fingerprint(&path)?;
+            let encoded = path.to_string_lossy().replace('\'', "''");
+            let normalized = path.to_string_lossy().to_lowercase().replace('\'', "''");
+            db.execute_batch(&format!("UPDATE documents SET path='{encoded}',normalized_path='{normalized}',file_size={},file_modified_at='{modified}',fingerprint='{fingerprint}' WHERE id='demo-0'",metadata.len()))?;
+            if args
+                .iter()
+                .any(|arg| arg == "--file-changed" || arg == "--file-restored")
+            {
+                let hex = yamantaka_storage::identity::full_sha256(
+                    &path,
+                    &yamantaka_domain::Cancellation::default(),
+                )?;
+                let mut digest = [0u8; 32];
+                for (index, byte) in digest.iter_mut().enumerate() {
+                    *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16)?;
+                }
+                let snapshot = db.file_snapshot("demo-0")?;
+                db.apply_file_check(
+                    &snapshot,
+                    yamantaka_domain::file_check::FileCheckResult::Available {
+                        digest,
+                        modified,
+                        baseline_created: true,
+                    },
+                    &yamantaka_domain::Cancellation::default(),
+                )?;
+            }
+            if args.iter().any(|arg| arg == "--file-missing") {
+                std::fs::remove_file(&path)?;
+            }
+            if args.iter().any(|arg| arg == "--file-changed") {
+                use std::io::Write;
+                std::fs::OpenOptions::new()
+                    .append(true)
+                    .open(&path)?
+                    .write_all(b"\n% synthetic changed-file fixture\n")?;
+            }
+            if args.iter().any(|arg| arg == "--file-restored") {
+                db.execute_batch("UPDATE documents SET is_missing=1 WHERE id='demo-0'")?;
             }
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--import-recovery") {
@@ -768,6 +817,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--search-excluded") {
                     app.preview_search_action("exclude");
                 }
+            }
+            if demo && args.iter().any(|arg| arg == "--file-check") {
+                app.preview_file_check();
             }
             if demo && args.iter().any(|arg| arg == "--import-recovery") {
                 app.preview_import_recovery(if args.iter().any(|arg| arg == "--resume-import") {

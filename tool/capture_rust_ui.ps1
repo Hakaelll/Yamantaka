@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='file-check-baseline'; args=@('--pdf-covers','--file-check') },
+    @{ name='file-check-missing-es'; args=@('--pdf-covers','--file-check','--file-missing','--es','--light','--reduce-motion') },
+    @{ name='file-check-changed'; args=@('--pdf-covers','--file-check','--file-changed') },
+    @{ name='file-check-restored-small-200'; args=@('--pdf-covers','--file-check','--file-restored','--size=640x480','--text-scale=2') },
     @{ name='import-recovery-pending'; args=@('--pdf-covers','--import-recovery') },
     @{ name='import-recovery-resumed-es'; args=@('--pdf-covers','--import-recovery','--resume-import','--es','--light','--reduce-motion') },
     @{ name='import-recovery-discarded'; args=@('--pdf-covers','--import-recovery','--discard-import') },

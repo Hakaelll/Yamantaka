@@ -1,6 +1,20 @@
 use super::*;
 
 impl YamantakaApp {
+    pub(super) fn file_status_label(
+        ui: &mut egui::Ui,
+        message: &str,
+        p: Palette,
+    ) -> egui::Response {
+        let width = ui
+            .available_width()
+            .min((ui.ctx().content_rect().width() - 64.0).max(1.0));
+        ui.add_sized(
+            [width, 0.0],
+            egui::Label::new(RichText::new(message).color(p.secondary)).wrap(),
+        )
+    }
+
     pub(super) fn details(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark);
         let document = self
@@ -156,6 +170,7 @@ impl YamantakaApp {
                                 )
                                 .clicked()
                                 {
+                                    self.file_check.cancel();
                                     self.file_comparison.cancel();
                                     self.inspector = false;
                                 }
@@ -164,6 +179,7 @@ impl YamantakaApp {
                         ui.add_space(6.0);
                         ui.separator();
                         ui.add_space(6.0);
+                        self.file_check_details(ui, &document, p);
                         self.file_comparison_details(ui, &document, p);
                         self.reading_goal(ui, &document);
                         ui.add_space(8.0);

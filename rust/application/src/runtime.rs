@@ -5,6 +5,7 @@ use crate::annotations::{
 use crate::cover_job::{CoverJob, CoverStep};
 use crate::cover_source::CoverSource;
 use crate::document_find::{FindBatch, FindRequest, FindScan, ScanStep};
+use crate::file_check::{FileCheckJob, FileCheckReply, FileCheckRequest};
 use crate::file_comparison::{ComparisonJob, ComparisonReply, ComparisonRequest};
 use crate::folder_import::FolderImport;
 use crate::import_enrichment::{ImportEnrichment, ImportStep};
@@ -39,6 +40,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    CheckFile(Box<FileCheckRequest>),
     PendingImports,
     ResumeImport(String, Cancellation),
     DiscardImport(String),
@@ -109,6 +111,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    FileChecked(Box<FileCheckReply>),
     PendingImports(Result<Vec<yamantaka_domain::import_recovery::PendingImport>>),
     FileComparison(Box<ComparisonReply>),
     Metadata(Box<crate::metadata_review::MetadataReply>),
@@ -722,6 +725,7 @@ impl Runtime {
                 let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
+                let mut file_check: Option<(FileCheckJob,Permit)> = None;
                 let mut indexer = SearchIndexController::default();
                 let mut index_cleanup: Option<PdfTicket<()>> = None;
                 let mut deferred: VecDeque<Command> = VecDeque::new();
@@ -797,6 +801,14 @@ impl Runtime {
                                     Update::ReadingSession(request.execute(&mut repository)), permit,
                                 ),
                                 Action::Shutdown => break,
+                                Action::CheckFile(request) => {
+                                    let document=request.document.clone();let cancel=request.cancel.clone();
+                                    let result=if file_check.is_some() {Err(Failure::QueueFull)} else {FileCheckJob::start(*request,&repository)};
+                                    match result {
+                                        Ok(job)=>file_check=Some((job,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::FileChecked(Box::new(FileCheckReply{document,result:Err(error),cancel})),permit),
+                                    }
+                                }
                                 Action::CompareFiles(request) => {
                                     let document = request.document.clone();
                                     let candidate = request.candidate.clone();
@@ -1213,6 +1225,10 @@ impl Runtime {
                         let (_, permit) = export.take().unwrap();
                         emit(&events, &notify, Update::AnnotationExport(reply), permit);
                     }
+                    if let Some(reply)=file_check.as_mut().and_then(|(job,_)|job.poll(&mut repository)) {
+                        let (_,permit)=file_check.take().unwrap();
+                        emit(&events,&notify,Update::FileChecked(Box::new(reply)),permit);
+                    }
                     if let Some(reply) = comparison.as_mut().and_then(|(job,_)|job.poll(&repository)) {
                         let (_,permit) = comparison.take().unwrap();
                         emit(&events,&notify,Update::FileComparison(Box::new(reply)),permit);
@@ -1474,6 +1490,7 @@ impl Runtime {
                         job.register(&mut select);
                     }
                     if let Some((job,_)) = &comparison { job.register(&mut select); }
+                    if let Some((job,_)) = &file_check {job.register(&mut select);}
                     for item in &pending {
                         item.register(&mut select);
                     }
@@ -1496,6 +1513,7 @@ impl Runtime {
                 drop(pending); // Drop tickets before engine join; no UI draining required.
                 drop(export); // Cancel and join file work before releasing the actor.
                 drop(comparison);
+                drop(file_check);
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
                     let _ = ticket.wait();
                 }

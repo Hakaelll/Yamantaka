@@ -1,10 +1,10 @@
 use crate::{Database, database::storage};
+use yamantaka_domain::source_revision::CataloguedFile;
 use yamantaka_domain::{
     Cancellation, Failure, LibraryRepository, Result,
     front_matter::{ENRICHMENT_ALGORITHM_VERSION, MAX_FRONT_MATTER_PAGES},
     metadata_review::{
-        MetadataEvidence, MetadataEvidenceKind, MetadataField, MetadataFile, MetadataLocation,
-        MetadataReview,
+        MetadataEvidence, MetadataEvidenceKind, MetadataField, MetadataLocation, MetadataReview,
     },
 };
 
@@ -12,7 +12,7 @@ pub(crate) fn evidence(
     record: &serde_json::Value,
     field: &str,
     value: &str,
-    file: &MetadataFile,
+    file: &CataloguedFile,
 ) -> Option<MetadataEvidence> {
     if record["version"] != 1
         || record["analyzerVersion"] != ENRICHMENT_ALGORITHM_VERSION
@@ -59,7 +59,7 @@ pub(crate) fn evidence(
     })
 }
 
-fn verify_file(file: &MetadataFile, cancel: &Cancellation) -> Result<()> {
+fn verify_file(file: &CataloguedFile, cancel: &Cancellation) -> Result<()> {
     cancel.check()?;
     let path = std::fs::canonicalize(&file.path).map_err(storage)?;
     let before = path.metadata().map_err(storage)?;

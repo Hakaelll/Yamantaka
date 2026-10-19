@@ -6,6 +6,7 @@ mod cover_picker_preview;
 mod cover_picker_view;
 mod cover_restore;
 mod details;
+mod file_check;
 mod file_comparison;
 mod find;
 mod global_notes;
@@ -160,6 +161,7 @@ pub struct YamantakaApp {
     annotations: annotations::AnnotationState,
     annotation_export: annotations::export::ExportState,
     file_comparison: file_comparison::ComparisonState,
+    file_check: file_check::CheckState,
     annotation_paint: annotations::paint::AnnotationPaint,
     annotation_preview: u8,
     annotation_multi_preview: bool,
@@ -336,6 +338,7 @@ impl YamantakaApp {
             annotations: Default::default(),
             annotation_export: Default::default(),
             file_comparison: Default::default(),
+            file_check: Default::default(),
             annotation_paint: Default::default(),
             annotation_preview: 0,
             annotation_multi_preview: false,
@@ -1374,6 +1377,10 @@ impl App for YamantakaApp {
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
                 Update::PendingImports(result) => self.importing.accept_recovery(result),
+                Update::FileChecked(reply) => {
+                    self.file_check.accept(*reply);
+                    self.refresh();
+                }
                 Update::FileComparison(reply) => self.file_comparison.accept(*reply),
                 Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
                 Update::AnnotationMarks(reply) => self.annotation_paint.accept(reply),
@@ -1893,6 +1900,7 @@ impl App for YamantakaApp {
         self.apply_global_note_preview();
         self.apply_annotation_export_preview();
         self.update_file_comparison();
+        self.update_file_check();
         self.apply_import_recovery_preview();
         let dropped = ctx.input(|i| {
             i.raw
@@ -2050,6 +2058,7 @@ impl App for YamantakaApp {
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
+                    && self.file_check.ready()
                     && (!matches!(self.surface, Surface::Notes) || self.global_notes.ready())
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
@@ -2135,7 +2144,7 @@ impl App for YamantakaApp {
                     let controls=ctx.data(|data|data.get_temp::<Vec<theme::ControlBounds>>(egui::Id::new("capture-controls")).unwrap_or_default());
                     let controls:Vec<_>=controls.into_iter().map(|item|serde_json::json!({"label":item.label,"rect":rect(item.rect),"clip":rect(item.clip),"enabled":item.enabled})).collect();
                     let usage = self.governor.usage();
-                    let record=serde_json::json!({"synthetic":self.demo,"libraryDocumentCount":self.count,"captureProcessId":std::process::id(),"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
+                    let mut record=serde_json::json!({"synthetic":self.demo,"libraryDocumentCount":self.count,"captureProcessId":std::process::id(),"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
                         "readingSession":self.session_capture_summary(),
                         "visibleThumbnailSlots":self.thumbnails.resident_count(),
@@ -2164,6 +2173,7 @@ impl App for YamantakaApp {
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
+                    record["fileCheck"]=self.file_check.summary();
                     let bytes=serde_json::to_vec_pretty(&record).map_err(|error|image::ImageError::IoError(std::io::Error::other(error)))?;
                     std::fs::write(path.with_extension("controls.json"),bytes).map_err(image::ImageError::IoError)
                 });
@@ -2192,6 +2202,7 @@ impl App for YamantakaApp {
         if let Err(error) = self.persist_reading_sessions_on_close() {
             eprintln!("{error}");
         }
+        self.file_check.cancel();
         self.file_comparison.cancel();
         self.annotation_export.cancel();
         self.global_notes.cancel();

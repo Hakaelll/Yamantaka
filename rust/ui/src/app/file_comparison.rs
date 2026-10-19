@@ -159,7 +159,7 @@ impl YamantakaApp {
                     "Could not verify. Check file access and compare again.",
                 ),
             };
-            let response = ui.label(RichText::new(message).color(p.secondary));
+            let response = Self::file_status_label(ui, message, p);
             if self.file_comparison.capture_mode {
                 ui.scroll_to_rect(response.rect, Some(egui::Align::Center));
             }

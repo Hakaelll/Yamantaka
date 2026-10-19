@@ -3,11 +3,11 @@ use yamantaka_application::{
     cover_source::CoverSource,
     metadata_source::{MetadataSourceReply, MetadataSourceRequest},
 };
-use yamantaka_domain::{Failure, RenderedPage, metadata_review::MetadataFile};
+use yamantaka_domain::{Failure, RenderedPage, source_revision::CataloguedFile};
 
 #[derive(Clone, PartialEq, Eq)]
 struct ReferenceScope {
-    file: MetadataFile,
+    file: CataloguedFile,
     page: u32,
 }
 pub(super) struct MetadataReference {

@@ -359,6 +359,7 @@ impl AnnotationRepository for Database {
         Ok(Box::new(Database {
             connection,
             import_journal: Default::default(),
+            file_checks: Default::default(),
         }))
     }
 

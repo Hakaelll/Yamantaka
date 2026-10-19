@@ -25,6 +25,7 @@ pub const MIGRATIONS: [&str; 11] = [
 pub struct Database {
     pub(crate) connection: Connection,
     pub(crate) import_journal: std::cell::RefCell<Option<Connection>>,
+    pub(crate) file_checks: std::cell::RefCell<Option<Connection>>,
 }
 impl Database {
     pub fn open(path: &Path) -> Result<Self> {
@@ -43,6 +44,7 @@ impl Database {
         Ok(Self {
             connection,
             import_journal: Default::default(),
+            file_checks: Default::default(),
         })
     }
     pub fn in_memory_at(target: u32) -> Result<Self> {
@@ -52,6 +54,7 @@ impl Database {
         Ok(Self {
             connection,
             import_journal: Default::default(),
+            file_checks: Default::default(),
         })
     }
     pub fn execute_batch(&self, sql: &str) -> Result<()> {
@@ -280,6 +283,18 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn file_snapshot(&self, id: &str) -> Result<yamantaka_domain::file_check::FileSnapshot> {
+        crate::file_check::read(self, id)
+    }
+    fn apply_file_check(
+        &mut self,
+        expected: &yamantaka_domain::file_check::FileSnapshot,
+        result: yamantaka_domain::file_check::FileCheckResult,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::file_check::FileCheckResult> {
+        crate::file_check::apply(self, expected, result, cancel)
+    }
+
     fn pending_imports(&self) -> Result<Vec<yamantaka_domain::import_recovery::PendingImport>> {
         crate::import_recovery::pending(self)
     }

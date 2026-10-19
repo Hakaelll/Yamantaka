@@ -19,3 +19,13 @@ pub fn legacy_fingerprint(size: u64, head: [u8; 32]) -> String {
         Sha256::digest(format!("{size}:{partial}").as_bytes())
     )
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CataloguedFile {
+    pub path: PathBuf,
+    pub fingerprint: String,
+    pub page_count: u32,
+    pub missing: bool,
+    pub size: u64,
+    pub modified: String,
+}
