@@ -60,6 +60,8 @@ Page-scoped multiselection supports favorite/unfavorite, document tag assignment
 
 Bulk automatic-cover regeneration now has a bounded actor coordinator with frozen per-document revisions, native-ticket/capacity readiness, partial cancellation and real-PDFium evidence. See [the runtime report](../validation/rust-bulk-cover-runtime-2026-10-20.md). The subsequent [native UI report](../validation/rust-bulk-cover-ui-2026-10-20.md) connects selection-menu confirmation, old-image retention and live refresh, including governed GPU-capacity recovery. Physical interaction, cancellation/fault stress and wider performance acceptance remain pending.
 
+The local SQL primitive for library removal now atomically deletes document-owned rows and cached FTS entries while preserving PDFs and shared entities. The populated-v11 rollback and backup evidence is recorded in [library removal storage](../validation/rust-library-removal-storage-2026-10-20.md). Native reader retirement, continuity reconciliation, confirmation and the user-facing action remain pending; the bulk-removal capability is still incomplete.
+
 ## Excluded claims
 
 Printing: `docs/adr/ADR-0002-printing.md` is a contract/proposal. Secondary reader

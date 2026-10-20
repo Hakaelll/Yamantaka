@@ -211,6 +211,11 @@ impl Default for LibraryQuery {
     }
 }
 pub trait LibraryRepository {
+    /// Remove the local record, its foreign-key dependants and cached search rows.
+    /// The caller must retire live readers first. Original PDF files are untouched.
+    fn remove_from_library(&mut self, _id: &str, _cancel: &Cancellation) -> Result<()> {
+        Err(Failure::Unsupported("Library removal".into()))
+    }
     fn tags(&self, _query: &tags::TagQuery, _cancel: &Cancellation) -> Result<tags::TagPage> {
         Err(Failure::Unsupported("Library tags".into()))
     }

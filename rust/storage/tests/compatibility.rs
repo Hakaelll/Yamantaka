@@ -1,6 +1,8 @@
 use std::fs;
 #[path = "support/collections.rs"]
 mod collection_verification;
+#[path = "support/library_removal.rs"]
+mod removal_verification;
 #[path = "support/smart_views.rs"]
 mod smart_view_verification;
 #[path = "support/tags.rs"]
@@ -139,6 +141,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     collection_verification::verify(&mut db);
     smart_view_verification::verify(&mut db);
     tag_verification::verify(&mut db);
+    removal_verification::verify();
 }
 
 #[test]

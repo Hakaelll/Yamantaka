@@ -328,6 +328,13 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn remove_from_library(
+        &mut self,
+        id: &str,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<()> {
+        crate::library_removal::remove(self, id, cancel)
+    }
     fn tags(
         &self,
         query: &yamantaka_domain::tags::TagQuery,

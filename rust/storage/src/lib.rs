@@ -14,6 +14,7 @@ pub mod identity;
 mod import_document;
 mod import_metadata;
 mod import_recovery;
+mod library_removal;
 mod metadata_reanalysis;
 mod metadata_review;
 mod metadata_source;
