@@ -170,6 +170,10 @@ pub enum Icon {
     Plus,
     Sort,
     Check,
+    Folder,
+    Bookmark,
+    Archive,
+    Star,
 }
 
 pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Color32) {
@@ -177,6 +181,56 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
     let v = |x, y| center + egui::vec2(x, y);
     let line = |a, b| painter.line_segment([a, b], s);
     match icon {
+        Icon::Folder => {
+            let points = [
+                v(-7.0, -5.0),
+                v(-2.0, -5.0),
+                v(0.0, -2.5),
+                v(7.0, -2.5),
+                v(7.0, 6.0),
+                v(-7.0, 6.0),
+                v(-7.0, -5.0),
+            ];
+            painter.add(egui::Shape::line(points.to_vec(), s));
+        }
+        Icon::Bookmark => {
+            painter.add(egui::Shape::line(
+                vec![
+                    v(-4.5, 7.0),
+                    v(-4.5, -7.0),
+                    v(4.5, -7.0),
+                    v(4.5, 7.0),
+                    v(0.0, 3.5),
+                    v(-4.5, 7.0),
+                ],
+                s,
+            ));
+        }
+        Icon::Archive => {
+            painter.rect_stroke(
+                egui::Rect::from_two_pos(v(-6.0, -3.0), v(6.0, 7.0)),
+                1.0,
+                s,
+                egui::StrokeKind::Inside,
+            );
+            painter.rect_stroke(
+                egui::Rect::from_two_pos(v(-7.5, -6.0), v(7.5, -2.5)),
+                1.0,
+                s,
+                egui::StrokeKind::Inside,
+            );
+            line(v(-2.0, 0.5), v(2.0, 0.5));
+        }
+        Icon::Star => {
+            let mut points = Vec::with_capacity(11);
+            for index in 0..=10 {
+                let angle = std::f32::consts::TAU * (index % 10) as f32 / 10.0
+                    - std::f32::consts::FRAC_PI_2;
+                let radius = if index % 2 == 0 { 8.0 } else { 3.6 };
+                points.push(v(angle.cos() * radius, angle.sin() * radius));
+            }
+            painter.add(egui::Shape::line(points, s));
+        }
         Icon::Check => {
             painter.rect_stroke(
                 egui::Rect::from_center_size(center, egui::vec2(13.0, 13.0)),

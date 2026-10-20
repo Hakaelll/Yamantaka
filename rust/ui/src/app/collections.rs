@@ -1,6 +1,7 @@
 use super::*;
 use yamantaka_domain::collections::{
-    Collection, CollectionChange, CollectionPage, CollectionQuery,
+    COLLECTION_ICONS, Collection, CollectionChange, CollectionDirection, CollectionPage,
+    CollectionQuery,
 };
 mod preview;
 mod view;
@@ -19,10 +20,13 @@ pub(super) struct CollectionState {
     write_failed: bool,
     draft: String,
     editing: Option<(String, String)>,
+    icon_editing: Option<String>,
     deleting: Option<Collection>,
     context: Option<Document>,
     pub(super) filter: Option<(String, String)>,
     preview: Option<(u8, u8)>,
+    order_verified: bool,
+    preview_menu: bool,
 }
 impl CollectionState {
     pub(super) fn new(preferences: &Preferences) -> Self {
@@ -62,7 +66,7 @@ impl CollectionState {
             && self.preview.is_none()
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"loaded":self.loaded,"failed":self.failed || self.write_failed,"total":self.total,"visible":self.entries.len(),"assigned":self.entries.iter().filter(|item|item.contains_document).count(),"pinned":self.entries.iter().filter(|item|item.pinned).count(),"filter":self.filter.as_ref().map(|(_,name)|name),"filterChecked":self.filter_checked,"confirmDelete":self.deleting.is_some(),"busy":!self.ready()})
+        serde_json::json!({"loaded":self.loaded,"failed":self.failed || self.write_failed,"total":self.total,"visible":self.entries.len(),"assigned":self.entries.iter().filter(|item|item.contains_document).count(),"pinned":self.entries.iter().filter(|item|item.pinned).count(),"filter":self.filter.as_ref().map(|(_,name)|name),"filterChecked":self.filter_checked,"confirmDelete":self.deleting.is_some(),"busy":!self.ready(),"orderVerified":self.order_verified,"entries":self.entries.iter().map(|entry|serde_json::json!({"name":entry.name,"icon":entry.icon,"order":entry.sort_order,"pinned":entry.pinned})).collect::<Vec<_>>()})
     }
 }
 impl Drop for CollectionState {
@@ -90,6 +94,7 @@ impl YamantakaApp {
         };
         self.collections.entries.clear();
         self.collections.editing = None;
+        self.collections.icon_editing = None;
         self.collections.deleting = None;
         self.load_collections();
     }
@@ -247,6 +252,7 @@ impl YamantakaApp {
                 }
                 self.collections.failed = false;
                 self.collections.editing = None;
+                self.collections.icon_editing = None;
                 self.collections.deleting = None;
                 self.refresh();
                 self.persist_library_state();

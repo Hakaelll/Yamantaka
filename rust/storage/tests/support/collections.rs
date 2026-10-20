@@ -241,4 +241,190 @@ pub fn verify(db: &mut Database) {
         )
     );
     db.integrity().unwrap();
+    verify_order_and_icons();
+}
+
+fn verify_order_and_icons() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("collection-order.sqlite3");
+    let mut db = Database::open(&path).unwrap();
+    db.execute_batch(super::DOCUMENT).unwrap();
+    let cancel = Cancellation::default();
+    for name in ["A", "B", "C", "Pinned"] {
+        db.change_collection(
+            &CollectionChange::Create {
+                name: name.into(),
+                icon: "folder".into(),
+            },
+            &cancel,
+        )
+        .unwrap();
+    }
+    db.execute_batch("UPDATE collections SET sort_order=0; UPDATE collections SET is_pinned=1 WHERE name='Pinned';").unwrap();
+    let names = |db: &Database| {
+        page(db)
+            .entries
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect::<Vec<_>>()
+    };
+    let b = page(&db)
+        .entries
+        .into_iter()
+        .find(|entry| entry.name == "B")
+        .unwrap();
+    db.change_collection(
+        &CollectionChange::SetMembership {
+            expected: (&b).into(),
+            document: "original".into(),
+            included: true,
+        },
+        &cancel,
+    )
+    .unwrap();
+    let earlier = CollectionChange::Move {
+        expected: (&b).into(),
+        direction: CollectionDirection::Earlier,
+    };
+    db.change_collection(&earlier, &cancel).unwrap();
+    assert_eq!(names(&db), ["Pinned", "B", "A", "C"]);
+    assert!(db.change_collection(&earlier, &cancel).is_err());
+    let b = page(&db).entries.remove(1);
+    assert_eq!((b.document_count, b.contains_document), (1, true));
+    db.change_collection(
+        &CollectionChange::Move {
+            expected: (&b).into(),
+            direction: CollectionDirection::Earlier,
+        },
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(names(&db), ["Pinned", "B", "A", "C"]);
+    db.change_collection(
+        &CollectionChange::Icon {
+            expected: (&b).into(),
+            icon: "reference".into(),
+        },
+        &cancel,
+    )
+    .unwrap();
+    assert!(
+        db.change_collection(
+            &CollectionChange::Icon {
+                expected: (&b).into(),
+                icon: "star".into()
+            },
+            &cancel
+        )
+        .is_err()
+    );
+    let b = page(&db).entries.remove(1);
+    assert_eq!(b.icon, "reference");
+    assert!(
+        db.change_collection(
+            &CollectionChange::Icon {
+                expected: (&b).into(),
+                icon: "unknown".into()
+            },
+            &cancel
+        )
+        .is_err()
+    );
+    let stopped = Cancellation::default();
+    stopped.cancel();
+    assert!(
+        db.change_collection(
+            &CollectionChange::Move {
+                expected: (&b).into(),
+                direction: CollectionDirection::Later
+            },
+            &stopped
+        )
+        .is_err()
+    );
+    db.execute_batch("CREATE TRIGGER reject_order BEFORE UPDATE OF sort_order ON collections WHEN OLD.name='A' BEGIN SELECT RAISE(ABORT,'synthetic order failure'); END;").unwrap();
+    assert!(
+        db.change_collection(
+            &CollectionChange::Move {
+                expected: (&b).into(),
+                direction: CollectionDirection::Later
+            },
+            &cancel
+        )
+        .is_err()
+    );
+    assert_eq!(names(&db), ["Pinned", "B", "A", "C"]);
+    assert_eq!(page(&db).entries[1].updated_at, b.updated_at);
+    db.execute_batch("DROP TRIGGER reject_order;").unwrap();
+    db.change_collection(
+        &CollectionChange::Move {
+            expected: (&b).into(),
+            direction: CollectionDirection::Later,
+        },
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(names(&db), ["Pinned", "A", "B", "C"]);
+    for index in 0..78 {
+        db.change_collection(
+            &CollectionChange::Create {
+                name: format!("Extra {index:03}"),
+                icon: "folder".into(),
+            },
+            &cancel,
+        )
+        .unwrap();
+    }
+    let first = page(&db);
+    let boundary = first.entries.last().unwrap();
+    let next = db
+        .collections(
+            &CollectionQuery {
+                offset: 80,
+                ..Default::default()
+            },
+            &cancel,
+        )
+        .unwrap()
+        .entries
+        .remove(0);
+    db.change_collection(
+        &CollectionChange::Move {
+            expected: boundary.into(),
+            direction: CollectionDirection::Later,
+        },
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(page(&db).entries[79].id, next.id);
+    assert_eq!(
+        db.collections(
+            &CollectionQuery {
+                offset: 80,
+                ..Default::default()
+            },
+            &cancel
+        )
+        .unwrap()
+        .entries[0]
+            .id,
+        boundary.id
+    );
+    drop(db);
+    let db = Database::open(&path).unwrap();
+    let b = page(&db)
+        .entries
+        .into_iter()
+        .find(|entry| entry.name == "B")
+        .unwrap();
+    assert_eq!(
+        (b.icon.as_str(), b.document_count, b.contains_document),
+        ("reference", 1, true)
+    );
+    assert_eq!(page(&db).entries[79].id, next.id);
+    assert_eq!(
+        db.get("original").unwrap().unwrap().title.as_deref(),
+        Some("Original")
+    );
+    db.integrity().unwrap();
 }

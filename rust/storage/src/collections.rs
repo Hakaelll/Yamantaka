@@ -1,6 +1,7 @@
 use crate::{Database, database::storage};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use yamantaka_domain::{Cancellation, Failure, MAX_LIBRARY_PAGE, Result, collections::*};
+mod order;
 
 fn invalid(message: &str) -> Failure {
     Failure::Invalid(message.into())
@@ -55,7 +56,7 @@ fn unique(db: &Connection, clean: &str, except: &str) -> Result<()> {
 fn create(db: &Connection, value: &str, icon: &str) -> Result<String> {
     let clean = name(value)?;
     unique(db, clean, "")?;
-    if !["folder", "study", "reference", "archive", "star"].contains(&icon) {
+    if !COLLECTION_ICONS.contains(&icon) {
         return Err(invalid("Unknown collection icon"));
     }
     let id = uuid::Uuid::new_v4().to_string();
@@ -205,6 +206,30 @@ impl Database {
                     ],
                 )
                 .map_err(storage)?;
+                expected.id.clone()
+            }
+            CollectionChange::Icon { expected, icon } => {
+                verify(&tx, expected)?;
+                if !COLLECTION_ICONS.contains(&icon.as_str()) {
+                    return Err(invalid("Unknown collection icon"));
+                }
+                tx.execute(
+                    "UPDATE collections SET icon=?,updated_at=? WHERE id=?",
+                    params![
+                        icon,
+                        revision_after(Some(&expected.updated_at)),
+                        expected.id
+                    ],
+                )
+                .map_err(storage)?;
+                expected.id.clone()
+            }
+            CollectionChange::Move {
+                expected,
+                direction,
+            } => {
+                verify(&tx, expected)?;
+                order::move_adjacent(&tx, expected, direction)?;
                 expected.id.clone()
             }
             CollectionChange::Delete { expected } => {

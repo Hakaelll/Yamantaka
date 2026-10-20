@@ -34,6 +34,12 @@ impl From<&Collection> for CollectionRevision {
     }
 }
 #[derive(Clone)]
+pub enum CollectionDirection {
+    Earlier,
+    Later,
+}
+pub const COLLECTION_ICONS: [&str; 5] = ["folder", "study", "reference", "archive", "star"];
+#[derive(Clone)]
 pub enum CollectionChange {
     EnsureForDocument {
         name: String,
@@ -51,6 +57,14 @@ pub enum CollectionChange {
     Pin {
         expected: CollectionRevision,
         pinned: bool,
+    },
+    Icon {
+        expected: CollectionRevision,
+        icon: String,
+    },
+    Move {
+        expected: CollectionRevision,
+        direction: CollectionDirection,
     },
     Delete {
         expected: CollectionRevision,

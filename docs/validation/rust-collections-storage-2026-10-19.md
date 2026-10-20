@@ -4,6 +4,8 @@ The Rust repository now exposes typed collection pages and changes on the
 existing schema-v11 tables. This checkpoint prepares the native collection
 manager. It does not expose collection management in the UI yet.
 
+Follow-up: [collection order and icons](rust-collection-order-2026-10-20.md) now connects native movement and icon editing. Pending statements below describe the earlier checkpoint.
+
 ## Connected Flutter reference
 
 `lib/storage/repositories/organization_repository.dart` and its controller define

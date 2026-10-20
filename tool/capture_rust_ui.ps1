@@ -41,6 +41,11 @@ $cases = @(
     @{ name='smart-recent-es'; args=@('--pdf-covers','--smart-view=recentlyOpened','--es','--light','--reduce-motion') },
     @{ name='smart-menu-small-200'; args=@('--pdf-covers','--smart-view=annotated','--smart-menu','--size=640x480','--text-scale=2') },
     @{ name='collections-manager'; args=@('--pdf-covers','--collections') },
+    @{ name='collections-actions-small-200'; args=@('--pdf-covers','--collections','--collection-actions','--size=640x480','--text-scale=2') },
+    @{ name='collections-actions'; args=@('--pdf-covers','--collections','--collection-actions') },
+    @{ name='collections-ordered'; args=@('--pdf-covers','--collections','--collection-order') },
+    @{ name='collections-order-search-es'; args=@('--pdf-covers','--collections','--collection-order-search','--es','--light','--reduce-motion') },
+    @{ name='collections-icon-small-200'; args=@('--pdf-covers','--collections','--collection-icon-review','--size=640x480','--text-scale=2') },
     @{ name='collections-filter-es'; args=@('--pdf-covers','--collections','--collection-filter','--es','--light','--reduce-motion') },
     @{ name='collections-delete-review'; args=@('--pdf-covers','--collections','--collection-delete-review') },
     @{ name='collections-small-200'; args=@('--pdf-covers','--collections','--size=640x480','--text-scale=2') },
@@ -366,6 +371,22 @@ foreach ($case in $cases) {
         }
     }
 
+    if ($case.name -match '^collections-(actions|actions-small-200|ordered|order-search-es|icon-small-200)$') {
+        if (-not $controls.collections.loaded -or $controls.collections.failed -or $controls.collections.busy -or -not $controls.collections.orderVerified -or $controls.collections.total -ne 2 -or $controls.collections.assigned -ne 1) { throw 'Collection changes did not settle correctly.' }
+        $expectedNames = if ($case.name -eq 'collections-order-search-es') { @('Reading seminar','Archive notes') } else { @('Archive notes','Reading seminar') }
+        if (($controls.collections.entries.name -join '|') -ne ($expectedNames -join '|')) { throw 'Collection order differs from the expected result.' }
+        if (($controls.collections.entries | Where-Object name -eq 'Reading seminar').icon -ne 'reference') { throw 'Saved collection icon did not reload.' }
+        if ($case.name -eq 'collections-icon-small-200') {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Reference','Star','Cancel')
+        } elseif ($case.name -in @('collections-actions','collections-actions-small-200')) {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Move earlier','Move later','Change icon')
+        } elseif ($case.name -eq 'collections-ordered') {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Refresh','View books','Collection actions')
+            $createControl = @($controls.controls | Where-Object label -eq 'Create')[0]
+            $refreshControl = @($controls.controls | Where-Object label -eq 'Refresh')[0]
+            if (-not $createControl -or -not $refreshControl -or [Math]::Abs($refreshControl.rect[1]-$createControl.rect[1]) -gt 120) { throw 'Collection form rows reserve excessive empty height.' }
+        }
+    }
     if ($case.name -match '^(tags|collections)-(manager|small-200)$') {
         $visibleLabels = @()
         if ($case.name -eq 'tags-small-200') {

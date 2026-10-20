@@ -6,6 +6,8 @@ details also exposes Organize in collections, which opens the same manager with
 membership checkboxes for that document. Saved IDs and schema-v11 relationships
 use the [collection storage contracts](rust-collections-storage-2026-10-19.md).
 
+Follow-up: [collection order and icons](rust-collection-order-2026-10-20.md) now connects native movement and icon editing. Pending statements below describe the earlier checkpoint.
+
 ## Commands and state
 
 The UI emits typed collection read/write actions through the application actor.

@@ -798,6 +798,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             1
                         } else if args.iter().any(|arg| arg == "--collection-delete-review") {
                             2
+                        } else if args.iter().any(|arg| arg == "--collection-icon-review") {
+                            3
+                        } else if args.iter().any(|arg| arg == "--collection-order") {
+                            4
+                        } else if args.iter().any(|arg| arg == "--collection-order-search") {
+                            5
+                        } else if args.iter().any(|arg| arg == "--collection-actions") {
+                            6
                         } else {
                             0
                         },

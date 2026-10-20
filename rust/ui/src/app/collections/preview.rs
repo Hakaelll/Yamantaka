@@ -89,7 +89,84 @@ impl YamantakaApp {
                     }
                 } else if mode == 2 {
                     self.collections.deleting = Some(entry);
+                } else if mode >= 3 {
+                    self.collections.preview = Some((5, mode));
+                    self.change_collection(CollectionChange::Pin {
+                        expected: (&entry).into(),
+                        pinned: false,
+                    });
                 }
+            }
+            5 => {
+                self.collections.preview = Some((6, mode));
+                self.change_collection(CollectionChange::Create {
+                    name: "Archive notes".into(),
+                    icon: "archive".into(),
+                });
+            }
+            6 => {
+                self.collections.preview = Some((7, mode));
+                self.change_collection(CollectionChange::Icon {
+                    expected: (&entry).into(),
+                    icon: "reference".into(),
+                });
+            }
+            7 if entry.icon == "reference" => {
+                self.collections.preview = Some((8, mode));
+                self.change_collection(CollectionChange::Move {
+                    expected: (&entry).into(),
+                    direction: CollectionDirection::Later,
+                });
+            }
+            8 => {
+                assert_eq!(
+                    self.collections
+                        .entries
+                        .iter()
+                        .map(|entry| entry.name.as_str())
+                        .collect::<Vec<_>>(),
+                    ["Archive notes", "Reading seminar"]
+                );
+                assert!(entry.contains_document);
+                if mode == 5 {
+                    self.collections.query.text = "Reading seminar".into();
+                    self.load_collections();
+                    self.collections.preview = Some((9, mode));
+                } else {
+                    self.collections.order_verified = true;
+                    self.collections.preview_menu = mode == 6;
+                    self.collections.preview = None;
+                    if mode == 3 {
+                        self.collections.icon_editing = Some(entry.id);
+                    }
+                }
+            }
+            9 => {
+                assert_eq!(self.collections.entries.len(), 1);
+                self.collections.preview = Some((10, mode));
+                self.change_collection(CollectionChange::Move {
+                    expected: (&entry).into(),
+                    direction: CollectionDirection::Earlier,
+                });
+            }
+            10 => {
+                self.collections.query.text.clear();
+                self.load_collections();
+                self.collections.preview = Some((11, mode));
+            }
+            11 => {
+                assert_eq!(
+                    self.collections
+                        .entries
+                        .iter()
+                        .map(|entry| entry.name.as_str())
+                        .collect::<Vec<_>>(),
+                    ["Reading seminar", "Archive notes"]
+                );
+                assert!(entry.contains_document);
+                assert_eq!(entry.icon, "reference");
+                self.collections.order_verified = true;
+                self.collections.preview = None;
             }
             _ => {}
         }
