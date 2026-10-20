@@ -50,6 +50,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    RemoveFromLibrary(Box<crate::library_removal::RemovalRequest>),
     RegenerateCovers(Box<crate::cover_regeneration::RegenerationRequest>),
     BulkSelection(Box<crate::library_bulk::BulkRequest>),
     Tags(yamantaka_domain::tags::TagQuery, Cancellation),
@@ -246,6 +247,7 @@ pub struct Runtime {
     import_revision: Arc<AtomicU64>,
     index_progress: Arc<Mutex<IndexProgress>>,
     library_check_progress: Arc<Mutex<Option<LibraryCheckSnapshot>>>,
+    library_removal_progress: Arc<Mutex<Option<crate::library_removal::RemovalSnapshot>>>,
     cover_regeneration_progress:
         Arc<Mutex<Option<crate::cover_regeneration::RegenerationSnapshot>>>,
     sender: Sender<Command>,
@@ -275,14 +277,21 @@ struct ImportState {
     permit: Permit,
     reanalysis: Option<Box<(yamantaka_domain::metadata_review::MetadataReview, Document)>>,
 }
+struct RejectedOpen {
+    document: Document,
+    error: Failure,
+    cancel: Cancellation,
+    revision: u64,
+}
 enum Pending {
+    RejectedOpen(Box<RejectedOpen>, PdfTicket<()>, Permit),
     ImportHashReady(PathBuf, String, ImportState),
     ImportHash(Box<ImportHashJob>, PathBuf, String, ImportState),
     ImportReady(ImportState),
     ImportFolder(Box<FolderImport>, ImportState),
     FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
-    Render(PdfTicket<Arc<RenderedPage>>, Permit),
+    Render(String, PdfTicket<Arc<RenderedPage>>, Permit),
     Text(String, u32, PdfTicket<String>, Permit),
     Outline(
         String,
@@ -320,6 +329,20 @@ enum Pending {
     ImportAbort(Failure, PdfTicket<()>, ImportState),
 }
 impl Pending {
+    fn reader_document(&self) -> Option<&str> {
+        match self {
+            Self::Open(document, ..) => Some(&document.id),
+            Self::Render(id, ..)
+            | Self::Text(id, ..)
+            | Self::Outline(id, ..)
+            | Self::TextGeometry(id, ..)
+            | Self::PageLinks(id, ..)
+            | Self::FindPage(id, ..) => Some(id),
+            Self::FindDocument(scan, _) => Some(&scan.request.document_id),
+            _ => None,
+        }
+    }
+
     fn import_state(&self) -> Option<&ImportState> {
         match self {
             Self::ImportReady(state)
@@ -348,7 +371,7 @@ impl Pending {
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
-            Self::Render(ticket, _) => {
+            Self::Render(_, ticket, _) => {
                 select.recv(ticket.readiness());
             }
             Self::Text(_, _, ticket, _) => {
@@ -372,7 +395,8 @@ impl Pending {
             Self::ImportScan(scan, _) => {
                 scan.register(select);
             }
-            Self::Close(_, ticket, _)
+            Self::RejectedOpen(_, ticket, _)
+            | Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
             | Self::ImportAbort(_, ticket, _) => {
                 select.recv(ticket.readiness());
@@ -387,7 +411,7 @@ impl Pending {
             Self::ImportFolder(folder, state) => state.cancel.is_cancelled() || folder.ready(),
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
-            Self::Render(ticket, _) => ticket.is_ready(),
+            Self::Render(_, ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
             Self::Outline(_, ticket, _) => ticket.is_ready(),
             Self::FindPage(_, ticket, _) => ticket.is_ready(),
@@ -395,7 +419,8 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.is_ready(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.is_ready(),
             Self::ImportScan(scan, _) => scan.ready(),
-            Self::Close(_, ticket, _)
+            Self::RejectedOpen(_, ticket, _)
+            | Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
             | Self::ImportAbort(_, ticket, _) => ticket.is_ready(),
         }
@@ -410,7 +435,7 @@ impl Pending {
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
-            Self::Render(ticket, _) => ticket.cancellation.cancel(),
+            Self::Render(_, ticket, _) => ticket.cancellation.cancel(),
             Self::Text(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::Outline(_, ticket, _) => ticket.cancellation.cancel(),
             Self::FindPage(_, ticket, _) => ticket.cancellation.cancel(),
@@ -418,7 +443,8 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportScan(scan, _) => scan.cancel(),
-            Self::Close(_, ticket, _)
+            Self::RejectedOpen(_, ticket, _)
+            | Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
             | Self::ImportAbort(_, ticket, _) => ticket.cancellation.cancel(),
         }
@@ -462,7 +488,19 @@ fn foreground_admissible(
     action: &Action,
     pending: &[Pending],
     awaiting: &Option<(String, Cancellation)>,
+    removing: bool,
 ) -> bool {
+    if removing
+        && matches!(
+            action,
+            Action::ResumeImport(..)
+                | Action::Import(..)
+                | Action::ImportFolder(..)
+                | Action::ReanalyzeMetadata(..)
+        )
+    {
+        return false;
+    }
     match action {
         Action::PendingImports => !pending.iter().any(|item| {
             item.import_state()
@@ -482,12 +520,16 @@ fn foreground_admissible(
         Action::Import(..) | Action::ImportFolder(..) | Action::ReanalyzeMetadata(..) => {
             awaiting.is_none() && !pending.iter().any(|item| matches!(item, Pending::Open(..)))
         }
-        Action::Open(document, ..) => awaiting
-            .as_ref()
-            .is_none_or(|(_, token)| token.is_cancelled())
-            && !pending.iter().any(
-                |item| matches!(item,Pending::Close(request, ..) if request.document==document.id),
-            ),
+        Action::Open(document, ..) => {
+            awaiting
+                .as_ref()
+                .is_none_or(|(_, token)| token.is_cancelled())
+                && !pending.iter().any(|item| match item {
+                    Pending::Close(request, ..) => request.document == document.id,
+                    Pending::RejectedOpen(request, ..) => request.document.id == document.id,
+                    _ => false,
+                })
+        }
         _ => true,
     }
 }
@@ -823,6 +865,8 @@ impl Runtime {
         let waiting_snapshot = waiting_covers.clone();
         let index_progress = Arc::new(Mutex::new(IndexProgress::default()));
         let progress_snapshot = index_progress.clone();
+        let library_removal_progress = Arc::new(Mutex::new(None));
+        let library_removal_snapshot = library_removal_progress.clone();
         let cover_regeneration_progress = Arc::new(Mutex::new(None));
         let cover_regeneration_snapshot = cover_regeneration_progress.clone();
         let library_check_progress = Arc::new(Mutex::new(None));
@@ -841,6 +885,7 @@ impl Runtime {
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
                 let mut cache_maintenance: Option<(CacheMaintenanceJob, Permit)> = None;
                 let mut cover_regeneration:Option<(crate::cover_regeneration::RegenerationJob,Permit)>=None;
+                let mut removal:Option<(crate::library_removal::RemovalJob,Permit)>=None;
                 let mut bulk_selection:Option<(crate::library_bulk::BulkJob,Permit)> = None;
                 let mut library_check:Option<(LibraryCheckJob,Permit)> = None;
                 let mut relocation: Option<(RelocationJob,Permit)> = None;
@@ -877,7 +922,7 @@ impl Runtime {
                     }
                     let index_busy =
                         indexer.native_document_id().is_some() || index_cleanup.is_some();
-                    let deferred_ready = !index_busy && deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open));
+                    let deferred_ready = !index_busy && deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open, removal.is_some()));
                     let command = if deferred_ready {
                         deferred.pop_front()
                     } else {
@@ -891,13 +936,13 @@ impl Runtime {
                         if (index_busy
                             && matches!(
                                 &action,
-                                Action::Open(..)
+                                Action::RemoveFromLibrary(..) | Action::Open(..)
                                     | Action::ResumeImport(..)
                                     | Action::ImportFolder(..)
                                     | Action::Import(..)
                                     | Action::ReanalyzeMetadata(..)
                                     | Action::VisibleDocuments(..)
-                            )) || !foreground_admissible(&action, &pending, &awaiting_open)
+                            )) || !foreground_admissible(&action, &pending, &awaiting_open, removal.is_some())
                         {
                             indexer.set_slot_available(false);
                             deferred.push_back(Command { action, permit });
@@ -1219,9 +1264,24 @@ impl Runtime {
                                         Err(error) => failed(&events, &notify, error, None, permit),
                                     }
                                 }
+                                Action::RemoveFromLibrary(request) => {
+                                    let cancel=request.cancel.clone();
+                                    let occupied=removal.is_some() || bulk_selection.is_some() || cover_regeneration.is_some() || file_check.is_some() || library_check.is_some() || relocation.is_some()
+                                        || pending.iter().any(|item|matches!(item,Pending::Close(..) | Pending::RejectedOpen(..)) || item.import_state().is_some());
+                                    let result=if occupied {Err(Failure::QueueFull)} else {crate::library_removal::RemovalJob::start(*request,&repository)};
+                                    match result {
+                                        Ok(job)=> {
+                                            for item in &pending {if item.reader_document().is_some_and(|id|job.contains(id)) {item.cancel();}}
+                                            for (cover,_) in &covers {if job.contains(cover.document()) {cover.cancel();}}
+                                            if awaiting_open.as_ref().is_some_and(|(id,_)|job.contains(id)) && let Some((_,token))=awaiting_open.take() {token.cancel();}
+                                            *library_removal_snapshot.lock().unwrap()=Some(job.snapshot(false));notify();removal=Some((job,permit));
+                                        }
+                                        Err(error)=>emit(&events,&notify,Update::SelectionOrganized(Box::new(crate::library_bulk::BulkReply{cancel,result:Err(error)})),permit),
+                                    }
+                                }
                                 Action::RegenerateCovers(request)=> {
                                     let cancel=request.cancel.clone();
-                                    let result=if cover_regeneration.is_some() || bulk_selection.is_some() {Err(Failure::QueueFull)} else {crate::cover_regeneration::RegenerationJob::start(*request,&repository)};
+                                    let result=if removal.is_some() || cover_regeneration.is_some() || bulk_selection.is_some() {Err(Failure::QueueFull)} else {crate::cover_regeneration::RegenerationJob::start(*request,&repository)};
                                     match result {
                                         Ok(job)=> {*cover_regeneration_snapshot.lock().unwrap()=Some(job.snapshot(false));notify();cover_regeneration=Some((job,permit));},
                                         Err(error)=>emit(&events,&notify,Update::SelectionOrganized(Box::new(crate::library_bulk::BulkReply{cancel,result:Err(error)})),permit),
@@ -1229,7 +1289,7 @@ impl Runtime {
                                 }
                                 Action::BulkSelection(request) => {
                                     let cancel=request.cancel.clone();
-                                    let result=if bulk_selection.is_some() || cover_regeneration.is_some() {Err(Failure::QueueFull)} else {crate::library_bulk::BulkJob::start(*request)};
+                                    let result=if removal.is_some() || bulk_selection.is_some() || cover_regeneration.is_some() {Err(Failure::QueueFull)} else {crate::library_bulk::BulkJob::start(*request)};
                                     match result {
                                         Ok(job)=>bulk_selection=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::SelectionOrganized(Box::new(crate::library_bulk::BulkReply {cancel,result:Err(error)})),permit),
@@ -1270,6 +1330,9 @@ impl Runtime {
                                     emit(&events, &notify, Update::Committed(id, WriteKind::VisibleDocuments), permit);
                                 }
                                 Action::Open(document, password, cancel) => {
+                                    let fresh=if removal.as_ref().is_some_and(|(job,_)|job.contains(&document.id)) {Err(Failure::Invalid("Document removal is in progress".into()))}
+                                        else {CoverSource::capture(&document).read(&repository,&cancel)};
+                                    let document=match fresh {Ok(document)=>document,Err(error)=>{emit(&events,&notify,Update::OpenFailed(Box::new(document),error,cancel),permit);continue;}};
                                     let mut protected = visible.clone();
                                     if !protected.contains(&document.id) { protected.push(document.id.clone()); }
                                     let revision = open_revision.checked_add(1);
@@ -1307,9 +1370,10 @@ impl Runtime {
                                 Action::PreviewCover(source,page,generation,cancel) => covers.push((CoverJob::preview(source,page,generation,cancel),permit)),
                                 Action::Cover(source,generation,cancel) => covers.push((CoverJob::library(source,generation,cancel),permit)),
                                 Action::Render(key, priority, cancel) => {
+                                    let document=key.document_id.clone();
                                     match engine.try_render(key, priority, cancel.clone())
                                     {
-                                        Ok(ticket) => pending.push(Pending::Render(ticket, permit)),
+                                        Ok(ticket) => pending.push(Pending::Render(document, ticket, permit)),
                                         Err(error) => {
                                             failed(&events, &notify, error, Some(cancel), permit)
                                         }
@@ -1474,6 +1538,19 @@ impl Runtime {
                                 });
                                 match result {
                                     Ok(info) => {
+                                        let document=match CoverSource::capture(&document).read(&repository,&cancel) {
+                                            Ok(fresh)=>fresh,
+                                            Err(error)=> {
+                                                match engine.try_close(document.id.clone()) {
+                                                    Ok(ticket)=>pending.push(Pending::RejectedOpen(Box::new(RejectedOpen{document,error,cancel,revision}),ticket,permit)),
+                                                    Err(error)=> {
+                                                        let error=match engine.set_visible_documents(&visible) {Ok(())=>{pdf_capacity.fetch_add(1,Ordering::Release);error},Err(error)=>error};
+                                                        emit(&events,&notify,Update::OpenFailed(Box::new(document),error,cancel),permit);
+                                                    }
+                                                }
+                                                continue;
+                                            }
+                                        };
                                         // Keep the old reader and replacement pinned until
                                         // the UI accepts this exact request, including races
                                         // where cancellation follows delivery of Opened.
@@ -1488,7 +1565,7 @@ impl Runtime {
                                     }
                                 }
                             }
-                            Pending::Render(ticket, permit) => {
+                            Pending::Render(_, ticket, permit) => {
                                 let cancel = ticket.cancellation.clone();
                                 let id = ticket.consumer_id;
                                 let epoch = ticket.epoch;
@@ -1561,6 +1638,16 @@ impl Runtime {
                                     Ok(matches) => emit(&events, &notify, Update::PageMatches(id, matches, cancel), permit),
                                     Err(error) => emit(&events, &notify, Update::PageFindFailed(id, error, cancel), permit),
                                 }
+                            }
+                            Pending::RejectedOpen(request,ticket,permit)=> {
+                                let RejectedOpen{document,error,cancel,revision}=*request;
+                                let closed=ticket.wait();
+                                if closed.is_ok() {visible.retain(|id|*id!=document.id);pdf_capacity.fetch_add(1,Ordering::Release);}
+                                let error=closed.err().unwrap_or(error);
+                                let error=if revision==open_revision && awaiting_open.is_none() {
+                                    match engine.set_visible_documents(&visible) {Ok(())=>error,Err(error)=>error}
+                                } else {error};
+                                emit(&events,&notify,Update::OpenFailed(Box::new(document),error,cancel),permit);
                             }
                             Pending::Close(request, ticket, permit) => {
                                 let result=ticket.wait();
@@ -1644,6 +1731,19 @@ impl Runtime {
                             }
                         }
                     }
+                    if let Some((job,_))=&mut removal {
+                        let before=job.snapshot(false);
+                        let finished=if job.ready() {job.advance(&mut repository,&engine)} else {false};
+                        let progress=job.snapshot(finished);
+                        if progress.report.retired.len()!=before.report.retired.len() {
+                            visible.retain(|id|!progress.report.retired.contains(id));
+                            pdf_capacity.fetch_add(1,Ordering::Release);
+                        }
+                        if finished || progress.report!=before.report {
+                            *library_removal_snapshot.lock().unwrap()=Some(progress);notify();
+                        }
+                        if finished {let (job,permit)=removal.take().unwrap();emit(&events,&notify,Update::SelectionOrganized(Box::new(job.reply())),permit);}
+                    }
                     let capacity=pdf_capacity.load(Ordering::Acquire);
                     if let Some((job,_))=&mut cover_regeneration {
                         let before=job.snapshot(false);
@@ -1688,7 +1788,7 @@ impl Runtime {
                     }
                     admit_import_hash(&engine,&mut pending,&events,&notify);
                     if index_cleanup.as_ref().is_some_and(PdfTicket::is_ready) && index_cleanup.take().unwrap().wait().is_ok() {pdf_capacity.fetch_add(1,Ordering::Release);notify();}
-                    let native_admission_pending = cover_regeneration.is_some() || !covers.is_empty() || pending.iter().any(|item| {
+                    let native_admission_pending = removal.is_some() || cover_regeneration.is_some() || !covers.is_empty() || pending.iter().any(|item| {
                         matches!(
                             item,
                             Pending::Open(..) | Pending::ImportReady(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
@@ -1717,10 +1817,11 @@ impl Runtime {
                         || !commands.is_empty()
                         || (pending.iter().any(|item|matches!(item,Pending::ImportHashReady(..))) && !pending.iter().any(|item|matches!(item,Pending::ImportHash(..))))
                         || cover_regeneration.as_ref().is_some_and(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
+                        || removal.as_ref().is_some_and(|(job,_)|job.ready())
                         || bulk_selection.is_some()
                         || indexer.needs_step()
                         || library_check.as_ref().is_some_and(|(job,_)|job.needs_step())
-                        || (deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open))
+                        || (deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open, removal.is_some()))
                             && indexer.native_document_id().is_none()
                             && index_cleanup.is_none())
                     {
@@ -1739,6 +1840,7 @@ impl Runtime {
                     if let Some((job,_)) = &relocation {job.register(&mut select);}
                     if let Some((job,_)) = &library_check {job.register(&mut select);}
                     if let Some((job,_)) = &cover_regeneration {job.register(&mut select);}
+                    if let Some((job,_)) = &removal {job.register(&mut select);}
                     for item in &pending {
                         item.register(&mut select);
                     }
@@ -1766,6 +1868,7 @@ impl Runtime {
                 drop(relocation);
                 drop(library_check);
                 drop(cover_regeneration);
+                drop(removal);
                 if let Ok(Some(ticket)) = indexer.shutdown(&engine) {
                     let _ = ticket.wait();
                 }
@@ -1783,6 +1886,7 @@ impl Runtime {
             index_progress,
             library_check_progress,
             cover_regeneration_progress,
+            library_removal_progress,
             sender,
             shutdown,
             outstanding: Arc::new(AtomicUsize::new(0)),
@@ -1804,6 +1908,9 @@ impl Runtime {
             .map_err(|_| Failure::Storage("Import recovery flush did not finish".into()))?
     }
     /// Coalesced bounded snapshot; reading it never queries SQL or PDFium.
+    pub fn library_removal_progress(&self) -> Option<crate::library_removal::RemovalSnapshot> {
+        self.library_removal_progress.lock().unwrap().clone()
+    }
     pub fn cover_regeneration_progress(
         &self,
     ) -> Option<crate::cover_regeneration::RegenerationSnapshot> {

@@ -25,6 +25,8 @@ pub struct BulkReport {
     pub succeeded: Vec<String>,
     pub failed: Vec<String>,
     pub remaining: Vec<String>,
+    /// Successful native closures, including cancelled or failed subsequent removals.
+    pub retired: Vec<String>,
 }
 pub struct BulkReply {
     pub cancel: Cancellation,
@@ -134,6 +136,7 @@ impl BulkJob {
                 succeeded: self.succeeded,
                 failed: self.failed,
                 remaining: self.request.ids[self.next..].to_vec(),
+                retired: Vec::new(),
             }),
         }
     }

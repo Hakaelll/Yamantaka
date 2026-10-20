@@ -87,6 +87,9 @@ impl CoverJob {
         })
     }
 
+    pub(crate) fn document(&self) -> &str {
+        self.source.id()
+    }
     pub fn waiting(&self) -> bool {
         matches!(self.work, Work::Waiting(_))
     }

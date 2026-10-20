@@ -144,6 +144,21 @@ fn run(operation: Operation, outcome: Outcome) {
         .unwrap();
     let request = held.recv_timeout(Duration::from_secs(10)).unwrap();
     requested(&opened, &request.id);
+    if operation == Operation::Import && outcome == Outcome::Resume {
+        let removal = Cancellation::default();
+        runtime
+            .submit(Action::RemoveFromLibrary(Box::new(
+                yamantaka_application::library_removal::RemovalRequest {
+                    ids: vec!["reader-a".into()],
+                    cancel: removal.clone(),
+                },
+            )))
+            .unwrap();
+        assert!(
+            matches!(wait(&runtime),Update::SelectionOrganized(reply) if reply.cancel.same_request(&removal) && matches!(reply.result,Err(Failure::QueueFull)))
+        );
+        assert!(!cancel.is_cancelled());
+    }
     open_reader(&runtime, reader_a);
     open_reader(&runtime, reader_b.clone());
     visible(&runtime, &["reader-a", "reader-b"]);

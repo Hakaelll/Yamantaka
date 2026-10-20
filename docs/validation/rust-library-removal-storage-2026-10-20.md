@@ -4,6 +4,8 @@ Date: 2026-10-20. Scope: the local database operation required by reviewed libra
 
 ## Connected Flutter behavior
 
+Follow-up: [the runtime coordinator](rust-library-removal-runtime-2026-10-20.md) now implements close-before-delete admission, partial outcomes and stale-opening rejection. The report below records the preceding storage checkpoint; the user-facing action remains incomplete.
+
 `LibraryBulkOperationService.execute(removeFromLibrary)` invokes cover cleanup and then `DocumentRepository.remove`, which deletes the document record. Foreign keys remove document-owned rows. The app shell closes the current reading when needed, refreshes organization/library state and clears last-document presentation settings. The original PDF is never deleted. Individual removal also asks for confirmation.
 
 The Rust repository operation preserves the SQL removal semantics and strengthens index consistency. `LibraryRepository::remove_from_library` validates one identifier, checks cancellation, begins an immediate transaction, deletes that document's cached FTS rows and deletes exactly one document. It checks cancellation again before committing. A missing document, SQL failure or rejected commit leaves the transaction uncommitted. FTS5 has no document foreign key, so its cleanup explicitly participates in the same transaction even when indexing is disabled or the document was excluded.
