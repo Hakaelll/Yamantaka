@@ -64,6 +64,20 @@ pub struct ReadingSessionLifecycle {
     sessions: Vec<Session>,
 }
 impl ReadingSessionLifecycle {
+    /// Removal waits for selected sessions to finish saving, without blocking the UI.
+    pub fn settled_for(&self, documents: &[String]) -> Result<bool> {
+        let selected = || {
+            self.sessions
+                .iter()
+                .filter(|session| documents.contains(&session.document))
+        };
+        if selected().any(|session| matches!(session.write, WriteState::Failed)) {
+            return Err(Failure::Invalid(
+                "Retry saving reading sessions before removing these books".into(),
+            ));
+        }
+        Ok(selected().next().is_none())
+    }
     pub fn current_document(&self) -> Option<&str> {
         self.sessions.last().and_then(|session| {
             matches!(session.phase, Phase::Reading(_)).then_some(session.document.as_str())

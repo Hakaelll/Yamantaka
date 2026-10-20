@@ -280,6 +280,9 @@ impl YamantakaApp {
             .is_some_and(|editor| editor.source_opened)
     }
     pub(super) fn begin_metadata_editor(&mut self, document: Document) {
+        if self.library_selection.removing_document(&document.id) {
+            return;
+        }
         let mut editor = MetadataEditor {
             title: document.display_title().into(),
             author: document.author.clone().unwrap_or_default(),

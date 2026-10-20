@@ -80,6 +80,31 @@ impl DocumentTabs {
         self.resources();
         Some(tab)
     }
+    /// Reconcile actual native closures while retaining contexts which can be reopened.
+    pub fn retire_documents(&mut self, documents: &[String]) {
+        let tabs: Vec<_> = self
+            .tabs
+            .iter()
+            .filter(|tab| documents.contains(&tab.document))
+            .map(|tab| tab.id.clone())
+            .collect();
+        for id in tabs {
+            self.close(&id);
+        }
+    }
+    /// Removed catalogue records must not survive in either continuity stack.
+    pub fn forget_documents(&mut self, documents: &[String]) {
+        self.tabs.retain(|tab| !documents.contains(&tab.document));
+        self.closed.retain(|tab| !documents.contains(&tab.document));
+        if self
+            .active
+            .as_ref()
+            .is_some_and(|id| !self.tabs.iter().any(|tab| &tab.id == id))
+        {
+            self.active = self.tabs.last().map(|tab| tab.id.clone());
+        }
+        self.resources();
+    }
     pub fn close_others(&mut self, id: &str) -> bool {
         if !self.tabs.iter().any(|tab| tab.id == id) {
             return false;

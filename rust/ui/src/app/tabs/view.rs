@@ -33,7 +33,10 @@ impl YamantakaApp {
         let mut bulk = None;
         ui.set_max_width(ui.available_width().min(340.0));
         ui.add_enabled_ui(
-            !(self.tabs.busy() || self.opening.busy() || self.reader_preferences_loading),
+            !(self.library_selection.removing()
+                || self.tabs.busy()
+                || self.opening.busy()
+                || self.reader_preferences_loading),
             |ui| {
                 for (id, title, pinned) in &entries {
                     if ui

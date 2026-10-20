@@ -2,6 +2,8 @@
 
 Date: 2026-10-20. Scope: the local database operation required by reviewed library removal. The native selection menu does not invoke this operation yet. Reader retirement, actor admission, confirmation, cancellation/results and continuity reconciliation must be connected before presenting it as a completed feature. This checkpoint does not establish release readiness.
 
+Follow-up: [the native removal interface](rust-library-removal-ui-2026-10-20.md) now connects confirmation, session saving, reader/continuity reconciliation and partial outcomes. Statements about the interface being pending below describe this earlier checkpoint. Physical and broader acceptance remain open.
+
 ## Connected Flutter behavior
 
 Follow-up: [the runtime coordinator](rust-library-removal-runtime-2026-10-20.md) now implements close-before-delete admission, partial outcomes and stale-opening rejection. The report below records the preceding storage checkpoint; the user-facing action remains incomplete.

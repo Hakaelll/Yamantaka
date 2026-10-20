@@ -57,6 +57,9 @@ impl CoverPicker {
 
 impl YamantakaApp {
     pub(super) fn begin_cover_picker(&mut self, document: Document) {
+        if self.library_selection.removing_document(&document.id) {
+            return;
+        }
         if self
             .cover_picker
             .as_ref()

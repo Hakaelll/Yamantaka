@@ -30,6 +30,27 @@ pub(super) struct SearchState {
     confirm_clear: bool,
 }
 impl SearchState {
+    pub(super) fn invalidate_removed(&mut self, ids: &[String]) {
+        self.cancel.cancel();
+        self.results
+            .retain(|result| !ids.contains(&result.document_id));
+        if self
+            .selected
+            .as_ref()
+            .is_some_and(|result| ids.contains(&result.document_id))
+        {
+            self.selection_cancel.cancel();
+            self.selected = None;
+            self.excluded = None;
+        }
+        self.searching = false;
+        self.stats = None;
+        self.completed = false;
+        self.offset = 0;
+        if self.enabled && !self.text.trim().is_empty() {
+            self.deadline = Some(Instant::now());
+        }
+    }
     pub fn new(enabled: bool) -> Self {
         Self {
             enabled,
@@ -142,6 +163,36 @@ impl YamantakaApp {
                     .clicked()
                     {
                         self.show_tags(None);
+                        ui.close();
+                    }
+                    if !self.tabs.model.tabs().is_empty() {
+                        let label = format!(
+                            "{} ({})",
+                            self.tr("Lecturas abiertas", "Open readings"),
+                            self.tabs.model.tabs().len()
+                        );
+                        let response = ui.menu_button(&label, |ui| self.reader_documents_menu(ui));
+                        theme::record_control_bounds(ui, &label, response.response.rect);
+                    }
+                    if !self.tabs.model.closed().is_empty()
+                        && ui
+                            .add_enabled_ui(
+                                !self.library_selection.removing()
+                                    && !self.tabs.busy()
+                                    && !self.opening.busy(),
+                                |ui| {
+                                    theme::navigation(
+                                        ui,
+                                        self.tr("Reabrir última lectura", "Reopen last reading"),
+                                        false,
+                                        p,
+                                    )
+                                },
+                            )
+                            .inner
+                            .clicked()
+                    {
+                        self.reopen_reader_tab();
                         ui.close();
                     }
                     self.library_check_menu(ui, p);

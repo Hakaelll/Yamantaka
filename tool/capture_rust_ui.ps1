@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='bulk-remove-review'; args=@('--pdf-covers','--bulk-remove=review') },
+    @{ name='bulk-remove-review-small-200'; args=@('--pdf-covers','--bulk-remove=review','--light','--es','--size=640x480','--text-scale=2','--reduce-motion') },
+    @{ name='bulk-remove-applied'; args=@('--pdf-covers','--bulk-remove=apply','--reduce-motion') },
+    @{ name='bulk-remove-cancelled-es'; args=@('--pdf-covers','--bulk-remove=cancel','--light','--es','--reduce-motion') },
+    @{ name='bulk-remove-partial-es'; args=@('--pdf-covers','--bulk-remove=failure','--es','--reduce-motion') },
+    @{ name='bulk-remove-readings-menu'; args=@('--pdf-covers','--bulk-remove=apply','--tools-menu','--reduce-motion') },
+    @{ name='bulk-remove-last-page'; args=@('--pdf-covers','--bulk-remove=last-page','--light','--reduce-motion') },
     @{ name='bulk-covers-review'; args=@('--pdf-covers','--bulk-covers=review') },
     @{ name='bulk-covers-review-small-200'; args=@('--pdf-covers','--bulk-covers=review','--light','--es','--size=640x480','--text-scale=2','--reduce-motion') },
     @{ name='bulk-covers-applied'; args=@('--pdf-covers','--bulk-covers=apply') },
@@ -288,6 +295,26 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    if ($case.name -like 'bulk-remove-*') {
+        $result = $controls.librarySelection.removal
+        if ($null -eq $result -or -not $controls.libraryQueryLoaded -or $controls.librarySelection.writing) { throw 'Library removal has not reached its verified state.' }
+        if ($case.name -like '*review*') {
+            if ($result.mode -ne 'review' -or $result.selected -ne 3 -or $controls.libraryDocumentCount -ne 10) { throw 'Removal review must preserve its fixed selection and records.' }
+            $cancelLabel = if ($case.args -contains '--es') { 'Cancelar' } else { 'Cancel' }
+            $removeLabel = if ($case.args -contains '--es') { 'Retirar' } else { 'Remove' }
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($cancelLabel,$removeLabel)
+        } else {
+            $expected = switch ($result.mode) { 'cancel' { 10 }; 'failure' { 8 }; 'last-page' { 80 }; default { 7 } }
+            if ($controls.libraryDocumentCount -ne $expected -or $result.remaining -ne $expected -or -not $result.continuitySaved) { throw 'Removal count or acknowledged continuity is incorrect.' }
+            if ($result.mode -eq 'last-page') { if ($result.recoveredOffset -ne 0) { throw 'Removing the final page must recover a valid catalogue page.' } }
+            elseif (-not $result.otherReadingKept) { throw 'Unselected reading context was not preserved.' }
+            if ($result.mode -in @('apply','failure') -and -not $result.sessionsSettled) { throw 'Selected reading sessions must finish saving before removal.' }
+            if ($result.mode -in @('apply','failure') -and -not $result.otherReadingReopened) { throw 'The retained reading must reopen with its original zoom.' }
+            if ($case.name -eq 'bulk-remove-readings-menu') {
+                & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Open readings (1)','Reopen last reading')
+            }
+        }
+    }
     if ($case.name -like 'bulk-covers-*') {
         $coverResult = $controls.libraryCovers.bulkRegeneration
         if ($null -eq $coverResult -or $coverResult.targets.Count -ne 3 -or $controls.librarySelection.writing -or $controls.libraryCovers.paused -ne 0) { throw 'Bulk cover preview has not reached its verified state.' }

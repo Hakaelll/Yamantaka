@@ -235,7 +235,11 @@ impl YamantakaApp {
         self.global_note_command(None, 0);
     }
     fn global_note_command(&mut self, mutation: Option<AnnotationBatchMutation>, offset: usize) {
-        if mutation.is_some() && (self.annotations.editing() || self.annotations.writing()) {
+        if mutation.is_some()
+            && (self.library_selection.removing()
+                || self.annotations.editing()
+                || self.annotations.writing())
+        {
             return;
         }
         let Some(request) = self.global_notes.request(mutation, offset, &self.governor) else {

@@ -60,6 +60,9 @@ impl YamantakaApp {
         self.request_tab_plan(plan)
     }
     pub(super) fn request_tab_plan(&mut self, plan: DocumentTabs) -> bool {
+        if self.library_selection.removing() {
+            return false;
+        }
         if self.tabs.closing.busy() {
             return false;
         }

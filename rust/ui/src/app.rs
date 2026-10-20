@@ -653,6 +653,9 @@ impl YamantakaApp {
         self.surface = surface;
     }
     fn open(&mut self, document: Document) -> bool {
+        if self.library_selection.removing() {
+            return false;
+        }
         self.sync_tab_context();
         if let Some(id) = self
             .tabs
@@ -668,6 +671,9 @@ impl YamantakaApp {
         self.open_candidate(document)
     }
     fn open_candidate(&mut self, document: Document) -> bool {
+        if self.library_selection.removing() {
+            return false;
+        }
         if self.tabs.closing.busy() {
             return false;
         }
@@ -1390,6 +1396,14 @@ impl App for YamantakaApp {
         {
             ctx.send_viewport_cmd(ViewportCommand::CancelClose);
         }
+        if self.library_selection.removing()
+            && ctx.input(|input| input.viewport().close_requested())
+        {
+            self.library_selection.close_after_removal = true;
+            self.library_selection.cancel();
+            self.runtime.wake();
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+        }
         self.observe_reading_session(ctx);
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.begin_frame()
@@ -1408,7 +1422,7 @@ impl App for YamantakaApp {
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
                 Update::PendingImports(result) => self.importing.accept_recovery(result),
-                Update::SelectionOrganized(reply) => self.accept_library_bulk(*reply),
+                Update::SelectionOrganized(reply) => self.accept_library_bulk(ctx, *reply),
                 Update::LibraryChecked(reply) => {
                     self.library_check.accept(*reply);
                     self.refresh();
@@ -1470,6 +1484,15 @@ impl App for YamantakaApp {
                 }
                 Update::Library(documents, count, cancel) => {
                     if cancel.is_cancelled() || !self.query_cancel.same_request(&cancel) {
+                        continue;
+                    }
+                    if documents.is_empty()
+                        && self.offset > 0
+                        && (count == 0 || self.offset as u64 >= count)
+                    {
+                        self.offset =
+                            usize::try_from(count.saturating_sub(1) / 80 * 80).unwrap_or(0);
+                        self.refresh();
                         continue;
                     }
                     self.library_loaded = true;
@@ -1937,7 +1960,7 @@ impl App for YamantakaApp {
             self.password.is_some()
                 || self.links.confirmation_open()
                 || self.bulk_picker.is_some()
-                || self.cover_batch_review_open(),
+                || self.selection_review_open(),
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
@@ -1945,7 +1968,7 @@ impl App for YamantakaApp {
             self.password.is_some()
                 || self.links.confirmation_open()
                 || self.bulk_picker.is_some()
-                || self.cover_batch_review_open(),
+                || self.selection_review_open(),
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -1977,6 +2000,7 @@ impl App for YamantakaApp {
         self.apply_annotation_export_preview();
         self.update_file_comparison();
         self.update_library_selection_preview();
+        self.update_removal_preview();
         self.update_cover_batch_preview(&ctx);
         self.update_bulk_organization_preview();
         self.update_tag_preview();
@@ -2000,18 +2024,6 @@ impl App for YamantakaApp {
             egui::Frame::new().fill(p.canvas).show(ui, |ui| {
                 if !matches!(self.surface, Surface::Reader) {
                     self.toolbar(ui);
-                    if !self.tabs.model.closed().is_empty()
-                        && !self.tabs.busy()
-                        && theme::navigation(
-                            ui,
-                            self.tr("Reabrir última lectura", "Reopen last reading"),
-                            false,
-                            p,
-                        )
-                        .clicked()
-                    {
-                        self.reopen_reader_tab();
-                    }
                 }
                 if let Some(error) = self.error.clone() {
                     egui::Frame::new()
@@ -2107,12 +2119,16 @@ impl App for YamantakaApp {
                     });
             });
         });
+        self.pump_library_removal(&ctx);
         self.update_cover_batch_progress();
-        self.cover_batch_review_dialog(&ctx);
+        self.selection_review_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
         self.pump_library_covers(&ctx);
+        if self.library_selection.close_after_removal && !self.library_selection.removing() {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+        }
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded

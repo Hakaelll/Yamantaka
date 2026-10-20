@@ -16,6 +16,16 @@ pub(in crate::app) struct ContinuityState {
     due: Option<Instant>,
 }
 impl YamantakaApp {
+    pub(in crate::app) fn enable_continuity_capture(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.tabs.continuity.loaded = true;
+        }
+    }
+    pub(in crate::app) fn continuity_settled(&self) -> bool {
+        let state = &self.tabs.continuity;
+        state.loaded && !state.paused && state.pending.is_none() && state.saved == self.tabs.model
+    }
+
     pub(in crate::app) fn begin_reader_continuity(&mut self) {
         if self.demo {
             return;
@@ -95,7 +105,10 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn pump_reader_continuity(&mut self, ctx: &egui::Context) {
-        if !self.tabs.continuity.loaded || self.tabs.continuity.paused {
+        if self.library_selection.removing()
+            || !self.tabs.continuity.loaded
+            || self.tabs.continuity.paused
+        {
             return;
         }
         self.sync_tab_context();

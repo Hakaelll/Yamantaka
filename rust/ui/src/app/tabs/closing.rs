@@ -34,7 +34,7 @@ impl TabState {
 }
 impl YamantakaApp {
     pub(in crate::app) fn close_reader_tab(&mut self, id: &str) {
-        if self.tabs.busy() || self.opening.busy() {
+        if self.library_selection.removing() || self.tabs.busy() || self.opening.busy() {
             return;
         }
         self.sync_tab_context();
@@ -86,7 +86,7 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn reopen_reader_tab(&mut self) {
-        if self.tabs.busy() || self.opening.busy() {
+        if self.library_selection.removing() || self.tabs.busy() || self.opening.busy() {
             return;
         }
         self.sync_tab_context();
@@ -135,7 +135,7 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn retry_reader_close(&mut self) {
-        if self.tabs.busy() || self.opening.busy() {
+        if self.library_selection.removing() || self.tabs.busy() || self.opening.busy() {
             return;
         }
         let live: Vec<_> = self

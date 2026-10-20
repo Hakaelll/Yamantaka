@@ -166,7 +166,7 @@ impl YamantakaApp {
         if self.demo && !self.sessions.capture_recording {
             return;
         }
-        if ctx.input(|i| i.viewport().close_requested()) {
+        if !self.library_selection.removing() && ctx.input(|i| i.viewport().close_requested()) {
             if let Err(error) = self.persist_reading_sessions_on_close() {
                 ctx.send_viewport_cmd(ViewportCommand::CancelClose);
                 self.error = Some(error.to_string());
@@ -182,6 +182,7 @@ impl YamantakaApp {
             && let (Some((document, _)), Some(preferences)) =
                 (&self.active, &self.reader_preferences)
             && preferences.document_id == document.id
+            && !self.library_selection.removing_document(&document.id)
         {
             let id = uuid::Uuid::new_v4().to_string();
             match self.sessions.lifecycle.begin(

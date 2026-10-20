@@ -1,6 +1,8 @@
 mod covers;
 mod menu;
 mod preview;
+mod removal;
+mod review;
 use super::*;
 use yamantaka_application::library_bulk::{BulkAction, BulkReply, BulkRequest};
 use yamantaka_domain::library_selection::LibrarySelection;
@@ -8,14 +10,28 @@ struct PendingBulk {
     cancel: Cancellation,
     action: PendingAction,
 }
+enum RemovalPhase {
+    Preparing,
+    Running,
+}
 enum PendingAction {
+    Removal {
+        ids: Vec<String>,
+        phase: RemovalPhase,
+    },
     Data(BulkAction),
     Covers {
         ids: Vec<String>,
         refreshed: std::collections::HashSet<String>,
     },
 }
-struct CoverReview {
+#[derive(Clone, Copy)]
+enum ReviewAction {
+    Covers,
+    Remove,
+}
+struct SelectionReview {
+    action: ReviewAction,
     ids: Vec<String>,
     focus_cancel: bool,
 }
@@ -23,7 +39,10 @@ struct CoverReview {
 pub(super) struct SelectionState {
     pub model: LibrarySelection,
     pending: Option<PendingBulk>,
-    cover_review: Option<CoverReview>,
+    review: Option<SelectionReview>,
+    pub(super) close_after_removal: bool,
+    removal_preview: Option<removal::preview::RemovalPreview>,
+    removal_verified: Option<serde_json::Value>,
     notice: Option<String>,
     pub(super) focus: Option<String>,
     pub columns: usize,
@@ -33,11 +52,19 @@ pub(super) struct SelectionState {
     preview_targets: Vec<String>,
 }
 impl SelectionState {
+    pub(super) fn removing(&self) -> bool {
+        self.pending
+            .as_ref()
+            .is_some_and(|pending| matches!(pending.action, PendingAction::Removal { .. }))
+    }
+    pub(super) fn removing_document(&self, id: &str) -> bool {
+        self.pending.as_ref().is_some_and(|pending|matches!(&pending.action,PendingAction::Removal{ids,..} if ids.iter().any(|selected|selected==id)))
+    }
     pub(super) fn writing(&self) -> bool {
         self.pending.is_some()
     }
     pub(super) fn ready(&self) -> bool {
-        self.pending.is_none() && self.preview.is_none()
+        self.pending.is_none() && self.preview.is_none() && self.removal_preview.is_none()
     }
     pub(super) fn cancel(&self) {
         if let Some(cancel) = &self.pending {
@@ -45,7 +72,7 @@ impl SelectionState {
         }
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"mode":self.model.mode,"ids":self.model.ids(),"writing":self.pending.is_some(),"notice":self.notice,"preview":self.preview,"verifiedFavoriteTargets":self.preview_targets})
+        serde_json::json!({"removal":self.removal_verified,"mode":self.model.mode,"ids":self.model.ids(),"writing":self.pending.is_some(),"notice":self.notice,"preview":self.preview,"verifiedFavoriteTargets":self.preview_targets})
     }
 }
 impl YamantakaApp {
@@ -85,8 +112,18 @@ impl YamantakaApp {
             && self.password.is_none()
             && !self.links.confirmation_open()
             && self.bulk_picker.is_none()
-            && self.library_selection.cover_review.is_none();
+            && self.library_selection.review.is_none();
         if response.has_focus() && keyboard_allowed {
+            if self.library_selection.pending.is_none()
+                && ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Delete))
+            {
+                let ids = if self.library_selection.model.ids().is_empty() {
+                    vec![document.id.clone()]
+                } else {
+                    self.library_selection.model.ids().to_vec()
+                };
+                self.review_removal_ids(ids);
+            }
             if ui.input_mut(|input| input.consume_key(egui::Modifiers::CTRL, egui::Key::A))
                 && self.library_selection.pending.is_none()
             {
@@ -129,6 +166,34 @@ impl YamantakaApp {
                 }
             }
         }
+        response.context_menu(|ui| {
+            ui.set_max_width((ui.ctx().content_rect().width() - 24.0).max(160.0));
+            let ids = if self.library_selection.model.contains(&document.id) {
+                self.library_selection.model.ids().to_vec()
+            } else {
+                vec![document.id.clone()]
+            };
+            let label = if ids.len() > 1 {
+                format!(
+                    "{} ({})…",
+                    self.tr("Retirar selección", "Remove selection"),
+                    ids.len()
+                )
+            } else {
+                self.tr("Retirar de la biblioteca…", "Remove from library…")
+                    .into()
+            };
+            if ui
+                .add_enabled_ui(!self.library_selection.writing(), |ui| {
+                    theme::bounded_navigation(ui, &label, Palette::new(self.dark))
+                })
+                .inner
+                .clicked()
+            {
+                self.review_removal_ids(ids);
+                ui.close();
+            }
+        });
         if keyboard_allowed
             && !self.library_selection.model.mode
             && !(modifiers.ctrl || modifiers.command || modifiers.shift)
@@ -146,12 +211,24 @@ impl YamantakaApp {
             || self.password.is_some()
             || self.links.confirmation_open()
             || self.bulk_picker.is_some()
-            || self.library_selection.cover_review.is_some()
+            || self.library_selection.review.is_some()
             || ctx.egui_wants_keyboard_input()
             || egui::Popup::is_any_open(ctx)
             || self.library_selection.pending.is_some()
         {
             return;
+        }
+        if ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Delete)) {
+            let ids = if self.library_selection.model.ids().is_empty() {
+                self.selected
+                    .iter()
+                    .filter(|id| self.documents.iter().any(|document| &document.id == *id))
+                    .cloned()
+                    .collect()
+            } else {
+                self.library_selection.model.ids().to_vec()
+            };
+            self.review_removal_ids(ids);
         }
         if ctx.input_mut(|input| input.consume_key(egui::Modifiers::CTRL, egui::Key::A)) {
             self.library_selection.model.all(&self.library_page_ids());
@@ -186,7 +263,7 @@ impl YamantakaApp {
             }
         }
     }
-    pub(super) fn accept_library_bulk(&mut self, reply: BulkReply) {
+    pub(super) fn accept_library_bulk(&mut self, ctx: &egui::Context, reply: BulkReply) {
         if !self
             .library_selection
             .pending
@@ -196,12 +273,22 @@ impl YamantakaApp {
             return;
         }
         let pending = self.library_selection.pending.take().unwrap();
-        if let PendingAction::Covers { ids, .. } = &pending.action {
+        if let PendingAction::Covers { ids, .. } | PendingAction::Removal { ids, .. } =
+            &pending.action
+        {
             self.library_covers.resume(ids);
         }
+        let removing = matches!(pending.action, PendingAction::Removal { .. });
         match reply.result {
             Ok(report) => {
+                if removing {
+                    self.reconcile_removal(ctx, &report);
+                    if !report.succeeded.is_empty() {
+                        self.removal_views_changed();
+                    }
+                }
                 match pending.action {
+                    PendingAction::Removal { .. } => {}
                     PendingAction::Data(BulkAction::Tag(_)) => {
                         self.bulk_tags_changed();
                         if self.search.enabled {
@@ -217,7 +304,11 @@ impl YamantakaApp {
 
                 let message = format!(
                     "{}: {} · {}: {} · {}: {}",
-                    self.tr("Guardados", "Saved"),
+                    if removing {
+                        self.tr("Retirados", "Removed")
+                    } else {
+                        self.tr("Guardados", "Saved")
+                    },
                     report.succeeded.len(),
                     self.tr("Fallidos", "Failed"),
                     report.failed.len(),
@@ -235,7 +326,17 @@ impl YamantakaApp {
                 self.library_selection.notice = Some(message);
                 self.refresh();
             }
-            Err(error) => self.library_selection.notice = Some(error.to_string()),
+            Err(error) => {
+                self.library_selection.notice = Some(if removing {
+                    match error {
+                    yamantaka_domain::Failure::Cancelled=>self.tr("Retirada cancelada. No se han retirado libros.","Removal cancelled. No books were removed.").into(),
+                    yamantaka_domain::Failure::QueueFull=>self.tr("La biblioteca está ocupada. Reintenta cuando termine la operación actual.","The library is busy. Retry after the current operation finishes.").into(),
+                    _=>error.to_string(),
+                }
+                } else {
+                    error.to_string()
+                })
+            }
         }
     }
 }

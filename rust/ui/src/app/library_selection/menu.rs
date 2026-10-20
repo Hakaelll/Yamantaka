@@ -28,7 +28,10 @@ impl YamantakaApp {
                     }
                     let busy = self.library_selection.pending.is_some();
                     if busy {
-                        if let Some(progress) = self.cover_batch_progress() {
+                        if let Some(progress) = self
+                            .removal_progress_label()
+                            .or_else(|| self.cover_batch_progress())
+                        {
                             ui.label(progress);
                         } else {
                             ui.label(self.tr("Guardando selección…", "Saving selection…"));
@@ -90,6 +93,17 @@ impl YamantakaApp {
                         .clicked()
                         {
                             self.open_cover_batch_review();
+                            ui.close();
+                        }
+                        if theme::navigation(
+                            ui,
+                            self.tr("Retirar de la biblioteca…", "Remove from library…"),
+                            false,
+                            p,
+                        )
+                        .clicked()
+                        {
+                            self.open_library_removal_review();
                             ui.close();
                         }
                         if theme::navigation(ui, self.tr("Archivar", "Archive"), false, p)

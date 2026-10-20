@@ -2,6 +2,8 @@
 
 Date: 2026-10-20. Scope: close-before-delete orchestration and stale-opening rejection for the [atomic storage operation](rust-library-removal-storage-2026-10-20.md). The selection menu does not invoke this coordinator yet. Confirmation, UI consumer retirement and reader-continuity reconciliation remain required before user-facing removal is complete. No release acceptance is claimed.
 
+Follow-up: [the native removal interface](rust-library-removal-ui-2026-10-20.md) now connects confirmation, session saving, reader/continuity reconciliation and partial outcomes. Statements about the interface being pending below describe this earlier checkpoint. Physical and broader acceptance remain open.
+
 ## Runtime contract
 
 `Action::RemoveFromLibrary` validates and deduplicates up to 80 catalogue identifiers, then captures their source records in one actor admission. Missing records become individual failures. One native close ticket runs at a time; SQL removal starts only after successful native closure and another check of path, fingerprint and page count. A changed source or native/SQL failure preserves the local record. Missing-file records can still be removed.

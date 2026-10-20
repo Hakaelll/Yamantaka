@@ -32,7 +32,8 @@ impl ContinuityWriter {
         if self.revision.is_some_and(|previous| revision <= previous) {
             return Err(Failure::Cancelled);
         }
-        repository.save_reader_continuity(tabs)?;
+        let tabs = retain_catalogued(repository, tabs.clone())?;
+        repository.save_reader_continuity(&tabs)?;
         self.revision = Some(revision);
         Ok(())
     }
@@ -48,7 +49,10 @@ impl ContinuityWriter {
         let result = match request.change {
             ContinuityChange::Load => (|| {
                 request.cancel.check()?;
-                let tabs = repository.reader_continuity()?;
+                let tabs = repository
+                    .reader_continuity()?
+                    .map(|tabs| retain_catalogued(repository, tabs))
+                    .transpose()?;
                 request.cancel.check()?;
                 Ok(tabs)
             })(),
@@ -62,4 +66,20 @@ impl ContinuityWriter {
             cancel: request.cancel,
         }
     }
+}
+
+fn retain_catalogued(
+    repository: &impl LibraryRepository,
+    mut tabs: DocumentTabs,
+) -> Result<DocumentTabs> {
+    let mut absent = Vec::new();
+    for tab in tabs.tabs().iter().chain(tabs.closed()) {
+        if !absent.iter().any(|id| id == tab.document())
+            && repository.get(tab.document())?.is_none()
+        {
+            absent.push(tab.document().to_owned());
+        }
+    }
+    tabs.forget_documents(&absent);
+    Ok(tabs)
 }

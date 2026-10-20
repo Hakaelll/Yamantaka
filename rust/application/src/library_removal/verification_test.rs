@@ -342,6 +342,165 @@ pub(crate) fn verify() {
     assert!(worker.text("d".into(), 0, Cancellation::default()).is_err());
     assert_eq!(open_count.load(Ordering::Acquire), 1);
     assert_eq!(inspector.count(&LibraryQuery::default()).unwrap(), 2);
+    use crate::reader_continuity::{ContinuityChange, ContinuityRequest};
+    use yamantaka_domain::{
+        reader_preferences::ReaderPreferences,
+        reader_tabs::{DocumentTabs, ReaderTab},
+    };
+    let tab = |id: &str, document: &str| {
+        ReaderTab::new(
+            id.into(),
+            document.into(),
+            0,
+            ReaderPreferences::new(document),
+            None,
+        )
+        .unwrap()
+    };
+    let mut tabs = DocumentTabs::default();
+    tabs.restore_continuity(
+        vec![tab("b-live", "b"), tab("a-live", "a")],
+        Some("a-live"),
+        vec![tab("c-closed", "c"), tab("d-closed", "d")],
+    )
+    .unwrap();
+    let mut reconciled = tabs.clone();
+    reconciled.retire_documents(&["b".into()]);
+    assert_eq!(
+        reconciled
+            .tabs()
+            .iter()
+            .map(|tab| tab.id())
+            .collect::<Vec<_>>(),
+        ["a-live"]
+    );
+    assert_eq!(
+        reconciled
+            .closed()
+            .iter()
+            .map(|tab| tab.id())
+            .collect::<Vec<_>>(),
+        ["c-closed", "d-closed", "b-live"]
+    );
+    reconciled.forget_documents(&["a".into(), "d".into()]);
+    assert!(reconciled.tabs().is_empty());
+    assert_eq!(
+        reconciled
+            .closed()
+            .iter()
+            .map(|tab| tab.id())
+            .collect::<Vec<_>>(),
+        ["c-closed", "b-live"]
+    );
+    let saved = Cancellation::default();
+    runtime
+        .submit(Action::ReaderContinuity(Box::new(ContinuityRequest {
+            change: ContinuityChange::Save {
+                revision: 1,
+                tabs: Box::new(tabs.clone()),
+            },
+            cancel: saved.clone(),
+        })))
+        .unwrap();
+    loop {
+        if let Update::ReaderContinuity(reply) = runtime
+            .updates
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap()
+            && reply.cancel.same_request(&saved)
+        {
+            reply.result.unwrap();
+            break;
+        }
+    }
+    let stored = inspector.reader_continuity().unwrap().unwrap();
+    assert_eq!(
+        stored.tabs().iter().map(|tab| tab.id()).collect::<Vec<_>>(),
+        ["b-live"]
+    );
+    assert_eq!(
+        stored
+            .closed()
+            .iter()
+            .map(|tab| tab.id())
+            .collect::<Vec<_>>(),
+        ["c-closed"]
+    );
+    editor.save_reader_continuity(&tabs).unwrap();
+    let loaded = Cancellation::default();
+    runtime
+        .submit(Action::ReaderContinuity(Box::new(ContinuityRequest {
+            change: ContinuityChange::Load,
+            cancel: loaded.clone(),
+        })))
+        .unwrap();
+    loop {
+        if let Update::ReaderContinuity(reply) = runtime
+            .updates
+            .recv_timeout(Duration::from_secs(5))
+            .unwrap()
+            && reply.cancel.same_request(&loaded)
+        {
+            let restored = reply.result.unwrap().unwrap();
+            assert_eq!(
+                restored
+                    .tabs()
+                    .iter()
+                    .map(|tab| tab.id())
+                    .collect::<Vec<_>>(),
+                ["b-live"]
+            );
+            assert_eq!(
+                restored
+                    .closed()
+                    .iter()
+                    .map(|tab| tab.id())
+                    .collect::<Vec<_>>(),
+                ["c-closed"]
+            );
+            break;
+        }
+    }
+    use crate::reading_sessions::lifecycle::ReadingSessionLifecycle;
+    use yamantaka_domain::reading_sessions::ReadingSessionStart;
+    let mut sessions = ReadingSessionLifecycle::default();
+    let selected = vec!["b".to_owned()];
+    sessions
+        .begin(
+            &ReadingSessionStart {
+                id: "removal-session",
+                document: "b",
+                started_at: "2026-10-20T10:00:00Z",
+                page: 0,
+            },
+            Duration::ZERO,
+            false,
+        )
+        .unwrap();
+    assert!(!sessions.settled_for(&selected).unwrap());
+    let started = sessions.next_request().unwrap().execute(&mut editor);
+    sessions.accept(started).unwrap().unwrap();
+    sessions
+        .finish(
+            "2026-10-20T10:00:01Z".into(),
+            1,
+            None,
+            Duration::from_secs(1),
+        )
+        .unwrap();
+    assert!(!sessions.settled_for(&selected).unwrap());
+    editor.execute_batch("CREATE TRIGGER reject_session_finish BEFORE UPDATE ON reading_sessions WHEN OLD.id='removal-session' BEGIN SELECT RAISE(ABORT,'synthetic session save failure'); END;").unwrap();
+    let failed = sessions.next_request().unwrap().execute(&mut editor);
+    assert!(sessions.accept(failed).unwrap().is_err());
+    assert!(sessions.settled_for(&selected).is_err());
+    assert!(editor.get("b").unwrap().is_some());
+    editor
+        .execute_batch("DROP TRIGGER reject_session_finish")
+        .unwrap();
+    assert!(sessions.retry("removal-session"));
+    let finished = sessions.next_request().unwrap().execute(&mut editor);
+    sessions.accept(finished).unwrap().unwrap();
+    assert!(sessions.settled_for(&selected).unwrap());
     drop(runtime);
     drop(worker);
     assert_eq!(governor.usage().total, 0);
