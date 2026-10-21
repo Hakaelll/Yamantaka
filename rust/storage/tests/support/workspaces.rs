@@ -14,7 +14,7 @@ pub fn preserved_split_references(document: &str) {
     "#).unwrap();
     let cancel = Cancellation::default();
     let source = database.workspaces(0, &cancel).unwrap().entries.remove(0);
-    let copy = database
+    let copied = database
         .change_workspace(
             &WorkspaceChange::Duplicate {
                 expected: (&source).into(),
@@ -23,6 +23,10 @@ pub fn preserved_split_references(document: &str) {
             &cancel,
         )
         .unwrap();
+    let WorkspaceChanged::Saved(copied) = copied else {
+        panic!("Duplicate must return a saved workspace");
+    };
+    let copy = copied.id;
     let entries = database.workspaces(0, &cancel).unwrap().entries;
     let copied = entries.iter().find(|item| item.id == copy).unwrap();
     let readings = database.workspace(&copied.into(), &cancel).unwrap();
@@ -58,6 +62,7 @@ pub fn preserved_split_references(document: &str) {
             &WorkspaceChange::Replace {
                 expected: copied.into(),
                 tabs: Box::new(readings.tabs),
+                view: None,
             },
             &cancel,
         )
@@ -75,5 +80,54 @@ pub fn preserved_split_references(document: &str) {
             )
             .is_err()
     );
+    let current = database
+        .workspaces(0, &cancel)
+        .unwrap()
+        .entries
+        .into_iter()
+        .find(|item| item.id == copy)
+        .unwrap();
+    let current_readings = database.workspace(&(&current).into(), &cancel).unwrap();
+    let mut view = current_readings.view;
+    view.query = serde_json::json!({"text":"Appendix","list":true});
+    view.focus = false;
+    let updated = database
+        .change_workspace(
+            &WorkspaceChange::Replace {
+                expected: (&current).into(),
+                tabs: Box::new(current_readings.tabs),
+                view: Some(Box::new(view)),
+            },
+            &cancel,
+        )
+        .unwrap();
+    let WorkspaceChanged::Saved(updated) = updated else {
+        panic!("Replace must return its committed revision");
+    };
+    let snapshot = database.workspace(&(&updated).into(), &cancel).unwrap();
+    assert_eq!(snapshot.view.query["custom"], "retained");
+    assert_eq!(snapshot.view.parsed_query().unwrap().text, "Appendix");
+    assert!(snapshot.view.parsed_query().unwrap().list);
+    assert!(!snapshot.view.focus);
+    let focused = database
+        .change_workspace(
+            &WorkspaceChange::Focus {
+                expected: (&updated).into(),
+                enabled: true,
+            },
+            &cancel,
+        )
+        .unwrap();
+    let WorkspaceChanged::Saved(focused) = focused else {
+        panic!("Focus must return its committed revision");
+    };
+    assert!(
+        database
+            .workspace(&(&focused).into(), &cancel)
+            .unwrap()
+            .view
+            .focus
+    );
+    assert_ne!(focused.updated_at, updated.updated_at);
     database.integrity().unwrap();
 }

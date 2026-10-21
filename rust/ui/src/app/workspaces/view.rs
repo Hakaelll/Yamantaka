@@ -28,7 +28,7 @@ impl YamantakaApp {
                         ui.add_enabled_ui(!state.draft.trim().is_empty() && !self.tabs.model.tabs().is_empty(),|ui| {
                             if theme::bounded_navigation(ui,self.tr("Guardar lecturas actuales","Save current readings"),p).clicked() {
                                 self.sync_tab_context();
-                                command=Some(WorkspaceCommand::Change(WorkspaceChange::Create {name:state.draft.clone(),tabs:Box::new(self.tabs.model.clone())}));
+                                command=Some(WorkspaceCommand::Change(WorkspaceChange::Create {name:state.draft.clone(),tabs:Box::new(self.tabs.model.clone()),view:Box::new(self.capture_workspace_view())}));
                             }
                         });
                         ui.add_space(12.0);
@@ -90,7 +90,7 @@ impl YamantakaApp {
                             let expected=entry.into();
                             command=Some(WorkspaceCommand::Change(if *replace {
                                 self.sync_tab_context();
-                                WorkspaceChange::Replace {expected,tabs:Box::new(self.tabs.model.clone())}
+                                WorkspaceChange::Replace {expected,tabs:Box::new(self.tabs.model.clone()),view:Some(Box::new(self.capture_workspace_view()))}
                             } else {WorkspaceChange::Delete {expected}}));
                         }
                     }));

@@ -1,6 +1,38 @@
 use super::*;
 
 impl YamantakaApp {
+    pub(super) fn reader_focus_exit(&mut self, ui: &mut egui::Ui, p: Palette) {
+        if self.workspaces.open
+            || self.reading_queue.open
+            || self.password.is_some()
+            || self.links.confirmation_open()
+            || self.backup_restore.open
+            || self.legacy_import.open
+        {
+            return;
+        }
+        let position = egui::pos2(ui.max_rect().right() - 48.0, ui.max_rect().top() + 8.0);
+        egui::Area::new(egui::Id::new("exit-reading-focus"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(position)
+            .show(ui.ctx(), |ui| {
+                egui::Frame::new()
+                    .fill(p.surface)
+                    .corner_radius(8)
+                    .show(ui, |ui| {
+                        if theme::icon_button(
+                            ui,
+                            self.tr("Salir de concentración · F8", "Exit focus mode · F8"),
+                            theme::Icon::Panel,
+                            p,
+                        )
+                        .clicked()
+                        {
+                            self.reader_focus = false;
+                        }
+                    });
+            });
+    }
     pub(super) fn compact_reader_toolbar(
         &mut self,
         ui: &mut egui::Ui,

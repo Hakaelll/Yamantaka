@@ -454,7 +454,7 @@ impl LibraryRepository for Database {
         &mut self,
         change: &yamantaka_domain::workspaces::WorkspaceChange,
         cancel: &yamantaka_domain::Cancellation,
-    ) -> Result<String> {
+    ) -> Result<yamantaka_domain::workspaces::WorkspaceChanged> {
         if let yamantaka_domain::workspaces::WorkspaceChange::Duplicate { expected, name } = change
         {
             return self.duplicate_workspace(expected, name, cancel);

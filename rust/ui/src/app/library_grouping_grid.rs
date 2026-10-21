@@ -7,6 +7,8 @@ impl YamantakaApp {
         compact: bool,
         p: Palette,
     ) {
+        let compact = compact
+            || self.library_density == yamantaka_domain::workspaces::WorkspaceDensity::Compact;
         if self.list {
             self.library_selection.columns = 1;
             self.list_documents(ui, documents, p);

@@ -1,4 +1,6 @@
 use crate::reader_tabs::DocumentTabs;
+mod view;
+pub use view::*;
 
 #[derive(Clone, Debug)]
 pub struct Workspace {
@@ -29,16 +31,23 @@ pub struct WorkspaceReadings {
     pub workspace: Workspace,
     pub tabs: DocumentTabs,
     pub captions: Vec<(String, String)>,
+    pub view: WorkspaceView,
+}
+pub enum WorkspaceChanged {
+    Saved(Workspace),
+    Deleted(String),
 }
 #[derive(Clone)]
 pub enum WorkspaceChange {
     Create {
         name: String,
         tabs: Box<DocumentTabs>,
+        view: Box<WorkspaceView>,
     },
     Replace {
         expected: WorkspaceRevision,
         tabs: Box<DocumentTabs>,
+        view: Option<Box<WorkspaceView>>,
     },
     Rename {
         expected: WorkspaceRevision,
@@ -50,6 +59,10 @@ pub enum WorkspaceChange {
     },
     SetDefault {
         expected: WorkspaceRevision,
+    },
+    Focus {
+        expected: WorkspaceRevision,
+        enabled: bool,
     },
     Delete {
         expected: WorkspaceRevision,

@@ -148,6 +148,17 @@ impl YamantakaApp {
         self.operation_actions(ui, p);
         if theme::navigation(
             ui,
+            self.tr("Modo concentración · F8", "Focus mode · F8"),
+            self.reader_focus,
+            p,
+        )
+        .clicked()
+        {
+            self.reader_focus = !self.reader_focus;
+            ui.close();
+        }
+        if theme::navigation(
+            ui,
             self.tr("Seleccionar texto", "Select text"),
             self.selection.enabled,
             p,

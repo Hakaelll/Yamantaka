@@ -151,6 +151,8 @@ pub struct YamantakaApp {
     missing_only: bool,
     modified_only: bool,
     list: bool,
+    library_density: yamantaka_domain::workspaces::WorkspaceDensity,
+    reader_focus: bool,
     offset: usize,
     selected: Option<String>,
     inspector: bool,
@@ -295,6 +297,15 @@ impl YamantakaApp {
             Some("descending") => SortDirection::Descending,
             _ => SortDirection::Default,
         };
+        let library_density = if preferences
+            .get("libraryDensity")
+            .and_then(serde_json::Value::as_str)
+            == Some("compact")
+        {
+            yamantaka_domain::workspaces::WorkspaceDensity::Compact
+        } else {
+            Default::default()
+        };
         let list = preferences
             .get("libraryView")
             .and_then(serde_json::Value::as_str)
@@ -359,6 +370,8 @@ impl YamantakaApp {
             missing_only,
             modified_only,
             list,
+            library_density,
+            reader_focus: false,
             offset: 0,
             selected: None,
             inspector,
@@ -513,6 +526,18 @@ impl YamantakaApp {
             return;
         }
         let state = [
+            (
+                "libraryDensity",
+                serde_json::Value::from(
+                    if self.library_density
+                        == yamantaka_domain::workspaces::WorkspaceDensity::Compact
+                    {
+                        "compact"
+                    } else {
+                        "comfortable"
+                    },
+                ),
+            ),
             ("libraryGrouping", self.grouping.mode.key().into()),
             (
                 "librarySort",
@@ -1295,11 +1320,20 @@ impl YamantakaApp {
             return;
         };
         self.sync_tab_context();
-        self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
-        ui.add_space(4.0);
+        if self.reader_focus {
+            self.prepare_annotations(&document.id);
+            self.text.clear();
+            self.thumbnails.clear();
+            self.reader_focus_exit(ui, p);
+        } else {
+            self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
+            ui.add_space(4.0);
+        }
         self.selection_toolbar(ui, p);
-        self.reader_panel(ui, &document, &info, p);
-        if self.panel && ui.ctx().content_rect().width() < 620.0 {
+        if !self.reader_focus {
+            self.reader_panel(ui, &document, &info, p);
+        }
+        if self.panel && !self.reader_focus && ui.ctx().content_rect().width() < 620.0 {
             return;
         }
         self.reader_viewport(ui, &document, &info, p);
@@ -1328,6 +1362,7 @@ impl App for YamantakaApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
+        self.guard_workspace_close(ctx);
         self.update_restore(ctx);
         if self.backup_restore.busy() && ctx.input(|input| input.viewport().close_requested()) {
             self.backup_restore.close_after = true;
@@ -1883,6 +1918,7 @@ impl App for YamantakaApp {
         self.advance_replacement_preview();
         self.advance_tab_preview();
         self.advance_queue_preview();
+        self.pump_workspace_context(ctx);
         self.advance_workspace_preview();
         self.advance_bulk_tab_preview();
         self.retire_closed_reader();
@@ -1916,6 +1952,9 @@ impl App for YamantakaApp {
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut Frame) {
+        if self.workspaces.close_after {
+            ui.disable();
+        }
         let ctx = ui.ctx().clone();
         ctx.data_mut(|data| {
             data.insert_temp(
@@ -1944,7 +1983,8 @@ impl App for YamantakaApp {
                 || self.legacy_import.open
                 || self.backup_restore.open
                 || self.reading_queue.open
-                || self.workspaces.open,
+                || self.workspaces.open
+                || self.workspaces.close_after,
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
@@ -1957,7 +1997,8 @@ impl App for YamantakaApp {
                 || self.legacy_import.open
                 || self.backup_restore.open
                 || self.reading_queue.open
-                || self.workspaces.open,
+                || self.workspaces.open
+                || self.workspaces.close_after,
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -1978,6 +2019,10 @@ impl App for YamantakaApp {
                 shortcuts::Shortcut::Fullscreen => {
                     let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
                     ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
+                }
+                shortcuts::Shortcut::Focus => {
+                    self.reader_focus = !self.reader_focus;
+                    ctx.request_repaint();
                 }
             }
         }

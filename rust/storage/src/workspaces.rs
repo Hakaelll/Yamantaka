@@ -33,6 +33,10 @@ fn verify(db: &Connection, expected: &WorkspaceRevision) -> Result<Workspace> {
         .filter(|row| row.updated_at == expected.updated_at)
         .ok_or_else(|| invalid("Workspace changed; refresh before retrying"))
 }
+fn header(db: &Connection, id: &str) -> Result<Workspace> {
+    db.query_row(&format!("{SUMMARY} WHERE w.id=?"), [id], summary)
+        .map_err(storage)
+}
 fn next_revision(previous: Option<&str>) -> String {
     let mut now = chrono::Utc::now();
     if let Some(previous) =

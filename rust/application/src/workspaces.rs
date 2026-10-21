@@ -11,7 +11,7 @@ pub struct WorkspaceRequest {
 pub enum WorkspaceOutcome {
     Page(WorkspacePage),
     Loaded(Box<WorkspaceReadings>),
-    Changed(String),
+    Changed(WorkspaceChanged),
 }
 pub struct WorkspaceReply {
     pub result: Result<WorkspaceOutcome>,

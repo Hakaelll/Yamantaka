@@ -29,6 +29,16 @@ pub(super) fn load(
     cancel.check()?;
     let db = &database.connection;
     let workspace = verify(db, expected)?;
+    let view = db.query_row("SELECT query_json,collection_id,grouping,sort_mode,density,focus_mode FROM workspaces WHERE id=?",[&expected.id],|row|Ok((row.get::<_,String>(0)?,row.get::<_,Option<String>>(1)?,row.get::<_,String>(2)?,row.get::<_,String>(3)?,row.get::<_,String>(4)?,row.get::<_,bool>(5)?))).map_err(storage)?;
+    let view = WorkspaceView {
+        query: serde_json::from_str(&view.0).map_err(storage)?,
+        collection_id: view.1,
+        grouping: serde_json::from_value(serde_json::Value::String(view.2)).map_err(storage)?,
+        sort: serde_json::from_value(serde_json::Value::String(view.3)).map_err(storage)?,
+        density: serde_json::from_value(serde_json::Value::String(view.4)).map_err(storage)?,
+        focus: view.5,
+    };
+    view.validate()?;
     if workspace.readings > 12 {
         return Err(invalid(
             "This workspace exceeds the twelve-reading limit; stored data is preserved",
@@ -113,5 +123,6 @@ pub(super) fn load(
         workspace,
         tabs: model,
         captions,
+        view,
     })
 }

@@ -141,7 +141,8 @@ impl Document {
             .unwrap_or(&self.file_name)
     }
 }
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum LibraryReadingState {
     #[default]
     All,
@@ -150,7 +151,8 @@ pub enum LibraryReadingState {
     Completed,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum LibrarySort {
     #[default]
     LastOpened,
@@ -161,7 +163,8 @@ pub enum LibrarySort {
     PageCount,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum SortDirection {
     /// Titles/authors ascend; dates, progress and page count descend.
     #[default]
@@ -241,7 +244,7 @@ pub trait LibraryRepository {
         &mut self,
         _change: &workspaces::WorkspaceChange,
         _cancel: &Cancellation,
-    ) -> Result<String> {
+    ) -> Result<workspaces::WorkspaceChanged> {
         Err(Failure::Unsupported("Saved workspace changes".into()))
     }
     fn library_memberships(

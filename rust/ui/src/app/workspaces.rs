@@ -3,8 +3,11 @@ use yamantaka_application::workspaces::{
     WorkspaceCommand, WorkspaceOutcome, WorkspaceReply, WorkspaceRequest,
 };
 use yamantaka_domain::workspaces::{Workspace, WorkspaceChange, WorkspacePage, WorkspaceRevision};
+mod binding;
+mod context;
 mod preview;
 mod view;
+use binding::{PendingContext, WorkspaceBinding};
 
 #[derive(Default)]
 pub(super) struct WorkspaceState {
@@ -14,6 +17,10 @@ pub(super) struct WorkspaceState {
     offset: usize,
     pending: Option<Cancellation>,
     loading: bool,
+    pending_change: Option<WorkspaceChange>,
+    pending_open: Option<PendingContext>,
+    binding: Option<WorkspaceBinding>,
+    pub(super) close_after: bool,
     draft: String,
     edit: Option<(Workspace, String, bool)>,
     confirm: Option<(Workspace, bool)>,
@@ -25,7 +32,7 @@ pub(super) struct WorkspaceState {
 }
 impl WorkspaceState {
     pub(super) fn ready(&self) -> bool {
-        self.pending.is_none() && self.preview == 0
+        self.pending.is_none() && self.pending_open.is_none() && self.preview == 0
     }
     pub(super) fn cancel(&mut self) {
         if let Some(cancel) = &self.pending {
@@ -47,6 +54,11 @@ impl YamantakaApp {
         }
         let cancel = Cancellation::default();
         let loading = matches!(command, WorkspaceCommand::Load(_));
+        let change = if let WorkspaceCommand::Change(change) = &command {
+            Some(change.clone())
+        } else {
+            None
+        };
         match self
             .runtime
             .submit(Action::Workspace(Box::new(WorkspaceRequest {
@@ -56,6 +68,7 @@ impl YamantakaApp {
             Ok(()) => {
                 self.workspaces.pending = Some(cancel);
                 self.workspaces.loading = loading;
+                self.workspaces.pending_change = change;
                 self.workspaces.error = None;
             }
             Err(error) => self.workspaces.error = Some(error.to_string()),
@@ -71,6 +84,7 @@ impl YamantakaApp {
             return;
         }
         self.workspaces.pending = None;
+        let change = self.workspaces.pending_change.take();
         match reply.result {
             Err(error) => {
                 assert!(
@@ -78,6 +92,15 @@ impl YamantakaApp {
                     "Workspace preview failed: {error}"
                 );
                 self.workspaces.error = Some(error.to_string());
+                if change.is_some() {
+                    self.workspaces.close_after = false;
+                    if let Some(binding) = &mut self.workspaces.binding
+                        && matches!(&change,Some(WorkspaceChange::Replace {expected,..}|WorkspaceChange::Focus {expected,..}) if expected.id==binding.workspace.id)
+                    {
+                        binding.paused = true;
+                    }
+                    self.error=Some(format!("{}: {error}",self.tr("No se han guardado los cambios del espacio. Las lecturas actuales se conservan.","Workspace changes could not be saved. Current readings are preserved.")));
+                }
             }
             Ok(WorkspaceOutcome::Page(WorkspacePage { entries, total })) => {
                 self.workspaces.entries = entries;
@@ -89,14 +112,17 @@ impl YamantakaApp {
                     });
                 }
             }
-            Ok(WorkspaceOutcome::Changed(_id)) => {
+            Ok(WorkspaceOutcome::Changed(changed)) => {
+                self.accept_workspace_change(changed, change);
                 self.workspaces.draft.clear();
                 self.workspaces.edit = None;
                 self.workspaces.confirm = None;
                 self.workspaces.notice = Some(self.tr("Cambios guardados", "Changes saved").into());
-                self.workspace_request(WorkspaceCommand::List {
-                    offset: self.workspaces.offset,
-                });
+                if self.workspaces.open || self.workspaces.preview > 0 {
+                    self.workspace_request(WorkspaceCommand::List {
+                        offset: self.workspaces.offset,
+                    });
+                }
             }
             Ok(WorkspaceOutcome::Loaded(saved)) => {
                 if !self.workspaces.open {
@@ -152,6 +178,11 @@ impl YamantakaApp {
                     self.tabs.captions.insert(id, title);
                 }
                 if self.request_tab_plan(plan) {
+                    self.workspaces.pending_open = Some(PendingContext {
+                        workspace: saved.workspace.clone(),
+                        view: saved.view,
+                        target: selected,
+                    });
                     self.workspaces.open = false;
                     self.workspaces.notice = Some(format!(
                         "{}: {}",

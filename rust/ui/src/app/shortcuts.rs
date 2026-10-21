@@ -9,6 +9,7 @@ pub(super) enum Shortcut {
     PreviousPage,
     NextPage,
     Fullscreen,
+    Focus,
     NextTab,
     PreviousTab,
     CloseTab,
@@ -34,6 +35,9 @@ pub(super) fn read(ctx: &egui::Context, modal_open: bool, reader_active: bool) -
             commands.push(Shortcut::ReopenTab);
         }
         if reader_active {
+            if input.consume_key(egui::Modifiers::NONE, egui::Key::F8) {
+                commands.push(Shortcut::Focus);
+            }
             if input.consume_key(egui::Modifiers::CTRL, egui::Key::W) {
                 commands.push(Shortcut::CloseTab);
             }

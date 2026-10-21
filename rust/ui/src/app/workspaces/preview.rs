@@ -67,7 +67,7 @@ impl YamantakaApp {
         let step = self.workspaces.preview;
         if step == 0
             || !self.library_loaded
-            || self.documents.len() < 3
+            || step <= 2 && self.documents.len() < 3
             || self.workspaces.pending.is_some()
         {
             return;
@@ -85,10 +85,16 @@ impl YamantakaApp {
         };
         match step {
             1 => {
+                self.query = "Architecture".into();
+                self.list = true;
+                self.reader_focus = true;
+                self.grouping.mode = super::super::library_grouping::Grouping::Author;
+                self.library_density = yamantaka_domain::workspaces::WorkspaceDensity::Compact;
                 self.workspaces.preview = 2;
                 self.workspace_change(WorkspaceChange::Create {
                     name: "Study".into(),
                     tabs: Box::new(self.workspace_fixture()),
+                    view: Box::new(self.capture_workspace_view()),
                 });
             }
             2 => {
@@ -96,6 +102,7 @@ impl YamantakaApp {
                 self.workspace_change(WorkspaceChange::Replace {
                     expected: find("Study"),
                     tabs: Box::new(self.workspace_fixture()),
+                    view: None,
                 });
             }
             3 => {
@@ -126,11 +133,27 @@ impl YamantakaApp {
             }
             7 => {
                 assert_eq!(self.workspaces.total, 1);
+                self.query.clear();
+                self.list = false;
+                self.grouping.reset();
+                self.reader_focus = false;
                 self.workspaces.preview = 8;
                 self.workspaces.open = true;
                 self.workspace_request(WorkspaceCommand::Load(find("Reference copy")));
             }
             8 if self.active.is_some() && self.tabs.ready() && !self.reader_preferences_loading => {
+                assert_eq!(self.query, "Architecture");
+                assert!(self.list && self.reader_focus && self.workspaces.binding.is_some());
+                assert!(self.grouping.mode == super::super::library_grouping::Grouping::Author);
+                let active = self.tabs.model.active().unwrap().id().to_owned();
+                self.tabs
+                    .model
+                    .update_queue(
+                        &active,
+                        QueueEntry::new(QueueStatus::Reviewed, "", "Study key figures"),
+                    )
+                    .unwrap();
+                self.reader_focus = false;
                 assert_eq!(self.tabs.model.tabs().len(), 3);
                 assert_eq!(
                     self.reader_preferences.as_ref().unwrap().page_rotation,
@@ -154,7 +177,27 @@ impl YamantakaApp {
                     )
                     .unwrap();
                 self.check_workspace_preview(&saved);
-                self.workspaces.preview = 0;
+                assert!(!saved.view.focus);
+                assert_eq!(
+                    saved.tabs.active().unwrap().queue().status(),
+                    QueueStatus::Reviewed
+                );
+                assert_eq!(
+                    saved.tabs.active().unwrap().queue().next_action(),
+                    Some("Study key figures")
+                );
+                self.reader_focus = true;
+                self.workspaces.preview = 10;
+            }
+            10 => {
+                if self
+                    .workspaces
+                    .binding
+                    .as_ref()
+                    .is_some_and(|binding| binding.focus)
+                {
+                    self.workspaces.preview = 0;
+                }
             }
             _ => {}
         }

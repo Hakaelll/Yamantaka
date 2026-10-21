@@ -106,14 +106,18 @@ impl Database {
         &mut self,
         change: &WorkspaceChange,
         cancel: &Cancellation,
-    ) -> Result<String> {
+    ) -> Result<WorkspaceChanged> {
         cancel.check()?;
         let tx = self
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(storage)?;
         let id = match change {
-            WorkspaceChange::Create { name: value, tabs } => {
+            WorkspaceChange::Create {
+                name: value,
+                tabs,
+                view: layout,
+            } => {
                 let clean = name(value)?;
                 let id = uuid::Uuid::new_v4().to_string();
                 let now = next_revision(None);
@@ -123,11 +127,19 @@ impl Database {
                 )
                 .map_err(storage)?;
                 readings(&tx, &id, tabs, cancel)?;
+                view(&tx, &id, layout)?;
                 id
             }
-            WorkspaceChange::Replace { expected, tabs } => {
+            WorkspaceChange::Replace {
+                expected,
+                tabs,
+                view: layout,
+            } => {
                 verify(&tx, expected)?;
                 readings(&tx, &expected.id, tabs, cancel)?;
+                if let Some(layout) = layout {
+                    view(&tx, &expected.id, layout)?;
+                }
                 tx.execute(
                     "UPDATE workspaces SET updated_at=? WHERE id=?",
                     params![next_revision(Some(&expected.updated_at)), expected.id],
@@ -153,16 +165,26 @@ impl Database {
             }
             WorkspaceChange::SetDefault { expected } => {
                 verify(&tx, expected)?;
-                // Both the old and new default revisions change for stale editors.
                 let now = next_revision(Some(&expected.updated_at));
-                tx.execute(
-                    "UPDATE workspaces SET is_default=0,updated_at=? WHERE is_default=1",
-                    [&now],
-                )
-                .map_err(storage)?;
+                // Other records' reading contexts are unchanged by this flag.
+                tx.execute("UPDATE workspaces SET is_default=0 WHERE is_default=1", [])
+                    .map_err(storage)?;
                 tx.execute(
                     "UPDATE workspaces SET is_default=1,updated_at=? WHERE id=?",
                     params![now, expected.id],
+                )
+                .map_err(storage)?;
+                expected.id.clone()
+            }
+            WorkspaceChange::Focus { expected, enabled } => {
+                verify(&tx, expected)?;
+                tx.execute(
+                    "UPDATE workspaces SET focus_mode=?,updated_at=? WHERE id=?",
+                    params![
+                        enabled,
+                        next_revision(Some(&expected.updated_at)),
+                        expected.id
+                    ],
                 )
                 .map_err(storage)?;
                 expected.id.clone()
@@ -180,15 +202,20 @@ impl Database {
             }
         };
         cancel.check()?;
+        let changed = if matches!(change, WorkspaceChange::Delete { .. }) {
+            WorkspaceChanged::Deleted(id)
+        } else {
+            WorkspaceChanged::Saved(header(&tx, &id)?)
+        };
         tx.commit().map_err(storage)?;
-        Ok(id)
+        Ok(changed)
     }
     pub(crate) fn duplicate_workspace(
         &mut self,
         expected: &WorkspaceRevision,
         value: &str,
         cancel: &Cancellation,
-    ) -> Result<String> {
+    ) -> Result<WorkspaceChanged> {
         let clean = name(value)?;
         // The transaction freezes metadata and reader rows together.
         let tx = self.connection.unchecked_transaction().map_err(storage)?;
@@ -198,7 +225,37 @@ impl Database {
         tx.execute("INSERT INTO workspaces(id,name,is_default,active_tab_id,panel_section,panel_width,split_json,collection_id,created_at,updated_at,query_json,grouping,sort_mode,density,visible_columns_json,focus_mode) SELECT ?,?,0,active_tab_id,panel_section,panel_width,split_json,collection_id,?,?,query_json,grouping,sort_mode,density,visible_columns_json,focus_mode FROM workspaces WHERE id=?",params![id,clean,now,now,expected.id]).map_err(storage)?;
         readings(&tx, &id, &source.tabs, cancel)?;
         cancel.check()?;
+        let changed = WorkspaceChanged::Saved(header(&tx, &id)?);
         tx.commit().map_err(storage)?;
-        Ok(id)
+        Ok(changed)
     }
+}
+fn view(db: &Connection, id: &str, view: &WorkspaceView) -> Result<()> {
+    view.validate()?;
+    let existing: String = db
+        .query_row(
+            "SELECT query_json FROM workspaces WHERE id=?",
+            [id],
+            |row| row.get(0),
+        )
+        .map_err(storage)?;
+    let mut query: serde_json::Value = serde_json::from_str(&existing).map_err(storage)?;
+    let incoming = view
+        .query
+        .as_object()
+        .ok_or_else(|| invalid("Workspace query must be an object"))?;
+    query
+        .as_object_mut()
+        .ok_or_else(|| invalid("Workspace query must be an object; stored data is preserved"))?
+        .extend(incoming.clone());
+    WorkspaceView {
+        query: query.clone(),
+        ..view.clone()
+    }
+    .validate()?;
+    let grouping = serde_json::to_value(view.grouping).map_err(storage)?;
+    let sort = serde_json::to_value(view.sort).map_err(storage)?;
+    let density = serde_json::to_value(view.density).map_err(storage)?;
+    db.execute("UPDATE workspaces SET query_json=?,collection_id=?,grouping=?,sort_mode=?,density=?,focus_mode=? WHERE id=?",params![serde_json::to_string(&query).map_err(storage)?,view.collection_id,grouping.as_str().unwrap(),sort.as_str().unwrap(),density.as_str().unwrap(),view.focus,id]).map_err(storage)?;
+    Ok(())
 }

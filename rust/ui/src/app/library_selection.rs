@@ -228,6 +228,7 @@ impl YamantakaApp {
             || self.backup_restore.open
             || self.reading_queue.open
             || self.workspaces.open
+            || self.workspaces.close_after
             || ctx.egui_wants_keyboard_input()
             || egui::Popup::is_any_open(ctx)
             || self.library_selection.pending.is_some()
