@@ -69,7 +69,7 @@ pub(super) fn verify(root: &Path, paths: &[PathBuf]) {
         ))
         .unwrap();
     loop {
-        if let Update::Library(rows, count, _) = resumed
+        if let Update::Library(rows, count, _, _) = resumed
             .updates
             .recv_timeout(Duration::from_secs(10))
             .unwrap()

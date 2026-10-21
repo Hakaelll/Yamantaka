@@ -12,6 +12,7 @@ impl YamantakaApp {
             || !self.library_tags.filters.is_empty()
     }
     pub(super) fn reset_library_filters(&mut self) {
+        self.grouping.reset();
         self.query.clear();
         self.smart_view = None;
         self.clear_tag_filters();

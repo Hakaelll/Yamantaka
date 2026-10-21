@@ -187,7 +187,7 @@ fn run(operation: Operation, outcome: Outcome) {
         .unwrap();
     let count = if expected.is_some() { 3 } else { 2 };
     assert!(
-        matches!(wait(&runtime),Update::Library(documents,total,_) if total==count && documents.len()==count as usize)
+        matches!(wait(&runtime),Update::Library(documents,total,_,_) if total==count && documents.len()==count as usize)
     );
     let mut target_bytes = originals[0].clone();
     if outcome == Outcome::SourceChanged {

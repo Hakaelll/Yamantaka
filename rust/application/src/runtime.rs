@@ -174,7 +174,12 @@ pub enum Update {
     ),
     Search(Vec<SearchResult>, Cancellation),
     IndexStatistics(IndexStats),
-    Library(Vec<Document>, u64, Cancellation),
+    Library(
+        Vec<Document>,
+        u64,
+        Vec<yamantaka_domain::LibraryMembership>,
+        Cancellation,
+    ),
     Opened(Box<Document>, PdfInfo, Cancellation),
     OpenFailed(Box<Document>, Failure, Cancellation),
     Page(Arc<RenderedPage>, Cancellation, u64, u64),
@@ -1212,7 +1217,8 @@ impl Runtime {
                                         let documents = repository.query(&query)?;
                                         let count = repository.count(&query)?;
                                         cancel.check()?;
-                                        Ok(Update::Library(documents, count, cancel.clone()))
+                                        let memberships=repository.library_memberships(&documents.iter().map(|doc|doc.id.clone()).collect::<Vec<_>>(), &cancel)?;
+                                        Ok(Update::Library(documents, count, memberships, cancel.clone()))
                                     })();
                                     match result {
                                         Ok(update) => emit(&events, &notify, update, permit),

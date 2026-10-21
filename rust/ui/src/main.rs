@@ -431,6 +431,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         {
             db.execute_batch("UPDATE documents SET added_at='2000-01-01T00:00:00Z',last_opened_at=''; UPDATE documents SET added_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),last_opened_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='demo-0'; INSERT INTO annotations(id,document_id,page_index,type,color,document_fingerprint,created_at,updated_at) VALUES('smart-a','demo-0',0,'note','violet','synthetic','2026-10-19','2026-10-19'),('smart-b','demo-0',1,'note','violet','synthetic','2026-10-19','2026-10-19'); INSERT INTO bookmarks(id,document_id,page_index,created_at,updated_at) VALUES('smart-a','demo-0',0,'2026-10-19','2026-10-19'),('smart-b','demo-0',1,'2026-10-19','2026-10-19');")?;
         }
+        if capture.is_some()
+            && args
+                .iter()
+                .filter_map(|arg| arg.to_str())
+                .any(|arg| arg.starts_with("--grouping="))
+        {
+            db.execute_batch("UPDATE documents SET author=CASE WHEN id IN ('demo-0','demo-2') THEN 'Study collective' WHEN id='demo-1' THEN NULL ELSE author END; INSERT INTO collections VALUES('grouping-collection','Personal study','personal study','study',0,1,'2026-10-21','2026-10-21'); INSERT INTO collection_documents VALUES('grouping-collection','demo-0','2026-10-21'),('grouping-collection','demo-2','2026-10-21'); INSERT INTO tags VALUES('grouping-tag','Research','research','violet','2026-10-21','2026-10-21'); INSERT INTO document_tags VALUES('demo-0','grouping-tag'),('demo-2','grouping-tag');")?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--tag-management=failure") {
             db.execute_batch("CREATE TRIGGER reject_tag_rename BEFORE UPDATE OF name ON tags WHEN NEW.name='Rejected name' BEGIN SELECT RAISE(ABORT,'synthetic tag failure'); END;")?;
         }
@@ -800,6 +808,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .find_map(|value| value.strip_prefix("--bulk-organization="))
                 {
                     app.preview_bulk_organization(mode);
+                }
+                if let Some(mode) = args
+                    .iter()
+                    .filter_map(|arg| arg.to_str())
+                    .find_map(|arg| arg.strip_prefix("--grouping="))
+                {
+                    app.preview_grouping(mode, args.iter().any(|arg| arg == "--fold-group"));
                 }
                 if args.iter().any(|arg| arg == "--library-tags") {
                     let mode = args

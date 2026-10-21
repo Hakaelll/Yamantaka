@@ -213,7 +213,7 @@ pub(crate) fn verify() {
         .submit(Action::Query(LibraryQuery::default(), query.clone()))
         .unwrap();
     loop {
-        if let Update::Library(_, count, scope) = runtime
+        if let Update::Library(_, count, _, scope) = runtime
             .updates
             .recv_timeout(Duration::from_secs(5))
             .unwrap()

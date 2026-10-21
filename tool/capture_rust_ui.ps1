@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Executable = "$PSScriptRoot/../target/debug/yamantaka-rust.exe",
     [string]$OutputDirectory = "$PSScriptRoot/../build/rust-visual/stage2",
     [string[]]$CaseNames = @()
@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='grouping-author'; args=@('--pdf-covers','--grouping=author') },
+    @{ name='grouping-author-folded'; args=@('--pdf-covers','--grouping=author','--fold-group') },
+    @{ name='grouping-collections'; args=@('--pdf-covers','--grouping=collection','--es','--light','--reduce-motion') },
+    @{ name='grouping-tags-list'; args=@('--pdf-covers','--grouping=tag','--list') },
+    @{ name='grouping-reading-small-200'; args=@('--pdf-covers','--grouping=readingState','--size=640x480','--text-scale=2','--es','--light','--reduce-motion') },
     @{ name='bulk-remove-review'; args=@('--pdf-covers','--bulk-remove=review') },
     @{ name='bulk-remove-review-small-200'; args=@('--pdf-covers','--bulk-remove=review','--light','--es','--size=640x480','--text-scale=2','--reduce-motion') },
     @{ name='bulk-remove-applied'; args=@('--pdf-covers','--bulk-remove=apply','--reduce-motion') },
@@ -358,6 +363,15 @@ foreach ($case in $cases) {
             if ($controls.bulkTargetPicker.open -or $controls.bulkOrganization.members -ne $expectedMembers -or $controls.libraryDocumentCount -ne $expectedMembers -or $controls.librarySelection.ids.Count -ne 0) { throw 'Bulk organization membership or filtered readback is incorrect.' }
             if ($case.name -eq 'bulk-tags-applied' -and $controls.bulkOrganization.annotationUses -ne 1) { throw 'Document tag assignment must preserve the existing annotation membership.' }
         }
+    }
+    if ($case.name -like 'grouping-*') {
+        $grouping=$controls.libraryGrouping
+        if (-not $grouping.verified -or $grouping.groups.Count -lt 2) { throw 'Grouping did not verify the native catalogue result.' }
+        $groupedCount=($grouping.groups | Measure-Object -Property count -Sum).Sum
+        if ($groupedCount -ne $controls.libraryDocumentCount) { throw 'Grouping lost or duplicated documents.' }
+        if ($case.name -eq 'grouping-author-folded') {
+            if (-not $grouping.groups[0].collapsed -or $grouping.visible.Count -ge $groupedCount) { throw 'Folding must remove only that group from visible navigation.' }
+        } elseif ($grouping.visible.Count -ne $groupedCount) { throw 'Expanded grouping must retain every page document.' }
     }
     if ($case.name -like 'library-selection-*') {
         if (-not $controls.libraryQueryLoaded -or $controls.librarySelection.writing -or $null -ne $controls.librarySelection.preview) { throw 'Library selection preview has not completed.' }

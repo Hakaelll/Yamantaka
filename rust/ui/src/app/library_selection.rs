@@ -77,7 +77,7 @@ impl SelectionState {
 }
 impl YamantakaApp {
     pub(super) fn library_page_ids(&self) -> Vec<String> {
-        self.documents.iter().map(|doc| doc.id.clone()).collect()
+        self.library_visible_ids()
     }
     fn select_library_book(&mut self, document: &Document, modifiers: egui::Modifiers) {
         if self.library_selection.pending.is_none() {
@@ -145,18 +145,29 @@ impl YamantakaApp {
             }
             let page = self.library_page_ids();
             if let Some(index) = page.iter().position(|id| id == &document.id) {
-                let columns = self.library_selection.columns.max(1);
                 for (key, target) in [
                     (egui::Key::ArrowLeft, index.saturating_sub(1)),
                     (egui::Key::ArrowRight, (index + 1).min(page.len() - 1)),
-                    (egui::Key::ArrowUp, index.saturating_sub(columns)),
-                    (egui::Key::ArrowDown, (index + columns).min(page.len() - 1)),
+                    (
+                        egui::Key::ArrowUp,
+                        self.library_vertical_index(&page, index, false),
+                    ),
+                    (
+                        egui::Key::ArrowDown,
+                        self.library_vertical_index(&page, index, true),
+                    ),
                     (egui::Key::Home, 0),
                     (egui::Key::End, page.len() - 1),
                 ] {
                     if ui.input_mut(|input| input.consume_key(modifiers, key)) {
-                        if modifiers.shift {
-                            self.select_library_book(&self.documents[target].clone(), modifiers);
+                        if modifiers.shift
+                            && let Some(document) = self
+                                .documents
+                                .iter()
+                                .find(|doc| doc.id == page[target])
+                                .cloned()
+                        {
+                            self.select_library_book(&document, modifiers);
                         }
                         self.selected = Some(page[target].clone());
                         self.library_selection.focus = Some(page[target].clone());
@@ -223,7 +234,7 @@ impl YamantakaApp {
             let ids = if self.library_selection.model.ids().is_empty() {
                 self.selected
                     .iter()
-                    .filter(|id| self.documents.iter().any(|document| &document.id == *id))
+                    .filter(|id| self.library_page_ids().contains(id))
                     .cloned()
                     .collect()
             } else {

@@ -17,6 +17,9 @@ mod goals;
 mod history;
 mod library_check;
 mod library_covers;
+mod library_grouping;
+mod library_grouping_grid;
+mod library_grouping_preview;
 mod library_intro;
 mod library_selection;
 mod links;
@@ -131,6 +134,7 @@ pub struct YamantakaApp {
     surface: Surface,
     documents: Vec<Document>,
     count: u64,
+    grouping: library_grouping::GroupingState,
     query: String,
     favorites: bool,
     reading_state: LibraryReadingState,
@@ -247,6 +251,11 @@ impl YamantakaApp {
             .filter(|scale| scale.is_finite())
             .unwrap_or(1.0)
             .clamp(1.0, 2.0) as f32;
+        let grouping = library_grouping::GroupingState::from_key(
+            preferences
+                .get("libraryGrouping")
+                .and_then(serde_json::Value::as_str),
+        );
         let sort = match preferences
             .get("librarySort")
             .and_then(serde_json::Value::as_str)
@@ -397,6 +406,7 @@ impl YamantakaApp {
             bulk_organization_verified: None,
             bulk_picker: None,
             library_selection: Default::default(),
+            grouping,
             query_cancel: Cancellation::default(),
             library_loaded: false,
             error: None,
@@ -487,6 +497,7 @@ impl YamantakaApp {
             return;
         }
         let state = [
+            ("libraryGrouping", self.grouping.mode.key().into()),
             (
                 "librarySort",
                 serde_json::Value::from(match self.sort {
@@ -1112,107 +1123,7 @@ impl YamantakaApp {
                     egui::ScrollArea::vertical()
                         .id_salt("catalogue")
                         .show(ui, |ui| {
-                            let documents = self.documents.clone();
-                            if !self.list {
-                                ui.add_space(24.0);
-                            }
-                            if self.list {
-                                self.library_selection.columns=1;
-                                self.list_documents(ui,documents,p);
-                            } else if ui.ctx().content_rect().width()<420.0 {self.compact_covers(ui,documents,p);} else {
-                                let columns = (ui.available_width()
-                                    / if compact { 260.0 } else { 240.0 })
-                                .floor()
-                                .max(1.0) as usize;
-                                self.library_selection.columns=columns;
-                                let gap = 36.0;
-                                let slot = ((ui.available_width() - gap * (columns - 1) as f32)
-                                    / columns as f32)
-                                    .max(100.0);
-                                let width = if compact {
-                                    slot.min(
-                                        ((ui.available_height() - book::CAPTION_HEIGHT - 5.0) / 1.34).clamp(110.0, 180.0),
-                                    )
-                                } else {
-                                    slot.min(228.0)
-                                };
-                                for row in documents.chunks(columns) {
-                                    ui.horizontal_top(|ui| {
-                                        ui.spacing_mut().item_spacing.x = gap;
-                                        for document in row {
-                                            let response = ui
-                                                .allocate_ui_with_layout(
-                                                    egui::vec2(slot, width * 1.34 + book::CAPTION_HEIGHT),
-                                                    egui::Layout::top_down(egui::Align::Center),
-                                                    |ui| {
-                                                        ui.push_id(&document.id, |ui| {
-                                                            book::cover(
-                                                                ui,
-                                                                document,
-                                                                width,
-                                                                self.library_selection.model.contains(&document.id),
-                                                                self.reduced_motion,
-                                                                p,
-                                                                if self.preview_tilt
-                                                                    && document.id == "demo-0"
-                                                                {
-                                                                    Some(egui::vec2(0.95, 0.75))
-                                                                } else {
-                                                                    None
-                                                                },
-                                                            )
-                                                        })
-                                                        .inner
-                                                    },
-                                                )
-                                                .inner;
-                                            self.library_book_response(ui,&response,document);
-                                            response.context_menu(|ui| {
-                                                if ui
-                                                    .button(
-                                                        self.tr("Abrir documento", "Open document"),
-                                                    )
-                                                    .clicked()
-                                                {
-                                                    self.open(document.clone());
-                                                    ui.close();
-                                                }
-                                                if ui
-                                                    .button(self.tr(
-                                                        "Mostrar en Explorer",
-                                                        "Show in Explorer",
-                                                    ))
-                                                    .clicked()
-                                                {
-                                                    if let Err(error) =
-                                                        yamantaka_windows::reveal(&document.path)
-                                                    {
-                                                        self.error = Some(error.to_string());
-                                                    }
-                                                    ui.close();
-                                                }
-                                                if ui
-                                                    .add_enabled(!self.library_selection.writing(), egui::Button::new(
-                                                        self.tr(
-                                                            "Cambiar favorito",
-                                                            "Toggle favorite",
-                                                        ),
-                                                    ))
-                                                    .clicked()
-                                                {
-                                                    self.send(Action::Favorite(
-                                                        document.id.clone(),
-                                                        !document.favorite,
-                                                    ));
-                                                    self.refresh();
-                                                    ui.close();
-                                                }
-                                            });
-                                        }
-                                    });
-                                    ui.add_space(14.0);
-                                }
-                            }
+                            self.grouped_library(ui,compact,p);
                             ui.horizontal(|ui| {
                                 if ui
                                     .add_enabled(
@@ -1294,44 +1205,57 @@ impl YamantakaApp {
         let sort_response = theme::control(ui, sort_name, Some(theme::Icon::Sort), false, false, p)
             .on_hover_text(self.tr("Ordenar biblioteca", "Sort library"));
         egui::Popup::menu(&sort_response).show(|ui| {
-            for (sort, es, en) in [
-                (
-                    LibrarySort::LastOpened,
-                    "Abiertos recientemente",
-                    "Recently opened",
-                ),
-                (LibrarySort::Title, "Título", "Title"),
-                (LibrarySort::Author, "Autor", "Author"),
-                (LibrarySort::Added, "Fecha de incorporación", "Date added"),
-                (
-                    LibrarySort::Progress,
-                    "Progreso de lectura",
-                    "Reading progress",
-                ),
-                (LibrarySort::PageCount, "Número de páginas", "Page count"),
-            ] {
-                if theme::navigation(ui, self.tr(es, en), self.sort == sort, p).clicked() {
-                    self.sort = sort;
-                    self.sort_direction = SortDirection::Default;
-                    self.offset = 0;
-                    self.refresh();
-                    ui.close();
-                }
-            }
-            ui.separator();
-            for (direction, es, en) in [
-                (SortDirection::Ascending, "Ascendente", "Ascending"),
-                (SortDirection::Descending, "Descendente", "Descending"),
-            ] {
-                if theme::navigation(ui, self.tr(es, en), self.sort_direction == direction, p)
-                    .clicked()
-                {
-                    self.sort_direction = direction;
-                    self.offset = 0;
-                    self.refresh();
-                    ui.close();
-                }
-            }
+            let height = (ui.ctx().content_rect().height() - 40.0).max(40.0);
+            egui::ScrollArea::vertical()
+                .id_salt("library-sort-group-options")
+                .max_height(height)
+                .show(ui, |ui| {
+                    for (sort, es, en) in [
+                        (
+                            LibrarySort::LastOpened,
+                            "Abiertos recientemente",
+                            "Recently opened",
+                        ),
+                        (LibrarySort::Title, "Título", "Title"),
+                        (LibrarySort::Author, "Autor", "Author"),
+                        (LibrarySort::Added, "Fecha de incorporación", "Date added"),
+                        (
+                            LibrarySort::Progress,
+                            "Progreso de lectura",
+                            "Reading progress",
+                        ),
+                        (LibrarySort::PageCount, "Número de páginas", "Page count"),
+                    ] {
+                        if theme::navigation(ui, self.tr(es, en), self.sort == sort, p).clicked() {
+                            self.sort = sort;
+                            self.sort_direction = SortDirection::Default;
+                            self.offset = 0;
+                            self.refresh();
+                            ui.close();
+                        }
+                    }
+                    ui.separator();
+                    for (direction, es, en) in [
+                        (SortDirection::Ascending, "Ascendente", "Ascending"),
+                        (SortDirection::Descending, "Descendente", "Descending"),
+                    ] {
+                        if theme::navigation(
+                            ui,
+                            self.tr(es, en),
+                            self.sort_direction == direction,
+                            p,
+                        )
+                        .clicked()
+                        {
+                            self.sort_direction = direction;
+                            self.offset = 0;
+                            self.refresh();
+                            ui.close();
+                        }
+                    }
+                    ui.separator();
+                    self.library_grouping_options(ui, p);
+                });
         });
         if self.library_has_filters()
             && theme::navigation(
@@ -1488,7 +1412,7 @@ impl App for YamantakaApp {
                         self.annotation_paint.invalidate();
                     }
                 }
-                Update::Library(documents, count, cancel) => {
+                Update::Library(documents, count, memberships, cancel) => {
                     if cancel.is_cancelled() || !self.query_cancel.same_request(&cancel) {
                         continue;
                     }
@@ -1503,6 +1427,8 @@ impl App for YamantakaApp {
                     }
                     self.library_loaded = true;
                     self.documents = documents;
+                    self.grouping.memberships = memberships;
+                    self.verify_grouping_preview();
                     self.library_selection
                         .model
                         .retain(&self.library_page_ids());
@@ -2302,6 +2228,7 @@ impl App for YamantakaApp {
                     record["bulkTargetPicker"]=self.bulk_picker_summary();
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();
                     record["librarySelection"]=self.library_selection.summary();
+                    record["libraryGrouping"]=self.grouping_summary();
                     record["libraryFiltersActive"]=self.library_has_filters().into();
                     record["libraryQueryLoaded"]=self.library_loaded.into();
                     record["smartView"]=self.smart_view.map(|view|view.key()).into();

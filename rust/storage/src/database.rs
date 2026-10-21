@@ -131,7 +131,7 @@ pub(crate) fn migrate(connection: &mut Connection, target: u32) -> Result<()> {
         }
     }
     if target >= 2 {
-        tx.execute_batch("CREATE INDEX IF NOT EXISTS idx_rust_document_tags_tag ON document_tags(tag_id,document_id); CREATE INDEX IF NOT EXISTS idx_rust_annotation_tags_tag ON annotation_tags(tag_id,annotation_id); CREATE INDEX IF NOT EXISTS idx_rust_tags_name ON tags(name COLLATE NOCASE,id);").map_err(storage)?;
+        tx.execute_batch("CREATE INDEX IF NOT EXISTS idx_rust_collection_documents_document ON collection_documents(document_id,collection_id); CREATE INDEX IF NOT EXISTS idx_rust_document_tags_tag ON document_tags(tag_id,document_id); CREATE INDEX IF NOT EXISTS idx_rust_annotation_tags_tag ON annotation_tags(tag_id,annotation_id); CREATE INDEX IF NOT EXISTS idx_rust_tags_name ON tags(name COLLATE NOCASE,id);").map_err(storage)?;
     }
     validate(&tx)?;
     tx.commit().map_err(storage)
@@ -539,6 +539,13 @@ impl LibraryRepository for Database {
         cancel: &yamantaka_domain::Cancellation,
     ) -> Result<String> {
         crate::import_document::save(self, document, reference, cancel)
+    }
+    fn library_memberships(
+        &self,
+        ids: &[String],
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<Vec<yamantaka_domain::LibraryMembership>> {
+        self.group_memberships(ids, cancel)
     }
     fn query(&self, query: &LibraryQuery) -> Result<Vec<Document>> {
         let (filter, mut values) = filter(query)?;

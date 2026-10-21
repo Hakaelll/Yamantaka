@@ -179,7 +179,7 @@ mod tests {
             .submit(Action::Query(LibraryQuery::default(), cancel.clone()))
             .unwrap();
         loop {
-            if let Update::Library(rows, count, token) = runtime
+            if let Update::Library(rows, count, _, token) = runtime
                 .updates
                 .recv_timeout(Duration::from_secs(15))
                 .unwrap()

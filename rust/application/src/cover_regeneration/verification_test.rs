@@ -185,7 +185,7 @@ pub(crate) fn verify() {
             .recv_timeout(Duration::from_secs(5))
             .unwrap()
         {
-            crate::runtime::Update::Library(_, count, cancel) if cancel.same_request(&query) => {
+            crate::runtime::Update::Library(_, count, _, cancel) if cancel.same_request(&query) => {
                 assert_eq!(count, 3);
                 break;
             }

@@ -210,7 +210,23 @@ impl Default for LibraryQuery {
         }
     }
 }
+/// Primary organization labels for one bounded catalogue page.
+#[derive(Debug, Clone, Default)]
+pub struct LibraryMembership {
+    pub document_id: String,
+    pub collection: Option<String>,
+    pub tag: Option<String>,
+}
 pub trait LibraryRepository {
+    fn library_memberships(
+        &self,
+        _ids: &[String],
+        cancel: &Cancellation,
+    ) -> Result<Vec<LibraryMembership>> {
+        cancel.check()?;
+        Ok(Vec::new())
+    }
+
     /// Remove the local record, its foreign-key dependants and cached search rows.
     /// The caller must retire live readers first. Original PDF files are untouched.
     fn remove_from_library(&mut self, _id: &str, _cancel: &Cancellation) -> Result<()> {
