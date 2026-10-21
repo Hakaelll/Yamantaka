@@ -153,9 +153,11 @@ python ./tool/create_rust_metadata_fixtures.py
 
 `--demo-window` opens an independent synthetic preview while an existing demo remains open.
 
-The demo uses an in-memory database and synthetic documents. It does not open the personal library. It currently depends on the repository's generated fixtures and is a development tool.
+The demo uses synthetic documents and does not open the personal library. Interactive desktop previews and selected capture scenarios use isolated file-backed stores; other demo modes use an in-memory database. It currently depends on the repository's generated fixtures and is a development tool.
 
 ## Data and migration
+
+Open **Settings → Storage → Export JSON backup** to save the current library data and settings as a v9 JSON file. Choose a destination outside the Rust data folder. Export runs in the background and can be cancelled; a failed or cancelled operation preserves an existing destination. PDFs are not included. The saved result offers **Show in folder**. Native restore and recovery controls remain in development. See [backup export verification](docs/validation/rust-backup-ui-2026-10-21.md) for the checked behavior and limits.
 
 The rewrite must preserve identifiers, relationships, progress, annotations, manual corrections, cover decisions, workspaces, sessions and automation journals. Originals are never PDF editing targets.
 
@@ -221,7 +223,8 @@ Current evidence is documented separately so dates and scopes remain explicit:
 - [Bulk library organization](docs/validation/rust-bulk-organization-2026-10-20.md): assign shared tags, add/remove collection membership and archive a fixed page selection. Destination pickers search and paginate, keep cancellation visible, and preserve complete accessible names when long labels are shortened. Reviewed library removal and automatic cover regeneration are now connected separately.
 - [Native Flutter import](docs/validation/rust-migration-ui-2026-10-21.md): source selection, reviewed independent copies, cancellable background work, next-launch activation, and return to the original store. Eight synthetic native captures and isolated production portable startups verify the connected flow; real-installation and recovery acceptance remain pending.
 - [Reviewed Flutter migration storage](docs/validation/rust-migration-review-2026-10-21.md): frozen source summaries, guarded confirmation, cancellable WAL snapshots, and receipts that verify copied preferences and logical records.
-- [Streaming backup export](docs/validation/rust-backup-streaming-2026-10-21.md): row-by-row v9 output, incremental category hashes, complete file-size limits, cancellation, and atomic replacement preserving existing backups on failure. Native backup and recovery controls remain pending.
+- [Streaming backup export](docs/validation/rust-backup-streaming-2026-10-21.md): row-by-row v9 output, incremental category hashes, complete file-size limits, cancellation, and atomic replacement preserving existing backups on failure. The subsequent native export checkpoint connects export; restore and recovery controls remain pending.
+- [Native backup export](docs/validation/rust-backup-ui-2026-10-21.md): Storage now connects the native save dialog, read-only background export, cancellation, saved result, and folder reveal. Restore and recovery controls remain pending.
 - [Native collections](docs/validation/rust-collections-ui-2026-10-19.md): Tools → Collections supports creation, search, pinning, renaming and reviewed deletion. Its collection action menu also offers **Move earlier**, **Move later** and **Change icon**. Moves follow the full pinned or unpinned group, including collections outside the current search or page. Organize a book from its details, then use View books to filter the library. [Order and icon verification](docs/validation/rust-collection-order-2026-10-20.md) covers atomic movement, inherited rank ties, persistence and compact native controls; selected books can now be added or removed through the library selection menu.
 - [Smart library views](docs/validation/rust-smart-views-2026-10-19.md): the State menu includes the eight Flutter views, including annotated/bookmarked PDFs and the last 14 days. Views combine with catalogue filters and keep bounded paging.
 - [Library filter recovery](docs/validation/rust-library-filters-2026-10-19.md): empty filtered results show a reset action. Both reset controls clear every filter category and return to the first page while preserving sort order.

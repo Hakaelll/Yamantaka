@@ -91,6 +91,7 @@ fn tampering_and_invalid_foreign_keys_do_not_touch_library() {
     let root = tempfile::tempdir().unwrap();
     let backup = root.path().join("backup.json");
     let db = Database::in_memory_at(11).unwrap();
+    assert!(db.file_path().is_none());
     db.export_backup(&backup, &Preferences::default(), &Cancellation::default())
         .unwrap();
     let mut exported: Value = serde_json::from_slice(&fs::read(&backup).unwrap()).unwrap();
@@ -113,7 +114,12 @@ fn streamed_export_preserves_destination_and_snapshot(root: &std::path::Path) {
     let restored = preview_payload(source.clone(), &Cancellation::default()).unwrap();
     let database_path = root.join("streaming.sqlite3");
     restored.database.snapshot(&database_path).unwrap();
-    let database = Database::open(&database_path).unwrap();
+    let database = Database::open_read_only(&database_path).unwrap();
+    assert_eq!(
+        database.file_path().as_deref(),
+        Some(database_path.as_path())
+    );
+    assert!(database.execute_batch("DELETE FROM documents").is_err());
     let concurrent = Database::open(&database_path).unwrap();
     let destination = root.join("streaming.json");
     fs::write(&destination, b"previous complete backup").unwrap();

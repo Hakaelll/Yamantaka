@@ -1,4 +1,5 @@
 mod annotations;
+mod backups;
 mod bookmarks;
 mod bulk_picker;
 mod cache_maintenance;
@@ -180,6 +181,7 @@ pub struct YamantakaApp {
     file_check: file_check::CheckState,
     cache_maintenance: cache_maintenance::CacheState,
     legacy_import: legacy_import::ImportState,
+    backups: backups::BackupState,
     collections: collections::CollectionState,
     library_tags: tags::TagState,
     smart_view: Option<yamantaka_domain::LibrarySmartView>,
@@ -387,6 +389,7 @@ impl YamantakaApp {
             file_check: Default::default(),
             cache_maintenance: Default::default(),
             legacy_import: Default::default(),
+            backups: Default::default(),
             library_check: Default::default(),
             relocation: Default::default(),
             annotation_paint: Default::default(),
@@ -1315,6 +1318,13 @@ impl App for YamantakaApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
+        self.update_backup(ctx);
+        if self.backups.busy() && ctx.input(|input| input.viewport().close_requested()) {
+            self.backups.close_after = true;
+            self.backups.cancel();
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
         self.update_legacy_import(ctx);
         if self.legacy_import.busy() && ctx.input(|input| input.viewport().close_requested()) {
             self.legacy_import.close_after = true;
@@ -2087,6 +2097,10 @@ impl App for YamantakaApp {
             ctx.send_viewport_cmd(ViewportCommand::CancelClose);
             ctx.request_repaint_after(Duration::from_millis(50));
         }
+        if self.backups.close_after && self.backups.busy() {
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
@@ -2128,6 +2142,7 @@ impl App for YamantakaApp {
                     && self.collections.ready()
                     && self.cache_maintenance.ready()
                     && self.legacy_import.ready()
+                    && self.backups.ready()
                     && self.file_check.ready()
                     && self.library_check.ready()
                     && self.relocation.ready()
@@ -2255,6 +2270,7 @@ impl App for YamantakaApp {
                     record["smartView"]=self.smart_view.map(|view|view.key()).into();
                     record["libraryTags"]=self.library_tags.summary();
                     record["legacyImport"]=self.legacy_import.summary();
+                    record["backup"]=self.backups.summary();
                     record["collections"]=self.collections.summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["fileCheck"]=self.file_check.summary();
@@ -2297,6 +2313,7 @@ impl App for YamantakaApp {
         self.file_check.cancel();
         self.file_comparison.cancel();
         self.annotation_export.cancel();
+        self.backups.cancel();
         self.global_notes.cancel();
         self.links.clear();
         self.annotation_paint.invalidate();

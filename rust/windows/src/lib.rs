@@ -148,6 +148,12 @@ pub fn pick_flutter_preferences() -> Option<PathBuf> {
         .add_filter("JSON", &["json"])
         .pick_file()
 }
+pub fn save_library_backup() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .set_file_name("yamantaka-backup.json")
+        .save_file()
+}
 
 pub fn pick_pdf_folder() -> Option<PathBuf> {
     rfd::FileDialog::new().pick_folder()

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod app;
+mod backup_worker;
 mod book;
 mod legacy_import_worker;
 mod page_presenter;
@@ -83,26 +84,27 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 uuid::Uuid::new_v4()
             ));
         }
-        let mut db = if capture.is_some()
-            && args.iter().any(|arg| {
-                arg.to_str()
-                    .is_some_and(|value| value.starts_with("--bulk-remove="))
-                    || arg == "--export-json"
-                    || arg == "--automatic-cover"
-                    || arg == "--cover-picker-save"
-                    || arg == "--cover-picker-cancel"
-                    || arg == "--cover-picker-failed-save"
-                    || arg == "--sessions-preview"
-                    || arg == "--export-markdown"
-                    || arg == "--global-notes-export-json"
-                    || arg == "--global-notes-export-markdown"
-                    || arg == "--metadata-review"
-                    || arg == "--file-check"
-                    || arg == "--relocate"
-                    || arg == "--library-check"
-                    || arg == "--import-recovery"
-                    || arg == "--cover-capacity-retry"
-            }) {
+        let mut db = if args.iter().any(|arg| arg == "--demo-window")
+            || capture.is_some()
+                && args.iter().any(|arg| {
+                    arg.to_str().is_some_and(|value| {
+                        value.starts_with("--bulk-remove=") || value.starts_with("--backup-export=")
+                    }) || arg == "--export-json"
+                        || arg == "--automatic-cover"
+                        || arg == "--cover-picker-save"
+                        || arg == "--cover-picker-cancel"
+                        || arg == "--cover-picker-failed-save"
+                        || arg == "--sessions-preview"
+                        || arg == "--export-markdown"
+                        || arg == "--global-notes-export-json"
+                        || arg == "--global-notes-export-markdown"
+                        || arg == "--metadata-review"
+                        || arg == "--file-check"
+                        || arg == "--relocate"
+                        || arg == "--library-check"
+                        || arg == "--import-recovery"
+                        || arg == "--cover-capacity-retry"
+                }) {
             std::fs::create_dir_all(&store).map_err(|_| {
                 yamantaka_domain::Failure::Storage("Synthetic export store could not open".into())
             })?;
@@ -697,6 +699,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     "capacity-reader-b".into(),
                 ])?;
             }
+            let backup_source = database.file_path();
             let runtime = Runtime::start(database, engine, move || notify.request_repaint())?;
             let presenter = cc.wgpu_render_state.clone().map(|state| {
                 page_presenter::PagePresenter::new(state, governor.clone(), cc.egui_ctx.clone())
@@ -722,6 +725,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 governor,
                 presenter,
             );
+            app.configure_backup(
+                backup_source,
+                if demo {
+                    store.clone()
+                } else {
+                    paths.store.clone()
+                },
+            );
             app.configure_legacy_import(
                 if demo {
                     store.clone()
@@ -738,6 +749,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if let Some(mode) = args
+                    .iter()
+                    .filter_map(|arg| arg.to_str())
+                    .find_map(|arg| arg.strip_prefix("--backup-export="))
+                {
+                    app.preview_backup(&cc.egui_ctx, mode);
+                }
                 if let Some(mode) = args
                     .iter()
                     .filter_map(|arg| arg.to_str())

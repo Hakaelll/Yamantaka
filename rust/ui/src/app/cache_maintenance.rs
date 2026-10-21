@@ -170,7 +170,7 @@ impl YamantakaApp {
                 });
             }
         });
-        if cramped && self.demo && self.capture.is_some() {
+        if cramped && self.demo && self.capture.is_some() && !self.backups.capture_active() {
             ui.scroll_to_rect(
                 amount.rect.union(actions.response.rect),
                 Some(egui::Align::Center),

@@ -1,6 +1,6 @@
 # Streaming backup export verification
 
-Date: 2026-10-21. Scope: the storage export and bounded backup-file reader. Native backup export, restore confirmation, and recovery controls remain pending.
+Date: 2026-10-21. Scope: the storage export and bounded backup-file reader. Native backup export, restore confirmation, and recovery controls were pending at this checkpoint. The subsequent [native export checkpoint](rust-backup-ui-2026-10-21.md) connects export separately; restore and recovery remain pending.
 
 The previous v9 exporter accumulated all table rows in JSON values, serialized that full payload to check its size, and serialized it again as an indented file. Its size check therefore preceded the bytes actually installed. The replacement writes compact JSON through a 64 KiB file buffer, holds one database row at a time, and calculates each category hash over that category's emitted JSON array. One SQLite read transaction spans every table. V9 envelope fields, column values, setting precedence, and category hash semantics remain compatible.
 

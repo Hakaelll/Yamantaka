@@ -28,6 +28,33 @@ pub struct Database {
     pub(crate) file_checks: std::cell::RefCell<Option<Connection>>,
 }
 impl Database {
+    pub fn file_path(&self) -> Option<std::path::PathBuf> {
+        self.connection
+            .path()
+            .filter(|path| !path.is_empty())
+            .map(std::path::PathBuf::from)
+    }
+
+    pub fn open_read_only(path: &Path) -> Result<Self> {
+        let connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(storage)?;
+        connection
+            .busy_timeout(Duration::from_secs(3))
+            .map_err(storage)?;
+        if version(&connection)? != SCHEMA_VERSION {
+            return Err(Failure::Invalid(
+                "The library must be migrated before opening a reader".into(),
+            ));
+        }
+        Ok(Self {
+            connection,
+            import_journal: Default::default(),
+            file_checks: Default::default(),
+        })
+    }
     pub fn open(path: &Path) -> Result<Self> {
         let mut connection = Connection::open(path).map_err(storage)?;
         configure(&connection)?;

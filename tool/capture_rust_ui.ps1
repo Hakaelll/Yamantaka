@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='backup-saved'; args=@('--backup-export=save') },
+    @{ name='backup-cancelled-es'; args=@('--backup-export=cancel','--es','--light','--reduce-motion') },
+    @{ name='backup-blocked'; args=@('--backup-export=blocked') },
+    @{ name='backup-saved-small-200'; args=@('--backup-export=save','--size=640x480','--text-scale=2','--es','--light','--reduce-motion') },
     @{ name='migration-files'; args=@('--legacy-import=files') },
     @{ name='migration-review'; args=@('--legacy-import=review') },
     @{ name='migration-copy-es'; args=@('--legacy-import=copy','--es','--light','--reduce-motion') },
@@ -371,6 +375,16 @@ foreach ($case in $cases) {
             if ($controls.bulkTargetPicker.open -or $controls.bulkOrganization.members -ne $expectedMembers -or $controls.libraryDocumentCount -ne $expectedMembers -or $controls.librarySelection.ids.Count -ne 0) { throw 'Bulk organization membership or filtered readback is incorrect.' }
             if ($case.name -eq 'bulk-tags-applied' -and $controls.bulkOrganization.annotationUses -ne 1) { throw 'Document tag assignment must preserve the existing annotation membership.' }
         }
+    }
+    if ($case.name -like 'backup-*') {
+        $backup=$controls.backup
+        if (-not $backup.verified -or $backup.busy) { throw 'Native backup scenario did not finish.' }
+        if ($case.name -eq 'backup-cancelled-es') {
+            if (-not $backup.cancelled -or $backup.saved) { throw 'Backup cancellation was not preserved.' }
+        } elseif ($case.name -eq 'backup-blocked') {
+            if (-not $backup.failed -or $backup.saved) { throw 'Library-internal backup destination was not rejected.' }
+        } elseif (-not $backup.saved) { throw 'Backup was not saved and verified.' }
+        if ($case.name -eq 'backup-saved-small-200') { & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Exportar copia JSON') }
     }
     if ($case.name -like 'migration-*') {
         $migration=$controls.legacyImport
