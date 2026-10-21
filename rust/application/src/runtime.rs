@@ -97,7 +97,11 @@ pub enum Action {
     Index(IndexCommand),
     IndexStatistics,
     VisibleDocuments(Vec<String>),
-    ConfirmOpen(String, Cancellation),
+    ConfirmOpen {
+        document: String,
+        visible: Vec<String>,
+        cancel: Cancellation,
+    },
     Query(LibraryQuery, Cancellation),
     Favorite(String, bool),
     LoadReaderPreferences(String, Cancellation),
@@ -1329,10 +1333,22 @@ impl Runtime {
                                         Err(error) => failed(&events, &notify, error, None, permit),
                                     }
                                 }
-                                Action::ConfirmOpen(id, cancel) => {
+                                Action::ConfirmOpen { document: id, visible: accepted, cancel } => {
                                     let matches = awaiting_open.as_ref().is_some_and(|(target, token)| target == &id && token.same_request(&cancel));
                                     if matches {
-                                        let ids = if cancel.is_cancelled() { visible.clone() } else { vec![id.clone()] };
+                                        let ids = if cancel.is_cancelled() { visible.clone() } else {
+                                            let valid = accepted.len() <= yamantaka_domain::MAX_HOT_DOCUMENTS
+                                                && accepted.contains(&id)
+                                                && accepted.iter().enumerate().all(|(index, item)| {
+                                                    !accepted[..index].contains(item)
+                                                        && (item == &id || visible.contains(item))
+                                                });
+                                            if !valid {
+                                                failed(&events, &notify, Failure::Invalid("Open confirmation must retain only admitted visible readers".into()), Some(cancel), permit);
+                                                continue;
+                                            }
+                                            accepted
+                                        };
                                         match engine.set_visible_documents(&ids) {
                                             Ok(()) => { visible = ids; awaiting_open = None; pdf_capacity.fetch_add(1,Ordering::Release); }
                                             Err(error) => { failed(&events, &notify, error, Some(cancel), permit); continue; }
@@ -2012,7 +2028,7 @@ impl Runtime {
                 .map_err(|_| Failure::Storage("Use-case worker stopped".into()))?;
             return Ok(());
         }
-        let counter = if matches!(action, Action::Close(_) | Action::ConfirmOpen(..)) {
+        let counter = if matches!(action, Action::Close(_) | Action::ConfirmOpen { .. }) {
             &self.control_outstanding
         } else {
             &self.outstanding

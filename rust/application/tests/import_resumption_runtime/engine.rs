@@ -142,6 +142,10 @@ pub(super) fn wait(runtime: &Runtime) -> Update {
 }
 pub(super) fn open_reader(runtime: &Runtime, document: Document) {
     let id = document.id.clone();
+    open_readers(runtime, document, &[&id]);
+}
+pub(super) fn open_readers(runtime: &Runtime, document: Document, keep: &[&str]) {
+    let id = document.id.clone();
     let cancel = Cancellation::default();
     runtime
         .submit(Action::Open(document, None, cancel.clone()))
@@ -149,7 +153,13 @@ pub(super) fn open_reader(runtime: &Runtime, document: Document) {
     assert!(
         matches!(wait(runtime),Update::Opened(document,_,token) if document.id==id && token.same_request(&cancel))
     );
-    runtime.submit(Action::ConfirmOpen(id, cancel)).unwrap();
+    runtime
+        .submit(Action::ConfirmOpen {
+            document: id,
+            visible: keep.iter().map(|id| id.to_string()).collect(),
+            cancel,
+        })
+        .unwrap();
     assert!(matches!(
         wait(runtime),
         Update::Committed(_, WriteKind::VisibleDocuments)

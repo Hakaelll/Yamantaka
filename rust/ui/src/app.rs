@@ -1939,10 +1939,11 @@ impl App for YamantakaApp {
         // after draining results. Retry bounded control backpressure without
         // dropping the ownership handoff or continuously repainting while idle.
         if let Some((id, token)) = self.open_confirmation.take() {
-            match self
-                .runtime
-                .submit(Action::ConfirmOpen(id.clone(), token.clone()))
-            {
+            match self.runtime.submit(Action::ConfirmOpen {
+                document: id.clone(),
+                visible: vec![id.clone()],
+                cancel: token.clone(),
+            }) {
                 Ok(()) => {}
                 Err(yamantaka_domain::Failure::QueueFull) => {
                     self.open_confirmation = Some((id, token));

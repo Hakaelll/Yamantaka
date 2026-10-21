@@ -14,7 +14,7 @@ use yamantaka_pdf::{MemoryLimits, PdfWorker};
 use yamantaka_storage::Database;
 #[path = "import_resumption_runtime/engine.rs"]
 mod engine;
-use engine::{Engine, open_reader, requested, visible, wait};
+use engine::{Engine, open_reader, open_readers, requested, visible, wait};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Operation {
@@ -160,8 +160,7 @@ fn run(operation: Operation, outcome: Outcome) {
         assert!(!cancel.is_cancelled());
     }
     open_reader(&runtime, reader_a);
-    open_reader(&runtime, reader_b.clone());
-    visible(&runtime, &["reader-a", "reader-b"]);
+    open_readers(&runtime, reader_b.clone(), &["reader-a", "reader-b"]);
     let lost = control
         .try_text_geometry(
             request.id.clone(),
@@ -215,8 +214,7 @@ fn run(operation: Operation, outcome: Outcome) {
                 (repeated.id.as_str(), repeated.page),
                 (request.id.as_str(), 1)
             );
-            open_reader(&runtime, reader_b);
-            visible(&runtime, &["reader-a", "reader-b"]);
+            open_readers(&runtime, reader_b, &["reader-a", "reader-b"]);
             let lost = control
                 .try_text_geometry(
                     repeated.id.clone(),
@@ -424,8 +422,7 @@ fn the_import_read_guard_survives_losing_and_reloading_the_initial_native_owner(
     let source = held.recv_timeout(Duration::from_secs(10)).unwrap();
     requested(&opened, &source.id);
     open_reader(&runtime, a);
-    open_reader(&runtime, b);
-    visible(&runtime, &["reader-a", "reader-b"]);
+    open_readers(&runtime, b, &["reader-a", "reader-b"]);
     let lost = control
         .try_source_revision(source.id.clone(), source.cancel)
         .unwrap()
