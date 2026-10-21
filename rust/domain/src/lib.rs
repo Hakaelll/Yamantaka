@@ -78,6 +78,8 @@ pub enum Failure {
     LegacyRunning,
     #[error("Flutter data changed after review. Review the source again.")]
     MigrationSourceChanged,
+    #[error("The backup changed after review. Review the file again.")]
+    BackupSourceChanged,
     #[error("Operation cancelled")]
     Cancelled,
     #[error("Work queue is full; drain results or cancel pending work")]

@@ -31,13 +31,25 @@ Copy-Item -LiteralPath $executablePath -Destination $native
 $null = New-Item -ItemType File -Path (Join-Path $sandbox '.yamantaka-rust-portable')
 $fixtureScript = Join-Path $sandbox 'prepare_fixture.py'
 @'
-import json, sqlite3, sys
+import json, sqlite3, sys, uuid
 from pathlib import Path
 root = Path(sys.argv[1]).resolve(strict=True)
 assert root.name == 'rust-data'
 selection = root / 'selected-library.json'
 if sys.argv[2] == 'original':
     selection.write_text(json.dumps({'version': 1, 'import': None}), encoding='utf-8')
+elif sys.argv[2] in ('interrupt', 'verify-recovered'):
+    identity = json.loads(selection.read_text(encoding='utf-8'))['import']
+    assert str(uuid.UUID(identity)) == identity
+    active = root / 'imports' / identity
+    journal = active.with_name('.' + identity + '.restore-journal.json')
+    safety = active.with_name('pre-restore-startup')
+    if sys.argv[2] == 'interrupt':
+        assert active.is_dir() and not safety.exists() and not journal.exists()
+        active.rename(safety)
+        journal.write_text(json.dumps({'version': 1, 'active': str(active), 'safety': str(safety), 'replacement_sha256': 'not-installed'}), encoding='utf-8')
+    else:
+        assert active.is_dir() and not safety.exists() and not journal.exists()
 else:
     database = root / 'yamantaka.sqlite3'
     assert database.is_file()
@@ -53,7 +65,11 @@ $originalHash = (Get-FileHash -LiteralPath (Join-Path $store 'yamantaka.sqlite3'
 $originalPreferencesHash = (Get-FileHash -LiteralPath (Join-Path $store 'preferences.json')).Hash
 $results = @()
 try {
-    foreach ($case in @(@{name='selected'; count=10}, @{name='original'; count=1})) {
+    foreach ($case in @(@{name='selected'; count=10}, @{name='recovered-import'; count=10}, @{name='original'; count=1})) {
+        if ($case.name -eq 'recovered-import') {
+            & $Python $fixtureScript $store 'interrupt'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not prepare the interrupted managed-store fixture.' }
+        }
         if ($case.name -eq 'original') {
             & $Python $fixtureScript $store 'original'
             if ($LASTEXITCODE -ne 0) { throw 'Could not choose the original synthetic library.' }
@@ -67,10 +83,14 @@ try {
         if ($record.synthetic -or -not $record.libraryQueryLoaded -or $record.libraryDocumentCount -ne $case.count) {
             throw "Production startup did not load the selected store: $($case.name)"
         }
-        if ($case.name -eq 'selected') {
+        if ($case.name -in @('selected','recovered-import')) {
             if ((Get-FileHash -LiteralPath (Join-Path $store 'yamantaka.sqlite3')).Hash -ne $originalHash -or (Get-FileHash -LiteralPath (Join-Path $store 'preferences.json')).Hash -ne $originalPreferencesHash) {
                 throw 'Imported startup changed the original store files.'
             }
+        }
+        if ($case.name -eq 'recovered-import') {
+            & $Python $fixtureScript $store 'verify-recovered'
+            if ($LASTEXITCODE -ne 0) { throw 'Managed-store startup did not complete rollback.' }
         }
         $results += [ordered]@{case=$case.name; productionStartup=$true; documentCount=$record.libraryDocumentCount; exitCode=$process.ExitCode}
         Write-Output "Production portable startup verified: $($case.name), $($case.count) books"

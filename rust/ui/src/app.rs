@@ -1,5 +1,7 @@
 mod annotations;
+mod backup_restore;
 mod backups;
+pub use backup_restore::RestoreHandover;
 mod bookmarks;
 mod bulk_picker;
 mod cache_maintenance;
@@ -182,6 +184,7 @@ pub struct YamantakaApp {
     cache_maintenance: cache_maintenance::CacheState,
     legacy_import: legacy_import::ImportState,
     backups: backups::BackupState,
+    backup_restore: backup_restore::RestoreState,
     collections: collections::CollectionState,
     library_tags: tags::TagState,
     smart_view: Option<yamantaka_domain::LibrarySmartView>,
@@ -215,7 +218,7 @@ pub struct YamantakaApp {
     importing: operations::BackgroundImport,
     preview_tools_menu: bool,
     activation: Receiver<Vec<PathBuf>>,
-    _instance: Instance,
+    _instance: std::rc::Rc<Instance>,
     _watch: ActivationWatch,
     capture: Option<PathBuf>,
     capture_requested: bool,
@@ -240,7 +243,7 @@ impl YamantakaApp {
         settings: bool,
         capture: Option<PathBuf>,
         activation: Receiver<Vec<PathBuf>>,
-        instance: Instance,
+        instance: std::rc::Rc<Instance>,
         watch: ActivationWatch,
         governor: MemoryGovernor,
         presenter: Option<PagePresenter>,
@@ -390,6 +393,7 @@ impl YamantakaApp {
             cache_maintenance: Default::default(),
             legacy_import: Default::default(),
             backups: Default::default(),
+            backup_restore: Default::default(),
             library_check: Default::default(),
             relocation: Default::default(),
             annotation_paint: Default::default(),
@@ -1318,10 +1322,18 @@ impl App for YamantakaApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
+        self.update_restore(ctx);
+        if self.backup_restore.busy() && ctx.input(|input| input.viewport().close_requested()) {
+            self.backup_restore.close_after = true;
+            self.backup_restore.cancel();
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
         self.update_backup(ctx);
         if self.backups.busy() && ctx.input(|input| input.viewport().close_requested()) {
             self.backups.close_after = true;
             self.backups.cancel();
+            self.backup_restore.cancel();
             ctx.send_viewport_cmd(ViewportCommand::CancelClose);
             ctx.request_repaint_after(Duration::from_millis(50));
         }
@@ -1365,6 +1377,7 @@ impl App for YamantakaApp {
             self.annotations.bind(&document.id);
         }
         while !self.legacy_import.open
+            && !self.backup_restore.open
             && let Ok(paths) = self.activation.try_recv()
         {
             ctx.send_viewport_cmd(ViewportCommand::Focus);
@@ -1917,7 +1930,8 @@ impl App for YamantakaApp {
                 || self.bulk_picker.is_some()
                 || self.selection_review_open()
                 || self.tag_dialog_open()
-                || self.legacy_import.open,
+                || self.legacy_import.open
+                || self.backup_restore.open,
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
@@ -1927,7 +1941,8 @@ impl App for YamantakaApp {
                 || self.bulk_picker.is_some()
                 || self.selection_review_open()
                 || self.tag_dialog_open()
-                || self.legacy_import.open,
+                || self.legacy_import.open
+                || self.backup_restore.open,
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -2083,6 +2098,7 @@ impl App for YamantakaApp {
         self.selection_review_dialog(&ctx);
         self.tag_management_dialogs(&ctx);
         self.legacy_import_dialog(&ctx);
+        self.restore_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
@@ -2094,6 +2110,10 @@ impl App for YamantakaApp {
             ctx.send_viewport_cmd(ViewportCommand::Close);
         }
         if self.legacy_import.close_after && self.legacy_import.busy() {
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
+        if self.backup_restore.close_after && self.backup_restore.busy() {
             ctx.send_viewport_cmd(ViewportCommand::CancelClose);
             ctx.request_repaint_after(Duration::from_millis(50));
         }
@@ -2143,6 +2163,7 @@ impl App for YamantakaApp {
                     && self.cache_maintenance.ready()
                     && self.legacy_import.ready()
                     && self.backups.ready()
+                    && self.backup_restore.ready()
                     && self.file_check.ready()
                     && self.library_check.ready()
                     && self.relocation.ready()
@@ -2271,6 +2292,7 @@ impl App for YamantakaApp {
                     record["libraryTags"]=self.library_tags.summary();
                     record["legacyImport"]=self.legacy_import.summary();
                     record["backup"]=self.backups.summary();
+                    record["restore"]=self.backup_restore.summary();
                     record["collections"]=self.collections.summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["fileCheck"]=self.file_check.summary();
@@ -2314,6 +2336,7 @@ impl App for YamantakaApp {
         self.file_comparison.cancel();
         self.annotation_export.cancel();
         self.backups.cancel();
+        self.backup_restore.cancel();
         self.global_notes.cancel();
         self.links.clear();
         self.annotation_paint.invalidate();

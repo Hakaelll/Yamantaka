@@ -4,6 +4,7 @@ mod backup_worker;
 mod book;
 mod legacy_import_worker;
 mod page_presenter;
+mod restore_worker;
 mod theme;
 use eframe::egui;
 use std::{path::PathBuf, sync::mpsc};
@@ -88,7 +89,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             || capture.is_some()
                 && args.iter().any(|arg| {
                     arg.to_str().is_some_and(|value| {
-                        value.starts_with("--bulk-remove=") || value.starts_with("--backup-export=")
+                        value.starts_with("--bulk-remove=")
+                            || value.starts_with("--backup-export=")
+                            || value == "--restore-preview"
+                            || value == "--restore-apply"
                     }) || arg == "--export-json"
                         || arg == "--automatic-cover"
                         || arg == "--cover-picker-save"
@@ -525,10 +529,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             )?;
             Preferences::default().save(&store.join("preferences.json"))?;
         }
+        if capture.is_some()
+            && args
+                .iter()
+                .any(|arg| arg == "--restore-preview" || arg == "--restore-apply")
+        {
+            db.export_backup(
+                &store.join("synthetic-backup.json"),
+                &Preferences::default(),
+                &yamantaka_domain::Cancellation::default(),
+            )?;
+        }
         (db, Preferences::default(), store)
     } else {
-        let active_store = yamantaka_storage::managed_imports::active_store(&paths.store)?;
-        yamantaka_storage::backup::recover_interrupted_restore(&active_store)?;
+        let active_store = yamantaka_storage::managed_imports::recover_and_select(&paths.store)?;
         std::fs::create_dir_all(&active_store)?;
         (
             Database::open(&active_store.join("yamantaka.sqlite3"))?,
@@ -676,6 +690,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     {
         options.viewport = options.viewport.with_inner_size([width, height]);
     }
+    let instance = std::rc::Rc::new(instance);
+    let app_instance = instance.clone();
+    let restore_handover: app::RestoreHandover = Default::default();
+    let ui_restore_handover = restore_handover.clone();
+    let restore_smoke = if demo {
+        capture
+            .as_ref()
+            .filter(|_| args.iter().any(|arg| arg == "--restore-apply"))
+            .map(|path| path.with_extension("restore-result.json"))
+    } else {
+        None
+    };
     eframe::run_native(
         "Yamantaka",
         options,
@@ -706,7 +732,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             });
             let (tx, rx) = mpsc::channel();
             let ctx = cc.egui_ctx.clone();
-            let watch = instance.watch(move |paths| {
+            let watch = app_instance.watch(move |paths| {
                 let _ = tx.send(paths);
                 ctx.request_repaint();
             })?;
@@ -720,10 +746,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 settings,
                 capture,
                 rx,
-                instance,
+                app_instance,
                 watch,
                 governor,
                 presenter,
+            );
+            app.configure_restore(
+                backup_source.as_ref().map(|_| store.clone()),
+                ui_restore_handover,
             );
             app.configure_backup(
                 backup_source,
@@ -749,6 +779,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args
+                    .iter()
+                    .any(|arg| arg == "--restore-preview" || arg == "--restore-apply")
+                {
+                    app.preview_restore(
+                        &cc.egui_ctx,
+                        store.join("synthetic-backup.json"),
+                        args.iter().any(|arg| arg == "--restore-apply"),
+                    );
+                }
                 if let Some(mode) = args
                     .iter()
                     .filter_map(|arg| arg.to_str())
@@ -1186,5 +1226,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             Ok(Box::new(app))
         }),
     )?;
+    if let Some(commit) = restore_handover.borrow_mut().take() {
+        let safety = yamantaka_storage::backup::install_preview(
+            commit.preview,
+            &commit.store,
+            &yamantaka_domain::Cancellation::default(),
+        )?;
+        if let Some(result) = restore_smoke {
+            let database = Database::open_read_only(&commit.store.join("yamantaka.sqlite3"))?;
+            let books = database.count(&yamantaka_domain::LibraryQuery::default())?;
+            std::fs::write(
+                result,
+                serde_json::to_vec(
+                    &serde_json::json!({"synthetic":true,"installed":true,"books":books,"safetyExists":safety.is_dir()}),
+                )?,
+            )?;
+        } else if !demo {
+            yamantaka_windows::show_restore_complete(&safety, english);
+        }
+    }
+    drop(instance);
     Ok(())
 }

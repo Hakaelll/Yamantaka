@@ -56,14 +56,14 @@ impl ImportTarget {
         save_selection(&self.root, Some(self.id.clone()))
     }
 }
-fn present(path: &Path) -> Result<bool> {
+pub(crate) fn present(path: &Path) -> Result<bool> {
     match fs::symlink_metadata(path) {
         Ok(_) => Ok(true),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(error) => Err(storage(error)),
     }
 }
-fn ordinary(path: &Path, directory: bool) -> Result<()> {
+pub(crate) fn ordinary(path: &Path, directory: bool) -> Result<()> {
     let metadata = fs::symlink_metadata(path).map_err(storage)?;
     #[cfg(windows)]
     let reparse = {
@@ -79,7 +79,7 @@ fn ordinary(path: &Path, directory: bool) -> Result<()> {
     }
     Ok(())
 }
-fn checked_store(root: &Path, id: &str) -> Result<PathBuf> {
+fn store_path(root: &Path, id: &str) -> Result<PathBuf> {
     let parsed = uuid::Uuid::parse_str(id)
         .map_err(|_| Failure::Invalid("Invalid imported library identity".into()))?;
     if parsed.to_string() != id {
@@ -87,16 +87,29 @@ fn checked_store(root: &Path, id: &str) -> Result<PathBuf> {
     }
     let imports = root.join("imports");
     let store = imports.join(id);
+    for path in [root, &imports] {
+        ordinary(path, true)?;
+    }
+    Ok(store)
+}
+fn checked_store(root: &Path, id: &str) -> Result<PathBuf> {
+    let store = store_path(root, id)?;
+    let imports = root.join("imports");
     for path in [root, &imports, &store] {
         ordinary(path, true)?;
     }
-    for name in [
-        "yamantaka.sqlite3",
-        "preferences.json",
-        "migration-receipt.json",
-    ] {
+    for name in ["yamantaka.sqlite3", "preferences.json"] {
         ordinary(&store.join(name), false)?;
     }
+    let restored = store.join("restore-receipt.json");
+    ordinary(
+        &if present(&restored)? {
+            restored
+        } else {
+            store.join("migration-receipt.json")
+        },
+        false,
+    )?;
     Ok(store)
 }
 fn save_selection(root: &Path, import: Option<String>) -> Result<()> {
@@ -107,10 +120,10 @@ fn save_selection(root: &Path, import: Option<String>) -> Result<()> {
     }
     atomic_json(&path, &Selection { version: 1, import })
 }
-pub fn active_store(root: &Path) -> Result<PathBuf> {
+fn selected(root: &Path) -> Result<Option<String>> {
     let path = root.join("selected-library.json");
     if !present(&path)? {
-        return Ok(root.to_owned());
+        return Ok(None);
     }
     ordinary(root, true)?;
     ordinary(&path, false)?;
@@ -121,10 +134,21 @@ pub fn active_store(root: &Path) -> Result<PathBuf> {
             "Unsupported library selection version".into(),
         ));
     }
-    match selection.import {
+    Ok(selection.import)
+}
+pub fn active_store(root: &Path) -> Result<PathBuf> {
+    match selected(root)? {
         Some(id) => checked_store(root, &id),
         None => Ok(root.to_owned()),
     }
+}
+/// Resolve managed selection only after interrupted directory swaps have recovered.
+pub fn recover_and_select(root: &Path) -> Result<PathBuf> {
+    crate::backup::recover_interrupted_restore(root)?;
+    if let Some(id) = selected(root)? {
+        crate::backup::recover_interrupted_restore(&store_path(root, &id)?)?;
+    }
+    active_store(root)
 }
 pub fn use_original(root: &Path, cancel: &Cancellation) -> Result<()> {
     ordinary(root, true)?;

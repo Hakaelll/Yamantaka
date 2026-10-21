@@ -2,10 +2,9 @@
 use crate::{
     Database,
     database::{storage, validate},
-    preferences::{Preferences, atomic_json},
+    preferences::Preferences,
 };
 use rusqlite::{params_from_iter, types::Value as SqlValue};
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs, io::Read, path::Path};
@@ -59,6 +58,14 @@ pub struct RestorePreview {
 /// Parse, validate category hashes, and restore constraints into an isolated DB.
 /// Neither preview nor failure touches the active library or any original PDF.
 pub fn preview(path: &Path, cancel: &Cancellation) -> Result<RestorePreview> {
+    let (payload, _) = read_payload(path, cancel, None)?;
+    preview_payload(payload, cancel)
+}
+fn read_payload(
+    path: &Path,
+    cancel: &Cancellation,
+    expected: Option<&str>,
+) -> Result<(Value, String)> {
     cancel.check()?;
     let mut file = fs::File::open(path).map_err(storage)?;
     let metadata = file.metadata().map_err(storage)?;
@@ -68,6 +75,7 @@ pub fn preview(path: &Path, cancel: &Cancellation) -> Result<RestorePreview> {
         ));
     }
     let mut bytes = Vec::new();
+    let mut digest = Sha256::new();
     let mut buffer = [0; 64 * 1024];
     loop {
         cancel.check()?;
@@ -79,10 +87,15 @@ pub fn preview(path: &Path, cancel: &Cancellation) -> Result<RestorePreview> {
             return Err(Failure::Invalid("Backup exceeds 128 MiB".into()));
         }
         bytes.extend_from_slice(&buffer[..count]);
+        digest.update(&buffer[..count]);
     }
     cancel.check()?;
+    let digest = format!("{:x}", digest.finalize());
+    if expected.is_some_and(|expected| expected != digest) {
+        return Err(Failure::BackupSourceChanged);
+    }
     let payload: Value = serde_json::from_slice(&bytes).map_err(storage)?;
-    preview_payload(payload, cancel)
+    Ok((payload, digest))
 }
 pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<RestorePreview> {
     cancel.check()?;
@@ -249,112 +262,9 @@ fn default_value(table: &str, column: &str) -> Value {
 mod export;
 pub use export::BackupProgress;
 
-/// Installation requires closing the active database first. The pre-restore copy
-/// remains in its own directory and can be selected for rollback on next launch.
-pub fn install_preview(
-    preview: RestorePreview,
-    active: &Path,
-    cancel: &Cancellation,
-) -> Result<std::path::PathBuf> {
-    cancel.check()?;
-    let parent = active
-        .parent()
-        .ok_or_else(|| Failure::Invalid("Missing restore parent".into()))?;
-    let stage = tempfile::Builder::new()
-        .prefix(".restore-")
-        .tempdir_in(parent)
-        .map_err(storage)?;
-    preview
-        .database
-        .snapshot(&stage.path().join("yamantaka.sqlite3"))?;
-    preview
-        .preferences
-        .save(&stage.path().join("preferences.json"))?;
-    cancel.check()?;
-    let safety = parent.join(format!("pre-restore-{}", uuid::Uuid::new_v4()));
-    let journal = restore_journal_path(active)?;
-    if journal.exists() {
-        return Err(Failure::Invalid(
-            "Recover the interrupted restore before starting another".into(),
-        ));
-    }
-    atomic_json(
-        &journal,
-        &RestoreJournal {
-            version: 1,
-            active: active.to_owned(),
-            safety: safety.clone(),
-            replacement_sha256: crate::identity::full_sha256(
-                &stage.path().join("yamantaka.sqlite3"),
-                cancel,
-            )?,
-        },
-    )?;
-    if active.exists() {
-        fs::rename(active, &safety).map_err(storage)?;
-    }
-    if let Err(error) = fs::rename(stage.path(), active) {
-        if safety.exists() {
-            fs::rename(&safety, active).map_err(storage)?;
-        }
-        fs::remove_file(&journal).map_err(storage)?;
-        return Err(storage(error));
-    }
-    fs::remove_file(journal).map_err(storage)?;
-    Ok(safety)
-}
-
-#[derive(Serialize, Deserialize)]
-struct RestoreJournal {
-    version: u32,
-    active: std::path::PathBuf,
-    safety: std::path::PathBuf,
-    replacement_sha256: String,
-}
-fn restore_journal_path(active: &Path) -> Result<std::path::PathBuf> {
-    let name = active
-        .file_name()
-        .ok_or_else(|| Failure::Invalid("Invalid active store".into()))?
-        .to_string_lossy();
-    Ok(active.with_file_name(format!(".{name}.restore-journal.json")))
-}
-/// Called before opening any active DB. A crash between the two renames rolls
-/// back to the complete safety store. A committed new store keeps its safety copy.
-pub fn recover_interrupted_restore(active: &Path) -> Result<bool> {
-    let journal_path = restore_journal_path(active)?;
-    if !journal_path.exists() {
-        return Ok(false);
-    }
-    let journal: RestoreJournal =
-        serde_json::from_slice(&fs::read(&journal_path).map_err(storage)?).map_err(storage)?;
-    let parent = active
-        .parent()
-        .ok_or_else(|| Failure::Invalid("Missing recovery parent".into()))?;
-    if journal.version != 1
-        || journal.active != active
-        || journal.safety.parent() != Some(parent)
-        || journal
-            .safety
-            .file_name()
-            .is_none_or(|name| !name.to_string_lossy().starts_with("pre-restore-"))
-    {
-        return Err(Failure::Invalid("Restore journal has invalid paths".into()));
-    }
-    if !active.exists() && journal.safety.exists() {
-        fs::rename(&journal.safety, active).map_err(storage)?;
-    } else if active.exists() && journal.safety.exists() {
-        if crate::identity::full_sha256(
-            &active.join("yamantaka.sqlite3"),
-            &Cancellation::default(),
-        )? != journal.replacement_sha256
-        {
-            return Err(Failure::Invalid(
-                "Interrupted restore requires explicit recovery; both copies were retained".into(),
-            ));
-        }
-    } else if !active.exists() {
-        return Err(Failure::Invalid("Both recovery stores are missing".into()));
-    }
-    fs::remove_file(journal_path).map_err(storage)?;
-    Ok(true)
-}
+mod restore;
+pub use restore::{
+    RestoreProgress, install_preview, install_preview_progress, recover_interrupted_restore,
+};
+mod review;
+pub use review::{RestoreReview, install_reviewed, prepare_reviewed, review};

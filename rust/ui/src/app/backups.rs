@@ -177,6 +177,7 @@ impl YamantakaApp {
                 let _ = yamantaka_windows::reveal(path);
             }
         }
+        self.restore_button(ui, p);
         ui.add_space(18.0);
         ui.separator();
         ui.add_space(18.0);

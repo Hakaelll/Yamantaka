@@ -154,6 +154,30 @@ pub fn save_library_backup() -> Option<PathBuf> {
         .set_file_name("yamantaka-backup.json")
         .save_file()
 }
+pub fn pick_library_backup() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .pick_file()
+}
+pub fn show_restore_complete(safety: &Path, english: bool) {
+    let message = if english {
+        format!(
+            "Backup restored. Reopen Yamantaka to use your library.\n\nPrevious library: {}",
+            safety.display()
+        )
+    } else {
+        format!(
+            "Copia restaurada. Vuelve a abrir Yamantaka para usar tu biblioteca.\n\nBiblioteca anterior: {}",
+            safety.display()
+        )
+    };
+    rfd::MessageDialog::new()
+        .set_title("Yamantaka")
+        .set_description(message)
+        .set_level(rfd::MessageLevel::Info)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
+}
 
 pub fn pick_pdf_folder() -> Option<PathBuf> {
     rfd::FileDialog::new().pick_folder()

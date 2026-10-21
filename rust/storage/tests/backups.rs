@@ -6,6 +6,8 @@ use yamantaka_storage::{
     backup::{TABLE_ORDER, install_preview, preview, preview_payload},
     preferences::Preferences,
 };
+#[path = "support/restore_review.rs"]
+mod restore_review;
 
 fn payload(version: u64) -> Value {
     let tables = TABLE_ORDER
@@ -192,6 +194,9 @@ fn bounded_export_keeps_existing_backup(root: &std::path::Path) {
 }
 #[test]
 fn replacement_keeps_complete_safety_store_and_cancel_does_not_write() {
+    if restore_review::child() {
+        return;
+    }
     let root = tempfile::tempdir().unwrap();
     let active = root.path().join("active");
     fs::create_dir(&active).unwrap();
@@ -208,6 +213,7 @@ fn replacement_keeps_complete_safety_store_and_cancel_does_not_write() {
     cancel.cancel();
     assert!(install_preview(restored, &active, &cancel).is_err());
     assert!(active.join("yamantaka.sqlite3").exists());
+    restore_review::verify(root.path());
 }
 
 #[test]

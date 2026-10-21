@@ -9,6 +9,7 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='restore-review'; args=@('--restore-preview','--es') },
     @{ name='backup-saved'; args=@('--backup-export=save') },
     @{ name='backup-cancelled-es'; args=@('--backup-export=cancel','--es','--light','--reduce-motion') },
     @{ name='backup-blocked'; args=@('--backup-export=blocked') },
@@ -375,6 +376,9 @@ foreach ($case in $cases) {
             if ($controls.bulkTargetPicker.open -or $controls.bulkOrganization.members -ne $expectedMembers -or $controls.libraryDocumentCount -ne $expectedMembers -or $controls.librarySelection.ids.Count -ne 0) { throw 'Bulk organization membership or filtered readback is incorrect.' }
             if ($case.name -eq 'bulk-tags-applied' -and $controls.bulkOrganization.annotationUses -ne 1) { throw 'Document tag assignment must preserve the existing annotation membership.' }
         }
+    }
+    if ($case.name -eq 'restore-review') {
+        if (-not $controls.restore.reviewed -or $controls.restore.busy -or $controls.restore.books -ne 10) { throw 'Restore review did not load the synthetic backup.' }
     }
     if ($case.name -like 'backup-*') {
         $backup=$controls.backup
