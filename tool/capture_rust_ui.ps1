@@ -35,6 +35,17 @@ $cases = @(
     @{ name='filters-empty-smart'; args=@('--smart-view=missing') },
     @{ name='filters-reset-smart-es'; args=@('--pdf-covers','--smart-view=missing','--reset-library-filters','--es','--light','--reduce-motion') },
     @{ name='tags-manager'; args=@('--pdf-covers','--library-tags') },
+    @{ name='tags-renamed'; args=@('--pdf-covers','--library-tags','--tag-management=rename') },
+    @{ name='tags-color-small-200'; args=@('--pdf-covers','--library-tags','--tag-management=color','--size=640x480','--text-scale=2') },
+    @{ name='tags-merge-picker-small-200'; args=@('--pdf-covers','--library-tags','--tag-management=picker','--size=640x480','--text-scale=2') },
+    @{ name='tags-merge-paged'; args=@('--pdf-covers','--library-tags','--tag-management=paged-picker') },
+    @{ name='tags-merge-review-small-200'; args=@('--pdf-covers','--library-tags','--tag-management=merge-review','--size=640x480','--text-scale=2','--es','--light','--reduce-motion') },
+    @{ name='tags-merged'; args=@('--pdf-covers','--library-tags','--tag-management=merge') },
+    @{ name='tags-delete-review-small-200'; args=@('--pdf-covers','--library-tags','--tag-management=delete-review','--size=640x480','--text-scale=2','--es','--light','--reduce-motion') },
+    @{ name='tags-deleted-es'; args=@('--pdf-covers','--library-tags','--tag-management=delete','--es','--light','--reduce-motion') },
+    @{ name='tags-failed-rename'; args=@('--pdf-covers','--library-tags','--tag-management=failure') },
+    @{ name='tags-review-cancelled'; args=@('--pdf-covers','--library-tags','--tag-management=cancel') },
+    @{ name='tags-actions'; args=@('--pdf-covers','--library-tags','--tag-management=actions') },
     @{ name='tags-filter-es'; args=@('--pdf-covers','--library-tags','--tag-filter','--es','--light','--reduce-motion') },
     @{ name='tags-small-200'; args=@('--pdf-covers','--library-tags','--size=640x480','--text-scale=2') },
     @{ name='smart-annotated'; args=@('--pdf-covers','--smart-view=annotated') },
@@ -371,6 +382,27 @@ foreach ($case in $cases) {
         }
     }
 
+    if ($case.args -like '--tag-management=*') {
+        $expectedFailure=$case.name -eq 'tags-failed-rename'
+        if (-not $controls.libraryTags.managementVerified -or $controls.libraryTags.failed -ne $expectedFailure -or $controls.libraryTags.busy -or -not $controls.libraryQueryLoaded) { throw 'Shared tag workflow did not settle correctly.' }
+        $changed=$case.name -in @('tags-merged','tags-deleted-es')
+        $expectedFilters=if ($changed) { 'Reference' } else { 'Reading notes|Reference' }
+        if (($controls.libraryTags.filters -join '|') -ne $expectedFilters) { throw 'Selected tag filters were not reconciled.' }
+        $expectedBooks=if ($case.name -eq 'tags-deleted-es') { 1 } else { 2 }
+        if ($controls.libraryDocumentCount -ne $expectedBooks) { throw 'Tag filter query returned an incorrect book count.' }
+        if ($case.name -eq 'tags-merged' -and ($controls.libraryTags.entries[0].books -ne 2 -or $controls.libraryTags.entries[0].annotations -ne 1)) { throw 'Merged tag lost book or annotation associations.' }
+        if ($case.name -eq 'tags-merge-paged' -and ($controls.libraryTags.mergeTotal -ne 82 -or $controls.libraryTags.mergeOffset -ne 80 -or $controls.libraryTags.mergeVisible -ne 2)) { throw 'Merge destinations did not reach the second bounded page.' }
+        $visibleLabels=switch ($case.name) {
+            'tags-color-small-200' { @('Save color','Cancel') }
+            'tags-merge-picker-small-200' { @('Search destination tag','Reference · 1 book','Cancel') }
+            'tags-merge-review-small-200' { @('Cancelar','Fusionar') }
+            'tags-delete-review-small-200' { @('Cancelar','Eliminar') }
+            'tags-actions' { @('Rename','Change color','Merge into…','Delete tag…') }
+            'tags-failed-rename' { @('New name','Save name','Cancel') }
+            default { @() }
+        }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $visibleLabels
+    }
     if ($case.name -match '^collections-(actions|actions-small-200|ordered|order-search-es|icon-small-200)$') {
         if (-not $controls.collections.loaded -or $controls.collections.failed -or $controls.collections.busy -or -not $controls.collections.orderVerified -or $controls.collections.total -ne 2 -or $controls.collections.assigned -ne 1) { throw 'Collection changes did not settle correctly.' }
         $expectedNames = if ($case.name -eq 'collections-order-search-es') { @('Reading seminar','Archive notes') } else { @('Archive notes','Reading seminar') }

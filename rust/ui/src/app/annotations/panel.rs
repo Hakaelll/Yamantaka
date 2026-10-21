@@ -65,7 +65,9 @@ impl YamantakaApp {
         info: &PdfInfo,
         p: Palette,
     ) {
-        let busy = self.annotations.pending.is_some() || self.global_notes.writing();
+        let busy = self.annotations.pending.is_some()
+            || self.global_notes.writing()
+            || self.library_tags.writing();
         let offset = self.annotations.page.as_ref().map_or(0, |page| page.offset);
         ui.label(
             RichText::new(self.tr("Notas de lectura", "Reading notes"))

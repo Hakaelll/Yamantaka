@@ -237,6 +237,7 @@ impl YamantakaApp {
     fn global_note_command(&mut self, mutation: Option<AnnotationBatchMutation>, offset: usize) {
         if mutation.is_some()
             && (self.library_selection.removing()
+                || self.library_tags.writing()
                 || self.annotations.editing()
                 || self.annotations.writing())
         {
@@ -435,7 +436,8 @@ impl YamantakaApp {
     fn global_notes_actions(&mut self, ui: &mut egui::Ui, p: Palette, offset: usize) {
         let enabled = self.global_notes.pending.is_none()
             && !self.annotations.editing()
-            && !self.annotations.writing();
+            && !self.annotations.writing()
+            && !self.library_tags.writing();
         if self.annotations.editing() {
             ui.label(self.tr(
                 "Termina o cancela tu nota en el lector para editar estas notas.",

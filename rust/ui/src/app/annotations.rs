@@ -317,7 +317,7 @@ impl Drop for AnnotationState {
 }
 impl YamantakaApp {
     pub(super) fn begin_page_note(&mut self) {
-        if self.global_notes.writing() {
+        if self.global_notes.writing() || self.library_tags.writing() {
             return;
         }
         let Some((document, info)) = &self.active else {
@@ -420,7 +420,7 @@ impl YamantakaApp {
         }
     }
     fn annotation_command(&mut self, mutation: Option<AnnotationMutation>, offset: usize) {
-        if mutation.is_some() && self.global_notes.writing() {
+        if mutation.is_some() && (self.global_notes.writing() || self.library_tags.writing()) {
             return;
         }
         let Some(request) = self.annotations.request(&self.governor, mutation, offset) else {
@@ -437,7 +437,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn annotate_selection(&mut self) {
-        if self.global_notes.writing() {
+        if self.global_notes.writing() || self.library_tags.writing() {
             return;
         }
         let Some((document, _)) = &self.active else {

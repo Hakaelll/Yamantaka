@@ -212,6 +212,7 @@ impl YamantakaApp {
             || self.links.confirmation_open()
             || self.bulk_picker.is_some()
             || self.library_selection.review.is_some()
+            || self.tag_dialog_open()
             || ctx.egui_wants_keyboard_input()
             || egui::Popup::is_any_open(ctx)
             || self.library_selection.pending.is_some()
@@ -238,7 +239,8 @@ impl YamantakaApp {
         }
     }
     pub(super) fn submit_library_bulk(&mut self, action: BulkAction, ids: Vec<String>) -> bool {
-        if self.library_selection.pending.is_some() || ids.is_empty() {
+        if self.library_selection.pending.is_some() || self.library_tags.writing() || ids.is_empty()
+        {
             return false;
         }
         let cancel = Cancellation::default();

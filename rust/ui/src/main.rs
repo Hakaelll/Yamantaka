@@ -431,6 +431,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         {
             db.execute_batch("UPDATE documents SET added_at='2000-01-01T00:00:00Z',last_opened_at=''; UPDATE documents SET added_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),last_opened_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='demo-0'; INSERT INTO annotations(id,document_id,page_index,type,color,document_fingerprint,created_at,updated_at) VALUES('smart-a','demo-0',0,'note','violet','synthetic','2026-10-19','2026-10-19'),('smart-b','demo-0',1,'note','violet','synthetic','2026-10-19','2026-10-19'); INSERT INTO bookmarks(id,document_id,page_index,created_at,updated_at) VALUES('smart-a','demo-0',0,'2026-10-19','2026-10-19'),('smart-b','demo-0',1,'2026-10-19','2026-10-19');")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--tag-management=failure") {
+            db.execute_batch("CREATE TRIGGER reject_tag_rename BEFORE UPDATE OF name ON tags WHEN NEW.name='Rejected name' BEGIN SELECT RAISE(ABORT,'synthetic tag failure'); END;")?;
+        }
+        if capture.is_some()
+            && args
+                .iter()
+                .any(|arg| arg == "--tag-management=paged-picker")
+        {
+            for index in 0..80 {
+                db.execute_batch(&format!("INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('tag-target-{index:03}','Z target {index:03}','z target {index:03}','blue','synthetic','synthetic')"))?;
+            }
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--library-tags") {
             db.execute_batch("INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('legacy-study','Study','study','violet','2026-10-19','2026-10-19'); INSERT INTO annotations(id,document_id,page_index,type,color,document_fingerprint,created_at,updated_at) VALUES('tag-annotation','demo-0',0,'note','violet','synthetic','2026-10-19','2026-10-19'); INSERT INTO annotation_tags(annotation_id,tag_id) VALUES('tag-annotation','legacy-study');")?;
         }
@@ -790,7 +802,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_bulk_organization(mode);
                 }
                 if args.iter().any(|arg| arg == "--library-tags") {
-                    app.preview_tags(u8::from(args.iter().any(|arg| arg == "--tag-filter")));
+                    let mode = args
+                        .iter()
+                        .filter_map(|arg| arg.to_str())
+                        .find_map(|value| value.strip_prefix("--tag-management="));
+                    app.preview_tags(match mode {
+                        Some("rename") => 2,
+                        Some("color") => 3,
+                        Some("picker") => 4,
+                        Some("merge-review") => 5,
+                        Some("merge") => 6,
+                        Some("delete-review") => 7,
+                        Some("delete") => 8,
+                        Some("failure") => 9,
+                        Some("cancel") => 10,
+                        Some("actions") => 11,
+                        Some("rename-editor") => 12,
+                        Some("paged-picker") => 14,
+                        _ => u8::from(args.iter().any(|arg| arg == "--tag-filter")),
+                    });
                 }
                 if args.iter().any(|arg| arg == "--collections") {
                     app.preview_collections(

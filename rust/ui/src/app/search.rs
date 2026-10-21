@@ -30,6 +30,14 @@ pub(super) struct SearchState {
     confirm_clear: bool,
 }
 impl SearchState {
+    pub(super) fn invalidate_tag_changes(&mut self) {
+        self.invalidate_removed(&[]);
+        self.results.clear();
+        self.selection_cancel.cancel();
+        self.selected = None;
+        self.excluded = None;
+    }
+
     pub(super) fn invalidate_removed(&mut self, ids: &[String]) {
         self.cancel.cancel();
         self.results

@@ -1396,6 +1396,12 @@ impl App for YamantakaApp {
         {
             ctx.send_viewport_cmd(ViewportCommand::CancelClose);
         }
+        if self.library_tags.writing() && ctx.input(|input| input.viewport().close_requested()) {
+            self.library_tags.close_after_write = true;
+            self.library_tags.cancel();
+            self.runtime.wake();
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+        }
         if self.library_selection.removing()
             && ctx.input(|input| input.viewport().close_requested())
         {
@@ -1960,7 +1966,8 @@ impl App for YamantakaApp {
             self.password.is_some()
                 || self.links.confirmation_open()
                 || self.bulk_picker.is_some()
-                || self.selection_review_open(),
+                || self.selection_review_open()
+                || self.tag_dialog_open(),
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
@@ -1968,7 +1975,8 @@ impl App for YamantakaApp {
             self.password.is_some()
                 || self.links.confirmation_open()
                 || self.bulk_picker.is_some()
-                || self.selection_review_open(),
+                || self.selection_review_open()
+                || self.tag_dialog_open(),
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -2122,11 +2130,15 @@ impl App for YamantakaApp {
         self.pump_library_removal(&ctx);
         self.update_cover_batch_progress();
         self.selection_review_dialog(&ctx);
+        self.tag_management_dialogs(&ctx);
         self.bulk_target_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
         self.pump_library_covers(&ctx);
         if self.library_selection.close_after_removal && !self.library_selection.removing() {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+        }
+        if self.library_tags.close_after_write && !self.library_tags.writing() {
             ctx.send_viewport_cmd(ViewportCommand::Close);
         }
         if let Some(path) = &self.capture {

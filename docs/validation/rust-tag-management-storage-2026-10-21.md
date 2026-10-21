@@ -2,6 +2,8 @@
 
 Date: 2026-10-21. Scope: repository and existing actor contracts for tag rename, color, merge and deletion. The native tag manager does not expose these actions yet. Confirmation, destination selection and reconciliation of active filters and annotation views remain required before user-facing tag management is complete.
 
+Follow-up: [native tag management](rust-tag-management-ui-2026-10-21.md) now connects the controls, confirmation and selected-filter/view reconciliation. Interface-pending statements below describe this preceding storage checkpoint.
+
 ## Data behavior
 
 Tag queries now return the stored metadata revision. Rename, color and deletion require that loaded revision; merge checks both source and destination. A stale or missing tag rejects the change. Rename retains the identifier and validates the existing 60 UTF-16-unit name limit and normalized uniqueness. Colors accept the supported names or a six-digit hexadecimal RGB value. Existing imported colors remain unchanged unless explicitly edited.

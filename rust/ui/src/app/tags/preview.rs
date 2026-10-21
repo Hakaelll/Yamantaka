@@ -15,6 +15,10 @@ impl YamantakaApp {
         {
             return;
         }
+        if step >= 6 {
+            self.advance_tag_management_preview(step, mode);
+            return;
+        }
         if self.library_tags.failed || self.library_tags.write_failed {
             self.library_tags.preview = None;
             return;
@@ -88,7 +92,18 @@ impl YamantakaApp {
                     return;
                 }
                 self.library_tags.preview = None;
-                if mode == 1 {
+                if mode >= 2 {
+                    let source = study.unwrap();
+                    let target = reference.unwrap();
+                    self.toggle_tag_filter(&source);
+                    self.toggle_tag_filter(&target);
+                    self.begin_tag_rename(source.clone());
+                    self.change_tag(TagChange::Rename {
+                        expected: (&source).into(),
+                        name: "Reading notes".into(),
+                    });
+                    self.library_tags.preview = Some((6, mode));
+                } else if mode == 1 {
                     self.toggle_tag_filter(&study.unwrap());
                     self.toggle_tag_filter(&reference.unwrap());
                     let mut saved = self.preferences.clone();

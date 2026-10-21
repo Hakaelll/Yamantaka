@@ -1,6 +1,11 @@
 use super::*;
 use yamantaka_domain::tags::{MAX_TAG_FILTERS, Tag, TagChange, TagPage, TagQuery};
+mod dialogs;
+mod editor;
+mod management;
 mod preview;
+mod preview_management;
+use management::{TagEditor, TagMergePicker, TagReview};
 mod view;
 
 #[derive(Default)]
@@ -16,6 +21,13 @@ pub(super) struct TagState {
     failed: bool,
     write_failed: bool,
     draft: String,
+    editing: Option<TagEditor>,
+    merge: Option<TagMergePicker>,
+    review: Option<TagReview>,
+    management_verified: bool,
+    preview_menu: bool,
+    pending_target: Option<Tag>,
+    pub(super) close_after_write: bool,
     context: Option<Document>,
     pub(super) filters: Vec<(String, String)>,
     preview: Option<(u8, u8)>,
@@ -49,7 +61,13 @@ impl TagState {
         }
         state
     }
+    pub(super) fn writing(&self) -> bool {
+        self.writing.is_some()
+    }
     pub(super) fn leave(&mut self) {
+        self.editing = None;
+        self.merge = None;
+        self.review = None;
         if let Some(cancel) = self.pending.take() {
             cancel.cancel();
         }
@@ -69,9 +87,13 @@ impl TagState {
             && self.writing.is_none()
             && self.filter_check.is_none()
             && self.preview.is_none()
+            && self
+                .merge
+                .as_ref()
+                .is_none_or(|picker| picker.pending.is_none())
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"loaded":self.loaded,"failed":self.failed||self.write_failed,"total":self.total,"visible":self.entries.len(),"assigned":self.entries.iter().filter(|tag|tag.contains_document).count(),"annotationUses":self.entries.iter().map(|tag|tag.annotation_count).sum::<u64>(),"filters":self.filters.iter().map(|(_,name)|name).collect::<Vec<_>>(),"filtersChecked":self.filters_checked,"busy":!self.ready()})
+        serde_json::json!({"loaded":self.loaded,"failed":self.failed||self.write_failed,"total":self.total,"visible":self.entries.len(),"assigned":self.entries.iter().filter(|tag|tag.contains_document).count(),"annotationUses":self.entries.iter().map(|tag|tag.annotation_count).sum::<u64>(),"filters":self.filters.iter().map(|(_,name)|name).collect::<Vec<_>>(),"filtersChecked":self.filters_checked,"busy":!self.ready(),"managementVerified":self.management_verified,"mergeOpen":self.merge.is_some(),"mergeTotal":self.merge.as_ref().map(|picker|picker.total),"mergeOffset":self.merge.as_ref().map(|picker|picker.query.offset),"mergeVisible":self.merge.as_ref().map(|picker|picker.entries.len()),"reviewOpen":self.review.is_some(),"entries":self.entries.iter().map(|tag|serde_json::json!({"name":tag.name,"color":tag.color,"books":tag.document_count,"annotations":tag.annotation_count})).collect::<Vec<_>>()})
     }
 }
 impl Drop for TagState {
@@ -148,6 +170,25 @@ impl YamantakaApp {
         result: yamantaka_domain::Result<TagPage>,
         cancel: Cancellation,
     ) {
+        if self.library_tags.merge.as_ref().is_some_and(|picker| {
+            picker
+                .pending
+                .as_ref()
+                .is_some_and(|scope| scope.same_request(&cancel))
+        }) {
+            let picker = self.library_tags.merge.as_mut().unwrap();
+            picker.pending = None;
+            picker.loaded = true;
+            match result {
+                Ok(page) => {
+                    picker.entries = page.entries;
+                    picker.total = page.total;
+                    picker.failed = false;
+                }
+                Err(_) => picker.failed = true,
+            }
+            return;
+        }
         if self
             .library_tags
             .filter_check
@@ -195,68 +236,13 @@ impl YamantakaApp {
                     self.load_tags();
                     return;
                 }
+                if let Some(editor) = &mut self.library_tags.editing {
+                    editor.refresh(&page.entries);
+                }
                 self.library_tags.entries = page.entries;
                 self.library_tags.total = page.total;
             }
             Err(_) => self.library_tags.failed = true,
-        }
-    }
-    fn change_tag(&mut self, change: TagChange) {
-        if self.library_tags.writing.is_some() {
-            return;
-        }
-        let cancel = Cancellation::default();
-        match self
-            .runtime
-            .submit(Action::ChangeTag(Box::new(change.clone()), cancel.clone()))
-        {
-            Ok(()) => {
-                self.library_tags.writing = Some((cancel, change));
-                self.library_tags.write_failed = false;
-            }
-            Err(error) => {
-                self.library_tags.write_failed = true;
-                self.error = Some(error.to_string());
-            }
-        }
-    }
-    pub(super) fn accept_tag_change(
-        &mut self,
-        result: yamantaka_domain::Result<String>,
-        cancel: Cancellation,
-    ) {
-        if !self
-            .library_tags
-            .writing
-            .as_ref()
-            .is_some_and(|(scope, _)| scope.same_request(&cancel))
-        {
-            return;
-        }
-        let (_, change) = self.library_tags.writing.take().unwrap();
-        match result {
-            Ok(id) => {
-                if matches!(
-                    change,
-                    TagChange::Ensure { .. } | TagChange::EnsureForDocument { .. }
-                ) {
-                    self.library_tags.draft.clear();
-                    self.library_tags.query.ids = vec![id];
-                    self.library_tags.query.text.clear();
-                    self.library_tags.query.offset = 0;
-                }
-                self.library_tags.write_failed = false;
-                self.refresh();
-                if self.search.enabled {
-                    self.send(Action::IndexStatistics);
-                }
-            }
-            Err(_) => self.library_tags.write_failed = true,
-        }
-        if matches!(self.surface, Surface::Tags) {
-            self.load_tags();
-        } else {
-            self.library_tags.loaded = false;
         }
     }
     fn toggle_tag_filter(&mut self, tag: &Tag) {

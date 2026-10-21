@@ -4,7 +4,8 @@ use yamantaka_application::{library_bulk::BulkReport, library_removal::RemovalRe
 
 impl YamantakaApp {
     fn removal_available(&mut self, ids: &[String]) -> bool {
-        if self.tabs.busy()
+        if self.library_tags.writing()
+            || self.tabs.busy()
             || self.opening.busy()
             || self.global_notes.writing()
             || self.annotations.writing()

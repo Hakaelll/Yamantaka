@@ -1,7 +1,7 @@
 use super::*;
 use crate::app::settings::quiet;
 
-fn color(value: &str, p: Palette) -> Color32 {
+pub(super) fn color(value: &str, p: Palette) -> Color32 {
     if let Some(hex) = value.strip_prefix('#').filter(|hex| hex.len() == 6)
         && let Ok(rgb) = u32::from_str_radix(hex, 16)
     {
@@ -38,7 +38,7 @@ impl YamantakaApp {
                 ui.add_space(if cramped {16.0} else {28.0});
                 ui.add_enabled_ui(self.library_tags.writing.is_none() && !self.library_selection.writing(),|ui| {
                     let label=ui.label(self.tr("Nombre de la etiqueta","Tag name"));
-                    ui.with_layout(controls_layout,|ui| {
+                    ui.allocate_ui_with_layout(egui::vec2(ui.available_width(),36.0),controls_layout,|ui| {
                         let response=ui.add_sized([ui.available_width().min(400.0),36.0],egui::TextEdit::singleline(&mut self.library_tags.draft).char_limit(60).background_color(p.surface).margin(egui::vec2(10.0,8.0))).labelled_by(label.id);
                         theme::record_control_bounds(ui,self.tr("Nombre de la etiqueta","Tag name"),response.rect);
                         let valid=!self.library_tags.draft.trim().is_empty()&&self.library_tags.draft.trim().encode_utf16().count()<=60;
@@ -51,7 +51,7 @@ impl YamantakaApp {
                 });
                 ui.add_space(24.0);
                 let label=ui.label(self.tr("Buscar etiquetas","Search tags"));
-                ui.with_layout(controls_layout,|ui| {
+                ui.allocate_ui_with_layout(egui::vec2(ui.available_width(),36.0),controls_layout,|ui| {
                     let response=ui.add_sized([ui.available_width().min(400.0),36.0],egui::TextEdit::singleline(&mut self.library_tags.query.text).char_limit(256).background_color(p.surface).margin(egui::vec2(10.0,8.0))).labelled_by(label.id);
                     theme::record_control_bounds(ui,self.tr("Buscar etiquetas","Search tags"),response.rect);
                     if response.changed() {self.library_tags.query.ids.clear();self.library_tags.query.offset=0;self.load_tags();}
@@ -59,12 +59,12 @@ impl YamantakaApp {
                 });
                 if !self.library_tags.query.ids.is_empty() {
                     ui.add_space(8.0);
-                    quiet(ui,self.tr("Mostrando la etiqueta creada o reutilizada.","Showing the created or reused tag."),p);
+                    quiet(ui,self.tr("Mostrando la etiqueta seleccionada.","Showing the selected tag."),p);
                     if theme::navigation(ui,self.tr("Mostrar todas las etiquetas","Show all tags"),false,p).clicked() {self.library_tags.query.ids.clear();self.library_tags.query.text.clear();self.library_tags.query.offset=0;self.load_tags();}
                 }
                 ui.add_space(12.0);
                 quiet(ui,self.tr("Al seleccionar varias etiquetas, se muestran libros con cualquiera de ellas.","Selecting several tags shows books with any of them."),p);
-                ui.with_layout(controls_layout,|ui| {
+                ui.allocate_ui_with_layout(egui::vec2(ui.available_width(),36.0),controls_layout,|ui| {
                     let count=self.library_tags.filters.len();
                     ui.label(format!("{}: {count}",self.tr("Etiquetas para filtrar","Tag filters")));
                     if ui.add_enabled_ui(count>0,|ui|theme::navigation(ui,self.tr("Ver libros","View books"),false,p)).inner.clicked() {self.show_surface(Surface::Library);}
@@ -102,14 +102,28 @@ impl YamantakaApp {
                             response.widget_info(||egui::WidgetInfo::selected(egui::WidgetType::Checkbox,ui.is_enabled(),selected,&accessible));
                             theme::record_control_bounds(ui,&accessible,response.rect);
                             if response.changed() {self.toggle_tag_filter(tag);}
+                            let actions_name=format!("{}: {}",self.tr("Acciones de etiqueta","Tag actions"),tag.name);
+                            let more=theme::icon_button(ui,&actions_name,theme::Icon::Menu,p);
+                            let mut popup=egui::Popup::menu(&more);
+                            if self.library_tags.preview_menu && tag.name=="Reading notes" {popup=popup.open(true);}
+                            popup.show(|ui| {
+                                ui.set_max_width((ui.ctx().content_rect().width()-24.0).max(160.0));
+                                egui::ScrollArea::vertical().id_salt("tag-actions").max_height((ui.ctx().content_rect().height()-32.0).max(40.0)).show(ui,|ui| {
+                                    if theme::navigation(ui,self.tr("Cambiar nombre","Rename"),false,p).clicked() {self.begin_tag_rename(tag.clone());ui.close();}
+                                    if theme::navigation(ui,self.tr("Cambiar color","Change color"),false,p).clicked() {self.begin_tag_color(tag.clone());ui.close();}
+                                    if theme::navigation(ui,self.tr("Fusionar con…","Merge into…"),false,p).clicked() {self.begin_tag_merge(tag.clone());ui.close();}
+                                    if theme::navigation(ui,self.tr("Eliminar etiqueta…","Delete tag…"),false,p).clicked() {self.begin_tag_delete(tag.clone());ui.close();}
+                                });
+                            });
                         }));
-                        if cramped&&self.demo&&self.capture.is_some()&&tag.contains_document&&self.library_tags.preview.is_none() {ui.scroll_to_rect(heading.response.rect.union(choices.response.rect),Some(egui::Align::Center));}
+                        self.tag_editor(ui,tag,busy,p);
+                        if cramped&&self.demo&&self.capture.is_some()&&tag.contains_document&&self.library_tags.preview.is_none()&&self.library_tags.editing.is_none() {ui.scroll_to_rect(heading.response.rect.union(choices.response.rect),Some(egui::Align::Center));}
                         ui.add_space(14.0);ui.separator();
                     });
                 }
                 if self.library_tags.loaded&&self.library_tags.entries.is_empty() {ui.add_space(24.0);ui.label(self.tr("No hay etiquetas que coincidan.","No matching tags."));}
                 ui.add_space(14.0);
-                ui.with_layout(controls_layout,|ui| {
+                ui.allocate_ui_with_layout(egui::vec2(ui.available_width(),36.0),controls_layout,|ui| {
                     let offset=self.library_tags.query.offset;
                     if ui.add_enabled_ui(!busy&&offset>0,|ui|theme::navigation(ui,self.tr("Anterior","Previous"),false,p)).inner.clicked() {self.library_tags.query.offset=offset.saturating_sub(80);self.load_tags();}
                     let first=if self.library_tags.total==0 {0} else {offset+1};
