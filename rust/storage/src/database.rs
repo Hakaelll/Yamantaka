@@ -436,6 +436,31 @@ impl LibraryRepository for Database {
     ) -> Result<yamantaka_domain::collections::CollectionPage> {
         self.collection_page(query, cancel)
     }
+    fn workspaces(
+        &self,
+        offset: usize,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::workspaces::WorkspacePage> {
+        self.workspace_page(offset, cancel)
+    }
+    fn workspace(
+        &self,
+        expected: &yamantaka_domain::workspaces::WorkspaceRevision,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::workspaces::WorkspaceReadings> {
+        self.workspace_readings(expected, cancel)
+    }
+    fn change_workspace(
+        &mut self,
+        change: &yamantaka_domain::workspaces::WorkspaceChange,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<String> {
+        if let yamantaka_domain::workspaces::WorkspaceChange::Duplicate { expected, name } = change
+        {
+            return self.duplicate_workspace(expected, name, cancel);
+        }
+        self.apply_workspace(change, cancel)
+    }
     fn change_collection(
         &mut self,
         change: &yamantaka_domain::collections::CollectionChange,

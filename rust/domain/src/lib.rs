@@ -42,6 +42,7 @@ pub mod search;
 pub mod source_revision;
 pub mod tags;
 pub mod text_selection;
+pub mod workspaces;
 use std::{
     path::PathBuf,
     sync::{
@@ -222,6 +223,27 @@ pub struct LibraryMembership {
     pub tag: Option<String>,
 }
 pub trait LibraryRepository {
+    fn workspaces(
+        &self,
+        _offset: usize,
+        _cancel: &Cancellation,
+    ) -> Result<workspaces::WorkspacePage> {
+        Err(Failure::Unsupported("Saved workspaces".into()))
+    }
+    fn workspace(
+        &self,
+        _expected: &workspaces::WorkspaceRevision,
+        _cancel: &Cancellation,
+    ) -> Result<workspaces::WorkspaceReadings> {
+        Err(Failure::Unsupported("Saved workspace readings".into()))
+    }
+    fn change_workspace(
+        &mut self,
+        _change: &workspaces::WorkspaceChange,
+        _cancel: &Cancellation,
+    ) -> Result<String> {
+        Err(Failure::Unsupported("Saved workspace changes".into()))
+    }
     fn library_memberships(
         &self,
         _ids: &[String],

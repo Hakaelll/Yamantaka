@@ -27,4 +27,5 @@ pub mod reader_preferences;
 pub mod reading_sessions;
 pub mod search;
 mod tags;
+mod workspaces;
 pub use database::Database;

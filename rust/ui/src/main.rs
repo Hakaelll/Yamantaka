@@ -93,6 +93,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             || value.starts_with("--backup-export=")
                             || value == "--restore-preview"
                             || value == "--restore-apply"
+                            || value == "--workspaces"
                     }) || arg == "--export-json"
                         || arg == "--automatic-cover"
                         || arg == "--cover-picker-save"
@@ -781,6 +782,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if demo {
                 if args.iter().any(|arg| arg == "--reading-queue") {
                     app.preview_reading_queue();
+                }
+                if args.iter().any(|arg| arg == "--workspaces") {
+                    app.preview_workspaces();
                 }
                 if args
                     .iter()

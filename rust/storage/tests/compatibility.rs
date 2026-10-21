@@ -13,6 +13,8 @@ mod removal_verification;
 mod smart_view_verification;
 #[path = "support/tags.rs"]
 mod tag_verification;
+#[path = "support/workspaces.rs"]
+mod workspace_verification;
 use yamantaka_domain::{Cancellation, LibraryQuery, LibraryRepository};
 use yamantaka_storage::{
     Database,
@@ -39,6 +41,7 @@ fn all_eleven_historical_schemas_preserve_ids_relationships_and_preferences() {
         assert_eq!(db.count(&LibraryQuery::default()).unwrap(), 1);
         db.integrity().unwrap();
     }
+    workspace_verification::preserved_split_references(DOCUMENT);
 }
 
 #[test]

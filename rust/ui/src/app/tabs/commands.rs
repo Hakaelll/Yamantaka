@@ -59,7 +59,7 @@ impl YamantakaApp {
         }
         self.request_tab_plan(plan)
     }
-    pub(super) fn request_tab_plan(&mut self, plan: DocumentTabs) -> bool {
+    pub(in crate::app) fn request_tab_plan(&mut self, plan: DocumentTabs) -> bool {
         if self.library_selection.removing() {
             return false;
         }
@@ -84,10 +84,9 @@ impl YamantakaApp {
             );
             return false;
         }
-        let target = plan
-            .active()
-            .expect("A tab plan has an active reading")
-            .clone();
+        let Some(target) = plan.active().cloned() else {
+            return self.request_empty_tab_plan(plan);
+        };
         if self
             .active
             .as_ref()

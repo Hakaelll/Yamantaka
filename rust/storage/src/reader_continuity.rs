@@ -197,6 +197,26 @@ fn read(path: &Path) -> Result<Option<Snapshot>> {
 pub fn load(path: &Path) -> Result<Option<DocumentTabs>> {
     read(path)?.map(|snapshot| snapshot.model()).transpose()
 }
+pub(crate) fn encode_workspace(model: &DocumentTabs) -> Result<Value> {
+    let snapshot = Snapshot {
+        version: 1,
+        active: model.active().map(|tab| tab.id().into()),
+        tabs: model
+            .tabs()
+            .iter()
+            .map(|tab| StoredTab::capture(tab, None))
+            .collect(),
+        closed: Vec::new(),
+        unknown: BTreeMap::new(),
+    };
+    snapshot.model()?;
+    serde_json::to_writer(OutputBudget(MAX_CONTINUITY_BYTES), &snapshot).map_err(storage)?;
+    serde_json::to_value(snapshot).map_err(storage)
+}
+pub(crate) fn decode_workspace(value: Value) -> Result<DocumentTabs> {
+    let snapshot: Snapshot = serde_json::from_value(value).map_err(storage)?;
+    snapshot.model()
+}
 pub fn save(path: &Path, model: &DocumentTabs) -> Result<()> {
     let previous = read(path)?;
     let capture = |tab: &ReaderTab| {

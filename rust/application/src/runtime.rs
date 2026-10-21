@@ -80,6 +80,7 @@ pub enum Action {
     SaveManualCover(Box<crate::manual_cover::ManualCoverRequest>),
     Cover(CoverSource, u64, Cancellation),
     ReaderContinuity(Box<ContinuityRequest>),
+    Workspace(Box<crate::workspaces::WorkspaceRequest>),
     ReadingHistory(Box<ReadingHistoryRequest>),
     TrimReadingHistory(usize, Cancellation),
     ReadingGoal(Box<ReadingGoalRequest>),
@@ -154,6 +155,7 @@ pub enum Update {
     ManualCover(crate::manual_cover::ManualCoverReply),
     Cover(String, Result<Arc<RenderedPage>>, Cancellation),
     ReaderContinuity(ContinuityReply),
+    Workspace(crate::workspaces::WorkspaceReply),
     ReaderClosed(ReaderCloseReply),
     ReadingHistory(ReadingHistoryReply),
     ReadingHistoryTrimmed(Result<u64>, Cancellation),
@@ -1249,6 +1251,10 @@ impl Runtime {
                                 Action::ReaderContinuity(request) => {
                                     let reply = continuity.execute(&mut repository, *request);
                                     emit(&events, &notify, Update::ReaderContinuity(reply), permit);
+                                }
+                                Action::Workspace(request) => {
+                                    let reply = crate::workspaces::execute(&mut repository, *request);
+                                    emit(&events, &notify, Update::Workspace(reply), permit);
                                 }
                                 Action::SaveReaderPreferences(id, prefs) => {
                                     let result = if prefs.document_id != id {

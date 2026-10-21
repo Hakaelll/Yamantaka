@@ -27,6 +27,7 @@ pub mod relocation;
 pub mod runtime;
 pub mod search_index;
 mod temporary_document;
+pub mod workspaces;
 
 pub enum Command {
     Query(LibraryQuery),

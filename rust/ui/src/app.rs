@@ -54,6 +54,7 @@ mod tabs;
 mod tags;
 mod text;
 mod thumbnails;
+mod workspaces;
 
 use crate::{
     book,
@@ -122,6 +123,7 @@ pub struct YamantakaApp {
     opening: opening::ReaderOpening,
     tabs: tabs::TabState,
     reading_queue: reading_queue::QueueState,
+    workspaces: workspaces::WorkspaceState,
     restoration: restoration::RestorationState,
     open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
@@ -320,6 +322,7 @@ impl YamantakaApp {
             opening: Default::default(),
             tabs: Default::default(),
             reading_queue: Default::default(),
+            workspaces: Default::default(),
             open_confirmation: None,
             password: None,
             password_attempted: false,
@@ -1382,6 +1385,7 @@ impl App for YamantakaApp {
         while !self.legacy_import.open
             && !self.backup_restore.open
             && !self.reading_queue.open
+            && !self.workspaces.open
             && let Ok(paths) = self.activation.try_recv()
         {
             ctx.send_viewport_cmd(ViewportCommand::Focus);
@@ -1871,6 +1875,7 @@ impl App for YamantakaApp {
                     self.history.accept(reply);
                 }
                 Update::ReaderContinuity(reply) => self.accept_reader_continuity(reply),
+                Update::Workspace(reply) => self.accept_workspace(reply),
             }
         }
         self.advance_cover_picker_preview();
@@ -1878,6 +1883,7 @@ impl App for YamantakaApp {
         self.advance_replacement_preview();
         self.advance_tab_preview();
         self.advance_queue_preview();
+        self.advance_workspace_preview();
         self.advance_bulk_tab_preview();
         self.retire_closed_reader();
         self.poll_import_progress(ctx);
@@ -1937,7 +1943,8 @@ impl App for YamantakaApp {
                 || self.tag_dialog_open()
                 || self.legacy_import.open
                 || self.backup_restore.open
-                || self.reading_queue.open,
+                || self.reading_queue.open
+                || self.workspaces.open,
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
@@ -1949,7 +1956,8 @@ impl App for YamantakaApp {
                 || self.tag_dialog_open()
                 || self.legacy_import.open
                 || self.backup_restore.open
-                || self.reading_queue.open,
+                || self.reading_queue.open
+                || self.workspaces.open,
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -2107,6 +2115,7 @@ impl App for YamantakaApp {
         self.legacy_import_dialog(&ctx);
         self.restore_dialog(&ctx);
         self.reading_queue_dialog(&ctx);
+        self.workspace_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
@@ -2198,6 +2207,7 @@ impl App for YamantakaApp {
                     && self.opening.ready()
                     && self.tabs.ready()
                     && self.reading_queue.ready()
+                    && self.workspaces.ready()
                     && match self.preview_password_target {
                         Some("unlock") => matches!(self.surface, Surface::Reader),
                         Some(_) => self.password.is_some(),
@@ -2340,6 +2350,7 @@ impl App for YamantakaApp {
         self.library_selection.cancel();
         self.library_tags.cancel();
         self.collections.cancel();
+        self.workspaces.cancel();
         self.cache_maintenance.cancel();
         self.file_check.cancel();
         self.file_comparison.cancel();

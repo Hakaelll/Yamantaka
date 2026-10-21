@@ -209,6 +209,16 @@ impl YamantakaApp {
                         self.show_reading_queue();
                         ui.close();
                     }
+                    if theme::bounded_navigation(
+                        ui,
+                        self.tr("Espacios de trabajo", "Workspaces"),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_workspaces();
+                        ui.close();
+                    }
                     self.library_check_menu(ui, p);
                     self.operation_actions(ui, p);
                     if theme::navigation(

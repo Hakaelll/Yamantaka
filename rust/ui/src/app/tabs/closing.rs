@@ -99,26 +99,48 @@ impl YamantakaApp {
             Err(error) => self.error = Some(error.to_string()),
         }
     }
-    fn submit_tab_close(&mut self, document: String, kind: CloseKind) {
+    pub(super) fn request_empty_tab_plan(&mut self, plan: DocumentTabs) -> bool {
+        if let Some((document, _)) = &self.active {
+            let document = document.id.clone();
+            self.cache_reading_context();
+            if let Err(error) = self.validate_reading_session_context() {
+                self.error = Some(error.to_string());
+                return false;
+            }
+            self.submit_tab_close(document, CloseKind::Last(plan))
+        } else {
+            let removed = removed_documents(&self.tabs.model, &plan);
+            self.cancel_reader_opening();
+            self.tabs.retire_after_switch = removed;
+            self.tabs.model = plan;
+            self.show_surface(Surface::Library);
+            true
+        }
+    }
+    fn submit_tab_close(&mut self, document: String, kind: CloseKind) -> bool {
         if let Err(error) = self
             .tabs
             .closing
             .can_enqueue(std::slice::from_ref(&document))
         {
             self.error = Some(error.to_string());
-            return;
+            return false;
         }
         let token = Cancellation::default();
         match self.runtime.submit(Action::Close(ReaderCloseRequest {
             document: document.clone(),
             cancel: token.clone(),
         })) {
-            Ok(()) => self.tabs.closing.bind(document, token, kind),
+            Ok(()) => {
+                self.tabs.closing.bind(document, token, kind);
+                true
+            }
             Err(error) => {
                 if matches!(kind, CloseKind::Retire) {
                     self.tabs.closing.fail(document);
                 }
                 self.error = Some(error.to_string());
+                false
             }
         }
     }
@@ -166,6 +188,10 @@ impl YamantakaApp {
         self.sync_tab_context();
         match pending.kind {
             CloseKind::Last(mut plan) => {
+                self.tabs.retire_after_switch = removed_documents(&self.tabs.model, &plan)
+                    .into_iter()
+                    .filter(|id| id != &reply.document)
+                    .collect();
                 self.cache_reading_context();
                 if let Err(error) = self.finish_reading_session() {
                     self.error = Some(error.to_string());
