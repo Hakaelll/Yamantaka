@@ -100,6 +100,7 @@ pub struct DocumentTabs {
     tabs: Vec<ReaderTab>,
     active: Option<String>,
     closed: Vec<ReaderTab>,
+    workspace: Option<crate::workspaces::WorkspaceRevision>,
 }
 pub struct OpenTabOutcome {
     pub selected: String,
@@ -107,6 +108,26 @@ pub struct OpenTabOutcome {
     pub reused: bool,
 }
 impl DocumentTabs {
+    pub fn workspace_reference(&self) -> Option<&crate::workspaces::WorkspaceRevision> {
+        self.workspace.as_ref()
+    }
+    pub fn set_workspace_reference(
+        &mut self,
+        reference: Option<crate::workspaces::WorkspaceRevision>,
+    ) -> Result<()> {
+        if reference.as_ref().is_some_and(|reference| {
+            reference.id.is_empty()
+                || reference.id.len() > 4096
+                || reference.updated_at.is_empty()
+                || reference.updated_at.len() > 4096
+        }) {
+            return Err(Failure::Invalid(
+                "Invalid saved workspace reference; stored continuity is preserved".into(),
+            ));
+        }
+        self.workspace = reference;
+        Ok(())
+    }
     pub fn tabs(&self) -> &[ReaderTab] {
         &self.tabs
     }

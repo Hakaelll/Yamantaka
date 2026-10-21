@@ -361,6 +361,7 @@ impl AnnotationRepository for Database {
             connection,
             import_journal: Default::default(),
             file_checks: Default::default(),
+            workspace_undo: None,
         }))
     }
 

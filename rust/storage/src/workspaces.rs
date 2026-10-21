@@ -2,6 +2,7 @@ use crate::{Database, database::storage};
 use rusqlite::{Connection, OptionalExtension, params};
 use yamantaka_domain::{Cancellation, Failure, MAX_LIBRARY_PAGE, Result, workspaces::*};
 mod readings;
+pub(crate) mod undo;
 mod write;
 
 fn invalid(message: &str) -> Failure {
@@ -48,6 +49,28 @@ fn next_revision(previous: Option<&str>) -> String {
     now.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
 }
 impl Database {
+    pub(crate) fn recover_workspace(
+        &self,
+        expected: Option<&WorkspaceRevision>,
+        cancel: &Cancellation,
+    ) -> Result<Option<WorkspaceReadings>> {
+        cancel.check()?;
+        let tx = self.connection.unchecked_transaction().map_err(storage)?;
+        let target = if let Some(expected) = expected {
+            Some(verify(&tx, expected)?)
+        } else {
+            tx.query_row(
+                &format!("{SUMMARY} WHERE w.is_default=1 ORDER BY w.updated_at DESC,w.id LIMIT 1"),
+                [],
+                summary,
+            )
+            .optional()
+            .map_err(storage)?
+        };
+        target
+            .map(|target| readings::load(self, &(&target).into(), cancel))
+            .transpose()
+    }
     pub(crate) fn workspace_page(
         &self,
         offset: usize,

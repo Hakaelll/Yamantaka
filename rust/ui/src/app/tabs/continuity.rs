@@ -9,6 +9,7 @@ pub(in crate::app) struct ContinuityState {
     pub(in crate::app) overridden: bool,
     loading: Option<Cancellation>,
     loaded: bool,
+    had_snapshot: bool,
     paused: bool,
     revision: u64,
     saved: DocumentTabs,
@@ -24,6 +25,13 @@ impl YamantakaApp {
     pub(in crate::app) fn continuity_settled(&self) -> bool {
         let state = &self.tabs.continuity;
         state.loaded && !state.paused && state.pending.is_none() && state.saved == self.tabs.model
+    }
+    pub(in crate::app) fn continuity_available_for_workspace(&self) -> Option<bool> {
+        let state = &self.tabs.continuity;
+        (state.loaded && !state.paused && !state.overridden).then_some(state.had_snapshot)
+    }
+    pub(in crate::app) fn continuity_loading(&self) -> bool {
+        self.tabs.continuity.loading.is_some()
     }
 
     pub(in crate::app) fn begin_reader_continuity(&mut self) {
@@ -68,7 +76,10 @@ impl YamantakaApp {
         }
         state.loading = None;
         let restored = match reply.result {
-            Ok(restored) => restored.unwrap_or_default(),
+            Ok(restored) => {
+                state.had_snapshot = restored.is_some();
+                restored.unwrap_or_default()
+            }
             Err(error) => {
                 self.error = Some(error.to_string());
                 return;

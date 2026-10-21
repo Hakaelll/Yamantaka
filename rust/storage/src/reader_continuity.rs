@@ -40,6 +40,8 @@ impl Write for OutputBudget {
 #[derive(Serialize, Deserialize)]
 struct Snapshot {
     version: u32,
+    #[serde(default)]
+    workspace: Option<yamantaka_domain::workspaces::WorkspaceRevision>,
     active: Option<String>,
     tabs: Vec<StoredTab>,
     closed: Vec<StoredTab>,
@@ -96,6 +98,7 @@ impl Snapshot {
                 .map(StoredTab::tab)
                 .collect::<Result<_>>()?,
         )?;
+        model.set_workspace_reference(self.workspace.clone())?;
         Ok(model)
     }
 }
@@ -200,6 +203,7 @@ pub fn load(path: &Path) -> Result<Option<DocumentTabs>> {
 pub(crate) fn encode_workspace(model: &DocumentTabs) -> Result<Value> {
     let snapshot = Snapshot {
         version: 1,
+        workspace: None,
         active: model.active().map(|tab| tab.id().into()),
         tabs: model
             .tabs()
@@ -230,6 +234,7 @@ pub fn save(path: &Path, model: &DocumentTabs) -> Result<()> {
     };
     let snapshot = Snapshot {
         version: 1,
+        workspace: model.workspace_reference().cloned(),
         active: model.active().map(|tab| tab.id().into()),
         tabs: model.tabs().iter().map(&capture).collect(),
         closed: model.closed().iter().map(capture).collect(),

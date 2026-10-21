@@ -226,6 +226,13 @@ pub struct LibraryMembership {
     pub tag: Option<String>,
 }
 pub trait LibraryRepository {
+    fn startup_workspace(
+        &self,
+        _expected: Option<&workspaces::WorkspaceRevision>,
+        _cancel: &Cancellation,
+    ) -> Result<Option<workspaces::WorkspaceReadings>> {
+        Err(Failure::Unsupported("Workspace startup recovery".into()))
+    }
     fn workspaces(
         &self,
         _offset: usize,

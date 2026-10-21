@@ -129,5 +129,70 @@ pub fn preserved_split_references(document: &str) {
             .focus
     );
     assert_ne!(focused.updated_at, updated.updated_at);
+    let before = database.workspace(&(&focused).into(), &cancel).unwrap();
+    let old_tab = before.tabs.tabs()[0].id().to_owned();
+    let deleted = database
+        .change_workspace(
+            &WorkspaceChange::Delete {
+                expected: (&focused).into(),
+            },
+            &cancel,
+        )
+        .unwrap();
+    let WorkspaceChanged::Deleted(undo) = deleted else {
+        panic!("Deletion must return an undo receipt");
+    };
+    assert!(
+        database
+            .startup_workspace(Some(&(&focused).into()), &cancel)
+            .is_err()
+    );
+    let cancelled = Cancellation::default();
+    cancelled.cancel();
+    assert!(
+        database
+            .change_workspace(
+                &WorkspaceChange::UndoDelete {
+                    token: undo.token.clone()
+                },
+                &cancelled
+            )
+            .is_err()
+    );
+    let restored = database
+        .change_workspace(
+            &WorkspaceChange::UndoDelete {
+                token: undo.token.clone(),
+            },
+            &cancel,
+        )
+        .unwrap();
+    let WorkspaceChanged::Saved(restored) = restored else {
+        panic!("Undo must return the restored workspace");
+    };
+    assert_eq!(restored.id, focused.id);
+    assert_ne!(restored.updated_at, focused.updated_at);
+    let restored_readings = database
+        .startup_workspace(Some(&(&restored).into()), &cancel)
+        .unwrap()
+        .unwrap();
+    assert_eq!(restored_readings.tabs.tabs()[0].id(), old_tab);
+    assert_eq!(restored_readings.view.query["custom"], "retained");
+    assert!(
+        database
+            .change_workspace(&WorkspaceChange::UndoDelete { token: undo.token }, &cancel)
+            .is_err()
+    );
+    let reference = WorkspaceRevision::from(&restored);
+    let mut continuity = restored_readings.tabs;
+    continuity
+        .set_workspace_reference(Some(reference.clone()))
+        .unwrap();
+    let continuity_path = root.path().join("continuity.json");
+    yamantaka_storage::reader_continuity::save(&continuity_path, &continuity).unwrap();
+    let reread = yamantaka_storage::reader_continuity::load(&continuity_path)
+        .unwrap()
+        .unwrap();
+    assert_eq!(reread.workspace_reference(), Some(&reference));
     database.integrity().unwrap();
 }

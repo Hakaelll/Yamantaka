@@ -10,7 +10,8 @@ pub struct Workspace {
     pub is_default: bool,
     pub readings: u64,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WorkspaceRevision {
     pub id: String,
     pub updated_at: String,
@@ -35,7 +36,13 @@ pub struct WorkspaceReadings {
 }
 pub enum WorkspaceChanged {
     Saved(Workspace),
-    Deleted(String),
+    Deleted(WorkspaceUndo),
+}
+#[derive(Clone, Debug)]
+pub struct WorkspaceUndo {
+    pub id: String,
+    pub token: String,
+    pub name: String,
 }
 #[derive(Clone)]
 pub enum WorkspaceChange {
@@ -66,5 +73,8 @@ pub enum WorkspaceChange {
     },
     Delete {
         expected: WorkspaceRevision,
+    },
+    UndoDelete {
+        token: String,
     },
 }

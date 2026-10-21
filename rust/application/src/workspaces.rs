@@ -2,6 +2,7 @@ use yamantaka_domain::{Cancellation, LibraryRepository, Result, workspaces::*};
 pub enum WorkspaceCommand {
     List { offset: usize },
     Load(WorkspaceRevision),
+    Startup(Option<WorkspaceRevision>),
     Change(WorkspaceChange),
 }
 pub struct WorkspaceRequest {
@@ -11,6 +12,7 @@ pub struct WorkspaceRequest {
 pub enum WorkspaceOutcome {
     Page(WorkspacePage),
     Loaded(Box<WorkspaceReadings>),
+    Startup(Option<Box<WorkspaceReadings>>),
     Changed(WorkspaceChanged),
 }
 pub struct WorkspaceReply {
@@ -22,6 +24,9 @@ pub(crate) fn execute(
     request: WorkspaceRequest,
 ) -> WorkspaceReply {
     let result = match request.command {
+        WorkspaceCommand::Startup(expected) => repository
+            .startup_workspace(expected.as_ref(), &request.cancel)
+            .map(|saved| WorkspaceOutcome::Startup(saved.map(Box::new))),
         WorkspaceCommand::List { offset } => repository
             .workspaces(offset, &request.cancel)
             .map(WorkspaceOutcome::Page),

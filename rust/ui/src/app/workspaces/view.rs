@@ -21,6 +21,13 @@ impl YamantakaApp {
                 ui.label(self.tr("Guarda tus lecturas y su cola para retomarlas después.","Save your readings and their queue to return to them later."));
                 if let Some(error)=&state.error {ui.colored_label(p.accent,error);}
                 if let Some(notice)=&state.notice {ui.label(notice);}
+                if let Some(undo)=&state.undo {
+                    ui.add_enabled_ui(!busy,|ui| {
+                        if theme::bounded_navigation(ui,self.tr("Deshacer eliminación","Undo deletion"),p).clicked() {
+                            command=Some(WorkspaceCommand::Change(WorkspaceChange::UndoDelete {token:undo.token.clone()}));
+                        }
+                    });
+                }
                 egui::ScrollArea::vertical().max_height((ctx.content_rect().height()-210.0).clamp(40.0,480.0)).show(ui,|ui| {
                     ui.add_enabled_ui(!busy,|ui| {
                         ui.label(self.tr("Nuevo espacio","New workspace"));
@@ -80,7 +87,7 @@ impl YamantakaApp {
                 });
                 if let Some((entry,replace))=&state.confirm {
                     ui.add_space(8.0);
-                    ui.label(if *replace {self.tr("Se reemplazarán las lecturas guardadas de este espacio.","This replaces the workspace's saved readings.")} else {self.tr("Se eliminará el espacio guardado y no se podrá deshacer. Los PDF y las lecturas abiertas se conservan.","The saved workspace will be deleted and cannot be recovered here. PDFs and open readings are preserved.")});
+                    ui.label(if *replace {self.tr("Se reemplazarán las lecturas guardadas de este espacio.","This replaces the workspace's saved readings.")} else {self.tr("Se eliminará el espacio guardado. Puedes deshacer la última eliminación durante esta sesión. Los PDF y las lecturas abiertas se conservan.","The saved workspace will be deleted. The last deletion can be undone during this session. PDFs and open readings are preserved.")});
                     let mut cancel_confirm=false;
                     ui.add_enabled_ui(!busy,|ui| ui.horizontal_wrapped(|ui| {
                         let cancel=theme::bounded_navigation(ui,self.tr("Cancelar","Cancel"),p);

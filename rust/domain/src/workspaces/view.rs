@@ -20,7 +20,7 @@ pub enum WorkspaceDensity {
     Comfortable,
     Compact,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WorkspaceView {
     pub query: Value,
     pub collection_id: Option<String>,

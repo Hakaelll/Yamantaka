@@ -112,6 +112,7 @@ impl Database {
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(storage)?;
+        let mut deleted = None;
         let id = match change {
             WorkspaceChange::Create {
                 name: value,
@@ -190,7 +191,10 @@ impl Database {
                 expected.id.clone()
             }
             WorkspaceChange::Delete { expected } => {
-                verify(&tx, expected)?;
+                let workspace = verify(&tx, expected)?;
+                deleted = Some(super::undo::WorkspaceUndoData::capture(
+                    &tx, &workspace, cancel,
+                )?);
                 tx.execute("DELETE FROM workspaces WHERE id=?", [&expected.id])
                     .map_err(storage)?;
                 expected.id.clone()
@@ -200,14 +204,22 @@ impl Database {
                     "Workspace duplication must load its source before the write transaction",
                 ));
             }
+            WorkspaceChange::UndoDelete { .. } => {
+                return Err(invalid(
+                    "Workspace undo requires its retained deletion receipt",
+                ));
+            }
         };
         cancel.check()?;
-        let changed = if matches!(change, WorkspaceChange::Delete { .. }) {
-            WorkspaceChanged::Deleted(id)
+        let changed = if let Some(deleted) = &deleted {
+            WorkspaceChanged::Deleted(deleted.receipt())
         } else {
             WorkspaceChanged::Saved(header(&tx, &id)?)
         };
         tx.commit().map_err(storage)?;
+        if let Some(deleted) = deleted {
+            self.workspace_undo = Some(deleted);
+        }
         Ok(changed)
     }
     pub(crate) fn duplicate_workspace(

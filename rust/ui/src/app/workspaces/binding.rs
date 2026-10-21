@@ -68,6 +68,14 @@ impl YamantakaApp {
                 });
             }
         }
+        if let Some(binding) = &self.workspaces.binding
+            && let Err(error) = self
+                .tabs
+                .model
+                .set_workspace_reference(Some((&binding.workspace).into()))
+        {
+            self.error = Some(error.to_string());
+        }
         if self.workspaces.close_after
             && self
                 .workspaces
@@ -119,17 +127,29 @@ impl YamantakaApp {
     ) {
         use yamantaka_domain::workspaces::WorkspaceChanged;
         match changed {
-            WorkspaceChanged::Deleted(id) => {
+            WorkspaceChanged::Deleted(undo) => {
+                if self
+                    .tabs
+                    .model
+                    .workspace_reference()
+                    .is_some_and(|reference| reference.id == undo.id)
+                {
+                    let _ = self.tabs.model.set_workspace_reference(None);
+                }
                 if self
                     .workspaces
                     .binding
                     .as_ref()
-                    .is_some_and(|binding| binding.workspace.id == id)
+                    .is_some_and(|binding| binding.workspace.id == undo.id)
                 {
                     self.workspaces.binding = None;
                 }
+                self.workspaces.undo = Some(undo);
             }
             WorkspaceChanged::Saved(workspace) => {
+                if matches!(change, Some(WorkspaceChange::UndoDelete { .. })) {
+                    self.workspaces.undo = None;
+                }
                 if let Some(WorkspaceChange::Create { tabs, view, .. }) = &change
                     && QueueContext::capture(tabs) == QueueContext::capture(&self.tabs.model)
                 {

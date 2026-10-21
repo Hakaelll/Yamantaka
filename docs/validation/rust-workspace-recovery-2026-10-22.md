@@ -1,0 +1,15 @@
+# Workspace restart recovery and deletion undo
+
+Reader continuity now includes an optional workspace reference with its exact committed revision. Older snapshots remain valid. References are validated and stored atomically with the reading context, avoiding a separate preferences write for every queue change. Named workspace snapshots do not embed that link.
+
+After successful continuity restoration, the application reads the referenced workspace on the existing actor. It rebinds only when the revision, ordered queue and active document match. Current pages and reader preferences stay in place. The saved library view and concentration mode are applied only if the user has not changed that view while the request was pending. Titles for inactive readings are also restored. Newer or conflicting workspace data leaves current readings available without linking or overwriting the workspace.
+
+With Restore last session enabled, a startup without any continuity snapshot can open the default workspace through the normal native reader admission path. An existing empty snapshot, an explicit opening/import, disabled restoration or invalid continuity prevents that fallback. Opening the workspace manager cancels a pending automatic lookup.
+
+Deletion retains one actor-owned undo receipt for the process lifetime. Its payload captures the actual SQLite header and reading rows, including unknown columns and JSON properties. Undo restores the original IDs and references in one transaction and advances the workspace revision. Cancellation, identity collisions and foreign-key failures roll back without consuming the receipt. A successful later deletion replaces it. The bounded payload allows up to eight MiB and 100,000 rows per table; exceeding the limit prevents deletion. PDFs and current readings are untouched.
+
+The retained compatibility case passed with checks for cancellation, one-shot undo, restored IDs and unknown properties, monotonic revision, startup revision rejection and continuity reference round trip. No additional standalone test was added and no broad suite was repeated.
+
+The native synthetic workspace scenario performs undo through the application actor and produces the [manager capture](../screenshots/rust-workspace-recovery/workspaces.png). The repeatable [startup check](../../tool/check_workspace_startup.ps1) then creates an isolated portable store from that synthetic fixture and runs two production startups: one with bound continuity and one without continuity. Both open a native PDF, restore the three-entry queue and concentration mode, and verify all reading titles. The script confirms that the saved workspace rows were not rewritten. Its generated stores and raw production captures stay local under build/verification.
+
+Physical mouse/keyboard acceptance, shutdown fault injection, panel-width/column application, saved split/comparison restoration and the remaining performance/accessibility matrix are pending. This checkpoint does not establish complete workspace parity or Release readiness.

@@ -196,8 +196,29 @@ impl YamantakaApp {
                     .as_ref()
                     .is_some_and(|binding| binding.focus)
                 {
-                    self.workspaces.preview = 0;
+                    let token = self.workspaces.undo.as_ref().unwrap().token.clone();
+                    self.workspaces.preview = 11;
+                    self.workspace_change(WorkspaceChange::UndoDelete { token });
                 }
+            }
+            11 => {
+                assert_eq!(self.workspaces.total, 2);
+                assert!(self.workspaces.undo.is_none());
+                self.workspaces.preview = 12;
+                self.workspace_change(WorkspaceChange::Delete {
+                    expected: find("Reading and study"),
+                });
+            }
+            12 => {
+                assert_eq!(self.workspaces.total, 1);
+                assert!(self.workspaces.undo.is_some());
+                assert!(self.tabs.model.workspace_reference().is_some());
+                yamantaka_storage::reader_continuity::save(
+                    &self.store.join("export-preview.reader-continuity.json"),
+                    &self.tabs.model,
+                )
+                .unwrap();
+                self.workspaces.preview = 0;
             }
             _ => {}
         }

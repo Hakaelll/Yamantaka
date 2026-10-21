@@ -5,7 +5,9 @@ use yamantaka_application::workspaces::{
 use yamantaka_domain::workspaces::{Workspace, WorkspaceChange, WorkspacePage, WorkspaceRevision};
 mod binding;
 mod context;
+mod opening;
 mod preview;
+mod startup;
 mod view;
 use binding::{PendingContext, WorkspaceBinding};
 
@@ -29,10 +31,16 @@ pub(super) struct WorkspaceState {
     focus_close: bool,
     focus_cancel: bool,
     preview: u8,
+    startup: startup::Startup,
+    startup_view: Option<yamantaka_domain::workspaces::WorkspaceView>,
+    undo: Option<yamantaka_domain::workspaces::WorkspaceUndo>,
 }
 impl WorkspaceState {
     pub(super) fn ready(&self) -> bool {
-        self.pending.is_none() && self.pending_open.is_none() && self.preview == 0
+        self.pending.is_none()
+            && self.pending_open.is_none()
+            && self.preview == 0
+            && self.startup == startup::Startup::Finished
     }
     pub(super) fn cancel(&mut self) {
         if let Some(cancel) = &self.pending {
@@ -42,6 +50,7 @@ impl WorkspaceState {
 }
 impl YamantakaApp {
     pub(super) fn show_workspaces(&mut self) {
+        self.cancel_workspace_startup();
         self.sync_tab_context();
         self.workspaces.open = true;
         self.workspaces.focus_close = true;
@@ -92,6 +101,17 @@ impl YamantakaApp {
                     "Workspace preview failed: {error}"
                 );
                 self.workspaces.error = Some(error.to_string());
+                if self.workspaces.startup == startup::Startup::Submitted {
+                    self.workspaces.startup = startup::Startup::Finished;
+                    let _ = self.tabs.model.set_workspace_reference(None);
+                    self.error = Some(format!(
+                        "{}: {error}",
+                        self.tr(
+                            "Se han recuperado las lecturas sin vincular el espacio guardado",
+                            "Readings were restored without linking the saved workspace"
+                        )
+                    ));
+                }
                 if change.is_some() {
                     self.workspaces.close_after = false;
                     if let Some(binding) = &mut self.workspaces.binding
@@ -125,80 +145,14 @@ impl YamantakaApp {
                 }
             }
             Ok(WorkspaceOutcome::Loaded(saved)) => {
-                if !self.workspaces.open {
-                    return;
-                }
-                if self.workspaces.preview > 0 {
-                    self.check_workspace_preview(&saved);
-                }
-                if self.tabs.busy()
-                    || self.opening.busy()
-                    || self.reader_preferences_loading
-                    || self.library_selection.removing()
-                {
-                    self.workspaces.error=Some(self.tr("Espera a que termine el cambio de lectura y vuelve a abrir el espacio.","Wait for the reading change to finish, then open the workspace again.").into());
-                    return;
-                }
-                self.sync_tab_context();
-                let mut plan = yamantaka_domain::reader_tabs::DocumentTabs::default();
-                let mut selected = None;
-                let mut readings = Vec::new();
-                for tab in saved.tabs.tabs() {
-                    let id = uuid::Uuid::new_v4().to_string();
-                    if saved
-                        .tabs
-                        .active()
-                        .is_some_and(|active| active.id() == tab.id())
-                    {
-                        selected = Some(id.clone());
+                if self.workspaces.open {
+                    if self.workspaces.preview > 0 {
+                        self.check_workspace_preview(&saved);
                     }
-                    let mapped = yamantaka_domain::reader_tabs::ReaderTab::new(
-                        id,
-                        tab.document().into(),
-                        tab.page(),
-                        tab.preferences().clone(),
-                        tab.panel(),
-                    )
-                    .map(|mapped| mapped.with_pinned(tab.pinned()))
-                    .and_then(|mapped| mapped.with_queue(tab.queue().clone()));
-                    match mapped {
-                        Ok(mapped) => readings.push(mapped),
-                        Err(error) => {
-                            self.workspaces.error = Some(error.to_string());
-                            return;
-                        }
-                    }
-                }
-                let closed = self.tabs.model.closed().to_vec();
-                if let Err(error) = plan.restore_continuity(readings, selected.as_deref(), closed) {
-                    self.workspaces.error = Some(error.to_string());
-                    return;
-                }
-                for (id, title) in saved.captions {
-                    self.tabs.captions.insert(id, title);
-                }
-                if self.request_tab_plan(plan) {
-                    self.workspaces.pending_open = Some(PendingContext {
-                        workspace: saved.workspace.clone(),
-                        view: saved.view,
-                        target: selected,
-                    });
-                    self.workspaces.open = false;
-                    self.workspaces.notice = Some(format!(
-                        "{}: {}",
-                        self.tr("Espacio abierto", "Workspace opened"),
-                        saved.workspace.name
-                    ));
-                } else {
-                    self.workspaces.error = Some(
-                        self.tr(
-                            "No se pudo iniciar la apertura. La lectura actual se conserva.",
-                            "Opening could not start. The current reading is preserved.",
-                        )
-                        .into(),
-                    );
+                    self.open_saved_workspace(*saved);
                 }
             }
+            Ok(WorkspaceOutcome::Startup(saved)) => self.accept_workspace_startup(saved),
         }
     }
     fn workspace_change(&mut self, change: WorkspaceChange) {

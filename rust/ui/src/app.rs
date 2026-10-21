@@ -1918,6 +1918,7 @@ impl App for YamantakaApp {
         self.advance_replacement_preview();
         self.advance_tab_preview();
         self.advance_queue_preview();
+        self.pump_workspace_startup(ctx);
         self.pump_workspace_context(ctx);
         self.advance_workspace_preview();
         self.advance_bulk_tab_preview();
@@ -2358,6 +2359,7 @@ impl App for YamantakaApp {
                     record["backup"]=self.backups.summary();
                     record["restore"]=self.backup_restore.summary();
                     record["collections"]=self.collections.summary();
+                    record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();

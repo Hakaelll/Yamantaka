@@ -26,6 +26,7 @@ pub struct Database {
     pub(crate) connection: Connection,
     pub(crate) import_journal: std::cell::RefCell<Option<Connection>>,
     pub(crate) file_checks: std::cell::RefCell<Option<Connection>>,
+    pub(crate) workspace_undo: Option<crate::workspaces::undo::WorkspaceUndoData>,
 }
 impl Database {
     pub fn file_path(&self) -> Option<std::path::PathBuf> {
@@ -53,6 +54,7 @@ impl Database {
             connection,
             import_journal: Default::default(),
             file_checks: Default::default(),
+            workspace_undo: None,
         })
     }
     pub fn open(path: &Path) -> Result<Self> {
@@ -72,6 +74,7 @@ impl Database {
             connection,
             import_journal: Default::default(),
             file_checks: Default::default(),
+            workspace_undo: None,
         })
     }
     pub fn in_memory_at(target: u32) -> Result<Self> {
@@ -82,6 +85,7 @@ impl Database {
             connection,
             import_journal: Default::default(),
             file_checks: Default::default(),
+            workspace_undo: None,
         })
     }
     pub fn execute_batch(&self, sql: &str) -> Result<()> {
@@ -443,6 +447,13 @@ impl LibraryRepository for Database {
     ) -> Result<yamantaka_domain::workspaces::WorkspacePage> {
         self.workspace_page(offset, cancel)
     }
+    fn startup_workspace(
+        &self,
+        expected: Option<&yamantaka_domain::workspaces::WorkspaceRevision>,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<Option<yamantaka_domain::workspaces::WorkspaceReadings>> {
+        self.recover_workspace(expected, cancel)
+    }
     fn workspace(
         &self,
         expected: &yamantaka_domain::workspaces::WorkspaceRevision,
@@ -455,6 +466,9 @@ impl LibraryRepository for Database {
         change: &yamantaka_domain::workspaces::WorkspaceChange,
         cancel: &yamantaka_domain::Cancellation,
     ) -> Result<yamantaka_domain::workspaces::WorkspaceChanged> {
+        if let yamantaka_domain::workspaces::WorkspaceChange::UndoDelete { token } = change {
+            return self.undo_workspace(token, cancel);
+        }
         if let yamantaka_domain::workspaces::WorkspaceChange::Duplicate { expected, name } = change
         {
             return self.duplicate_workspace(expected, name, cancel);
