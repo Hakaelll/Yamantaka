@@ -64,6 +64,8 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Excluded claims
 
+The current open-reading context now includes a native queue with ordering, five review states, blocking reasons, next actions and continuity persistence. See the [reading queue checkpoint](../validation/rust-reading-queue-2026-10-22.md). Named saved workspace creation, switching and management remain pending; this does not establish complete workspace parity.
+
 Printing: `docs/adr/ADR-0002-printing.md` is a contract/proposal. Secondary reader
 windows: registry/contracts do not establish a complete flow. OCR is not a complete
 connected feature. Backup encryption: `docs/adr/ADR-0003-backup-encryption.md` is

@@ -779,6 +779,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_tilt();
             }
             if demo {
+                if args.iter().any(|arg| arg == "--reading-queue") {
+                    app.preview_reading_queue();
+                }
                 if args
                     .iter()
                     .any(|arg| arg == "--restore-preview" || arg == "--restore-apply")

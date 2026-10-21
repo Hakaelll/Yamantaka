@@ -3,6 +3,8 @@ use crate::reading_sessions::restoration::SessionPanel;
 use crate::{Failure, MAX_HOT_DOCUMENTS, MAX_TABS, Result};
 
 mod commands;
+mod queue;
+pub use queue::{QueueEntry, QueueStatus};
 
 pub const MAX_CLOSED_TABS: usize = 10;
 pub const MAX_PINNED_TABS: usize = 3;
@@ -23,6 +25,7 @@ pub struct ReaderTab {
     panel: Option<SessionPanel>,
     pinned: bool,
     resource: TabResourceState,
+    queue: QueueEntry,
 }
 impl ReaderTab {
     pub fn new(
@@ -40,11 +43,13 @@ impl ReaderTab {
             panel,
             pinned: false,
             resource: TabResourceState::Suspended,
+            queue: QueueEntry::default(),
         };
         tab.validate()?;
         Ok(tab)
     }
     fn validate(&self) -> Result<()> {
+        self.queue.validate()?;
         if self.id.is_empty()
             || self.document.is_empty()
             || self.preferences.document_id != self.document

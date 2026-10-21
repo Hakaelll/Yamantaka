@@ -9,6 +9,7 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reading-queue'; args=@('--reading-queue','--es') },
     @{ name='restore-review'; args=@('--restore-preview','--es') },
     @{ name='backup-saved'; args=@('--backup-export=save') },
     @{ name='backup-cancelled-es'; args=@('--backup-export=cancel','--es','--light','--reduce-motion') },

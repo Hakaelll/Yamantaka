@@ -23,7 +23,7 @@ struct PendingSwitch {
 pub(super) struct TabState {
     pub(in crate::app) continuity: continuity::ContinuityState,
     pub(super) model: DocumentTabs,
-    captions: HashMap<String, String>,
+    pub(super) captions: HashMap<String, String>,
     pending: Option<PendingSwitch>,
     restoration: Option<(ReaderTab, Cancellation)>,
     preview: preview::TabPreview,

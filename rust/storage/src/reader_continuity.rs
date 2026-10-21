@@ -14,7 +14,7 @@ use yamantaka_domain::{
         CoverPolicy, InitialSide, PageRotation, ReaderMode, ReaderPreferences, ReaderTheme,
         ZoomMode,
     },
-    reader_tabs::{DocumentTabs, ReaderTab},
+    reader_tabs::{DocumentTabs, QueueEntry, ReaderTab},
     reading_sessions::restoration::SessionPanel,
 };
 
@@ -54,6 +54,8 @@ struct StoredTab {
     pinned: bool,
     panel: Option<String>,
     preferences: StoredPreferences,
+    #[serde(default)]
+    queue: QueueEntry,
     #[serde(flatten)]
     unknown: BTreeMap<String, Value>,
 }
@@ -128,15 +130,15 @@ impl StoredTab {
                 ));
             }
         };
-        Ok(
-            ReaderTab::new(self.id.clone(), self.document.clone(), self.page, p, panel)?
-                .with_pinned(self.pinned),
-        )
+        ReaderTab::new(self.id.clone(), self.document.clone(), self.page, p, panel)?
+            .with_pinned(self.pinned)
+            .with_queue(self.queue.clone())
     }
     fn capture(tab: &ReaderTab, previous: Option<&Self>) -> Self {
         let p = tab.preferences();
         Self {
             id: tab.id().into(),
+            queue: tab.queue().clone(),
             document: tab.document().into(),
             page: tab.page(),
             pinned: tab.pinned(),

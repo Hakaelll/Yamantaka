@@ -39,6 +39,7 @@ mod reader_controls;
 mod reader_destination;
 mod reader_options;
 mod reader_viewport;
+mod reading_queue;
 mod relocation;
 mod render_plan;
 mod render_updates;
@@ -120,6 +121,7 @@ pub struct YamantakaApp {
     open_intent: open_intent::OpenIntent,
     opening: opening::ReaderOpening,
     tabs: tabs::TabState,
+    reading_queue: reading_queue::QueueState,
     restoration: restoration::RestorationState,
     open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
@@ -317,6 +319,7 @@ impl YamantakaApp {
             open_intent: open_intent::OpenIntent::default(),
             opening: Default::default(),
             tabs: Default::default(),
+            reading_queue: Default::default(),
             open_confirmation: None,
             password: None,
             password_attempted: false,
@@ -1378,6 +1381,7 @@ impl App for YamantakaApp {
         }
         while !self.legacy_import.open
             && !self.backup_restore.open
+            && !self.reading_queue.open
             && let Ok(paths) = self.activation.try_recv()
         {
             ctx.send_viewport_cmd(ViewportCommand::Focus);
@@ -1873,6 +1877,7 @@ impl App for YamantakaApp {
         self.advance_metadata_preview();
         self.advance_replacement_preview();
         self.advance_tab_preview();
+        self.advance_queue_preview();
         self.advance_bulk_tab_preview();
         self.retire_closed_reader();
         self.poll_import_progress(ctx);
@@ -1931,7 +1936,8 @@ impl App for YamantakaApp {
                 || self.selection_review_open()
                 || self.tag_dialog_open()
                 || self.legacy_import.open
-                || self.backup_restore.open,
+                || self.backup_restore.open
+                || self.reading_queue.open,
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
@@ -1942,7 +1948,8 @@ impl App for YamantakaApp {
                 || self.selection_review_open()
                 || self.tag_dialog_open()
                 || self.legacy_import.open
-                || self.backup_restore.open,
+                || self.backup_restore.open
+                || self.reading_queue.open,
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -2099,6 +2106,7 @@ impl App for YamantakaApp {
         self.tag_management_dialogs(&ctx);
         self.legacy_import_dialog(&ctx);
         self.restore_dialog(&ctx);
+        self.reading_queue_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
@@ -2189,6 +2197,7 @@ impl App for YamantakaApp {
                     && self.importing.recovery_ready()
                     && self.opening.ready()
                     && self.tabs.ready()
+                    && self.reading_queue.ready()
                     && match self.preview_password_target {
                         Some("unlock") => matches!(self.surface, Surface::Reader),
                         Some(_) => self.password.is_some(),

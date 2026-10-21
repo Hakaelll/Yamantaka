@@ -203,6 +203,12 @@ impl YamantakaApp {
                         self.reopen_reader_tab();
                         ui.close();
                     }
+                    if theme::bounded_navigation(ui, self.tr("Cola de lectura", "Reading queue"), p)
+                        .clicked()
+                    {
+                        self.show_reading_queue();
+                        ui.close();
+                    }
                     self.library_check_menu(ui, p);
                     self.operation_actions(ui, p);
                     if theme::navigation(

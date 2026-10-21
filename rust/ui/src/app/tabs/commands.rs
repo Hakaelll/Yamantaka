@@ -133,7 +133,10 @@ impl YamantakaApp {
             current.panel(),
         );
         let mut plan = self.tabs.model.clone();
-        match tab.and_then(|tab| plan.open(tab, true)) {
+        match tab
+            .and_then(|tab| tab.with_queue(current.queue().clone()))
+            .and_then(|tab| plan.open(tab, true))
+        {
             Ok(_) => {
                 self.request_tab_plan(plan);
             }

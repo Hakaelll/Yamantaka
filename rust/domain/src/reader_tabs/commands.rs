@@ -211,6 +211,7 @@ impl DocumentTabs {
         )?;
         updated.pinned = tab.pinned;
         updated.resource = tab.resource;
+        updated.queue = tab.queue.clone();
         self.tabs[index] = updated;
         Ok(())
     }
@@ -235,6 +236,7 @@ impl DocumentTabs {
         )?;
         updated.pinned = previous.pinned;
         updated.resource = previous.resource;
+        updated.queue = previous.queue.clone();
         self.closed[index] = updated;
         Ok(true)
     }

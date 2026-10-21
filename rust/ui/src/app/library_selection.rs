@@ -226,6 +226,7 @@ impl YamantakaApp {
             || self.tag_dialog_open()
             || self.legacy_import.open
             || self.backup_restore.open
+            || self.reading_queue.open
             || ctx.egui_wants_keyboard_input()
             || egui::Popup::is_any_open(ctx)
             || self.library_selection.pending.is_some()
