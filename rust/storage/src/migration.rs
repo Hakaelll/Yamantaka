@@ -1,6 +1,6 @@
 //! Independent, WAL-aware capture of a closed Flutter installation.
 use crate::{
-    database::{migrate, readonly, snapshot, storage, validate, version},
+    database::{migrate, readonly, snapshot_cancellable, storage, validate, version},
     identity::full_sha256,
     preferences::{Preferences, atomic_json},
 };
@@ -15,7 +15,10 @@ use std::{
 };
 use yamantaka_domain::{Cancellation, Failure, Result, SCHEMA_VERSION};
 
-#[derive(Clone)]
+mod review;
+pub use review::{MigrationReview, review};
+
+#[derive(Debug, Clone)]
 pub struct LegacySource {
     pub database: PathBuf,
     pub preferences: PathBuf,
@@ -26,11 +29,43 @@ pub struct MigrationReceipt {
     pub source_schema: u32,
     pub target_schema: u32,
     pub source_preferences_sha256: String,
+    #[serde(default)]
+    pub source_schema_sha256: String,
+    #[serde(default)]
+    pub captured_schema_sha256: String,
     pub captured_database_sha256: String,
+    #[serde(default)]
+    pub captured_preferences_sha256: String,
+    #[serde(default)]
+    pub captured_data_sha256: BTreeMap<String, String>,
     pub imported_rows: BTreeMap<String, u64>,
     #[serde(default)]
     pub preserved_data_sha256: BTreeMap<String, String>,
     pub completed_at: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MigrationProgress {
+    Copying { copied_pages: u32, total_pages: u32 },
+    Validating,
+    Installing,
+}
+
+pub fn capture_reviewed(
+    review: &MigrationReview,
+    destination: &Path,
+    flutter_closed: impl Fn() -> Result<bool>,
+    cancel: &Cancellation,
+    mut progress: impl FnMut(MigrationProgress),
+) -> Result<MigrationReceipt> {
+    capture_inner(
+        review.source(),
+        destination,
+        flutter_closed,
+        cancel,
+        Some(review),
+        &mut progress,
+    )
 }
 
 /// Caller supplies a fresh native process check, repeated around the capture.
@@ -43,6 +78,23 @@ pub fn capture(
     flutter_closed: impl Fn() -> Result<bool>,
     cancel: &Cancellation,
 ) -> Result<MigrationReceipt> {
+    capture_inner(
+        source,
+        destination,
+        flutter_closed,
+        cancel,
+        None,
+        &mut |_| {},
+    )
+}
+fn capture_inner(
+    source: &LegacySource,
+    destination: &Path,
+    flutter_closed: impl Fn() -> Result<bool>,
+    cancel: &Cancellation,
+    reviewed: Option<&MigrationReview>,
+    progress: &mut dyn FnMut(MigrationProgress),
+) -> Result<MigrationReceipt> {
     cancel.check()?;
     if !flutter_closed()? {
         return Err(Failure::LegacyRunning);
@@ -52,7 +104,7 @@ pub fn capture(
             .map_err(|_| Failure::DestinationOccupied)?;
         let receipt: MigrationReceipt =
             serde_json::from_slice(&bytes).map_err(|_| Failure::DestinationOccupied)?;
-        if receipt.version != 2 {
+        if receipt.version != 3 {
             return Err(Failure::DestinationOccupied);
         }
         Some(receipt)
@@ -68,19 +120,31 @@ pub fn capture(
         .tempdir_in(parent)
         .map_err(storage)?;
     let preferences_before = fs::read(&source.preferences).map_err(storage)?;
-    let preferences = Preferences::from_flutter(&source.preferences)?;
+    let preferences = Preferences::from_flutter_bytes(&preferences_before)?;
     let original = readonly(&source.database)?;
+    original.execute_batch("BEGIN").map_err(storage)?;
     let schema = version(&original)?;
     if schema == 0 || schema > SCHEMA_VERSION {
         return Err(Failure::Invalid("Unsupported Flutter database".into()));
     }
-    original.execute_batch("BEGIN").map_err(storage)?;
     validate(&original)?;
     let rows = table_counts(&original)?;
     let originals = table_identities(&original, cancel)?;
     let preferences_hash = format!("{:x}", Sha256::digest(&preferences_before));
+    let source_hashes = fingerprints(&originals);
+    let source_schema_sha256 = schema_hash(&original, cancel)?;
+    if let Some(reviewed) = reviewed {
+        reviewed.check(
+            schema,
+            &rows,
+            &source_hashes,
+            &preferences_hash,
+            &source_schema_sha256,
+        )?;
+    }
     if let Some(receipt) = existing {
         if receipt.source_schema != schema
+            || receipt.source_schema_sha256 != source_schema_sha256
             || receipt.source_preferences_sha256 != preferences_hash
             || receipt.preserved_data_sha256
                 != originals
@@ -91,20 +155,37 @@ pub fn capture(
             return Err(Failure::DestinationOccupied);
         }
         original.execute_batch("COMMIT").map_err(storage)?;
-        if !flutter_closed()?
-            || preferences_before != fs::read(&source.preferences).map_err(storage)?
-        {
-            return Err(Failure::LegacyRunning);
-        }
+        confirm_source_preferences(source, &preferences_before, &flutter_closed)?;
         return verify_capture(destination, cancel);
     }
+    let mut expected_after_cleanup = source_hashes;
+    expected_after_cleanup.remove("library_search");
+    expected_after_cleanup.remove("search_index_state");
+    for table in ["documents", "document_covers"] {
+        if let Some(identity) = originals.get(table) {
+            expected_after_cleanup.insert(
+                table.into(),
+                table_hash_projected(&original, table, &identity.columns, true, cancel)?,
+            );
+        }
+    }
     let target_path = staging.path().join("yamantaka.sqlite3");
-    snapshot(&original, &target_path)?;
+    snapshot_cancellable(
+        &original,
+        &target_path,
+        cancel,
+        |copied_pages, total_pages| {
+            progress(MigrationProgress::Copying {
+                copied_pages,
+                total_pages,
+            })
+        },
+    )?;
     original.execute_batch("COMMIT").map_err(storage)?;
     cancel.check()?;
-    if preferences_before != fs::read(&source.preferences).map_err(storage)? || !flutter_closed()? {
-        return Err(Failure::LegacyRunning);
-    }
+    confirm_source_preferences(source, &preferences_before, &flutter_closed)?;
+    progress(MigrationProgress::Validating);
+    cancel.check()?;
     let mut target = Connection::open(&target_path).map_err(storage)?;
     migrate(&mut target, SCHEMA_VERSION)?;
     let target_rows = table_counts(&target)?;
@@ -125,14 +206,27 @@ pub fn capture(
     // Never point Rust thumbnails at the Flutter installation.
     target.execute_batch("UPDATE documents SET thumbnail_path=NULL; UPDATE document_covers SET small_thumbnail_path='',large_thumbnail_path=''; DELETE FROM library_search; DELETE FROM search_index_state;").map_err(storage)?;
     validate(&target)?;
+    for (table, expected) in &expected_after_cleanup {
+        if table_hash(&target, table, &originals[table].columns, cancel)? != *expected {
+            return Err(Failure::Invalid(format!(
+                "Cache cleanup changed preserved records in {table}"
+            )));
+        }
+    }
+    let captured_schema_sha256 = schema_hash(&target, cancel)?;
+    let captured_data_sha256 = fingerprints(&table_identities(&target, cancel)?);
     target.close().map_err(|(_, e)| storage(e))?;
     preferences.save(&staging.path().join("preferences.json"))?;
     let receipt = MigrationReceipt {
-        version: 2,
+        version: 3,
         source_schema: schema,
         target_schema: SCHEMA_VERSION,
         source_preferences_sha256: preferences_hash,
+        source_schema_sha256,
+        captured_schema_sha256,
         captured_database_sha256: full_sha256(&target_path, cancel)?,
+        captured_preferences_sha256: full_sha256(&staging.path().join("preferences.json"), cancel)?,
+        captured_data_sha256,
         imported_rows: rows,
         preserved_data_sha256: originals
             .into_iter()
@@ -142,9 +236,10 @@ pub fn capture(
     };
     atomic_json(&staging.path().join("migration-receipt.json"), &receipt)?;
     cancel.check()?;
-    if !flutter_closed()? {
-        return Err(Failure::LegacyRunning);
-    }
+    progress(MigrationProgress::Installing);
+    cancel.check()?;
+    confirm_source_preferences(source, &preferences_before, &flutter_closed)?;
+    cancel.check()?;
     if destination.exists() {
         return Err(Failure::DestinationOccupied);
     }
@@ -153,12 +248,26 @@ pub fn capture(
     Ok(receipt)
 }
 
+fn confirm_source_preferences(
+    source: &LegacySource,
+    expected: &[u8],
+    flutter_closed: &impl Fn() -> Result<bool>,
+) -> Result<()> {
+    if !flutter_closed()? {
+        return Err(Failure::LegacyRunning);
+    }
+    if fs::read(&source.preferences).map_err(storage)? != expected {
+        return Err(Failure::MigrationSourceChanged);
+    }
+    Ok(())
+}
+
 pub fn verify_capture(destination: &Path, cancel: &Cancellation) -> Result<MigrationReceipt> {
     let receipt: MigrationReceipt = serde_json::from_slice(
         &fs::read(destination.join("migration-receipt.json")).map_err(storage)?,
     )
     .map_err(storage)?;
-    if !(1..=2).contains(&receipt.version) || receipt.target_schema != SCHEMA_VERSION {
+    if receipt.version != 3 || receipt.target_schema != SCHEMA_VERSION {
         return Err(Failure::Invalid("Unsupported migration receipt".into()));
     }
     if full_sha256(&destination.join("yamantaka.sqlite3"), cancel)?
@@ -168,14 +277,40 @@ pub fn verify_capture(destination: &Path, cancel: &Cancellation) -> Result<Migra
             "Captured database hash differs (the library may have been edited)".into(),
         ));
     }
-    Preferences::load(&destination.join("preferences.json"))?;
-    validate(&readonly(&destination.join("yamantaka.sqlite3"))?)?;
+    let preferences_path = destination.join("preferences.json");
+    if full_sha256(&preferences_path, cancel)? != receipt.captured_preferences_sha256 {
+        return Err(Failure::Invalid(
+            "Captured preferences differ from the migration receipt".into(),
+        ));
+    }
+    Preferences::load(&preferences_path)?;
+    let database = readonly(&destination.join("yamantaka.sqlite3"))?;
+    database.execute_batch("BEGIN").map_err(storage)?;
+    validate(&database)?;
+    if schema_hash(&database, cancel)? != receipt.captured_schema_sha256 {
+        return Err(Failure::Invalid(
+            "Captured schema differs from the migration receipt".into(),
+        ));
+    }
+    if fingerprints(&table_identities(&database, cancel)?) != receipt.captured_data_sha256 {
+        return Err(Failure::Invalid(
+            "Captured records differ from the migration receipt".into(),
+        ));
+    }
+    database.execute_batch("COMMIT").map_err(storage)?;
+    cancel.check()?;
     Ok(receipt)
 }
 
 struct TableIdentity {
     columns: Vec<String>,
     sha256: String,
+}
+fn fingerprints(identities: &BTreeMap<String, TableIdentity>) -> BTreeMap<String, String> {
+    identities
+        .iter()
+        .map(|(name, identity)| (name.clone(), identity.sha256.clone()))
+        .collect()
 }
 fn quoted(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
@@ -205,9 +340,37 @@ fn table_hash(
     columns: &[String],
     cancel: &Cancellation,
 ) -> Result<String> {
+    table_hash_projected(connection, name, columns, false, cancel)
+}
+fn schema_hash(connection: &Connection, cancel: &Cancellation) -> Result<String> {
+    table_hash(
+        connection,
+        "sqlite_schema",
+        &[
+            "type".into(),
+            "name".into(),
+            "tbl_name".into(),
+            "sql".into(),
+        ],
+        cancel,
+    )
+}
+fn table_hash_projected(
+    connection: &Connection,
+    name: &str,
+    columns: &[String],
+    reset_cache: bool,
+    cancel: &Cancellation,
+) -> Result<String> {
     let column_sql = columns
         .iter()
-        .map(|column| quoted(column))
+        .map(|column| match (reset_cache, name, column.as_str()) {
+            (true, "documents", "thumbnail_path") => "NULL".into(),
+            (true, "document_covers", "small_thumbnail_path" | "large_thumbnail_path") => {
+                "''".into()
+            }
+            _ => quoted(column),
+        })
         .collect::<Vec<_>>()
         .join(",");
     let mut statement = connection
@@ -219,6 +382,10 @@ fn table_hash(
     let mut rows = statement.query([]).map_err(storage)?;
     let mut hash = Sha256::new();
     hash.update((columns.len() as u64).to_le_bytes());
+    for column in columns {
+        hash.update((column.len() as u64).to_le_bytes());
+        hash.update(column.as_bytes());
+    }
     while let Some(row) = rows.next().map_err(storage)? {
         cancel.check()?;
         hash.update([0xff]);

@@ -157,15 +157,67 @@ pub(crate) fn validate(connection: &Connection) -> Result<()> {
     Ok(())
 }
 pub(crate) fn snapshot(source: &Connection, destination: &Path) -> Result<()> {
+    snapshot_cancellable(
+        source,
+        destination,
+        &yamantaka_domain::Cancellation::default(),
+        |_, _| {},
+    )
+}
+pub(crate) fn snapshot_cancellable(
+    source: &Connection,
+    destination: &Path,
+    cancel: &yamantaka_domain::Cancellation,
+    mut progress: impl FnMut(u32, u32),
+) -> Result<()> {
+    use rusqlite::backup::{Backup, StepResult};
+    cancel.check()?;
     if destination.exists() {
         return Err(Failure::DestinationOccupied);
     }
-    let mut copy = Connection::open(destination).map_err(storage)?;
-    let backup = rusqlite::backup::Backup::new(source, &mut copy).map_err(storage)?;
-    backup
-        .run_to_completion(128, Duration::from_millis(1), None)
+    let _owned_destination = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(destination)
+        .map_err(|error| {
+            if error.kind() == std::io::ErrorKind::AlreadyExists {
+                Failure::DestinationOccupied
+            } else {
+                storage(error)
+            }
+        })?;
+    let mut copy = Connection::open_with_flags(destination, OpenFlags::SQLITE_OPEN_READ_WRITE)
         .map_err(storage)?;
+    let backup = Backup::new(source, &mut copy).map_err(storage)?;
+    let mut blocked_since = None;
+    loop {
+        cancel.check()?;
+        let step = backup.step(128).map_err(storage)?;
+        let state = backup.progress();
+        progress(
+            state.pagecount.saturating_sub(state.remaining).max(0) as u32,
+            state.pagecount.max(0) as u32,
+        );
+        cancel.check()?;
+        match step {
+            StepResult::Done => break,
+            StepResult::More => {
+                blocked_since = None;
+            }
+            StepResult::Busy | StepResult::Locked => {
+                let since = blocked_since.get_or_insert_with(std::time::Instant::now);
+                if since.elapsed() >= Duration::from_secs(3) {
+                    return Err(Failure::Storage(
+                        "Database remained locked during its snapshot".into(),
+                    ));
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            _ => return Err(Failure::Storage("Unexpected database backup state".into())),
+        }
+    }
     drop(backup);
+    cancel.check()?;
     validate(&copy)
 }
 pub(crate) fn readonly(path: &Path) -> Result<Connection> {

@@ -50,8 +50,10 @@ impl Preferences {
         Ok(result)
     }
     pub fn from_flutter(path: &Path) -> Result<Self> {
-        let raw: BTreeMap<String, Value> =
-            serde_json::from_slice(&fs::read(path).map_err(storage)?).map_err(storage)?;
+        Self::from_flutter_bytes(&fs::read(path).map_err(storage)?)
+    }
+    pub(crate) fn from_flutter_bytes(bytes: &[u8]) -> Result<Self> {
+        let raw: BTreeMap<String, Value> = serde_json::from_slice(bytes).map_err(storage)?;
         let mut result = Self::default();
         for (key, value) in raw {
             let key = key.strip_prefix("flutter.").unwrap_or(&key).to_owned();

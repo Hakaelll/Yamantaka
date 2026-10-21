@@ -3,6 +3,8 @@ use std::fs;
 mod collection_verification;
 #[path = "support/library_grouping.rs"]
 mod grouping_verification;
+#[path = "support/migration_review.rs"]
+mod migration_review_verification;
 #[path = "support/library_removal.rs"]
 mod removal_verification;
 #[path = "support/smart_views.rs"]
@@ -69,6 +71,21 @@ fn wal_capture_includes_committed_frames_and_never_overwrites() {
         repeated.preserved_data_sha256,
         receipt.preserved_data_sha256
     );
+    let captured_preferences = target.join("preferences.json");
+    let original_preferences = fs::read(&captured_preferences).unwrap();
+    let mut edited = Preferences::load(&captured_preferences).unwrap();
+    edited.rust.insert("unexpected-change".into(), true.into());
+    edited.save(&captured_preferences).unwrap();
+    let accepted_changed_preferences = verify_capture(&target, &Cancellation::default()).is_ok();
+    fs::write(&captured_preferences, &original_preferences).unwrap();
+    fs::remove_file(&captured_preferences).unwrap();
+    let accepted_missing_preferences = verify_capture(&target, &Cancellation::default()).is_ok();
+    fs::write(&captured_preferences, &original_preferences).unwrap();
+    assert_eq!(
+        (accepted_changed_preferences, accepted_missing_preferences),
+        (false, false),
+        "A verified migration must retain its exact preferences file"
+    );
     let copied = rusqlite::Connection::open_with_flags(
         target.join("yamantaka.sqlite3"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
@@ -99,6 +116,7 @@ fn wal_capture_includes_committed_frames_and_never_overwrites() {
         .execute_batch("UPDATE documents SET title='Changed source'")
         .unwrap();
     assert!(capture(&legacy, &target, || Ok(true), &Cancellation::default()).is_err());
+    migration_review_verification::verify(root.path());
 }
 
 #[test]

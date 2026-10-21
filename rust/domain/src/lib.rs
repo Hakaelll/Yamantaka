@@ -76,6 +76,8 @@ pub enum Failure {
     DestinationOccupied,
     #[error("Close Flutter before capturing its database and preferences.")]
     LegacyRunning,
+    #[error("Flutter data changed after review. Review the source again.")]
+    MigrationSourceChanged,
     #[error("Operation cancelled")]
     Cancelled,
     #[error("Work queue is full; drain results or cancel pending work")]
