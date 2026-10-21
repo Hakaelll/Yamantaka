@@ -332,7 +332,10 @@ impl YamantakaApp {
                     "Document titles and content keep their original language.",
                 ), p);
             }
-            4 => self.cache_maintenance_settings(ui, p),
+            4 => {
+                self.cache_maintenance_settings(ui, p);
+                self.legacy_import_settings(ui, p);
+            }
             _ => {
                 if !cramped {
                     section_title(ui, self.tr("Privacidad", "Privacy"));

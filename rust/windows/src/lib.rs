@@ -138,6 +138,17 @@ pub fn flutter_closed() -> Result<bool> {
     }
 }
 
+pub fn pick_flutter_database() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("SQLite", &["sqlite3", "sqlite", "db"])
+        .pick_file()
+}
+pub fn pick_flutter_preferences() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .pick_file()
+}
+
 pub fn pick_pdf_folder() -> Option<PathBuf> {
     rfd::FileDialog::new().pick_folder()
 }

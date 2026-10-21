@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod app;
 mod book;
+mod legacy_import_worker;
 mod page_presenter;
 mod theme;
 use eframe::egui;
@@ -57,6 +58,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .filter(|arg| !arg.to_string_lossy().starts_with("--"))
         .map(PathBuf::from)
         .collect();
+    let primary_instance = if !demo {
+        match Instance::acquire(&paths.activations, &initial)? {
+            Activation::Primary(instance) => Some(instance),
+            Activation::Forwarded => return Ok(()),
+        }
+    } else {
+        None
+    };
     let (database, mut prefs, store) = if demo {
         let mut store = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/demo-store");
         // Captures have their own instance identity so QA does not forward to
@@ -499,14 +508,30 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             reading.view_mode = ReaderMode::Book;
         }
         db.save_reader_preferences("demo-0", &reading)?;
+        if capture.is_some()
+            && args
+                .iter()
+                .filter_map(|arg| arg.to_str())
+                .any(|arg| arg.starts_with("--legacy-import="))
+        {
+            std::fs::create_dir_all(store.join("flutter-source"))?;
+            db.snapshot(&store.join("flutter-source/yamantaka.sqlite3"))?;
+            db.snapshot(&store.join("yamantaka.sqlite3"))?;
+            std::fs::write(
+                store.join("flutter-source/shared_preferences.json"),
+                r#"{"flutter.darkMode":true,"flutter.languageCode":"en","custom":42}"#,
+            )?;
+            Preferences::default().save(&store.join("preferences.json"))?;
+        }
         (db, Preferences::default(), store)
     } else {
-        yamantaka_storage::backup::recover_interrupted_restore(&paths.store)?;
-        std::fs::create_dir_all(&paths.store)?;
+        let active_store = yamantaka_storage::managed_imports::active_store(&paths.store)?;
+        yamantaka_storage::backup::recover_interrupted_restore(&active_store)?;
+        std::fs::create_dir_all(&active_store)?;
         (
-            Database::open(&paths.store.join("yamantaka.sqlite3"))?,
-            Preferences::load(&paths.store.join("preferences.json"))?,
-            paths.store.clone(),
+            Database::open(&active_store.join("yamantaka.sqlite3"))?,
+            Preferences::load(&active_store.join("preferences.json"))?,
+            active_store,
         )
     };
     if demo && args.iter().any(|arg| arg == "--sessions-disabled") {
@@ -519,8 +544,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         paths.activations
     };
-    let Activation::Primary(instance) = Instance::acquire(&activations, &initial)? else {
-        return Ok(());
+    let instance = if let Some(instance) = primary_instance {
+        instance
+    } else {
+        let Activation::Primary(instance) = Instance::acquire(&activations, &initial)? else {
+            return Ok(());
+        };
+        instance
     };
     let bundled = executable.parent().unwrap().join("pdfium.dll");
     let library = if bundled.exists() || !cfg!(debug_assertions) {
@@ -692,11 +722,36 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 governor,
                 presenter,
             );
+            app.configure_legacy_import(
+                if demo {
+                    store.clone()
+                } else {
+                    paths.store.clone()
+                },
+                yamantaka_storage::migration::LegacySource {
+                    database: paths.legacy_installed.join("yamantaka.sqlite3"),
+                    preferences: paths.legacy_installed.join("shared_preferences.json"),
+                },
+            );
             cc.egui_ctx.set_zoom_factor(app.text_scale());
             if tilt {
                 app.preview_tilt();
             }
             if demo {
+                if let Some(mode) = args
+                    .iter()
+                    .filter_map(|arg| arg.to_str())
+                    .find_map(|arg| arg.strip_prefix("--legacy-import="))
+                {
+                    app.preview_legacy_import(
+                        &cc.egui_ctx,
+                        yamantaka_storage::migration::LegacySource {
+                            database: store.join("flutter-source/yamantaka.sqlite3"),
+                            preferences: store.join("flutter-source/shared_preferences.json"),
+                        },
+                        mode,
+                    );
+                }
                 if args.iter().any(|arg| arg == "--cover-capacity-retry") {
                     app.preview_cover_capacity();
                 }

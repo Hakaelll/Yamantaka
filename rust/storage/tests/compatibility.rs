@@ -3,6 +3,8 @@ use std::fs;
 mod collection_verification;
 #[path = "support/library_grouping.rs"]
 mod grouping_verification;
+#[path = "support/managed_imports.rs"]
+mod managed_import_verification;
 #[path = "support/migration_review.rs"]
 mod migration_review_verification;
 #[path = "support/library_removal.rs"]
@@ -117,6 +119,7 @@ fn wal_capture_includes_committed_frames_and_never_overwrites() {
         .unwrap();
     assert!(capture(&legacy, &target, || Ok(true), &Cancellation::default()).is_err());
     migration_review_verification::verify(root.path());
+    managed_import_verification::verify(root.path());
 }
 
 #[test]

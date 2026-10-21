@@ -9,6 +9,14 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='migration-files'; args=@('--legacy-import=files') },
+    @{ name='migration-review'; args=@('--legacy-import=review') },
+    @{ name='migration-copy-es'; args=@('--legacy-import=copy','--es','--light','--reduce-motion') },
+    @{ name='migration-selected'; args=@('--legacy-import=activate') },
+    @{ name='migration-original'; args=@('--legacy-import=original') },
+    @{ name='migration-stale'; args=@('--legacy-import=stale') },
+    @{ name='migration-cancelled'; args=@('--legacy-import=cancel') },
+    @{ name='migration-blocked-small-200'; args=@('--legacy-import=blocked','--size=640x480','--text-scale=2','--es','--light','--reduce-motion') },
     @{ name='grouping-author'; args=@('--pdf-covers','--grouping=author') },
     @{ name='grouping-author-folded'; args=@('--pdf-covers','--grouping=author','--fold-group') },
     @{ name='grouping-collections'; args=@('--pdf-covers','--grouping=collection','--es','--light','--reduce-motion') },
@@ -363,6 +371,17 @@ foreach ($case in $cases) {
             if ($controls.bulkTargetPicker.open -or $controls.bulkOrganization.members -ne $expectedMembers -or $controls.libraryDocumentCount -ne $expectedMembers -or $controls.librarySelection.ids.Count -ne 0) { throw 'Bulk organization membership or filtered readback is incorrect.' }
             if ($case.name -eq 'bulk-tags-applied' -and $controls.bulkOrganization.annotationUses -ne 1) { throw 'Document tag assignment must preserve the existing annotation membership.' }
         }
+    }
+    if ($case.name -like 'migration-*') {
+        $migration=$controls.legacyImport
+        if (-not $migration.verified -or $migration.busy -or -not $migration.open) { throw 'Native migration scenario did not finish.' }
+        if ($case.name -in @('migration-stale','migration-cancelled','migration-blocked-small-200')) {
+            if (-not $migration.failed -or $migration.copied) { throw 'Migration rejection or cancellation must not install a copy.' }
+        } elseif ($case.name -eq 'migration-selected' -and -not $migration.selectedNext) { throw 'Imported library was not selected for next launch.' }
+        elseif ($case.name -eq 'migration-original' -and -not $migration.originalNext) { throw 'Original Rust library was not restored for next launch.' }
+        elseif ($case.name -eq 'migration-copy-es' -and -not $migration.copied) { throw 'Independent migration copy was not created.' }
+        if ($case.name -eq 'migration-selected') { & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Close','Use original') }
+        if ($case.name -eq 'migration-blocked-small-200') { & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cerrar','Revisar origen') }
     }
     if ($case.name -like 'grouping-*') {
         $grouping=$controls.libraryGrouping

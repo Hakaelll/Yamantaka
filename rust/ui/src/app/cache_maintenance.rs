@@ -152,16 +152,15 @@ impl YamantakaApp {
                     self.runtime.wake();
                 }
             } else {
-                if theme::navigation(ui, self.tr("Calcular tamaño", "Calculate size"), false, p)
+                if theme::bounded_navigation(ui, self.tr("Calcular tamaño", "Calculate size"), p)
                     .clicked()
                 {
                     self.start_cache_maintenance(CoverCacheOperation::Inspect);
                 }
                 ui.add_enabled_ui(inventory.is_some_and(|i| i.files > 0), |ui| {
-                    if theme::navigation(
+                    if theme::bounded_navigation(
                         ui,
                         self.tr("Liberar caché de portadas", "Free cover cache"),
-                        false,
                         p,
                     )
                     .clicked()

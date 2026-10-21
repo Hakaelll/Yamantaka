@@ -1,6 +1,6 @@
 # Reviewed migration and capture verification
 
-Date: 2026-10-21. Scope: the storage contract for an independent Flutter import. This checkpoint does not connect a native migration wizard or activate an imported library.
+Date: 2026-10-21. Scope: the storage contract for an independent Flutter import. This checkpoint does not connect a native migration wizard or activate an imported library. The subsequent [native import checkpoint](rust-migration-ui-2026-10-21.md) connects those parts and records their separate evidence.
 
 ## Problem and behavior
 

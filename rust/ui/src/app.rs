@@ -15,6 +15,7 @@ mod find;
 mod global_notes;
 mod goals;
 mod history;
+mod legacy_import;
 mod library_check;
 mod library_covers;
 mod library_grouping;
@@ -178,6 +179,7 @@ pub struct YamantakaApp {
     file_comparison: file_comparison::ComparisonState,
     file_check: file_check::CheckState,
     cache_maintenance: cache_maintenance::CacheState,
+    legacy_import: legacy_import::ImportState,
     collections: collections::CollectionState,
     library_tags: tags::TagState,
     smart_view: Option<yamantaka_domain::LibrarySmartView>,
@@ -384,6 +386,7 @@ impl YamantakaApp {
             file_comparison: Default::default(),
             file_check: Default::default(),
             cache_maintenance: Default::default(),
+            legacy_import: Default::default(),
             library_check: Default::default(),
             relocation: Default::default(),
             annotation_paint: Default::default(),
@@ -1312,6 +1315,14 @@ impl App for YamantakaApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
+        self.update_legacy_import(ctx);
+        if self.legacy_import.busy() && ctx.input(|input| input.viewport().close_requested()) {
+            self.legacy_import.close_after = true;
+            self.legacy_import.cancel();
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
+
         if self
             .cover_picker
             .as_ref()
@@ -1343,7 +1354,9 @@ impl App for YamantakaApp {
         if let Some((document, _)) = &self.active {
             self.annotations.bind(&document.id);
         }
-        while let Ok(paths) = self.activation.try_recv() {
+        while !self.legacy_import.open
+            && let Ok(paths) = self.activation.try_recv()
+        {
             ctx.send_viewport_cmd(ViewportCommand::Focus);
             if !paths.is_empty() {
                 self.import(paths);
@@ -1893,7 +1906,8 @@ impl App for YamantakaApp {
                 || self.links.confirmation_open()
                 || self.bulk_picker.is_some()
                 || self.selection_review_open()
-                || self.tag_dialog_open(),
+                || self.tag_dialog_open()
+                || self.legacy_import.open,
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
@@ -1902,7 +1916,8 @@ impl App for YamantakaApp {
                 || self.links.confirmation_open()
                 || self.bulk_picker.is_some()
                 || self.selection_review_open()
-                || self.tag_dialog_open(),
+                || self.tag_dialog_open()
+                || self.legacy_import.open,
             matches!(self.surface, Surface::Reader),
         ) {
             match shortcut {
@@ -2057,6 +2072,7 @@ impl App for YamantakaApp {
         self.update_cover_batch_progress();
         self.selection_review_dialog(&ctx);
         self.tag_management_dialogs(&ctx);
+        self.legacy_import_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
@@ -2066,6 +2082,10 @@ impl App for YamantakaApp {
         }
         if self.library_tags.close_after_write && !self.library_tags.writing() {
             ctx.send_viewport_cmd(ViewportCommand::Close);
+        }
+        if self.legacy_import.close_after && self.legacy_import.busy() {
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
+            ctx.request_repaint_after(Duration::from_millis(50));
         }
         if let Some(path) = &self.capture {
             if !self.capture_requested {
@@ -2107,6 +2127,7 @@ impl App for YamantakaApp {
                     && self.library_tags.ready()
                     && self.collections.ready()
                     && self.cache_maintenance.ready()
+                    && self.legacy_import.ready()
                     && self.file_check.ready()
                     && self.library_check.ready()
                     && self.relocation.ready()
@@ -2233,6 +2254,7 @@ impl App for YamantakaApp {
                     record["libraryQueryLoaded"]=self.library_loaded.into();
                     record["smartView"]=self.smart_view.map(|view|view.key()).into();
                     record["libraryTags"]=self.library_tags.summary();
+                    record["legacyImport"]=self.legacy_import.summary();
                     record["collections"]=self.collections.summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["fileCheck"]=self.file_check.summary();

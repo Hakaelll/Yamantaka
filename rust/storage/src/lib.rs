@@ -16,6 +16,7 @@ mod import_metadata;
 mod import_recovery;
 mod library_grouping;
 mod library_removal;
+pub mod managed_imports;
 mod metadata_reanalysis;
 mod metadata_review;
 mod metadata_source;

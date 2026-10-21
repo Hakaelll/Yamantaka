@@ -224,6 +224,7 @@ impl YamantakaApp {
             || self.bulk_picker.is_some()
             || self.library_selection.review.is_some()
             || self.tag_dialog_open()
+            || self.legacy_import.open
             || ctx.egui_wants_keyboard_input()
             || egui::Popup::is_any_open(ctx)
             || self.library_selection.pending.is_some()
