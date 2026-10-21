@@ -4,14 +4,11 @@ use crate::{
     database::{storage, validate},
     preferences::{Preferences, atomic_json},
 };
-use rusqlite::{
-    params_from_iter,
-    types::{Value as SqlValue, ValueRef},
-};
+use rusqlite::{params_from_iter, types::Value as SqlValue};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{collections::BTreeMap, fs, io::Read, path::Path};
 use yamantaka_domain::{Cancellation, Failure, Result};
 
 type Contracts = BTreeMap<String, BTreeMap<String, Vec<String>>>;
@@ -62,11 +59,29 @@ pub struct RestorePreview {
 /// Parse, validate category hashes, and restore constraints into an isolated DB.
 /// Neither preview nor failure touches the active library or any original PDF.
 pub fn preview(path: &Path, cancel: &Cancellation) -> Result<RestorePreview> {
-    if fs::metadata(path).map_err(storage)?.len() > MAX_BACKUP_BYTES {
-        return Err(Failure::Invalid("Backup exceeds 128 MiB".into()));
+    cancel.check()?;
+    let mut file = fs::File::open(path).map_err(storage)?;
+    let metadata = file.metadata().map_err(storage)?;
+    if !metadata.is_file() || metadata.len() > MAX_BACKUP_BYTES {
+        return Err(Failure::Invalid(
+            "Backup exceeds 128 MiB or is not a file".into(),
+        ));
     }
-    let payload: Value =
-        serde_json::from_slice(&fs::read(path).map_err(storage)?).map_err(storage)?;
+    let mut bytes = Vec::new();
+    let mut buffer = [0; 64 * 1024];
+    loop {
+        cancel.check()?;
+        let count = file.read(&mut buffer).map_err(storage)?;
+        if count == 0 {
+            break;
+        }
+        if bytes.len() as u64 + count as u64 > MAX_BACKUP_BYTES {
+            return Err(Failure::Invalid("Backup exceeds 128 MiB".into()));
+        }
+        bytes.extend_from_slice(&buffer[..count]);
+    }
+    cancel.check()?;
+    let payload: Value = serde_json::from_slice(&bytes).map_err(storage)?;
     preview_payload(payload, cancel)
 }
 pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<RestorePreview> {
@@ -231,66 +246,8 @@ fn default_value(table: &str, column: &str) -> Value {
     }
 }
 
-impl Database {
-    pub fn export_backup(
-        &self,
-        path: &Path,
-        preferences: &Preferences,
-        cancel: &Cancellation,
-    ) -> Result<()> {
-        let mut tables = Map::new();
-        let mut categories = Vec::new();
-        // One read transaction makes all tables a coherent point-in-time export.
-        let tx = self.connection.unchecked_transaction().map_err(storage)?;
-        for table in TABLE_ORDER {
-            cancel.check()?;
-            let mut statement = tx
-                .prepare(&format!("SELECT * FROM {table}"))
-                .map_err(storage)?;
-            let names = statement
-                .column_names()
-                .into_iter()
-                .map(str::to_owned)
-                .collect::<Vec<_>>();
-            let mut cursor = statement.query([]).map_err(storage)?;
-            let mut rows = Vec::new();
-            while let Some(row) = cursor.next().map_err(storage)? {
-                cancel.check()?;
-                let mut values = Map::new();
-                for (index, name) in names.iter().enumerate() {
-                    let value = match row.get_ref(index).map_err(storage)? {
-                        ValueRef::Null => Value::Null,
-                        ValueRef::Integer(v) => json!(v),
-                        ValueRef::Real(v) => json!(v),
-                        ValueRef::Text(v) => json!(std::str::from_utf8(v).map_err(storage)?),
-                        ValueRef::Blob(_) => {
-                            return Err(Failure::Invalid(
-                                "Unexpected blob in legacy backup table".into(),
-                            ));
-                        }
-                    };
-                    values.insert(name.clone(), value);
-                }
-                rows.push(Value::Object(values));
-            }
-            let rows = Value::Array(rows);
-            categories.push(json!({"name":table,"rows":rows.as_array().unwrap().len(),"sha256":hash_json(&rows)?}));
-            tables.insert(table.into(), rows);
-        }
-        tx.commit().map_err(storage)?;
-        let mut settings = preferences.legacy.clone();
-        settings.extend(preferences.rust.clone());
-        let settings = serde_json::to_value(settings).map_err(storage)?;
-        categories
-            .push(json!({"name":"settings","rows":1,"sha256":hash_json(&json!([settings]))?}));
-        let exported = chrono::Utc::now().to_rfc3339();
-        let payload = json!({"format":"yamantaka-local-backup","version":9,"exportedAt":exported,"containsPdfFiles":false,"manifest":{"format":"yamantaka-local-backup","version":9,"schemaVersion":11,"exportedAt":exported,"containsPdfFiles":false,"categories":categories},"settings":settings,"tables":tables});
-        if serde_json::to_vec(&payload).map_err(storage)?.len() as u64 > MAX_BACKUP_BYTES {
-            return Err(Failure::Invalid("Backup exceeds 128 MiB".into()));
-        }
-        atomic_json(path, &payload)
-    }
-}
+mod export;
+pub use export::BackupProgress;
 
 /// Installation requires closing the active database first. The pre-restore copy
 /// remains in its own directory and can be selected for rollback on next launch.

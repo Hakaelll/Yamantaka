@@ -100,6 +100,89 @@ fn tampering_and_invalid_foreign_keys_do_not_touch_library() {
     invalid["tables"]["bookmarks"] = json!([{"id":"b","document_id":"missing","page_index":0,"label":null,"created_at":"2026-10-08","updated_at":"2026-10-08"}]);
     assert!(preview_payload(invalid, &Cancellation::default()).is_err());
     assert_eq!(db.count(&LibraryQuery::default()).unwrap(), 0);
+    streamed_export_preserves_destination_and_snapshot(root.path());
+}
+
+fn streamed_export_preserves_destination_and_snapshot(root: &std::path::Path) {
+    let mut source: Value =
+        serde_json::from_str(include_str!("fixtures/populated-backup-v9.json")).unwrap();
+    for row in source["tables"]["documents"].as_array_mut().unwrap() {
+        row["is_modified"] = json!(0);
+        row["last_validated_at"] = Value::Null;
+    }
+    let restored = preview_payload(source.clone(), &Cancellation::default()).unwrap();
+    let database_path = root.join("streaming.sqlite3");
+    restored.database.snapshot(&database_path).unwrap();
+    let database = Database::open(&database_path).unwrap();
+    let concurrent = Database::open(&database_path).unwrap();
+    let destination = root.join("streaming.json");
+    fs::write(&destination, b"previous complete backup").unwrap();
+    let entries = fs::read_dir(root).unwrap().count();
+    let cancel = Cancellation::default();
+    let mut reached = false;
+    let result =
+        database.export_backup_progress(&destination, &restored.preferences, &cancel, |progress| {
+            if progress.table == "bookmarks" && progress.rows == 1 {
+                reached = true;
+                cancel.cancel();
+            }
+        });
+    assert!(reached);
+    assert!(matches!(result, Err(yamantaka_domain::Failure::Cancelled)));
+    assert_eq!(fs::read(&destination).unwrap(), b"previous complete backup");
+    assert_eq!(fs::read_dir(root).unwrap().count(), entries);
+    let mut changed = false;
+    database.export_backup_progress(&destination, &restored.preferences, &Cancellation::default(), |progress| {
+        if !changed && progress.table == "documents" && progress.rows == 1 {
+            concurrent.execute_batch("UPDATE documents SET title='Changed after snapshot'; UPDATE bookmarks SET label='Changed after snapshot';").unwrap();
+            changed = true;
+        }
+    }).unwrap();
+    assert!(changed);
+    let exported: Value = serde_json::from_slice(&fs::read(&destination).unwrap()).unwrap();
+    assert_eq!(
+        exported["tables"]["documents"],
+        source["tables"]["documents"]
+    );
+    assert_eq!(
+        exported["tables"]["bookmarks"],
+        source["tables"]["bookmarks"]
+    );
+    preview(&destination, &Cancellation::default()).unwrap();
+    bounded_export_keeps_existing_backup(root);
+}
+
+fn bounded_export_keeps_existing_backup(root: &std::path::Path) {
+    let destination = root.join("bounded.json");
+    fs::write(&destination, b"previous complete backup").unwrap();
+    let entries = fs::read_dir(root).unwrap().count();
+    let database = Database::in_memory_at(11).unwrap();
+    // JSON escaping expands these 25 MiB of SQLite text beyond the 128 MiB file limit.
+    database.execute_batch("WITH RECURSIVE sequence(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM sequence WHERE n<400) INSERT INTO tags SELECT CAST(n AS TEXT),CAST(zeroblob(65536) AS TEXT),CAST(n AS TEXT),'violet','2026-10-21','2026-10-21' FROM sequence;").unwrap();
+    let mut copied_rows = 0;
+    let result = database.export_backup_progress(
+        &destination,
+        &Preferences::default(),
+        &Cancellation::default(),
+        |progress| {
+            if progress.table == "tags" {
+                copied_rows = progress.rows;
+            }
+        },
+    );
+    assert!(matches!(result, Err(yamantaka_domain::Failure::Invalid(_))));
+    assert!((1..400).contains(&copied_rows));
+    assert_eq!(fs::read(&destination).unwrap(), b"previous complete backup");
+    assert_eq!(fs::read_dir(root).unwrap().count(), entries);
+    database.execute_batch("DELETE FROM tags; WITH RECURSIVE sequence(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM sequence WHERE n<100001) INSERT INTO tags SELECT CAST(n AS TEXT),'Tag',CAST(n AS TEXT),'violet','2026-10-21','2026-10-21' FROM sequence;").unwrap();
+    let result = database.export_backup(
+        &destination,
+        &Preferences::default(),
+        &Cancellation::default(),
+    );
+    assert!(matches!(result, Err(yamantaka_domain::Failure::Invalid(_))));
+    assert_eq!(fs::read(&destination).unwrap(), b"previous complete backup");
+    assert_eq!(fs::read_dir(root).unwrap().count(), entries);
 }
 #[test]
 fn replacement_keeps_complete_safety_store_and_cancel_does_not_write() {
