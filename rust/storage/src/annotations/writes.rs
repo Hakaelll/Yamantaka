@@ -32,7 +32,20 @@ pub(crate) fn ensure_tag(db: &Connection, tag: &str, now: &str) -> Result<String
     {
         return Ok(id);
     }
-    let id = format!("{:x}", Sha256::digest(format!("tag:{normalized}")));
+    let legacy_id = format!("{:x}", Sha256::digest(format!("tag:{normalized}")));
+    // A renamed tag can still own the legacy ID derived from its former name.
+    let occupied: bool = db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM tags WHERE id=?)",
+            [&legacy_id],
+            |row| row.get(0),
+        )
+        .map_err(storage)?;
+    let id = if occupied {
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        legacy_id
+    };
     db.execute("INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES(?,?,?,'blue',?,?)",params![id,tag,normalized,now,now]).map_err(storage)?;
     Ok(id)
 }

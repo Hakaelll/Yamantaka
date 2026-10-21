@@ -51,7 +51,7 @@ fn verify_session(db: &Connection, session: &IndexSession) -> Result<()> {
     }
     Ok(())
 }
-const TITLE: &str = "COALESCE(d.title_override,d.title,d.source_title,d.file_name)";
+pub(crate) const TITLE: &str = "COALESCE(d.title_override,d.title,d.source_title,d.file_name)";
 pub(crate) fn refresh_document_tags(db: &Connection, id: &str, access: IndexAccess) -> Result<()> {
     let excluded:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM search_index_state WHERE document_id=? AND status='excluded')",[id],|row|row.get(0)).map_err(storage)?;
     if excluded {

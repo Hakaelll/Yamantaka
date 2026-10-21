@@ -186,7 +186,7 @@ UI components dispatch commands and receive state. They do not execute SQL or ca
 
 ## Validation
 
-The current Rust suite contains 54 essential tests, following a reduction from 536 at the owner's request. It retains migration, backup, rollback, original-file, native cancellation, password, rendering, and metadata checks. Older checkpoint reports record the larger suites that existed on their dates. Removed tests remain recoverable in Git. Run the retained checks for the affected work; large capture matrices are not part of every edit.
+The current Rust suite contains 55 essential tests, following a reduction from 536 at the owner's request. It retains migration, backup, rollback, original-file, native cancellation, password, rendering, and metadata checks. Older checkpoint reports record the larger suites that existed on their dates. Removed tests remain recoverable in Git. Run the retained checks for the affected work; large capture matrices are not part of every edit.
 
 Run the Rust checks from the repository root:
 
@@ -201,6 +201,7 @@ Generate the PDF fixtures and fetch PDFium first to run the native PDF suite. Te
 Current evidence is documented separately so dates and scopes remain explicit:
 
 - [Acceptance matrix](docs/architecture/rust-rewrite-parity.md): the source of truth for completion.
+- [Guarded shared-tag storage](docs/validation/rust-tag-management-storage-2026-10-21.md): rename, color, merge and deletion preserve identities and associations through guarded transactions, including cached search refresh and rollback. Native editing, confirmation and filter reconciliation remain pending.
 - [Library removal storage](docs/validation/rust-library-removal-storage-2026-10-20.md): document-owned rows and cached FTS entries can now be removed in one rollback-safe transaction while original PDFs and shared organization data remain intact. The [actor coordinator](docs/validation/rust-library-removal-runtime-2026-10-20.md) closes readers before deletion, reports closures separately from removed records and rejects stale openings. The [native removal flow](docs/validation/rust-library-removal-ui-2026-10-20.md) now connects confirmation, session saving, presentation/continuity reconciliation, cancellation and partial outcomes. Physical interaction and broader concurrency acceptance remain pending.
 - [Bulk cover runtime](docs/validation/rust-bulk-cover-runtime-2026-10-20.md): the actor now coordinates bounded automatic-cover regeneration with frozen decision revisions, protected-reader waits, cancellation and partial results. The [native selection-menu flow](docs/validation/rust-bulk-cover-ui-2026-10-20.md) now connects confirmation, progress/cancellation and retained-image refresh, including recovery after governed GPU capacity returns.
 - [Bulk library organization](docs/validation/rust-bulk-organization-2026-10-20.md): assign shared tags, add/remove collection membership and archive a fixed page selection. Destination pickers search and paginate, keep cancellation visible, and preserve complete accessible names when long labels are shortened. Reviewed library removal and automatic cover regeneration are now connected separately.

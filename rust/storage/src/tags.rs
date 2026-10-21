@@ -3,6 +3,8 @@ use rusqlite::{Connection, TransactionBehavior, params, params_from_iter, types:
 use yamantaka_domain::{
     Cancellation, Failure, MAX_LIBRARY_PAGE, Result, search::IndexAccess, tags::*,
 };
+mod edits;
+mod search_cache;
 
 fn document_exists(db: &Connection, id: &str) -> Result<()> {
     if !db
@@ -59,7 +61,7 @@ impl Database {
             .map_err(storage)? as u64;
         let offset = i64::try_from(query.offset)
             .map_err(|_| Failure::Invalid("Tag page offset is too large".into()))?;
-        let mut statement=self.connection.prepare(&format!("SELECT t.id,t.name,t.color,(SELECT count(*) FROM document_tags d WHERE d.tag_id=t.id),(SELECT count(*) FROM annotation_tags a WHERE a.tag_id=t.id),EXISTS(SELECT 1 FROM document_tags d WHERE d.tag_id=t.id AND d.document_id=?) FROM tags t{predicate} ORDER BY t.name COLLATE NOCASE,t.id LIMIT ? OFFSET ?")).map_err(storage)?;
+        let mut statement=self.connection.prepare(&format!("SELECT t.id,t.name,t.color,(SELECT count(*) FROM document_tags d WHERE d.tag_id=t.id),(SELECT count(*) FROM annotation_tags a WHERE a.tag_id=t.id),EXISTS(SELECT 1 FROM document_tags d WHERE d.tag_id=t.id AND d.document_id=?),t.updated_at FROM tags t{predicate} ORDER BY t.name COLLATE NOCASE,t.id LIMIT ? OFFSET ?")).map_err(storage)?;
         values.insert(
             0,
             query
@@ -81,6 +83,7 @@ impl Database {
                     document_count: row.get::<_, i64>(3)? as u64,
                     annotation_count: row.get::<_, i64>(4)? as u64,
                     contains_document: row.get(5)?,
+                    updated_at: row.get(6)?,
                 })
             })
             .map_err(storage)?;
@@ -118,6 +121,10 @@ impl Database {
                 membership(&tx, tag, document, *included, access)?;
                 tag.clone()
             }
+            TagChange::Rename { .. }
+            | TagChange::Color { .. }
+            | TagChange::Merge { .. }
+            | TagChange::Delete { .. } => edits::apply(&tx, change, access, cancel)?,
         };
         cancel.check()?;
         tx.commit().map_err(storage)?;
