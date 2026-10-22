@@ -155,15 +155,28 @@ pub(super) fn open_readers(runtime: &Runtime, document: Document, keep: &[&str])
     );
     runtime
         .submit(Action::ConfirmOpen {
-            document: id,
+            document: id.clone(),
             visible: keep.iter().map(|id| id.to_string()).collect(),
-            cancel,
+            cancel: cancel.clone(),
         })
         .unwrap();
     assert!(matches!(
         wait(runtime),
-        Update::Committed(_, WriteKind::VisibleDocuments)
+        Update::OpenConfirmed { document, cancel: token, result: Ok(Some(ids)) }
+            if document == id && token.same_request(&cancel)
+                && ids == keep.iter().map(|id| id.to_string()).collect::<Vec<_>>()
     ));
+    runtime
+        .submit(Action::ConfirmOpen {
+            document: id.clone(),
+            visible: vec![id.clone()],
+            cancel: cancel.clone(),
+        })
+        .unwrap();
+    assert!(
+        matches!(wait(runtime), Update::OpenConfirmed { document, cancel: token, result: Ok(None) }
+        if document == id && token.same_request(&cancel))
+    );
 }
 pub(super) fn visible(runtime: &Runtime, ids: &[&str]) {
     runtime

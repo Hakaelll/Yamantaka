@@ -17,3 +17,9 @@ The native binary compiled. One existing synthetic scenario, `reader-preserved`,
 `ReaderPane` now owns the accepted document, canonical navigation, reader preferences, panel state, find, links, outline, thumbnails, bookmarks, annotations, text selection, text extraction, restoration and rendering surface. Replacement preparation, layout rebuilding and navigation updates operate on that pane. Runtime dispatch, PDF opening coordination, tabs, session recording, exports, the presenter and the memory governor remain application services. This extraction keeps one live pane and does not yet route interaction methods through a second instance.
 
 The native binary compiled. The existing `tabs-close-reopen` scenario completed, including one native reader close and recovery of the original document on page 2 with custom zoom 1.75 and scroll offset 1500. Its synthetic PNG and control record remain local in `build/rust-visual/reader-pane`. Only this scenario was run for the context extraction; no additional test cases were added.
+
+## Scoped confirmation replies
+
+Opening confirmation now returns `OpenConfirmed` with the document, original cancellation token and committed visible set. A stale request returns `Ok(None)` rather than an indistinguishable saved event. Errors leave the pending handoff intact, and the single-reader UI retries bounded control backpressure without replacing a newer confirmation. This gives a secondary admission coordinator enough identity to distinguish its own completion from a late acknowledgement.
+
+The retained native import-preemption case passed with full-set and token assertions. It also replays the completed confirmation and verifies the stale no-op response. The native UI compiled. No new standalone tests or broad suites were added. Cross-document reference admission remains pending; the connected [page-reference feature](rust-page-reference-2026-10-22.md) currently compares pages of one document.

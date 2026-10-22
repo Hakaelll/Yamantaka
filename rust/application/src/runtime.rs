@@ -139,6 +139,12 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    /// Some contains the committed protection set; None means a stale request.
+    OpenConfirmed {
+        document: String,
+        cancel: Cancellation,
+        result: Result<Option<Vec<String>>>,
+    },
     SelectionOrganized(Box<crate::library_bulk::BulkReply>),
     Tags(Result<yamantaka_domain::tags::TagPage>, Cancellation),
     TagChanged(Result<String>, Cancellation),
@@ -1334,8 +1340,9 @@ impl Runtime {
                                     }
                                 }
                                 Action::ConfirmOpen { document: id, visible: accepted, cancel } => {
-                                    let matches = awaiting_open.as_ref().is_some_and(|(target, token)| target == &id && token.same_request(&cancel));
-                                    if matches {
+                                    let result = (|| {
+                                        let matches = awaiting_open.as_ref().is_some_and(|(target, token)| target == &id && token.same_request(&cancel));
+                                        if !matches { return Ok(None); }
                                         let ids = if cancel.is_cancelled() { visible.clone() } else {
                                             let valid = accepted.len() <= yamantaka_domain::MAX_HOT_DOCUMENTS
                                                 && accepted.contains(&id)
@@ -1344,18 +1351,17 @@ impl Runtime {
                                                         && (item == &id || visible.contains(item))
                                                 });
                                             if !valid {
-                                                failed(&events, &notify, Failure::Invalid("Open confirmation must retain only admitted visible readers".into()), Some(cancel), permit);
-                                                continue;
+                                                return Err(Failure::Invalid("Open confirmation must retain only admitted visible readers".into()));
                                             }
                                             accepted
                                         };
-                                        match engine.set_visible_documents(&ids) {
-                                            Ok(()) => { visible = ids; awaiting_open = None; pdf_capacity.fetch_add(1,Ordering::Release); }
-                                            Err(error) => { failed(&events, &notify, error, Some(cancel), permit); continue; }
-                                        }
-                                    }
-                                    // A stale confirmation is an idempotent no-op.
-                                    emit(&events, &notify, Update::Committed(id, WriteKind::VisibleDocuments), permit);
+                                        engine.set_visible_documents(&ids)?;
+                                        visible = ids;
+                                        awaiting_open = None;
+                                        pdf_capacity.fetch_add(1,Ordering::Release);
+                                        Ok(Some(visible.clone()))
+                                    })();
+                                    emit(&events, &notify, Update::OpenConfirmed { document: id, cancel, result }, permit);
                                 }
                                 Action::Open(document, password, cancel) => {
                                     let fresh=if removal.as_ref().is_some_and(|(job,_)|job.contains(&document.id)) {Err(Failure::Invalid("Document removal is in progress".into()))}

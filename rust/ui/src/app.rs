@@ -1744,6 +1744,22 @@ impl App for YamantakaApp {
                     self.send(Action::IndexStatistics);
                     self.refresh_selected_index_state();
                 }
+                Update::OpenConfirmed {
+                    document,
+                    cancel,
+                    result,
+                } => {
+                    if let Err(error) = result {
+                        if matches!(error, yamantaka_domain::Failure::QueueFull) {
+                            if self.open_confirmation.is_none() {
+                                self.open_confirmation = Some((document, cancel));
+                                ctx.request_repaint_after(Duration::from_millis(100));
+                            }
+                        } else if !matches!(error, yamantaka_domain::Failure::Cancelled) {
+                            self.error = Some(error.to_string());
+                        }
+                    }
+                }
                 Update::Committed(_, _) => {}
                 Update::Search(results, cancel) => {
                     if !cancel.is_cancelled() {
