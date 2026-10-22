@@ -150,6 +150,8 @@ impl YamantakaApp {
                             reference.followed_position = None;
                             reference.pending_primary_page = None;
                             reference.pending_primary_zoom = false;
+                            reference.differences.clear();
+                            reference.difference_target = None;
                         }
                         Err(error) => {
                             reference.error = Some(error.to_string());

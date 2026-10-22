@@ -117,6 +117,38 @@ impl YamantakaApp {
                     reference.pending_primary_page.is_none() && !reference.pending_primary_zoom
                 );
                 self.reference_sync_demo = 8;
+                reference.toggle_difference(1);
+                reference.toggle_difference(0);
+                let target =
+                    reference.adjacent_difference(self.reader.navigation.as_ref().unwrap(), false);
+                assert_eq!(target, Some(0));
+                reference.difference_target = target;
+            }
+            8 if self.reader.page == 0 && reference.pane.page == 0 && !reference.pane.loading => {
+                let target =
+                    reference.adjacent_difference(self.reader.navigation.as_ref().unwrap(), true);
+                assert_eq!(target, Some(1));
+                reference.difference_target = target;
+                self.reference_sync_demo = 9;
+            }
+            9 if self.reader.page == 1 && reference.pane.page == 1 && !reference.pane.loading => {
+                reference.toggle_difference(0);
+                assert!(!reference.differences.contains(&0));
+                reference.toggle_difference(1);
+                assert!(reference.differences.is_empty());
+                assert!(
+                    reference
+                        .adjacent_difference(self.reader.navigation.as_ref().unwrap(), true)
+                        .is_none()
+                );
+                assert!(
+                    reference
+                        .adjacent_difference(self.reader.navigation.as_ref().unwrap(), false)
+                        .is_none()
+                );
+                reference.toggle_difference(1);
+                self.reference_sync_differences = true;
+                self.reference_sync_demo = 10;
                 reference.sync_preview = self.capture.is_some();
             }
             _ => {}

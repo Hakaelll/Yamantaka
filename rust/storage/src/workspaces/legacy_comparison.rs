@@ -51,6 +51,7 @@ pub(super) fn decode(
         layout,
         scroll_offset: Some(prefs.scroll_offset),
         bidirectional: true,
+        differences: Default::default(),
         primary: primary.document().into(),
         document: secondary.document().into(),
         page: secondary.page(),

@@ -31,21 +31,23 @@ impl ReferenceView {
 }
 
 impl YamantakaApp {
-    pub(in crate::app) fn apply_reference_sync(&mut self) {
+    pub(in crate::app) fn apply_reference_sync(&mut self) -> bool {
         let Some(reference) = &mut self.reference else {
-            return;
+            return false;
         };
         let page = reference.pending_primary_page.take();
         let zoom = std::mem::take(&mut reference.pending_primary_zoom)
             .then_some(reference.pane.viewport.scale);
         if !reference.bidirectional || reference.busy() || reference.close_requested {
-            return;
+            return false;
         }
+        let mut changed = false;
         if let Some(page) = page
             && let Some(nav) = &self.reader.navigation
             && nav.position().page() != page.min(nav.page_count() - 1)
         {
             self.navigate(page);
+            changed = true;
         }
         if let Some(zoom) = zoom
             && zoom.is_finite()
@@ -56,6 +58,8 @@ impl YamantakaApp {
             preferences.zoom_mode = ZoomMode::Custom;
             preferences.zoom_level = f64::from(zoom);
             self.apply_reader_preferences(preferences);
+            changed = true;
         }
+        changed
     }
 }

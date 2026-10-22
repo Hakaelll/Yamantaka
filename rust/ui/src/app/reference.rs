@@ -4,6 +4,8 @@ use yamantaka_domain::workspaces::ComparisonLayout;
 use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
 mod chooser;
+mod differences;
+mod options;
 mod password;
 mod preview;
 mod saved;
@@ -23,6 +25,8 @@ pub(super) struct ReferenceView {
     pub(in crate::app) bidirectional: bool,
     pending_primary_page: Option<u32>,
     pending_primary_zoom: bool,
+    pub(in crate::app) differences: std::collections::BTreeSet<u32>,
+    difference_target: Option<u32>,
     followed_position: Option<ReaderPosition>,
     pub(in crate::app) layout: ComparisonLayout,
     pub(in crate::app) stacked: bool,
@@ -80,6 +84,8 @@ impl ReferenceView {
             bidirectional: false,
             pending_primary_page: None,
             pending_primary_zoom: false,
+            differences: Default::default(),
+            difference_target: None,
             followed_position: None,
             layout: ComparisonLayout::Automatic,
             stacked: false,
@@ -97,10 +103,13 @@ impl ReferenceView {
         bytes: usize,
         english: bool,
         p: Palette,
-        can_choose: bool,
+        primary: &reader_pane::ReaderPane,
     ) -> bool {
         let tr = |es, en| if english { en } else { es };
         let mut close = false;
+        let can_choose = self.pane.active.as_ref().map(|(doc, _)| &doc.id)
+            == primary.active.as_ref().map(|(doc, _)| &doc.id);
+        let primary = primary.navigation.as_ref();
         if !can_choose && let Some((document, _)) = &self.pane.active {
             ui.add(
                 egui::Label::new(
@@ -128,7 +137,7 @@ impl ReferenceView {
                 close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
                     .clicked();
             });
-            self.viewport(ui, runtime, bytes, english);
+            self.viewport(ui, runtime, bytes, english, p);
             return close;
         }
         let count = self
@@ -213,42 +222,7 @@ impl ReferenceView {
             if self.sync_preview {
                 popup = popup.open(true);
             }
-            popup.show(|ui| {
-                ui.label(
-                    RichText::new(tr("Página y zoom", "Page and zoom"))
-                        .color(p.secondary)
-                        .size(12.0),
-                );
-                ui.checkbox(&mut self.follow_page, tr("Seguir página", "Follow page"));
-                ui.checkbox(&mut self.follow_zoom, tr("Seguir zoom", "Follow zoom"));
-                ui.checkbox(
-                    &mut self.bidirectional,
-                    tr("En ambas direcciones", "In both directions"),
-                );
-                ui.checkbox(
-                    &mut self.follow_position,
-                    tr("Seguir posición", "Follow position"),
-                )
-                .on_hover_text(tr(
-                    "La posición sigue siempre a la lectura principal.",
-                    "Position always follows the main reading.",
-                ));
-                ui.separator();
-                ui.label(
-                    RichText::new(tr("Disposición", "Arrangement"))
-                        .color(p.secondary)
-                        .size(12.0),
-                );
-                for (layout, es, en) in [
-                    (ComparisonLayout::Automatic, "Automática", "Automatic"),
-                    (ComparisonLayout::SideBySide, "Lado a lado", "Side by side"),
-                    (ComparisonLayout::Stacked, "Una encima de otra", "Stacked"),
-                ] {
-                    if theme::navigation(ui, tr(es, en), self.layout == layout, p).clicked() {
-                        self.layout = layout;
-                    }
-                }
-            });
+            popup.show(|ui| self.options_menu(ui, primary, english, p));
             close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
                 .clicked();
         });
@@ -261,7 +235,7 @@ impl ReferenceView {
                 }
             });
         }
-        self.viewport(ui, runtime, bytes, english);
+        self.viewport(ui, runtime, bytes, english, p);
         close
     }
 
@@ -327,7 +301,14 @@ impl ReferenceView {
         }
     }
 
-    fn viewport(&mut self, ui: &mut egui::Ui, runtime: &Runtime, bytes: usize, english: bool) {
+    fn viewport(
+        &mut self,
+        ui: &mut egui::Ui,
+        runtime: &Runtime,
+        bytes: usize,
+        english: bool,
+        p: Palette,
+    ) {
         let (Some((document, _)), Some(layout), Some(preferences), Some(navigation)) = (
             &self.pane.active,
             self.pane.viewport.layout.clone(),
@@ -421,6 +402,14 @@ impl ReferenceView {
                         .paint_page(ui, runtime, &key, paper, &preferences, label)
                 {
                     self.error = Some(error.to_string());
+                }
+                if self.differences.contains(&page.page) {
+                    ui.painter().rect_stroke(
+                        paper,
+                        1,
+                        egui::Stroke::new(2.0, p.accent),
+                        egui::StrokeKind::Inside,
+                    );
                 }
             }
             self.pane.loading = !self.pane.viewport.retry
@@ -561,10 +550,7 @@ impl YamantakaApp {
         let bytes = self.governor.limits().pages.min(14 * 1024 * 1024) / 2;
         let mut close = false;
         let mut selected = None;
-        let can_choose = self.reference.as_ref().is_some_and(|reference| {
-            reference.pane.active.as_ref().map(|(doc, _)| &doc.id)
-                == self.reader.active.as_ref().map(|(doc, _)| &doc.id)
-        });
+        let mut difference = None;
         if let Some(reference) = &mut self.reference {
             reference.follow_primary_zoom(self.reader.viewport.scale);
             reference
@@ -575,8 +561,9 @@ impl YamantakaApp {
                     .id_salt("reference-pane"),
                 |ui| {
                     ui.set_clip_rect(second.intersect(ui.clip_rect()));
-                    close = reference.show(ui, &self.runtime, bytes, self.english, p, can_choose);
+                    close = reference.show(ui, &self.runtime, bytes, self.english, p, &self.reader);
                     selected = reference.selection.take();
+                    difference = reference.difference_target.take();
                 },
             );
         }
@@ -590,7 +577,13 @@ impl YamantakaApp {
             }
         }
         if !close {
-            self.apply_reference_sync();
+            if self.apply_reference_sync() {
+                ui.ctx().request_repaint();
+            }
+            if let Some(page) = difference {
+                self.navigate(page);
+                ui.ctx().request_repaint();
+            }
         }
         ui.allocate_rect(rect, egui::Sense::hover());
         if let Some(document) = selected {

@@ -217,6 +217,7 @@ pub fn preserved_split_references(document: &str) {
     assert_eq!(reread.workspace_reference(), Some(&reference));
     let comparison = WorkspaceComparison {
         bidirectional: false,
+        differences: std::collections::BTreeSet::from([1, 3]),
         layout: ComparisonLayout::Stacked,
         scroll_offset: None,
         primary: "original".into(),

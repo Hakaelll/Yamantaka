@@ -1,0 +1,11 @@
+# Manual comparison difference marks checkpoint
+
+The reference menu now includes manual difference marks for the main reading's current page, with Remove mark, Previous difference and Next difference actions. Navigation uses the nearest marked page in the requested direction and disables actions when no target exists. Page synchronization determines whether the reference follows that jump. Matching page numbers receive a thin accent border in both views. This preserves the manual marking behavior connected to Flutter's comparison dialog.
+
+Marks belong to the current comparison and are included in its workspace context. Closing or replacing the reference clears its transient marks. A linked workspace saves those changes, including closing the reference; other saved workspace copies retain their own marks. Older comparison records default to an empty set. Marks outside a shortened document remain stored but are excluded from forward navigation. Original PDFs and ordinary PDF bookmarks remain unchanged.
+
+Comparison menu content now has a bounded, scrollable viewport. Its controls remain under the existing header button. Main-reading changes issued after the reference viewport, including reverse synchronization and difference navigation, explicitly request another frame so they do not depend on subsequent pointer input.
+
+The native binary compiled. One existing storage test and the existing `reader-reference-sync` native scenario passed; no standalone tests or broad suite were added. Storage round-tripping now includes marks on pages 2 and 4. The native scenario marks two pages, navigates backward and forward through the production target path, removes marks, verifies the empty-state targets and leaves page 2 marked. The earlier synchronization checks remain in that same scenario. The [synthetic capture](../screenshots/rust-comparison-differences/reader-reference-sync.png) shows the marked-page borders and the scrollable menu at its initial position; the control record confirms the final mark and completed navigation sequence.
+
+Secondary reader tools, document swapping, overlays, physical accessibility and performance acceptance, and Release packaging remain pending.

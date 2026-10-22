@@ -19,6 +19,8 @@ pub struct WorkspaceComparison {
     pub scroll_offset: Option<f64>,
     #[serde(default)]
     pub bidirectional: bool,
+    #[serde(default)]
+    pub differences: std::collections::BTreeSet<u32>,
     pub primary: String,
     pub document: String,
     pub page: u32,
