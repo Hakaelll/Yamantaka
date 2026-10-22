@@ -11,6 +11,8 @@ impl ReferenceView {
         let position = self.pane.navigation.as_ref()?.position();
         let prefs = self.pane.reader_preferences.as_ref()?;
         Some(WorkspaceComparison {
+            layout: self.layout,
+            scroll_offset: None,
             primary: primary.into(),
             document: document.id.clone(),
             page: position.page(),
@@ -52,6 +54,8 @@ impl ReferenceView {
         }
         self.pane.navigation_changed();
         self.pane.rebuild_layout(direction)?;
+        self.pane.restoration.scroll = saved.scroll_offset;
+        self.layout = saved.layout;
         self.set_ratio(saved.ratio);
         self.follow_page = saved.follow_page;
         self.follow_zoom = saved.follow_zoom;

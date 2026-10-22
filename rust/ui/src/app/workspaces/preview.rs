@@ -94,6 +94,8 @@ impl YamantakaApp {
                 let mut view = self.capture_workspace_view();
                 let mut query = view.parsed_query().unwrap();
                 query.comparison = Some(yamantaka_domain::workspaces::WorkspaceComparison {
+                    layout: yamantaka_domain::workspaces::ComparisonLayout::Stacked,
+                    scroll_offset: Some(80.0),
                     primary: self.documents[2].id.clone(),
                     document: self.documents[1].id.clone(),
                     page: 1,
@@ -163,10 +165,9 @@ impl YamantakaApp {
             8 if self.reader.active.is_some()
                 && self.tabs.ready()
                 && self.workspaces.comparison_restore.is_none()
-                && self
-                    .reference
-                    .as_ref()
-                    .is_some_and(|reference| !reference.busy() && !reference.pane.loading)
+                && self.reference.as_ref().is_some_and(|reference| {
+                    !reference.busy() && !reference.pane.loading && reference.stacked
+                })
                 && !self.reader.reader_preferences_loading =>
             {
                 assert_eq!(self.query, "Architecture");
@@ -179,8 +180,13 @@ impl YamantakaApp {
                 assert_eq!(comparison.rotation, 90);
                 assert!((comparison.zoom - 0.8).abs() < 0.0001);
                 assert_eq!(comparison.ratio, 0.6);
+                assert_eq!(
+                    comparison.layout,
+                    yamantaka_domain::workspaces::ComparisonLayout::Stacked
+                );
                 let reference = self.reference.as_mut().unwrap();
                 reference.follow_zoom = true;
+                reference.layout = yamantaka_domain::workspaces::ComparisonLayout::SideBySide;
                 reference.set_ratio(0.55);
                 let active = self.tabs.model.active().unwrap().id().to_owned();
                 self.tabs
@@ -229,6 +235,10 @@ impl YamantakaApp {
                 assert_eq!(comparison.document, "demo-1");
                 assert!(comparison.follow_zoom);
                 assert_eq!(comparison.ratio, 0.55);
+                assert_eq!(
+                    comparison.layout,
+                    yamantaka_domain::workspaces::ComparisonLayout::SideBySide
+                );
                 assert_eq!(saved.reference_document.as_ref().unwrap().id, "demo-1");
                 assert_eq!(
                     saved.tabs.active().unwrap().queue().status(),

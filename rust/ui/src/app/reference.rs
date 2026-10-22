@@ -1,5 +1,6 @@
 use super::*;
 use yamantaka_domain::reader::ReaderPosition;
+use yamantaka_domain::workspaces::ComparisonLayout;
 use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
 mod chooser;
@@ -19,6 +20,8 @@ pub(super) struct ReferenceView {
     pub follow_zoom: bool,
     pub follow_position: bool,
     followed_position: Option<ReaderPosition>,
+    pub(in crate::app) layout: ComparisonLayout,
+    pub(in crate::app) stacked: bool,
     sync_preview: bool,
     ratio: f32,
     size: egui::Vec2,
@@ -71,6 +74,8 @@ impl ReferenceView {
             follow_zoom: false,
             follow_position: false,
             followed_position: None,
+            layout: ComparisonLayout::Automatic,
+            stacked: false,
             sync_preview: false,
             ratio: 0.5,
             size: egui::Vec2::ZERO,
@@ -217,6 +222,21 @@ impl ReferenceView {
                     &mut self.follow_position,
                     tr("Seguir posición", "Follow position"),
                 );
+                ui.separator();
+                ui.label(
+                    RichText::new(tr("Disposición", "Arrangement"))
+                        .color(p.secondary)
+                        .size(12.0),
+                );
+                for (layout, es, en) in [
+                    (ComparisonLayout::Automatic, "Automática", "Automatic"),
+                    (ComparisonLayout::SideBySide, "Lado a lado", "Side by side"),
+                    (ComparisonLayout::Stacked, "Una encima de otra", "Stacked"),
+                ] {
+                    if theme::navigation(ui, tr(es, en), self.layout == layout, p).clicked() {
+                        self.layout = layout;
+                    }
+                }
             });
             close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
                 .clicked();
@@ -332,6 +352,7 @@ impl ReferenceView {
                 preferences.zoom_mode,
                 f64::from(self.pane.zoom),
             ) {
+                let y = self.pane.restoration.scroll.take().unwrap_or(y);
                 scroll = scroll.scroll_offset(egui::vec2(x as f32, y as f32));
             }
             self.pane.viewport.scroll_anchor = false;
@@ -458,13 +479,18 @@ impl YamantakaApp {
             reference.pane.navigation_changed();
         }
         let rect = ui.available_rect_before_wrap();
-        if reference.size != rect.size() {
+        let stacked = match reference.layout {
+            ComparisonLayout::Automatic => rect.width() < 960.0,
+            ComparisonLayout::SideBySide => false,
+            ComparisonLayout::Stacked => true,
+        };
+        if reference.size != rect.size() || reference.stacked != stacked {
             reference.size = rect.size();
+            reference.stacked = stacked;
             reference.followed_position = None;
             self.reader.viewport.scroll_anchor = true;
             reference.pane.viewport.scroll_anchor = true;
         }
-        let stacked = rect.width() < 960.0;
         let extent = if stacked { rect.height() } else { rect.width() };
         let split = extent * reference.ratio;
         let mut first = rect;

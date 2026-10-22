@@ -1,9 +1,22 @@
 use crate::{Failure, Result, reader::ReaderPosition, reader_preferences::*};
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ComparisonLayout {
+    #[default]
+    Automatic,
+    SideBySide,
+    Stacked,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkspaceComparison {
+    #[serde(default)]
+    pub layout: ComparisonLayout,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scroll_offset: Option<f64>,
     pub primary: String,
     pub document: String,
     pub page: u32,
@@ -40,6 +53,7 @@ impl WorkspaceComparison {
             || self.document.len() > 4096
             || !(self.zoom as f32).is_finite()
             || self.zoom as f32 <= 0.0
+            || self.scroll_offset.is_some_and(|offset| !offset.is_finite())
             || !self.ratio.is_finite()
             || !(0.2..=0.8).contains(&self.ratio)
         {

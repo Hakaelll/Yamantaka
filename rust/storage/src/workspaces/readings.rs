@@ -30,7 +30,7 @@ pub(super) fn load(
     let db = &database.connection;
     let workspace = verify(db, expected)?;
     let view = db.query_row("SELECT query_json,collection_id,grouping,sort_mode,density,focus_mode FROM workspaces WHERE id=?",[&expected.id],|row|Ok((row.get::<_,String>(0)?,row.get::<_,Option<String>>(1)?,row.get::<_,String>(2)?,row.get::<_,String>(3)?,row.get::<_,String>(4)?,row.get::<_,bool>(5)?))).map_err(storage)?;
-    let view = WorkspaceView {
+    let mut view = WorkspaceView {
         query: serde_json::from_str(&view.0).map_err(storage)?,
         collection_id: view.1,
         grouping: serde_json::from_value(serde_json::Value::String(view.2)).map_err(storage)?,
@@ -94,28 +94,47 @@ pub(super) fn load(
         .or_else(|| tabs.first().map(ReaderTab::id));
     let mut model = DocumentTabs::default();
     model.restore(tabs.clone(), selected)?;
-    if let Some(split) = split {
-        let split: serde_json::Value = serde_json::from_str(&split).map_err(storage)?;
-        if let Some(context) = split.get(CONTEXT) {
-            let rich = crate::reader_continuity::decode_workspace(context.clone())?;
-            // Flutter may edit the v11 rows without updating the Rust extension.
-            if rich.tabs().len() == tabs.len()
-                && rich.active().map(ReaderTab::id) == model.active().map(ReaderTab::id)
-                && rich.tabs().iter().zip(&tabs).all(|(a, b)| {
-                    a.id() == b.id()
-                        && a.document() == b.document()
-                        && a.page() == b.page()
-                        && a.pinned() == b.pinned()
-                        && a.queue() == b.queue()
-                        && a.preferences().zoom_level == b.preferences().zoom_level
-                        && a.preferences().persisted_layout_name()
-                            == b.preferences().persisted_layout_name()
-                        && a.preferences().view_mode == b.preferences().view_mode
-                        && a.preferences().scroll_offset == b.preferences().scroll_offset
-                })
-            {
-                model = rich;
+    let split: serde_json::Value = split
+        .map(|split| serde_json::from_str(&split).map_err(storage))
+        .transpose()?
+        .unwrap_or_else(|| serde_json::json!({}));
+    if let Some(context) = split.get(CONTEXT) {
+        let rich = crate::reader_continuity::decode_workspace(context.clone())?;
+        // Flutter may edit the v11 rows without updating the Rust extension.
+        if rich.tabs().len() == tabs.len()
+            && rich.active().map(ReaderTab::id) == model.active().map(ReaderTab::id)
+            && rich.tabs().iter().zip(&tabs).all(|(a, b)| {
+                a.id() == b.id()
+                    && a.document() == b.document()
+                    && a.page() == b.page()
+                    && a.pinned() == b.pinned()
+                    && a.queue() == b.queue()
+                    && a.preferences().zoom_level == b.preferences().zoom_level
+                    && a.preferences().persisted_layout_name()
+                        == b.preferences().persisted_layout_name()
+                    && a.preferences().view_mode == b.preferences().view_mode
+                    && a.preferences().scroll_offset == b.preferences().scroll_offset
+            })
+        {
+            model = rich;
+        }
+    }
+    let mut comparison_warning = None;
+    if view.query.get("yamantakaRustComparison").is_none() {
+        match super::legacy_comparison::decode(&split, &model) {
+            Ok(Some(comparison)) => {
+                view.query
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        invalid("Workspace query must be an object; stored data is preserved")
+                    })?
+                    .insert(
+                        "yamantakaRustComparison".into(),
+                        serde_json::to_value(comparison).map_err(storage)?,
+                    );
             }
+            Ok(None) => {}
+            Err(error) => comparison_warning = Some(error.to_string()),
         }
     }
     let reference_document = view
@@ -131,5 +150,6 @@ pub(super) fn load(
         captions,
         view,
         reference_document,
+        comparison_warning,
     })
 }

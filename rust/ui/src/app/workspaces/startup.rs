@@ -110,7 +110,11 @@ impl YamantakaApp {
                     .and_then(|query| query.comparison),
             });
             if unchanged {
-                self.schedule_workspace_comparison(&saved.view, saved.reference_document);
+                self.schedule_workspace_comparison(
+                    &saved.view,
+                    saved.reference_document,
+                    saved.comparison_warning,
+                );
             } else {
                 let comparison = self.capture_workspace_comparison();
                 self.workspaces.binding.as_mut().unwrap().comparison = comparison;

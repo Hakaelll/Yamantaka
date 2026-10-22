@@ -14,6 +14,26 @@ pub fn preserved_split_references(document: &str) {
     "#).unwrap();
     let cancel = Cancellation::default();
     let source = database.workspaces(0, &cancel).unwrap().entries.remove(0);
+    let legacy = database.workspace(&(&source).into(), &cancel).unwrap();
+    let comparison = legacy.view.parsed_query().unwrap().comparison.unwrap();
+    assert_eq!(comparison.layout, ComparisonLayout::Stacked);
+    assert_eq!(comparison.document, "original");
+    assert_eq!(comparison.ratio, 0.6);
+    assert_eq!(comparison.scroll_offset, Some(0.0));
+    assert!(legacy.comparison_warning.is_none());
+    database.execute_batch("UPDATE workspaces SET split_json=json_set(split_json,'$.comparisonMode',json('true')) WHERE id='source'").unwrap();
+    let unsupported = database.workspace(&(&source).into(), &cancel).unwrap();
+    assert_eq!(unsupported.tabs.tabs().len(), 1);
+    assert!(
+        unsupported
+            .view
+            .parsed_query()
+            .unwrap()
+            .comparison
+            .is_none()
+    );
+    assert!(unsupported.comparison_warning.is_some());
+    database.execute_batch("UPDATE workspaces SET split_json=json_remove(split_json,'$.comparisonMode') WHERE id='source'").unwrap();
     let copied = database
         .change_workspace(
             &WorkspaceChange::Duplicate {
@@ -195,6 +215,8 @@ pub fn preserved_split_references(document: &str) {
         .unwrap();
     assert_eq!(reread.workspace_reference(), Some(&reference));
     let comparison = WorkspaceComparison {
+        layout: ComparisonLayout::Stacked,
+        scroll_offset: None,
         primary: "original".into(),
         document: "original".into(),
         page: 3,

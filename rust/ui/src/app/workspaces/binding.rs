@@ -33,6 +33,7 @@ pub(super) struct PendingContext {
     pub(super) view: WorkspaceView,
     pub(super) target: Option<String>,
     pub(super) reference_document: Option<Document>,
+    pub(super) comparison_warning: Option<String>,
 }
 impl YamantakaApp {
     fn workspace_dirty(&self) -> bool {
@@ -75,7 +76,11 @@ impl YamantakaApp {
                         .ok()
                         .and_then(|query| query.comparison),
                 });
-                self.schedule_workspace_comparison(&pending.view, pending.reference_document);
+                self.schedule_workspace_comparison(
+                    &pending.view,
+                    pending.reference_document,
+                    pending.comparison_warning,
+                );
             }
         }
         self.pump_workspace_comparison();

@@ -68,6 +68,7 @@ impl YamantakaApp {
                 view: saved.view,
                 target: selected,
                 reference_document: saved.reference_document,
+                comparison_warning: saved.comparison_warning,
             });
             self.workspaces.open = false;
             self.workspaces.notice = Some(format!(

@@ -1,6 +1,7 @@
 use crate::{Database, database::storage};
 use rusqlite::{Connection, OptionalExtension, params};
 use yamantaka_domain::{Cancellation, Failure, MAX_LIBRARY_PAGE, Result, workspaces::*};
+mod legacy_comparison;
 mod readings;
 pub(crate) mod undo;
 mod write;

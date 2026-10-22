@@ -17,7 +17,17 @@ impl YamantakaApp {
         &mut self,
         view: &yamantaka_domain::workspaces::WorkspaceView,
         document: Option<Document>,
+        warning: Option<String>,
     ) {
+        if let Some(warning) = warning {
+            self.error = Some(format!(
+                "{}: {warning}",
+                self.tr(
+                    "La comparación guardada no se pudo recuperar",
+                    "The saved comparison could not be restored"
+                )
+            ));
+        }
         self.workspaces.comparison_restore = view
             .parsed_query()
             .ok()
