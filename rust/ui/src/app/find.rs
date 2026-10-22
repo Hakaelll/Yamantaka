@@ -191,7 +191,7 @@ impl YamantakaApp {
                 None => navigation.go_to_page(page),
             });
         if changed {
-            self.reader_scroll_anchor = true;
+            self.viewport.scroll_anchor = true;
             self.apply_navigation();
         }
     }

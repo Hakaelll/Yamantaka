@@ -55,7 +55,7 @@ impl YamantakaApp {
             }
             TabPreview::WaitFirst
                 if self.restoration.ready()
-                    && self.reader_pages.values().any(|p| p.image.is_some()) =>
+                    && self.viewport.pages.values().any(|p| p.image.is_some()) =>
             {
                 if matches!(self.tabs.preview_close, 2 | 3) {
                     let id = self.tabs.model.active().unwrap().id().to_owned();
@@ -92,7 +92,7 @@ impl YamantakaApp {
                     && self.restoration.ready()
                     && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-0")
                     && self.reader_preferences.is_some()
-                    && self.reader_pages.values().any(|p| p.image.is_some()) =>
+                    && self.viewport.pages.values().any(|p| p.image.is_some()) =>
             {
                 if self.tabs.preview_close == 4 {
                     let ids: Vec<_> = self
@@ -149,7 +149,7 @@ impl YamantakaApp {
                     && self.restoration.ready()
                     && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-0")
                     && self.reader_preferences.is_some()
-                    && self.reader_pages.values().any(|p| p.image.is_some()) =>
+                    && self.viewport.pages.values().any(|p| p.image.is_some()) =>
             {
                 self.tabs.preview = TabPreview::Complete;
             }

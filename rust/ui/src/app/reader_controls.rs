@@ -136,7 +136,7 @@ impl YamantakaApp {
             return;
         }
         self.zoom = zoom.clamp(0.2, 8.0);
-        self.generation += 1;
+        self.viewport.generation += 1;
         self.reset_render_request();
     }
 }

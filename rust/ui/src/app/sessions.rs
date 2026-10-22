@@ -101,7 +101,7 @@ impl YamantakaApp {
                 self.page,
                 reading_context(
                     preferences,
-                    self.reader_scale,
+                    self.viewport.scale,
                     self.panel.then_some(self.reader_panel_tab),
                 ),
             ));

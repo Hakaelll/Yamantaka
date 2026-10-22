@@ -64,7 +64,7 @@ impl YamantakaApp {
                 if self.tabs.pending.is_none()
                     && self.tabs.restoration.is_none()
                     && self.restoration.ready()
-                    && self.reader_pages.values().any(|p| p.image.is_some()) =>
+                    && self.viewport.pages.values().any(|p| p.image.is_some()) =>
             {
                 self.tabs.bulk_preview = BulkPreview::Complete;
             }

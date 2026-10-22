@@ -257,7 +257,7 @@ impl YamantakaApp {
             })
             && !self.loading
             && !self.opening.busy()
-            && !self.reader_pages.is_empty()
+            && !self.viewport.pages.is_empty()
         {
             if action == "source-return" {
                 self.show_surface(Surface::Library);

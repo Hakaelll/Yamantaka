@@ -15,7 +15,8 @@ impl YamantakaApp {
         }
         let result = (|| {
             let layout = self
-                .reader_layout
+                .viewport
+                .layout
                 .as_ref()
                 .ok_or_else(|| "Reader layout is unavailable".to_string())?;
             let navigation = self

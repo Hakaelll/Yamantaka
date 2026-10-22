@@ -136,7 +136,11 @@ impl YamantakaApp {
             ReplacementPreview::Settling
                 if !self.loading
                     && self.restoration.ready()
-                    && self.reader_pages.values().any(|slot| slot.image.is_some()) =>
+                    && self
+                        .viewport
+                        .pages
+                        .values()
+                        .any(|slot| slot.image.is_some()) =>
             {
                 if let Some(mut candidate) = self.documents.get(1).cloned() {
                     candidate.path =
@@ -171,12 +175,8 @@ impl YamantakaApp {
         self.reader_preferences_cancel = preferences;
         self.reader_preferences = None;
         self.reader_preferences_loading = true;
-        self.cancel.cancel();
-        self.cancel = Cancellation::default();
-        self.reader_pages.clear();
-        self.reader_layout = None;
-        self.reset_render_request();
-        self.generation += 1;
+        self.viewport.clear();
+        self.viewport.generation += 1;
     }
     pub(super) fn cancel_reader_opening(&mut self) {
         self.tabs.cancel();

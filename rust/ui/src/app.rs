@@ -38,6 +38,7 @@ mod password;
 mod reader_controls;
 mod reader_destination;
 mod reader_options;
+mod reader_surface;
 mod reader_viewport;
 mod reading_queue;
 mod relocation;
@@ -156,6 +157,7 @@ pub struct YamantakaApp {
     offset: usize,
     selected: Option<String>,
     inspector: bool,
+    viewport: reader_surface::ReaderSurface,
     active: Option<(Document, Arc<PdfInfo>)>,
     navigation: Option<ReaderNavigation>,
     reader_preferences: Option<ReaderPreferences>,
@@ -163,7 +165,6 @@ pub struct YamantakaApp {
     reader_preferences_loading: bool,
     page: u32,
     zoom: f32,
-    reader_scale: f32,
     panel: bool,
     reader_panel_tab: outline::ReaderPanelTab,
     find: find::FindState,
@@ -204,15 +205,8 @@ pub struct YamantakaApp {
     selection: selection::SelectionState,
     selection_preview: selection::SelectionPreview,
     selection_keyboard_preview: bool,
-    reader_pages: HashMap<u32, ReaderPage>,
-    reader_layout: Option<Arc<ReaderLayout>>,
-    reader_scroll_anchor: bool,
     presenter: Option<PagePresenter>,
     governor: MemoryGovernor,
-    generation: u64,
-    requested: Option<RenderKey>,
-    render_retry: bool,
-    cancel: Cancellation,
     bulk_organization_preview: Option<bulk_picker::OrganizationPreview>,
     bulk_organization_verified: Option<serde_json::Value>,
     bulk_picker: Option<bulk_picker::BulkPicker>,
@@ -375,6 +369,7 @@ impl YamantakaApp {
             offset: 0,
             selected: None,
             inspector,
+            viewport: Default::default(),
             active: None,
             navigation: None,
             reader_preferences: None,
@@ -382,7 +377,6 @@ impl YamantakaApp {
             reader_preferences_loading: false,
             page: 0,
             zoom: 1.0,
-            reader_scale: 1.0,
             panel: false,
             reader_panel_tab: outline::ReaderPanelTab::Bookmarks,
             find: Default::default(),
@@ -422,15 +416,8 @@ impl YamantakaApp {
             selection: Default::default(),
             selection_preview: Default::default(),
             selection_keyboard_preview: false,
-            reader_pages: HashMap::new(),
-            reader_layout: None,
-            reader_scroll_anchor: true,
             presenter,
             governor,
-            generation: 0,
-            requested: None,
-            render_retry: false,
-            cancel: Cancellation::default(),
             bulk_organization_preview: None,
             bulk_organization_verified: None,
             bulk_picker: None,
@@ -513,13 +500,7 @@ impl YamantakaApp {
         Ok(())
     }
     fn reset_render_request(&mut self) {
-        self.requested = None;
-        self.render_retry = false;
-        self.reader_scroll_anchor = true;
-        for page in self.reader_pages.values_mut() {
-            page.cancel.cancel();
-            page.requested = None;
-        }
+        self.viewport.reset_requests();
     }
     fn persist_library_state(&mut self) {
         if self.demo {
@@ -778,9 +759,9 @@ impl YamantakaApp {
         self.restoration.clear();
         if let (Some((doc, _)), Some(navigation)) = (&self.active, &self.navigation) {
             self.page = navigation.position().page();
-            self.generation += 1;
-            self.cancel.cancel();
-            self.cancel = Cancellation::default();
+            self.viewport.generation += 1;
+            self.viewport.cancel.cancel();
+            self.viewport.cancel = Cancellation::default();
             self.send(Action::Navigate(doc.id.clone(), self.page));
             self.reset_render_request();
         }
@@ -1756,7 +1737,7 @@ impl App for YamantakaApp {
                     if self.reader_preferences.is_none() {
                         self.reader_preferences_loading = false;
                     }
-                    self.render_retry = self.requested.is_some();
+                    self.viewport.retry = self.viewport.requested.is_some();
                     self.loading = false;
                 }
                 Update::ReaderClosed(reply) => {
@@ -2092,7 +2073,7 @@ impl App for YamantakaApp {
                                     self.error = None;
                                     self.retry_reader_close();
                                 }
-                                if self.render_retry
+                                if self.viewport.retry
                                     && theme::primary_icon(
                                         ui,
                                         self.tr("Reintentar página", "Retry page"),
@@ -2101,7 +2082,7 @@ impl App for YamantakaApp {
                                     )
                                     .clicked()
                                 {
-                                    self.render_retry = false;
+                                    self.viewport.retry = false;
                                     self.reset_render_request();
                                     self.error = None;
                                 }
@@ -2273,9 +2254,8 @@ impl App for YamantakaApp {
                     && (!matches!(self.surface, Surface::Reader)
                         || self.reader_preferences.is_some()
                             && (self.panel && ctx.content_rect().width() < 620.0
-                                || !self.reader_pages.is_empty()
-                                    && self
-                                        .reader_pages
+                                || !self.viewport.pages.is_empty()
+                                    && self.viewport.pages
                                         .values()
                                         .all(|page| page.image.is_some())));
                 if ready {
@@ -2411,10 +2391,9 @@ impl App for YamantakaApp {
         self.text.clear();
         self.selection.clear();
         self.find = Default::default();
-        self.cancel.cancel();
+        self.viewport.clear();
         self.query_cancel.cancel();
         self.reader_preferences_cancel.cancel();
-        self.reader_pages.clear();
         self.thumbnails.clear();
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.shutdown()

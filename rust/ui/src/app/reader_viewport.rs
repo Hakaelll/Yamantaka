@@ -30,11 +30,11 @@ impl YamantakaApp {
                 if let Some(navigation) = &mut self.navigation {
                     navigation.apply_preferences(preferences, direction);
                 }
-                self.reader_layout = Some(Arc::new(layout));
-                self.reader_scroll_anchor = true;
+                self.viewport.layout = Some(Arc::new(layout));
+                self.viewport.scroll_anchor = true;
             }
             Err(error) => {
-                self.reader_layout = None;
+                self.viewport.layout = None;
                 self.error = Some(error.to_string());
             }
         }
@@ -66,7 +66,7 @@ impl YamantakaApp {
         ];
         self.apply_reader_destination(document, info, viewport_size);
         let (Some(layout), Some(preferences), Some(navigation)) = (
-            self.reader_layout.clone(),
+            self.viewport.layout.clone(),
             self.reader_preferences.clone(),
             self.navigation.as_ref(),
         ) else {
@@ -80,7 +80,7 @@ impl YamantakaApp {
         ui.painter()
             .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
         let mut scrolling = egui::ScrollArea::both().id_salt(("pdf-viewport", &document.id));
-        if self.reader_scroll_anchor {
+        if self.viewport.scroll_anchor {
             match layout.scroll_for_anchor(
                 viewport_size,
                 anchor,
@@ -96,7 +96,7 @@ impl YamantakaApp {
                     return;
                 }
             }
-            self.reader_scroll_anchor = false;
+            self.viewport.scroll_anchor = false;
         }
         let dpr = ui.ctx().pixels_per_point();
         let device_limit = ui.ctx().input(|input| input.max_texture_side).min(16384) as u32;
@@ -119,14 +119,14 @@ impl YamantakaApp {
                     return;
                 }
             };
-            self.reader_scale = frame.zoom as f32;
+            self.viewport.scale = frame.zoom as f32;
             ui.set_min_size(egui::vec2(
                 frame.content_size[0] as f32,
                 frame.content_size[1] as f32,
             ));
             // Only intersecting pages retain presentation leases. Cancelling a
             // consumer never cancels another ticket that shares its native render.
-            self.reader_pages.retain(|page, slot| {
+            self.viewport.pages.retain(|page, slot| {
                 let keep = frame.pages.iter().any(|visible| visible.page == *page);
                 if !keep {
                     slot.cancel.cancel();
@@ -153,10 +153,9 @@ impl YamantakaApp {
                     physical_width: physical[0],
                     physical_height: physical[1],
                     rotation: layout.rotation().degrees(),
-                    generation: self.generation,
+                    generation: self.viewport.generation,
                 };
-                let slot = self
-                    .reader_pages
+                let slot = self.viewport.pages
                     .entry(visible.page)
                     .or_insert_with(|| ReaderPage {
                         requested: None,
@@ -171,12 +170,12 @@ impl YamantakaApp {
                     slot.requested.as_ref(),
                     Instant::now(),
                 );
-                if !self.render_retry
+                if !self.viewport.retry
                     && let Some(delay) = decision.wake_after
                 {
                     ui.ctx().request_repaint_after(delay);
                 }
-                if !self.render_retry
+                if !self.viewport.retry
                     && let Some(key) = decision.request
                 {
                     slot.cancel.cancel();
@@ -197,11 +196,11 @@ impl YamantakaApp {
                                 }));
                             }
                             slot.requested = Some(key.clone());
-                            self.requested = Some(key);
+                            self.viewport.requested = Some(key);
                         }
                         Err(error) => {
                             self.error = Some(error.to_string());
-                            self.render_retry = true;
+                            self.viewport.retry = true;
                         }
                     }
                 }
@@ -264,9 +263,8 @@ impl YamantakaApp {
                     );
                 }
             }
-            self.loading = !self.render_retry
-                && self
-                    .reader_pages
+            self.loading = !self.viewport.retry
+                && self.viewport.pages
                     .values()
                     .any(|slot| !slot.plan.ready(slot.image_key.as_ref()));
             feedback = layout.anchor_at_scroll(&frame, anchor).ok();

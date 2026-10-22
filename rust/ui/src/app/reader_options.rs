@@ -64,7 +64,7 @@ impl YamantakaApp {
             return;
         }
         self.zoom = zoom;
-        self.reader_scale = zoom;
+        self.viewport.scale = zoom;
         let start = preferences.page_rotation.unrotate_point([0.5, 0.0]);
         self.reader_preferences = Some(preferences);
         self.rebuild_reader_layout();
@@ -74,9 +74,9 @@ impl YamantakaApp {
                     .expect("Quarter-turn page starts are normalized"),
             );
         }
-        self.generation += 1;
-        self.cancel.cancel();
-        self.cancel = Cancellation::default();
+        self.viewport.generation += 1;
+        self.viewport.cancel.cancel();
+        self.viewport.cancel = Cancellation::default();
         self.reset_render_request();
         self.sync_tab_context();
     }
@@ -93,9 +93,9 @@ impl YamantakaApp {
             return;
         }
         self.zoom = zoom;
-        self.generation += 1;
-        self.cancel.cancel();
-        self.cancel = Cancellation::default();
+        self.viewport.generation += 1;
+        self.viewport.cancel.cancel();
+        self.viewport.cancel = Cancellation::default();
         self.reset_render_request();
         self.reader_preferences = Some(preferences.clone());
         self.rebuild_reader_layout();
@@ -214,13 +214,13 @@ impl YamantakaApp {
                 if theme::icon_button(ui, self.tr("Alejar", "Zoom out"), theme::Icon::Minus, p)
                     .clicked()
                 {
-                    self.set_reader_zoom(self.reader_scale / 1.2);
+                    self.set_reader_zoom(self.viewport.scale / 1.2);
                 }
                 ui.label(self.reader_zoom_label());
                 if theme::icon_button(ui, self.tr("Acercar", "Zoom in"), theme::Icon::Plus, p)
                     .clicked()
                 {
-                    self.set_reader_zoom(self.reader_scale * 1.2);
+                    self.set_reader_zoom(self.viewport.scale * 1.2);
                 }
             });
             let environments = [
