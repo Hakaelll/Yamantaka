@@ -145,6 +145,7 @@ impl YamantakaApp {
                             reference.pane = pane;
                             visible.push(document.id.clone());
                             reference.follow_page = false;
+                            reference.follow_zoom = false;
                         }
                         Err(error) => {
                             reference.error = Some(error.to_string());

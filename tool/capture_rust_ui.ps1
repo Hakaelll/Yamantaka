@@ -9,6 +9,7 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-sync'; args=@('--reader','--reference','--reference-sync','--es') },
     @{ name='reader-reference-chooser'; args=@('--reader','--reference','--reference-chooser','--es') },
     @{ name='reader-reference-password-import'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-import','--es') },
     @{ name='reader-reference-password-retry'; args=@('--reader','--reference','--reference-book','--reference-protected','--es') },
@@ -347,6 +348,9 @@ foreach ($case in $cases) {
     }
     if ($case.name -eq 'reader-reference-chooser') {
         if ($controls.referenceChooser.demoStage -ne 3 -or $controls.referenceChooser.pagedRows -ne 30 -or $controls.referenceChooser.count -ne 1 -or $controls.referenceChooser.rows -ne 1 -or -not $controls.referenceChooser.outsideVisible -or $controls.libraryDocumentCount -ne 110) { throw 'Reference selection did not page and search beyond the visible main catalogue page.' }
+    }
+    if ($case.name -eq 'reader-reference-sync') {
+        if ($controls.referenceSync.demoStage -ne 4 -or -not $controls.referenceSync.linkedConfirmed -or $controls.reference.followZoom -or -not $controls.reference.followPage -or [Math]::Abs($controls.referenceSync.primaryScale-1.6) -gt 0.0001 -or [Math]::Abs($controls.reference.scale-0.8) -gt 0.0001 -or $controls.currentReaderPage -ne 1 -or $controls.reference.page -ne 1) { throw 'Reference page/zoom following or independent manual zoom did not settle correctly.' }
     }
     if ($case.name -eq 'reader-reference-closed') {
         if ($controls.referenceAdmission.demoStage -ne 5 -or $controls.referenceAdmission.nativeCloses -ne 1 -or $controls.reference -or $controls.currentReaderPage -ne 0) { throw 'Reference closure did not acknowledge one native close and preserve the primary reading.' }

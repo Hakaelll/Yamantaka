@@ -14,6 +14,8 @@ pub(super) struct ReferenceView {
     pub(super) chooser: chooser::ReferenceChooser,
     pub pane: reader_pane::ReaderPane,
     pub follow_page: bool,
+    pub follow_zoom: bool,
+    sync_preview: bool,
     ratio: f32,
     size: egui::Vec2,
     error: Option<String>,
@@ -62,6 +64,8 @@ impl ReferenceView {
             chooser: Default::default(),
             pane,
             follow_page: false,
+            follow_zoom: false,
+            sync_preview: false,
             ratio: 0.5,
             size: egui::Vec2::ZERO,
             error: None,
@@ -175,22 +179,34 @@ impl ReferenceView {
             )
             .clicked();
             let fit = theme::navigation(ui, tr("Ajustar", "Fit"), false, p).clicked();
-            if let Some(prefs) = &mut self.pane.reader_preferences {
-                if out || zoom_in {
-                    self.pane.zoom = (self.pane.viewport.scale
-                        * if zoom_in { 1.2 } else { 1.0 / 1.2 })
+            if out || zoom_in {
+                let zoom = (self.pane.viewport.scale * if zoom_in { 1.2 } else { 1.0 / 1.2 })
                     .clamp(0.2, 8.0);
-                    prefs.zoom_mode = ZoomMode::Custom;
-                    prefs.zoom_level = f64::from(self.pane.zoom);
-                }
-                if fit {
-                    prefs.zoom_mode = ZoomMode::FitPage;
-                }
-                if out || zoom_in || fit {
-                    self.pane.viewport.reset_requests();
-                }
+                self.set_zoom(ZoomMode::Custom, zoom);
             }
-            ui.checkbox(&mut self.follow_page, tr("Seguir página", "Follow page"));
+            if fit {
+                self.set_zoom(ZoomMode::FitPage, self.pane.zoom);
+            }
+            let linked = theme::navigation(
+                ui,
+                tr("Vincular", "Link views"),
+                self.follow_page || self.follow_zoom,
+                p,
+            );
+            let mut popup = egui::Popup::menu(&linked)
+                .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+            if self.sync_preview {
+                popup = popup.open(true);
+            }
+            popup.show(|ui| {
+                ui.label(
+                    RichText::new(tr("Desde la lectura principal", "From the main reading"))
+                        .color(p.secondary)
+                        .size(12.0),
+                );
+                ui.checkbox(&mut self.follow_page, tr("Seguir página", "Follow page"));
+                ui.checkbox(&mut self.follow_zoom, tr("Seguir zoom", "Follow zoom"));
+            });
             close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
                 .clicked();
         });
@@ -222,6 +238,35 @@ impl ReferenceView {
         self.pane.viewport.retry = true;
         self.pane.loading = false;
         true
+    }
+
+    pub(in crate::app) fn set_zoom(&mut self, mode: ZoomMode, zoom: f32) {
+        self.follow_zoom = false;
+        if let Some(prefs) = &mut self.pane.reader_preferences {
+            self.pane.zoom = zoom;
+            prefs.zoom_mode = mode;
+            prefs.zoom_level = f64::from(zoom);
+            self.pane.viewport.reset_requests();
+        }
+    }
+
+    fn follow_primary_zoom(&mut self, scale: f32) {
+        if !self.follow_zoom
+            || self.busy()
+            || self.close_requested
+            || !scale.is_finite()
+            || scale <= 0.0
+        {
+            return;
+        }
+        if let Some(prefs) = &mut self.pane.reader_preferences
+            && (prefs.zoom_mode != ZoomMode::Custom || (self.pane.zoom - scale).abs() > 0.0001)
+        {
+            self.pane.zoom = scale;
+            prefs.zoom_mode = ZoomMode::Custom;
+            prefs.zoom_level = f64::from(scale);
+            self.pane.viewport.reset_requests();
+        }
     }
 
     fn viewport(&mut self, ui: &mut egui::Ui, runtime: &Runtime, bytes: usize, english: bool) {
@@ -365,9 +410,12 @@ impl YamantakaApp {
         let Some(reference) = &mut self.reference else {
             return;
         };
-        if reference.follow_page
+        if !reference.busy()
+            && !reference.close_requested
+            && reference.follow_page
             && let Some(nav) = &mut reference.pane.navigation
-            && nav.go_to_page(self.reader.page)
+            && nav.position().page() != self.reader.page.min(nav.page_count() - 1)
+            && nav.go_to_page(self.reader.page.min(nav.page_count() - 1))
         {
             reference.pane.navigation_changed();
         }
@@ -450,6 +498,7 @@ impl YamantakaApp {
                 == self.reader.active.as_ref().map(|(doc, _)| &doc.id)
         });
         if let Some(reference) = &mut self.reference {
+            reference.follow_primary_zoom(self.reader.viewport.scale);
             ui.scope_builder(
                 egui::UiBuilder::new()
                     .max_rect(second)

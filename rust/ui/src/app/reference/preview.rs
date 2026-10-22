@@ -1,6 +1,57 @@
 use super::*;
 
 impl YamantakaApp {
+    pub fn preview_reference_sync(&mut self) {
+        if self.demo {
+            self.reference_sync_demo = 1;
+        }
+    }
+
+    pub(in crate::app) fn advance_reference_sync(&mut self) {
+        if !self.demo {
+            return;
+        }
+        let Some(reference) = &mut self.reference else {
+            return;
+        };
+        match self.reference_sync_demo {
+            1 if !reference.busy()
+                && reference
+                    .pane
+                    .viewport
+                    .pages
+                    .values()
+                    .any(|slot| slot.image.is_some()) =>
+            {
+                reference.follow_page = true;
+                reference.follow_zoom = true;
+                self.set_reader_zoom(1.6);
+                self.navigate(1);
+                self.reference_sync_demo = 2;
+            }
+            2 if reference.pane.page == 1
+                && (reference.pane.viewport.scale - 1.6).abs() < 0.0001
+                && !reference.pane.loading =>
+            {
+                assert!(reference.follow_zoom);
+                assert!((self.reader.viewport.scale - 1.6).abs() < 0.0001);
+                self.reference_sync_linked = true;
+                reference.set_zoom(ZoomMode::Custom, 0.8);
+                self.reference_sync_demo = 3;
+            }
+            3 if (reference.pane.viewport.scale - 0.8).abs() < 0.0001
+                && !reference.pane.loading =>
+            {
+                assert!(!reference.follow_zoom);
+                assert!((self.reader.viewport.scale - 1.6).abs() < 0.0001);
+                assert_eq!(self.reader.page, 1);
+                self.reference_sync_demo = 4;
+                reference.sync_preview = self.capture.is_some();
+            }
+            _ => {}
+        }
+    }
+
     pub fn preview_reference_chooser(&mut self) {
         if self.demo {
             self.reference_chooser_demo = 1;

@@ -1167,6 +1167,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| arg == "--reference-sync") {
+                        app.preview_reference_sync();
+                    }
                     if args.iter().any(|arg| arg == "--reference-chooser") {
                         app.preview_reference_chooser();
                     }
