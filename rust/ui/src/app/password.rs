@@ -1,7 +1,14 @@
 use super::*;
 use yamantaka_domain::PdfPassword;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum PasswordTarget {
+    Primary,
+    Reference,
+}
+
 pub(super) struct PasswordChallenge {
+    target: PasswordTarget,
     document: Document,
     value: PdfPassword,
     rejected: bool,
@@ -11,15 +18,35 @@ pub(super) struct PasswordChallenge {
 impl PasswordChallenge {
     pub fn new(document: Document, rejected: bool) -> Self {
         Self {
+            target: PasswordTarget::Primary,
             document,
             value: PdfPassword::default(),
             rejected,
             focus: true,
         }
     }
+
+    pub(super) fn reference(document: Document, rejected: bool) -> Self {
+        Self {
+            target: PasswordTarget::Reference,
+            ..Self::new(document, rejected)
+        }
+    }
+
+    pub(super) fn reference_document(&self) -> Option<&Document> {
+        (self.target == PasswordTarget::Reference).then_some(&self.document)
+    }
 }
 
 impl YamantakaApp {
+    pub(super) fn dismiss_password_challenge(&mut self) {
+        if let Some(challenge) = self.password.take()
+            && let Some(document) = challenge.reference_document()
+        {
+            self.cancel_reference_password(&document.id);
+        }
+    }
+
     pub(crate) fn preview_password(&mut self, action: &'static str) {
         if self.demo && self.capture.is_some() {
             self.preview_password_target = Some(action);
@@ -168,9 +195,17 @@ impl YamantakaApp {
             ctx.memory_mut(|memory| memory.surrender_focus(field_id));
         }
         if cancel {
-            self.cancel_reader_opening();
+            match challenge.target {
+                PasswordTarget::Primary => self.cancel_reader_opening(),
+                PasswordTarget::Reference => self.cancel_reference_password(&challenge.document.id),
+            }
         } else if submit {
-            self.retry_password(challenge.document, challenge.value);
+            match challenge.target {
+                PasswordTarget::Primary => self.retry_password(challenge.document, challenge.value),
+                PasswordTarget::Reference => {
+                    self.retry_reference_password(challenge.document, challenge.value)
+                }
+            }
         } else {
             self.password = Some(challenge);
         }

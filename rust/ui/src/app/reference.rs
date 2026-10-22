@@ -1,12 +1,14 @@
 use super::*;
 use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
+mod password;
 mod preview;
 use admission::Admission;
 
 pub(super) struct ReferenceView {
     admission: Admission,
     close_requested: bool,
+    password_attempted: bool,
     selection: Option<Document>,
     pub pane: reader_pane::ReaderPane,
     pub follow_page: bool,
@@ -53,6 +55,7 @@ impl ReferenceView {
         Ok(Self {
             admission: Admission::Ready,
             close_requested: false,
+            password_attempted: false,
             selection: None,
             pane,
             follow_page: false,

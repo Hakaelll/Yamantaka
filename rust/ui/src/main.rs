@@ -174,7 +174,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     ))
                 })
             };
-            let document_path = cover_fixture.as_ref().unwrap_or(&fixture).canonicalize()?;
+            let reference_protected =
+                (index == 1 && args.iter().any(|arg| arg == "--reference-protected")).then(|| {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../build/rust-fixtures/protected.pdf")
+                });
+            let document_path = reference_protected
+                .as_ref()
+                .or(cover_fixture.as_ref())
+                .unwrap_or(&fixture)
+                .canonicalize()?;
             let path = document_path.to_string_lossy().replace('\'', "''");
             let title = if index == 0
                 && args.iter().any(|arg| {
@@ -1156,6 +1165,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         app.preview_reference_book(
                             args.iter().any(|arg| arg == "--reference-close"),
                         );
+                        if args.iter().any(|arg| arg == "--reference-protected") {
+                            app.preview_reference_password(
+                                args.iter().any(|arg| arg == "--reference-password-cancel"),
+                                args.iter().any(|arg| arg == "--reference-password-import"),
+                            );
+                        }
                     }
                 }
                 if args.iter().any(|arg| arg == "--reader-options") {

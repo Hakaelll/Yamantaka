@@ -1,5 +1,7 @@
 # Reference document checkpoint
 
+The later [protected reference checkpoint](rust-reference-password-2026-10-22.md) adds the shared password dialog, retry and cancellation routing. The pending list below records this earlier checkpoint.
+
 Open **Reading options → Compare pages**, then use the book button in the reference header to choose a document from the current library page. The main reading stays active while the reference opens. Its page, fit and zoom remain independent. The reference header displays the chosen title. The same reference can optionally follow the primary page.
 
 Opening, confirmation and closure have separate request-scoped states. Admission confirms the complete two-document protection set through the shared PDF actor. Opening failure retains the previous reference; cancellation retains ownership until its matching completion. Closing a different reference waits for `ReaderClosed` before dropping it. A failed close keeps its view and permits retry. Leaving the reader waits for this closure. Closing the same-document reference releases only its view, preserving the shared native handle.

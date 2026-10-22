@@ -162,7 +162,7 @@ impl YamantakaApp {
     pub(super) fn replace_reader_state(&mut self, preferences: Cancellation) {
         self.reference = None;
         self.reader.prepare_replacement(preferences);
-        self.password = None;
+        self.dismiss_password_challenge();
         self.password_attempted = false;
     }
     pub(super) fn cancel_reader_opening(&mut self) {
@@ -170,7 +170,7 @@ impl YamantakaApp {
         self.opening.cancel();
         self.reader.restoration.clear();
         self.open_intent.leave_destination();
-        self.password = None;
+        self.dismiss_password_challenge();
         self.password_attempted = false;
         self.reader.loading = false;
     }

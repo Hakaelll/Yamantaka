@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-password-import'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-import','--es') },
+    @{ name='reader-reference-password-retry'; args=@('--reader','--reference','--reference-book','--reference-protected','--es') },
+    @{ name='reader-reference-password-cancel'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-cancel','--es') },
     @{ name='reader-reference-book'; args=@('--reader','--reference','--reference-book','--es') },
     @{ name='reader-reference-closed'; args=@('--reader','--reference','--reference-book','--reference-close','--es') },
     @{ name='reader-reference'; args=@('--reader','--reference','--es') },
@@ -343,6 +346,12 @@ foreach ($case in $cases) {
     }
     if ($case.name -eq 'reader-reference-closed') {
         if ($controls.referenceAdmission.demoStage -ne 5 -or $controls.referenceAdmission.nativeCloses -ne 1 -or $controls.reference -or $controls.currentReaderPage -ne 0) { throw 'Reference closure did not acknowledge one native close and preserve the primary reading.' }
+    }
+    if ($case.name -eq 'reader-reference-password-retry') {
+        if ($controls.referenceAdmission.demoStage -ne 3 -or $controls.referenceAdmission.passwordAttempts -ne 2 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.images -lt 1 -or $controls.currentReaderPage -ne 0) { throw 'The protected reference did not recover from an incorrect password without replacing the primary reader.' }
+    }
+    if ($case.name -in @('reader-reference-password-cancel','reader-reference-password-import')) {
+        if ($controls.referenceAdmission.demoStage -ne 7 -or $controls.referenceAdmission.passwordAttempts -ne 0 -or $controls.reference.document -ne 'demo-0' -or $controls.currentReaderPage -ne 0) { throw 'Cancelling reference unlocking did not retain the original reading and reference.' }
     }
     if ($case.name -like 'bulk-remove-*') {
         $result = $controls.librarySelection.removal

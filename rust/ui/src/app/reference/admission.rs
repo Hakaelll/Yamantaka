@@ -7,6 +7,9 @@ pub(in crate::app) enum Admission {
         document: String,
         cancel: Cancellation,
     },
+    Password {
+        document: String,
+    },
     Confirming {
         document: String,
         cancel: Cancellation,
@@ -47,6 +50,7 @@ impl YamantakaApp {
 
     pub(in crate::app) fn open_reference(&mut self, document: Document) {
         if self.opening.busy()
+            || self.password.is_some()
             || self.tabs.busy()
             || self.open_confirmation.is_some()
             || self.reader.reader_preferences_loading
@@ -81,6 +85,7 @@ impl YamantakaApp {
         {
             Ok(()) => {
                 reference.error = None;
+                reference.password_attempted = false;
                 reference.admission = Admission::Opening {
                     document: document.id,
                     cancel,
@@ -165,18 +170,31 @@ impl YamantakaApp {
 
     pub(in crate::app) fn accept_reference_failure(
         &mut self,
-        document: &str,
+        document: &Document,
         token: &Cancellation,
         error: &yamantaka_domain::Failure,
     ) -> bool {
         let Some(reference) = &mut self.reference else {
             return false;
         };
-        if !matches!(&reference.admission, Admission::Opening {document: id, cancel} if id == document && cancel.same_request(token))
+        if !matches!(&reference.admission, Admission::Opening {document: id, cancel} if id == &document.id && cancel.same_request(token))
         {
             return false;
         }
         reference.admission = Admission::Ready;
+        if token.is_cancelled() || reference.close_requested {
+            return true;
+        }
+        if matches!(error, yamantaka_domain::Failure::PasswordRequired) {
+            reference.admission = Admission::Password {
+                document: document.id.clone(),
+            };
+            self.password = Some(crate::app::password::PasswordChallenge::reference(
+                document.clone(),
+                reference.password_attempted,
+            ));
+            return true;
+        }
         if !matches!(error, yamantaka_domain::Failure::Cancelled) {
             reference.error = Some(error.to_string());
         }
@@ -228,6 +246,10 @@ impl YamantakaApp {
             return true;
         };
         reference.close_requested = true;
+        if matches!(reference.admission, Admission::Password { .. }) {
+            reference.admission = Admission::Ready;
+            self.password = None;
+        }
         if let Admission::Opening { cancel, .. } = &reference.admission {
             cancel.cancel();
             self.runtime.wake();

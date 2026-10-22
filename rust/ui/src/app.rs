@@ -122,6 +122,8 @@ pub struct YamantakaApp {
     reference_demo: u8,
     reference_close_demo: bool,
     reference_native_closes: u64,
+    reference_password_demo: u8,
+    reference_password_attempts: u8,
     preview_reference: bool,
     search: search::SearchState,
     global_notes: global_notes::GlobalNotes,
@@ -307,6 +309,8 @@ impl YamantakaApp {
             reference_demo: 0,
             reference_close_demo: false,
             reference_native_closes: 0,
+            reference_password_demo: 0,
+            reference_password_attempts: 0,
             preview_reference: false,
             search: search::SearchState::new(
                 preferences
@@ -553,7 +557,7 @@ impl YamantakaApp {
     pub fn import(&mut self, paths: Vec<PathBuf>) {
         self.tabs.continuity.overridden = true;
         self.open_intent.leave_destination();
-        self.password = None;
+        self.dismiss_password_challenge();
         let cancel = self.importing.begin();
         if let Err(error) = self.runtime.submit(Action::Import(paths, cancel.clone())) {
             self.importing.submission_failed(&cancel);
@@ -563,7 +567,7 @@ impl YamantakaApp {
     pub fn import_folder(&mut self, root: PathBuf) {
         self.tabs.continuity.overridden = true;
         self.open_intent.leave_destination();
-        self.password = None;
+        self.dismiss_password_challenge();
         let cancel = self.importing.begin();
         if let Err(error) = self
             .runtime
@@ -659,7 +663,7 @@ impl YamantakaApp {
         self.reader.find.stop();
         self.reader.thumbnails.clear();
         self.open_intent.leave_destination();
-        self.password = None;
+        self.dismiss_password_challenge();
         self.surface = surface;
     }
     fn open(&mut self, document: Document) -> bool {
@@ -719,7 +723,7 @@ impl YamantakaApp {
         }
         self.opening.bind(id, next_cancel);
         self.reader.restoration.clear();
-        self.password = None;
+        self.dismiss_password_challenge();
         self.password_attempted = false;
         self.open_intent.begin_open();
         self.reader.loading = true;
@@ -1669,7 +1673,7 @@ impl App for YamantakaApp {
                     self.refresh();
                 }
                 Update::OpenFailed(document, error, cancel) => {
-                    if self.accept_reference_failure(&document.id, &cancel, &error) {
+                    if self.accept_reference_failure(&document, &cancel, &error) {
                         continue;
                     }
                     let cancelled = cancel.is_cancelled();
@@ -2259,7 +2263,7 @@ impl App for YamantakaApp {
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
-                    && (self.reference_demo == 0 || self.reference_demo == 3 || self.reference_demo == 5)
+                    && matches!(self.reference_demo, 0 | 3 | 5 | 7)
                     && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.goals.ready())
                     && self.metadata_preview.is_none_or(|(_,stage)|stage==3)
                     && self.metadata.as_ref().is_none_or(|editor|editor.capture_ready())
@@ -2387,7 +2391,7 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
-                    record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes});
+                    record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
                     record["libraryCheck"]=self.library_check.summary();
