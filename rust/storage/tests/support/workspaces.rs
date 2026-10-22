@@ -20,6 +20,7 @@ pub fn preserved_split_references(document: &str) {
     assert_eq!(comparison.document, "original");
     assert_eq!(comparison.ratio, 0.6);
     assert_eq!(comparison.scroll_offset, Some(0.0));
+    assert!(comparison.bidirectional);
     assert!(legacy.comparison_warning.is_none());
     database.execute_batch("UPDATE workspaces SET split_json=json_set(split_json,'$.comparisonMode',json('true')) WHERE id='source'").unwrap();
     let unsupported = database.workspace(&(&source).into(), &cancel).unwrap();
@@ -215,6 +216,7 @@ pub fn preserved_split_references(document: &str) {
         .unwrap();
     assert_eq!(reread.workspace_reference(), Some(&reference));
     let comparison = WorkspaceComparison {
+        bidirectional: false,
         layout: ComparisonLayout::Stacked,
         scroll_offset: None,
         primary: "original".into(),

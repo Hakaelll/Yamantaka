@@ -11,6 +11,7 @@ impl ReferenceView {
         let position = self.pane.navigation.as_ref()?.position();
         let prefs = self.pane.reader_preferences.as_ref()?;
         Some(WorkspaceComparison {
+            bidirectional: self.bidirectional,
             layout: self.layout,
             scroll_offset: None,
             primary: primary.into(),
@@ -60,6 +61,9 @@ impl ReferenceView {
         self.follow_page = saved.follow_page;
         self.follow_zoom = saved.follow_zoom;
         self.follow_position = saved.follow_position;
+        self.bidirectional = saved.bidirectional;
+        self.pending_primary_page = None;
+        self.pending_primary_zoom = false;
         self.followed_position = None;
         Ok(())
     }

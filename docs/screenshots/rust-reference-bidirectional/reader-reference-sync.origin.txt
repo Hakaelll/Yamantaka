@@ -1,0 +1,10 @@
+Origin: native screenshot of the Yamantaka Rust executable, not an AI-generated image.
+Captured with tool/capture_rust_ui.ps1; isolated synthetic study collection; PDF source is the repository's generated acceptance fixture. Write scenarios may use an isolated file-backed synthetic store. No personal library was opened.
+Case: reader-reference-sync
+Arguments: --demo --reader --reference --reference-sync --es
+Capture UTC: 10/22/2026 18:47:16
+Executable SHA-256: 9B434562DE07CB7FB669448035CBD7E0C1CDF4542F9CE55D02A9933CF3B8A6A1
+Original PNG SHA-256: 1CC1082ED3530C4309CAD2702FDBA91F2A8254752951A0E6B22639906F416461
+Logical viewport: 0, 0, 1440, 960
+Pixels per logical point: 1.25
+See capture-manifest.json for exact source hashes and conditions. These captures do not certify physical monitor DPI, Narrator, full functional parity or whole-rewrite acceptance.

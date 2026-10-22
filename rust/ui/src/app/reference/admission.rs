@@ -148,6 +148,8 @@ impl YamantakaApp {
                             reference.follow_zoom = false;
                             reference.follow_position = false;
                             reference.followed_position = None;
+                            reference.pending_primary_page = None;
+                            reference.pending_primary_zoom = false;
                         }
                         Err(error) => {
                             reference.error = Some(error.to_string());

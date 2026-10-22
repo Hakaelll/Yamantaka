@@ -129,6 +129,7 @@ pub struct YamantakaApp {
     reference_sync_demo: u8,
     reference_sync_linked: bool,
     reference_sync_position: bool,
+    reference_sync_reverse: bool,
     preview_reference: bool,
     search: search::SearchState,
     global_notes: global_notes::GlobalNotes,
@@ -321,6 +322,7 @@ impl YamantakaApp {
             reference_sync_demo: 0,
             reference_sync_linked: false,
             reference_sync_position: false,
+            reference_sync_reverse: false,
             preview_reference: false,
             search: search::SearchState::new(
                 preferences
@@ -2290,7 +2292,7 @@ impl App for YamantakaApp {
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
                     && matches!(self.reference_demo, 0 | 3 | 5 | 7)
                     && matches!(self.reference_chooser_demo, 0 | 3)
-                    && matches!(self.reference_sync_demo, 0 | 5)
+                    && matches!(self.reference_sync_demo, 0 | 8)
                     && (self.reference_chooser_demo == 0 || self.reference.as_ref().is_some_and(|reference|reference.chooser.loaded && reference.chooser.total == 1))
                     && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.goals.ready())
                     && self.metadata_preview.is_none_or(|(_,stage)|stage==3)
@@ -2418,8 +2420,8 @@ impl App for YamantakaApp {
                     record["collections"]=self.collections.summary();
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
-                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
-                    record["referenceSync"]=serde_json::json!({"demoStage":self.reference_sync_demo,"linkedConfirmed":self.reference_sync_linked,"positionConfirmed":self.reference_sync_position,"primaryScale":self.reader.viewport.scale});
+                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
+                    record["referenceSync"]=serde_json::json!({"demoStage":self.reference_sync_demo,"linkedConfirmed":self.reference_sync_linked,"positionConfirmed":self.reference_sync_position,"reverseConfirmed":self.reference_sync_reverse,"primaryScale":self.reader.viewport.scale});
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();

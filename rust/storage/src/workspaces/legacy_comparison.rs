@@ -50,6 +50,7 @@ pub(super) fn decode(
     let comparison = WorkspaceComparison {
         layout,
         scroll_offset: Some(prefs.scroll_offset),
+        bidirectional: true,
         primary: primary.document().into(),
         document: secondary.document().into(),
         page: secondary.page(),

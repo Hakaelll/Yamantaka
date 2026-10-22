@@ -17,6 +17,8 @@ pub struct WorkspaceComparison {
     pub layout: ComparisonLayout,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scroll_offset: Option<f64>,
+    #[serde(default)]
+    pub bidirectional: bool,
     pub primary: String,
     pub document: String,
     pub page: u32,

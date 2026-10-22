@@ -77,7 +77,46 @@ impl YamantakaApp {
                 assert!(!reference.follow_zoom);
                 assert!((self.reader.viewport.scale - 1.6).abs() < 0.0001);
                 assert_eq!(self.reader.page, 1);
+                reference.bidirectional = true;
+                reference.follow_zoom = true;
+                reference.set_zoom(ZoomMode::Custom, 0.9);
+                reference.set_page(0);
                 self.reference_sync_demo = 5;
+            }
+            5 if self.reader.page == 0
+                && reference.pane.page == 0
+                && (self.reader.viewport.scale - 0.9).abs() < 0.0001
+                && (reference.pane.viewport.scale - 0.9).abs() < 0.0001
+                && !reference.pane.loading =>
+            {
+                assert!(reference.follow_page && reference.follow_zoom);
+                assert!(!reference.follow_position);
+                assert!(
+                    reference.pending_primary_page.is_none() && !reference.pending_primary_zoom
+                );
+                reference.set_zoom(ZoomMode::FitPage, reference.pane.zoom);
+                self.reference_sync_demo = 6;
+            }
+            6 if (self.reader.viewport.scale - reference.pane.viewport.scale).abs() < 0.0001
+                && !reference.pending_primary_zoom
+                && !reference.pane.loading =>
+            {
+                assert!(reference.follow_zoom);
+                self.reference_sync_reverse = true;
+                self.set_reader_zoom(1.1);
+                self.navigate(1);
+                self.reference_sync_demo = 7;
+            }
+            7 if self.reader.page == 1
+                && reference.pane.page == 1
+                && (self.reader.viewport.scale - 1.1).abs() < 0.0001
+                && (reference.pane.viewport.scale - 1.1).abs() < 0.0001
+                && !reference.pane.loading =>
+            {
+                assert!(
+                    reference.pending_primary_page.is_none() && !reference.pending_primary_zoom
+                );
+                self.reference_sync_demo = 8;
                 reference.sync_preview = self.capture.is_some();
             }
             _ => {}

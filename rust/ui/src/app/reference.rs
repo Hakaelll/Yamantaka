@@ -7,6 +7,7 @@ mod chooser;
 mod password;
 mod preview;
 mod saved;
+mod sync;
 use admission::Admission;
 
 pub(super) struct ReferenceView {
@@ -19,6 +20,9 @@ pub(super) struct ReferenceView {
     pub follow_page: bool,
     pub follow_zoom: bool,
     pub follow_position: bool,
+    pub(in crate::app) bidirectional: bool,
+    pending_primary_page: Option<u32>,
+    pending_primary_zoom: bool,
     followed_position: Option<ReaderPosition>,
     pub(in crate::app) layout: ComparisonLayout,
     pub(in crate::app) stacked: bool,
@@ -73,6 +77,9 @@ impl ReferenceView {
             follow_page: false,
             follow_zoom: false,
             follow_position: false,
+            bidirectional: false,
+            pending_primary_page: None,
+            pending_primary_zoom: false,
             followed_position: None,
             layout: ComparisonLayout::Automatic,
             stacked: false,
@@ -169,12 +176,8 @@ impl ReferenceView {
                 )
                 .labelled_by(page_label.id)
                 .changed()
-                && let Some(nav) = &mut self.pane.navigation
             {
-                nav.go_to_page(page - 1);
-                self.pane.navigation_changed();
-                self.follow_page = false;
-                self.follow_position = false;
+                self.set_page(page - 1);
             }
             let out = theme::icon_button(
                 ui,
@@ -212,16 +215,24 @@ impl ReferenceView {
             }
             popup.show(|ui| {
                 ui.label(
-                    RichText::new(tr("Desde la lectura principal", "From the main reading"))
+                    RichText::new(tr("Página y zoom", "Page and zoom"))
                         .color(p.secondary)
                         .size(12.0),
                 );
                 ui.checkbox(&mut self.follow_page, tr("Seguir página", "Follow page"));
                 ui.checkbox(&mut self.follow_zoom, tr("Seguir zoom", "Follow zoom"));
                 ui.checkbox(
+                    &mut self.bidirectional,
+                    tr("En ambas direcciones", "In both directions"),
+                );
+                ui.checkbox(
                     &mut self.follow_position,
                     tr("Seguir posición", "Follow position"),
-                );
+                )
+                .on_hover_text(tr(
+                    "La posición sigue siempre a la lectura principal.",
+                    "Position always follows the main reading.",
+                ));
                 ui.separator();
                 ui.label(
                     RichText::new(tr("Disposición", "Arrangement"))
@@ -271,19 +282,9 @@ impl ReferenceView {
         true
     }
 
-    pub(in crate::app) fn set_zoom(&mut self, mode: ZoomMode, zoom: f32) {
-        self.follow_zoom = false;
-        self.followed_position = None;
-        if let Some(prefs) = &mut self.pane.reader_preferences {
-            self.pane.zoom = zoom;
-            prefs.zoom_mode = mode;
-            prefs.zoom_level = f64::from(zoom);
-            self.pane.viewport.reset_requests();
-        }
-    }
-
     fn follow_primary_zoom(&mut self, scale: f32) {
         if !self.follow_zoom
+            || self.pending_primary_zoom
             || self.busy()
             || self.close_requested
             || !scale.is_finite()
@@ -471,6 +472,7 @@ impl YamantakaApp {
         if !reference.busy()
             && !reference.close_requested
             && reference.follow_page
+            && reference.pending_primary_page.is_none()
             && !reference.follow_position
             && let Some(nav) = &mut reference.pane.navigation
             && nav.position().page() != self.reader.page.min(nav.page_count() - 1)
@@ -586,6 +588,9 @@ impl YamantakaApp {
                 reference.pane.viewport.scroll_anchor = true;
                 reference.followed_position = None;
             }
+        }
+        if !close {
+            self.apply_reference_sync();
         }
         ui.allocate_rect(rect, egui::Sense::hover());
         if let Some(document) = selected {
