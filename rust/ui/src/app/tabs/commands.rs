@@ -64,6 +64,9 @@ impl YamantakaApp {
         self.request_tab_plan(plan)
     }
     pub(in crate::app) fn request_tab_plan(&mut self, plan: DocumentTabs) -> bool {
+        if self.reference_blocks_switch() {
+            return false;
+        }
         if self.library_selection.removing() {
             return false;
         }

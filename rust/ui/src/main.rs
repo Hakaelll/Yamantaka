@@ -1152,6 +1152,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| arg == "--reference-book") {
+                        app.preview_reference_book(
+                            args.iter().any(|arg| arg == "--reference-close"),
+                        );
+                    }
                 }
                 if args.iter().any(|arg| arg == "--reader-options") {
                     app.preview_reader_options(usize::from(

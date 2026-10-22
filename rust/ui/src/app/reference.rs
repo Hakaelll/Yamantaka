@@ -1,12 +1,26 @@
 use super::*;
 use yamantaka_domain::{PageLayout, reader::ReaderMode};
+mod admission;
+mod preview;
+use admission::Admission;
 
 pub(super) struct ReferenceView {
+    admission: Admission,
+    close_requested: bool,
+    selection: Option<Document>,
     pub pane: reader_pane::ReaderPane,
     pub follow_page: bool,
     ratio: f32,
     size: egui::Vec2,
     error: Option<String>,
+}
+
+impl Drop for ReferenceView {
+    fn drop(&mut self) {
+        if let Admission::Opening { cancel, .. } = &self.admission {
+            cancel.cancel();
+        }
+    }
 }
 
 impl ReferenceView {
@@ -37,6 +51,9 @@ impl ReferenceView {
         pane.navigation_changed();
         pane.rebuild_layout(direction)?;
         Ok(Self {
+            admission: Admission::Ready,
+            close_requested: false,
+            selection: None,
             pane,
             follow_page: false,
             ratio: 0.5,
@@ -52,15 +69,77 @@ impl ReferenceView {
         bytes: usize,
         english: bool,
         p: Palette,
+        documents: &[Document],
+        can_choose: bool,
     ) -> bool {
         let tr = |es, en| if english { en } else { es };
         let mut close = false;
+        if !can_choose && let Some((document, _)) = &self.pane.active {
+            ui.add(
+                egui::Label::new(
+                    RichText::new(document.display_title())
+                        .color(p.secondary)
+                        .size(12.0),
+                )
+                .truncate(),
+            );
+        }
+        if self.busy() {
+            ui.horizontal_wrapped(|ui| {
+                if let Some(error) = self.error.clone() {
+                    ui.label(error);
+                    if theme::navigation(ui, tr("Reintentar", "Retry"), false, p).clicked()
+                        && let Admission::Confirming {
+                            blocked, submitted, ..
+                        } = &mut self.admission
+                    {
+                        *blocked = false;
+                        *submitted = false;
+                        self.error = None;
+                    }
+                }
+                close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
+                    .clicked();
+            });
+            self.viewport(ui, runtime, bytes, english);
+            return close;
+        }
         let count = self
             .pane
             .navigation
             .as_ref()
             .map_or(1, ReaderNavigation::page_count);
         ui.horizontal_wrapped(|ui| {
+            ui.add_enabled_ui(can_choose, |ui| {
+                let button = theme::icon_button(
+                    ui,
+                    tr("Elegir libro de referencia", "Choose reference book"),
+                    theme::Icon::Book,
+                    p,
+                );
+                egui::Popup::menu(&button).show(|ui| {
+                    egui::ScrollArea::vertical()
+                        .max_height(320.0)
+                        .show(ui, |ui| {
+                            for document in documents {
+                                if theme::navigation(
+                                    ui,
+                                    document.display_title(),
+                                    self.pane
+                                        .active
+                                        .as_ref()
+                                        .is_some_and(|(doc, _)| doc.id == document.id),
+                                    p,
+                                )
+                                .clicked()
+                                {
+                                    self.selection = Some(document.clone());
+                                    ui.close();
+                                }
+                            }
+                        });
+                });
+            });
             let page_label = ui.label(
                 RichText::new(tr("Referencia", "Reference"))
                     .color(p.secondary)
@@ -263,7 +342,8 @@ impl YamantakaApp {
     }
     pub(super) fn toggle_reference(&mut self) {
         self.reader.viewport.scroll_anchor = true;
-        if self.reference.take().is_some() {
+        if self.reference.is_some() {
+            self.request_reference_close();
             return;
         }
         if self.presenter.is_none() {
@@ -364,6 +444,11 @@ impl YamantakaApp {
         );
         let bytes = self.governor.limits().pages.min(14 * 1024 * 1024) / 2;
         let mut close = false;
+        let mut selected = None;
+        let can_choose = self.reference.as_ref().is_some_and(|reference| {
+            reference.pane.active.as_ref().map(|(doc, _)| &doc.id)
+                == self.reader.active.as_ref().map(|(doc, _)| &doc.id)
+        });
         if let Some(reference) = &mut self.reference {
             ui.scope_builder(
                 egui::UiBuilder::new()
@@ -371,13 +456,21 @@ impl YamantakaApp {
                     .id_salt("reference-pane"),
                 |ui| {
                     ui.set_clip_rect(second.intersect(ui.clip_rect()));
-                    close = reference.show(ui, &self.runtime, bytes, self.english, p);
+                    close = reference.show(
+                        ui,
+                        &self.runtime,
+                        bytes,
+                        self.english,
+                        p,
+                        &self.documents,
+                        can_choose,
+                    );
+                    selected = reference.selection.take();
                 },
             );
         }
         if close {
-            self.reference = None;
-            self.reader.viewport.scroll_anchor = true;
+            self.request_reference_close();
         } else if drag.dragged() {
             self.reader.viewport.scroll_anchor = true;
             if let Some(reference) = &mut self.reference {
@@ -385,5 +478,8 @@ impl YamantakaApp {
             }
         }
         ui.allocate_rect(rect, egui::Sense::hover());
+        if let Some(document) = selected {
+            self.open_reference(document);
+        }
     }
 }

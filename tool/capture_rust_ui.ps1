@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-book'; args=@('--reader','--reference','--reference-book','--es') },
+    @{ name='reader-reference-closed'; args=@('--reader','--reference','--reference-book','--reference-close','--es') },
     @{ name='reader-reference'; args=@('--reader','--reference','--es') },
     @{ name='reader-reference-stacked'; args=@('--reader','--reference','--size=900x700','--light','--es') },
     @{ name='workspaces'; args=@('--workspaces','--es') },
@@ -333,8 +335,14 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
-    if ($case.name -like 'reader-reference*') {
+    if ($case.name -in @('reader-reference','reader-reference-stacked')) {
         if (-not $controls.reference -or $controls.reference.images -lt 1 -or $controls.reference.page -ne 1 -or $controls.currentReaderPage -ne 0 -or $controls.reference.document -ne 'demo-0') { throw 'Page comparison did not retain independent pages and a native reference image.' }
+    }
+    if ($case.name -eq 'reader-reference-book') {
+        if ($controls.referenceAdmission.demoStage -ne 3 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.images -lt 1 -or $controls.currentReaderPage -ne 0) { throw 'The second document did not open beside the preserved primary reading.' }
+    }
+    if ($case.name -eq 'reader-reference-closed') {
+        if ($controls.referenceAdmission.demoStage -ne 5 -or $controls.referenceAdmission.nativeCloses -ne 1 -or $controls.reference -or $controls.currentReaderPage -ne 0) { throw 'Reference closure did not acknowledge one native close and preserve the primary reading.' }
     }
     if ($case.name -like 'bulk-remove-*') {
         $result = $controls.librarySelection.removal

@@ -118,6 +118,10 @@ impl PageImage {
 pub struct YamantakaApp {
     reader: reader_pane::ReaderPane,
     reference: Option<reference::ReferenceView>,
+    reference_return: Option<Surface>,
+    reference_demo: u8,
+    reference_close_demo: bool,
+    reference_native_closes: u64,
     preview_reference: bool,
     search: search::SearchState,
     global_notes: global_notes::GlobalNotes,
@@ -299,6 +303,10 @@ impl YamantakaApp {
         let mut app = Self {
             reader: Default::default(),
             reference: None,
+            reference_return: None,
+            reference_demo: 0,
+            reference_close_demo: false,
+            reference_native_closes: 0,
             preview_reference: false,
             search: search::SearchState::new(
                 preferences
@@ -603,6 +611,10 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        if !matches!(surface, Surface::Reader) && !self.request_reference_close() {
+            self.reference_return = Some(surface);
+            return;
+        }
         if matches!(surface, Surface::Library)
             && matches!(self.surface, Surface::Reader)
             && self.metadata_source_context()
@@ -669,6 +681,9 @@ impl YamantakaApp {
         self.open_candidate(document)
     }
     fn open_candidate(&mut self, document: Document) -> bool {
+        if self.reference_blocks_switch() {
+            return false;
+        }
         if self.library_selection.removing() {
             return false;
         }
@@ -1505,6 +1520,9 @@ impl App for YamantakaApp {
                         .accept(&id, &cancel, Err(error.to_string()));
                 }
                 Update::Opened(document, info, cancel) => {
+                    if self.accept_reference_opened(&document, &info, &cancel) {
+                        continue;
+                    }
                     let editing = self.reader.annotations.editing()
                         && self.opening.matches(&document.id, &cancel);
                     if editing {
@@ -1651,6 +1669,9 @@ impl App for YamantakaApp {
                     self.refresh();
                 }
                 Update::OpenFailed(document, error, cancel) => {
+                    if self.accept_reference_failure(&document.id, &cancel, &error) {
+                        continue;
+                    }
                     let cancelled = cancel.is_cancelled();
                     let password = matches!(error, yamantaka_domain::Failure::PasswordRequired)
                         && self.open_intent.wants_reader();
@@ -1731,6 +1752,9 @@ impl App for YamantakaApp {
                     self.reader.loading = false;
                 }
                 Update::ReaderClosed(reply) => {
+                    if self.accept_reference_close(&reply) {
+                        continue;
+                    }
                     if self.accept_tab_close(&reply) {
                         continue;
                     }
@@ -1749,6 +1773,9 @@ impl App for YamantakaApp {
                     cancel,
                     result,
                 } => {
+                    if self.accept_reference_confirmation(&document, &cancel, &result) {
+                        continue;
+                    }
                     if let Err(error) = result {
                         if matches!(error, yamantaka_domain::Failure::QueueFull) {
                             if self.open_confirmation.is_none() {
@@ -1917,6 +1944,8 @@ impl App for YamantakaApp {
         self.advance_workspace_preview();
         self.advance_bulk_tab_preview();
         self.retire_closed_reader();
+        self.pump_reference(ctx);
+        self.advance_reference_demo();
         self.poll_import_progress(ctx);
         self.sync_reading_session(ctx);
         self.pump_reader_continuity(ctx);
@@ -2230,6 +2259,7 @@ impl App for YamantakaApp {
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
+                    && (self.reference_demo == 0 || self.reference_demo == 3 || self.reference_demo == 5)
                     && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.goals.ready())
                     && self.metadata_preview.is_none_or(|(_,stage)|stage==3)
                     && self.metadata.as_ref().is_none_or(|editor|editor.capture_ready())
@@ -2357,6 +2387,7 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
+                    record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes});
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
                     record["libraryCheck"]=self.library_check.summary();

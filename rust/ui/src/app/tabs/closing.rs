@@ -118,6 +118,9 @@ impl YamantakaApp {
         }
     }
     fn submit_tab_close(&mut self, document: String, kind: CloseKind) -> bool {
+        if self.reference_blocks_switch() {
+            return false;
+        }
         if let Err(error) = self
             .tabs
             .closing
