@@ -146,6 +146,8 @@ impl YamantakaApp {
                             visible.push(document.id.clone());
                             reference.follow_page = false;
                             reference.follow_zoom = false;
+                            reference.follow_position = false;
+                            reference.followed_position = None;
                         }
                         Err(error) => {
                             reference.error = Some(error.to_string());

@@ -25,6 +25,7 @@ impl YamantakaApp {
             {
                 reference.follow_page = true;
                 reference.follow_zoom = true;
+                reference.follow_position = true;
                 self.set_reader_zoom(1.6);
                 self.navigate(1);
                 self.reference_sync_demo = 2;
@@ -36,16 +37,47 @@ impl YamantakaApp {
                 assert!(reference.follow_zoom);
                 assert!((self.reader.viewport.scale - 1.6).abs() < 0.0001);
                 self.reference_sync_linked = true;
-                reference.set_zoom(ZoomMode::Custom, 0.8);
+                self.reader.navigation.as_mut().unwrap().update_anchor(
+                    yamantaka_domain::reader::ReaderPosition::at(1, [0.5, 0.05]).unwrap(),
+                );
+                self.reader.viewport.scroll_anchor = true;
                 self.reference_sync_demo = 3;
             }
-            3 if (reference.pane.viewport.scale - 0.8).abs() < 0.0001
+            3 if reference
+                .pane
+                .navigation
+                .as_ref()
+                .is_some_and(|nav| (nav.position().normalized_offset() - 0.05).abs() < 0.0001)
+                && !reference.pane.loading =>
+            {
+                assert!(
+                    (self
+                        .reader
+                        .navigation
+                        .as_ref()
+                        .unwrap()
+                        .position()
+                        .normalized_offset()
+                        - 0.05)
+                        .abs()
+                        < 0.0001
+                );
+                self.reference_sync_position = true;
+                let generation = reference.pane.viewport.generation;
+                let position = self.reader.navigation.as_ref().map(|nav| nav.position());
+                reference.follow_primary_position(position);
+                reference.follow_primary_position(position);
+                assert_eq!(reference.pane.viewport.generation, generation);
+                reference.set_zoom(ZoomMode::Custom, 0.8);
+                self.reference_sync_demo = 4;
+            }
+            4 if (reference.pane.viewport.scale - 0.8).abs() < 0.0001
                 && !reference.pane.loading =>
             {
                 assert!(!reference.follow_zoom);
                 assert!((self.reader.viewport.scale - 1.6).abs() < 0.0001);
                 assert_eq!(self.reader.page, 1);
-                self.reference_sync_demo = 4;
+                self.reference_sync_demo = 5;
                 reference.sync_preview = self.capture.is_some();
             }
             _ => {}

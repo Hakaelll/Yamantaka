@@ -1,4 +1,5 @@
 use super::*;
+use yamantaka_domain::reader::ReaderPosition;
 use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
 mod chooser;
@@ -15,6 +16,8 @@ pub(super) struct ReferenceView {
     pub pane: reader_pane::ReaderPane,
     pub follow_page: bool,
     pub follow_zoom: bool,
+    pub follow_position: bool,
+    followed_position: Option<ReaderPosition>,
     sync_preview: bool,
     ratio: f32,
     size: egui::Vec2,
@@ -65,6 +68,8 @@ impl ReferenceView {
             pane,
             follow_page: false,
             follow_zoom: false,
+            follow_position: false,
+            followed_position: None,
             sync_preview: false,
             ratio: 0.5,
             size: egui::Vec2::ZERO,
@@ -163,6 +168,7 @@ impl ReferenceView {
                 nav.go_to_page(page - 1);
                 self.pane.navigation_changed();
                 self.follow_page = false;
+                self.follow_position = false;
             }
             let out = theme::icon_button(
                 ui,
@@ -190,7 +196,7 @@ impl ReferenceView {
             let linked = theme::navigation(
                 ui,
                 tr("Vincular", "Link views"),
-                self.follow_page || self.follow_zoom,
+                self.follow_page || self.follow_zoom || self.follow_position,
                 p,
             );
             let mut popup = egui::Popup::menu(&linked)
@@ -206,6 +212,10 @@ impl ReferenceView {
                 );
                 ui.checkbox(&mut self.follow_page, tr("Seguir página", "Follow page"));
                 ui.checkbox(&mut self.follow_zoom, tr("Seguir zoom", "Follow zoom"));
+                ui.checkbox(
+                    &mut self.follow_position,
+                    tr("Seguir posición", "Follow position"),
+                );
             });
             close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
                 .clicked();
@@ -242,6 +252,7 @@ impl ReferenceView {
 
     pub(in crate::app) fn set_zoom(&mut self, mode: ZoomMode, zoom: f32) {
         self.follow_zoom = false;
+        self.followed_position = None;
         if let Some(prefs) = &mut self.pane.reader_preferences {
             self.pane.zoom = zoom;
             prefs.zoom_mode = mode;
@@ -266,6 +277,31 @@ impl ReferenceView {
             prefs.zoom_mode = ZoomMode::Custom;
             prefs.zoom_level = f64::from(scale);
             self.pane.viewport.reset_requests();
+            self.followed_position = None;
+        }
+    }
+
+    fn follow_primary_position(&mut self, position: Option<ReaderPosition>) {
+        if !self.follow_position || self.busy() || self.close_requested {
+            self.followed_position = None;
+            return;
+        }
+        let Some(position) = position else {
+            return;
+        };
+        if self.followed_position == Some(position) {
+            return;
+        }
+        self.followed_position = Some(position);
+        if let Some(nav) = &mut self.pane.navigation {
+            let page_changed = nav.position().page() != position.page().min(nav.page_count() - 1);
+            if nav.update_anchor(position) {
+                if page_changed {
+                    self.pane.navigation_changed();
+                } else {
+                    self.pane.viewport.scroll_anchor = true;
+                }
+            }
         }
     }
 
@@ -413,6 +449,7 @@ impl YamantakaApp {
         if !reference.busy()
             && !reference.close_requested
             && reference.follow_page
+            && !reference.follow_position
             && let Some(nav) = &mut reference.pane.navigation
             && nav.position().page() != self.reader.page.min(nav.page_count() - 1)
             && nav.go_to_page(self.reader.page.min(nav.page_count() - 1))
@@ -422,6 +459,7 @@ impl YamantakaApp {
         let rect = ui.available_rect_before_wrap();
         if reference.size != rect.size() {
             reference.size = rect.size();
+            reference.followed_position = None;
             self.reader.viewport.scroll_anchor = true;
             reference.pane.viewport.scroll_anchor = true;
         }
@@ -499,6 +537,8 @@ impl YamantakaApp {
         });
         if let Some(reference) = &mut self.reference {
             reference.follow_primary_zoom(self.reader.viewport.scale);
+            reference
+                .follow_primary_position(self.reader.navigation.as_ref().map(|nav| nav.position()));
             ui.scope_builder(
                 egui::UiBuilder::new()
                     .max_rect(second)
@@ -516,6 +556,7 @@ impl YamantakaApp {
             self.reader.viewport.scroll_anchor = true;
             if let Some(reference) = &mut self.reference {
                 reference.pane.viewport.scroll_anchor = true;
+                reference.followed_position = None;
             }
         }
         ui.allocate_rect(rect, egui::Sense::hover());
