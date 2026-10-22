@@ -1,6 +1,52 @@
 use super::*;
 
 impl YamantakaApp {
+    pub fn preview_reference_chooser(&mut self) {
+        if self.demo {
+            self.reference_chooser_demo = 1;
+        }
+    }
+
+    pub(in crate::app) fn advance_reference_chooser(&mut self) {
+        if !self.demo || self.reference_chooser_demo == 0 {
+            return;
+        }
+        let Some(reference) = &mut self.reference else {
+            return;
+        };
+        reference.chooser.preview = true;
+        match self.reference_chooser_demo {
+            1 if !reference.busy()
+                && reference
+                    .pane
+                    .viewport
+                    .pages
+                    .values()
+                    .any(|slot| slot.image.is_some()) =>
+            {
+                reference.chooser.schedule(80, Duration::ZERO);
+                self.reference_chooser_demo = 2;
+            }
+            2 if reference.chooser.loaded && reference.chooser.offset == 80 => {
+                assert_eq!(reference.chooser.total, 110);
+                assert_eq!(reference.chooser.entries.len(), 30);
+                self.reference_chooser_paged = reference.chooser.entries.len();
+                let index = (0..100)
+                    .find(|index| {
+                        !self
+                            .documents
+                            .iter()
+                            .any(|doc| doc.id == format!("chooser-{index:03}"))
+                    })
+                    .expect("Catalogue fixture has more books than the main page");
+                reference.chooser.text = format!("Reference catalogue entry {index:03}");
+                reference.chooser.schedule(0, Duration::ZERO);
+                self.reference_chooser_demo = 3;
+            }
+            _ => {}
+        }
+    }
+
     pub fn preview_reference_password(&mut self, cancel: bool, import: bool) {
         if self.demo {
             self.reference_password_demo = if import {

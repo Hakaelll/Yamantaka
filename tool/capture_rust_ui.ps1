@@ -9,6 +9,7 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-chooser'; args=@('--reader','--reference','--reference-chooser','--es') },
     @{ name='reader-reference-password-import'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-import','--es') },
     @{ name='reader-reference-password-retry'; args=@('--reader','--reference','--reference-book','--reference-protected','--es') },
     @{ name='reader-reference-password-cancel'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-cancel','--es') },
@@ -343,6 +344,9 @@ foreach ($case in $cases) {
     }
     if ($case.name -eq 'reader-reference-book') {
         if ($controls.referenceAdmission.demoStage -ne 3 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.images -lt 1 -or $controls.currentReaderPage -ne 0) { throw 'The second document did not open beside the preserved primary reading.' }
+    }
+    if ($case.name -eq 'reader-reference-chooser') {
+        if ($controls.referenceChooser.demoStage -ne 3 -or $controls.referenceChooser.pagedRows -ne 30 -or $controls.referenceChooser.count -ne 1 -or $controls.referenceChooser.rows -ne 1 -or -not $controls.referenceChooser.outsideVisible -or $controls.libraryDocumentCount -ne 110) { throw 'Reference selection did not page and search beyond the visible main catalogue page.' }
     }
     if ($case.name -eq 'reader-reference-closed') {
         if ($controls.referenceAdmission.demoStage -ne 5 -or $controls.referenceAdmission.nativeCloses -ne 1 -or $controls.reference -or $controls.currentReaderPage -ne 0) { throw 'Reference closure did not acknowledge one native close and preserve the primary reading.' }

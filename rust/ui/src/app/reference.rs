@@ -1,6 +1,7 @@
 use super::*;
 use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
+mod chooser;
 mod password;
 mod preview;
 use admission::Admission;
@@ -10,6 +11,7 @@ pub(super) struct ReferenceView {
     close_requested: bool,
     password_attempted: bool,
     selection: Option<Document>,
+    pub(super) chooser: chooser::ReferenceChooser,
     pub pane: reader_pane::ReaderPane,
     pub follow_page: bool,
     ratio: f32,
@@ -57,6 +59,7 @@ impl ReferenceView {
             close_requested: false,
             password_attempted: false,
             selection: None,
+            chooser: Default::default(),
             pane,
             follow_page: false,
             ratio: 0.5,
@@ -72,7 +75,6 @@ impl ReferenceView {
         bytes: usize,
         english: bool,
         p: Palette,
-        documents: &[Document],
         can_choose: bool,
     ) -> bool {
         let tr = |es, en| if english { en } else { es };
@@ -120,27 +122,22 @@ impl ReferenceView {
                     theme::Icon::Book,
                     p,
                 );
-                egui::Popup::menu(&button).show(|ui| {
-                    egui::ScrollArea::vertical()
-                        .max_height(320.0)
-                        .show(ui, |ui| {
-                            for document in documents {
-                                if theme::navigation(
-                                    ui,
-                                    document.display_title(),
-                                    self.pane
-                                        .active
-                                        .as_ref()
-                                        .is_some_and(|(doc, _)| doc.id == document.id),
-                                    p,
-                                )
-                                .clicked()
-                                {
-                                    self.selection = Some(document.clone());
-                                    ui.close();
-                                }
-                            }
-                        });
+                if button.clicked() {
+                    self.chooser.reopen();
+                }
+                let mut popup = egui::Popup::menu(&button)
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+                if self.chooser.preview {
+                    popup = popup.open(true);
+                }
+                popup.show(|ui| {
+                    self.selection = self.chooser.show(
+                        ui,
+                        runtime,
+                        english,
+                        p,
+                        self.pane.active.as_ref().map(|(doc, _)| doc.id.as_str()),
+                    );
                 });
             });
             let page_label = ui.label(
@@ -459,15 +456,7 @@ impl YamantakaApp {
                     .id_salt("reference-pane"),
                 |ui| {
                     ui.set_clip_rect(second.intersect(ui.clip_rect()));
-                    close = reference.show(
-                        ui,
-                        &self.runtime,
-                        bytes,
-                        self.english,
-                        p,
-                        &self.documents,
-                        can_choose,
-                    );
+                    close = reference.show(ui, &self.runtime, bytes, self.english, p, can_choose);
                     selected = reference.selection.take();
                 },
             );

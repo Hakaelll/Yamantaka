@@ -124,6 +124,8 @@ pub struct YamantakaApp {
     reference_native_closes: u64,
     reference_password_demo: u8,
     reference_password_attempts: u8,
+    reference_chooser_demo: u8,
+    reference_chooser_paged: usize,
     preview_reference: bool,
     search: search::SearchState,
     global_notes: global_notes::GlobalNotes,
@@ -311,6 +313,8 @@ impl YamantakaApp {
             reference_native_closes: 0,
             reference_password_demo: 0,
             reference_password_attempts: 0,
+            reference_chooser_demo: 0,
+            reference_chooser_paged: 0,
             preview_reference: false,
             search: search::SearchState::new(
                 preferences
@@ -1460,6 +1464,11 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Library(documents, count, memberships, cancel) => {
+                    if self.reference.as_mut().is_some_and(|reference| {
+                        reference.chooser.accept(&documents, count, &cancel)
+                    }) {
+                        continue;
+                    }
                     if cancel.is_cancelled() || !self.query_cancel.same_request(&cancel) {
                         continue;
                     }
@@ -1713,6 +1722,14 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Failed(error, cancel) => {
+                    if let Some(token) = &cancel
+                        && self
+                            .reference
+                            .as_mut()
+                            .is_some_and(|reference| reference.chooser.fail(token, &error))
+                    {
+                        continue;
+                    }
                     if cancel
                         .as_ref()
                         .is_some_and(|token| self.importing.finish(token))
@@ -1950,6 +1967,7 @@ impl App for YamantakaApp {
         self.retire_closed_reader();
         self.pump_reference(ctx);
         self.advance_reference_demo();
+        self.advance_reference_chooser();
         self.poll_import_progress(ctx);
         self.sync_reading_session(ctx);
         self.pump_reader_continuity(ctx);
@@ -2264,6 +2282,8 @@ impl App for YamantakaApp {
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
                     && matches!(self.reference_demo, 0 | 3 | 5 | 7)
+                    && matches!(self.reference_chooser_demo, 0 | 3)
+                    && (self.reference_chooser_demo == 0 || self.reference.as_ref().is_some_and(|reference|reference.chooser.loaded && reference.chooser.total == 1))
                     && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.goals.ready())
                     && self.metadata_preview.is_none_or(|(_,stage)|stage==3)
                     && self.metadata.as_ref().is_none_or(|editor|editor.capture_ready())
@@ -2392,6 +2412,7 @@ impl App for YamantakaApp {
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
+                    record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
                     record["libraryCheck"]=self.library_check.summary();

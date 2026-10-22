@@ -218,6 +218,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 ))?;
             }
         }
+        if args.iter().any(|arg| arg == "--reference-chooser") {
+            let path = fixture.to_string_lossy().replace('\'', "''");
+            for index in 0..100 {
+                db.execute_batch(&format!("INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) VALUES('chooser-{index:03}','{path}','chooser-{index:03}','reference.pdf','Reference catalogue entry {index:03}','Study collection',2,900,'2000-01-01','2000-01-01','2000-01-01','synthetic');"))?;
+            }
+        }
         if capture.is_some()
             && args
                 .iter()
@@ -1161,6 +1167,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| arg == "--reference-chooser") {
+                        app.preview_reference_chooser();
+                    }
                     if args.iter().any(|arg| arg == "--reference-book") {
                         app.preview_reference_book(
                             args.iter().any(|arg| arg == "--reference-close"),
