@@ -27,6 +27,92 @@ impl Default for ReaderSurface {
 }
 
 impl ReaderSurface {
+    pub fn paint_page(
+        &mut self,
+        ui: &mut egui::Ui,
+        runtime: &Runtime,
+        key: &RenderKey,
+        paper: egui::Rect,
+        preferences: &ReaderPreferences,
+        label: String,
+    ) -> yamantaka_domain::Result<Option<RenderKey>> {
+        let slot = self.pages.entry(key.page).or_insert_with(|| ReaderPage {
+            requested: None,
+            cancel: Cancellation::default(),
+            image: None,
+            image_key: None,
+            plan: Default::default(),
+        });
+        let decision = slot.plan.next(
+            key,
+            slot.image_key.as_ref(),
+            slot.requested.as_ref(),
+            Instant::now(),
+        );
+        let mut submitted = None;
+        let mut failure = None;
+        if !self.retry {
+            if let Some(delay) = decision.wake_after {
+                ui.ctx().request_repaint_after(delay);
+            }
+            if let Some(request) = decision.request {
+                slot.cancel.cancel();
+                slot.cancel = Cancellation::default();
+                match runtime.submit(Action::Render(
+                    request.clone(),
+                    yamantaka_domain::Priority::Visible,
+                    slot.cancel.clone(),
+                )) {
+                    Ok(()) => {
+                        slot.requested = Some(request.clone());
+                        self.requested = Some(request.clone());
+                        submitted = Some(request);
+                    }
+                    Err(error) => {
+                        self.retry = true;
+                        failure = Some(error);
+                    }
+                }
+            }
+        }
+        let response = ui.allocate_rect(paper, egui::Sense::hover());
+        response.widget_info(|| {
+            egui::WidgetInfo::labeled(egui::WidgetType::Image, ui.is_enabled(), &label)
+        });
+        if !matches!(
+            preferences.reading_theme,
+            ReaderTheme::Dark | ReaderTheme::Black
+        ) {
+            ui.painter().add(
+                egui::epaint::Shadow {
+                    offset: [0, 3],
+                    blur: 12,
+                    spread: 0,
+                    color: Color32::from_black_alpha(32),
+                }
+                .as_shape(paper, 1),
+            );
+        }
+        if let Some(image) = &slot.image {
+            let rotation = slot
+                .image_key
+                .as_ref()
+                .map_or(key.rotation, |key| key.rotation);
+            ui.painter().add(render_plan::page_mesh(
+                image.id(),
+                paper,
+                rotation,
+                preferences.page_rotation,
+            ));
+        } else {
+            ui.painter().rect_filled(paper, 1, Color32::WHITE);
+        }
+        match failure {
+            Some(error) => Err(error),
+            None => Ok(submitted),
+        }
+    }
+
     pub fn accepts(&self, page: &yamantaka_domain::RenderedPage, cancel: &Cancellation) -> bool {
         self.pages
             .get(&page.key.page)

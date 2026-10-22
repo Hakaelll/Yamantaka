@@ -160,6 +160,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn replace_reader_state(&mut self, preferences: Cancellation) {
+        self.reference = None;
         self.reader.prepare_replacement(preferences);
         self.password = None;
         self.password_attempted = false;

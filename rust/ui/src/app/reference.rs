@@ -1,0 +1,389 @@
+use super::*;
+use yamantaka_domain::{PageLayout, reader::ReaderMode};
+
+pub(super) struct ReferenceView {
+    pub pane: reader_pane::ReaderPane,
+    pub follow_page: bool,
+    ratio: f32,
+    size: egui::Vec2,
+    error: Option<String>,
+}
+
+impl ReferenceView {
+    fn new(
+        source: &reader_pane::ReaderPane,
+        direction: ReadingDirection,
+    ) -> yamantaka_domain::Result<Self> {
+        let (Some(active), Some(mut preferences), Some(navigation)) = (
+            source.active.clone(),
+            source.reader_preferences.clone(),
+            source.navigation.clone(),
+        ) else {
+            return Err(yamantaka_domain::Failure::Invalid(
+                "Open a reading before comparing pages".into(),
+            ));
+        };
+        preferences.page_layout = PageLayout::Single;
+        preferences.view_mode = ReaderMode::Document;
+        preferences.zoom_mode = ZoomMode::FitPage;
+        preferences.scroll_offset = 0.0;
+        let mut pane = reader_pane::ReaderPane::default();
+        pane.active = Some(active);
+        pane.navigation = Some(navigation);
+        pane.reader_preferences = Some(preferences);
+        if let Some(navigation) = &mut pane.navigation {
+            navigation.go_to_page((source.page + 1).min(navigation.page_count() - 1));
+        }
+        pane.navigation_changed();
+        pane.rebuild_layout(direction)?;
+        Ok(Self {
+            pane,
+            follow_page: false,
+            ratio: 0.5,
+            size: egui::Vec2::ZERO,
+            error: None,
+        })
+    }
+
+    fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        runtime: &Runtime,
+        bytes: usize,
+        english: bool,
+        p: Palette,
+    ) -> bool {
+        let tr = |es, en| if english { en } else { es };
+        let mut close = false;
+        let count = self
+            .pane
+            .navigation
+            .as_ref()
+            .map_or(1, ReaderNavigation::page_count);
+        ui.horizontal_wrapped(|ui| {
+            let page_label = ui.label(
+                RichText::new(tr("Referencia", "Reference"))
+                    .color(p.secondary)
+                    .size(12.0),
+            );
+            let mut page = self.pane.page + 1;
+            if ui
+                .add(
+                    egui::DragValue::new(&mut page)
+                        .range(1..=count)
+                        .suffix(format!(" / {count}")),
+                )
+                .labelled_by(page_label.id)
+                .changed()
+                && let Some(nav) = &mut self.pane.navigation
+            {
+                nav.go_to_page(page - 1);
+                self.pane.navigation_changed();
+                self.follow_page = false;
+            }
+            let out = theme::icon_button(
+                ui,
+                tr("Alejar referencia", "Zoom reference out"),
+                theme::Icon::Minus,
+                p,
+            )
+            .clicked();
+            let zoom_in = theme::icon_button(
+                ui,
+                tr("Acercar referencia", "Zoom reference in"),
+                theme::Icon::Plus,
+                p,
+            )
+            .clicked();
+            let fit = theme::navigation(ui, tr("Ajustar", "Fit"), false, p).clicked();
+            if let Some(prefs) = &mut self.pane.reader_preferences {
+                if out || zoom_in {
+                    self.pane.zoom = (self.pane.viewport.scale
+                        * if zoom_in { 1.2 } else { 1.0 / 1.2 })
+                    .clamp(0.2, 8.0);
+                    prefs.zoom_mode = ZoomMode::Custom;
+                    prefs.zoom_level = f64::from(self.pane.zoom);
+                }
+                if fit {
+                    prefs.zoom_mode = ZoomMode::FitPage;
+                }
+                if out || zoom_in || fit {
+                    self.pane.viewport.reset_requests();
+                }
+            }
+            ui.checkbox(&mut self.follow_page, tr("Seguir página", "Follow page"));
+            close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
+                .clicked();
+        });
+        if let Some(error) = self.error.clone() {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(error);
+                if theme::navigation(ui, tr("Reintentar", "Retry"), false, p).clicked() {
+                    self.pane.viewport.reset_requests();
+                    self.error = None;
+                }
+            });
+        }
+        self.viewport(ui, runtime, bytes, english);
+        close
+    }
+
+    pub fn fail_render(&mut self, token: &Cancellation, error: &yamantaka_domain::Failure) -> bool {
+        if token.is_cancelled()
+            || !self
+                .pane
+                .viewport
+                .pages
+                .values()
+                .any(|slot| slot.cancel.same_request(token))
+        {
+            return false;
+        }
+        self.error = Some(error.to_string());
+        self.pane.viewport.retry = true;
+        self.pane.loading = false;
+        true
+    }
+
+    fn viewport(&mut self, ui: &mut egui::Ui, runtime: &Runtime, bytes: usize, english: bool) {
+        let (Some((document, _)), Some(layout), Some(preferences), Some(navigation)) = (
+            &self.pane.active,
+            self.pane.viewport.layout.clone(),
+            self.pane.reader_preferences.clone(),
+            &self.pane.navigation,
+        ) else {
+            return;
+        };
+        let document = document.clone();
+        let anchor = navigation.position();
+        let size = ui.available_size();
+        let viewport = [f64::from(size.x.max(1.0)), f64::from(size.y.max(1.0))];
+        ui.painter().rect_filled(
+            ui.available_rect_before_wrap(),
+            0,
+            YamantakaApp::reading_paper(preferences.reading_theme),
+        );
+        let mut scroll = egui::ScrollArea::both().id_salt("reference-pages");
+        if self.pane.viewport.scroll_anchor {
+            if let Ok([x, y]) = layout.scroll_for_anchor(
+                viewport,
+                anchor,
+                preferences.zoom_mode,
+                f64::from(self.pane.zoom),
+            ) {
+                scroll = scroll.scroll_offset(egui::vec2(x as f32, y as f32));
+            }
+            self.pane.viewport.scroll_anchor = false;
+        }
+        let dpr = ui.ctx().pixels_per_point();
+        let cap = ui.ctx().input(|input| input.max_texture_side).min(16384) as u32;
+        scroll.show_viewport(ui, |ui, visible| {
+            let frame = match layout.frame(
+                viewport,
+                anchor,
+                preferences.zoom_mode,
+                f64::from(self.pane.zoom),
+                [f64::from(visible.left()), f64::from(visible.top())],
+                0.0,
+            ) {
+                Ok(frame) => frame,
+                Err(error) => {
+                    self.error = Some(error.to_string());
+                    return;
+                }
+            };
+            self.pane.viewport.scale = frame.zoom as f32;
+            ui.set_min_size(egui::vec2(
+                frame.content_size[0] as f32,
+                frame.content_size[1] as f32,
+            ));
+            self.pane.viewport.pages.retain(|page, slot| {
+                let keep = frame.pages.iter().any(|visible| visible.page == *page);
+                if !keep {
+                    slot.cancel.cancel();
+                }
+                keep
+            });
+            let origin = ui.max_rect().min;
+            for page in &frame.pages {
+                let size = egui::vec2(page.rect.width as f32, page.rect.height as f32);
+                let physical =
+                    preview_dimensions(size, dpr, cap, (bytes / frame.pages.len().max(1)).max(4));
+                let key = RenderKey {
+                    document_id: document.id.clone(),
+                    page: page.page,
+                    region: None,
+                    physical_width: physical[0],
+                    physical_height: physical[1],
+                    rotation: layout.rotation().degrees(),
+                    generation: self.pane.viewport.generation,
+                };
+                let paper = egui::Rect::from_min_size(
+                    origin + egui::vec2(page.rect.left as f32, page.rect.top as f32),
+                    size,
+                );
+                let label = format!(
+                    "{} · {} {}",
+                    document.display_title(),
+                    if english {
+                        "reference page"
+                    } else {
+                        "página de referencia"
+                    },
+                    page.page + 1
+                );
+                if let Err(error) =
+                    self.pane
+                        .viewport
+                        .paint_page(ui, runtime, &key, paper, &preferences, label)
+                {
+                    self.error = Some(error.to_string());
+                }
+            }
+            self.pane.loading = !self.pane.viewport.retry
+                && self
+                    .pane
+                    .viewport
+                    .pages
+                    .values()
+                    .any(|slot| !slot.plan.ready(slot.image_key.as_ref()));
+            if let Ok(position) = layout.anchor_at_scroll(&frame, anchor)
+                && let Some(nav) = &mut self.pane.navigation
+            {
+                nav.update_anchor(position);
+                self.pane.page = nav.position().page();
+            }
+        });
+    }
+}
+
+impl YamantakaApp {
+    pub fn preview_reference(&mut self) {
+        self.preview_reference = self.demo;
+    }
+    pub(super) fn toggle_reference(&mut self) {
+        self.reader.viewport.scroll_anchor = true;
+        if self.reference.take().is_some() {
+            return;
+        }
+        if self.presenter.is_none() {
+            return;
+        }
+        match ReferenceView::new(&self.reader, self.reading_direction()) {
+            Ok(reference) => self.reference = Some(reference),
+            Err(error) => self.error = Some(error.to_string()),
+        }
+    }
+
+    pub(super) fn comparison_viewport(
+        &mut self,
+        ui: &mut egui::Ui,
+        document: &Document,
+        info: &PdfInfo,
+        p: Palette,
+    ) {
+        let Some(reference) = &mut self.reference else {
+            return;
+        };
+        if reference.follow_page
+            && let Some(nav) = &mut reference.pane.navigation
+            && nav.go_to_page(self.reader.page)
+        {
+            reference.pane.navigation_changed();
+        }
+        let rect = ui.available_rect_before_wrap();
+        if reference.size != rect.size() {
+            reference.size = rect.size();
+            self.reader.viewport.scroll_anchor = true;
+            reference.pane.viewport.scroll_anchor = true;
+        }
+        let stacked = rect.width() < 960.0;
+        let extent = if stacked { rect.height() } else { rect.width() };
+        let split = extent * reference.ratio;
+        let mut first = rect;
+        let mut second = rect;
+        if stacked {
+            first.max.y = rect.top() + split - 4.0;
+            second.min.y = first.bottom() + 8.0;
+        } else {
+            first.max.x = rect.left() + split - 4.0;
+            second.min.x = first.right() + 8.0;
+        }
+        let divider = if stacked {
+            egui::Rect::from_min_max(
+                egui::pos2(rect.left(), first.bottom()),
+                egui::pos2(rect.right(), second.top()),
+            )
+        } else {
+            egui::Rect::from_min_max(
+                egui::pos2(first.right(), rect.top()),
+                egui::pos2(second.left(), rect.bottom()),
+            )
+        };
+        let drag = ui.interact(
+            divider,
+            ui.id().with("reference-divider"),
+            egui::Sense::drag(),
+        );
+        drag.clone().on_hover_cursor(if stacked {
+            egui::CursorIcon::ResizeVertical
+        } else {
+            egui::CursorIcon::ResizeHorizontal
+        });
+        if drag.dragged() {
+            reference.ratio = (reference.ratio
+                + if stacked {
+                    drag.drag_delta().y
+                } else {
+                    drag.drag_delta().x
+                } / extent.max(1.0))
+            .clamp(0.2, 0.8);
+        }
+        ui.painter().line_segment(
+            if stacked {
+                [
+                    egui::pos2(rect.left(), divider.center().y),
+                    egui::pos2(rect.right(), divider.center().y),
+                ]
+            } else {
+                [
+                    egui::pos2(divider.center().x, rect.top()),
+                    egui::pos2(divider.center().x, rect.bottom()),
+                ]
+            },
+            egui::Stroke::new(1.0, p.line),
+        );
+        ui.scope_builder(
+            egui::UiBuilder::new()
+                .max_rect(first)
+                .id_salt("reading-pane"),
+            |ui| {
+                ui.set_clip_rect(first.intersect(ui.clip_rect()));
+                self.reader_viewport(ui, document, info, p);
+            },
+        );
+        let bytes = self.governor.limits().pages.min(14 * 1024 * 1024) / 2;
+        let mut close = false;
+        if let Some(reference) = &mut self.reference {
+            ui.scope_builder(
+                egui::UiBuilder::new()
+                    .max_rect(second)
+                    .id_salt("reference-pane"),
+                |ui| {
+                    ui.set_clip_rect(second.intersect(ui.clip_rect()));
+                    close = reference.show(ui, &self.runtime, bytes, self.english, p);
+                },
+            );
+        }
+        if close {
+            self.reference = None;
+            self.reader.viewport.scroll_anchor = true;
+        } else if drag.dragged() {
+            self.reader.viewport.scroll_anchor = true;
+            if let Some(reference) = &mut self.reference {
+                reference.pane.viewport.scroll_anchor = true;
+            }
+        }
+        ui.allocate_rect(rect, egui::Sense::hover());
+    }
+}

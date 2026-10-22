@@ -123,7 +123,7 @@ impl YamantakaApp {
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
             let preview_budget =
-                (self.governor.limits().pages.min(14 * 1024 * 1024) / count).max(4);
+                (self.governor.limits().pages.min(14 * 1024 * 1024) / count / if self.reference.is_some() { 2 } else { 1 }).max(4);
             let page_label = self.tr("página", "page");
             for visible in &frame.pages {
                 let displayed = egui::vec2(visible.rect.width as f32, visible.rect.height as f32);
@@ -137,99 +137,25 @@ impl YamantakaApp {
                     rotation: layout.rotation().degrees(),
                     generation: self.reader.viewport.generation,
                 };
-                let slot = self.reader.viewport.pages
-                    .entry(visible.page)
-                    .or_insert_with(|| ReaderPage {
-                        requested: None,
-                        cancel: Cancellation::default(),
-                        image: None,
-                        image_key: None,
-                        plan: Default::default(),
-                    });
-                let decision = slot.plan.next(
-                    &key,
-                    slot.image_key.as_ref(),
-                    slot.requested.as_ref(),
-                    Instant::now(),
-                );
-                if !self.reader.viewport.retry
-                    && let Some(delay) = decision.wake_after
-                {
-                    ui.ctx().request_repaint_after(delay);
-                }
-                if !self.reader.viewport.retry
-                    && let Some(key) = decision.request
-                {
-                    slot.cancel.cancel();
-                    slot.cancel = Cancellation::default();
-                    match self.runtime.submit(Action::Render(
-                        key.clone(),
-                        yamantaka_domain::Priority::Visible,
-                        slot.cancel.clone(),
-                    )) {
-                        Ok(()) => {
-                            if self.capture.is_some() && self.capture_render_events.len() < 128 {
-                                self.capture_render_events.push(serde_json::json!({
-                                    "event":"submitted", "document":key.document_id,
-                                    "page":key.page,"generation":key.generation,"rotation":key.rotation,
-                                    "pixels":[key.physical_width,key.physical_height],
-                                    "target":[physical[0],physical[1]],"viewport":viewport_size,
-                                    "retainedImage":slot.image_key.is_some(),
-                                }));
-                            }
-                            slot.requested = Some(key.clone());
-                            self.reader.viewport.requested = Some(key);
-                        }
-                        Err(error) => {
-                            self.error = Some(error.to_string());
-                            self.reader.viewport.retry = true;
-                        }
-                    }
-                }
+                let retained = self.reader.viewport.pages.get(&visible.page)
+                    .is_some_and(|slot| slot.image_key.is_some());
                 let paper = egui::Rect::from_min_size(
                     origin + egui::vec2(visible.rect.left as f32, visible.rect.top as f32),
                     displayed,
                 );
-                let response = ui.allocate_rect(paper, egui::Sense::hover());
-                response.widget_info(|| {
-                    egui::WidgetInfo::labeled(
-                        egui::WidgetType::Image,
-                        ui.is_enabled(),
-                        format!(
-                            "{} · {} {}",
-                            document.display_title(),
-                            page_label,
-                            visible.page + 1
-                        ),
-                    )
-                });
-                if !matches!(
-                    preferences.reading_theme,
-                    ReaderTheme::Dark | ReaderTheme::Black
-                ) {
-                    ui.painter().add(
-                        egui::epaint::Shadow {
-                            offset: [0, 3],
-                            blur: 12,
-                            spread: 0,
-                            color: Color32::from_black_alpha(32),
-                        }
-                        .as_shape(paper, 1),
-                    );
-                }
-                if let Some(image) = &slot.image {
-                    let rotation = slot
-                        .image_key
-                        .as_ref()
-                        .map_or(layout.rotation().degrees(), |key| key.rotation);
-                    ui.painter().add(render_plan::page_mesh(
-                        image.id(),
-                        paper,
-                        rotation,
-                        layout.rotation(),
-                    ));
-                } else {
-                    ui.painter().rect_filled(paper, 1, Color32::WHITE);
+                let label = format!("{} · {} {}", document.display_title(), page_label, visible.page + 1);
+                match self.reader.viewport.paint_page(ui, &self.runtime, &key, paper, &preferences, label) {
+                    Ok(Some(request)) if self.capture.is_some() && self.capture_render_events.len() < 128 => {
+                        self.capture_render_events.push(serde_json::json!({
+                            "event":"submitted", "document":request.document_id,
+                            "page":request.page,"generation":request.generation,"rotation":request.rotation,
+                            "pixels":[request.physical_width,request.physical_height],
+                            "target":[physical[0],physical[1]],"viewport":viewport_size,
+                            "retainedImage":retained,
+                        }));
+                    }
+                    Err(error) => self.error = Some(error.to_string()),
+                    _ => {}
                 }
                 self.paint_annotations(ui, visible.page, paper, layout.rotation());
                 self.paint_find_matches(ui, visible.page, paper, layout.rotation(), p);

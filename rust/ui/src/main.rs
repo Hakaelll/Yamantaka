@@ -1150,6 +1150,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             if demo && reader {
                 app.preview_reader();
+                if args.iter().any(|arg| arg == "--reference") {
+                    app.preview_reference();
+                }
                 if args.iter().any(|arg| arg == "--reader-options") {
                     app.preview_reader_options(usize::from(
                         args.iter().any(|arg| arg == "--layout-options"),

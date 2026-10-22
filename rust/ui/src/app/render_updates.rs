@@ -17,8 +17,12 @@ impl YamantakaApp {
         cancel: &Cancellation,
     ) {
         let reader = self.reader.viewport.accepts(page, cancel);
+        let reference = self
+            .reference
+            .as_ref()
+            .is_some_and(|reference| reference.pane.viewport.accepts(page, cancel));
         let thumbnail = self.reader.thumbnails.accepts(page, cancel);
-        if !reader && !thumbnail {
+        if !reader && !thumbnail && !reference {
             return;
         }
         let replacement = if let Some(presenter) = &mut self.presenter {
@@ -34,7 +38,18 @@ impl YamantakaApp {
                 TextureOptions::LINEAR,
             )))
         };
-        if thumbnail {
+        if reference {
+            if let Some(reference) = &mut self.reference {
+                match replacement {
+                    Ok(image) => {
+                        reference.pane.viewport.install(page, cancel, image);
+                    }
+                    Err(error) => {
+                        reference.fail_render(cancel, &error);
+                    }
+                }
+            }
+        } else if thumbnail {
             self.reader.thumbnails.install(page, cancel, replacement);
         } else {
             match replacement {

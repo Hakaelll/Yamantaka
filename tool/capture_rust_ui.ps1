@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference'; args=@('--reader','--reference','--es') },
+    @{ name='reader-reference-stacked'; args=@('--reader','--reference','--size=900x700','--light','--es') },
     @{ name='workspaces'; args=@('--workspaces','--es') },
     @{ name='reading-queue'; args=@('--reading-queue','--es') },
     @{ name='restore-review'; args=@('--restore-preview','--es') },
@@ -331,6 +333,9 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    if ($case.name -like 'reader-reference*') {
+        if (-not $controls.reference -or $controls.reference.images -lt 1 -or $controls.reference.page -ne 1 -or $controls.currentReaderPage -ne 0 -or $controls.reference.document -ne 'demo-0') { throw 'Page comparison did not retain independent pages and a native reference image.' }
+    }
     if ($case.name -like 'bulk-remove-*') {
         $result = $controls.librarySelection.removal
         if ($null -eq $result -or -not $controls.libraryQueryLoaded -or $controls.librarySelection.writing) { throw 'Library removal has not reached its verified state.' }

@@ -32,7 +32,7 @@ impl YamantakaApp {
             })
     }
 
-    fn reading_paper(environment: ReaderTheme) -> Color32 {
+    pub(super) fn reading_paper(environment: ReaderTheme) -> Color32 {
         match environment {
             ReaderTheme::Light => Color32::from_rgb(243, 243, 241),
             ReaderTheme::Ivory => Color32::from_rgb(234, 229, 216),
@@ -148,6 +148,24 @@ impl YamantakaApp {
     fn reader_options_content(&mut self, ui: &mut egui::Ui, p: Palette) {
         ui.set_max_width(280.0);
         self.operation_actions(ui, p);
+        if ui
+            .add_enabled_ui(
+                self.reader.reader_preferences.is_some() && self.presenter.is_some(),
+                |ui| {
+                    theme::navigation(
+                        ui,
+                        self.tr("Comparar páginas", "Compare pages"),
+                        self.reference.is_some(),
+                        p,
+                    )
+                },
+            )
+            .inner
+            .clicked()
+        {
+            self.toggle_reference();
+            ui.close();
+        }
         if theme::navigation(
             ui,
             self.tr("Modo concentración · F8", "Focus mode · F8"),

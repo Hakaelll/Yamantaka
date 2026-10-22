@@ -42,6 +42,7 @@ mod reader_pane;
 mod reader_surface;
 mod reader_viewport;
 mod reading_queue;
+mod reference;
 mod relocation;
 mod render_plan;
 mod render_updates;
@@ -116,6 +117,8 @@ impl PageImage {
 }
 pub struct YamantakaApp {
     reader: reader_pane::ReaderPane,
+    reference: Option<reference::ReferenceView>,
+    preview_reference: bool,
     search: search::SearchState,
     global_notes: global_notes::GlobalNotes,
     history: history::HistoryState,
@@ -295,6 +298,8 @@ impl YamantakaApp {
             .unwrap_or(false);
         let mut app = Self {
             reader: Default::default(),
+            reference: None,
+            preview_reference: false,
             search: search::SearchState::new(
                 preferences
                     .get("globalIndexEnabled")
@@ -616,6 +621,10 @@ impl YamantakaApp {
         self.cover_picker = None;
         self.runtime.wake();
         if !matches!(surface, Surface::Reader) {
+            if self.reference.is_some() {
+                self.reader.viewport.scroll_anchor = true;
+            }
+            self.reference = None;
             self.tabs.leave_destination();
             self.reader.restoration.clear();
         }
@@ -1268,7 +1277,15 @@ impl YamantakaApp {
         if self.reader.panel && !self.reader_focus && ui.ctx().content_rect().width() < 620.0 {
             return;
         }
-        self.reader_viewport(ui, &document, &info, p);
+        if self.preview_reference && self.reader.reader_preferences.is_some() {
+            self.preview_reference = false;
+            self.toggle_reference();
+        }
+        if self.reference.is_some() {
+            self.comparison_viewport(ui, &document, &info, p);
+        } else {
+            self.reader_viewport(ui, &document, &info, p);
+        }
         self.cache_reading_context();
     }
 }
@@ -1695,7 +1712,15 @@ impl App for YamantakaApp {
                     {
                         continue;
                     }
-                    if cancel.is_some_and(|token| token.is_cancelled()) {
+                    if cancel.as_ref().is_some_and(|token| token.is_cancelled()) {
+                        continue;
+                    }
+                    if let Some(token) = &cancel
+                        && self
+                            .reference
+                            .as_mut()
+                            .is_some_and(|reference| reference.fail_render(token, &error))
+                    {
                         continue;
                     }
                     self.error = Some(error.to_string());
@@ -2188,6 +2213,7 @@ impl App for YamantakaApp {
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     && self.reader.restoration.ready()
+                    && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
                     && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.goals.ready())
                     && self.metadata_preview.is_none_or(|(_,stage)|stage==3)
                     && self.metadata.as_ref().is_none_or(|editor|editor.capture_ready())
@@ -2314,6 +2340,7 @@ impl App for YamantakaApp {
                     record["collections"]=self.collections.summary();
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
+                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
                     record["libraryCheck"]=self.library_check.summary();
@@ -2363,6 +2390,7 @@ impl App for YamantakaApp {
         self.reader.text.clear();
         self.reader.selection.clear();
         self.reader.find = Default::default();
+        self.reference = None;
         self.reader.viewport.clear();
         self.query_cancel.cancel();
         self.reader.reader_preferences_cancel.cancel();
