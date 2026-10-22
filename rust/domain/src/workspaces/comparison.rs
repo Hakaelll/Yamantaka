@@ -20,6 +20,8 @@ pub struct WorkspaceComparison {
     #[serde(default)]
     pub bidirectional: bool,
     #[serde(default)]
+    pub swapped: bool,
+    #[serde(default)]
     pub differences: std::collections::BTreeSet<u32>,
     pub primary: String,
     pub document: String,

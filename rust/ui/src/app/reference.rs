@@ -23,6 +23,7 @@ pub(super) struct ReferenceView {
     pub follow_zoom: bool,
     pub follow_position: bool,
     pub(in crate::app) bidirectional: bool,
+    pub(in crate::app) swapped: bool,
     pending_primary_page: Option<u32>,
     pending_primary_zoom: bool,
     pub(in crate::app) differences: std::collections::BTreeSet<u32>,
@@ -82,6 +83,7 @@ impl ReferenceView {
             follow_zoom: false,
             follow_position: false,
             bidirectional: false,
+            swapped: false,
             pending_primary_page: None,
             pending_primary_zoom: false,
             differences: Default::default(),
@@ -483,7 +485,12 @@ impl YamantakaApp {
             reference.pane.viewport.scroll_anchor = true;
         }
         let extent = if stacked { rect.height() } else { rect.width() };
-        let split = extent * reference.ratio;
+        let leading_ratio = if reference.swapped {
+            1.0 - reference.ratio
+        } else {
+            reference.ratio
+        };
+        let split = extent * leading_ratio;
         let mut first = rect;
         let mut second = rect;
         if stacked {
@@ -515,13 +522,14 @@ impl YamantakaApp {
             egui::CursorIcon::ResizeHorizontal
         });
         if drag.dragged() {
+            let delta = if stacked {
+                drag.drag_delta().y
+            } else {
+                drag.drag_delta().x
+            };
             reference.set_ratio(
                 reference.ratio
-                    + if stacked {
-                        drag.drag_delta().y
-                    } else {
-                        drag.drag_delta().x
-                    } / extent.max(1.0),
+                    + delta * if reference.swapped { -1.0 } else { 1.0 } / extent.max(1.0),
             );
         }
         ui.painter().line_segment(
@@ -538,12 +546,17 @@ impl YamantakaApp {
             },
             egui::Stroke::new(1.0, p.line),
         );
+        let (primary_rect, reference_rect) = if reference.swapped {
+            (second, first)
+        } else {
+            (first, second)
+        };
         ui.scope_builder(
             egui::UiBuilder::new()
-                .max_rect(first)
+                .max_rect(primary_rect)
                 .id_salt("reading-pane"),
             |ui| {
-                ui.set_clip_rect(first.intersect(ui.clip_rect()));
+                ui.set_clip_rect(primary_rect.intersect(ui.clip_rect()));
                 self.reader_viewport(ui, document, info, p);
             },
         );
@@ -557,10 +570,10 @@ impl YamantakaApp {
                 .follow_primary_position(self.reader.navigation.as_ref().map(|nav| nav.position()));
             ui.scope_builder(
                 egui::UiBuilder::new()
-                    .max_rect(second)
+                    .max_rect(reference_rect)
                     .id_salt("reference-pane"),
                 |ui| {
-                    ui.set_clip_rect(second.intersect(ui.clip_rect()));
+                    ui.set_clip_rect(reference_rect.intersect(ui.clip_rect()));
                     close = reference.show(ui, &self.runtime, bytes, self.english, p, &self.reader);
                     selected = reference.selection.take();
                     difference = reference.difference_target.take();

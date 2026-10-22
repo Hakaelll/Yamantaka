@@ -95,6 +95,7 @@ impl YamantakaApp {
                 let mut query = view.parsed_query().unwrap();
                 query.comparison = Some(yamantaka_domain::workspaces::WorkspaceComparison {
                     bidirectional: false,
+                    swapped: false,
                     differences: Default::default(),
                     layout: yamantaka_domain::workspaces::ComparisonLayout::Stacked,
                     scroll_offset: Some(80.0),

@@ -14,7 +14,7 @@ $cases = @(
     @{ name='reader-reference-password-import'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-import','--es') },
     @{ name='reader-reference-password-retry'; args=@('--reader','--reference','--reference-book','--reference-protected','--es') },
     @{ name='reader-reference-password-cancel'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-cancel','--es') },
-    @{ name='reader-reference-book'; args=@('--reader','--reference','--reference-book','--es') },
+    @{ name='reader-reference-book'; args=@('--reader','--reference','--reference-book','--reference-swap','--es') },
     @{ name='reader-reference-closed'; args=@('--reader','--reference','--reference-book','--reference-close','--es') },
     @{ name='reader-reference'; args=@('--reader','--reference','--es') },
     @{ name='reader-reference-stacked'; args=@('--reader','--reference','--size=900x700','--light','--es') },
@@ -343,14 +343,15 @@ foreach ($case in $cases) {
     if ($case.name -in @('reader-reference','reader-reference-stacked')) {
         if (-not $controls.reference -or $controls.reference.images -lt 1 -or $controls.reference.page -ne 1 -or $controls.currentReaderPage -ne 0 -or $controls.reference.document -ne 'demo-0') { throw 'Page comparison did not retain independent pages and a native reference image.' }
     }
-    if ($case.name -eq 'reader-reference-book') {
-        if ($controls.referenceAdmission.demoStage -ne 3 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.images -lt 1 -or $controls.currentReaderPage -ne 0) { throw 'The second document did not open beside the preserved primary reading.' }
-    }
     if ($case.name -eq 'reader-reference-chooser') {
         if ($controls.referenceChooser.demoStage -ne 3 -or $controls.referenceChooser.pagedRows -ne 30 -or $controls.referenceChooser.count -ne 1 -or $controls.referenceChooser.rows -ne 1 -or -not $controls.referenceChooser.outsideVisible -or $controls.libraryDocumentCount -ne 110) { throw 'Reference selection did not page and search beyond the visible main catalogue page.' }
     }
     if ($case.name -eq 'reader-reference-sync') {
         if ($controls.referenceSync.demoStage -ne 10 -or -not $controls.referenceSync.differencesConfirmed -or @($controls.reference.differences).Count -ne 1 -or $controls.reference.differences[0] -ne 1 -or -not $controls.referenceSync.reverseConfirmed -or -not $controls.reference.bidirectional -or -not $controls.referenceSync.positionConfirmed -or $controls.reference.followPosition -or -not $controls.referenceSync.linkedConfirmed -or -not $controls.reference.followZoom -or -not $controls.reference.followPage -or [Math]::Abs($controls.referenceSync.primaryScale-1.1) -gt 0.0001 -or [Math]::Abs($controls.reference.scale-1.1) -gt 0.0001 -or $controls.currentReaderPage -ne 1 -or $controls.reference.page -ne 1) { throw 'Reference page/zoom/position following or independent manual zoom did not settle correctly.' }
+    }
+    if ($case.name -eq 'reader-reference-book') {
+        $referenceClose = @($controls.controls | Where-Object { $_.label -eq 'Cerrar referencia' })
+        if ($controls.referenceAdmission.demoStage -ne 9 -or $controls.reference.images -lt 1 -or $controls.referenceAdmission.nativeCloses -ne 0 -or -not $controls.reference.swapped -or $controls.reference.document -ne 'demo-1' -or [Math]::Abs($controls.reference.scale-1.2) -gt 0.0001 -or $controls.currentReaderPage -ne 0 -or $referenceClose.Count -ne 1 -or $referenceClose[0].rect[0] -ge (($controls.viewport[2]-$controls.viewport[0])/2)) { throw 'Swapping comparison positions did not preserve both readings or place the reference on the left.' }
     }
     if ($case.name -eq 'reader-reference-closed') {
         if ($controls.referenceAdmission.demoStage -ne 5 -or $controls.referenceAdmission.nativeCloses -ne 1 -or $controls.reference -or $controls.currentReaderPage -ne 0) { throw 'Reference closure did not acknowledge one native close and preserve the primary reading.' }

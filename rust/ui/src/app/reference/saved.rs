@@ -2,6 +2,10 @@ use super::*;
 use yamantaka_domain::workspaces::WorkspaceComparison;
 
 impl ReferenceView {
+    pub(in crate::app) fn swap_positions(&mut self) {
+        self.swapped = !self.swapped;
+        self.size = egui::Vec2::ZERO;
+    }
     pub(in crate::app) fn set_ratio(&mut self, ratio: f32) {
         self.ratio = ratio.clamp(0.2, 0.8);
         self.followed_position = None;
@@ -12,6 +16,7 @@ impl ReferenceView {
         let prefs = self.pane.reader_preferences.as_ref()?;
         Some(WorkspaceComparison {
             bidirectional: self.bidirectional,
+            swapped: self.swapped,
             differences: self.differences.clone(),
             layout: self.layout,
             scroll_offset: None,
@@ -63,6 +68,8 @@ impl ReferenceView {
         self.follow_zoom = saved.follow_zoom;
         self.follow_position = saved.follow_position;
         self.bidirectional = saved.bidirectional;
+        self.swapped = saved.swapped;
+        self.size = egui::Vec2::ZERO;
         self.differences = saved.differences.clone();
         self.difference_target = None;
         self.pending_primary_page = None;

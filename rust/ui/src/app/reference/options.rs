@@ -47,6 +47,17 @@ impl ReferenceView {
                         self.layout = layout;
                     }
                 }
+                if theme::navigation(
+                    ui,
+                    tr("Intercambiar posiciones", "Swap positions"),
+                    self.swapped,
+                    p,
+                )
+                .clicked()
+                {
+                    self.swap_positions();
+                    ui.ctx().request_repaint();
+                }
                 if let Some(primary) = primary {
                     self.difference_options(ui, primary, english, p);
                 }
