@@ -110,7 +110,7 @@ impl YamantakaApp {
         let modifiers = ui.input(|input| input.modifiers);
         let keyboard_allowed = !egui::Popup::is_any_open(ui.ctx())
             && self.password.is_none()
-            && !self.links.confirmation_open()
+            && !self.reader.links.confirmation_open()
             && self.bulk_picker.is_none()
             && self.library_selection.review.is_none();
         if response.has_focus() && keyboard_allowed {
@@ -220,7 +220,7 @@ impl YamantakaApp {
     pub(super) fn library_selection_shortcuts(&mut self, ctx: &egui::Context) {
         if !matches!(self.surface, Surface::Library)
             || self.password.is_some()
-            || self.links.confirmation_open()
+            || self.reader.links.confirmation_open()
             || self.bulk_picker.is_some()
             || self.library_selection.review.is_some()
             || self.tag_dialog_open()

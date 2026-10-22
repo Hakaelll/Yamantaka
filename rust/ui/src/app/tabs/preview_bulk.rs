@@ -28,7 +28,7 @@ impl YamantakaApp {
             || self.capture.is_none()
             || self.tabs.busy()
             || self.opening.busy()
-            || self.reader_preferences_loading
+            || self.reader.reader_preferences_loading
         {
             return;
         }
@@ -38,12 +38,24 @@ impl YamantakaApp {
                 self.open(document);
                 self.tabs.bulk_preview = BulkPreview::Third;
             }
-            BulkPreview::Third if self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-2") => {
+            BulkPreview::Third
+                if self
+                    .reader
+                    .active
+                    .as_ref()
+                    .is_some_and(|(d, _)| d.id == "demo-2") =>
+            {
                 let document = self.documents[3].clone();
                 self.open(document);
                 self.tabs.bulk_preview = BulkPreview::Fourth;
             }
-            BulkPreview::Fourth if self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-3") => {
+            BulkPreview::Fourth
+                if self
+                    .reader
+                    .active
+                    .as_ref()
+                    .is_some_and(|(d, _)| d.id == "demo-3") =>
+            {
                 // Initial traversal reordered the pinned duplicate before the first reading.
                 let target = if self.tabs.preview_close == 6 {
                     self.tabs
@@ -63,8 +75,13 @@ impl YamantakaApp {
             BulkPreview::Closed
                 if self.tabs.pending.is_none()
                     && self.tabs.restoration.is_none()
-                    && self.restoration.ready()
-                    && self.viewport.pages.values().any(|p| p.image.is_some()) =>
+                    && self.reader.restoration.ready()
+                    && self
+                        .reader
+                        .viewport
+                        .pages
+                        .values()
+                        .any(|p| p.image.is_some()) =>
             {
                 self.tabs.bulk_preview = BulkPreview::Complete;
             }

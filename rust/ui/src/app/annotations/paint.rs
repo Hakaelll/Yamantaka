@@ -72,8 +72,9 @@ impl AnnotationPaint {
 }
 impl YamantakaApp {
     pub(in crate::app) fn request_annotation_marks(&mut self, document: &str, visible: &[u32]) {
-        self.annotation_paint.retain(document, visible);
+        self.reader.annotation_paint.retain(document, visible);
         let pending = self
+            .reader
             .annotation_paint
             .pages
             .values()
@@ -84,12 +85,13 @@ impl YamantakaApp {
             if available == 0 {
                 break;
             }
-            if self.annotation_paint.pages.contains_key(&page) {
+            if self.reader.annotation_paint.pages.contains_key(&page) {
                 continue;
             }
             available -= 1;
             let cancel = Cancellation::default();
-            self.annotation_paint
+            self.reader
+                .annotation_paint
                 .pages
                 .insert(page, Phase::Pending(cancel.clone()));
             let request = AnnotationMarksRequest {
@@ -102,7 +104,7 @@ impl YamantakaApp {
                 .runtime
                 .submit(Action::AnnotationMarks(Box::new(request)))
             {
-                self.annotation_paint.accept(AnnotationMarksReply {
+                self.reader.annotation_paint.accept(AnnotationMarksReply {
                     document: document.into(),
                     page,
                     result: Err(error),

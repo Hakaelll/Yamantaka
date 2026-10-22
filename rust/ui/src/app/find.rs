@@ -114,30 +114,30 @@ impl FindState {
 
 impl YamantakaApp {
     pub(super) fn toggle_reader_panel(&mut self) {
-        self.panel = !self.panel;
-        if !self.panel {
-            self.find.stop();
+        self.reader.panel = !self.reader.panel;
+        if !self.reader.panel {
+            self.reader.find.stop();
         }
     }
     pub fn preview_find(&mut self, query: &str, step: Option<bool>) {
         if self.demo && self.capture.is_some() {
-            self.panel = true;
-            self.reader_panel_tab = outline::ReaderPanelTab::Find;
-            self.find.preview = Some(query.into());
+            self.reader.panel = true;
+            self.reader.reader_panel_tab = outline::ReaderPanelTab::Find;
+            self.reader.find.preview = Some(query.into());
             self.find_preview_step = step;
         }
     }
     pub(super) fn show_find(&mut self) {
-        self.panel = true;
-        self.reader_panel_tab = outline::ReaderPanelTab::Find;
-        self.find.focus = true;
+        self.reader.panel = true;
+        self.reader.reader_panel_tab = outline::ReaderPanelTab::Find;
+        self.reader.find.focus = true;
     }
     fn submit_find(&mut self, request: FindRequest, edge: SelectionEdge, wrap: bool) {
-        self.find.stop();
+        self.reader.find.stop();
         let token = request.cancellation.clone();
         let progress = request.progress.clone();
-        self.find.document = Some(request.document_id.clone());
-        self.find.phase = match self.runtime.submit(Action::FindDocument(request)) {
+        self.reader.find.document = Some(request.document_id.clone());
+        self.reader.find.phase = match self.runtime.submit(Action::FindDocument(request)) {
             Ok(()) => FindPhase::Running {
                 token,
                 progress,
@@ -148,16 +148,16 @@ impl YamantakaApp {
         };
     }
     fn new_find(&mut self) {
-        let Some((document, info)) = &self.active else {
+        let Some((document, info)) = &self.reader.active else {
             return;
         };
         let request = PdfFindQuery::new(
-            &self.find.editor,
-            self.find.match_case,
-            self.find.whole_words,
+            &self.reader.find.editor,
+            self.reader.find.match_case,
+            self.reader.find.whole_words,
         )
         .and_then(|query| {
-            self.find.query = Some(query.clone());
+            self.reader.find.query = Some(query.clone());
             FindRequest::new(
                 document.id.clone(),
                 query,
@@ -169,13 +169,13 @@ impl YamantakaApp {
         match request {
             Ok(request) => self.submit_find(request, SelectionEdge::First, false),
             Err(error) => {
-                self.find.stop();
-                self.find.phase = FindPhase::Failed(error.to_string());
+                self.reader.find.stop();
+                self.reader.find.phase = FindPhase::Failed(error.to_string());
             }
         }
     }
     pub(super) fn choose_find_match(&mut self, index: usize) {
-        let FindPhase::Ready { batch, selected } = &mut self.find.phase else {
+        let FindPhase::Ready { batch, selected } = &mut self.reader.find.phase else {
             return;
         };
         let Some((page, item)) = batch.matches().nth(index) else {
@@ -184,6 +184,7 @@ impl YamantakaApp {
         *selected = Some(index);
         let position = item.position(page);
         let changed = self
+            .reader
             .navigation
             .as_mut()
             .is_some_and(|navigation| match position {
@@ -191,7 +192,7 @@ impl YamantakaApp {
                 None => navigation.go_to_page(page),
             });
         if changed {
-            self.viewport.scroll_anchor = true;
+            self.reader.viewport.scroll_anchor = true;
             self.apply_navigation();
         }
     }
@@ -201,20 +202,20 @@ impl YamantakaApp {
         cancel: &Cancellation,
         result: Result<FindBatch, String>,
     ) {
-        let wrap_edge = match &self.find.phase {
+        let wrap_edge = match &self.reader.find.phase {
             FindPhase::Running {
                 edge, wrap: true, ..
             } => Some(*edge),
             _ => None,
         };
-        if self.find.accept(document, cancel, result) {
+        if self.reader.find.accept(document, cancel, result) {
             if let Some(edge) = wrap_edge
-                && matches!(&self.find.phase, FindPhase::Ready { batch, .. } if batch.matches().next().is_none())
+                && matches!(&self.reader.find.phase, FindPhase::Ready { batch, .. } if batch.matches().next().is_none())
             {
                 self.wrap_find(edge);
                 return;
             }
-            let index = match &self.find.phase {
+            let index = match &self.reader.find.phase {
                 FindPhase::Ready { selected, .. } => *selected,
                 _ => None,
             };
@@ -222,7 +223,7 @@ impl YamantakaApp {
                 self.choose_find_match(index);
                 if let Some(forward) = self.find_preview_step.take() {
                     if self.find_preview_closed {
-                        self.panel = false;
+                        self.reader.panel = false;
                     }
                     self.step_find(forward);
                 }
@@ -230,10 +231,10 @@ impl YamantakaApp {
         }
     }
     fn wrap_find(&mut self, edge: SelectionEdge) {
-        let Some((document, info)) = &self.active else {
+        let Some((document, info)) = &self.reader.active else {
             return;
         };
-        let Some(query) = self.find.query.clone() else {
+        let Some(query) = self.reader.find.query.clone() else {
             return;
         };
         let request = match edge {
@@ -255,8 +256,8 @@ impl YamantakaApp {
         match request {
             Ok(request) => self.submit_find(request, edge, false),
             Err(error) => {
-                self.find.stop();
-                self.find.phase = FindPhase::Failed(error.to_string());
+                self.reader.find.stop();
+                self.reader.find.phase = FindPhase::Failed(error.to_string());
             }
         }
     }
@@ -264,7 +265,7 @@ impl YamantakaApp {
         let FindPhase::Ready {
             batch,
             selected: Some(selected),
-        } = &self.find.phase
+        } = &self.reader.find.phase
         else {
             return;
         };
@@ -278,10 +279,10 @@ impl YamantakaApp {
             self.choose_find_match(index);
             return;
         }
-        let Some((document, info)) = &self.active else {
+        let Some((document, info)) = &self.reader.active else {
             return;
         };
-        let Some(query) = self.find.query.clone() else {
+        let Some(query) = self.reader.find.query.clone() else {
             return;
         };
         let wrap = if forward {
@@ -321,14 +322,14 @@ impl YamantakaApp {
                 wrap,
             ),
             Err(error) => {
-                self.find.stop();
-                self.find.phase = FindPhase::Failed(error.to_string());
+                self.reader.find.stop();
+                self.reader.find.phase = FindPhase::Failed(error.to_string());
             }
         }
     }
     pub(super) fn find_panel_content(&mut self, ui: &mut egui::Ui, info: &PdfInfo, p: Palette) {
-        if let Some(query) = self.find.preview.take() {
-            self.find.editor = query;
+        if let Some(query) = self.reader.find.preview.take() {
+            self.reader.find.editor = query;
             self.new_find();
         }
         let compact = ui.ctx().content_rect().width() < 620.0;
@@ -343,7 +344,7 @@ impl YamantakaApp {
                 let width = (ui.available_width() - 48.0).max(40.0);
                 let response = ui.add_sized(
                     [width, 40.0],
-                    egui::TextEdit::singleline(&mut self.find.editor)
+                    egui::TextEdit::singleline(&mut self.reader.find.editor)
                         .id_salt("reader-find-query")
                         .hint_text(label)
                         .char_limit(1024),
@@ -353,31 +354,33 @@ impl YamantakaApp {
             })
             .inner;
         response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::TextEdit, true, label));
-        if self.find.focus {
+        if self.reader.find.focus {
             response.request_focus();
-            self.find.focus = false;
+            self.reader.find.focus = false;
         }
         let enter = submit_on_enter(ui, &response);
         let mut changed = response.changed();
         let case_label = self.tr("Mayúsculas", "Match case");
         let words_label = self.tr("Palabras completas", "Whole words");
         ui.horizontal_wrapped(|ui| {
-            changed |= ui.checkbox(&mut self.find.match_case, case_label).changed();
             changed |= ui
-                .checkbox(&mut self.find.whole_words, words_label)
+                .checkbox(&mut self.reader.find.match_case, case_label)
+                .changed();
+            changed |= ui
+                .checkbox(&mut self.reader.find.whole_words, words_label)
                 .changed();
         });
         if changed {
-            self.find.stop();
-            self.find.phase = FindPhase::Idle;
-            self.find.query = None;
+            self.reader.find.stop();
+            self.reader.find.phase = FindPhase::Idle;
+            self.reader.find.query = None;
         }
         ui.add_space(6.0);
         if pressed || enter {
             self.new_find();
         }
         ui.add_space(12.0);
-        match &self.find.phase {
+        match &self.reader.find.phase {
             FindPhase::Idle => {
                 ui.label(
                     RichText::new(self.tr(
@@ -413,7 +416,7 @@ impl YamantakaApp {
                 if theme::navigation(ui, self.tr("Cancelar búsqueda", "Cancel search"), false, p)
                     .clicked()
                 {
-                    self.find.stop();
+                    self.reader.find.stop();
                 }
             }
             FindPhase::Ready { batch, selected } => {
@@ -483,7 +486,7 @@ impl YamantakaApp {
                     }
                 });
                 let mut choose = None;
-                if let FindPhase::Ready { batch, .. } = &self.find.phase {
+                if let FindPhase::Ready { batch, .. } = &self.reader.find.phase {
                     egui::ScrollArea::vertical()
                         .id_salt("reader-find-results")
                         .max_height(ui.available_height().max(40.0))
@@ -519,7 +522,7 @@ impl YamantakaApp {
                 if let Some(index) = choose {
                     self.choose_find_match(index);
                     if compact {
-                        self.panel = false;
+                        self.reader.panel = false;
                     }
                 }
                 if let Some(forward) = step {
@@ -536,7 +539,7 @@ impl YamantakaApp {
         rotation: yamantaka_domain::reader_preferences::PageRotation,
         p: Palette,
     ) {
-        let FindPhase::Ready { batch, selected } = &self.find.phase else {
+        let FindPhase::Ready { batch, selected } = &self.reader.find.phase else {
             return;
         };
         for (index, (match_page, item)) in batch.matches().enumerate() {

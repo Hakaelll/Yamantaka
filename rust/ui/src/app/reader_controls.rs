@@ -5,7 +5,7 @@ impl YamantakaApp {
         if self.workspaces.open
             || self.reading_queue.open
             || self.password.is_some()
-            || self.links.confirmation_open()
+            || self.reader.links.confirmation_open()
             || self.backup_restore.open
             || self.legacy_import.open
         {
@@ -60,7 +60,7 @@ impl YamantakaApp {
                         self.refresh();
                     }
                     if ui
-                        .add_enabled_ui(self.page > 0, |ui| {
+                        .add_enabled_ui(self.reader.page > 0, |ui| {
                             theme::icon_button(
                                 ui,
                                 self.tr("Página anterior", "Previous page"),
@@ -73,7 +73,7 @@ impl YamantakaApp {
                     {
                         self.step_reader(false);
                     }
-                    let mut shown = self.page + 1;
+                    let mut shown = self.reader.page + 1;
                     let response = ui.add_sized(
                         [64.0, 40.0],
                         egui::DragValue::new(&mut shown)
@@ -91,7 +91,7 @@ impl YamantakaApp {
                         self.navigate(shown.saturating_sub(1));
                     }
                     if ui
-                        .add_enabled_ui(self.page + 1 < page_count, |ui| {
+                        .add_enabled_ui(self.reader.page + 1 < page_count, |ui| {
                             theme::icon_button(
                                 ui,
                                 self.tr("Página siguiente", "Next page"),
@@ -118,7 +118,7 @@ impl YamantakaApp {
                         ui,
                         self.tr("Navegador de lectura", "Reading navigator"),
                         theme::Icon::Panel,
-                        self.panel,
+                        self.reader.panel,
                         p,
                     )
                     .clicked()
@@ -129,14 +129,14 @@ impl YamantakaApp {
             });
     }
     pub(super) fn set_reader_zoom(&mut self, zoom: f32) {
-        if let Some(mut preferences) = self.reader_preferences.clone() {
+        if let Some(mut preferences) = self.reader.reader_preferences.clone() {
             preferences.zoom_mode = ZoomMode::Custom;
             preferences.zoom_level = zoom.clamp(0.2, 8.0) as f64;
             self.apply_reader_preferences(preferences);
             return;
         }
-        self.zoom = zoom.clamp(0.2, 8.0);
-        self.viewport.generation += 1;
+        self.reader.zoom = zoom.clamp(0.2, 8.0);
+        self.reader.viewport.generation += 1;
         self.reset_render_request();
     }
 }

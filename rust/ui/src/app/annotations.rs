@@ -320,18 +320,19 @@ impl YamantakaApp {
         if self.global_notes.writing() || self.library_tags.writing() {
             return;
         }
-        let Some((document, info)) = &self.active else {
+        let Some((document, info)) = &self.reader.active else {
             return;
         };
-        if self.page as usize >= info.pages.len() {
+        if self.reader.page as usize >= info.pages.len() {
             return;
         }
-        self.annotations.bind(&document.id);
-        self.annotations.editor = Some(AnnotationEditor {
+        self.reader.annotations.bind(&document.id);
+        self.reader.annotations.editor = Some(AnnotationEditor {
             source: EditorSource::PageNote {
-                page: self.page,
+                page: self.reader.page,
                 fingerprint: document.fingerprint.clone(),
                 rotation: self
+                    .reader
                     .reader_preferences
                     .as_ref()
                     .map_or(PageRotation::Deg0, |prefs| prefs.page_rotation),
@@ -343,14 +344,14 @@ impl YamantakaApp {
             review: AnnotationReviewState::Pending,
             confirmed: false,
         });
-        self.annotations.error = None;
-        self.panel = true;
-        self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+        self.reader.annotations.error = None;
+        self.reader.panel = true;
+        self.reader.reader_panel_tab = outline::ReaderPanelTab::Annotations;
     }
     pub fn preview_annotation_list(&mut self) {
         if self.demo && self.capture.is_some() {
-            self.panel = true;
-            self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+            self.reader.panel = true;
+            self.reader.reader_panel_tab = outline::ReaderPanelTab::Annotations;
         }
     }
     pub fn preview_page_note(&mut self, save: bool) {
@@ -367,38 +368,38 @@ impl YamantakaApp {
         }
     }
     pub(super) fn annotation_capture_summary(&self) -> serde_json::Value {
-        serde_json::json!({"studyTaggedResident":self.annotations.page.as_ref().map_or(0,|page|page.entries().iter().filter(|record|record.data().tags.iter().any(|tag|tag=="Study")).count()),"selected":self.annotations.selected.count(),"acceptedResident":self.annotations.page.as_ref().map_or(0,|page|page.entries().iter().filter(|record|record.data().values.review_state==AnnotationReviewState::Accepted).count()),"filters":{"active":self.annotations.filters.count(),"text":self.annotations.filters.text,"tag":self.annotations.filters.tag,"kind":self.annotations.filters.kind,"review":self.annotations.filters.review},"resident":self.annotations.page.as_ref().map_or(0,|page|page.entries().len()),"total":self.annotations.page.as_ref().map_or(0,|page|page.total),"pending":self.annotations.pending.is_some(),"editing":self.annotations.editor.is_some(),"fallback":self.annotations.fallback(),"saved":self.annotations.saved})
+        serde_json::json!({"studyTaggedResident":self.reader.annotations.page.as_ref().map_or(0,|page|page.entries().iter().filter(|record|record.data().tags.iter().any(|tag|tag=="Study")).count()),"selected":self.reader.annotations.selected.count(),"acceptedResident":self.reader.annotations.page.as_ref().map_or(0,|page|page.entries().iter().filter(|record|record.data().values.review_state==AnnotationReviewState::Accepted).count()),"filters":{"active":self.reader.annotations.filters.count(),"text":self.reader.annotations.filters.text,"tag":self.reader.annotations.filters.tag,"kind":self.reader.annotations.filters.kind,"review":self.reader.annotations.filters.review},"resident":self.reader.annotations.page.as_ref().map_or(0,|page|page.entries().len()),"total":self.reader.annotations.page.as_ref().map_or(0,|page|page.total),"pending":self.reader.annotations.pending.is_some(),"editing":self.reader.annotations.editor.is_some(),"fallback":self.reader.annotations.fallback(),"saved":self.reader.annotations.saved})
     }
     pub(super) fn apply_annotation_preview(&mut self) {
         if self.annotation_preview == 0 {
             return;
         }
-        if matches!(self.annotation_preview, 4 | 5) && self.annotations.editor.is_none() {
+        if matches!(self.annotation_preview, 4 | 5) && self.reader.annotations.editor.is_none() {
             self.begin_page_note();
-            if let Some(editor) = &mut self.annotations.editor {
+            if let Some(editor) = &mut self.reader.annotations.editor {
                 editor.note = "An observation from this scanned page.".into();
                 editor.tags = "Study, Optics".into();
             }
         }
         if matches!(self.annotation_preview, 1 | 2)
-            && self.annotations.editor.is_none()
+            && self.reader.annotations.editor.is_none()
             && self.selection_preview == selection::SelectionPreview::Complete
-            && self.selection.preview_ready()
+            && self.reader.selection.preview_ready()
         {
-            if self.annotation_multi_preview && !self.selection.extend_preview(1) {
+            if self.annotation_multi_preview && !self.reader.selection.extend_preview(1) {
                 return;
             }
             self.annotate_selection();
-            if let Some(editor) = &mut self.annotations.editor {
+            if let Some(editor) = &mut self.reader.annotations.editor {
                 editor.note = "A passage to revisit during study.".into();
                 editor.tags = "Study, Optics".into();
             }
         }
-        if self.annotations.editor.is_some() && self.annotations.pending.is_none() {
+        if self.reader.annotations.editor.is_some() && self.reader.annotations.pending.is_none() {
             if matches!(self.annotation_preview, 1 | 4) {
                 self.annotation_preview = 0;
             } else if matches!(self.annotation_preview, 2 | 5) {
-                match self.annotations.mutation(&self.governor) {
+                match self.reader.annotations.mutation(&self.governor) {
                     Ok(change) => {
                         self.annotation_command(Some(change), 0);
                         self.annotation_preview = 3;
@@ -411,10 +412,10 @@ impl YamantakaApp {
             }
         }
         if self.annotation_preview == 3
-            && self.annotations.pending.is_none()
-            && self.annotations.saved
+            && self.reader.annotations.pending.is_none()
+            && self.reader.annotations.saved
         {
-            self.selection.clear();
+            self.reader.selection.clear();
             self.selection_preview = selection::SelectionPreview::Off;
             self.annotation_preview = 0;
         }
@@ -423,13 +424,17 @@ impl YamantakaApp {
         if mutation.is_some() && (self.global_notes.writing() || self.library_tags.writing()) {
             return;
         }
-        let Some(request) = self.annotations.request(&self.governor, mutation, offset) else {
+        let Some(request) = self
+            .reader
+            .annotations
+            .request(&self.governor, mutation, offset)
+        else {
             return;
         };
         let document_id = request.query.document_id.clone();
         let cancel = request.cancel.clone();
         if let Err(error) = self.runtime.submit(Action::Annotation(Box::new(request))) {
-            self.annotations.accept(AnnotationReply {
+            self.reader.annotations.accept(AnnotationReply {
                 document_id,
                 result: Err(error),
                 cancel,
@@ -440,17 +445,18 @@ impl YamantakaApp {
         if self.global_notes.writing() || self.library_tags.writing() {
             return;
         }
-        let Some((document, _)) = &self.active else {
+        let Some((document, _)) = &self.reader.active else {
             return;
         };
-        match self.selection.annotation_source(&self.governor) {
+        match self.reader.selection.annotation_source(&self.governor) {
             Ok(snapshot) => {
-                self.annotations.bind(&document.id);
-                self.annotations.editor = Some(AnnotationEditor {
+                self.reader.annotations.bind(&document.id);
+                self.reader.annotations.editor = Some(AnnotationEditor {
                     source: EditorSource::Selection {
                         snapshot,
                         fingerprint: document.fingerprint.clone(),
                         rotation: self
+                            .reader
                             .reader_preferences
                             .as_ref()
                             .map_or(PageRotation::Deg0, |prefs| prefs.page_rotation),
@@ -462,9 +468,9 @@ impl YamantakaApp {
                     review: AnnotationReviewState::Pending,
                     confirmed: false,
                 });
-                self.annotations.error = None;
-                self.panel = true;
-                self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+                self.reader.annotations.error = None;
+                self.reader.panel = true;
+                self.reader.reader_panel_tab = outline::ReaderPanelTab::Annotations;
             }
             Err(error) => self.error = Some(error.to_string()),
         }

@@ -141,7 +141,10 @@ impl YamantakaApp {
                 self.workspaces.open = true;
                 self.workspace_request(WorkspaceCommand::Load(find("Reference copy")));
             }
-            8 if self.active.is_some() && self.tabs.ready() && !self.reader_preferences_loading => {
+            8 if self.reader.active.is_some()
+                && self.tabs.ready()
+                && !self.reader.reader_preferences_loading =>
+            {
                 assert_eq!(self.query, "Architecture");
                 assert!(self.list && self.reader_focus && self.workspaces.binding.is_some());
                 assert!(self.grouping.mode == super::super::library_grouping::Grouping::Author);
@@ -156,7 +159,11 @@ impl YamantakaApp {
                 self.reader_focus = false;
                 assert_eq!(self.tabs.model.tabs().len(), 3);
                 assert_eq!(
-                    self.reader_preferences.as_ref().unwrap().page_rotation,
+                    self.reader
+                        .reader_preferences
+                        .as_ref()
+                        .unwrap()
+                        .page_rotation,
                     PageRotation::Deg90
                 );
                 self.workspaces.preview = 9;

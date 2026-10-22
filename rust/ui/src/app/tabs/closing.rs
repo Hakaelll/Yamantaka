@@ -49,7 +49,7 @@ impl YamantakaApp {
             return;
         };
         let active = self.tabs.model.active().is_some_and(|t| t.id() == id);
-        if active && self.annotations.editing() {
+        if active && self.reader.annotations.editing() {
             self.error = Some(
                 self.tr(
                     "Termina o cancela la nota antes de cerrar la lectura.",
@@ -100,7 +100,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn request_empty_tab_plan(&mut self, plan: DocumentTabs) -> bool {
-        if let Some((document, _)) = &self.active {
+        if let Some((document, _)) = &self.reader.active {
             let document = document.id.clone();
             self.cache_reading_context();
             if let Err(error) = self.validate_reading_session_context() {
@@ -199,10 +199,10 @@ impl YamantakaApp {
                 self.tabs.refresh_plan_context(&mut plan);
                 self.tabs.model = plan;
                 self.replace_reader_state(Cancellation::default());
-                self.reader_preferences_loading = false;
-                self.restoration.clear();
-                self.active = None;
-                self.navigation = None;
+                self.reader.reader_preferences_loading = false;
+                self.reader.restoration.clear();
+                self.reader.active = None;
+                self.reader.navigation = None;
                 self.show_surface(Surface::Library);
                 self.refresh();
             }

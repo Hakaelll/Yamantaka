@@ -65,26 +65,26 @@ impl BookmarkState {
 
 impl YamantakaApp {
     fn bookmark_command(&mut self, offset: usize, change: Option<BookmarkChange>) {
-        if self.bookmarks.pending.is_some() {
+        if self.reader.bookmarks.pending.is_some() {
             return;
         }
-        let Some(document) = self.bookmarks.document.clone() else {
+        let Some(document) = self.reader.bookmarks.document.clone() else {
             return;
         };
         let cancel = Cancellation::default();
         let writing = change.is_some();
-        self.bookmarks.clear_edit = self.bookmarks.editing.as_ref().is_some_and(|editing| {
+        self.reader.bookmarks.clear_edit = self.reader.bookmarks.editing.as_ref().is_some_and(|editing| {
             matches!(&change, Some(BookmarkChange::Rename { id, .. } | BookmarkChange::Remove { id }) if id == &editing.id)
         });
         let action = match change {
             Some(change) => Action::ChangeBookmark(document, change, offset, cancel.clone()),
             None => Action::Bookmarks(document, offset, cancel.clone()),
         };
-        self.bookmarks.error = None;
-        self.bookmarks.saved = false;
+        self.reader.bookmarks.error = None;
+        self.reader.bookmarks.saved = false;
         match self.runtime.submit(action) {
-            Ok(()) => self.bookmarks.pending = Some((cancel, writing)),
-            Err(error) => self.bookmarks.error = Some(error.to_string()),
+            Ok(()) => self.reader.bookmarks.pending = Some((cancel, writing)),
+            Err(error) => self.reader.bookmarks.error = Some(error.to_string()),
         }
     }
 
@@ -96,32 +96,32 @@ impl YamantakaApp {
         p: Palette,
     ) {
         self.prepare_annotations(&document.id);
-        if !self.panel {
-            self.text.clear();
-            self.thumbnails.clear();
+        if !self.reader.panel {
+            self.reader.text.clear();
+            self.reader.thumbnails.clear();
             return;
         }
-        if self.reader_panel_tab != outline::ReaderPanelTab::Thumbnails {
-            self.thumbnails.clear();
+        if self.reader.reader_panel_tab != outline::ReaderPanelTab::Thumbnails {
+            self.reader.thumbnails.clear();
         }
-        if self.bookmarks.bind(&document.id)
-            && (self.reader_panel_tab == outline::ReaderPanelTab::Bookmarks)
+        if self.reader.bookmarks.bind(&document.id)
+            && (self.reader.reader_panel_tab == outline::ReaderPanelTab::Bookmarks)
         {
             self.bookmark_command(0, None);
         }
-        if (self.reader_panel_tab == outline::ReaderPanelTab::Bookmarks)
-            && self.bookmarks.page.is_none()
-            && self.bookmarks.pending.is_none()
-            && self.bookmarks.error.is_none()
+        if (self.reader.reader_panel_tab == outline::ReaderPanelTab::Bookmarks)
+            && self.reader.bookmarks.page.is_none()
+            && self.reader.bookmarks.pending.is_none()
+            && self.reader.bookmarks.error.is_none()
         {
             self.bookmark_command(0, None);
         }
-        if self.reader_panel_tab == outline::ReaderPanelTab::Text {
+        if self.reader.reader_panel_tab == outline::ReaderPanelTab::Text {
             self.request_page_text(&document.id);
         } else {
-            self.text.clear();
+            self.reader.text.clear();
         }
-        if self.reader_panel_tab == outline::ReaderPanelTab::Outline {
+        if self.reader.reader_panel_tab == outline::ReaderPanelTab::Outline {
             self.request_outline(&document.id);
         }
         // Narrow windows use the same scrollable content as a full-width drawer,
@@ -143,7 +143,7 @@ impl YamantakaApp {
     }
 
     fn reader_panel_content(&mut self, ui: &mut egui::Ui, info: &PdfInfo, p: Palette) {
-        let previous_tab = self.reader_panel_tab;
+        let previous_tab = self.reader.reader_panel_tab;
         let compact = ui.ctx().content_rect().width() < 620.0;
         let tabs = [
             (outline::ReaderPanelTab::Outline, "Índice", "Contents"),
@@ -160,7 +160,7 @@ impl YamantakaApp {
         if compact {
             let selected = tabs
                 .iter()
-                .find(|(tab, _, _)| *tab == self.reader_panel_tab)
+                .find(|(tab, _, _)| *tab == self.reader.reader_panel_tab)
                 .unwrap();
             egui::ComboBox::from_id_salt("reader-panel-section")
                 .selected_text(self.tr(selected.1, selected.2))
@@ -168,16 +168,21 @@ impl YamantakaApp {
                 .show_ui(ui, |ui| {
                     for (tab, es, en) in tabs {
                         let label = self.tr(es, en);
-                        ui.selectable_value(&mut self.reader_panel_tab, tab, label);
+                        ui.selectable_value(&mut self.reader.reader_panel_tab, tab, label);
                     }
                 });
         } else {
             ui.horizontal_wrapped(|ui| {
                 for (tab, es, en) in tabs {
-                    if theme::navigation(ui, self.tr(es, en), self.reader_panel_tab == tab, p)
-                        .clicked()
+                    if theme::navigation(
+                        ui,
+                        self.tr(es, en),
+                        self.reader.reader_panel_tab == tab,
+                        p,
+                    )
+                    .clicked()
                     {
-                        self.reader_panel_tab = tab;
+                        self.reader.reader_panel_tab = tab;
                     }
                 }
                 if theme::icon_button(
@@ -188,16 +193,16 @@ impl YamantakaApp {
                 )
                 .clicked()
                 {
-                    self.panel = false;
-                    self.find.stop();
+                    self.reader.panel = false;
+                    self.reader.find.stop();
                 }
             });
         }
-        if previous_tab != self.reader_panel_tab {
-            self.find.stop();
+        if previous_tab != self.reader.reader_panel_tab {
+            self.reader.find.stop();
         }
         ui.add_space(
-            if compact && self.reader_panel_tab == outline::ReaderPanelTab::Text {
+            if compact && self.reader.reader_panel_tab == outline::ReaderPanelTab::Text {
                 4.0
             } else if compact {
                 8.0
@@ -205,24 +210,24 @@ impl YamantakaApp {
                 18.0
             },
         );
-        if self.reader_panel_tab == outline::ReaderPanelTab::Annotations {
+        if self.reader.reader_panel_tab == outline::ReaderPanelTab::Annotations {
             self.annotation_panel(ui, info, p);
             return;
         }
-        if self.reader_panel_tab == outline::ReaderPanelTab::Find {
+        if self.reader.reader_panel_tab == outline::ReaderPanelTab::Find {
             self.find_panel_content(ui, info, p);
             return;
         }
-        if self.reader_panel_tab == outline::ReaderPanelTab::Text {
+        if self.reader.reader_panel_tab == outline::ReaderPanelTab::Text {
             self.text_panel_content(ui, p);
             return;
         }
-        self.text.clear();
-        if self.reader_panel_tab == outline::ReaderPanelTab::Thumbnails {
+        self.reader.text.clear();
+        if self.reader.reader_panel_tab == outline::ReaderPanelTab::Thumbnails {
             self.thumbnails_panel_content(ui, info, p);
             return;
         }
-        if self.reader_panel_tab == outline::ReaderPanelTab::Outline {
+        if self.reader.reader_panel_tab == outline::ReaderPanelTab::Outline {
             self.outline_panel_content(ui, p);
             return;
         }
@@ -240,33 +245,44 @@ impl YamantakaApp {
             );
             ui.add_space(14.0);
         }
-        let busy = self.bookmarks.pending.is_some();
-        let offset = self.bookmarks.page.as_ref().map_or(0, |page| page.offset);
+        let busy = self.reader.bookmarks.pending.is_some();
+        let offset = self
+            .reader
+            .bookmarks
+            .page
+            .as_ref()
+            .map_or(0, |page| page.offset);
         let add = format!(
             "{} {}",
             self.tr("Guardar página", "Bookmark page"),
-            u64::from(self.page) + 1
+            u64::from(self.reader.page) + 1
         );
         if ui
-            .add_enabled_ui(!busy && (self.page as usize) < info.pages.len(), |ui| {
-                theme::control(ui, &add, Some(theme::Icon::Add), false, true, p)
-            })
+            .add_enabled_ui(
+                !busy && (self.reader.page as usize) < info.pages.len(),
+                |ui| theme::control(ui, &add, Some(theme::Icon::Add), false, true, p),
+            )
             .inner
             .clicked()
         {
-            self.bookmark_command(offset, Some(BookmarkChange::Ensure { page: self.page }));
+            self.bookmark_command(
+                offset,
+                Some(BookmarkChange::Ensure {
+                    page: self.reader.page,
+                }),
+            );
         }
         if busy {
             ui.label(
                 RichText::new(self.tr("Actualizando marcadores…", "Updating bookmarks…"))
                     .color(p.secondary),
             );
-        } else if self.bookmarks.saved {
+        } else if self.reader.bookmarks.saved {
             ui.label(
                 RichText::new(self.tr("Cambios guardados.", "Changes saved.")).color(p.secondary),
             );
         }
-        if let Some(error) = self.bookmarks.error.clone() {
+        if let Some(error) = self.reader.bookmarks.error.clone() {
             ui.label(self.tr(
                 "No se pudieron actualizar los marcadores.",
                 "Bookmarks could not be updated.",
@@ -280,7 +296,7 @@ impl YamantakaApp {
                 self.bookmark_command(offset, None);
             }
         }
-        if let Some(editing) = self.bookmarks.editing.clone() {
+        if let Some(editing) = self.reader.bookmarks.editing.clone() {
             ui.add_space(16.0);
             let label = ui.label(format!(
                 "{} {}",
@@ -289,7 +305,7 @@ impl YamantakaApp {
             ));
             ui.add_enabled(
                 !busy,
-                egui::TextEdit::singleline(&mut self.bookmarks.label)
+                egui::TextEdit::singleline(&mut self.reader.bookmarks.label)
                     .desired_width(f32::INFINITY)
                     .char_limit(4096),
             )
@@ -306,19 +322,19 @@ impl YamantakaApp {
                         offset,
                         Some(BookmarkChange::Rename {
                             id: editing.id,
-                            label: Some(self.bookmarks.label.clone()),
+                            label: Some(self.reader.bookmarks.label.clone()),
                         }),
                     );
                 }
                 if !busy && theme::navigation(ui, self.tr("Cancelar", "Cancel"), false, p).clicked()
                 {
-                    self.bookmarks.editing = None;
-                    self.bookmarks.label.clear();
+                    self.reader.bookmarks.editing = None;
+                    self.reader.bookmarks.label.clear();
                 }
             });
         }
         ui.add_space(20.0);
-        let Some(page) = self.bookmarks.page.clone() else {
+        let Some(page) = self.reader.bookmarks.page.clone() else {
             return;
         };
         if page.total == 0 {
@@ -348,14 +364,19 @@ impl YamantakaApp {
                     );
                     if ui
                         .add_enabled_ui(valid, |ui| {
-                            theme::navigation(ui, &caption, self.page == bookmark.page_index, p)
+                            theme::navigation(
+                                ui,
+                                &caption,
+                                self.reader.page == bookmark.page_index,
+                                p,
+                            )
                         })
                         .inner
                         .clicked()
                     {
                         self.navigate(bookmark.page_index);
                         if ui.ctx().content_rect().width() < 620.0 {
-                            self.panel = false;
+                            self.reader.panel = false;
                         }
                     }
                     if ui
@@ -365,8 +386,8 @@ impl YamantakaApp {
                         .inner
                         .clicked()
                     {
-                        self.bookmarks.label = bookmark.label.clone().unwrap_or_default();
-                        self.bookmarks.editing = Some(bookmark.clone());
+                        self.reader.bookmarks.label = bookmark.label.clone().unwrap_or_default();
+                        self.reader.bookmarks.editing = Some(bookmark.clone());
                     }
                     if ui
                         .add_enabled_ui(!busy, |ui| {

@@ -43,7 +43,7 @@ impl YamantakaApp {
         if self.workspaces.pending.is_some()
             || self.tabs.busy()
             || self.opening.busy()
-            || self.reader_preferences_loading
+            || self.reader.reader_preferences_loading
         {
             return;
         }
@@ -79,7 +79,7 @@ impl YamantakaApp {
         if self.continuity_available_for_workspace().is_none()
             || self.tabs.busy()
             || self.opening.busy()
-            || self.reader_preferences_loading
+            || self.reader.reader_preferences_loading
         {
             return;
         }
@@ -104,7 +104,7 @@ impl YamantakaApp {
                 focus: saved.view.focus,
                 paused: false,
             });
-        } else if unchanged && self.tabs.model.tabs().is_empty() && self.active.is_none() {
+        } else if unchanged && self.tabs.model.tabs().is_empty() && self.reader.active.is_none() {
             self.open_saved_workspace(*saved);
         }
     }

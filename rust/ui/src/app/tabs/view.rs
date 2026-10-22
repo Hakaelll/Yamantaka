@@ -36,7 +36,7 @@ impl YamantakaApp {
             !(self.library_selection.removing()
                 || self.tabs.busy()
                 || self.opening.busy()
-                || self.reader_preferences_loading),
+                || self.reader.reader_preferences_loading),
             |ui| {
                 for (id, title, pinned) in &entries {
                     if ui

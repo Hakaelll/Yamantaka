@@ -118,11 +118,11 @@ impl YamantakaApp {
         }
         match self.opening.preview {
             ReplacementPreview::Configure
-                if self.active.is_some()
-                    && self.reader_preferences.is_some()
+                if self.reader.active.is_some()
+                    && self.reader.reader_preferences.is_some()
                     && !self.opening.busy() =>
             {
-                let mut preferences = self.reader_preferences.clone().unwrap();
+                let mut preferences = self.reader.reader_preferences.clone().unwrap();
                 preferences.zoom_mode = ZoomMode::Custom;
                 preferences.zoom_level = 1.75;
                 preferences.page_layout = yamantaka_domain::PageLayout::Continuous;
@@ -130,13 +130,14 @@ impl YamantakaApp {
                 preferences.scroll_offset = 1500.0;
                 self.apply_reader_preferences(preferences);
                 self.navigate(1);
-                self.restoration.scroll = Some(1500.0);
+                self.reader.restoration.scroll = Some(1500.0);
                 self.opening.preview = ReplacementPreview::Settling;
             }
             ReplacementPreview::Settling
-                if !self.loading
-                    && self.restoration.ready()
+                if !self.reader.loading
+                    && self.reader.restoration.ready()
                     && self
+                        .reader
                         .viewport
                         .pages
                         .values()
@@ -159,32 +160,17 @@ impl YamantakaApp {
         }
     }
     pub(super) fn replace_reader_state(&mut self, preferences: Cancellation) {
-        self.links.clear();
-        self.annotation_paint.invalidate();
-        self.text.clear();
-        self.selection.clear();
-        self.thumbnails.clear();
-        let preview = self.find.take_preview();
-        self.find = Default::default();
-        self.find.restore_preview(preview);
-        self.reader_destination = None;
-        self.outline = Default::default();
+        self.reader.prepare_replacement(preferences);
         self.password = None;
         self.password_attempted = false;
-        self.reader_preferences_cancel.cancel();
-        self.reader_preferences_cancel = preferences;
-        self.reader_preferences = None;
-        self.reader_preferences_loading = true;
-        self.viewport.clear();
-        self.viewport.generation += 1;
     }
     pub(super) fn cancel_reader_opening(&mut self) {
         self.tabs.cancel();
         self.opening.cancel();
-        self.restoration.clear();
+        self.reader.restoration.clear();
         self.open_intent.leave_destination();
         self.password = None;
         self.password_attempted = false;
-        self.loading = false;
+        self.reader.loading = false;
     }
 }

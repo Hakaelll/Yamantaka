@@ -217,8 +217,8 @@ impl YamantakaApp {
             None
         };
         if self.global_notes.accept(reply) {
-            self.annotations.invalidate_records();
-            self.annotation_paint.invalidate();
+            self.reader.annotations.invalidate_records();
+            self.reader.annotation_paint.invalidate();
         }
         if let Some(error) = failure {
             self.error = Some(format!(
@@ -238,8 +238,8 @@ impl YamantakaApp {
         if mutation.is_some()
             && (self.library_selection.removing()
                 || self.library_tags.writing()
-                || self.annotations.editing()
-                || self.annotations.writing())
+                || self.reader.annotations.editing()
+                || self.reader.annotations.writing())
         {
             return;
         }
@@ -427,7 +427,7 @@ impl YamantakaApp {
             });
     }
     fn activate_global_note(&mut self, id: String, page: u32) {
-        if self.annotations.editing() {
+        if self.reader.annotations.editing() {
             return;
         }
         let cancel = self.open_intent.lookup(id.clone(), Some(page));
@@ -435,10 +435,10 @@ impl YamantakaApp {
     }
     fn global_notes_actions(&mut self, ui: &mut egui::Ui, p: Palette, offset: usize) {
         let enabled = self.global_notes.pending.is_none()
-            && !self.annotations.editing()
-            && !self.annotations.writing()
+            && !self.reader.annotations.editing()
+            && !self.reader.annotations.writing()
             && !self.library_tags.writing();
-        if self.annotations.editing() {
+        if self.reader.annotations.editing() {
             ui.label(self.tr(
                 "Termina o cancela tu nota en el lector para editar estas notas.",
                 "Finish or cancel your note in the reader to edit these notes.",

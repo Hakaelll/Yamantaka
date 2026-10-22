@@ -93,16 +93,17 @@ impl YamantakaApp {
         })
     }
     pub(super) fn cache_reading_context(&mut self) {
-        if let (Some((document, _)), Some(preferences)) = (&self.active, &self.reader_preferences)
+        if let (Some((document, _)), Some(preferences)) =
+            (&self.reader.active, &self.reader.reader_preferences)
             && self.sessions.lifecycle.current_document() == Some(document.id.as_str())
             && preferences.document_id == document.id
         {
             self.sessions.snapshot = Some((
-                self.page,
+                self.reader.page,
                 reading_context(
                     preferences,
-                    self.viewport.scale,
-                    self.panel.then_some(self.reader_panel_tab),
+                    self.reader.viewport.scale,
+                    self.reader.panel.then_some(self.reader.reader_panel_tab),
                 ),
             ));
         }
@@ -178,9 +179,9 @@ impl YamantakaApp {
                 self.error = Some(error.to_string());
             }
         } else if self.sessions.lifecycle.current_document().is_none()
-            && !self.reader_preferences_loading
+            && !self.reader.reader_preferences_loading
             && let (Some((document, _)), Some(preferences)) =
-                (&self.active, &self.reader_preferences)
+                (&self.reader.active, &self.reader.reader_preferences)
             && preferences.document_id == document.id
             && !self.library_selection.removing_document(&document.id)
         {
@@ -190,7 +191,7 @@ impl YamantakaApp {
                     id: &id,
                     document: &document.id,
                     started_at: &self.sessions.timestamp(),
-                    page: self.page,
+                    page: self.reader.page,
                 },
                 self.sessions.origin.elapsed(),
                 self.reader_is_visible(ctx),

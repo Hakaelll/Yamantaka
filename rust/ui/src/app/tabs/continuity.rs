@@ -86,7 +86,9 @@ impl YamantakaApp {
             }
         };
         if (!restored.tabs().is_empty() || !restored.closed().is_empty())
-            && (self.active.is_some() || self.opening.busy() || !self.tabs.model.tabs().is_empty())
+            && (self.reader.active.is_some()
+                || self.opening.busy()
+                || !self.tabs.model.tabs().is_empty())
         {
             self.error = Some(self.tr("La lectura actual tiene prioridad. La sesión anterior se conserva para su recuperación.", "The current reading takes priority. The previous session is preserved for recovery.").into());
             return;

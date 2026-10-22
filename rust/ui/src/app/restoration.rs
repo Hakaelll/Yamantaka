@@ -37,24 +37,24 @@ impl RestorationState {
 }
 impl YamantakaApp {
     pub(super) fn restoration_summary(&self) -> serde_json::Value {
-        serde_json::json!({"pending":self.restoration.pending.is_some(),"scrollPending":self.restoration.scroll,"panelOpen":self.panel,"preferences":self.reader_preferences.as_ref().map(|preferences|serde_json::json!({"document":preferences.document_id,"zoom":preferences.zoom_level,"layout":preferences.persisted_layout_name(),"mode":preferences.view_mode.persisted_name(),"theme":preferences.reading_theme.persisted_name(),"scroll":preferences.scroll_offset}))})
+        serde_json::json!({"pending":self.reader.restoration.pending.is_some(),"scrollPending":self.reader.restoration.scroll,"panelOpen":self.reader.panel,"preferences":self.reader.reader_preferences.as_ref().map(|preferences|serde_json::json!({"document":preferences.document_id,"zoom":preferences.zoom_level,"layout":preferences.persisted_layout_name(),"mode":preferences.view_mode.persisted_name(),"theme":preferences.reading_theme.persisted_name(),"scroll":preferences.scroll_offset}))})
     }
     pub(super) fn restore_loaded_preferences(
         &mut self,
         preferences: ReaderPreferences,
     ) -> ReaderPreferences {
-        let Some(context) = self
-            .restoration
-            .take(&preferences.document_id, &self.reader_preferences_cancel)
-        else {
+        let Some(context) = self.reader.restoration.take(
+            &preferences.document_id,
+            &self.reader.reader_preferences_cancel,
+        ) else {
             return preferences;
         };
         match context.apply(&preferences) {
             Ok(restored) => {
-                self.restoration.scroll = Some(restored.scroll_offset);
-                self.panel = context.panel().is_some();
+                self.reader.restoration.scroll = Some(restored.scroll_offset);
+                self.reader.panel = context.panel().is_some();
                 if let Some(panel) = context.panel() {
-                    self.reader_panel_tab = match panel {
+                    self.reader.reader_panel_tab = match panel {
                         SessionPanel::Outline => outline::ReaderPanelTab::Outline,
                         SessionPanel::Thumbnails => outline::ReaderPanelTab::Thumbnails,
                         SessionPanel::Search => outline::ReaderPanelTab::Find,

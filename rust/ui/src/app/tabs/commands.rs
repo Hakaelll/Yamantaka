@@ -2,14 +2,18 @@ use super::*;
 
 impl YamantakaApp {
     pub(in crate::app) fn sync_tab_context(&mut self) {
-        let (Some((document, _)), Some(preferences)) = (&self.active, &self.reader_preferences)
+        let (Some((document, _)), Some(preferences)) =
+            (&self.reader.active, &self.reader.reader_preferences)
         else {
             return;
         };
-        if preferences.document_id != document.id || self.reader_preferences_loading {
+        if preferences.document_id != document.id || self.reader.reader_preferences_loading {
             return;
         }
-        let panel = self.panel.then(|| session_panel(self.reader_panel_tab));
+        let panel = self
+            .reader
+            .panel
+            .then(|| session_panel(self.reader.reader_panel_tab));
         if !self
             .tabs
             .model
@@ -19,7 +23,7 @@ impl YamantakaApp {
             let tab = ReaderTab::new(
                 uuid::Uuid::new_v4().to_string(),
                 document.id.clone(),
-                self.page,
+                self.reader.page,
                 preferences.clone(),
                 panel,
             );
@@ -31,10 +35,10 @@ impl YamantakaApp {
                 }
             }
         }
-        if let Err(error) = self
-            .tabs
-            .model
-            .update_active(self.page, preferences.clone(), panel)
+        if let Err(error) =
+            self.tabs
+                .model
+                .update_active(self.reader.page, preferences.clone(), panel)
         {
             self.error = Some(error.to_string());
         }
@@ -74,7 +78,7 @@ impl YamantakaApp {
             self.error = Some(error.to_string());
             return false;
         }
-        if self.annotations.editing() {
+        if self.reader.annotations.editing() {
             self.error = Some(
                 self.tr(
                     "Termina o cancela la nota antes de cambiar de lectura.",
@@ -88,15 +92,17 @@ impl YamantakaApp {
             return self.request_empty_tab_plan(plan);
         };
         if self
+            .reader
             .active
             .as_ref()
             .is_some_and(|(d, _)| d.id == target.document())
-            && self.reader_preferences.is_some()
+            && self.reader.reader_preferences.is_some()
         {
             self.cancel_reader_opening();
             self.tabs.begin(plan, Cancellation::default());
-            self.tabs.adopt(self.reader_preferences_cancel.clone());
-            let preferences = self.reader_preferences.clone().unwrap();
+            self.tabs
+                .adopt(self.reader.reader_preferences_cancel.clone());
+            let preferences = self.reader.reader_preferences.clone().unwrap();
             self.navigate(target.page());
             self.load_reader_preferences(preferences);
             self.show_surface(Surface::Reader);
@@ -185,17 +191,17 @@ impl YamantakaApp {
         &mut self,
         preferences: ReaderPreferences,
     ) -> ReaderPreferences {
-        let Some(tab) = self
-            .tabs
-            .take_restoration(&preferences.document_id, &self.reader_preferences_cancel)
-        else {
+        let Some(tab) = self.tabs.take_restoration(
+            &preferences.document_id,
+            &self.reader.reader_preferences_cancel,
+        ) else {
             return preferences;
         };
-        self.panel = tab.panel().is_some();
+        self.reader.panel = tab.panel().is_some();
         if let Some(panel) = tab.panel() {
-            self.reader_panel_tab = reader_panel(panel);
+            self.reader.reader_panel_tab = reader_panel(panel);
         }
-        self.restoration.scroll = Some(tab.preferences().scroll_offset);
+        self.reader.restoration.scroll = Some(tab.preferences().scroll_offset);
         tab.preferences().clone()
     }
 }

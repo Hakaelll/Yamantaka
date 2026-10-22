@@ -147,7 +147,7 @@ impl YamantakaApp {
         let active = self.tabs.model.active().map(|tab| tab.id().to_owned());
         let busy = self.tabs.busy()
             || self.opening.busy()
-            || self.reader_preferences_loading
+            || self.reader.reader_preferences_loading
             || self.library_selection.removing();
         let modal = egui::Modal::new(egui::Id::new("reading-queue"))
             .frame(

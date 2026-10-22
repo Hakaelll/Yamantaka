@@ -16,8 +16,8 @@ impl YamantakaApp {
         page: &RenderedPage,
         cancel: &Cancellation,
     ) {
-        let reader = self.viewport.accepts(page, cancel);
-        let thumbnail = self.thumbnails.accepts(page, cancel);
+        let reader = self.reader.viewport.accepts(page, cancel);
+        let thumbnail = self.reader.thumbnails.accepts(page, cancel);
         if !reader && !thumbnail {
             return;
         }
@@ -35,11 +35,11 @@ impl YamantakaApp {
             )))
         };
         if thumbnail {
-            self.thumbnails.install(page, cancel, replacement);
+            self.reader.thumbnails.install(page, cancel, replacement);
         } else {
             match replacement {
                 Ok(image) => {
-                    if let Some(replaced) = self.viewport.install(page, cancel, image) {
+                    if let Some(replaced) = self.reader.viewport.install(page, cancel, image) {
                         if self.capture.is_some() && self.capture_render_events.len() < 128 {
                             self.capture_render_events.push(serde_json::json!({
                                 "event":"installed","document":page.key.document_id,
@@ -52,10 +52,10 @@ impl YamantakaApp {
                 }
                 Err(error) => {
                     self.error = Some(error.to_string());
-                    self.viewport.retry = true;
+                    self.reader.viewport.retry = true;
                 }
             }
-            self.loading = false;
+            self.reader.loading = false;
         }
     }
 }

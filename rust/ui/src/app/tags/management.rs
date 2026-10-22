@@ -47,8 +47,8 @@ impl YamantakaApp {
     pub(super) fn can_change_shared_tags(&mut self) -> bool {
         if self.library_selection.writing()
             || self.library_tags.writing()
-            || self.annotations.editing()
-            || self.annotations.writing()
+            || self.reader.annotations.editing()
+            || self.reader.annotations.writing()
             || self.global_notes.writing()
         {
             self.library_tags.write_failed = true;
@@ -252,7 +252,7 @@ impl YamantakaApp {
                 self.library_tags.merge = None;
                 self.library_tags.review = None;
                 self.library_tags.write_failed = false;
-                self.annotations.invalidate_records();
+                self.reader.annotations.invalidate_records();
                 self.global_notes.leave();
                 if matches!(self.surface, Surface::Notes) {
                     self.show_global_notes();

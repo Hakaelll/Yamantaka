@@ -66,6 +66,7 @@ impl YamantakaApp {
             AnnotationExportScope::Document(id)
                 if matches!(self.surface, Surface::Notes)
                     || self
+                        .reader
                         .active
                         .as_ref()
                         .is_some_and(|(active, _)| active.id != *id) =>
@@ -92,9 +93,9 @@ impl YamantakaApp {
         let ready = if matches!(self.surface, Surface::Notes) {
             self.global_notes.export_ready()
         } else {
-            self.annotations.ready()
+            self.reader.annotations.ready()
         };
-        if self.annotation_preview != 0 || !ready || self.annotations.editing() {
+        if self.annotation_preview != 0 || !ready || self.reader.annotations.editing() {
             return;
         }
         let Some(format) = self.annotation_export.preview.take() else {
@@ -119,13 +120,13 @@ impl YamantakaApp {
             };
             AnnotationExportRequest::review(query, path, format, self.governor.clone())
         } else {
-            let Some((document, info)) = self.active.as_ref() else {
+            let Some((document, info)) = self.reader.active.as_ref() else {
                 return;
             };
             let progress = if info.pages.is_empty() {
                 0.0
             } else {
-                (u64::from(self.page) + 1) as f64 / info.pages.len() as f64
+                (u64::from(self.reader.page) + 1) as f64 / info.pages.len() as f64
             };
             AnnotationExportRequest::new(document, progress, path, format, self.governor.clone())
         };
@@ -173,9 +174,9 @@ impl YamantakaApp {
             });
         } else {
             let can_export = if review {
-                self.global_notes.export_ready() && !self.annotations.editing()
+                self.global_notes.export_ready() && !self.reader.annotations.editing()
             } else {
-                self.annotations.pending.is_none() && self.active.is_some()
+                self.reader.annotations.pending.is_none() && self.reader.active.is_some()
             };
             let mut selected = None;
             ui.add_enabled_ui(can_export, |ui| {
@@ -235,7 +236,7 @@ impl YamantakaApp {
                         let scope = if review {
                             Some(AnnotationExportScope::Review)
                         } else {
-                            self.active.as_ref().map(|(document, _)| {
+                            self.reader.active.as_ref().map(|(document, _)| {
                                 AnnotationExportScope::Document(document.id.clone())
                             })
                         };

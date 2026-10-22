@@ -38,6 +38,7 @@ mod password;
 mod reader_controls;
 mod reader_destination;
 mod reader_options;
+mod reader_pane;
 mod reader_surface;
 mod reader_viewport;
 mod reading_queue;
@@ -114,6 +115,7 @@ impl PageImage {
     }
 }
 pub struct YamantakaApp {
+    reader: reader_pane::ReaderPane,
     search: search::SearchState,
     global_notes: global_notes::GlobalNotes,
     history: history::HistoryState,
@@ -125,7 +127,6 @@ pub struct YamantakaApp {
     tabs: tabs::TabState,
     reading_queue: reading_queue::QueueState,
     workspaces: workspaces::WorkspaceState,
-    restoration: restoration::RestorationState,
     open_confirmation: Option<(String, Cancellation)>,
     password: Option<password::PasswordChallenge>,
     password_attempted: bool,
@@ -157,34 +158,14 @@ pub struct YamantakaApp {
     offset: usize,
     selected: Option<String>,
     inspector: bool,
-    viewport: reader_surface::ReaderSurface,
-    active: Option<(Document, Arc<PdfInfo>)>,
-    navigation: Option<ReaderNavigation>,
-    reader_preferences: Option<ReaderPreferences>,
-    reader_preferences_cancel: Cancellation,
-    reader_preferences_loading: bool,
-    page: u32,
-    zoom: f32,
-    panel: bool,
-    reader_panel_tab: outline::ReaderPanelTab,
-    find: find::FindState,
-    links: links::LinkState,
     link_preview: links::LinkPreview,
     find_preview_step: Option<bool>,
     pub find_preview_closed: bool,
-    outline: outline::OutlineState,
-    thumbnails: thumbnails::ThumbnailState,
     library_covers: library_covers::LibraryCovers,
     cover_picker: Option<cover_picker::CoverPicker>,
     cover_picker_demo: cover_picker_preview::CoverPickerDemo,
     thumbnail_preview_page: Option<u32>,
     outline_preview_target: Option<usize>,
-    reader_destination: Option<(
-        String,
-        yamantaka_domain::pdf_destination::NavigationDestination,
-    )>,
-    bookmarks: bookmarks::BookmarkState,
-    annotations: annotations::AnnotationState,
     annotation_export: annotations::export::ExportState,
     file_comparison: file_comparison::ComparisonState,
     file_check: file_check::CheckState,
@@ -198,11 +179,8 @@ pub struct YamantakaApp {
     smart_menu_preview: bool,
     library_check: library_check::CheckState,
     relocation: relocation::RelocationState,
-    annotation_paint: annotations::paint::AnnotationPaint,
     annotation_preview: u8,
     annotation_multi_preview: bool,
-    text: text::TextState,
-    selection: selection::SelectionState,
     selection_preview: selection::SelectionPreview,
     selection_keyboard_preview: bool,
     presenter: Option<PagePresenter>,
@@ -214,7 +192,6 @@ pub struct YamantakaApp {
     query_cancel: Cancellation,
     library_loaded: bool,
     error: Option<String>,
-    loading: bool,
     importing: operations::BackgroundImport,
     preview_tools_menu: bool,
     activation: Receiver<Vec<PathBuf>>,
@@ -317,6 +294,7 @@ impl YamantakaApp {
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
         let mut app = Self {
+            reader: Default::default(),
             search: search::SearchState::new(
                 preferences
                     .get("globalIndexEnabled")
@@ -369,37 +347,19 @@ impl YamantakaApp {
             offset: 0,
             selected: None,
             inspector,
-            viewport: Default::default(),
-            active: None,
-            navigation: None,
-            reader_preferences: None,
-            reader_preferences_cancel: Cancellation::default(),
-            reader_preferences_loading: false,
-            page: 0,
-            zoom: 1.0,
-            panel: false,
-            reader_panel_tab: outline::ReaderPanelTab::Bookmarks,
-            find: Default::default(),
-            links: Default::default(),
             link_preview: Default::default(),
             find_preview_step: None,
             find_preview_closed: false,
-            outline: Default::default(),
-            thumbnails: Default::default(),
             library_covers: Default::default(),
             cover_picker: None,
             cover_picker_demo: Default::default(),
             thumbnail_preview_page: None,
             outline_preview_target: None,
-            reader_destination: None,
-            bookmarks: bookmarks::BookmarkState::default(),
-            restoration: Default::default(),
             global_notes: Default::default(),
             history: Default::default(),
             goals: Default::default(),
             metadata: None,
             metadata_preview: None,
-            annotations: Default::default(),
             annotation_export: Default::default(),
             file_comparison: Default::default(),
             file_check: Default::default(),
@@ -409,11 +369,8 @@ impl YamantakaApp {
             backup_restore: Default::default(),
             library_check: Default::default(),
             relocation: Default::default(),
-            annotation_paint: Default::default(),
             annotation_preview: 0,
             annotation_multi_preview: false,
-            text: Default::default(),
-            selection: Default::default(),
             selection_preview: Default::default(),
             selection_keyboard_preview: false,
             presenter,
@@ -426,7 +383,6 @@ impl YamantakaApp {
             query_cancel: Cancellation::default(),
             library_loaded: false,
             error: None,
-            loading: false,
             importing: Default::default(),
             preview_tools_menu: false,
             activation,
@@ -500,7 +456,7 @@ impl YamantakaApp {
         Ok(())
     }
     fn reset_render_request(&mut self) {
-        self.viewport.reset_requests();
+        self.reader.viewport.reset_requests();
     }
     fn persist_library_state(&mut self) {
         if self.demo {
@@ -621,14 +577,14 @@ impl YamantakaApp {
         if self.demo && self.capture.is_some() {
             self.list = list;
             self.inspector = details;
-            self.panel = panel;
-            self.reader_panel_tab = outline::ReaderPanelTab::Text;
+            self.reader.panel = panel;
+            self.reader.reader_panel_tab = outline::ReaderPanelTab::Text;
         }
     }
     pub fn preview_bookmarks(&mut self) {
         if self.demo && self.capture.is_some() {
-            self.panel = true;
-            self.reader_panel_tab = outline::ReaderPanelTab::Bookmarks;
+            self.reader.panel = true;
+            self.reader.reader_panel_tab = outline::ReaderPanelTab::Bookmarks;
         }
     }
     /// Exercise the real selected and keyboard-focus treatments on different rows.
@@ -661,7 +617,7 @@ impl YamantakaApp {
         self.runtime.wake();
         if !matches!(surface, Surface::Reader) {
             self.tabs.leave_destination();
-            self.restoration.clear();
+            self.reader.restoration.clear();
         }
         if matches!(self.surface, Surface::Tags) {
             self.library_tags.leave();
@@ -675,12 +631,12 @@ impl YamantakaApp {
         if matches!(self.surface, Surface::History) {
             self.history.leave();
         }
-        self.links.clear();
-        self.annotation_paint.invalidate();
-        self.text.clear();
-        self.selection.clear();
-        self.find.stop();
-        self.thumbnails.clear();
+        self.reader.links.clear();
+        self.reader.annotation_paint.invalidate();
+        self.reader.text.clear();
+        self.reader.selection.clear();
+        self.reader.find.stop();
+        self.reader.thumbnails.clear();
         self.open_intent.leave_destination();
         self.password = None;
         self.surface = surface;
@@ -710,7 +666,7 @@ impl YamantakaApp {
         if self.tabs.closing.busy() {
             return false;
         }
-        if self.annotations.editing() {
+        if self.reader.annotations.editing() {
             self.error = Some(
                 self.tr(
                     "Termina o cancela la nota antes de cambiar de lectura.",
@@ -738,16 +694,17 @@ impl YamantakaApp {
             return false;
         }
         self.opening.bind(id, next_cancel);
-        self.restoration.clear();
+        self.reader.restoration.clear();
         self.password = None;
         self.password_attempted = false;
         self.open_intent.begin_open();
-        self.loading = true;
+        self.reader.loading = true;
         true
     }
 
     fn navigate(&mut self, page: u32) {
         if self
+            .reader
             .navigation
             .as_mut()
             .is_some_and(|nav| nav.go_to_page(page))
@@ -756,14 +713,8 @@ impl YamantakaApp {
         }
     }
     fn apply_navigation(&mut self) {
-        self.restoration.clear();
-        if let (Some((doc, _)), Some(navigation)) = (&self.active, &self.navigation) {
-            self.page = navigation.position().page();
-            self.viewport.generation += 1;
-            self.viewport.cancel.cancel();
-            self.viewport.cancel = Cancellation::default();
-            self.send(Action::Navigate(doc.id.clone(), self.page));
-            self.reset_render_request();
+        if let Some((document, page)) = self.reader.navigation_changed() {
+            self.send(Action::Navigate(document, page));
         }
     }
     fn settings_changed(&mut self, ctx: &egui::Context) {
@@ -847,7 +798,7 @@ impl YamantakaApp {
                         self.show_surface(Surface::Library);
                         self.refresh();
                     }
-                    if self.active.is_some() {
+                    if self.reader.active.is_some() {
                         let response = if narrow {
                             theme::icon_button(
                                 ui,
@@ -1293,7 +1244,7 @@ impl YamantakaApp {
     }
     fn reader(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark);
-        let Some((document, info)) = self.active.clone() else {
+        let Some((document, info)) = self.reader.active.clone() else {
             ui.label(self.tr(
                 "Elige un documento en la biblioteca.",
                 "Choose a document from your library.",
@@ -1303,8 +1254,8 @@ impl YamantakaApp {
         self.sync_tab_context();
         if self.reader_focus {
             self.prepare_annotations(&document.id);
-            self.text.clear();
-            self.thumbnails.clear();
+            self.reader.text.clear();
+            self.reader.thumbnails.clear();
             self.reader_focus_exit(ui, p);
         } else {
             self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
@@ -1314,7 +1265,7 @@ impl YamantakaApp {
         if !self.reader_focus {
             self.reader_panel(ui, &document, &info, p);
         }
-        if self.panel && !self.reader_focus && ui.ctx().content_rect().width() < 620.0 {
+        if self.reader.panel && !self.reader_focus && ui.ctx().content_rect().width() < 620.0 {
             return;
         }
         self.reader_viewport(ui, &document, &info, p);
@@ -1395,8 +1346,8 @@ impl App for YamantakaApp {
         {
             self.error = Some(error.to_string());
         }
-        if let Some((document, _)) = &self.active {
-            self.annotations.bind(&document.id);
+        if let Some((document, _)) = &self.reader.active {
+            self.reader.annotations.bind(&document.id);
         }
         while !self.legacy_import.open
             && !self.backup_restore.open
@@ -1452,14 +1403,14 @@ impl App for YamantakaApp {
                 }
                 Update::FileComparison(reply) => self.file_comparison.accept(*reply),
                 Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
-                Update::AnnotationMarks(reply) => self.annotation_paint.accept(reply),
+                Update::AnnotationMarks(reply) => self.reader.annotation_paint.accept(reply),
                 Update::Annotations(reply) => {
                     if self.global_notes.matches(&reply) {
                         self.accept_global_note_reply(reply);
                         continue;
                     }
-                    let revision = self.annotations.revision;
-                    if let Some(error) = self.annotations.accept(reply) {
+                    let revision = self.reader.annotations.revision;
+                    if let Some(error) = self.reader.annotations.accept(reply) {
                         self.error = Some(format!(
                             "{}: {error}",
                             self.tr(
@@ -1468,8 +1419,8 @@ impl App for YamantakaApp {
                             )
                         ));
                     }
-                    if self.annotations.revision != revision {
-                        self.annotation_paint.invalidate();
+                    if self.reader.annotations.revision != revision {
+                        self.reader.annotation_paint.invalidate();
                     }
                 }
                 Update::Library(documents, count, memberships, cancel) => {
@@ -1504,18 +1455,21 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Outline(id, outline, cancel) => {
-                    self.outline.accept(&id, &cancel, Ok(outline));
+                    self.reader.outline.accept(&id, &cancel, Ok(outline));
                     self.apply_outline_preview();
                 }
                 Update::OutlineFailed(id, error, cancel) => {
-                    self.outline.accept(&id, &cancel, Err(error.to_string()))
+                    self.reader
+                        .outline
+                        .accept(&id, &cancel, Err(error.to_string()))
                 }
                 Update::Bookmarks(id, _, page, cancel) => {
-                    self.bookmarks.accept(&id, &cancel, Ok(page));
+                    self.reader.bookmarks.accept(&id, &cancel, Ok(page));
                 }
                 Update::BookmarkFailed(id, error, cancel) => {
                     if !cancel.is_cancelled()
                         && self
+                            .reader
                             .active
                             .as_ref()
                             .is_some_and(|(document, _)| document.id != id)
@@ -1529,11 +1483,13 @@ impl App for YamantakaApp {
                             )
                         ));
                     }
-                    self.bookmarks.accept(&id, &cancel, Err(error.to_string()));
+                    self.reader
+                        .bookmarks
+                        .accept(&id, &cancel, Err(error.to_string()));
                 }
                 Update::Opened(document, info, cancel) => {
-                    let editing =
-                        self.annotations.editing() && self.opening.matches(&document.id, &cancel);
+                    let editing = self.reader.annotations.editing()
+                        && self.opening.matches(&document.id, &cancel);
                     if editing {
                         self.error = Some(
                             self.tr(
@@ -1548,9 +1504,9 @@ impl App for YamantakaApp {
                         || editing
                     {
                         if self.opening.fail(&document.id, &cancel, false) {
-                            self.loading = false;
+                            self.reader.loading = false;
                             self.tabs.fail(&document.id, &cancel);
-                            self.restoration.clear();
+                            self.reader.restoration.clear();
                         }
                         cancel.cancel();
                         self.open_confirmation = Some((document.id.clone(), cancel));
@@ -1577,10 +1533,10 @@ impl App for YamantakaApp {
                             self.error = Some(error.to_string());
                             self.opening.fail(&document.id, &cancel, false);
                             self.tabs.fail(&document.id, &cancel);
-                            self.restoration.clear();
+                            self.reader.restoration.clear();
                             cancel.cancel();
                             self.open_confirmation = Some((document.id.clone(), cancel));
-                            self.loading = false;
+                            self.reader.loading = false;
                             continue;
                         }
                     };
@@ -1588,10 +1544,10 @@ impl App for YamantakaApp {
                         self.error = Some(error.to_string());
                         self.opening.fail(&document.id, &cancel, false);
                         self.tabs.fail(&document.id, &cancel);
-                        self.restoration.clear();
+                        self.reader.restoration.clear();
                         cancel.cancel();
                         self.open_confirmation = Some((document.id.clone(), cancel));
-                        self.loading = false;
+                        self.reader.loading = false;
                         continue;
                     }
                     let Some(preferences_cancel) = self.opening.accept(&document.id, &cancel)
@@ -1605,22 +1561,22 @@ impl App for YamantakaApp {
                         .accept_open(&document.id, &cancel, preferences_cancel.clone());
                     self.forget_failed_retirement(&document.id);
                     self.replace_reader_state(preferences_cancel);
-                    self.page = page;
-                    self.navigation = Some(navigation);
+                    self.reader.page = page;
+                    self.reader.navigation = Some(navigation);
                     self.open_confirmation = Some((document.id.clone(), cancel));
                     if target_page.is_some() {
-                        self.send(Action::Navigate(document.id.clone(), self.page));
+                        self.send(Action::Navigate(document.id.clone(), self.reader.page));
                     }
-                    self.active = Some((*document, Arc::new(info)));
-                    let id = self.active.as_ref().unwrap().0.id.clone();
+                    self.reader.active = Some((*document, Arc::new(info)));
+                    let id = self.reader.active.as_ref().unwrap().0.id.clone();
                     self.send(Action::LoadReaderPreferences(
                         id,
-                        self.reader_preferences_cancel.clone(),
+                        self.reader.reader_preferences_cancel.clone(),
                     ));
                     if reveal_reader {
                         self.show_surface(Surface::Reader);
                     }
-                    self.loading = false;
+                    self.reader.loading = false;
                 }
                 Update::DocumentMatches(id, batch, cancel) => {
                     self.accept_find(&id, &cancel, Ok(batch))
@@ -1630,10 +1586,13 @@ impl App for YamantakaApp {
                 }
                 Update::PageMatches(..) | Update::PageFindFailed(..) => {}
                 Update::PageLinks(id, payload, cancel) => {
-                    self.links.accept(&id, payload.page(), &cancel, Ok(payload));
+                    self.reader
+                        .links
+                        .accept(&id, payload.page(), &cancel, Ok(payload));
                 }
                 Update::PageLinksFailed(id, page, error, cancel) => {
-                    self.links
+                    self.reader
+                        .links
                         .accept(&id, page, &cancel, Err(error.to_string()));
                 }
                 Update::Cover(id, result, cancel) => {
@@ -1651,14 +1610,20 @@ impl App for YamantakaApp {
                 Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::TextGeometry(id, payload, cancel) => {
-                    self.selection
+                    self.reader
+                        .selection
                         .accept(&id, payload.page(), &cancel, Ok(payload.clone()));
-                    self.text.accept(&id, payload.page(), &cancel, Ok(payload));
+                    self.reader
+                        .text
+                        .accept(&id, payload.page(), &cancel, Ok(payload));
                 }
                 Update::TextGeometryFailed(id, page, error, cancel) => {
-                    self.selection
+                    self.reader
+                        .selection
                         .accept(&id, page, &cancel, Err(error.to_string()));
-                    self.text.accept(&id, page, &cancel, Err(error.to_string()));
+                    self.reader
+                        .text
+                        .accept(&id, page, &cancel, Err(error.to_string()));
                 }
                 Update::Text(..) => {}
                 Update::Imported(_, cancel) => {
@@ -1675,10 +1640,10 @@ impl App for YamantakaApp {
                     if !self.opening.fail(&document.id, &cancel, password) {
                         continue;
                     }
-                    self.loading = false;
+                    self.reader.loading = false;
                     if !password || cancelled {
                         self.tabs.fail(&document.id, &cancel);
-                        self.restoration.clear();
+                        self.reader.restoration.clear();
                     }
                     if cancelled {
                         continue;
@@ -1726,7 +1691,7 @@ impl App for YamantakaApp {
                     }
                     if cancel
                         .as_ref()
-                        .is_some_and(|token| self.thumbnails.fail(token, error.to_string()))
+                        .is_some_and(|token| self.reader.thumbnails.fail(token, error.to_string()))
                     {
                         continue;
                     }
@@ -1734,11 +1699,11 @@ impl App for YamantakaApp {
                         continue;
                     }
                     self.error = Some(error.to_string());
-                    if self.reader_preferences.is_none() {
-                        self.reader_preferences_loading = false;
+                    if self.reader.reader_preferences.is_none() {
+                        self.reader.reader_preferences_loading = false;
                     }
-                    self.viewport.retry = self.viewport.requested.is_some();
-                    self.loading = false;
+                    self.reader.viewport.retry = self.reader.viewport.requested.is_some();
+                    self.reader.loading = false;
                 }
                 Update::ReaderClosed(reply) => {
                     if self.accept_tab_close(&reply) {
@@ -1814,6 +1779,7 @@ impl App for YamantakaApp {
                             document.filter(|document| document.id == id && !document.missing)
                         {
                             if self
+                                .reader
                                 .active
                                 .as_ref()
                                 .is_some_and(|(active, _)| active.id == id)
@@ -1823,12 +1789,14 @@ impl App for YamantakaApp {
                                 }
                                 self.show_surface(Surface::Reader);
                                 if let Some(context) = target.context {
-                                    self.restoration.arm(
+                                    self.reader.restoration.arm(
                                         id,
-                                        self.reader_preferences_cancel.clone(),
+                                        self.reader.reader_preferences_cancel.clone(),
                                         context,
                                     );
-                                    if let Some(preferences) = self.reader_preferences.clone() {
+                                    if let Some(preferences) =
+                                        self.reader.reader_preferences.clone()
+                                    {
                                         self.load_reader_preferences(preferences);
                                     }
                                 }
@@ -1839,7 +1807,7 @@ impl App for YamantakaApp {
                                         self.open_intent.set_page(id.clone(), page);
                                     }
                                     if let Some(context) = target.context {
-                                        self.restoration.arm(
+                                        self.reader.restoration.arm(
                                             id,
                                             self.opening.preferences().unwrap(),
                                             context,
@@ -1854,8 +1822,12 @@ impl App for YamantakaApp {
                 }
                 Update::ReaderPreferences(id, preferences, cancel) => {
                     if cancel.is_cancelled()
-                        || !cancel.same_request(&self.reader_preferences_cancel)
-                        || !self.active.as_ref().is_some_and(|(doc, _)| doc.id == id)
+                        || !cancel.same_request(&self.reader.reader_preferences_cancel)
+                        || !self
+                            .reader
+                            .active
+                            .as_ref()
+                            .is_some_and(|(doc, _)| doc.id == id)
                     {
                         continue;
                     }
@@ -1911,8 +1883,8 @@ impl App for YamantakaApp {
             && self.capture.is_some()
             && self.selection_preview == selection::SelectionPreview::Waiting
             && matches!(self.surface, Surface::Reader)
-            && self.active.is_some()
-            && !self.selection.enabled
+            && self.reader.active.is_some()
+            && !self.reader.selection.enabled
         {
             self.toggle_text_selection();
         }
@@ -1956,10 +1928,10 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
-        self.selection.keyboard_input(
+        self.reader.selection.keyboard_input(
             &ctx,
             self.password.is_some()
-                || self.links.confirmation_open()
+                || self.reader.links.confirmation_open()
                 || self.bulk_picker.is_some()
                 || self.selection_review_open()
                 || self.tag_dialog_open()
@@ -1973,7 +1945,7 @@ impl App for YamantakaApp {
         for shortcut in shortcuts::read(
             &ctx,
             self.password.is_some()
-                || self.links.confirmation_open()
+                || self.reader.links.confirmation_open()
                 || self.bulk_picker.is_some()
                 || self.selection_review_open()
                 || self.tag_dialog_open()
@@ -2073,7 +2045,7 @@ impl App for YamantakaApp {
                                     self.error = None;
                                     self.retry_reader_close();
                                 }
-                                if self.viewport.retry
+                                if self.reader.viewport.retry
                                     && theme::primary_icon(
                                         ui,
                                         self.tr("Reintentar página", "Retry page"),
@@ -2082,7 +2054,7 @@ impl App for YamantakaApp {
                                     )
                                     .clicked()
                                 {
-                                    self.viewport.retry = false;
+                                    self.reader.viewport.retry = false;
                                     self.reset_render_request();
                                     self.error = None;
                                 }
@@ -2170,33 +2142,33 @@ impl App for YamantakaApp {
             if !self.capture_requested {
                 let ready = self.library_loaded
                     && (!matches!(self.surface, Surface::Reader)
-                        || (!self.panel && self.reader_panel_tab != outline::ReaderPanelTab::Find)
-                        || match self.reader_panel_tab {
-                            outline::ReaderPanelTab::Bookmarks => self.bookmarks.ready(),
-                            outline::ReaderPanelTab::Annotations => self.annotations.ready(),
-                            outline::ReaderPanelTab::Outline => self.outline.ready(),
-                            outline::ReaderPanelTab::Thumbnails => self.thumbnails.ready(),
-                            outline::ReaderPanelTab::Find => self.find.ready(),
+                        || (!self.reader.panel && self.reader.reader_panel_tab != outline::ReaderPanelTab::Find)
+                        || match self.reader.reader_panel_tab {
+                            outline::ReaderPanelTab::Bookmarks => self.reader.bookmarks.ready(),
+                            outline::ReaderPanelTab::Annotations => self.reader.annotations.ready(),
+                            outline::ReaderPanelTab::Outline => self.reader.outline.ready(),
+                            outline::ReaderPanelTab::Thumbnails => self.reader.thumbnails.ready(),
+                            outline::ReaderPanelTab::Find => self.reader.find.ready(),
                             outline::ReaderPanelTab::Text => {
-                                if self.selection.enabled {
-                                    self.selection
-                                        .text_state(self.page)
+                                if self.reader.selection.enabled {
+                                    self.reader.selection
+                                        .text_state(self.reader.page)
                                         .is_some_and(text::TextState::ready)
                                 } else {
-                                    self.text.ready()
+                                    self.reader.text.ready()
                                 }
                             }
                         })
                     && (self.link_preview == links::LinkPreview::Off
-                        || self.links.ready()
+                        || self.reader.links.ready()
                             && matches!(
                                 self.link_preview,
                                 links::LinkPreview::Focus | links::LinkPreview::Complete
                             ))
                     && (self.selection_preview == selection::SelectionPreview::Off
                         || self.selection_preview == selection::SelectionPreview::Complete
-                            && self.selection.preview_ready())
-                    && self.reader_destination.is_none()
+                            && self.reader.selection.preview_ready())
+                    && self.reader.reader_destination.is_none()
                     && self.annotation_preview == 0
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
@@ -2214,22 +2186,22 @@ impl App for YamantakaApp {
                     && self.relocation.ready()
                     && (!matches!(self.surface, Surface::Notes) || self.global_notes.ready())
                     && (!matches!(self.surface, Surface::History) || self.history.ready())
-                    && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
-                    && self.restoration.ready()
+                    && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
+                    && self.reader.restoration.ready()
                     && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.goals.ready())
                     && self.metadata_preview.is_none_or(|(_,stage)|stage==3)
                     && self.metadata.as_ref().is_none_or(|editor|editor.capture_ready())
                     && self.library_covers.slots_ready()
                     && self.cover_picker_capture_ready()
                     && self.cover_picker.as_ref().is_none_or(|picker|picker.capture_ready())
-                    && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.page))} else {None})
+                    && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     // The compact drawer hides the PDF, so it has no visible marks to request.
                     && (!matches!(self.surface, Surface::Reader)
-                        || self.panel && ctx.content_rect().width() < 620.0
-                        || self.annotation_paint.ready())
+                        || self.reader.panel && ctx.content_rect().width() < 620.0
+                        || self.reader.annotation_paint.ready())
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
-                    && !self.loading
+                    && !self.reader.loading
                     && !self.importing.busy()
                     && self.importing.recovery_ready()
                     && self.opening.ready()
@@ -2242,7 +2214,7 @@ impl App for YamantakaApp {
                         None => true,
                     }
                     && (!self.search.preview_open_page
-                        || matches!(self.surface, Surface::Reader) && self.page == 1)
+                        || matches!(self.surface, Surface::Reader) && self.reader.page == 1)
                     && (!self.search.preview_excluded
                         || self
                             .search
@@ -2252,10 +2224,10 @@ impl App for YamantakaApp {
                     && (!self.search.preview_results
                         || self.search.completed && !self.search.searching)
                     && (!matches!(self.surface, Surface::Reader)
-                        || self.reader_preferences.is_some()
-                            && (self.panel && ctx.content_rect().width() < 620.0
-                                || !self.viewport.pages.is_empty()
-                                    && self.viewport.pages
+                        || self.reader.reader_preferences.is_some()
+                            && (self.reader.panel && ctx.content_rect().width() < 620.0
+                                || !self.reader.viewport.pages.is_empty()
+                                    && self.reader.viewport.pages
                                         .values()
                                         .all(|page| page.image.is_some())));
                 if ready {
@@ -2301,17 +2273,17 @@ impl App for YamantakaApp {
                     let mut record=serde_json::json!({"synthetic":self.demo,"libraryDocumentCount":self.count,"captureProcessId":std::process::id(),"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),"controls":controls,
                         "pagePresenter":if self.presenter.is_some(){"native-wgpu"}else{"egui-glow"},
                         "readingSession":self.session_capture_summary(),
-                        "visibleThumbnailSlots":self.thumbnails.resident_count(),
+                        "visibleThumbnailSlots":self.reader.thumbnails.resident_count(),
                         "libraryCovers":self.cover_summary(),
                         "coverPicker":self.cover_picker_summary(),
                         "coverPickerDemo":self.cover_picker_demo_summary(),
                         "metadataReview":self.metadata.as_ref().map(|editor|editor.summary()),
-                        "documentFind":self.find.capture_summary(),
-                        "documentLinks":self.links.capture_summary(),
-                        "pageText": if self.selection.enabled { self.selection.text_state(self.page).map(text::TextState::capture_summary) } else { Some(self.text.capture_summary()) },
-                        "textSelection":self.selection.capture_summary(),
+                        "documentFind":self.reader.find.capture_summary(),
+                        "documentLinks":self.reader.links.capture_summary(),
+                        "pageText": if self.reader.selection.enabled { self.reader.selection.text_state(self.reader.page).map(text::TextState::capture_summary) } else { Some(self.reader.text.capture_summary()) },
+                        "textSelection":self.reader.selection.capture_summary(),
                         "annotations":self.annotation_capture_summary(),
-                        "annotationPaint":self.annotation_paint.capture_summary(),
+                        "annotationPaint":self.reader.annotation_paint.capture_summary(),
                         "annotationExport":self.annotation_export.capture_summary(),
                         "fileComparison":self.file_comparison.summary(),
                         "importRecovery":self.importing.recovery_summary(),
@@ -2321,8 +2293,8 @@ impl App for YamantakaApp {
                         "readerOpening":self.opening.summary(),
                         "readerTabs":self.tabs.summary(),
                         "readingGoal": self.goals.summary(),
-                        "currentReaderPage":self.page,
-                        "readerZoom":self.zoom,
+                        "currentReaderPage":self.reader.page,
+                        "readerZoom":self.reader.zoom,
                         "readerRenderEvents":self.capture_render_events,
                         "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
@@ -2386,15 +2358,15 @@ impl App for YamantakaApp {
         self.backups.cancel();
         self.backup_restore.cancel();
         self.global_notes.cancel();
-        self.links.clear();
-        self.annotation_paint.invalidate();
-        self.text.clear();
-        self.selection.clear();
-        self.find = Default::default();
-        self.viewport.clear();
+        self.reader.links.clear();
+        self.reader.annotation_paint.invalidate();
+        self.reader.text.clear();
+        self.reader.selection.clear();
+        self.reader.find = Default::default();
+        self.reader.viewport.clear();
         self.query_cancel.cancel();
-        self.reader_preferences_cancel.cancel();
-        self.thumbnails.clear();
+        self.reader.reader_preferences_cancel.cancel();
+        self.reader.thumbnails.clear();
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.shutdown()
         {

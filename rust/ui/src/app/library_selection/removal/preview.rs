@@ -25,11 +25,12 @@ impl YamantakaApp {
             "demo-2".to_owned(),
         ];
         let reader_ready = |app: &Self, id: &str| {
-            app.active
+            app.reader
+                .active
                 .as_ref()
                 .is_some_and(|(document, _)| document.id == id)
-                && !app.reader_preferences_loading
-                && app.reader_preferences.is_some()
+                && !app.reader.reader_preferences_loading
+                && app.reader.reader_preferences.is_some()
                 && app.tabs.ready()
         };
         match preview.stage {
@@ -58,7 +59,7 @@ impl YamantakaApp {
                 }
             }
             1 if reader_ready(self, "demo-3") => {
-                let mut preferences = self.reader_preferences.clone().unwrap();
+                let mut preferences = self.reader.reader_preferences.clone().unwrap();
                 preferences.zoom_mode = ZoomMode::Custom;
                 preferences.zoom_level = 1.25;
                 self.load_reader_preferences(preferences);
@@ -78,7 +79,7 @@ impl YamantakaApp {
                     "duplicate-selected".into(),
                     "demo-0".into(),
                     0,
-                    self.reader_preferences.clone().unwrap(),
+                    self.reader.reader_preferences.clone().unwrap(),
                     None,
                 )
                 .unwrap();
@@ -163,7 +164,7 @@ impl YamantakaApp {
                             .all(|tab| !targets.iter().any(|id| id == tab.document()))
                     );
                     assert!(self.sessions.lifecycle.settled_for(&targets).unwrap());
-                    assert!(self.active.is_none());
+                    assert!(self.reader.active.is_none());
                     if preview.mode == "failure" {
                         assert_eq!(self.library_selection.model.ids(), ["demo-0"]);
                         assert!(
@@ -218,7 +219,10 @@ impl YamantakaApp {
                 preview.stage = 4;
             }
             4 if reader_ready(self, "demo-3") => {
-                assert_eq!(self.reader_preferences.as_ref().unwrap().zoom_level, 1.25);
+                assert_eq!(
+                    self.reader.reader_preferences.as_ref().unwrap().zoom_level,
+                    1.25
+                );
                 self.show_surface(Surface::Library);
                 self.refresh();
                 preview.stage = 5;

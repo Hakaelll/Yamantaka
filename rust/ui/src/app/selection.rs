@@ -141,24 +141,28 @@ impl YamantakaApp {
         }
     }
     pub(super) fn toggle_text_selection(&mut self) {
-        if self.selection.enabled {
-            self.selection.clear();
-        } else if let Some((document, _)) = &self.active {
-            self.selection.enabled = true;
-            self.selection.document = Some(document.id.clone());
-            if self.text.payload().is_some() || self.text.pending() || self.text.error().is_some() {
-                self.selection
+        if self.reader.selection.enabled {
+            self.reader.selection.clear();
+        } else if let Some((document, _)) = &self.reader.active {
+            self.reader.selection.enabled = true;
+            self.reader.selection.document = Some(document.id.clone());
+            if self.reader.text.payload().is_some()
+                || self.reader.text.pending()
+                || self.reader.text.error().is_some()
+            {
+                self.reader
+                    .selection
                     .pages
-                    .insert(self.page, std::mem::take(&mut self.text));
+                    .insert(self.reader.page, std::mem::take(&mut self.reader.text));
             }
         }
     }
     pub(super) fn request_selection_pages(&mut self, document: &str, pages: &[u32]) {
-        if !self.selection.enabled {
+        if !self.reader.selection.enabled {
             return;
         }
-        for page in self.selection.next_pages(pages) {
-            let state = self.selection.pages.entry(page).or_default();
+        for page in self.reader.selection.next_pages(pages) {
+            let state = self.reader.selection.pages.entry(page).or_default();
             if let Some(cancel) = state.begin(document, page)
                 && let Err(error) =
                     self.runtime
@@ -169,7 +173,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn selection_toolbar(&mut self, ui: &mut egui::Ui, palette: Palette) {
-        if !self.selection.enabled || self.annotations.editing() {
+        if !self.reader.selection.enabled || self.reader.annotations.editing() {
             return;
         }
         let compact = ui.ctx().content_rect().width() < 620.0;
@@ -186,7 +190,8 @@ impl YamantakaApp {
             }
             copy = ui
                 .add_enabled_ui(
-                    self.selection
+                    self.reader
+                        .selection
                         .range()
                         .is_some_and(|range| !range.is_empty()),
                     |ui| {
@@ -230,21 +235,22 @@ impl YamantakaApp {
             )
             .clicked()
             {
-                self.selection.gesture = SelectionGesture::default();
+                self.reader.selection.gesture = SelectionGesture::default();
             }
             if theme::navigation(ui, self.tr("Terminar", "Done"), false, palette).clicked() {
-                self.selection.clear();
+                self.reader.selection.clear();
             }
         });
-        let modal = self.password.is_some() || self.links.confirmation_open();
-        copy |= self.selection.edit_commands(ui.ctx(), modal);
+        let modal = self.password.is_some() || self.reader.links.confirmation_open();
+        copy |= self.reader.selection.edit_commands(ui.ctx(), modal);
         if copy {
-            match self.selection.copy(&self.governor) {
+            match self.reader.selection.copy(&self.governor) {
                 Ok(text) => ui.ctx().copy_text(text.text().into()),
                 Err(error) => self.error = Some(error.to_string()),
             }
         }
         if let Some(error) = self
+            .reader
             .selection
             .pages
             .values()
@@ -259,7 +265,8 @@ impl YamantakaApp {
             )
             .clicked()
             {
-                self.selection
+                self.reader
+                    .selection
                     .pages
                     .retain(|_, state| state.error().is_none());
             }
@@ -275,14 +282,15 @@ impl YamantakaApp {
         rotation: PageRotation,
         palette: Palette,
     ) {
-        if !self.selection.enabled
-            || self.selection.document.as_deref() != Some(document)
+        if !self.reader.selection.enabled
+            || self.reader.selection.document.as_deref() != Some(document)
             || self.password.is_some()
-            || self.links.confirmation_open()
+            || self.reader.links.confirmation_open()
         {
             return;
         }
         let Some(payload) = self
+            .reader
             .selection
             .pages
             .get(&page)
@@ -329,7 +337,7 @@ impl YamantakaApp {
             rotation,
             egui::Id::new(("select-pdf-text", document, page)),
             self.tr("Seleccionar texto del PDF. Mayús+flechas amplía la selección; Ctrl+A selecciona la página; Ctrl+C copia el pasaje.", "Select PDF text. Shift+arrows extends the selection; Ctrl+A selects the page; Ctrl+C copies the passage."),
-            &mut self.selection.gesture,
+            &mut self.reader.selection.gesture,
         );
         if ui.memory(|memory| memory.has_focus(egui::Id::new(("select-pdf-text", document, page))))
         {
@@ -340,7 +348,7 @@ impl YamantakaApp {
                 egui::StrokeKind::Inside,
             );
         }
-        if let Some(range) = self.selection.range()
+        if let Some(range) = self.reader.selection.range()
             && let Ok(Some(selected)) = range.page(payload)
         {
             for bounds in selected.regions() {

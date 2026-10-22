@@ -7,7 +7,7 @@ impl YamantakaApp {
         info: &PdfInfo,
         viewport: [f64; 2],
     ) {
-        let Some((id, destination)) = self.reader_destination.take() else {
+        let Some((id, destination)) = self.reader.reader_destination.take() else {
             return;
         };
         if id != document.id {
@@ -15,15 +15,18 @@ impl YamantakaApp {
         }
         let result = (|| {
             let layout = self
+                .reader
                 .viewport
                 .layout
                 .as_ref()
                 .ok_or_else(|| "Reader layout is unavailable".to_string())?;
             let navigation = self
+                .reader
                 .navigation
                 .as_ref()
                 .ok_or_else(|| "Reader navigation is unavailable".to_string())?;
             let mut preferences = self
+                .reader
                 .reader_preferences
                 .clone()
                 .ok_or_else(|| "Reader preferences are unavailable".to_string())?;
@@ -38,7 +41,7 @@ impl YamantakaApp {
                     viewport,
                     anchor,
                     preferences.zoom_mode,
-                    f64::from(self.zoom),
+                    f64::from(self.reader.zoom),
                 )
                 .map_err(|error| error.to_string())?;
             let frame = layout
@@ -46,7 +49,7 @@ impl YamantakaApp {
                     viewport,
                     anchor,
                     preferences.zoom_mode,
-                    f64::from(self.zoom),
+                    f64::from(self.reader.zoom),
                     scroll,
                     0.0,
                 )
@@ -73,9 +76,9 @@ impl YamantakaApp {
         })();
         match result {
             Ok((preferences, resolved)) => {
-                self.zoom = resolved.zoom as f32;
-                self.reader_preferences = Some(preferences.clone());
-                if let Some(navigation) = &mut self.navigation {
+                self.reader.zoom = resolved.zoom as f32;
+                self.reader.reader_preferences = Some(preferences.clone());
+                if let Some(navigation) = &mut self.reader.navigation {
                     navigation.navigate_to(resolved.position);
                 }
                 self.apply_navigation();

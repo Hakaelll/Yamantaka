@@ -100,17 +100,18 @@ impl OutlineState {
 impl YamantakaApp {
     pub fn preview_outline(&mut self, target: Option<usize>) {
         if self.demo && self.capture.is_some() {
-            self.panel = true;
-            self.reader_panel_tab = ReaderPanelTab::Outline;
+            self.reader.panel = true;
+            self.reader.reader_panel_tab = ReaderPanelTab::Outline;
             self.outline_preview_target = target;
         }
     }
     pub(super) fn apply_outline_preview(&mut self) {
-        if !self.outline.ready() {
+        if !self.reader.outline.ready() {
             return;
         }
         if let Some(index) = self.outline_preview_target.take()
             && let Some(destination) = self
+                .reader
                 .outline
                 .outline
                 .as_ref()
@@ -126,22 +127,22 @@ impl YamantakaApp {
         destination: yamantaka_domain::pdf_destination::NavigationDestination,
         compact: bool,
     ) {
-        if let Some(document) = self.outline.document.clone() {
-            self.reader_destination = Some((document, destination));
+        if let Some(document) = self.reader.outline.document.clone() {
+            self.reader.reader_destination = Some((document, destination));
             if compact {
-                self.panel = false;
+                self.reader.panel = false;
             }
         }
     }
 
     pub(super) fn request_outline(&mut self, document: &str) {
-        if self.outline.document.as_deref() != Some(document) {
-            self.outline = OutlineState::default();
-            self.outline.document = Some(document.into());
+        if self.reader.outline.document.as_deref() != Some(document) {
+            self.reader.outline = OutlineState::default();
+            self.reader.outline.document = Some(document.into());
         }
-        if self.outline.pending.is_some()
-            || self.outline.outline.is_some()
-            || self.outline.error.is_some()
+        if self.reader.outline.pending.is_some()
+            || self.reader.outline.outline.is_some()
+            || self.reader.outline.error.is_some()
         {
             return;
         }
@@ -150,8 +151,8 @@ impl YamantakaApp {
             .runtime
             .submit(Action::Outline(document.into(), cancel.clone()))
         {
-            Ok(()) => self.outline.pending = Some(cancel),
-            Err(error) => self.outline.error = Some(error.to_string()),
+            Ok(()) => self.reader.outline.pending = Some(cancel),
+            Err(error) => self.reader.outline.error = Some(error.to_string()),
         }
     }
 
@@ -163,7 +164,7 @@ impl YamantakaApp {
             );
             ui.add_space(6.0);
         }
-        if let Some(error) = self.outline.error.clone() {
+        if let Some(error) = self.reader.outline.error.clone() {
             ui.label(self.tr(
                 "No se pudo cargar el índice.",
                 "Contents could not be loaded.",
@@ -173,11 +174,11 @@ impl YamantakaApp {
             });
             if theme::navigation(ui, self.tr("Volver a intentar", "Try again"), false, p).clicked()
             {
-                self.outline.error = None;
+                self.reader.outline.error = None;
             }
             return;
         }
-        let Some(outline) = self.outline.outline.clone() else {
+        let Some(outline) = self.reader.outline.outline.clone() else {
             ui.label(
                 RichText::new(self.tr("Cargando capítulos…", "Loading chapters…"))
                     .color(p.secondary),
@@ -209,87 +210,93 @@ impl YamantakaApp {
         let mut destination = None;
         egui::ScrollArea::vertical()
             .id_salt("outline-chapters")
-            .show_rows(ui, row_height, self.outline.rows.len(), |ui, range| {
-                for index in range {
-                    let row = self.outline.rows[index];
-                    let entry = &outline.entries()[row.entry];
-                    ui.push_id(row.entry, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.add_space((row.depth.min(6) * 12) as f32);
-                            if row.children {
-                                let collapsed = self.outline.collapsed.contains(&row.entry);
-                                let label = format!(
-                                    "{} {}",
-                                    self.tr(
-                                        if collapsed { "Desplegar" } else { "Plegar" },
-                                        if collapsed { "Expand" } else { "Collapse" }
-                                    ),
-                                    entry.title
-                                );
-                                if theme::icon_button(
-                                    ui,
-                                    &label,
-                                    if collapsed {
-                                        theme::Icon::Plus
-                                    } else {
-                                        theme::Icon::Minus
-                                    },
-                                    p,
-                                )
-                                .clicked()
-                                {
-                                    toggle = Some(row.entry);
-                                }
-                            }
-                            if !row.children {
-                                ui.add_space(40.0 + ui.spacing().item_spacing.x);
-                            }
-                            let mut label = entry.title.clone();
-                            if let Some(target) = entry.destination {
-                                label.push_str(&format!(" · {}", u64::from(target.page) + 1));
-                                let selected = self.page == target.page;
-                                if ui
-                                    .add_sized(
-                                        [ui.available_width().max(40.0), row_height],
-                                        egui::Button::new(
-                                            RichText::new(&label).color(if selected {
-                                                p.ink
-                                            } else {
-                                                p.secondary
-                                            }),
-                                        )
-                                        .selected(selected)
-                                        .stroke(egui::Stroke::NONE)
-                                        .fill(if selected {
-                                            p.raised
+            .show_rows(
+                ui,
+                row_height,
+                self.reader.outline.rows.len(),
+                |ui, range| {
+                    for index in range {
+                        let row = self.reader.outline.rows[index];
+                        let entry = &outline.entries()[row.entry];
+                        ui.push_id(row.entry, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.add_space((row.depth.min(6) * 12) as f32);
+                                if row.children {
+                                    let collapsed =
+                                        self.reader.outline.collapsed.contains(&row.entry);
+                                    let label = format!(
+                                        "{} {}",
+                                        self.tr(
+                                            if collapsed { "Desplegar" } else { "Plegar" },
+                                            if collapsed { "Expand" } else { "Collapse" }
+                                        ),
+                                        entry.title
+                                    );
+                                    if theme::icon_button(
+                                        ui,
+                                        &label,
+                                        if collapsed {
+                                            theme::Icon::Plus
                                         } else {
-                                            Color32::TRANSPARENT
-                                        })
-                                        .corner_radius(8)
-                                        .wrap_mode(egui::TextWrapMode::Truncate),
+                                            theme::Icon::Minus
+                                        },
+                                        p,
                                     )
-                                    .on_hover_text(&entry.title)
                                     .clicked()
-                                {
-                                    destination = Some(target);
+                                    {
+                                        toggle = Some(row.entry);
+                                    }
                                 }
-                            } else {
-                                ui.add_sized(
-                                    [ui.available_width().max(40.0), row_height],
-                                    egui::Label::new(RichText::new(&label).color(p.secondary))
-                                        .truncate(),
-                                )
-                                .on_hover_text(&entry.title);
-                            }
+                                if !row.children {
+                                    ui.add_space(40.0 + ui.spacing().item_spacing.x);
+                                }
+                                let mut label = entry.title.clone();
+                                if let Some(target) = entry.destination {
+                                    label.push_str(&format!(" · {}", u64::from(target.page) + 1));
+                                    let selected = self.reader.page == target.page;
+                                    if ui
+                                        .add_sized(
+                                            [ui.available_width().max(40.0), row_height],
+                                            egui::Button::new(
+                                                RichText::new(&label).color(if selected {
+                                                    p.ink
+                                                } else {
+                                                    p.secondary
+                                                }),
+                                            )
+                                            .selected(selected)
+                                            .stroke(egui::Stroke::NONE)
+                                            .fill(if selected {
+                                                p.raised
+                                            } else {
+                                                Color32::TRANSPARENT
+                                            })
+                                            .corner_radius(8)
+                                            .wrap_mode(egui::TextWrapMode::Truncate),
+                                        )
+                                        .on_hover_text(&entry.title)
+                                        .clicked()
+                                    {
+                                        destination = Some(target);
+                                    }
+                                } else {
+                                    ui.add_sized(
+                                        [ui.available_width().max(40.0), row_height],
+                                        egui::Label::new(RichText::new(&label).color(p.secondary))
+                                            .truncate(),
+                                    )
+                                    .on_hover_text(&entry.title);
+                                }
+                            });
                         });
-                    });
-                }
-            });
+                    }
+                },
+            );
         if let Some(index) = toggle {
-            if !self.outline.collapsed.remove(&index) {
-                self.outline.collapsed.insert(index);
+            if !self.reader.outline.collapsed.remove(&index) {
+                self.reader.outline.collapsed.insert(index);
             }
-            self.outline.rebuild_rows();
+            self.reader.outline.rebuild_rows();
         }
         if let Some(destination) = destination {
             self.choose_reader_destination(destination, compact);

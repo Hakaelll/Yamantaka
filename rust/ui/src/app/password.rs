@@ -31,7 +31,7 @@ impl YamantakaApp {
         let cancel = self.opening.retry(id.clone());
         self.tabs.bind_open(cancel.clone());
         self.password_attempted = true;
-        self.loading = true;
+        self.reader.loading = true;
         if let Err(error) = self
             .runtime
             .submit(Action::Open(document, Some(value), cancel.clone()))

@@ -107,13 +107,13 @@ impl YamantakaApp {
                         "Locate the file again in the library.",
                     ));
                 }
-                if self.annotations.editing() {
+                if self.reader.annotations.editing() {
                     ui.label(self.tr(
                         "Termina o cancela la nota del lector antes de abrir otra lectura.",
                         "Finish or cancel the reader note before opening another reading.",
                     ));
                 }
-                ui.add_enabled_ui(!entry.missing && !self.annotations.editing(), |ui| {
+                ui.add_enabled_ui(!entry.missing && !self.reader.annotations.editing(), |ui| {
                     if theme::control(
                         ui,
                         &format!(
@@ -138,7 +138,7 @@ impl YamantakaApp {
                     match self.history.context_for(page) {
                         Ok(Some(context)) => {
                             ui.add_enabled_ui(
-                                !entry.missing && !self.annotations.editing(),
+                                !entry.missing && !self.reader.annotations.editing(),
                                 |ui| {
                                     if theme::navigation(
                                         ui,

@@ -143,7 +143,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn external_link_dialog(&mut self, ctx: &egui::Context) {
-        let Some(mut confirmation) = self.links.confirmation.take() else {
+        let Some(mut confirmation) = self.reader.links.confirmation.take() else {
             return;
         };
         let PdfLinkTarget::External(uri) =
@@ -221,13 +221,13 @@ impl YamantakaApp {
                 return;
             }
         }
-        self.links.confirmation = Some(confirmation);
+        self.reader.links.confirmation = Some(confirmation);
     }
 
     pub(super) fn request_visible_links(&mut self, document: &str, pages: &[u32]) {
-        self.links.retain(document, pages);
-        for page in self.links.next_pages(pages) {
-            if self.links.pages.contains_key(&page) {
+        self.reader.links.retain(document, pages);
+        for page in self.reader.links.next_pages(pages) {
+            if self.reader.links.pages.contains_key(&page) {
                 continue;
             }
             let cancel = Cancellation::default();
@@ -236,10 +236,14 @@ impl YamantakaApp {
                 .submit(Action::PageLinks(document.into(), page, cancel.clone()))
             {
                 Ok(()) => {
-                    self.links.pages.insert(page, LinkPhase::Pending(cancel));
+                    self.reader
+                        .links
+                        .pages
+                        .insert(page, LinkPhase::Pending(cancel));
                 }
                 Err(error) => {
-                    self.links
+                    self.reader
+                        .links
                         .pages
                         .insert(page, LinkPhase::Failed(error.to_string()));
                 }
@@ -256,7 +260,7 @@ impl YamantakaApp {
         rotation: PageRotation,
         palette: Palette,
     ) {
-        let Some(phase) = self.links.pages.get(&page) else {
+        let Some(phase) = self.reader.links.pages.get(&page) else {
             return;
         };
         let mut chosen: Option<(Arc<PdfPageLinks>, usize)> = None;
@@ -293,7 +297,7 @@ impl YamantakaApp {
                             palette,
                         );
                         theme::record_control_bounds(ui, &label, rect);
-                        if page == self.page
+                        if page == self.reader.page
                             && link.annotation_index == payload.links()[0].annotation_index
                             && index == 0
                         {
@@ -333,12 +337,12 @@ impl YamantakaApp {
             LinkPhase::Pending(_) => {}
         }
         if retry {
-            self.links.pages.remove(&page);
+            self.reader.links.pages.remove(&page);
         }
         if let Some((payload, link_index)) = chosen {
             match &payload.links()[link_index].target {
                 PdfLinkTarget::Internal(destination) => {
-                    self.reader_destination = Some((document.into(), *destination))
+                    self.reader.reader_destination = Some((document.into(), *destination))
                 }
                 PdfLinkTarget::Rejected(reason) => {
                     self.error = Some(match reason {
@@ -347,7 +351,7 @@ impl YamantakaApp {
                     }.to_owned());
                 }
                 PdfLinkTarget::External(_) => {
-                    self.links.confirmation = Some(ExternalConfirmation {
+                    self.reader.links.confirmation = Some(ExternalConfirmation {
                         payload,
                         link_index,
                         focus_cancel: true,

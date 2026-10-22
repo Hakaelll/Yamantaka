@@ -234,10 +234,11 @@ impl YamantakaApp {
         }
         let id = location.document.id.clone();
         let inherited = self
+            .reader
             .active
             .as_ref()
             .filter(|(document, _)| document.id == id)
-            .and(self.navigation.clone());
+            .and(self.reader.navigation.clone());
         self.sync_tab_context();
         self.tabs.cancel();
         if self.open_candidate(location.document) {

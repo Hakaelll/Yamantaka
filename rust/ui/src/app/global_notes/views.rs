@@ -149,7 +149,7 @@ impl YamantakaApp {
                 }
                 ui.add_space(24.0);
                 if ui
-                    .add_enabled_ui(!self.annotations.editing(), |ui| {
+                    .add_enabled_ui(!self.reader.annotations.editing(), |ui| {
                         theme::control(
                             ui,
                             self.tr("Abrir en el documento", "Open in document"),

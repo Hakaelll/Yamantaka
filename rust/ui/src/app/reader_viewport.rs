@@ -16,32 +16,14 @@ impl YamantakaApp {
     }
 
     pub(super) fn rebuild_reader_layout(&mut self) {
-        let (Some((_, info)), Some(preferences)) = (&self.active, &self.reader_preferences) else {
-            return;
-        };
         let direction = self.reading_direction();
-        match ReaderLayout::new(
-            info.pages.iter().map(|page| page.size()),
-            preferences,
-            direction,
-            24.0,
-        ) {
-            Ok(layout) => {
-                if let Some(navigation) = &mut self.navigation {
-                    navigation.apply_preferences(preferences, direction);
-                }
-                self.viewport.layout = Some(Arc::new(layout));
-                self.viewport.scroll_anchor = true;
-            }
-            Err(error) => {
-                self.viewport.layout = None;
-                self.error = Some(error.to_string());
-            }
+        if let Err(error) = self.reader.rebuild_layout(direction) {
+            self.error = Some(error.to_string());
         }
     }
 
     pub(super) fn step_reader(&mut self, forward: bool) {
-        if self.navigation.as_mut().is_some_and(|navigation| {
+        if self.reader.navigation.as_mut().is_some_and(|navigation| {
             if forward {
                 navigation.next_page()
             } else {
@@ -66,9 +48,9 @@ impl YamantakaApp {
         ];
         self.apply_reader_destination(document, info, viewport_size);
         let (Some(layout), Some(preferences), Some(navigation)) = (
-            self.viewport.layout.clone(),
-            self.reader_preferences.clone(),
-            self.navigation.as_ref(),
+            self.reader.viewport.layout.clone(),
+            self.reader.reader_preferences.clone(),
+            self.reader.navigation.as_ref(),
         ) else {
             ui.label(
                 RichText::new(self.tr("Preparando el documento…", "Preparing your document…"))
@@ -80,15 +62,15 @@ impl YamantakaApp {
         ui.painter()
             .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
         let mut scrolling = egui::ScrollArea::both().id_salt(("pdf-viewport", &document.id));
-        if self.viewport.scroll_anchor {
+        if self.reader.viewport.scroll_anchor {
             match layout.scroll_for_anchor(
                 viewport_size,
                 anchor,
                 preferences.zoom_mode,
-                f64::from(self.zoom),
+                f64::from(self.reader.zoom),
             ) {
                 Ok([x, y]) => {
-                    let y = self.restoration.scroll.take().unwrap_or(y);
+                    let y = self.reader.restoration.scroll.take().unwrap_or(y);
                     scrolling = scrolling.scroll_offset(egui::vec2(x as f32, y as f32));
                 }
                 Err(error) => {
@@ -96,20 +78,20 @@ impl YamantakaApp {
                     return;
                 }
             }
-            self.viewport.scroll_anchor = false;
+            self.reader.viewport.scroll_anchor = false;
         }
         let dpr = ui.ctx().pixels_per_point();
         let device_limit = ui.ctx().input(|input| input.max_texture_side).min(16384) as u32;
         let mut feedback = None;
         scrolling.show_viewport(ui, |ui, visible| {
-            if let Some(preferences) = &mut self.reader_preferences {
+            if let Some(preferences) = &mut self.reader.reader_preferences {
                 preferences.scroll_offset = f64::from(visible.top()).max(0.0);
             }
             let frame = match layout.frame(
                 viewport_size,
                 anchor,
                 preferences.zoom_mode,
-                f64::from(self.zoom),
+                f64::from(self.reader.zoom),
                 [f64::from(visible.left()), f64::from(visible.top())],
                 0.0,
             ) {
@@ -119,14 +101,14 @@ impl YamantakaApp {
                     return;
                 }
             };
-            self.viewport.scale = frame.zoom as f32;
+            self.reader.viewport.scale = frame.zoom as f32;
             ui.set_min_size(egui::vec2(
                 frame.content_size[0] as f32,
                 frame.content_size[1] as f32,
             ));
             // Only intersecting pages retain presentation leases. Cancelling a
             // consumer never cancels another ticket that shares its native render.
-            self.viewport.pages.retain(|page, slot| {
+            self.reader.viewport.pages.retain(|page, slot| {
                 let keep = frame.pages.iter().any(|visible| visible.page == *page);
                 if !keep {
                     slot.cancel.cancel();
@@ -136,7 +118,7 @@ impl YamantakaApp {
             let link_pages: Vec<u32> = frame.pages.iter().map(|visible| visible.page).collect();
             self.request_visible_links(&document.id, &link_pages);
             self.request_annotation_marks(&document.id, &link_pages);
-            self.selection.retain_visible(&document.id, &link_pages);
+            self.reader.selection.retain_visible(&document.id, &link_pages);
             self.request_selection_pages(&document.id, &link_pages);
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
@@ -153,9 +135,9 @@ impl YamantakaApp {
                     physical_width: physical[0],
                     physical_height: physical[1],
                     rotation: layout.rotation().degrees(),
-                    generation: self.viewport.generation,
+                    generation: self.reader.viewport.generation,
                 };
-                let slot = self.viewport.pages
+                let slot = self.reader.viewport.pages
                     .entry(visible.page)
                     .or_insert_with(|| ReaderPage {
                         requested: None,
@@ -170,12 +152,12 @@ impl YamantakaApp {
                     slot.requested.as_ref(),
                     Instant::now(),
                 );
-                if !self.viewport.retry
+                if !self.reader.viewport.retry
                     && let Some(delay) = decision.wake_after
                 {
                     ui.ctx().request_repaint_after(delay);
                 }
-                if !self.viewport.retry
+                if !self.reader.viewport.retry
                     && let Some(key) = decision.request
                 {
                     slot.cancel.cancel();
@@ -196,11 +178,11 @@ impl YamantakaApp {
                                 }));
                             }
                             slot.requested = Some(key.clone());
-                            self.viewport.requested = Some(key);
+                            self.reader.viewport.requested = Some(key);
                         }
                         Err(error) => {
                             self.error = Some(error.to_string());
-                            self.viewport.retry = true;
+                            self.reader.viewport.retry = true;
                         }
                     }
                 }
@@ -252,7 +234,7 @@ impl YamantakaApp {
                 self.paint_annotations(ui, visible.page, paper, layout.rotation());
                 self.paint_find_matches(ui, visible.page, paper, layout.rotation(), p);
                 self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
-                if !self.selection.enabled {
+                if !self.reader.selection.enabled {
                     self.reader_link_regions(
                         ui,
                         &document.id,
@@ -263,26 +245,26 @@ impl YamantakaApp {
                     );
                 }
             }
-            self.loading = !self.viewport.retry
-                && self.viewport.pages
+            self.reader.loading = !self.reader.viewport.retry
+                && self.reader.viewport.pages
                     .values()
                     .any(|slot| !slot.plan.ready(slot.image_key.as_ref()));
             feedback = layout.anchor_at_scroll(&frame, anchor).ok();
         });
         if let Some(position) = feedback {
-            let changed_page = position.page() != self.page;
-            if let Some(navigation) = &mut self.navigation {
+            let changed_page = position.page() != self.reader.page;
+            if let Some(navigation) = &mut self.reader.navigation {
                 navigation.update_anchor(position);
-                self.page = navigation.position().page();
+                self.reader.page = navigation.position().page();
             }
             if changed_page && layout.layout() == PageLayout::Continuous {
-                self.send(Action::Navigate(document.id.clone(), self.page));
+                self.send(Action::Navigate(document.id.clone(), self.reader.page));
             }
         }
-        if self.panel && self.reader_panel_tab == outline::ReaderPanelTab::Text {
+        if self.reader.panel && self.reader.reader_panel_tab == outline::ReaderPanelTab::Text {
             self.request_page_text(&document.id);
         } else {
-            self.text.clear();
+            self.reader.text.clear();
         }
     }
 }

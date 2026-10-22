@@ -246,18 +246,19 @@ impl YamantakaApp {
             self.metadata_preview = Some((action, 3));
         } else if stage == 4
             && self.metadata.as_ref().is_some_and(|editor| {
-                self.active
+                self.reader
+                    .active
                     .as_ref()
                     .is_some_and(|(doc, _)| doc.id == editor.document.id)
                     && editor
                         .snapshot
                         .as_ref()
                         .and_then(|s| s.title_evidence.as_ref())
-                        .is_some_and(|e| e.page == self.page)
+                        .is_some_and(|e| e.page == self.reader.page)
             })
-            && !self.loading
+            && !self.reader.loading
             && !self.opening.busy()
-            && !self.viewport.pages.is_empty()
+            && !self.reader.viewport.pages.is_empty()
         {
             if action == "source-return" {
                 self.show_surface(Surface::Library);
@@ -269,6 +270,7 @@ impl YamantakaApp {
         self.metadata.as_ref().is_some_and(|editor| {
             editor.source_opened
                 && self
+                    .reader
                     .active
                     .as_ref()
                     .is_some_and(|(document, _)| document.id == editor.document.id)
@@ -338,7 +340,7 @@ impl YamantakaApp {
             for document in self
                 .documents
                 .iter_mut()
-                .chain(self.active.iter_mut().map(|(document, _)| document))
+                .chain(self.reader.active.iter_mut().map(|(document, _)| document))
             {
                 if document.id == saved.document {
                     document.title = Some(saved.title.clone());

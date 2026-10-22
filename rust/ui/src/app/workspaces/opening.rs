@@ -6,7 +6,7 @@ impl YamantakaApp {
     ) {
         if self.tabs.busy()
             || self.opening.busy()
-            || self.reader_preferences_loading
+            || self.reader.reader_preferences_loading
             || self.library_selection.removing()
         {
             self.workspaces.error = Some(

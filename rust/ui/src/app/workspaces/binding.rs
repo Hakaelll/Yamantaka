@@ -52,7 +52,7 @@ impl YamantakaApp {
         if self.workspaces.pending_open.is_some()
             && !self.tabs.busy()
             && !self.opening.busy()
-            && !self.reader_preferences_loading
+            && !self.reader.reader_preferences_loading
         {
             let pending = self.workspaces.pending_open.take().unwrap();
             if self.tabs.model.active().map(|tab| tab.id()) == pending.target.as_deref() {
@@ -90,7 +90,7 @@ impl YamantakaApp {
             || self.workspaces.pending_open.is_some()
             || self.tabs.busy()
             || self.opening.busy()
-            || self.reader_preferences_loading
+            || self.reader.reader_preferences_loading
             || self.library_selection.removing()
         {
             if self.workspaces.close_after {

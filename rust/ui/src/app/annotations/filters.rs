@@ -50,17 +50,17 @@ impl YamantakaApp {
     pub fn preview_annotation_filters(&mut self, empty: bool) {
         if self.demo && self.capture.is_some() {
             self.preview_annotation_list();
-            self.annotations.filter_preview = Some(empty);
+            self.reader.annotations.filter_preview = Some(empty);
         }
     }
     pub(in crate::app) fn apply_annotation_filter_preview(&mut self) {
-        if !self.annotations.ready() {
+        if !self.reader.annotations.ready() {
             return;
         }
-        let Some(empty) = self.annotations.filter_preview.take() else {
+        let Some(empty) = self.reader.annotations.filter_preview.take() else {
             return;
         };
-        self.annotations.filter_draft = Filters {
+        self.reader.annotations.filter_draft = Filters {
             text: if empty {
                 "No matching study note"
             } else {
@@ -71,20 +71,21 @@ impl YamantakaApp {
             kind: Some(AnnotationKind::Highlight),
             review: Some(AnnotationReviewState::Pending),
         };
-        if self.annotations.apply_filters() {
-            self.annotations.filters_open = !empty;
+        if self.reader.annotations.apply_filters() {
+            self.reader.annotations.filters_open = !empty;
             self.annotation_command(None, 0);
         }
     }
     pub(in crate::app) fn annotation_filters_panel(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let count = self.annotations.filters.count();
+        let count = self.reader.annotations.filters.count();
         let caption = if count == 0 {
             self.tr("Filtrar notas", "Filter notes").to_owned()
         } else {
             format!("{} ({count})", self.tr("Filtros activos", "Active filters"))
         };
-        let enabled = !self.annotations.editing()
+        let enabled = !self.reader.annotations.editing()
             && !self
+                .reader
                 .annotations
                 .pending
                 .as_ref()
@@ -92,19 +93,21 @@ impl YamantakaApp {
         let mut apply = false;
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal_wrapped(|ui| {
-                if theme::navigation(ui, &caption, self.annotations.filters_open, p).clicked() {
-                    self.annotations.filters_open = !self.annotations.filters_open;
+                if theme::navigation(ui, &caption, self.reader.annotations.filters_open, p)
+                    .clicked()
+                {
+                    self.reader.annotations.filters_open = !self.reader.annotations.filters_open;
                 }
                 if count > 0
                     && theme::navigation(ui, self.tr("Restablecer", "Reset"), false, p).clicked()
                 {
-                    self.annotations.filter_draft = Filters::default();
+                    self.reader.annotations.filter_draft = Filters::default();
                     apply = true;
                 }
             });
-            if self.annotations.filters_open {
+            if self.reader.annotations.filters_open {
                 let english = self.english;
-                let draft = &mut self.annotations.filter_draft;
+                let draft = &mut self.reader.annotations.filter_draft;
                 let label = ui.label(if english { "Text" } else { "Texto" });
                 ui.add(
                     egui::TextEdit::singleline(&mut draft.text)
@@ -233,7 +236,7 @@ impl YamantakaApp {
                 }
             }
         });
-        if apply && self.annotations.apply_filters() {
+        if apply && self.reader.annotations.apply_filters() {
             self.annotation_command(None, 0);
         }
     }

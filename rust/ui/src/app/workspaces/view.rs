@@ -9,7 +9,7 @@ impl YamantakaApp {
         let busy = state.pending.is_some()
             || self.tabs.busy()
             || self.opening.busy()
-            || self.reader_preferences_loading
+            || self.reader.reader_preferences_loading
             || self.library_selection.removing();
         let mut command = None;
         let mut close = false;

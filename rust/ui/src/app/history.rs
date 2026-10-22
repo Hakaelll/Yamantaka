@@ -210,7 +210,7 @@ impl YamantakaApp {
         page: u32,
         context: ReaderSessionRestoration,
     ) {
-        if self.annotations.editing() {
+        if self.reader.annotations.editing() {
             return;
         }
         let cancel = self.open_intent.lookup_context(id.clone(), page, context);

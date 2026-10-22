@@ -38,11 +38,11 @@ impl YamantakaApp {
         }
         match self.tabs.preview {
             TabPreview::ConfigureFirst
-                if self.reader_preferences.is_some() && self.active.is_some() =>
+                if self.reader.reader_preferences.is_some() && self.reader.active.is_some() =>
             {
                 self.sync_tab_context();
                 self.tabs.preview_first = self.tabs.model.active().map(|t| t.id().to_owned());
-                let mut preferences = self.reader_preferences.clone().unwrap();
+                let mut preferences = self.reader.reader_preferences.clone().unwrap();
                 preferences.zoom_mode = ZoomMode::Custom;
                 preferences.zoom_level = 1.75;
                 preferences.page_layout = yamantaka_domain::PageLayout::Continuous;
@@ -50,12 +50,17 @@ impl YamantakaApp {
                 preferences.scroll_offset = 1500.0;
                 self.navigate(1);
                 self.apply_reader_preferences(preferences);
-                self.restoration.scroll = Some(1500.0);
+                self.reader.restoration.scroll = Some(1500.0);
                 self.tabs.preview = TabPreview::WaitFirst;
             }
             TabPreview::WaitFirst
-                if self.restoration.ready()
-                    && self.viewport.pages.values().any(|p| p.image.is_some()) =>
+                if self.reader.restoration.ready()
+                    && self
+                        .reader
+                        .viewport
+                        .pages
+                        .values()
+                        .any(|p| p.image.is_some()) =>
             {
                 if matches!(self.tabs.preview_close, 2 | 3) {
                     let id = self.tabs.model.active().unwrap().id().to_owned();
@@ -68,10 +73,14 @@ impl YamantakaApp {
             }
             TabPreview::WaitSecond
                 if !self.opening.busy()
-                    && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-1")
-                    && self.reader_preferences.is_some() =>
+                    && self
+                        .reader
+                        .active
+                        .as_ref()
+                        .is_some_and(|(d, _)| d.id == "demo-1")
+                    && self.reader.reader_preferences.is_some() =>
             {
-                let mut preferences = self.reader_preferences.clone().unwrap();
+                let mut preferences = self.reader.reader_preferences.clone().unwrap();
                 preferences.zoom_mode = ZoomMode::FitWidth;
                 preferences.page_rotation =
                     yamantaka_domain::reader_preferences::PageRotation::Deg90;
@@ -89,10 +98,19 @@ impl YamantakaApp {
             TabPreview::ReturnFirst
                 if self.tabs.pending.is_none()
                     && self.tabs.restoration.is_none()
-                    && self.restoration.ready()
-                    && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-0")
-                    && self.reader_preferences.is_some()
-                    && self.viewport.pages.values().any(|p| p.image.is_some()) =>
+                    && self.reader.restoration.ready()
+                    && self
+                        .reader
+                        .active
+                        .as_ref()
+                        .is_some_and(|(d, _)| d.id == "demo-0")
+                    && self.reader.reader_preferences.is_some()
+                    && self
+                        .reader
+                        .viewport
+                        .pages
+                        .values()
+                        .any(|p| p.image.is_some()) =>
             {
                 if self.tabs.preview_close == 4 {
                     let ids: Vec<_> = self
@@ -117,7 +135,11 @@ impl YamantakaApp {
             TabPreview::WaitInactiveClosed
                 if !self.tabs.busy()
                     && self.tabs.model.tabs().len() == 1
-                    && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-0") =>
+                    && self
+                        .reader
+                        .active
+                        .as_ref()
+                        .is_some_and(|(d, _)| d.id == "demo-0") =>
             {
                 self.tabs.preview = TabPreview::Complete;
             }
@@ -125,14 +147,18 @@ impl YamantakaApp {
                 if !self.tabs.busy()
                     && !self.opening.busy()
                     && self.tabs.restoration.is_none()
-                    && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-1") =>
+                    && self
+                        .reader
+                        .active
+                        .as_ref()
+                        .is_some_and(|(d, _)| d.id == "demo-1") =>
             {
                 self.reopen_reader_tab();
                 self.tabs.preview = TabPreview::WaitReopened;
             }
             TabPreview::WaitLastClosed
                 if !self.tabs.busy()
-                    && self.active.is_none()
+                    && self.reader.active.is_none()
                     && matches!(self.surface, Surface::Library) =>
             {
                 if self.tabs.preview_close == 3 {
@@ -146,10 +172,19 @@ impl YamantakaApp {
                 if !self.tabs.busy()
                     && !self.opening.busy()
                     && self.tabs.restoration.is_none()
-                    && self.restoration.ready()
-                    && self.active.as_ref().is_some_and(|(d, _)| d.id == "demo-0")
-                    && self.reader_preferences.is_some()
-                    && self.viewport.pages.values().any(|p| p.image.is_some()) =>
+                    && self.reader.restoration.ready()
+                    && self
+                        .reader
+                        .active
+                        .as_ref()
+                        .is_some_and(|(d, _)| d.id == "demo-0")
+                    && self.reader.reader_preferences.is_some()
+                    && self
+                        .reader
+                        .viewport
+                        .pages
+                        .values()
+                        .any(|p| p.image.is_some()) =>
             {
                 self.tabs.preview = TabPreview::Complete;
             }

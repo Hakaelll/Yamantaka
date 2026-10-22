@@ -129,8 +129,8 @@ fn physical_dimensions(
 impl YamantakaApp {
     pub fn preview_thumbnails(&mut self, page: Option<u32>) {
         if self.demo && self.capture.is_some() {
-            self.panel = true;
-            self.reader_panel_tab = outline::ReaderPanelTab::Thumbnails;
+            self.reader.panel = true;
+            self.reader.reader_panel_tab = outline::ReaderPanelTab::Thumbnails;
             self.thumbnail_preview_page = page;
         }
     }
@@ -138,7 +138,7 @@ impl YamantakaApp {
     fn choose_thumbnail_page(&mut self, page: u32, compact: bool) {
         self.navigate(page);
         if compact {
-            self.panel = false;
+            self.reader.panel = false;
         }
     }
 
@@ -148,10 +148,10 @@ impl YamantakaApp {
         info: &PdfInfo,
         p: Palette,
     ) {
-        let Some((document, _)) = &self.active else {
+        let Some((document, _)) = &self.reader.active else {
             return;
         };
-        let Some(preferences) = &self.reader_preferences else {
+        let Some(preferences) = &self.reader.reader_preferences else {
             return;
         };
         let document = document.id.clone();
@@ -159,7 +159,7 @@ impl YamantakaApp {
         if let Some(page) = self.thumbnail_preview_page.take() {
             self.choose_thumbnail_page(page.min(info.pages.len().saturating_sub(1) as u32), false);
         }
-        self.thumbnails.bind(&document, rotation);
+        self.reader.thumbnails.bind(&document, rotation);
         let compact = ui.ctx().content_rect().width() < 620.0;
         if !compact {
             ui.label(RichText::new(self.tr("Encuentra tu página", "Find your page")).size(22.0));
@@ -173,7 +173,7 @@ impl YamantakaApp {
             );
             ui.add_space(14.0);
         }
-        if let Some(error) = self.thumbnails.error.clone() {
+        if let Some(error) = self.reader.thumbnails.error.clone() {
             ui.label(self.tr(
                 "No se pudieron preparar las páginas.",
                 "Pages could not be prepared.",
@@ -183,14 +183,14 @@ impl YamantakaApp {
             });
             if theme::navigation(ui, self.tr("Volver a intentar", "Try again"), false, p).clicked()
             {
-                self.thumbnails.clear();
+                self.reader.thumbnails.clear();
             }
             return;
         }
         let row_height = if compact { 48.0 } else { 172.0 };
-        let scroll_to = if self.thumbnails.active_page != Some(self.page) {
-            self.thumbnails.active_page = Some(self.page);
-            Some(self.page as f32 * (row_height + ui.spacing().item_spacing.y))
+        let scroll_to = if self.reader.thumbnails.active_page != Some(self.reader.page) {
+            self.reader.thumbnails.active_page = Some(self.reader.page);
+            Some(self.reader.page as f32 * (row_height + ui.spacing().item_spacing.y))
         } else {
             None
         };
@@ -207,7 +207,7 @@ impl YamantakaApp {
         }
         scrolling.show_rows(ui, row_height, info.pages.len(), |ui, range| {
             visible.extend(range.clone().take(MAX_VISIBLE).map(|index| index as u32));
-            self.thumbnails.retain_visible(&visible);
+            self.reader.thumbnails.retain_visible(&visible);
             for index in range {
                 let page = index as u32;
                 let size = info.pages[index].size();
@@ -225,20 +225,21 @@ impl YamantakaApp {
                     physical_width: dimensions[0],
                     physical_height: dimensions[1],
                     rotation,
-                    generation: self.thumbnails.generation,
+                    generation: self.reader.thumbnails.generation,
                 };
                 if visible.contains(&page) {
-                    let slot = self
-                        .thumbnails
-                        .pages
-                        .entry(page)
-                        .or_insert_with(|| ReaderPage {
-                            requested: None,
-                            cancel: Cancellation::default(),
-                            image: None,
-                            image_key: None,
-                            plan: Default::default(),
-                        });
+                    let slot =
+                        self.reader
+                            .thumbnails
+                            .pages
+                            .entry(page)
+                            .or_insert_with(|| ReaderPage {
+                                requested: None,
+                                cancel: Cancellation::default(),
+                                image: None,
+                                image_key: None,
+                                plan: Default::default(),
+                            });
                     if slot.requested.as_ref() != Some(&key) {
                         slot.cancel.cancel();
                         slot.cancel = Cancellation::default();
@@ -248,7 +249,7 @@ impl YamantakaApp {
                             slot.cancel.clone(),
                         )) {
                             Ok(()) => slot.requested = Some(key),
-                            Err(error) => self.thumbnails.error = Some(error.to_string()),
+                            Err(error) => self.reader.thumbnails.error = Some(error.to_string()),
                         }
                     }
                 }
@@ -258,7 +259,7 @@ impl YamantakaApp {
                         egui::vec2(ui.available_width().max(40.0), row_height),
                         egui::Sense::click(),
                     );
-                    let selected = self.page == page;
+                    let selected = self.reader.page == page;
                     response.widget_info(|| {
                         egui::WidgetInfo::selected(
                             egui::WidgetType::Button,
@@ -314,6 +315,7 @@ impl YamantakaApp {
                     };
                     let image_rect = egui::Rect::from_center_size(center, image_size);
                     if let Some(image) = self
+                        .reader
                         .thumbnails
                         .pages
                         .get(&page)
@@ -351,7 +353,7 @@ impl YamantakaApp {
                 });
             }
         });
-        self.thumbnails.retain_visible(&visible);
+        self.reader.thumbnails.retain_visible(&visible);
         if let Some(page) = jump {
             self.choose_thumbnail_page(page, compact);
         }

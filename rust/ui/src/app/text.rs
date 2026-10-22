@@ -82,29 +82,30 @@ impl Drop for TextState {
 
 impl YamantakaApp {
     pub(super) fn request_page_text(&mut self, document: &str) {
-        if self.selection.enabled {
-            self.request_selection_pages(document, &[self.page]);
+        if self.reader.selection.enabled {
+            self.request_selection_pages(document, &[self.reader.page]);
             return;
         }
-        if let Some(cancel) = self.text.begin(document, self.page)
+        if let Some(cancel) = self.reader.text.begin(document, self.reader.page)
             && let Err(error) = self.runtime.submit(Action::TextGeometry(
                 document.into(),
-                self.page,
+                self.reader.page,
                 cancel.clone(),
             ))
         {
-            self.text
-                .accept(document, self.page, &cancel, Err(error.to_string()));
+            self.reader
+                .text
+                .accept(document, self.reader.page, &cancel, Err(error.to_string()));
         }
     }
     pub(super) fn text_panel_content(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let state = if self.selection.enabled {
-            let Some(state) = self.selection.text_state(self.page) else {
+        let state = if self.reader.selection.enabled {
+            let Some(state) = self.reader.selection.text_state(self.reader.page) else {
                 return;
             };
             state
         } else {
-            &self.text
+            &self.reader.text
         };
         let compact = ui.ctx().content_rect().width() < 620.0;
         if compact {
@@ -138,10 +139,10 @@ impl YamantakaApp {
         if let Some(error) = &state.error {
             ui.label(RichText::new(error).color(p.secondary));
             if theme::navigation(ui, self.tr("Reintentar", "Retry"), false, p).clicked() {
-                if self.selection.enabled {
-                    self.selection.retry_page(self.page);
+                if self.reader.selection.enabled {
+                    self.reader.selection.retry_page(self.reader.page);
                 } else {
-                    self.text.clear();
+                    self.reader.text.clear();
                 }
             }
             return;

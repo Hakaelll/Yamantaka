@@ -8,10 +8,10 @@ impl YamantakaApp {
             || self.tabs.busy()
             || self.opening.busy()
             || self.global_notes.writing()
-            || self.annotations.writing()
-            || self.annotations.editing()
-            || self.active.as_ref().is_some_and(|(document, _)| {
-                ids.contains(&document.id) && self.reader_preferences_loading
+            || self.reader.annotations.writing()
+            || self.reader.annotations.editing()
+            || self.reader.active.as_ref().is_some_and(|(document, _)| {
+                ids.contains(&document.id) && self.reader.reader_preferences_loading
             })
         {
             self.library_selection.notice = Some(
@@ -106,15 +106,16 @@ impl YamantakaApp {
             self.library_covers.pause(ids);
             self.runtime.wake();
             if self
+                .reader
                 .active
                 .as_ref()
                 .is_some_and(|(document, _)| ids.contains(&document.id))
             {
                 self.cancel_reader_opening();
                 self.replace_reader_state(Cancellation::default());
-                self.reader_preferences_loading = false;
-                self.active = None;
-                self.navigation = None;
+                self.reader.reader_preferences_loading = false;
+                self.reader.active = None;
+                self.reader.navigation = None;
                 self.show_surface(Surface::Library);
             }
             let result = self

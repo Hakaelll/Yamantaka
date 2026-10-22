@@ -51,10 +51,10 @@ fn mark_color(color: AnnotationColor) -> Color32 {
 }
 impl YamantakaApp {
     pub(in crate::app) fn prepare_annotations(&mut self, document: &str) {
-        self.annotations.bind(document);
-        if self.annotations.page.is_none()
-            && self.annotations.pending.is_none()
-            && self.annotations.error.is_none()
+        self.reader.annotations.bind(document);
+        if self.reader.annotations.page.is_none()
+            && self.reader.annotations.pending.is_none()
+            && self.reader.annotations.error.is_none()
         {
             self.annotation_command(None, 0);
         }
@@ -65,10 +65,15 @@ impl YamantakaApp {
         info: &PdfInfo,
         p: Palette,
     ) {
-        let busy = self.annotations.pending.is_some()
+        let busy = self.reader.annotations.pending.is_some()
             || self.global_notes.writing()
             || self.library_tags.writing();
-        let offset = self.annotations.page.as_ref().map_or(0, |page| page.offset);
+        let offset = self
+            .reader
+            .annotations
+            .page
+            .as_ref()
+            .map_or(0, |page| page.offset);
         ui.label(
             RichText::new(self.tr("Notas de lectura", "Reading notes"))
                 .size(22.0)
@@ -89,7 +94,7 @@ impl YamantakaApp {
                 ui.label(self.tr("Actualizando notas…", "Updating notes…"));
             });
         }
-        if self.annotations.saved {
+        if self.reader.annotations.saved {
             ui.label(
                 RichText::new(self.tr(
                     "Notas actualizadas en tu biblioteca.",
@@ -98,7 +103,7 @@ impl YamantakaApp {
                 .color(p.secondary),
             );
         }
-        if let Some(error) = self.annotations.error.clone() {
+        if let Some(error) = self.reader.annotations.error.clone() {
             ui.label(self.tr(
                 "No se pudieron actualizar las notas.",
                 "Notes could not be updated.",
@@ -112,7 +117,7 @@ impl YamantakaApp {
                 self.annotation_command(None, offset);
             }
         }
-        if let Some(error) = self.annotation_paint.error().map(str::to_owned) {
+        if let Some(error) = self.reader.annotation_paint.error().map(str::to_owned) {
             ui.label(self.tr(
                 "No se pudieron cargar las marcas de página.",
                 "Page marks could not be loaded.",
@@ -122,13 +127,13 @@ impl YamantakaApp {
             });
             if theme::navigation(ui, self.tr("Recargar marcas", "Reload marks"), false, p).clicked()
             {
-                self.annotation_paint.invalidate();
+                self.reader.annotation_paint.invalidate();
             }
         }
-        if self.annotations.editor.is_some() {
+        if self.reader.annotations.editor.is_some() {
             let english = self.english;
-            let fallback = self.annotations.fallback();
-            let editor = self.annotations.editor.as_mut().unwrap();
+            let fallback = self.reader.annotations.fallback();
+            let editor = self.reader.annotations.editor.as_mut().unwrap();
             ui.add_enabled_ui(!busy,|ui| {
                 if let EditorSource::Selection {snapshot,..}=&editor.source
                     && snapshot.pages().len()>1
@@ -195,13 +200,18 @@ impl YamantakaApp {
                 }
             });
             ui.add_space(12.0);
-            let valid = self.annotations.editor.as_ref().is_some_and(|editor| {
-                editor.note.encode_utf16().count() <= 4000
-                    && editor.tag_changes().is_ok()
-                    && (!fallback || editor.confirmed)
-                    && (!matches!(&editor.source, EditorSource::PageNote { .. })
-                        || !editor.note.trim().is_empty())
-            });
+            let valid = self
+                .reader
+                .annotations
+                .editor
+                .as_ref()
+                .is_some_and(|editor| {
+                    editor.note.encode_utf16().count() <= 4000
+                        && editor.tag_changes().is_ok()
+                        && (!fallback || editor.confirmed)
+                        && (!matches!(&editor.source, EditorSource::PageNote { .. })
+                            || !editor.note.trim().is_empty())
+                });
             ui.horizontal_wrapped(|ui| {
                 if ui
                     .add_enabled_ui(!busy && valid, |ui| {
@@ -217,14 +227,14 @@ impl YamantakaApp {
                     .inner
                     .clicked()
                 {
-                    match self.annotations.mutation(&self.governor) {
+                    match self.reader.annotations.mutation(&self.governor) {
                         Ok(change) => self.annotation_command(Some(change), offset),
-                        Err(error) => self.annotations.error = Some(error.to_string()),
+                        Err(error) => self.reader.annotations.error = Some(error.to_string()),
                     }
                 }
                 if !busy && theme::navigation(ui, self.tr("Cancelar", "Cancel"), false, p).clicked()
                 {
-                    self.annotations.editor = None;
+                    self.reader.annotations.editor = None;
                 }
             });
         } else {
@@ -241,7 +251,7 @@ impl YamantakaApp {
                     .on_hover_text(format!(
                         "{} {}",
                         self.tr("Añadir nota a la página", "Add note to page"),
-                        u64::from(self.page) + 1
+                        u64::from(self.reader.page) + 1
                     ))
                     .clicked()
                     {
@@ -264,19 +274,19 @@ impl YamantakaApp {
                 });
             });
         }
-        if self.annotations.editor.is_none() || self.annotation_export.busy() {
+        if self.reader.annotations.editor.is_none() || self.annotation_export.busy() {
             ui.add_space(16.0);
             self.annotation_export_panel(ui, p);
         }
         ui.add_space(16.0);
         self.annotation_filters_panel(ui, p);
         ui.add_space(12.0);
-        let Some(page) = self.annotations.page.clone() else {
+        let Some(page) = self.reader.annotations.page.clone() else {
             return;
         };
         if page.total == 0 {
             ui.label(
-                RichText::new(if self.annotations.filters.count() > 0 {
+                RichText::new(if self.reader.annotations.filters.count() > 0 {
                     self.tr(
                         "No hay notas que coincidan. Prueba otros filtros.",
                         "No notes match. Try different filters.",
@@ -294,7 +304,7 @@ impl YamantakaApp {
                 ui.separator();
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui| {
-                    let selected = self.annotations.selected.0[index];
+                    let selected = self.reader.annotations.selected.0[index];
                     let caption = format!(
                         "{} {}",
                         self.tr(
@@ -313,13 +323,14 @@ impl YamantakaApp {
                     );
                     if ui
                         .add_enabled_ui(
-                            self.annotations.pending.is_none() && !self.annotations.editing(),
+                            self.reader.annotations.pending.is_none()
+                                && !self.reader.annotations.editing(),
                             |ui| theme::navigation(ui, &caption, selected, p),
                         )
                         .inner
                         .clicked()
                     {
-                        self.annotations.selected.0[index] = !selected;
+                        self.reader.annotations.selected.0[index] = !selected;
                     }
                     ui.label(
                         RichText::new(format!(
@@ -360,12 +371,12 @@ impl YamantakaApp {
                     {
                         self.navigate(data.values.page_index);
                         if ui.ctx().content_rect().width() < 620.0 {
-                            self.panel = false;
+                            self.reader.panel = false;
                         }
                     }
                     if !busy && theme::navigation(ui, self.tr("Editar", "Edit"), false, p).clicked()
                     {
-                        self.annotations.editor = Some(AnnotationEditor {
+                        self.reader.annotations.editor = Some(AnnotationEditor {
                             source: EditorSource::Stored {
                                 page: page.clone(),
                                 index,
@@ -420,7 +431,7 @@ impl YamantakaApp {
         paper: egui::Rect,
         rotation: PageRotation,
     ) {
-        let Some(records) = self.annotation_paint.marks(page) else {
+        let Some(records) = self.reader.annotation_paint.marks(page) else {
             return;
         };
         for mark in records.marks() {

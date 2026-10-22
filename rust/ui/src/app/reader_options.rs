@@ -24,7 +24,8 @@ impl YamantakaApp {
     }
 
     pub(super) fn reader_canvas(&self, palette: Palette) -> Color32 {
-        self.reader_preferences
+        self.reader
+            .reader_preferences
             .as_ref()
             .map_or(palette.canvas, |prefs| {
                 Self::reading_paper(prefs.reading_theme)
@@ -44,18 +45,19 @@ impl YamantakaApp {
 
     pub(super) fn reader_zoom_label(&self) -> String {
         match self
+            .reader
             .reader_preferences
             .as_ref()
             .map(|prefs| prefs.zoom_mode)
         {
             Some(ZoomMode::FitPage) => self.tr("Ajustar página", "Fit page").into(),
             Some(ZoomMode::FitWidth) => self.tr("Ajustar ancho", "Fit width").into(),
-            _ => format!("{:.0}%", self.zoom * 100.0),
+            _ => format!("{:.0}%", self.reader.zoom * 100.0),
         }
     }
 
     pub(super) fn load_reader_preferences(&mut self, preferences: ReaderPreferences) {
-        self.reader_preferences_loading = false;
+        self.reader.reader_preferences_loading = false;
         let preferences = self.restore_loaded_preferences(preferences);
         let preferences = self.restore_tab_preferences(preferences);
         let zoom = preferences.zoom_level as f32;
@@ -63,20 +65,20 @@ impl YamantakaApp {
             self.error = Some("Reader zoom cannot be represented".into());
             return;
         }
-        self.zoom = zoom;
-        self.viewport.scale = zoom;
+        self.reader.zoom = zoom;
+        self.reader.viewport.scale = zoom;
         let start = preferences.page_rotation.unrotate_point([0.5, 0.0]);
-        self.reader_preferences = Some(preferences);
+        self.reader.reader_preferences = Some(preferences);
         self.rebuild_reader_layout();
-        if let Some(navigation) = &mut self.navigation {
+        if let Some(navigation) = &mut self.reader.navigation {
             navigation.update_anchor(
-                ReaderPosition::at(self.page, start)
+                ReaderPosition::at(self.reader.page, start)
                     .expect("Quarter-turn page starts are normalized"),
             );
         }
-        self.viewport.generation += 1;
-        self.viewport.cancel.cancel();
-        self.viewport.cancel = Cancellation::default();
+        self.reader.viewport.generation += 1;
+        self.reader.viewport.cancel.cancel();
+        self.reader.viewport.cancel = Cancellation::default();
         self.reset_render_request();
         self.sync_tab_context();
     }
@@ -92,12 +94,12 @@ impl YamantakaApp {
             self.error = Some("Reader zoom cannot be represented".into());
             return;
         }
-        self.zoom = zoom;
-        self.viewport.generation += 1;
-        self.viewport.cancel.cancel();
-        self.viewport.cancel = Cancellation::default();
+        self.reader.zoom = zoom;
+        self.reader.viewport.generation += 1;
+        self.reader.viewport.cancel.cancel();
+        self.reader.viewport.cancel = Cancellation::default();
         self.reset_render_request();
-        self.reader_preferences = Some(preferences.clone());
+        self.reader.reader_preferences = Some(preferences.clone());
         self.rebuild_reader_layout();
         if !self.demo {
             self.send(Action::SaveReaderPreferences(
@@ -160,7 +162,7 @@ impl YamantakaApp {
         if theme::navigation(
             ui,
             self.tr("Seleccionar texto", "Select text"),
-            self.selection.enabled,
+            self.reader.selection.enabled,
             p,
         )
         .clicked()
@@ -169,9 +171,9 @@ impl YamantakaApp {
             ui.close();
         }
         ui.separator();
-        let Some(mut preferences) = self.reader_preferences.clone() else {
+        let Some(mut preferences) = self.reader.reader_preferences.clone() else {
             ui.label(
-                RichText::new(if self.reader_preferences_loading {
+                RichText::new(if self.reader.reader_preferences_loading {
                     self.tr("Cargando preferencias…", "Loading preferences…")
                 } else {
                     self.tr(
@@ -214,13 +216,13 @@ impl YamantakaApp {
                 if theme::icon_button(ui, self.tr("Alejar", "Zoom out"), theme::Icon::Minus, p)
                     .clicked()
                 {
-                    self.set_reader_zoom(self.viewport.scale / 1.2);
+                    self.set_reader_zoom(self.reader.viewport.scale / 1.2);
                 }
                 ui.label(self.reader_zoom_label());
                 if theme::icon_button(ui, self.tr("Acercar", "Zoom in"), theme::Icon::Plus, p)
                     .clicked()
                 {
-                    self.set_reader_zoom(self.viewport.scale * 1.2);
+                    self.set_reader_zoom(self.reader.viewport.scale * 1.2);
                 }
             });
             let environments = [

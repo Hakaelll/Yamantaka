@@ -2,7 +2,7 @@ use super::*;
 
 impl YamantakaApp {
     pub(super) fn navigation_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let Some(navigation) = self.navigation.as_ref() else {
+        let Some(navigation) = self.reader.navigation.as_ref() else {
             return;
         };
         let back = navigation.can_back();
@@ -22,7 +22,11 @@ impl YamantakaApp {
             .inner
             .clicked()
         {
-            changed = self.navigation.as_mut().is_some_and(ReaderNavigation::back);
+            changed = self
+                .reader
+                .navigation
+                .as_mut()
+                .is_some_and(ReaderNavigation::back);
         }
         if ui
             .add_enabled_ui(forward, |ui| {
@@ -39,16 +43,21 @@ impl YamantakaApp {
             .clicked()
         {
             changed = self
+                .reader
                 .navigation
                 .as_mut()
                 .is_some_and(ReaderNavigation::forward);
         }
         ui.separator();
         for (slot, name) in [(MarkSlot::A, "A"), (MarkSlot::B, "B")] {
-            let mark = self.navigation.as_ref().and_then(|nav| nav.mark(slot));
+            let mark = self
+                .reader
+                .navigation
+                .as_ref()
+                .and_then(|nav| nav.mark(slot));
             let save = format!("{} {name}", self.tr("Guardar posición", "Save position"));
             if theme::navigation(ui, &save, false, p).clicked()
-                && let Some(nav) = self.navigation.as_mut()
+                && let Some(nav) = self.reader.navigation.as_mut()
             {
                 nav.capture_mark(slot);
                 ui.close();
@@ -68,6 +77,7 @@ impl YamantakaApp {
                 .clicked()
             {
                 changed = self
+                    .reader
                     .navigation
                     .as_mut()
                     .is_some_and(|nav| nav.jump_to_mark(slot));
