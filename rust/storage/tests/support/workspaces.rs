@@ -194,5 +194,72 @@ pub fn preserved_split_references(document: &str) {
         .unwrap()
         .unwrap();
     assert_eq!(reread.workspace_reference(), Some(&reference));
+    let comparison = WorkspaceComparison {
+        primary: "original".into(),
+        document: "original".into(),
+        page: 3,
+        point: [0.6, 0.2],
+        zoom_mode: "custom".into(),
+        zoom: 1.6,
+        theme: "sepia".into(),
+        rotation: 90,
+        horizontal_margin: 48.0,
+        vertical_margin: 24.0,
+        ratio: 0.6,
+        follow_page: true,
+        follow_zoom: false,
+        follow_position: false,
+    };
+    let change = WorkspaceChange::Comparison {
+        expected: reference.clone(),
+        value: Some(comparison.clone()),
+    };
+    let WorkspaceChanged::Saved(with_comparison) =
+        database.change_workspace(&change, &cancel).unwrap()
+    else {
+        panic!("Comparison must return its committed revision");
+    };
+    assert!(database.change_workspace(&change, &cancel).is_err());
+    let snapshot = database
+        .startup_workspace(Some(&(&with_comparison).into()), &cancel)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        snapshot.view.parsed_query().unwrap().comparison,
+        Some(comparison.clone())
+    );
+    assert_eq!(snapshot.reference_document.unwrap().id, "original");
+    assert_eq!(snapshot.view.query["custom"], "retained");
+    let mut invalid = comparison;
+    invalid.point = [0.5, 1.1];
+    assert!(
+        database
+            .change_workspace(
+                &WorkspaceChange::Comparison {
+                    expected: (&with_comparison).into(),
+                    value: Some(invalid)
+                },
+                &cancel
+            )
+            .is_err()
+    );
+    let WorkspaceChanged::Saved(without_comparison) = database
+        .change_workspace(
+            &WorkspaceChange::Comparison {
+                expected: (&with_comparison).into(),
+                value: None,
+            },
+            &cancel,
+        )
+        .unwrap()
+    else {
+        panic!("Comparison removal must return its revision");
+    };
+    let snapshot = database
+        .workspace(&(&without_comparison).into(), &cancel)
+        .unwrap();
+    assert!(snapshot.view.parsed_query().unwrap().comparison.is_none());
+    assert!(snapshot.reference_document.is_none());
+    assert_eq!(snapshot.view.query["custom"], "retained");
     database.integrity().unwrap();
 }

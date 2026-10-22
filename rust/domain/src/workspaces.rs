@@ -1,5 +1,7 @@
 use crate::reader_tabs::DocumentTabs;
+mod comparison;
 mod view;
+pub use comparison::WorkspaceComparison;
 pub use view::*;
 
 #[derive(Clone, Debug)]
@@ -33,6 +35,7 @@ pub struct WorkspaceReadings {
     pub tabs: DocumentTabs,
     pub captions: Vec<(String, String)>,
     pub view: WorkspaceView,
+    pub reference_document: Option<crate::Document>,
 }
 pub enum WorkspaceChanged {
     Saved(Workspace),
@@ -70,6 +73,10 @@ pub enum WorkspaceChange {
     Focus {
         expected: WorkspaceRevision,
         enabled: bool,
+    },
+    Comparison {
+        expected: WorkspaceRevision,
+        value: Option<WorkspaceComparison>,
     },
     Delete {
         expected: WorkspaceRevision,

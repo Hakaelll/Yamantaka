@@ -118,11 +118,18 @@ pub(super) fn load(
             }
         }
     }
+    let reference_document = view
+        .parsed_query()?
+        .comparison
+        .map(|comparison| yamantaka_domain::LibraryRepository::get(database, &comparison.document))
+        .transpose()?
+        .flatten();
     cancel.check()?;
     Ok(WorkspaceReadings {
         workspace,
         tabs: model,
         captions,
         view,
+        reference_document,
     })
 }

@@ -148,6 +148,40 @@ impl Database {
                 .map_err(storage)?;
                 expected.id.clone()
             }
+            WorkspaceChange::Comparison { expected, value } => {
+                verify(&tx, expected)?;
+                if let Some(value) = value {
+                    value.validate()?;
+                }
+                let existing: String = tx
+                    .query_row(
+                        "SELECT query_json FROM workspaces WHERE id=?",
+                        [&expected.id],
+                        |row| row.get(0),
+                    )
+                    .map_err(storage)?;
+                let mut query: serde_json::Value =
+                    serde_json::from_str(&existing).map_err(storage)?;
+                query
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        invalid("Workspace query must be an object; stored data is preserved")
+                    })?
+                    .insert(
+                        "yamantakaRustComparison".into(),
+                        serde_json::to_value(value).map_err(storage)?,
+                    );
+                tx.execute(
+                    "UPDATE workspaces SET query_json=?,updated_at=? WHERE id=?",
+                    params![
+                        serde_json::to_string(&query).map_err(storage)?,
+                        next_revision(Some(&expected.updated_at)),
+                        expected.id
+                    ],
+                )
+                .map_err(storage)?;
+                expected.id.clone()
+            }
             WorkspaceChange::Rename {
                 expected,
                 name: value,

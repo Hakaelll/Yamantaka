@@ -54,6 +54,8 @@ pub struct WorkspaceQuery {
     pub list: bool,
     pub inspector: bool,
     pub smart_view: Option<String>,
+    #[serde(rename = "yamantakaRustComparison")]
+    pub comparison: Option<super::WorkspaceComparison>,
     #[serde(flatten)]
     pub unknown: BTreeMap<String, Value>,
 }
@@ -80,6 +82,9 @@ impl WorkspaceView {
             return Err(Failure::Invalid(
                 "Unknown saved workspace library view; stored data is preserved".into(),
             ));
+        }
+        if let Some(comparison) = &query.comparison {
+            comparison.validate()?;
         }
         Ok(query)
     }

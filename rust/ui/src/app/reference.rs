@@ -5,6 +5,7 @@ mod admission;
 mod chooser;
 mod password;
 mod preview;
+mod saved;
 use admission::Admission;
 
 pub(super) struct ReferenceView {
@@ -33,7 +34,7 @@ impl Drop for ReferenceView {
 }
 
 impl ReferenceView {
-    fn new(
+    pub(in crate::app) fn new(
         source: &reader_pane::ReaderPane,
         direction: ReadingDirection,
     ) -> yamantaka_domain::Result<Self> {
@@ -497,13 +498,14 @@ impl YamantakaApp {
             egui::CursorIcon::ResizeHorizontal
         });
         if drag.dragged() {
-            reference.ratio = (reference.ratio
-                + if stacked {
-                    drag.drag_delta().y
-                } else {
-                    drag.drag_delta().x
-                } / extent.max(1.0))
-            .clamp(0.2, 0.8);
+            reference.set_ratio(
+                reference.ratio
+                    + if stacked {
+                        drag.drag_delta().y
+                    } else {
+                        drag.drag_delta().x
+                    } / extent.max(1.0),
+            );
         }
         ui.painter().line_segment(
             if stacked {

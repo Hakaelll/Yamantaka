@@ -7,6 +7,11 @@ impl YamantakaApp {
         let mut state = std::mem::take(&mut self.workspaces);
         let p = Palette::new(self.dark);
         let busy = state.pending.is_some()
+            || state.comparison_restore.is_some()
+            || self
+                .reference
+                .as_ref()
+                .is_some_and(|reference| reference.busy())
             || self.tabs.busy()
             || self.opening.busy()
             || self.reader.reader_preferences_loading

@@ -26,18 +26,22 @@ pub(super) struct WorkspaceBinding {
     pub(super) queue: QueueContext,
     pub(super) focus: bool,
     pub(super) paused: bool,
+    pub(super) comparison: Option<yamantaka_domain::workspaces::WorkspaceComparison>,
 }
 pub(super) struct PendingContext {
     pub(super) workspace: Workspace,
     pub(super) view: WorkspaceView,
     pub(super) target: Option<String>,
+    pub(super) reference_document: Option<Document>,
 }
 impl YamantakaApp {
     fn workspace_dirty(&self) -> bool {
         self.workspaces.binding.as_ref().is_some_and(|binding| {
             !binding.paused
                 && (binding.queue != QueueContext::capture(&self.tabs.model)
-                    || binding.focus != self.reader_focus)
+                    || binding.focus != self.reader_focus
+                    || self.workspaces.comparison_restore.is_none()
+                        && binding.comparison != self.capture_workspace_comparison())
         })
     }
     pub(in crate::app) fn guard_workspace_close(&mut self, ctx: &egui::Context) {
@@ -65,9 +69,16 @@ impl YamantakaApp {
                     queue: QueueContext::capture(&self.tabs.model),
                     focus: pending.view.focus,
                     paused: false,
+                    comparison: pending
+                        .view
+                        .parsed_query()
+                        .ok()
+                        .and_then(|query| query.comparison),
                 });
+                self.schedule_workspace_comparison(&pending.view, pending.reference_document);
             }
         }
+        self.pump_workspace_comparison();
         if let Some(binding) = &self.workspaces.binding
             && let Err(error) = self
                 .tabs
@@ -88,6 +99,11 @@ impl YamantakaApp {
         }
         if self.workspaces.pending.is_some()
             || self.workspaces.pending_open.is_some()
+            || self.workspaces.comparison_restore.is_some()
+            || self
+                .reference
+                .as_ref()
+                .is_some_and(|reference| reference.busy())
             || self.tabs.busy()
             || self.opening.busy()
             || self.reader.reader_preferences_loading
@@ -107,11 +123,31 @@ impl YamantakaApp {
                     tabs: Box::new(self.tabs.model.clone()),
                     view: None,
                 }
-            } else {
+            } else if binding.focus != self.reader_focus {
                 WorkspaceChange::Focus {
                     expected,
                     enabled: self.reader_focus,
                 }
+            } else {
+                let value = self.capture_workspace_comparison();
+                let now = Instant::now();
+                if self
+                    .workspaces
+                    .comparison_due
+                    .as_ref()
+                    .is_none_or(|(previous, _)| *previous != value)
+                {
+                    self.workspaces.comparison_due = Some((value.clone(), now));
+                }
+                let due = self.workspaces.comparison_due.as_ref().unwrap().1;
+                if !self.workspaces.close_after
+                    && now.duration_since(due) < Duration::from_millis(600)
+                {
+                    ctx.request_repaint_after(Duration::from_millis(600));
+                    return;
+                }
+                self.workspaces.comparison_due = None;
+                WorkspaceChange::Comparison { expected, value }
             };
             self.workspace_change(change);
             ctx.request_repaint();
@@ -158,6 +194,7 @@ impl YamantakaApp {
                         queue: QueueContext::capture(tabs),
                         focus: view.focus,
                         paused: false,
+                        comparison: view.parsed_query().ok().and_then(|query| query.comparison),
                     });
                     return;
                 }
@@ -171,10 +208,16 @@ impl YamantakaApp {
                             binding.queue = QueueContext::capture(&tabs);
                             if let Some(view) = view {
                                 binding.focus = view.focus;
+                                binding.comparison =
+                                    view.parsed_query().ok().and_then(|query| query.comparison);
                             }
                         }
                         Some(WorkspaceChange::Focus { enabled, .. }) => {
                             binding.focus = enabled;
+                            binding.paused = false;
+                        }
+                        Some(WorkspaceChange::Comparison { value, .. }) => {
+                            binding.comparison = value;
                             binding.paused = false;
                         }
                         _ => {}

@@ -19,6 +19,12 @@ impl YamantakaApp {
             return;
         }
         self.sync_tab_context();
+        if self.reference_blocks_switch() {
+            return;
+        }
+        if self.reference.is_some() {
+            self.request_reference_close();
+        }
         let mut plan = yamantaka_domain::reader_tabs::DocumentTabs::default();
         let mut selected = None;
         let mut readings = Vec::new();
@@ -61,6 +67,7 @@ impl YamantakaApp {
                 workspace: saved.workspace.clone(),
                 view: saved.view,
                 target: selected,
+                reference_document: saved.reference_document,
             });
             self.workspaces.open = false;
             self.workspaces.notice = Some(format!(

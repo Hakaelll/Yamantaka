@@ -91,10 +91,29 @@ impl YamantakaApp {
                 self.grouping.mode = super::super::library_grouping::Grouping::Author;
                 self.library_density = yamantaka_domain::workspaces::WorkspaceDensity::Compact;
                 self.workspaces.preview = 2;
+                let mut view = self.capture_workspace_view();
+                let mut query = view.parsed_query().unwrap();
+                query.comparison = Some(yamantaka_domain::workspaces::WorkspaceComparison {
+                    primary: self.documents[2].id.clone(),
+                    document: self.documents[1].id.clone(),
+                    page: 1,
+                    point: [0.5, 0.0],
+                    zoom_mode: "custom".into(),
+                    zoom: 0.8,
+                    theme: "sepia".into(),
+                    rotation: 90,
+                    horizontal_margin: 48.0,
+                    vertical_margin: 24.0,
+                    ratio: 0.6,
+                    follow_page: false,
+                    follow_zoom: false,
+                    follow_position: false,
+                });
+                view.query = serde_json::to_value(query).unwrap();
                 self.workspace_change(WorkspaceChange::Create {
                     name: "Study".into(),
                     tabs: Box::new(self.workspace_fixture()),
-                    view: Box::new(self.capture_workspace_view()),
+                    view: Box::new(view),
                 });
             }
             2 => {
@@ -143,11 +162,26 @@ impl YamantakaApp {
             }
             8 if self.reader.active.is_some()
                 && self.tabs.ready()
+                && self.workspaces.comparison_restore.is_none()
+                && self
+                    .reference
+                    .as_ref()
+                    .is_some_and(|reference| !reference.busy() && !reference.pane.loading)
                 && !self.reader.reader_preferences_loading =>
             {
                 assert_eq!(self.query, "Architecture");
                 assert!(self.list && self.reader_focus && self.workspaces.binding.is_some());
                 assert!(self.grouping.mode == super::super::library_grouping::Grouping::Author);
+                let comparison = self.capture_workspace_comparison().unwrap();
+                assert_eq!(comparison.document, "demo-1");
+                assert_eq!(comparison.primary, "demo-2");
+                assert_eq!(comparison.page, 1);
+                assert_eq!(comparison.rotation, 90);
+                assert!((comparison.zoom - 0.8).abs() < 0.0001);
+                assert_eq!(comparison.ratio, 0.6);
+                let reference = self.reference.as_mut().unwrap();
+                reference.follow_zoom = true;
+                reference.set_ratio(0.55);
                 let active = self.tabs.model.active().unwrap().id().to_owned();
                 self.tabs
                     .model
@@ -169,7 +203,13 @@ impl YamantakaApp {
                 self.workspaces.preview = 9;
                 self.show_workspaces();
             }
-            9 => {
+            9 if self
+                .workspaces
+                .binding
+                .as_ref()
+                .and_then(|binding| binding.comparison.as_ref())
+                .is_some_and(|comparison| comparison.follow_zoom && comparison.ratio == 0.55) =>
+            {
                 use yamantaka_domain::LibraryRepository;
                 let database = yamantaka_storage::Database::open_read_only(
                     &self.store.join("export-preview.sqlite3"),
@@ -185,6 +225,11 @@ impl YamantakaApp {
                     .unwrap();
                 self.check_workspace_preview(&saved);
                 assert!(!saved.view.focus);
+                let comparison = saved.view.parsed_query().unwrap().comparison.unwrap();
+                assert_eq!(comparison.document, "demo-1");
+                assert!(comparison.follow_zoom);
+                assert_eq!(comparison.ratio, 0.55);
+                assert_eq!(saved.reference_document.as_ref().unwrap().id, "demo-1");
                 assert_eq!(
                     saved.tabs.active().unwrap().queue().status(),
                     QueueStatus::Reviewed

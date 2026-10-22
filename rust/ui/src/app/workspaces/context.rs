@@ -22,6 +22,7 @@ impl YamantakaApp {
             list: self.list,
             inspector: self.inspector,
             smart_view: self.smart_view.map(|view| view.key().into()),
+            comparison: self.capture_workspace_comparison(),
             ..Default::default()
         };
         WorkspaceView {

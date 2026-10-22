@@ -103,7 +103,18 @@ impl YamantakaApp {
                 queue: QueueContext::capture(&self.tabs.model),
                 focus: saved.view.focus,
                 paused: false,
+                comparison: saved
+                    .view
+                    .parsed_query()
+                    .ok()
+                    .and_then(|query| query.comparison),
             });
+            if unchanged {
+                self.schedule_workspace_comparison(&saved.view, saved.reference_document);
+            } else {
+                let comparison = self.capture_workspace_comparison();
+                self.workspaces.binding.as_mut().unwrap().comparison = comparison;
+            }
         } else if unchanged && self.tabs.model.tabs().is_empty() && self.reader.active.is_none() {
             self.open_saved_workspace(*saved);
         }

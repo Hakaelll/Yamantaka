@@ -4,6 +4,7 @@ use yamantaka_application::workspaces::{
 };
 use yamantaka_domain::workspaces::{Workspace, WorkspaceChange, WorkspacePage, WorkspaceRevision};
 mod binding;
+mod comparison;
 mod context;
 mod opening;
 mod preview;
@@ -21,6 +22,11 @@ pub(super) struct WorkspaceState {
     loading: bool,
     pending_change: Option<WorkspaceChange>,
     pending_open: Option<PendingContext>,
+    comparison_restore: Option<comparison::RestoreComparison>,
+    comparison_due: Option<(
+        Option<yamantaka_domain::workspaces::WorkspaceComparison>,
+        Instant,
+    )>,
     binding: Option<WorkspaceBinding>,
     pub(super) close_after: bool,
     draft: String,
@@ -39,6 +45,7 @@ impl WorkspaceState {
     pub(super) fn ready(&self) -> bool {
         self.pending.is_none()
             && self.pending_open.is_none()
+            && self.comparison_restore.is_none()
             && self.preview == 0
             && self.startup == startup::Startup::Finished
     }
@@ -115,7 +122,7 @@ impl YamantakaApp {
                 if change.is_some() {
                     self.workspaces.close_after = false;
                     if let Some(binding) = &mut self.workspaces.binding
-                        && matches!(&change,Some(WorkspaceChange::Replace {expected,..}|WorkspaceChange::Focus {expected,..}) if expected.id==binding.workspace.id)
+                        && matches!(&change,Some(WorkspaceChange::Replace {expected,..}|WorkspaceChange::Focus {expected,..}|WorkspaceChange::Comparison {expected,..}) if expected.id==binding.workspace.id)
                     {
                         binding.paused = true;
                     }
