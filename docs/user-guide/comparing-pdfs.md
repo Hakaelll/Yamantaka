@@ -30,6 +30,12 @@ Select a result to jump to its passage. Results are highlighted in the reference
 
 Use **Cancel search** to stop an active search. Closing its popup also stops a running scan; completed results remain available. A PDF without extractable text reports that condition. The main reading keeps its own query, results and selection.
 
+## Use PDF links
+
+Select an internal link in the reference to open its destination in that pane. Destination position and zoom are retained. Page and zoom synchronization follow your selected comparison options.
+
+Web and email links ask for confirmation before Windows opens the destination in another application. Select **Cancel** to stay in the reader. Unsupported targets display a message without opening another application.
+
 ## Mark differences manually
 
 In **Link views**, find **Differences · manual marks**. **Mark this page** marks the main reading's current page; **Remove mark** removes it. Matching page numbers have a thin accent border in both views.
@@ -44,4 +50,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, zoom and text search. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, zoom, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

@@ -241,7 +241,7 @@ impl YamantakaApp {
                 self.reader.selection.clear();
             }
         });
-        let modal = self.password.is_some() || self.reader.links.confirmation_open();
+        let modal = self.password.is_some() || self.link_confirmation_open();
         copy |= self.reader.selection.edit_commands(ui.ctx(), modal);
         if copy {
             match self.reader.selection.copy(&self.governor) {
@@ -285,7 +285,7 @@ impl YamantakaApp {
         if !self.reader.selection.enabled
             || self.reader.selection.document.as_deref() != Some(document)
             || self.password.is_some()
-            || self.reader.links.confirmation_open()
+            || self.link_confirmation_open()
         {
             return;
         }

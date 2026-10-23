@@ -1,0 +1,11 @@
+# Reference PDF links checkpoint
+
+The reference now loads and activates PDF links for its visible pages. Internal links use the same canonical destination resolver as the main reading, including destination position and zoom. Selecting one updates the reference; page and zoom synchronization then follow the selected comparison options. External links use that pane's existing validated target and confirmation dialog. Rejected targets report their error without opening another application.
+
+Both panes share link request scheduling, hit-region geometry, keyboard interaction, target handling and external confirmation presentation. Each retains its own document, page requests, cancellation identities and pending confirmation. Interactive IDs include the pane's UI scope. Replies route to the matching owner before the main reader receives them. At most two link-page requests are pending per pane. Requests and interactions pause during reference admission and closure, and closing the reference cancels its pending link consumers.
+
+Modal and shortcut guards now recognize an external-link confirmation from either pane. The reference keeps the destination payload alive while asking for confirmation. Native captures retain the existing protection against dispatching approved targets to external applications.
+
+The native binary compiled. Three focused native scenarios passed; no standalone Rust tests or broad suite were added. `reader-reference-links` activates an internal link by keyboard in a distinct reference PDF and confirms it reaches page 2 while the main reading remains on page 1. `reader-reference-external` confirms that the reference's own external-link dialog opens while the main link state remains unchanged; Cancel and Open are both wholly visible and enabled. `links-keyboard` checks the main reader's existing keyboard navigation through the shared implementation. The [internal-link capture](../screenshots/rust-reference-links/reader-reference-links.png), [external confirmation capture](../screenshots/rust-reference-links/reader-reference-external.png) and adjacent control records retain the evidence.
+
+Other secondary reader tools, overlays, physical accessibility and performance acceptance, and Release packaging remain pending.

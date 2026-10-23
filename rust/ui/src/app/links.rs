@@ -1,4 +1,6 @@
 use super::*;
+mod dialog;
+mod regions;
 use yamantaka_domain::{
     pdf_links::{ExternalLinkRejection, PdfLinkTarget, PdfPageLinks},
     reader_preferences::PageRotation,
@@ -31,6 +33,7 @@ impl Drop for LinkPhase {
 
 #[derive(Default)]
 pub(super) struct LinkState {
+    pub(super) preview: LinkPreview,
     document: Option<String>,
     pages: HashMap<u32, LinkPhase>,
     confirmation: Option<ExternalConfirmation>,
@@ -42,6 +45,12 @@ struct ExternalConfirmation {
 }
 
 impl LinkState {
+    pub(super) fn owns(&self, document: &str, page: u32, cancel: &Cancellation) -> bool {
+        self.document.as_deref() == Some(document)
+            && !cancel.is_cancelled()
+            && matches!(self.pages.get(&page), Some(LinkPhase::Pending(current)) if current.same_request(cancel))
+    }
+
     pub(super) fn confirmation_open(&self) -> bool {
         self.confirmation.is_some()
     }
@@ -68,7 +77,7 @@ impl LinkState {
                 })
                 .sum::<usize>()
         };
-        serde_json::json!({"residentPages":self.pages.len(), "readyPages":self.pages.values().filter(|phase| matches!(phase, LinkPhase::Ready(_))).count(), "internalLinks":count(|target| matches!(target, PdfLinkTarget::Internal(_))), "externalLinks":count(|target| matches!(target, PdfLinkTarget::External(_))), "rejectedLinks":count(|target| matches!(target, PdfLinkTarget::Rejected(_))), "confirmationOpen":self.confirmation.is_some()})
+        serde_json::json!({"keyboardActivated":self.preview==LinkPreview::Complete,"residentPages":self.pages.len(), "readyPages":self.pages.values().filter(|phase| matches!(phase, LinkPhase::Ready(_))).count(), "internalLinks":count(|target| matches!(target, PdfLinkTarget::Internal(_))), "externalLinks":count(|target| matches!(target, PdfLinkTarget::External(_))), "rejectedLinks":count(|target| matches!(target, PdfLinkTarget::Rejected(_))), "confirmationOpen":self.confirmation.is_some()})
     }
 
     pub(super) fn clear(&mut self) {
@@ -135,230 +144,35 @@ impl LinkState {
 impl YamantakaApp {
     pub fn preview_links(&mut self, activate: bool) {
         if self.demo && self.capture.is_some() {
-            self.link_preview = if activate {
+            self.reader.links.preview = if activate {
                 LinkPreview::Activate
             } else {
                 LinkPreview::Focus
             };
         }
     }
+    pub(super) fn link_confirmation_open(&self) -> bool {
+        self.reader.links.confirmation_open()
+            || self
+                .reference
+                .as_ref()
+                .is_some_and(|reference| reference.pane.links.confirmation_open())
+    }
     pub(super) fn external_link_dialog(&mut self, ctx: &egui::Context) {
-        let Some(mut confirmation) = self.reader.links.confirmation.take() else {
-            return;
+        let p = Palette::new(self.dark);
+        let is_capture = self.demo && self.capture.is_some();
+        let error = if self.reader.links.confirmation_open() {
+            self.reader.links.dialog(ctx, p, self.english, is_capture)
+        } else if let Some(reference) = &mut self.reference {
+            reference
+                .pane
+                .links
+                .dialog(ctx, p, self.english, is_capture)
+        } else {
+            None
         };
-        let PdfLinkTarget::External(uri) =
-            &confirmation.payload.links()[confirmation.link_index].target
-        else {
-            return;
-        };
-        let palette = Palette::new(self.dark);
-        let compact = ctx.content_rect().height() < 420.0;
-        let mut approved = false;
-        let mut cancelled = false;
-        let modal = egui::Modal::new(egui::Id::new("confirm-external-pdf-link"))
-            .frame(
-                egui::Frame::new()
-                    .fill(palette.surface)
-                    .stroke(egui::Stroke::new(1.0, palette.line))
-                    .corner_radius(12)
-                    .inner_margin(if compact { 12 } else { 24 }),
-            )
-            .show(ctx, |ui| {
-                ui.set_width((ctx.content_rect().width() - 48.0).clamp(160.0, 440.0));
-                ui.label(
-                    RichText::new(self.tr("Abrir enlace externo", "Open external link"))
-                        .size(if compact { 20.0 } else { 24.0 })
-                        .color(palette.ink),
-                );
-                ui.add_space(if compact { 4.0 } else { 12.0 });
-                egui::ScrollArea::vertical()
-                    .max_height((ctx.content_rect().height() - 144.0).max(48.0))
-                    .show(ui, |ui| {
-                        ui.label(
-                            RichText::new(self.tr(
-                                "Windows abrirá este destino en otra aplicación.",
-                                "Windows will open this destination in another application.",
-                            ))
-                            .color(palette.secondary),
-                        );
-                        ui.add_space(if compact { 4.0 } else { 12.0 });
-                        ui.add(
-                            egui::Label::new(RichText::new(uri.as_str()).color(palette.ink)).wrap(),
-                        );
-                    });
-                ui.add_space(if compact { 4.0 } else { 16.0 });
-                ui.horizontal_wrapped(|ui| {
-                    let cancel =
-                        theme::navigation(ui, self.tr("Cancelar", "Cancel"), false, palette);
-                    if confirmation.focus_cancel {
-                        cancel.request_focus();
-                        confirmation.focus_cancel = false;
-                    }
-                    cancelled = cancel.clicked();
-                    approved = theme::control(
-                        ui,
-                        self.tr("Abrir", "Open"),
-                        Some(theme::Icon::Right),
-                        true,
-                        false,
-                        palette,
-                    )
-                    .clicked();
-                });
-            });
-        cancelled |= modal.should_close();
-        if cancelled {
-            return;
-        }
-        if approved {
-            // Native captures never dispatch to an external application.
-            if self.demo && self.capture.is_some() {
-                return;
-            }
-            if let Err(error) = yamantaka_windows::open_external_uri(uri) {
-                self.error = Some(error.to_string());
-            } else {
-                return;
-            }
-        }
-        self.reader.links.confirmation = Some(confirmation);
-    }
-
-    pub(super) fn request_visible_links(&mut self, document: &str, pages: &[u32]) {
-        self.reader.links.retain(document, pages);
-        for page in self.reader.links.next_pages(pages) {
-            if self.reader.links.pages.contains_key(&page) {
-                continue;
-            }
-            let cancel = Cancellation::default();
-            match self
-                .runtime
-                .submit(Action::PageLinks(document.into(), page, cancel.clone()))
-            {
-                Ok(()) => {
-                    self.reader
-                        .links
-                        .pages
-                        .insert(page, LinkPhase::Pending(cancel));
-                }
-                Err(error) => {
-                    self.reader
-                        .links
-                        .pages
-                        .insert(page, LinkPhase::Failed(error.to_string()));
-                }
-            }
-        }
-    }
-
-    pub(super) fn reader_link_regions(
-        &mut self,
-        ui: &mut egui::Ui,
-        document: &str,
-        page: u32,
-        paper: egui::Rect,
-        rotation: PageRotation,
-        palette: Palette,
-    ) {
-        let Some(phase) = self.reader.links.pages.get(&page) else {
-            return;
-        };
-        let mut chosen: Option<(Arc<PdfPageLinks>, usize)> = None;
-        let mut retry = false;
-        match phase {
-            LinkPhase::Ready(payload) => {
-                for (link_index, link) in payload.links().iter().enumerate() {
-                    let label = match &link.target {
-                        PdfLinkTarget::Internal(destination) => format!(
-                            "{} {}",
-                            self.tr("Ir a la página", "Go to page"),
-                            destination.page + 1
-                        ),
-                        PdfLinkTarget::External(_) => self
-                            .tr("Abrir enlace externo…", "Open external link…")
-                            .to_owned(),
-                        PdfLinkTarget::Rejected(_) => self
-                            .tr("Enlace no permitido", "Link not permitted")
-                            .to_owned(),
-                    };
-                    for (index, bounds) in link.regions.iter().enumerate() {
-                        let rect = reader_viewport::page_region(paper, rotation, *bounds);
-                        let response = link_control(
-                            ui,
-                            rect,
-                            egui::Id::new((
-                                "pdf-link",
-                                document,
-                                page,
-                                link.annotation_index,
-                                index,
-                            )),
-                            &label,
-                            palette,
-                        );
-                        theme::record_control_bounds(ui, &label, rect);
-                        if page == self.reader.page
-                            && link.annotation_index == payload.links()[0].annotation_index
-                            && index == 0
-                        {
-                            if matches!(
-                                self.link_preview,
-                                LinkPreview::Focus | LinkPreview::Activate
-                            ) {
-                                response.request_focus();
-                            }
-                            if self.link_preview == LinkPreview::Activate && response.has_focus() {
-                                self.link_preview = LinkPreview::KeyPending;
-                                ui.ctx().request_repaint();
-                            }
-                        }
-                        if response.clicked() {
-                            chosen = Some((payload.clone(), link_index));
-                            if self.link_preview != LinkPreview::Off {
-                                self.link_preview = LinkPreview::Complete;
-                            }
-                        }
-                        response
-                            .on_hover_cursor(egui::CursorIcon::PointingHand)
-                            .on_hover_text(&label);
-                    }
-                }
-            }
-            LinkPhase::Failed(error) => {
-                let rect = egui::Rect::from_min_size(
-                    paper.min + egui::vec2(8.0, 8.0),
-                    egui::vec2(paper.width().clamp(1.0, 220.0), 32.0),
-                );
-                let label = self.tr("Reintentar enlaces", "Retry links");
-                let response = ui.put(rect, egui::Button::new(label));
-                retry = response.clicked();
-                response.on_hover_text(error);
-            }
-            LinkPhase::Pending(_) => {}
-        }
-        if retry {
-            self.reader.links.pages.remove(&page);
-        }
-        if let Some((payload, link_index)) = chosen {
-            match &payload.links()[link_index].target {
-                PdfLinkTarget::Internal(destination) => {
-                    self.reader.reader_destination = Some((document.into(), *destination))
-                }
-                PdfLinkTarget::Rejected(reason) => {
-                    self.error = Some(match reason {
-                        ExternalLinkRejection::InvalidTarget => self.tr("Este enlace no es válido o usa un esquema no permitido. Solo se admiten http, https y mailto.", "This link is invalid or uses a scheme that is not permitted. Only http, https and mailto are allowed."),
-                        ExternalLinkRejection::TooLong => self.tr("Este enlace supera el límite de tamaño y no se puede abrir.", "This link exceeds the size limit and cannot be opened."),
-                    }.to_owned());
-                }
-                PdfLinkTarget::External(_) => {
-                    self.reader.links.confirmation = Some(ExternalConfirmation {
-                        payload,
-                        link_index,
-                        focus_cancel: true,
-                    })
-                }
-            }
-            ui.ctx().request_repaint();
+        if let Some(error) = error {
+            self.error = Some(error);
         }
     }
 }

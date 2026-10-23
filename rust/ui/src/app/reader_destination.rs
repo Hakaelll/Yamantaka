@@ -1,32 +1,30 @@
 use super::*;
 
-impl YamantakaApp {
-    pub(super) fn apply_reader_destination(
+impl reader_pane::ReaderPane {
+    pub(in crate::app) fn resolve_destination(
         &mut self,
-        document: &Document,
-        info: &PdfInfo,
         viewport: [f64; 2],
-    ) {
-        let Some((id, destination)) = self.reader.reader_destination.take() else {
-            return;
+    ) -> Result<bool, String> {
+        let Some((id, destination)) = self.reader_destination.take() else {
+            return Ok(false);
+        };
+        let Some((document, info)) = &self.active else {
+            return Ok(false);
         };
         if id != document.id {
-            return;
+            return Ok(false);
         }
         let result = (|| {
             let layout = self
-                .reader
                 .viewport
                 .layout
                 .as_ref()
                 .ok_or_else(|| "Reader layout is unavailable".to_string())?;
             let navigation = self
-                .reader
                 .navigation
                 .as_ref()
                 .ok_or_else(|| "Reader navigation is unavailable".to_string())?;
             let mut preferences = self
-                .reader
                 .reader_preferences
                 .clone()
                 .ok_or_else(|| "Reader preferences are unavailable".to_string())?;
@@ -41,7 +39,7 @@ impl YamantakaApp {
                     viewport,
                     anchor,
                     preferences.zoom_mode,
-                    f64::from(self.reader.zoom),
+                    f64::from(self.zoom),
                 )
                 .map_err(|error| error.to_string())?;
             let frame = layout
@@ -49,7 +47,7 @@ impl YamantakaApp {
                     viewport,
                     anchor,
                     preferences.zoom_mode,
-                    f64::from(self.reader.zoom),
+                    f64::from(self.zoom),
                     scroll,
                     0.0,
                 )
@@ -76,20 +74,34 @@ impl YamantakaApp {
         })();
         match result {
             Ok((preferences, resolved)) => {
-                self.reader.zoom = resolved.zoom as f32;
-                self.reader.reader_preferences = Some(preferences.clone());
-                if let Some(navigation) = &mut self.reader.navigation {
+                self.zoom = resolved.zoom as f32;
+                self.reader_preferences = Some(preferences.clone());
+                if let Some(navigation) = &mut self.navigation {
                     navigation.navigate_to(resolved.position);
                 }
+                Ok(true)
+            }
+            Err(error) => Err(error),
+        }
+    }
+}
+
+impl YamantakaApp {
+    pub(super) fn apply_reader_destination(&mut self, viewport: [f64; 2]) {
+        match self.reader.resolve_destination(viewport) {
+            Ok(true) => {
                 self.apply_navigation();
-                if !self.demo {
+                if !self.demo
+                    && let Some(preferences) = self.reader.reader_preferences.clone()
+                {
                     self.send(Action::SaveReaderPreferences(
-                        document.id.clone(),
+                        preferences.document_id.clone(),
                         preferences,
                     ));
                 }
             }
             Err(error) => self.error = Some(error),
+            _ => {}
         }
     }
 }

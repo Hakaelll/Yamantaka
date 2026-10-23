@@ -316,6 +316,27 @@ impl ReferenceView {
         english: bool,
         p: Palette,
     ) {
+        if self.pane.reader_destination.is_some() {
+            let size = ui.available_size();
+            let previous_zoom = self.pane.viewport.scale;
+            match self
+                .pane
+                .resolve_destination([f64::from(size.x.max(1.0)), f64::from(size.y.max(1.0))])
+            {
+                Ok(true) => {
+                    self.reference_navigation_changed();
+                    if (self.pane.zoom - previous_zoom).abs() > 0.0001 {
+                        if self.bidirectional && self.follow_zoom {
+                            self.pending_primary_zoom = true;
+                        } else {
+                            self.follow_zoom = false;
+                        }
+                    }
+                }
+                Err(error) => self.error = Some(error),
+                _ => {}
+            }
+        }
         let (Some((document, _)), Some(layout), Some(preferences), Some(navigation)) = (
             &self.pane.active,
             self.pane.viewport.layout.clone(),
@@ -364,6 +385,12 @@ impl ReferenceView {
                 }
             };
             self.pane.viewport.scale = frame.zoom as f32;
+            if !self.busy() && !self.close_requested {
+                let pages: Vec<u32> = frame.pages.iter().map(|page| page.page).collect();
+                self.pane
+                    .links
+                    .request_visible(runtime, &document.id, &pages);
+            }
             ui.set_min_size(egui::vec2(
                 frame.content_size[0] as f32,
                 frame.content_size[1] as f32,
@@ -421,6 +448,22 @@ impl ReferenceView {
                 self.pane
                     .find
                     .paint(ui, page.page, paper, layout.rotation(), p);
+                if !self.busy() && !self.close_requested && !self.pane.selection.enabled {
+                    match self.pane.links.regions(
+                        ui,
+                        page.page,
+                        paper,
+                        layout.rotation(),
+                        p,
+                        english,
+                    ) {
+                        Ok(Some(destination)) => {
+                            self.pane.reader_destination = Some((document.id.clone(), destination))
+                        }
+                        Err(error) => self.error = Some(error),
+                        _ => {}
+                    }
+                }
             }
             self.pane.loading = !self.pane.viewport.retry
                 && self
@@ -462,7 +505,6 @@ impl YamantakaApp {
         &mut self,
         ui: &mut egui::Ui,
         document: &Document,
-        info: &PdfInfo,
         p: Palette,
     ) {
         let Some(reference) = &mut self.reference else {
@@ -565,7 +607,7 @@ impl YamantakaApp {
                 .id_salt("reading-pane"),
             |ui| {
                 ui.set_clip_rect(primary_rect.intersect(ui.clip_rect()));
-                self.reader_viewport(ui, document, info, p);
+                self.reader_viewport(ui, document, p);
             },
         );
         let bytes = self.governor.limits().pages.min(14 * 1024 * 1024) / 2;

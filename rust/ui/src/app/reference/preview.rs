@@ -221,6 +221,10 @@ impl YamantakaApp {
         }
     }
 
+    pub fn preview_reference_links(&mut self) {
+        self.reference_links_demo = self.demo;
+    }
+
     pub(in crate::app) fn advance_reference_demo(&mut self) {
         if !self.demo {
             return;
@@ -323,6 +327,10 @@ impl YamantakaApp {
                     reference.set_zoom(ZoomMode::Custom, 1.2);
                     reference.swap_positions();
                     self.reference_demo = 8;
+                } else if self.reference_links_demo {
+                    self.reference.as_mut().unwrap().pane.links.preview =
+                        links::LinkPreview::Activate;
+                    self.reference_demo = 12;
                 }
             }
             8 if self
@@ -358,6 +366,29 @@ impl YamantakaApp {
                 assert!(self.reader.find.capture_summary().is_null());
                 assert_eq!(self.reader.active.as_ref().unwrap().0.id, "demo-0");
                 self.reference_demo = 11;
+            }
+            12 if self.reference.as_ref().is_some_and(|reference| {
+                reference.pane.links.preview == links::LinkPreview::Complete
+                    && !reference.pane.loading
+                    && (reference.pane.page == 1 || reference.pane.links.confirmation_open())
+            }) =>
+            {
+                assert_eq!(self.reader.page, 0);
+                assert_eq!(self.reader.active.as_ref().unwrap().0.id, "demo-0");
+                assert!(!self.reader.links.confirmation_open());
+                assert_eq!(
+                    self.reference
+                        .as_ref()
+                        .unwrap()
+                        .pane
+                        .active
+                        .as_ref()
+                        .unwrap()
+                        .0
+                        .id,
+                    "demo-1"
+                );
+                self.reference_demo = 13;
             }
             4 if self.reference.is_none() => {
                 if self.capture.is_some() {

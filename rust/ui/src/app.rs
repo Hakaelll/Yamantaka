@@ -123,6 +123,7 @@ pub struct YamantakaApp {
     reference_close_demo: bool,
     reference_swap_demo: bool,
     reference_find_demo: bool,
+    reference_links_demo: bool,
     reference_native_closes: u64,
     reference_password_demo: u8,
     reference_password_attempts: u8,
@@ -176,7 +177,6 @@ pub struct YamantakaApp {
     offset: usize,
     selected: Option<String>,
     inspector: bool,
-    link_preview: links::LinkPreview,
     find_preview_step: Option<bool>,
     pub find_preview_closed: bool,
     library_covers: library_covers::LibraryCovers,
@@ -319,6 +319,7 @@ impl YamantakaApp {
             reference_close_demo: false,
             reference_swap_demo: false,
             reference_find_demo: false,
+            reference_links_demo: false,
             reference_native_closes: 0,
             reference_password_demo: 0,
             reference_password_attempts: 0,
@@ -382,7 +383,6 @@ impl YamantakaApp {
             offset: 0,
             selected: None,
             inspector,
-            link_preview: Default::default(),
             find_preview_step: None,
             find_preview_closed: false,
             library_covers: Default::default(),
@@ -1319,9 +1319,9 @@ impl YamantakaApp {
             self.toggle_reference();
         }
         if self.reference.is_some() {
-            self.comparison_viewport(ui, &document, &info, p);
+            self.comparison_viewport(ui, &document, p);
         } else {
-            self.reader_viewport(ui, &document, &info, p);
+            self.reader_viewport(ui, &document, p);
         }
         self.cache_reading_context();
     }
@@ -1334,9 +1334,16 @@ impl App for YamantakaApp {
         }
         if self.demo
             && self.capture.is_some()
-            && self.link_preview == links::LinkPreview::KeyPending
+            && (self.reader.links.preview == links::LinkPreview::KeyPending
+                || self.reference.as_ref().is_some_and(|reference| {
+                    reference.pane.links.preview == links::LinkPreview::KeyPending
+                }))
         {
-            self.link_preview = links::LinkPreview::Activate;
+            if self.reader.links.preview == links::LinkPreview::KeyPending {
+                self.reader.links.preview = links::LinkPreview::Activate;
+            } else if let Some(reference) = &mut self.reference {
+                reference.pane.links.preview = links::LinkPreview::Activate;
+            }
             input.events.push(egui::Event::Key {
                 key: egui::Key::Enter,
                 physical_key: None,
@@ -1668,14 +1675,32 @@ impl App for YamantakaApp {
                 }
                 Update::PageMatches(..) | Update::PageFindFailed(..) => {}
                 Update::PageLinks(id, payload, cancel) => {
-                    self.reader
-                        .links
-                        .accept(&id, payload.page(), &cancel, Ok(payload));
+                    let page = payload.page();
+                    if let Some(reference) = self
+                        .reference
+                        .as_mut()
+                        .filter(|reference| reference.pane.links.owns(&id, page, &cancel))
+                    {
+                        reference.pane.links.accept(&id, page, &cancel, Ok(payload));
+                    } else {
+                        self.reader.links.accept(&id, page, &cancel, Ok(payload));
+                    }
                 }
                 Update::PageLinksFailed(id, page, error, cancel) => {
-                    self.reader
-                        .links
-                        .accept(&id, page, &cancel, Err(error.to_string()));
+                    if let Some(reference) = self
+                        .reference
+                        .as_mut()
+                        .filter(|reference| reference.pane.links.owns(&id, page, &cancel))
+                    {
+                        reference
+                            .pane
+                            .links
+                            .accept(&id, page, &cancel, Err(error.to_string()));
+                    } else {
+                        self.reader
+                            .links
+                            .accept(&id, page, &cancel, Err(error.to_string()));
+                    }
                 }
                 Update::Cover(id, result, cancel) => {
                     if self.accept_metadata_reference(ctx, &id, &result, &cancel) {
@@ -2058,7 +2083,7 @@ impl App for YamantakaApp {
         self.reader.selection.keyboard_input(
             &ctx,
             self.password.is_some()
-                || self.reader.links.confirmation_open()
+                || self.link_confirmation_open()
                 || self.bulk_picker.is_some()
                 || self.selection_review_open()
                 || self.tag_dialog_open()
@@ -2072,7 +2097,7 @@ impl App for YamantakaApp {
         for shortcut in shortcuts::read(
             &ctx,
             self.password.is_some()
-                || self.reader.links.confirmation_open()
+                || self.link_confirmation_open()
                 || self.bulk_picker.is_some()
                 || self.selection_review_open()
                 || self.tag_dialog_open()
@@ -2286,10 +2311,10 @@ impl App for YamantakaApp {
                                 }
                             }
                         })
-                    && (self.link_preview == links::LinkPreview::Off
+                    && (self.reader.links.preview == links::LinkPreview::Off
                         || self.reader.links.ready()
                             && matches!(
-                                self.link_preview,
+                                self.reader.links.preview,
                                 links::LinkPreview::Focus | links::LinkPreview::Complete
                             ))
                     && (self.selection_preview == selection::SelectionPreview::Off
@@ -2316,7 +2341,7 @@ impl App for YamantakaApp {
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
-                    && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9 | 11)
+                    && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9 | 11 | 13)
                     && matches!(self.reference_chooser_demo, 0 | 3)
                     && matches!(self.reference_sync_demo, 0 | 10)
                     && (self.reference_chooser_demo == 0 || self.reference.as_ref().is_some_and(|reference|reference.chooser.loaded && reference.chooser.total == 1))
@@ -2428,7 +2453,7 @@ impl App for YamantakaApp {
                         "currentReaderPage":self.reader.page,
                         "readerZoom":self.reader.zoom,
                         "readerRenderEvents":self.capture_render_events,
-                        "linkKeyboardActivated":self.link_preview == links::LinkPreview::Complete,
+                        "linkKeyboardActivated":self.reader.links.preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
                     record["bulkOrganization"]=self.bulk_organization_verified.clone().unwrap_or(serde_json::Value::Null);
@@ -2446,7 +2471,7 @@ impl App for YamantakaApp {
                     record["collections"]=self.collections.summary();
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
-                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"find":reference.pane.find.capture_summary(),"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
+                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"find":reference.pane.find.capture_summary(),"links":reference.pane.links.capture_summary(),"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
                     record["referenceSync"]=serde_json::json!({"demoStage":self.reference_sync_demo,"linkedConfirmed":self.reference_sync_linked,"positionConfirmed":self.reference_sync_position,"reverseConfirmed":self.reference_sync_reverse,"differencesConfirmed":self.reference_sync_differences,"primaryScale":self.reader.viewport.scale});
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();

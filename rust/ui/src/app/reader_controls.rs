@@ -5,7 +5,7 @@ impl YamantakaApp {
         if self.workspaces.open
             || self.reading_queue.open
             || self.password.is_some()
-            || self.reader.links.confirmation_open()
+            || self.link_confirmation_open()
             || self.backup_restore.open
             || self.legacy_import.open
         {

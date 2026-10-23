@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-links'; args=@('--reader','--reference','--reference-book','--reference-links','--es') },
+    @{ name='reader-reference-external'; args=@('--reader','--reference','--reference-book','--reference-links','--reference-link-external','--es') },
     @{ name='reader-reference-sync'; args=@('--reader','--reference','--reference-sync','--es') },
     @{ name='reader-reference-chooser'; args=@('--reader','--reference','--reference-chooser','--es') },
     @{ name='reader-reference-password-import'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-import','--es') },
@@ -356,6 +358,14 @@ foreach ($case in $cases) {
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($referenceMatch[0].label)
 
         if ($controls.referenceAdmission.demoStage -ne 11 -or $controls.reference.page -ne 1 -or $controls.reference.find.matches -ne 1 -or $controls.reference.find.page -ne 1 -or $controls.documentFind -or $controls.reference.images -lt 1 -or $controls.referenceAdmission.nativeCloses -ne 0 -or -not $controls.reference.swapped -or $controls.reference.document -ne 'demo-1' -or [Math]::Abs($controls.reference.scale-1.2) -gt 0.0001 -or $controls.currentReaderPage -ne 0 -or $referenceClose.Count -ne 1 -or $referenceClose[0].rect[0] -ge (($controls.viewport[2]-$controls.viewport[0])/2)) { throw 'Swapping comparison positions did not preserve both readings or place the reference on the left.' }
+    }
+    if ($case.name -in @('reader-reference-links','reader-reference-external')) {
+        if ($controls.referenceAdmission.demoStage -ne 13 -or $controls.reference.document -ne 'demo-1' -or -not $controls.reference.links.keyboardActivated -or $controls.currentReaderPage -ne 0 -or $controls.documentLinks.confirmationOpen) { throw 'Reference link activation changed the main reading or its confirmation state.' }
+        if ($case.name -eq 'reader-reference-links' -and ($controls.reference.page -ne 1 -or $controls.reference.links.confirmationOpen)) { throw 'The reference internal link did not navigate its own PDF destination.' }
+        if ($case.name -eq 'reader-reference-external') {
+            if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
+        }
     }
     if ($case.name -eq 'reader-reference-closed') {
         if ($controls.referenceAdmission.demoStage -ne 5 -or $controls.referenceAdmission.nativeCloses -ne 1 -or $controls.reference -or $controls.currentReaderPage -ne 0) { throw 'Reference closure did not acknowledge one native close and preserve the primary reading.' }

@@ -179,8 +179,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                         .join("../../build/rust-fixtures/protected.pdf")
                 });
+            let reference_links = (index == 1 && args.iter().any(|arg| arg == "--reference-links"))
+                .then(|| {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+                        if args.iter().any(|arg| arg == "--reference-link-external") {
+                            "../../build/rust-fixtures/external-links.pdf"
+                        } else {
+                            "../../build/rust-fixtures/links.pdf"
+                        },
+                    )
+                });
             let document_path = reference_protected
                 .as_ref()
+                .or(reference_links.as_ref())
                 .or(cover_fixture.as_ref())
                 .unwrap_or(&fixture)
                 .canonicalize()?;
@@ -1179,6 +1190,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             args.iter().any(|arg| arg == "--reference-swap"),
                             args.iter().any(|arg| arg == "--reference-find"),
                         );
+                        if args.iter().any(|arg| arg == "--reference-links") {
+                            app.preview_reference_links();
+                        }
                         if args.iter().any(|arg| arg == "--reference-protected") {
                             app.preview_reference_password(
                                 args.iter().any(|arg| arg == "--reference-password-cancel"),

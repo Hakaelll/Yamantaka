@@ -34,19 +34,13 @@ impl YamantakaApp {
         }
     }
 
-    pub(super) fn reader_viewport(
-        &mut self,
-        ui: &mut egui::Ui,
-        document: &Document,
-        info: &PdfInfo,
-        p: Palette,
-    ) {
+    pub(super) fn reader_viewport(&mut self, ui: &mut egui::Ui, document: &Document, p: Palette) {
         let viewport = ui.available_size();
         let viewport_size = [
             f64::from(viewport.x.max(1.0)),
             f64::from(viewport.y.max(1.0)),
         ];
-        self.apply_reader_destination(document, info, viewport_size);
+        self.apply_reader_destination(viewport_size);
         let (Some(layout), Some(preferences), Some(navigation)) = (
             self.reader.viewport.layout.clone(),
             self.reader.reader_preferences.clone(),
@@ -116,7 +110,7 @@ impl YamantakaApp {
                 keep
             });
             let link_pages: Vec<u32> = frame.pages.iter().map(|visible| visible.page).collect();
-            self.request_visible_links(&document.id, &link_pages);
+            self.reader.links.request_visible(&self.runtime, &document.id, &link_pages);
             self.request_annotation_marks(&document.id, &link_pages);
             self.reader.selection.retain_visible(&document.id, &link_pages);
             self.request_selection_pages(&document.id, &link_pages);
@@ -164,14 +158,11 @@ impl YamantakaApp {
                 self.reader.find.paint(ui, visible.page, paper, layout.rotation(), p);
                 self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
                 if !self.reader.selection.enabled {
-                    self.reader_link_regions(
-                        ui,
-                        &document.id,
-                        visible.page,
-                        paper,
-                        layout.rotation(),
-                        p,
-                    );
+                    match self.reader.links.regions(ui, visible.page, paper, layout.rotation(), p, self.english) {
+                        Ok(Some(destination)) => self.reader.reader_destination = Some((document.id.clone(), destination)),
+                        Err(error) => self.error = Some(error),
+                        _ => {}
+                    }
                 }
             }
             self.reader.loading = !self.reader.viewport.retry
