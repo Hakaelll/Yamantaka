@@ -1,4 +1,6 @@
 use super::*;
+mod reference;
+mod view;
 use std::collections::HashSet;
 use yamantaka_domain::outline::PdfOutline;
 
@@ -38,6 +40,34 @@ impl Drop for OutlineState {
 }
 
 impl OutlineState {
+    pub(super) fn owns(&self, document: &str, cancel: &Cancellation) -> bool {
+        self.document.as_deref() == Some(document)
+            && !cancel.is_cancelled()
+            && self
+                .pending
+                .as_ref()
+                .is_some_and(|pending| pending.same_request(cancel))
+    }
+    pub(super) fn cancel(&mut self) {
+        if let Some(cancel) = self.pending.take() {
+            cancel.cancel();
+        }
+    }
+    pub(super) fn destination(
+        &self,
+        index: usize,
+    ) -> Option<yamantaka_domain::pdf_destination::NavigationDestination> {
+        self.outline.as_ref()?.entries().get(index)?.destination
+    }
+    pub(super) fn toggle(&mut self, index: usize) {
+        if !self.collapsed.remove(&index) {
+            self.collapsed.insert(index);
+        }
+        self.rebuild_rows();
+    }
+    pub(super) fn capture_summary(&self) -> serde_json::Value {
+        serde_json::json!({"entries":self.outline.as_ref().map_or(0, |outline| outline.entries().len()), "rows":self.rows.len(), "pending":self.pending.is_some()})
+    }
     pub(super) fn ready(&self) -> bool {
         self.outline.is_some() && self.pending.is_none()
     }
@@ -135,170 +165,13 @@ impl YamantakaApp {
         }
     }
 
-    pub(super) fn request_outline(&mut self, document: &str) {
-        if self.reader.outline.document.as_deref() != Some(document) {
-            self.reader.outline = OutlineState::default();
-            self.reader.outline.document = Some(document.into());
-        }
-        if self.reader.outline.pending.is_some()
-            || self.reader.outline.outline.is_some()
-            || self.reader.outline.error.is_some()
-        {
-            return;
-        }
-        let cancel = Cancellation::default();
-        match self
-            .runtime
-            .submit(Action::Outline(document.into(), cancel.clone()))
-        {
-            Ok(()) => self.reader.outline.pending = Some(cancel),
-            Err(error) => self.reader.outline.error = Some(error.to_string()),
-        }
-    }
-
     pub(super) fn outline_panel_content(&mut self, ui: &mut egui::Ui, p: Palette) {
         let compact = ui.ctx().content_rect().width() < 620.0;
-        if !compact {
-            ui.label(
-                RichText::new(self.tr("Explora el documento", "Explore this document")).size(22.0),
-            );
-            ui.add_space(6.0);
-        }
-        if let Some(error) = self.reader.outline.error.clone() {
-            ui.label(self.tr(
-                "No se pudo cargar el índice.",
-                "Contents could not be loaded.",
-            ));
-            ui.collapsing(self.tr("Detalles", "Details"), |ui| {
-                ui.label(error);
-            });
-            if theme::navigation(ui, self.tr("Volver a intentar", "Try again"), false, p).clicked()
-            {
-                self.reader.outline.error = None;
-            }
-            return;
-        }
-        let Some(outline) = self.reader.outline.outline.clone() else {
-            ui.label(
-                RichText::new(self.tr("Cargando capítulos…", "Loading chapters…"))
-                    .color(p.secondary),
-            );
-            return;
-        };
-        if outline.entries().is_empty() {
-            ui.label(
-                RichText::new(self.tr(
-                    "Este documento no tiene índice.",
-                    "This document has no contents.",
-                ))
-                .color(p.secondary),
-            );
-            return;
-        }
-        if !compact {
-            ui.label(
-                RichText::new(self.tr(
-                    "Elige un capítulo para continuar leyendo.",
-                    "Choose a chapter to continue reading.",
-                ))
-                .color(p.secondary),
-            );
-            ui.add_space(14.0);
-        }
-        let row_height = 40.0;
-        let mut toggle = None;
-        let mut destination = None;
-        egui::ScrollArea::vertical()
-            .id_salt("outline-chapters")
-            .show_rows(
-                ui,
-                row_height,
-                self.reader.outline.rows.len(),
-                |ui, range| {
-                    for index in range {
-                        let row = self.reader.outline.rows[index];
-                        let entry = &outline.entries()[row.entry];
-                        ui.push_id(row.entry, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.add_space((row.depth.min(6) * 12) as f32);
-                                if row.children {
-                                    let collapsed =
-                                        self.reader.outline.collapsed.contains(&row.entry);
-                                    let label = format!(
-                                        "{} {}",
-                                        self.tr(
-                                            if collapsed { "Desplegar" } else { "Plegar" },
-                                            if collapsed { "Expand" } else { "Collapse" }
-                                        ),
-                                        entry.title
-                                    );
-                                    if theme::icon_button(
-                                        ui,
-                                        &label,
-                                        if collapsed {
-                                            theme::Icon::Plus
-                                        } else {
-                                            theme::Icon::Minus
-                                        },
-                                        p,
-                                    )
-                                    .clicked()
-                                    {
-                                        toggle = Some(row.entry);
-                                    }
-                                }
-                                if !row.children {
-                                    ui.add_space(40.0 + ui.spacing().item_spacing.x);
-                                }
-                                let mut label = entry.title.clone();
-                                if let Some(target) = entry.destination {
-                                    label.push_str(&format!(" · {}", u64::from(target.page) + 1));
-                                    let selected = self.reader.page == target.page;
-                                    if ui
-                                        .add_sized(
-                                            [ui.available_width().max(40.0), row_height],
-                                            egui::Button::new(
-                                                RichText::new(&label).color(if selected {
-                                                    p.ink
-                                                } else {
-                                                    p.secondary
-                                                }),
-                                            )
-                                            .selected(selected)
-                                            .stroke(egui::Stroke::NONE)
-                                            .fill(if selected {
-                                                p.raised
-                                            } else {
-                                                Color32::TRANSPARENT
-                                            })
-                                            .corner_radius(8)
-                                            .wrap_mode(egui::TextWrapMode::Truncate),
-                                        )
-                                        .on_hover_text(&entry.title)
-                                        .clicked()
-                                    {
-                                        destination = Some(target);
-                                    }
-                                } else {
-                                    ui.add_sized(
-                                        [ui.available_width().max(40.0), row_height],
-                                        egui::Label::new(RichText::new(&label).color(p.secondary))
-                                            .truncate(),
-                                    )
-                                    .on_hover_text(&entry.title);
-                                }
-                            });
-                        });
-                    }
-                },
-            );
-        if let Some(index) = toggle {
-            if !self.reader.outline.collapsed.remove(&index) {
-                self.reader.outline.collapsed.insert(index);
-            }
-            self.reader.outline.rebuild_rows();
-        }
-        if let Some(destination) = destination {
+        if let Some(destination) =
+            self.reader
+                .outline
+                .show(ui, self.reader.page, p, self.english, compact, None)
+        {
             self.choose_reader_destination(destination, compact);
         }
     }

@@ -26,6 +26,8 @@ pub(super) struct ReferenceView {
     pub(in crate::app) swapped: bool,
     pub(in crate::app) search_visible: bool,
     pub(in crate::app) search_preview: bool,
+    pub(in crate::app) outline_visible: bool,
+    pub(in crate::app) outline_preview: bool,
     pending_primary_page: Option<u32>,
     pending_primary_zoom: bool,
     pub(in crate::app) differences: std::collections::BTreeSet<u32>,
@@ -88,6 +90,8 @@ impl ReferenceView {
             swapped: false,
             search_visible: false,
             search_preview: false,
+            outline_visible: false,
+            outline_preview: false,
             pending_primary_page: None,
             pending_primary_zoom: false,
             differences: Default::default(),
@@ -153,6 +157,7 @@ impl ReferenceView {
             .map_or(1, ReaderNavigation::page_count);
         ui.horizontal_wrapped(|ui| {
             self.reference_search(ui, runtime, english, p);
+            self.reference_outline(ui, runtime, english, p);
             ui.add_enabled_ui(can_choose, |ui| {
                 let button = theme::icon_button(
                     ui,
@@ -230,8 +235,13 @@ impl ReferenceView {
                 popup = popup.open(true);
             }
             popup.show(|ui| self.options_menu(ui, primary, english, p));
-            close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
-                .clicked();
+            close = theme::icon_button(
+                ui,
+                tr("Cerrar referencia", "Close reference"),
+                theme::Icon::Close,
+                p,
+            )
+            .clicked();
         });
         if let Some(error) = self.error.clone() {
             ui.horizontal_wrapped(|ui| {

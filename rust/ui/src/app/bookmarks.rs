@@ -122,7 +122,7 @@ impl YamantakaApp {
             self.reader.text.clear();
         }
         if self.reader.reader_panel_tab == outline::ReaderPanelTab::Outline {
-            self.request_outline(&document.id);
+            self.reader.outline.request(&self.runtime, &document.id);
         }
         // Narrow windows use the same scrollable content as a full-width drawer,
         // rather than leaving a sliver of PDF alongside a fixed-width sidebar.

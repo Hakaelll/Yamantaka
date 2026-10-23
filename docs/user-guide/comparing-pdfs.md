@@ -22,6 +22,12 @@ Enable **In both directions** to keep the selected page or zoom link active when
 
 **Follow position** also follows the point within the main PDF page. This setting always runs from the main reading toward the reference. Its canvas may limit the point that can be displayed near page edges. Manual reference page navigation turns position following off.
 
+## Browse reference contents
+
+Select the contents icon in the reference header to open its chapter hierarchy. Use the plus or minus controls to expand or collapse sections, then select a chapter or passage. Its destination page, position and zoom apply to the reference; synchronization follows your selected options.
+
+The popup reports when the PDF has no contents and offers retry after a loading error. Closing it cancels an outstanding request. The main contents panel retains its own state.
+
 ## Search the reference
 
 Select the search icon in the reference header, enter a word or phrase, and press Enter or **Find**. **Match case** and **Whole words** refine the search.
@@ -50,4 +56,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, zoom, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, zoom, chapter contents, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

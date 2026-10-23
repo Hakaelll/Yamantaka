@@ -156,6 +156,7 @@ pub fn display(ui: &mut egui::Ui, text: &str, size: f32) -> egui::Response {
 
 #[derive(Clone, Copy)]
 pub enum Icon {
+    Close,
     Menu,
     Book,
     Add,
@@ -181,6 +182,10 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
     let v = |x, y| center + egui::vec2(x, y);
     let line = |a, b| painter.line_segment([a, b], s);
     match icon {
+        Icon::Close => {
+            line(v(-4.0, -4.0), v(4.0, 4.0));
+            line(v(-4.0, 4.0), v(4.0, -4.0));
+        }
         Icon::Folder => {
             let points = [
                 v(-7.0, -5.0),

@@ -189,8 +189,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         },
                     )
                 });
+            let reference_outline =
+                (index == 1 && args.iter().any(|arg| arg == "--reference-outline")).then(|| {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../build/rust-fixtures/outline.pdf")
+                });
             let document_path = reference_protected
                 .as_ref()
+                .or(reference_outline.as_ref())
                 .or(reference_links.as_ref())
                 .or(cover_fixture.as_ref())
                 .unwrap_or(&fixture)
@@ -1192,6 +1198,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         );
                         if args.iter().any(|arg| arg == "--reference-links") {
                             app.preview_reference_links();
+                        }
+                        if args.iter().any(|arg| arg == "--reference-outline") {
+                            app.preview_reference_outline();
                         }
                         if args.iter().any(|arg| arg == "--reference-protected") {
                             app.preview_reference_password(

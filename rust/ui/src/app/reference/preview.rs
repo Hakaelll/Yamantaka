@@ -225,6 +225,10 @@ impl YamantakaApp {
         self.reference_links_demo = self.demo;
     }
 
+    pub fn preview_reference_outline(&mut self) {
+        self.reference_outline_demo = self.demo;
+    }
+
     pub(in crate::app) fn advance_reference_demo(&mut self) {
         if !self.demo {
             return;
@@ -331,6 +335,9 @@ impl YamantakaApp {
                     self.reference.as_mut().unwrap().pane.links.preview =
                         links::LinkPreview::Activate;
                     self.reference_demo = 12;
+                } else if self.reference_outline_demo {
+                    self.reference.as_mut().unwrap().outline_preview = true;
+                    self.reference_demo = 14;
                 }
             }
             8 if self
@@ -389,6 +396,33 @@ impl YamantakaApp {
                     "demo-1"
                 );
                 self.reference_demo = 13;
+            }
+            14 if self
+                .reference
+                .as_ref()
+                .is_some_and(|reference| reference.pane.outline.ready()) =>
+            {
+                let reference = self.reference.as_mut().unwrap();
+                assert_eq!(reference.pane.outline.capture_summary()["rows"], 6);
+                reference.pane.outline.toggle(2);
+                assert_eq!(reference.pane.outline.capture_summary()["rows"], 5);
+                reference.pane.outline.toggle(2);
+                assert_eq!(reference.pane.outline.capture_summary()["rows"], 6);
+                let destination = reference.pane.outline.destination(3).unwrap();
+                assert_eq!(destination.page, 1);
+                reference.pane.reader_destination = Some(("demo-1".into(), destination));
+                self.reference_demo = 15;
+            }
+            15 if self
+                .reference
+                .as_ref()
+                .is_some_and(|reference| reference.pane.page == 1 && !reference.pane.loading) =>
+            {
+                let reference = self.reference.as_ref().unwrap();
+                assert!((reference.pane.viewport.scale - 1.5).abs() < 0.0001);
+                assert_eq!(self.reader.page, 0);
+                assert_eq!(self.reader.outline.capture_summary()["entries"], 0);
+                self.reference_demo = 16;
             }
             4 if self.reference.is_none() => {
                 if self.capture.is_some() {
