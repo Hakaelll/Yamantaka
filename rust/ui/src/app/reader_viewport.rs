@@ -161,7 +161,7 @@ impl YamantakaApp {
                 if self.reference.as_ref().is_some_and(|reference| reference.differences.contains(&visible.page)) {
                     ui.painter().rect_stroke(paper, 1, egui::Stroke::new(2.0, p.accent), egui::StrokeKind::Inside);
                 }
-                self.paint_find_matches(ui, visible.page, paper, layout.rotation(), p);
+                self.reader.find.paint(ui, visible.page, paper, layout.rotation(), p);
                 self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
                 if !self.reader.selection.enabled {
                     self.reader_link_regions(

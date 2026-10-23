@@ -14,7 +14,7 @@ $cases = @(
     @{ name='reader-reference-password-import'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-import','--es') },
     @{ name='reader-reference-password-retry'; args=@('--reader','--reference','--reference-book','--reference-protected','--es') },
     @{ name='reader-reference-password-cancel'; args=@('--reader','--reference','--reference-book','--reference-protected','--reference-password-cancel','--es') },
-    @{ name='reader-reference-book'; args=@('--reader','--reference','--reference-book','--reference-swap','--es') },
+    @{ name='reader-reference-book'; args=@('--reader','--reference','--reference-book','--reference-swap','--reference-find','--es') },
     @{ name='reader-reference-closed'; args=@('--reader','--reference','--reference-book','--reference-close','--es') },
     @{ name='reader-reference'; args=@('--reader','--reference','--es') },
     @{ name='reader-reference-stacked'; args=@('--reader','--reference','--size=900x700','--light','--es') },
@@ -351,7 +351,11 @@ foreach ($case in $cases) {
     }
     if ($case.name -eq 'reader-reference-book') {
         $referenceClose = @($controls.controls | Where-Object { $_.label -eq 'Cerrar referencia' })
-        if ($controls.referenceAdmission.demoStage -ne 9 -or $controls.reference.images -lt 1 -or $controls.referenceAdmission.nativeCloses -ne 0 -or -not $controls.reference.swapped -or $controls.reference.document -ne 'demo-1' -or [Math]::Abs($controls.reference.scale-1.2) -gt 0.0001 -or $controls.currentReaderPage -ne 0 -or $referenceClose.Count -ne 1 -or $referenceClose[0].rect[0] -ge (($controls.viewport[2]-$controls.viewport[0])/2)) { throw 'Swapping comparison positions did not preserve both readings or place the reference on the left.' }
+        $referenceMatch = @($controls.controls | Where-Object { $_.label -like 'Página 2*Mixed*' })
+        if ($referenceMatch.Count -ne 1) { throw 'The reference search must display its selectable result.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($referenceMatch[0].label)
+
+        if ($controls.referenceAdmission.demoStage -ne 11 -or $controls.reference.page -ne 1 -or $controls.reference.find.matches -ne 1 -or $controls.reference.find.page -ne 1 -or $controls.documentFind -or $controls.reference.images -lt 1 -or $controls.referenceAdmission.nativeCloses -ne 0 -or -not $controls.reference.swapped -or $controls.reference.document -ne 'demo-1' -or [Math]::Abs($controls.reference.scale-1.2) -gt 0.0001 -or $controls.currentReaderPage -ne 0 -or $referenceClose.Count -ne 1 -or $referenceClose[0].rect[0] -ge (($controls.viewport[2]-$controls.viewport[0])/2)) { throw 'Swapping comparison positions did not preserve both readings or place the reference on the left.' }
     }
     if ($case.name -eq 'reader-reference-closed') {
         if ($controls.referenceAdmission.demoStage -ne 5 -or $controls.referenceAdmission.nativeCloses -ne 1 -or $controls.reference -or $controls.currentReaderPage -ne 0) { throw 'Reference closure did not acknowledge one native close and preserve the primary reading.' }

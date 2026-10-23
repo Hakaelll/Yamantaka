@@ -212,11 +212,12 @@ impl YamantakaApp {
             };
         }
     }
-    pub fn preview_reference_book(&mut self, close: bool, swap: bool) {
+    pub fn preview_reference_book(&mut self, close: bool, swap: bool, find: bool) {
         if self.demo {
             self.reference_demo = 1;
             self.reference_close_demo = close;
             self.reference_swap_demo = swap;
+            self.reference_find_demo = find;
         }
     }
 
@@ -338,6 +339,25 @@ impl YamantakaApp {
                 assert_eq!(self.reader.zoom, 1.0);
                 assert_eq!(self.reference_native_closes, 0);
                 self.reference_demo = 9;
+                if self.reference_find_demo {
+                    self.reference
+                        .as_mut()
+                        .unwrap()
+                        .preview_reference_find(&self.runtime);
+                    self.reference_demo = 10;
+                }
+            }
+            10 if self.reference.as_ref().is_some_and(|reference| {
+                reference.pane.page == 1 && !reference.pane.loading && reference.pane.find.ready()
+            }) =>
+            {
+                let summary = self.reference.as_ref().unwrap().pane.find.capture_summary();
+                assert_eq!(summary["matches"], 1);
+                assert_eq!(summary["page"], 1);
+                assert_eq!(self.reader.page, 0);
+                assert!(self.reader.find.capture_summary().is_null());
+                assert_eq!(self.reader.active.as_ref().unwrap().0.id, "demo-0");
+                self.reference_demo = 11;
             }
             4 if self.reference.is_none() => {
                 if self.capture.is_some() {

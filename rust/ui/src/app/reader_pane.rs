@@ -58,6 +58,19 @@ impl Default for ReaderPane {
 }
 
 impl ReaderPane {
+    pub fn navigate_find(&mut self, target: find::FindTarget) -> bool {
+        let changed = self
+            .navigation
+            .as_mut()
+            .is_some_and(|navigation| match target.position {
+                Some(position) => navigation.navigate_to(position),
+                None => navigation.go_to_page(target.page),
+            });
+        if changed {
+            self.viewport.scroll_anchor = true;
+        }
+        changed
+    }
     pub fn prepare_replacement(&mut self, preferences: Cancellation) {
         self.links.clear();
         self.annotation_paint.invalidate();

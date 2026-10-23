@@ -253,6 +253,7 @@ impl YamantakaApp {
             return true;
         };
         reference.close_requested = true;
+        reference.pane.find.stop();
         if matches!(reference.admission, Admission::Password { .. }) {
             reference.admission = Admission::Ready;
             self.password = None;

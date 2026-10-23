@@ -1,4 +1,10 @@
 use super::*;
+mod controller;
+mod reference;
+pub(super) struct FindTarget {
+    pub page: u32,
+    pub position: Option<yamantaka_domain::reader::ReaderPosition>,
+}
 use yamantaka_application::document_find::{FindBatch, FindCursor, FindProgress, FindRequest};
 use yamantaka_domain::pdf_find::{DocumentTextPresence, PdfFindQuery};
 
@@ -52,6 +58,9 @@ impl Drop for FindState {
     }
 }
 impl FindState {
+    pub(super) fn owns(&self, document: &str, cancel: &Cancellation) -> bool {
+        matches!(&self.phase, FindPhase::Running { token, .. } if self.document.as_deref() == Some(document) && !cancel.is_cancelled() && token.same_request(cancel))
+    }
     pub(super) fn take_preview(&mut self) -> Option<String> {
         self.preview.take()
     }
@@ -132,67 +141,19 @@ impl YamantakaApp {
         self.reader.reader_panel_tab = outline::ReaderPanelTab::Find;
         self.reader.find.focus = true;
     }
-    fn submit_find(&mut self, request: FindRequest, edge: SelectionEdge, wrap: bool) {
-        self.reader.find.stop();
-        let token = request.cancellation.clone();
-        let progress = request.progress.clone();
-        self.reader.find.document = Some(request.document_id.clone());
-        self.reader.find.phase = match self.runtime.submit(Action::FindDocument(request)) {
-            Ok(()) => FindPhase::Running {
-                token,
-                progress,
-                edge,
-                wrap,
-            },
-            Err(error) => FindPhase::Failed(error.to_string()),
-        };
-    }
+
     fn new_find(&mut self) {
-        let Some((document, info)) = &self.reader.active else {
-            return;
-        };
-        let request = PdfFindQuery::new(
-            &self.reader.find.editor,
-            self.reader.find.match_case,
-            self.reader.find.whole_words,
-        )
-        .and_then(|query| {
-            self.reader.find.query = Some(query.clone());
-            FindRequest::new(
-                document.id.clone(),
-                query,
-                info.pages.len() as u32,
-                FindCursor::default(),
-                Cancellation::default(),
-            )
-        });
-        match request {
-            Ok(request) => self.submit_find(request, SelectionEdge::First, false),
-            Err(error) => {
-                self.reader.find.stop();
-                self.reader.find.phase = FindPhase::Failed(error.to_string());
-            }
+        if let Some((document, info)) = &self.reader.active {
+            self.reader.find.start(&self.runtime, document, info);
         }
     }
     pub(super) fn choose_find_match(&mut self, index: usize) {
-        let FindPhase::Ready { batch, selected } = &mut self.reader.find.phase else {
-            return;
-        };
-        let Some((page, item)) = batch.matches().nth(index) else {
-            return;
-        };
-        *selected = Some(index);
-        let position = item.position(page);
-        let changed = self
-            .reader
-            .navigation
-            .as_mut()
-            .is_some_and(|navigation| match position {
-                Some(position) => navigation.navigate_to(position),
-                None => navigation.go_to_page(page),
-            });
-        if changed {
-            self.reader.viewport.scroll_anchor = true;
+        if let Some(target) = self.reader.find.choose(index) {
+            self.apply_find_target(target);
+        }
+    }
+    fn apply_find_target(&mut self, target: FindTarget) {
+        if self.reader.navigate_find(target) {
             self.apply_navigation();
         }
     }
@@ -202,129 +163,35 @@ impl YamantakaApp {
         cancel: &Cancellation,
         result: Result<FindBatch, String>,
     ) {
-        let wrap_edge = match &self.reader.find.phase {
-            FindPhase::Running {
-                edge, wrap: true, ..
-            } => Some(*edge),
-            _ => None,
+        let Some((active, info)) = &self.reader.active else {
+            return;
         };
-        if self.reader.find.accept(document, cancel, result) {
-            if let Some(edge) = wrap_edge
-                && matches!(&self.reader.find.phase, FindPhase::Ready { batch, .. } if batch.matches().next().is_none())
-            {
-                self.wrap_find(edge);
-                return;
-            }
-            let index = match &self.reader.find.phase {
-                FindPhase::Ready { selected, .. } => *selected,
-                _ => None,
-            };
-            if let Some(index) = index {
-                self.choose_find_match(index);
-                if let Some(forward) = self.find_preview_step.take() {
-                    if self.find_preview_closed {
-                        self.reader.panel = false;
-                    }
-                    self.step_find(forward);
+        if active.id != document {
+            return;
+        }
+        if let Some(target) =
+            self.reader
+                .find
+                .accept_result(&self.runtime, active, info, cancel, result)
+        {
+            self.apply_find_target(target);
+            if let Some(forward) = self.find_preview_step.take() {
+                if self.find_preview_closed {
+                    self.reader.panel = false;
                 }
+                self.step_find(forward);
             }
         }
     }
-    fn wrap_find(&mut self, edge: SelectionEdge) {
-        let Some((document, info)) = &self.reader.active else {
-            return;
-        };
-        let Some(query) = self.reader.find.query.clone() else {
-            return;
-        };
-        let request = match edge {
-            SelectionEdge::First => FindRequest::new(
-                document.id.clone(),
-                query,
-                info.pages.len() as u32,
-                FindCursor::default(),
-                Cancellation::default(),
-            ),
-            SelectionEdge::Last => FindRequest::previous(
-                document.id.clone(),
-                query,
-                info.pages.len() as u32,
-                None,
-                Cancellation::default(),
-            ),
-        };
-        match request {
-            Ok(request) => self.submit_find(request, edge, false),
-            Err(error) => {
-                self.reader.find.stop();
-                self.reader.find.phase = FindPhase::Failed(error.to_string());
-            }
-        }
-    }
+
     pub(super) fn step_find(&mut self, forward: bool) {
-        let FindPhase::Ready {
-            batch,
-            selected: Some(selected),
-        } = &self.reader.find.phase
-        else {
-            return;
-        };
-        let count = batch.matches().count();
-        let inside = if forward {
-            (*selected + 1 < count).then_some(*selected + 1)
-        } else {
-            selected.checked_sub(1)
-        };
-        if let Some(index) = inside {
-            self.choose_find_match(index);
-            return;
-        }
-        let Some((document, info)) = &self.reader.active else {
-            return;
-        };
-        let Some(query) = self.reader.find.query.clone() else {
-            return;
-        };
-        let wrap = if forward {
-            batch.next.is_some()
-        } else {
-            batch
-                .start
-                .is_some_and(|start| start != FindCursor::default())
-        };
-        let cancel = Cancellation::default();
-        let request = if forward {
-            FindRequest::new(
-                document.id.clone(),
-                query,
-                info.pages.len() as u32,
-                batch.next.unwrap_or_default(),
-                cancel,
-            )
-        } else {
-            let boundary = batch.start.filter(|start| *start != FindCursor::default());
-            FindRequest::previous(
-                document.id.clone(),
-                query,
-                info.pages.len() as u32,
-                boundary,
-                cancel,
-            )
-        };
-        match request {
-            Ok(request) => self.submit_find(
-                request,
-                if forward {
-                    SelectionEdge::First
-                } else {
-                    SelectionEdge::Last
-                },
-                wrap,
-            ),
-            Err(error) => {
-                self.reader.find.stop();
-                self.reader.find.phase = FindPhase::Failed(error.to_string());
-            }
+        if let Some((document, info)) = &self.reader.active
+            && let Some(target) = self
+                .reader
+                .find
+                .step(&self.runtime, document, info, forward)
+        {
+            self.apply_find_target(target);
         }
     }
     pub(super) fn find_panel_content(&mut self, ui: &mut egui::Ui, info: &PdfInfo, p: Palette) {
@@ -527,40 +394,6 @@ impl YamantakaApp {
                 }
                 if let Some(forward) = step {
                     self.step_find(forward);
-                }
-            }
-        }
-    }
-    pub(super) fn paint_find_matches(
-        &self,
-        ui: &egui::Ui,
-        page: u32,
-        paper: egui::Rect,
-        rotation: yamantaka_domain::reader_preferences::PageRotation,
-        p: Palette,
-    ) {
-        let FindPhase::Ready { batch, selected } = &self.reader.find.phase else {
-            return;
-        };
-        for (index, (match_page, item)) in batch.matches().enumerate() {
-            if match_page != page {
-                continue;
-            }
-            for bounds in &item.rectangles {
-                let rect = reader_viewport::page_region(paper, rotation, *bounds);
-                let active = *selected == Some(index);
-                ui.painter().rect_filled(
-                    rect,
-                    1,
-                    p.accent.gamma_multiply(if active { 0.30 } else { 0.14 }),
-                );
-                if active {
-                    ui.painter().rect_stroke(
-                        rect,
-                        1,
-                        egui::Stroke::new(1.0, p.accent),
-                        egui::StrokeKind::Inside,
-                    );
                 }
             }
         }

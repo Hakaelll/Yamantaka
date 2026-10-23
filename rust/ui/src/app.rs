@@ -122,6 +122,7 @@ pub struct YamantakaApp {
     reference_demo: u8,
     reference_close_demo: bool,
     reference_swap_demo: bool,
+    reference_find_demo: bool,
     reference_native_closes: u64,
     reference_password_demo: u8,
     reference_password_attempts: u8,
@@ -317,6 +318,7 @@ impl YamantakaApp {
             reference_demo: 0,
             reference_close_demo: false,
             reference_swap_demo: false,
+            reference_find_demo: false,
             reference_native_closes: 0,
             reference_password_demo: 0,
             reference_password_attempts: 0,
@@ -1639,10 +1641,30 @@ impl App for YamantakaApp {
                     self.reader.loading = false;
                 }
                 Update::DocumentMatches(id, batch, cancel) => {
-                    self.accept_find(&id, &cancel, Ok(batch))
+                    if let Some(reference) = self
+                        .reference
+                        .as_mut()
+                        .filter(|reference| reference.pane.find.owns(&id, &cancel))
+                    {
+                        reference.accept_reference_find(&self.runtime, &cancel, Ok(batch));
+                    } else {
+                        self.accept_find(&id, &cancel, Ok(batch));
+                    }
                 }
                 Update::DocumentFindFailed(id, error, cancel) => {
-                    self.accept_find(&id, &cancel, Err(error.to_string()))
+                    if let Some(reference) = self
+                        .reference
+                        .as_mut()
+                        .filter(|reference| reference.pane.find.owns(&id, &cancel))
+                    {
+                        reference.accept_reference_find(
+                            &self.runtime,
+                            &cancel,
+                            Err(error.to_string()),
+                        );
+                    } else {
+                        self.accept_find(&id, &cancel, Err(error.to_string()));
+                    }
                 }
                 Update::PageMatches(..) | Update::PageFindFailed(..) => {}
                 Update::PageLinks(id, payload, cancel) => {
@@ -2294,7 +2316,7 @@ impl App for YamantakaApp {
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
-                    && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9)
+                    && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9 | 11)
                     && matches!(self.reference_chooser_demo, 0 | 3)
                     && matches!(self.reference_sync_demo, 0 | 10)
                     && (self.reference_chooser_demo == 0 || self.reference.as_ref().is_some_and(|reference|reference.chooser.loaded && reference.chooser.total == 1))
@@ -2424,7 +2446,7 @@ impl App for YamantakaApp {
                     record["collections"]=self.collections.summary();
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
-                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
+                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"find":reference.pane.find.capture_summary(),"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
                     record["referenceSync"]=serde_json::json!({"demoStage":self.reference_sync_demo,"linkedConfirmed":self.reference_sync_linked,"positionConfirmed":self.reference_sync_position,"reverseConfirmed":self.reference_sync_reverse,"differencesConfirmed":self.reference_sync_differences,"primaryScale":self.reader.viewport.scale});
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();

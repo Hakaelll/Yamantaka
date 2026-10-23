@@ -4,15 +4,24 @@ impl ReferenceView {
     pub(in crate::app) fn set_page(&mut self, page: u32) {
         if let Some(nav) = &mut self.pane.navigation {
             nav.go_to_page(page);
-            let page = nav.position().page();
-            self.pane.navigation_changed();
-            if self.bidirectional && self.follow_page {
-                self.pending_primary_page = Some(page);
-            } else {
-                self.follow_page = false;
-            }
-            self.follow_position = false;
+            self.reference_navigation_changed();
         }
+    }
+
+    pub(in crate::app) fn apply_reference_find(&mut self, target: find::FindTarget) {
+        if self.pane.navigate_find(target) {
+            self.reference_navigation_changed();
+        }
+    }
+
+    fn reference_navigation_changed(&mut self) {
+        self.pane.navigation_changed();
+        if self.bidirectional && self.follow_page {
+            self.pending_primary_page = Some(self.pane.page);
+        } else {
+            self.follow_page = false;
+        }
+        self.follow_position = false;
     }
 
     pub(in crate::app) fn set_zoom(&mut self, mode: ZoomMode, zoom: f32) {

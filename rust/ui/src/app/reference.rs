@@ -24,6 +24,8 @@ pub(super) struct ReferenceView {
     pub follow_position: bool,
     pub(in crate::app) bidirectional: bool,
     pub(in crate::app) swapped: bool,
+    pub(in crate::app) search_visible: bool,
+    pub(in crate::app) search_preview: bool,
     pending_primary_page: Option<u32>,
     pending_primary_zoom: bool,
     pub(in crate::app) differences: std::collections::BTreeSet<u32>,
@@ -84,6 +86,8 @@ impl ReferenceView {
             follow_position: false,
             bidirectional: false,
             swapped: false,
+            search_visible: false,
+            search_preview: false,
             pending_primary_page: None,
             pending_primary_zoom: false,
             differences: Default::default(),
@@ -148,6 +152,7 @@ impl ReferenceView {
             .as_ref()
             .map_or(1, ReaderNavigation::page_count);
         ui.horizontal_wrapped(|ui| {
+            self.reference_search(ui, runtime, english, p);
             ui.add_enabled_ui(can_choose, |ui| {
                 let button = theme::icon_button(
                     ui,
@@ -413,6 +418,9 @@ impl ReferenceView {
                         egui::StrokeKind::Inside,
                     );
                 }
+                self.pane
+                    .find
+                    .paint(ui, page.page, paper, layout.rotation(), p);
             }
             self.pane.loading = !self.pane.viewport.retry
                 && self

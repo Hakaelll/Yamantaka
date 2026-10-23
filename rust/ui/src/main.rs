@@ -1177,6 +1177,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         app.preview_reference_book(
                             args.iter().any(|arg| arg == "--reference-close"),
                             args.iter().any(|arg| arg == "--reference-swap"),
+                            args.iter().any(|arg| arg == "--reference-find"),
                         );
                         if args.iter().any(|arg| arg == "--reference-protected") {
                             app.preview_reference_password(
