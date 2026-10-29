@@ -1199,6 +1199,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         if args.iter().any(|arg| arg == "--reference-links") {
                             app.preview_reference_links();
                         }
+                        if args.iter().any(|arg| arg == "--reference-thumbnails") {
+                            app.preview_reference_thumbnails();
+                        }
                         if args.iter().any(|arg| arg == "--reference-outline") {
                             app.preview_reference_outline();
                         }

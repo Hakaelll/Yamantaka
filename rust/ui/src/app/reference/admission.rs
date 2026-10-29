@@ -256,6 +256,7 @@ impl YamantakaApp {
         reference.pane.find.stop();
         reference.pane.links.clear();
         reference.pane.outline.cancel();
+        reference.pane.thumbnails.clear();
         if matches!(reference.admission, Admission::Password { .. }) {
             reference.admission = Admission::Ready;
             self.password = None;

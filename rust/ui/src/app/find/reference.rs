@@ -2,45 +2,7 @@ use super::*;
 use crate::app::reference::ReferenceView;
 
 impl ReferenceView {
-    pub(in crate::app) fn reference_search(
-        &mut self,
-        ui: &mut egui::Ui,
-        runtime: &Runtime,
-        english: bool,
-        p: Palette,
-    ) {
-        let button = theme::icon_button(
-            ui,
-            if english {
-                "Search reference PDF"
-            } else {
-                "Buscar en referencia"
-            },
-            theme::Icon::Search,
-            p,
-        );
-        let mut popup = egui::Popup::menu(&button)
-            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-        if self.search_preview {
-            popup = popup.open(true);
-        }
-        let shown = popup.show(|ui| {
-            ui.set_width((ui.ctx().content_rect().width() - 40.0).clamp(120.0, 420.0));
-            let height = (ui.ctx().content_rect().height() - 100.0).max(80.0);
-            egui::ScrollArea::vertical()
-                .max_height(height)
-                .min_scrolled_height(height.min(360.0))
-                .show(ui, |ui| {
-                    self.reference_search_contents(ui, runtime, english, p)
-                });
-        });
-        if self.search_visible && shown.is_none() {
-            self.pane.find.stop();
-        }
-        self.search_visible = shown.is_some();
-    }
-
-    fn reference_search_contents(
+    pub(in crate::app) fn reference_search_contents(
         &mut self,
         ui: &mut egui::Ui,
         runtime: &Runtime,

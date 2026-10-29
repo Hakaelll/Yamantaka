@@ -5,11 +5,13 @@ use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
 mod chooser;
 mod differences;
+mod navigator;
 mod options;
 mod password;
 mod preview;
 mod saved;
 mod sync;
+mod toolbar;
 use admission::Admission;
 
 pub(super) struct ReferenceView {
@@ -26,8 +28,8 @@ pub(super) struct ReferenceView {
     pub(in crate::app) swapped: bool,
     pub(in crate::app) search_visible: bool,
     pub(in crate::app) search_preview: bool,
-    pub(in crate::app) outline_visible: bool,
     pub(in crate::app) outline_preview: bool,
+    pub(in crate::app) thumbnails_preview: bool,
     pending_primary_page: Option<u32>,
     pending_primary_zoom: bool,
     pub(in crate::app) differences: std::collections::BTreeSet<u32>,
@@ -90,8 +92,8 @@ impl ReferenceView {
             swapped: false,
             search_visible: false,
             search_preview: false,
-            outline_visible: false,
             outline_preview: false,
+            thumbnails_preview: false,
             pending_primary_page: None,
             pending_primary_zoom: false,
             differences: Default::default(),
@@ -120,7 +122,11 @@ impl ReferenceView {
         let can_choose = self.pane.active.as_ref().map(|(doc, _)| &doc.id)
             == primary.active.as_ref().map(|(doc, _)| &doc.id);
         let primary = primary.navigation.as_ref();
-        if !can_choose && let Some((document, _)) = &self.pane.active {
+        let compact = ui.available_width() < 560.0 || ui.available_height() < 180.0;
+        if !can_choose
+            && !compact
+            && let Some((document, _)) = &self.pane.active
+        {
             ui.add(
                 egui::Label::new(
                     RichText::new(document.display_title())
@@ -156,33 +162,7 @@ impl ReferenceView {
             .as_ref()
             .map_or(1, ReaderNavigation::page_count);
         ui.horizontal_wrapped(|ui| {
-            self.reference_search(ui, runtime, english, p);
-            self.reference_outline(ui, runtime, english, p);
-            ui.add_enabled_ui(can_choose, |ui| {
-                let button = theme::icon_button(
-                    ui,
-                    tr("Elegir libro de referencia", "Choose reference book"),
-                    theme::Icon::Book,
-                    p,
-                );
-                if button.clicked() {
-                    self.chooser.reopen();
-                }
-                let mut popup = egui::Popup::menu(&button)
-                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-                if self.chooser.preview {
-                    popup = popup.open(true);
-                }
-                popup.show(|ui| {
-                    self.selection = self.chooser.show(
-                        ui,
-                        runtime,
-                        english,
-                        p,
-                        self.pane.active.as_ref().map(|(doc, _)| doc.id.as_str()),
-                    );
-                });
-            });
+            self.navigator(ui, runtime, english, p);
             let page_label = ui.label(
                 RichText::new(tr("Referencia", "Reference"))
                     .color(p.secondary)
@@ -200,41 +180,27 @@ impl ReferenceView {
             {
                 self.set_page(page - 1);
             }
-            let out = theme::icon_button(
-                ui,
-                tr("Alejar referencia", "Zoom reference out"),
-                theme::Icon::Minus,
-                p,
-            )
-            .clicked();
-            let zoom_in = theme::icon_button(
-                ui,
-                tr("Acercar referencia", "Zoom reference in"),
-                theme::Icon::Plus,
-                p,
-            )
-            .clicked();
-            let fit = theme::navigation(ui, tr("Ajustar", "Fit"), false, p).clicked();
-            if out || zoom_in {
-                let zoom = (self.pane.viewport.scale * if zoom_in { 1.2 } else { 1.0 / 1.2 })
-                    .clamp(0.2, 8.0);
-                self.set_zoom(ZoomMode::Custom, zoom);
+            if compact {
+                let button = theme::icon_button(
+                    ui,
+                    tr("Opciones de referencia", "Reference options"),
+                    theme::Icon::Menu,
+                    p,
+                );
+                let mut popup = egui::Popup::menu(&button)
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+                if self.sync_preview || self.chooser.preview {
+                    popup = popup.open(true);
+                }
+                popup.show(|ui| {
+                    ui.set_width((ui.ctx().content_rect().width() - 40.0).clamp(120.0, 420.0));
+                    ui.horizontal_wrapped(|ui| {
+                        self.toolbar_tools(ui, runtime, primary, can_choose, english, p)
+                    });
+                });
+            } else {
+                self.toolbar_tools(ui, runtime, primary, can_choose, english, p);
             }
-            if fit {
-                self.set_zoom(ZoomMode::FitPage, self.pane.zoom);
-            }
-            let linked = theme::navigation(
-                ui,
-                tr("Vincular", "Link views"),
-                self.follow_page || self.follow_zoom || self.follow_position,
-                p,
-            );
-            let mut popup = egui::Popup::menu(&linked)
-                .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-            if self.sync_preview {
-                popup = popup.open(true);
-            }
-            popup.show(|ui| self.options_menu(ui, primary, english, p));
             close = theme::icon_button(
                 ui,
                 tr("Cerrar referencia", "Close reference"),
@@ -364,7 +330,11 @@ impl ReferenceView {
             0,
             YamantakaApp::reading_paper(preferences.reading_theme),
         );
-        let mut scroll = egui::ScrollArea::both().id_salt("reference-pages");
+        let mut scroll = egui::ScrollArea::both()
+            .id_salt("reference-pages")
+            .max_height(size.y.max(1.0))
+            .min_scrolled_height(0.0)
+            .auto_shrink([false, false]);
         if self.pane.viewport.scroll_anchor {
             if let Ok([x, y]) = layout.scroll_for_anchor(
                 viewport,

@@ -1,6 +1,6 @@
 # Compare PDFs
 
-Open a PDF, then choose **Reading options → Compare pages**. The main reading keeps its existing tools and the reference opens with independent page and zoom controls.
+Open a PDF, then choose **Reading options → Compare pages**. The main reading keeps its existing tools and the reference opens with independent page and zoom controls. In smaller panes, **Reference options** groups the book chooser, zoom and linking controls to leave more room for the PDF.
 
 ## Choose a reference
 
@@ -24,13 +24,19 @@ Enable **In both directions** to keep the selected page or zoom link active when
 
 ## Browse reference contents
 
-Select the contents icon in the reference header to open its chapter hierarchy. Use the plus or minus controls to expand or collapse sections, then select a chapter or passage. Its destination page, position and zoom apply to the reference; synchronization follows your selected options.
+Open **Navigate reference PDF → Contents** in the reference header to browse its chapter hierarchy. Use the plus or minus controls to expand or collapse sections, then select a chapter or passage. Its destination page, position and zoom apply to the reference; synchronization follows your selected options.
 
 The popup reports when the PDF has no contents and offers retry after a loading error. Closing it cancels an outstanding request. The main contents panel retains its own state.
 
+## Browse page thumbnails
+
+Open **Navigate reference PDF → Pages** to browse thumbnails. Select a page to navigate the reference. The main reading retains its own page unless page synchronization is enabled.
+
+Only visible thumbnails are rendered, with at most 16 resident slots and a maximum image side of 256 physical pixels. Closing the navigator or switching sections releases the thumbnails and cancels pending work.
+
 ## Search the reference
 
-Select the search icon in the reference header, enter a word or phrase, and press Enter or **Find**. **Match case** and **Whole words** refine the search.
+Open **Navigate reference PDF → Find**, enter a word or phrase, and press Enter or **Find**. **Match case** and **Whole words** refine the search.
 
 Select a result to jump to its passage. Results are highlighted in the reference. **Previous** and **Next** navigate matches, including groups beyond the current batch of up to 80 results. With independent page controls, selecting a result moves only the reference. Linked navigation follows the options described above.
 
@@ -56,4 +62,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, zoom, chapter contents, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, zoom, chapter contents, page thumbnails, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

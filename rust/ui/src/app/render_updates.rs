@@ -22,7 +22,11 @@ impl YamantakaApp {
             .as_ref()
             .is_some_and(|reference| reference.pane.viewport.accepts(page, cancel));
         let thumbnail = self.reader.thumbnails.accepts(page, cancel);
-        if !reader && !thumbnail && !reference {
+        let reference_thumbnail = self
+            .reference
+            .as_ref()
+            .is_some_and(|reference| reference.pane.thumbnails.accepts(page, cancel));
+        if !reader && !thumbnail && !reference && !reference_thumbnail {
             return;
         }
         let replacement = if let Some(presenter) = &mut self.presenter {
@@ -48,6 +52,10 @@ impl YamantakaApp {
                         reference.fail_render(cancel, &error);
                     }
                 }
+            }
+        } else if reference_thumbnail {
+            if let Some(reference) = &mut self.reference {
+                reference.pane.thumbnails.install(page, cancel, replacement);
             }
         } else if thumbnail {
             self.reader.thumbnails.install(page, cancel, replacement);

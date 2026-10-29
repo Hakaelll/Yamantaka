@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-thumbnails'; args=@('--reader','--reference','--reference-book','--reference-thumbnails','--es') },
+    @{ name='reader-reference-thumbnails-small-200'; args=@('--reader','--reference','--reference-book','--reference-thumbnails','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-outline'; args=@('--reader','--reference','--reference-book','--reference-outline','--es') },
     @{ name='reader-reference-links'; args=@('--reader','--reference','--reference-book','--reference-links','--es') },
     @{ name='reader-reference-external'; args=@('--reader','--reference','--reference-book','--reference-links','--reference-link-external','--es') },
@@ -367,6 +369,10 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -like 'reader-reference-thumbnails*') {
+        if ($controls.referenceAdmission.demoStage -ne 19 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.page -ne 1 -or $controls.reference.thumbnailSlots -lt 1 -or $controls.reference.thumbnailSlots -gt 16 -or $controls.visibleThumbnailSlots -ne 0 -or $controls.currentReaderPage -ne 0) { throw 'Reference thumbnails did not navigate independently within their bounded resident slots.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Páginas','Página 2')
     }
     if ($case.name -eq 'reader-reference-outline') {
         if ($controls.referenceAdmission.demoStage -ne 16 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.page -ne 1 -or [Math]::Abs($controls.reference.scale-1.5) -gt 0.0001 -or $controls.reference.outline.entries -ne 6 -or $controls.reference.outline.rows -ne 6 -or $controls.documentOutline.entries -ne 0 -or $controls.currentReaderPage -ne 0) { throw 'The reference outline did not navigate independently through its resolved PDF destination.' }

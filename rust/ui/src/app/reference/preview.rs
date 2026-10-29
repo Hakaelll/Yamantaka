@@ -225,6 +225,10 @@ impl YamantakaApp {
         self.reference_links_demo = self.demo;
     }
 
+    pub fn preview_reference_thumbnails(&mut self) {
+        self.reference_thumbnails_demo = self.demo;
+    }
+
     pub fn preview_reference_outline(&mut self) {
         self.reference_outline_demo = self.demo;
     }
@@ -335,6 +339,9 @@ impl YamantakaApp {
                     self.reference.as_mut().unwrap().pane.links.preview =
                         links::LinkPreview::Activate;
                     self.reference_demo = 12;
+                } else if self.reference_thumbnails_demo {
+                    self.reference.as_mut().unwrap().thumbnails_preview = true;
+                    self.reference_demo = 17;
                 } else if self.reference_outline_demo {
                     self.reference.as_mut().unwrap().outline_preview = true;
                     self.reference_demo = 14;
@@ -423,6 +430,29 @@ impl YamantakaApp {
                 assert_eq!(self.reader.page, 0);
                 assert_eq!(self.reader.outline.capture_summary()["entries"], 0);
                 self.reference_demo = 16;
+            }
+            17 if self
+                .reference
+                .as_ref()
+                .is_some_and(|reference| reference.pane.thumbnails.ready()) =>
+            {
+                let reference = self.reference.as_mut().unwrap();
+                assert!((1..=16).contains(&reference.pane.thumbnails.resident_count()));
+                assert_eq!(self.reader.thumbnails.resident_count(), 0);
+                reference.stop_navigator_requests();
+                assert_eq!(reference.pane.thumbnails.resident_count(), 0);
+                reference.set_page(1);
+                self.reference_demo = 18;
+            }
+            18 if self.reference.as_ref().is_some_and(|reference| {
+                reference.pane.page == 1
+                    && !reference.pane.loading
+                    && reference.pane.thumbnails.ready()
+            }) =>
+            {
+                assert_eq!(self.reader.page, 0);
+                assert_eq!(self.reader.thumbnails.resident_count(), 0);
+                self.reference_demo = 19;
             }
             4 if self.reference.is_none() => {
                 if self.capture.is_some() {
