@@ -176,6 +176,7 @@ pub enum Update {
     AnnotationMarks(AnnotationMarksReply),
     Annotations(AnnotationReply),
     Bookmarks(String, usize, BookmarkPage, Cancellation),
+    BookmarkChanged(String, BookmarkPage, Cancellation),
     BookmarkFailed(String, Failure, Cancellation),
     SearchFailed(Failure, Cancellation),
     Document(String, Option<Document>, Cancellation),
@@ -1097,7 +1098,7 @@ impl Runtime {
                                     };
                                     let result = repository.change_bookmark(&id, &change, offset, access, &cancel);
                                     match result {
-                                        Ok(page) => emit(&events, &notify, Update::Bookmarks(id, offset, page, cancel), permit),
+                                        Ok(page) => emit(&events, &notify, Update::BookmarkChanged(id, page, cancel), permit),
                                         Err(error) => emit(&events, &notify, Update::BookmarkFailed(id, error, cancel), permit),
                                     }
                                 }

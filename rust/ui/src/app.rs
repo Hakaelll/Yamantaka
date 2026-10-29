@@ -126,6 +126,7 @@ pub struct YamantakaApp {
     reference_links_demo: bool,
     reference_outline_demo: bool,
     reference_thumbnails_demo: bool,
+    reference_bookmarks_demo: bool,
     reference_native_closes: u64,
     reference_password_demo: u8,
     reference_password_attempts: u8,
@@ -324,6 +325,7 @@ impl YamantakaApp {
             reference_links_demo: false,
             reference_outline_demo: false,
             reference_thumbnails_demo: false,
+            reference_bookmarks_demo: false,
             reference_native_closes: 0,
             reference_password_demo: 0,
             reference_password_attempts: 0,
@@ -1553,28 +1555,13 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Bookmarks(id, _, page, cancel) => {
-                    self.reader.bookmarks.accept(&id, &cancel, Ok(page));
+                    self.accept_bookmarks(&id, &cancel, Ok(page), false);
+                }
+                Update::BookmarkChanged(id, page, cancel) => {
+                    self.accept_bookmarks(&id, &cancel, Ok(page), true);
                 }
                 Update::BookmarkFailed(id, error, cancel) => {
-                    if !cancel.is_cancelled()
-                        && self
-                            .reader
-                            .active
-                            .as_ref()
-                            .is_some_and(|(document, _)| document.id != id)
-                    {
-                        // Leaving a document must not hide an accepted write failure.
-                        self.error = Some(format!(
-                            "{}: {error}",
-                            self.tr(
-                                "No se pudieron guardar los marcadores del documento anterior",
-                                "Could not save bookmarks in the previous document",
-                            )
-                        ));
-                    }
-                    self.reader
-                        .bookmarks
-                        .accept(&id, &cancel, Err(error.to_string()));
+                    self.accept_bookmarks(&id, &cancel, Err(error.to_string()), false);
                 }
                 Update::Opened(document, info, cancel) => {
                     if self.accept_reference_opened(&document, &info, &cancel) {
@@ -2371,7 +2358,7 @@ impl App for YamantakaApp {
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
-                    && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9 | 11 | 13 | 16 | 19)
+                    && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9 | 11 | 13 | 16 | 19 | 28 | 35)
                     && matches!(self.reference_chooser_demo, 0 | 3)
                     && matches!(self.reference_sync_demo, 0 | 10)
                     && (self.reference_chooser_demo == 0 || self.reference.as_ref().is_some_and(|reference|reference.chooser.loaded && reference.chooser.total == 1))
@@ -2502,7 +2489,8 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["documentOutline"] = self.reader.outline.capture_summary();
-                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"find":reference.pane.find.capture_summary(),"links":reference.pane.links.capture_summary(),"outline":reference.pane.outline.capture_summary(),"thumbnailSlots":reference.pane.thumbnails.resident_count(),"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
+                    record["documentBookmarks"] = self.reader.bookmarks.capture_summary();
+                    record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"find":reference.pane.find.capture_summary(),"links":reference.pane.links.capture_summary(),"outline":reference.pane.outline.capture_summary(),"bookmarks":reference.pane.bookmarks.capture_summary(),"thumbnailSlots":reference.pane.thumbnails.resident_count(),"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
                     record["referenceSync"]=serde_json::json!({"demoStage":self.reference_sync_demo,"linkedConfirmed":self.reference_sync_linked,"positionConfirmed":self.reference_sync_position,"reverseConfirmed":self.reference_sync_reverse,"differencesConfirmed":self.reference_sync_differences,"primaryScale":self.reader.viewport.scale});
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();

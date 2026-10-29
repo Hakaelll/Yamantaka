@@ -237,6 +237,9 @@ impl YamantakaApp {
         if !self.demo {
             return;
         }
+        if self.advance_reference_bookmarks_demo() {
+            return;
+        }
         if self.reference_demo == 2
             && let Some(document) = self
                 .password
@@ -339,6 +342,12 @@ impl YamantakaApp {
                     self.reference.as_mut().unwrap().pane.links.preview =
                         links::LinkPreview::Activate;
                     self.reference_demo = 12;
+                } else if self.reference_bookmarks_demo {
+                    let reference = self.reference.as_mut().unwrap();
+                    reference.bookmarks_preview = true;
+                    reference.set_page(1);
+                    self.reader.bookmarks.prepare(&self.runtime, "demo-0");
+                    self.reference_demo = 20;
                 } else if self.reference_thumbnails_demo {
                     self.reference.as_mut().unwrap().thumbnails_preview = true;
                     self.reference_demo = 17;

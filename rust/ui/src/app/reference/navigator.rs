@@ -19,11 +19,16 @@ impl ReferenceView {
         );
         if !matches!(
             self.pane.reader_panel_tab,
-            ReaderPanelTab::Outline | ReaderPanelTab::Thumbnails | ReaderPanelTab::Find
+            ReaderPanelTab::Outline
+                | ReaderPanelTab::Thumbnails
+                | ReaderPanelTab::Find
+                | ReaderPanelTab::Bookmarks
         ) {
             self.pane.reader_panel_tab = ReaderPanelTab::Outline;
         }
-        if self.thumbnails_preview {
+        if self.bookmarks_preview {
+            self.pane.reader_panel_tab = ReaderPanelTab::Bookmarks;
+        } else if self.thumbnails_preview {
             self.pane.reader_panel_tab = ReaderPanelTab::Thumbnails;
         } else if self.search_preview {
             self.pane.reader_panel_tab = ReaderPanelTab::Find;
@@ -32,24 +37,49 @@ impl ReferenceView {
         }
         let mut popup = egui::Popup::menu(&button)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-        if self.search_preview || self.outline_preview || self.thumbnails_preview {
+        if self.search_preview
+            || self.outline_preview
+            || self.thumbnails_preview
+            || self.bookmarks_preview
+        {
             popup = popup.open(true);
         }
         let shown = popup.show(|ui| {
             ui.set_width((ui.ctx().content_rect().width() - 40.0).clamp(120.0, 420.0));
             let previous = self.pane.reader_panel_tab;
-            ui.horizontal_wrapped(|ui| {
-                for (tab, label) in [
-                    (ReaderPanelTab::Outline, tr("Índice", "Contents")),
-                    (ReaderPanelTab::Thumbnails, tr("Páginas", "Pages")),
-                    (ReaderPanelTab::Find, tr("Buscar", "Find")),
-                ] {
-                    if theme::navigation(ui, label, self.pane.reader_panel_tab == tab, p).clicked()
-                    {
-                        self.pane.reader_panel_tab = tab;
+            let sections = [
+                (ReaderPanelTab::Outline, tr("Índice", "Contents")),
+                (ReaderPanelTab::Thumbnails, tr("Páginas", "Pages")),
+                (ReaderPanelTab::Find, tr("Buscar", "Find")),
+                (ReaderPanelTab::Bookmarks, tr("Marcadores", "Bookmarks")),
+            ];
+            if ui.available_width() < 350.0 {
+                let selected = sections
+                    .iter()
+                    .find(|(tab, _)| *tab == self.pane.reader_panel_tab)
+                    .unwrap()
+                    .1;
+                let response = egui::ComboBox::from_id_salt("reference-navigator-section")
+                    .selected_text(selected)
+                    .width(ui.available_width())
+                    .show_ui(ui, |ui| {
+                        for (tab, label) in sections {
+                            ui.selectable_value(&mut self.pane.reader_panel_tab, tab, label);
+                        }
+                    })
+                    .response;
+                theme::record_control_bounds(ui, selected, response.rect);
+            } else {
+                ui.horizontal_wrapped(|ui| {
+                    for (tab, label) in sections {
+                        if theme::navigation(ui, label, self.pane.reader_panel_tab == tab, p)
+                            .clicked()
+                        {
+                            self.pane.reader_panel_tab = tab;
+                        }
                     }
-                }
-            });
+                });
+            }
             ui.add_space(8.0);
             if previous != self.pane.reader_panel_tab {
                 self.stop_navigator_requests();
@@ -64,6 +94,32 @@ impl ReferenceView {
                         .show(ui, |ui| {
                             self.reference_search_contents(ui, runtime, english, p)
                         });
+                }
+                ReaderPanelTab::Bookmarks => {
+                    let Some((document, info)) = &self.pane.active else {
+                        return;
+                    };
+                    self.pane.bookmarks.prepare(runtime, &document.id);
+                    let height = (ui.ctx().content_rect().height() - 160.0).max(80.0);
+                    let mut jump = None;
+                    egui::ScrollArea::vertical()
+                        .id_salt("reference-bookmarks")
+                        .max_height(height)
+                        .min_scrolled_height(height.min(360.0))
+                        .show(ui, |ui| {
+                            jump = self.pane.bookmarks.show(
+                                ui,
+                                runtime,
+                                self.pane.page,
+                                info.pages.len(),
+                                english,
+                                p,
+                            );
+                        });
+                    if let Some(page) = jump {
+                        self.set_page(page);
+                        ui.ctx().request_repaint();
+                    }
                 }
                 ReaderPanelTab::Thumbnails => {
                     let Some((document, info)) = &self.pane.active else {
@@ -115,6 +171,7 @@ impl ReferenceView {
         self.pane.find.stop();
         self.pane.outline.cancel();
         self.pane.thumbnails.clear();
+        self.pane.bookmarks.cancel_query();
         self.search_visible = false;
     }
 }

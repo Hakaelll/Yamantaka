@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-bookmarks'; args=@('--reader','--reference','--reference-book','--reference-bookmarks','--es') },
+    @{ name='reader-reference-bookmarks-small-200'; args=@('--reader','--reference','--reference-book','--reference-bookmarks','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
+    @{ name='reader-reference-bookmarks-shared'; args=@('--reader','--reference','--reference-bookmarks','--es') },
     @{ name='reader-reference-thumbnails'; args=@('--reader','--reference','--reference-book','--reference-thumbnails','--es') },
     @{ name='reader-reference-thumbnails-small-200'; args=@('--reader','--reference','--reference-book','--reference-thumbnails','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-outline'; args=@('--reader','--reference','--reference-book','--reference-outline','--es') },
@@ -369,6 +372,14 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -in @('reader-reference-bookmarks','reader-reference-bookmarks-small-200')) {
+        if ($controls.referenceAdmission.demoStage -ne 28 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.page -ne 1 -or $controls.reference.bookmarks.total -ne 1 -or $controls.reference.bookmarks.entries[0].label -cne 'Compare this passage' -or $controls.documentBookmarks.total -ne 2 -or $controls.currentReaderPage -ne 0) { throw 'Reference bookmark CRUD or independent navigation did not complete.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Marcadores','Guardar página 2')
+    }
+    if ($case.name -eq 'reader-reference-bookmarks-shared') {
+        if ($controls.referenceAdmission.demoStage -ne 35 -or $controls.reference -or $controls.documentBookmarks.total -ne 1 -or $controls.documentBookmarks.entries[0].label -cne 'Shared reading note' -or $controls.documentBookmarks.entries[0].page_index -ne 1 -or $controls.currentReaderPage -ne 0) { throw 'Shared bookmark changes or the accepted write after reference closure were lost.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Página 2')
     }
     if ($case.name -like 'reader-reference-thumbnails*') {
         if ($controls.referenceAdmission.demoStage -ne 19 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.page -ne 1 -or $controls.reference.thumbnailSlots -lt 1 -or $controls.reference.thumbnailSlots -gt 16 -or $controls.visibleThumbnailSlots -ne 0 -or $controls.currentReaderPage -ne 0) { throw 'Reference thumbnails did not navigate independently within their bounded resident slots.' }

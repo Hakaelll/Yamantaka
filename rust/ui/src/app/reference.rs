@@ -3,6 +3,7 @@ use yamantaka_domain::reader::ReaderPosition;
 use yamantaka_domain::workspaces::ComparisonLayout;
 use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
+mod bookmark_preview;
 mod chooser;
 mod differences;
 mod navigator;
@@ -30,6 +31,7 @@ pub(super) struct ReferenceView {
     pub(in crate::app) search_preview: bool,
     pub(in crate::app) outline_preview: bool,
     pub(in crate::app) thumbnails_preview: bool,
+    pub(in crate::app) bookmarks_preview: bool,
     pending_primary_page: Option<u32>,
     pending_primary_zoom: bool,
     pub(in crate::app) differences: std::collections::BTreeSet<u32>,
@@ -71,6 +73,7 @@ impl ReferenceView {
         preferences.scroll_offset = 0.0;
         let mut pane = reader_pane::ReaderPane::default();
         pane.active = Some(active);
+        pane.reader_panel_tab = outline::ReaderPanelTab::Outline;
         pane.navigation = Some(navigation);
         pane.reader_preferences = Some(preferences);
         if let Some(navigation) = &mut pane.navigation {
@@ -94,6 +97,7 @@ impl ReferenceView {
             search_preview: false,
             outline_preview: false,
             thumbnails_preview: false,
+            bookmarks_preview: false,
             pending_primary_page: None,
             pending_primary_zoom: false,
             differences: Default::default(),

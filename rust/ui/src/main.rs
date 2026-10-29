@@ -109,6 +109,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         || arg == "--library-check"
                         || arg == "--import-recovery"
                         || arg == "--cover-capacity-retry"
+                        || arg == "--reference-bookmarks"
                 }) {
             std::fs::create_dir_all(&store).map_err(|_| {
                 yamantaka_domain::Failure::Storage("Synthetic export store could not open".into())
@@ -520,7 +521,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         let mut reading = ReaderPreferences::new("demo-0");
-        if args.iter().any(|arg| arg == "--bookmarks") {
+        if args
+            .iter()
+            .any(|arg| arg == "--bookmarks" || arg == "--reference-bookmarks")
+        {
             db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('demo-bookmark-1','demo-0',0,'A passage to revisit','2026-10-09','2026-10-09'),('demo-bookmark-2','demo-0',1,'Notes for tomorrow','2026-10-09','2026-10-09');")?;
         }
         for arg in &args {
@@ -1186,6 +1190,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_reference();
                     if args.iter().any(|arg| arg == "--reference-sync") {
                         app.preview_reference_sync();
+                    }
+                    if args.iter().any(|arg| arg == "--reference-bookmarks") {
+                        app.preview_reference_bookmarks(
+                            !args.iter().any(|arg| arg == "--reference-book"),
+                        );
                     }
                     if args.iter().any(|arg| arg == "--reference-chooser") {
                         app.preview_reference_chooser();

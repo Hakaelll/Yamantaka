@@ -120,6 +120,7 @@ impl YamantakaApp {
                 Ok(navigation) => {
                     let mut pane = reader_pane::ReaderPane::default();
                     pane.page = navigation.position().page();
+                    pane.reader_panel_tab = reference.pane.reader_panel_tab;
                     pane.navigation = Some(navigation);
                     pane.active = Some((document.clone(), Arc::new(info.clone())));
                     let mut preferences = ReaderPreferences::new(&document.id);
@@ -257,6 +258,7 @@ impl YamantakaApp {
         reference.pane.links.clear();
         reference.pane.outline.cancel();
         reference.pane.thumbnails.clear();
+        reference.pane.bookmarks.cancel_query();
         if matches!(reference.admission, Admission::Password { .. }) {
             reference.admission = Admission::Ready;
             self.password = None;

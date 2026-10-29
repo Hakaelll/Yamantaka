@@ -22,6 +22,8 @@ Enable **In both directions** to keep the selected page or zoom link active when
 
 **Follow position** also follows the point within the main PDF page. This setting always runs from the main reading toward the reference. Its canvas may limit the point that can be displayed near page edges. Manual reference page navigation turns position following off.
 
+Open **Navigate reference PDF** in the reference header to choose a section. In narrow windows, use the section selector at the top of the popup.
+
 ## Browse reference contents
 
 Open **Navigate reference PDF → Contents** in the reference header to browse its chapter hierarchy. Use the plus or minus controls to expand or collapse sections, then select a chapter or passage. Its destination page, position and zoom apply to the reference; synchronization follows your selected options.
@@ -33,6 +35,14 @@ The popup reports when the PDF has no contents and offers retry after a loading 
 Open **Navigate reference PDF → Pages** to browse thumbnails. Select a page to navigate the reference. The main reading retains its own page unless page synchronization is enabled.
 
 Only visible thumbnails are rendered, with at most 16 resident slots and a maximum image side of 256 physical pixels. Closing the navigator or switching sections releases the thumbnails and cancels pending work.
+
+## Save reference bookmarks
+
+Open **Navigate reference PDF → Bookmarks**, then select **Bookmark page N**. Select a saved page to return to it. **Edit** changes its label; **Remove** deletes that bookmark. Lists retrieve up to 80 entries per page, with Previous and Next controls for longer lists.
+
+Bookmarks belong to their PDF. Distinct documents keep separate lists. When both panes show the same PDF, changes appear in both lists while each pane keeps its own navigation and editor. Selecting a bookmark follows the comparison's page synchronization options.
+
+Closing the navigator cancels an outstanding list query. An accepted save, rename or removal continues if you close the reference. A failed write remains visible in the owning editor, or in the main application if that editor has closed. Changing bookmarks also refreshes library results, including the Bookmarked view.
 
 ## Search the reference
 
@@ -62,4 +72,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, zoom, chapter contents, page thumbnails, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, zoom, chapter contents, page thumbnails, bookmarks, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
