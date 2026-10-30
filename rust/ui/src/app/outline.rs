@@ -12,6 +12,7 @@ pub(super) enum ReaderPanelTab {
     Bookmarks,
     Annotations,
     Text,
+    Positions,
 }
 
 #[derive(Clone, Copy)]

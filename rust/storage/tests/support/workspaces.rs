@@ -109,6 +109,15 @@ pub fn preserved_split_references(document: &str) {
         .find(|item| item.id == copy)
         .unwrap();
     let current_readings = database.workspace(&(&current).into(), &cancel).unwrap();
+    let mut current_tabs = current_readings.tabs;
+    let active = current_tabs.active().unwrap();
+    current_tabs
+        .update_active(
+            active.page(),
+            active.preferences().clone(),
+            Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions),
+        )
+        .unwrap();
     let mut view = current_readings.view;
     view.query = serde_json::json!({"text":"Appendix","list":true});
     view.focus = false;
@@ -116,7 +125,7 @@ pub fn preserved_split_references(document: &str) {
         .change_workspace(
             &WorkspaceChange::Replace {
                 expected: (&current).into(),
-                tabs: Box::new(current_readings.tabs),
+                tabs: Box::new(current_tabs),
                 view: Some(Box::new(view)),
             },
             &cancel,
@@ -126,6 +135,10 @@ pub fn preserved_split_references(document: &str) {
         panic!("Replace must return its committed revision");
     };
     let snapshot = database.workspace(&(&updated).into(), &cancel).unwrap();
+    assert_eq!(
+        snapshot.tabs.active().unwrap().panel(),
+        Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions)
+    );
     assert_eq!(snapshot.view.query["custom"], "retained");
     assert_eq!(snapshot.view.parsed_query().unwrap().text, "Appendix");
     assert!(snapshot.view.parsed_query().unwrap().list);
@@ -215,6 +228,21 @@ pub fn preserved_split_references(document: &str) {
         .unwrap()
         .unwrap();
     assert_eq!(reread.workspace_reference(), Some(&reference));
+    assert_eq!(
+        reread.active().unwrap().panel(),
+        Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions)
+    );
+    let context: yamantaka_domain::reading_sessions::ReaderSessionContext =
+        serde_json::from_value(serde_json::json!({"panelSection":"positions"})).unwrap();
+    let restoration =
+        yamantaka_domain::reading_sessions::restoration::ReaderSessionRestoration::try_from(
+            context,
+        )
+        .unwrap();
+    assert_eq!(
+        restoration.panel(),
+        Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions)
+    );
     let comparison = WorkspaceComparison {
         bidirectional: false,
         swapped: true,
@@ -255,6 +283,10 @@ pub fn preserved_split_references(document: &str) {
         Some(comparison.clone())
     );
     assert_eq!(snapshot.reference_document.unwrap().id, "original");
+    assert_eq!(
+        snapshot.tabs.active().unwrap().panel(),
+        Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions)
+    );
     assert_eq!(snapshot.view.query["custom"], "retained");
     let mut invalid = comparison;
     invalid.point = [0.5, 1.1];
@@ -286,6 +318,10 @@ pub fn preserved_split_references(document: &str) {
         .unwrap();
     assert!(snapshot.view.parsed_query().unwrap().comparison.is_none());
     assert!(snapshot.reference_document.is_none());
+    assert_eq!(
+        snapshot.tabs.active().unwrap().panel(),
+        Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions)
+    );
     assert_eq!(snapshot.view.query["custom"], "retained");
     database.integrity().unwrap();
 }

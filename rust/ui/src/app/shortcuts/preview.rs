@@ -1,10 +1,14 @@
 use super::ReadingTarget;
+#[path = "history_preview.rs"]
+mod history;
 use crate::app::*;
 
 #[derive(Default)]
 pub(in crate::app) struct ShortcutPreview {
     phase: u8,
     close: bool,
+    history: bool,
+    primary_positions: bool,
     pending: Vec<egui::Event>,
     reference_zoom: f32,
     primary_zoom: f32,
@@ -14,7 +18,7 @@ pub(in crate::app) struct ShortcutPreview {
 
 impl ShortcutPreview {
     pub fn ready(&self) -> bool {
-        matches!(self.phase, 0 | 14 | 16)
+        matches!(self.phase, 0 | 14 | 16 | 34)
     }
     pub fn phase(&self) -> u8 {
         self.phase
@@ -37,10 +41,17 @@ impl ShortcutPreview {
 }
 
 impl YamantakaApp {
-    pub fn preview_reference_shortcuts(&mut self, close: bool) {
+    pub fn preview_reference_shortcuts(
+        &mut self,
+        close: bool,
+        history: bool,
+        primary_positions: bool,
+    ) {
         if self.demo {
             self.reference_shortcuts_preview.phase = 1;
             self.reference_shortcuts_preview.close = close;
+            self.reference_shortcuts_preview.history = history;
+            self.reference_shortcuts_preview.primary_positions = primary_positions;
         }
     }
 
@@ -57,6 +68,10 @@ impl YamantakaApp {
                     .as_ref()
                     .is_some_and(|(doc, _)| doc.id == "demo-1")
         });
+        if self.reference_shortcuts_preview.phase >= 20 {
+            self.advance_history_preview(ctx, reference_ready);
+            return;
+        }
         let preview = &mut self.reference_shortcuts_preview;
         match preview.phase {
             1 if reference_ready && matches!(self.reference_demo, 3 | 9) => {
@@ -176,7 +191,9 @@ impl YamantakaApp {
                 preview.key(15, egui::Key::F6, egui::Modifiers::NONE);
             }
             15 if self.reading_focus.reference() && self.reading_focus.canvas_focused(ctx) => {
-                if preview.close {
+                if preview.history {
+                    preview.key(20, egui::Key::ArrowRight, egui::Modifiers::NONE);
+                } else if preview.close {
                     preview.key(17, egui::Key::W, egui::Modifiers::CTRL);
                 } else {
                     preview.phase = 14;

@@ -61,6 +61,7 @@ impl YamantakaApp {
                         SessionPanel::Bookmarks => outline::ReaderPanelTab::Bookmarks,
                         SessionPanel::Annotations => outline::ReaderPanelTab::Annotations,
                         SessionPanel::Text => outline::ReaderPanelTab::Text,
+                        SessionPanel::Positions => outline::ReaderPanelTab::Positions,
                     };
                 }
                 restored

@@ -176,6 +176,7 @@ fn session_panel(panel: outline::ReaderPanelTab) -> SessionPanel {
         outline::ReaderPanelTab::Bookmarks => SessionPanel::Bookmarks,
         outline::ReaderPanelTab::Annotations => SessionPanel::Annotations,
         outline::ReaderPanelTab::Text => SessionPanel::Text,
+        outline::ReaderPanelTab::Positions => SessionPanel::Positions,
     }
 }
 fn reader_panel(panel: SessionPanel) -> outline::ReaderPanelTab {
@@ -186,6 +187,7 @@ fn reader_panel(panel: SessionPanel) -> outline::ReaderPanelTab {
         SessionPanel::Bookmarks => outline::ReaderPanelTab::Bookmarks,
         SessionPanel::Annotations => outline::ReaderPanelTab::Annotations,
         SessionPanel::Text => outline::ReaderPanelTab::Text,
+        SessionPanel::Positions => outline::ReaderPanelTab::Positions,
     }
 }
 

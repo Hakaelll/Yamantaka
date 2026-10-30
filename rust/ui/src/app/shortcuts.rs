@@ -14,6 +14,8 @@ pub(super) enum Shortcut {
     PreviousPage,
     NextPage,
     SwitchPane,
+    HistoryBack,
+    HistoryForward,
     ZoomIn,
     ZoomOut,
     FitPage,
@@ -94,6 +96,12 @@ pub(super) fn read(
                 commands.push(Shortcut::NextMatch);
             }
             if !text_has_focus {
+                if input.consume_key(egui::Modifiers::ALT, egui::Key::ArrowLeft) {
+                    commands.push(Shortcut::HistoryBack);
+                }
+                if input.consume_key(egui::Modifiers::ALT, egui::Key::ArrowRight) {
+                    commands.push(Shortcut::HistoryForward);
+                }
                 if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight)
                     || input.consume_key(egui::Modifiers::NONE, egui::Key::PageDown)
                 {

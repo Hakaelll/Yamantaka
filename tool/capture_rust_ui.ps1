@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-history'; args=@('--reader','--reference','--reference-book','--reference-history','--reference-swap','--es') },
+    @{ name='reader-reference-history-small-200'; args=@('--reader','--reference','--reference-book','--reference-history','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
+    @{ name='reader-primary-history'; args=@('--reader','--reference','--reference-book','--reference-history','--history-primary') },
     @{ name='reader-reference-shortcuts'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--es') },
     @{ name='reader-reference-shortcuts-small-200'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-shortcuts-close'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--reference-swap','--reference-shortcuts-close','--es') },
@@ -377,6 +380,14 @@ foreach ($case in $cases) {
         if ($case.name -eq 'reader-reference-external') {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
+        }
+    }
+    if ($case.name -in @('reader-reference-history','reader-reference-history-small-200','reader-primary-history')) {
+        if ($controls.referenceShortcutPhase -ne 34 -or $controls.currentReaderPage -ne 1 -or $controls.reference.page -ne 1 -or $controls.primaryNavigation.markA -ne 1 -or $null -ne $controls.primaryNavigation.markB -or $controls.referenceNavigation.markA -ne 0 -or $controls.referenceNavigation.markB -ne 1 -or $controls.primaryNavigation.forward -or $controls.referenceNavigation.forward) { throw 'Independent history traversal, branch replacement or A/B marks failed.' }
+        if ($case.name -eq 'reader-primary-history') {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Positions','Save position A','Save position B')
+        } else {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Posiciones','Guardar posición A')
         }
     }
     if ($case.name -in @('reader-reference-shortcuts','reader-reference-shortcuts-small-200')) {

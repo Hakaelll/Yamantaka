@@ -2170,7 +2170,9 @@ impl App for YamantakaApp {
                 shortcuts::Shortcut::SwitchPane
                 | shortcuts::Shortcut::ZoomIn
                 | shortcuts::Shortcut::ZoomOut
-                | shortcuts::Shortcut::FitPage => unreachable!(),
+                | shortcuts::Shortcut::FitPage
+                | shortcuts::Shortcut::HistoryBack
+                | shortcuts::Shortcut::HistoryForward => unreachable!(),
                 shortcuts::Shortcut::GlobalSearch => self.show_search(),
                 shortcuts::Shortcut::DocumentFind => self.show_find(),
                 shortcuts::Shortcut::PreviousMatch => self.step_find(false),
@@ -2359,6 +2361,7 @@ impl App for YamantakaApp {
                     && (!matches!(self.surface, Surface::Reader)
                         || (!self.reader.panel && self.reader.reader_panel_tab != outline::ReaderPanelTab::Find)
                         || match self.reader.reader_panel_tab {
+                            outline::ReaderPanelTab::Positions => true,
                             outline::ReaderPanelTab::Bookmarks => self.reader.bookmarks.ready(),
                             outline::ReaderPanelTab::Annotations => self.reader.annotations.ready(),
                             outline::ReaderPanelTab::Outline => self.reader.outline.ready(),
@@ -2536,6 +2539,8 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["primaryNavigation"] = navigation::summary(self.reader.navigation.as_ref());
+                    record["referenceNavigation"] = navigation::summary(self.reference.as_ref().and_then(|reference| reference.pane.navigation.as_ref()));
                     record["readingFocus"] = serde_json::json!(format!("{:?}", self.reading_focus.target));
                     record["documentOutline"] = self.reader.outline.capture_summary();
                     record["documentBookmarks"] = self.reader.bookmarks.capture_summary();

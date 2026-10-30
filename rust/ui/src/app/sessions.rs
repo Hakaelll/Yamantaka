@@ -74,6 +74,7 @@ fn reading_context(
                 outline::ReaderPanelTab::Bookmarks => "bookmarks",
                 outline::ReaderPanelTab::Annotations => "annotations",
                 outline::ReaderPanelTab::Text => "text",
+                outline::ReaderPanelTab::Positions => "positions",
             }
             .into()
         }),

@@ -24,6 +24,7 @@ impl ReferenceView {
                 | ReaderPanelTab::Find
                 | ReaderPanelTab::Bookmarks
                 | ReaderPanelTab::Text
+                | ReaderPanelTab::Positions
         ) {
             self.pane.reader_panel_tab = ReaderPanelTab::Outline;
         }
@@ -61,6 +62,7 @@ impl ReferenceView {
                 (ReaderPanelTab::Find, tr("Buscar", "Find")),
                 (ReaderPanelTab::Bookmarks, tr("Marcadores", "Bookmarks")),
                 (ReaderPanelTab::Text, tr("Texto", "Text")),
+                (ReaderPanelTab::Positions, tr("Posiciones", "Positions")),
             ];
             let selected = sections
                 .iter()
@@ -83,6 +85,26 @@ impl ReferenceView {
                 self.stop_navigator_requests();
             }
             match self.pane.reader_panel_tab {
+                ReaderPanelTab::Positions => {
+                    // Popup placement depends on its height, so do not derive height from its cursor.
+                    let height = (ui.ctx().content_rect().height() - 100.0).max(80.0);
+                    let mut action = None;
+                    egui::ScrollArea::vertical()
+                        .id_salt("reference-positions")
+                        .max_height(height)
+                        .min_scrolled_height(height.min(180.0))
+                        .show(ui, |ui| {
+                            if let Some(nav) = &self.pane.navigation {
+                                action = navigation::positions(ui, nav, english, p);
+                            }
+                        });
+                    if let Some(action) = action {
+                        if action.apply(self.pane.navigation.as_mut().unwrap()) {
+                            self.reference_navigation_changed();
+                        }
+                        ui.close();
+                    }
+                }
                 ReaderPanelTab::Find => {
                     let height = (ui.ctx().content_rect().height() - 160.0).max(80.0);
                     egui::ScrollArea::vertical()

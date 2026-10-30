@@ -12,6 +12,7 @@ pub enum SessionPanel {
     Bookmarks,
     Annotations,
     Text,
+    Positions,
 }
 #[derive(Debug, Clone)]
 pub struct ReaderSessionRestoration {
@@ -41,6 +42,7 @@ impl TryFrom<ReaderSessionContext> for ReaderSessionRestoration {
             Some("bookmarks") => Some(SessionPanel::Bookmarks),
             Some("annotations") => Some(SessionPanel::Annotations),
             Some("text") => Some(SessionPanel::Text),
+            Some("positions") => Some(SessionPanel::Positions),
             Some(_) => {
                 return Err(Failure::Invalid(
                     "Unknown stored reading panel; original data is preserved".into(),

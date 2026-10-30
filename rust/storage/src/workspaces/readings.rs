@@ -14,6 +14,7 @@ pub(super) fn panel(value: Option<&str>) -> Result<Option<SessionPanel>> {
         Some("bookmarks") => Some(SessionPanel::Bookmarks),
         Some("annotations") => Some(SessionPanel::Annotations),
         Some("text") => Some(SessionPanel::Text),
+        Some("positions") => Some(SessionPanel::Positions),
         Some(_) => {
             return Err(invalid(
                 "Unknown saved workspace panel; stored data is preserved",

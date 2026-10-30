@@ -1211,9 +1211,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             args.iter().any(|arg| arg == "--reference-swap"),
                             args.iter().any(|arg| arg == "--reference-find"),
                         );
-                        if args.iter().any(|arg| arg == "--reference-shortcuts") {
+                        if args.iter().any(|arg| {
+                            arg == "--reference-shortcuts" || arg == "--reference-history"
+                        }) {
                             app.preview_reference_shortcuts(
                                 args.iter().any(|arg| arg == "--reference-shortcuts-close"),
+                                args.iter().any(|arg| arg == "--reference-history"),
+                                args.iter().any(|arg| arg == "--history-primary"),
                             );
                         }
                         if args.iter().any(|arg| arg == "--reference-text") {

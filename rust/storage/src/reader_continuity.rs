@@ -127,6 +127,7 @@ impl StoredTab {
             Some("bookmarks") => Some(SessionPanel::Bookmarks),
             Some("annotations") => Some(SessionPanel::Annotations),
             Some("text") => Some(SessionPanel::Text),
+            Some("positions") => Some(SessionPanel::Positions),
             Some(_) => {
                 return Err(Failure::Invalid(
                     "Unknown continuity panel; original file is preserved".into(),
@@ -153,6 +154,7 @@ impl StoredTab {
                     SessionPanel::Bookmarks => "bookmarks",
                     SessionPanel::Annotations => "annotations",
                     SessionPanel::Text => "text",
+                    SessionPanel::Positions => "positions",
                 }
                 .into()
             }),

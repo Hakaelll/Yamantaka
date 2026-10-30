@@ -7,7 +7,13 @@ impl YamantakaApp {
         ctx: &egui::Context,
         shortcut: &Shortcut,
     ) -> bool {
-        if matches!(shortcut, Shortcut::PreviousPage | Shortcut::NextPage) {
+        if matches!(
+            shortcut,
+            Shortcut::PreviousPage
+                | Shortcut::NextPage
+                | Shortcut::HistoryBack
+                | Shortcut::HistoryForward
+        ) {
             // Page keys must not also move egui's spatial keyboard focus.
             ctx.memory_mut(|memory| memory.move_focus(egui::FocusDirection::None));
         }
@@ -47,6 +53,8 @@ impl YamantakaApp {
                     | Shortcut::NextPage
                     | Shortcut::ZoomIn
                     | Shortcut::ZoomOut
+                    | Shortcut::HistoryBack
+                    | Shortcut::HistoryForward
                     | Shortcut::FitPage
             ) {
                 return false;
@@ -55,6 +63,21 @@ impl YamantakaApp {
                 return true;
             }
             match shortcut {
+                Shortcut::HistoryBack | Shortcut::HistoryForward => {
+                    let action = if matches!(shortcut, Shortcut::HistoryBack) {
+                        navigation::PositionAction::Back
+                    } else {
+                        navigation::PositionAction::Forward
+                    };
+                    if reference
+                        .pane
+                        .navigation
+                        .as_mut()
+                        .is_some_and(|nav| action.apply(nav))
+                    {
+                        reference.reference_navigation_changed();
+                    }
+                }
                 Shortcut::DocumentFind => {
                     reference.pane.reader_panel_tab = outline::ReaderPanelTab::Find;
                     reference.search_visible = false;
@@ -100,6 +123,21 @@ impl YamantakaApp {
             return true;
         }
         match shortcut {
+            Shortcut::HistoryBack | Shortcut::HistoryForward => {
+                let action = if matches!(shortcut, Shortcut::HistoryBack) {
+                    navigation::PositionAction::Back
+                } else {
+                    navigation::PositionAction::Forward
+                };
+                if self
+                    .reader
+                    .navigation
+                    .as_mut()
+                    .is_some_and(|nav| action.apply(nav))
+                {
+                    self.apply_navigation();
+                }
+            }
             Shortcut::ZoomIn | Shortcut::ZoomOut => {
                 let zoom = self.reader.viewport.scale
                     * if matches!(shortcut, Shortcut::ZoomIn) {

@@ -23,6 +23,7 @@ Click a pane or one of its controls to make it active. Keyboard focus entering a
 | Left / Right, Page Up / Page Down | Previous / next page when the canvas has keyboard input |
 | Ctrl++ / Ctrl+- | Zoom in / out using the existing reader zoom controls |
 | Ctrl+0 | Fit page |
+| Alt+Left / Alt+Right | Previous / next history position when a canvas has keyboard input |
 | Ctrl+F | Open that PDF's search and focus its query field |
 | F3 / Shift+F3 | Next / previous result in that PDF |
 | Ctrl+W | Close the reference when it is active; otherwise close the main reading tab |
@@ -40,6 +41,14 @@ Enable **In both directions** to keep the selected page or zoom link active when
 **Follow position** also follows the point within the main PDF page. This setting always runs from the main reading toward the reference. Its canvas may limit the point that can be displayed near page edges. Manual reference page navigation turns position following off.
 
 Open **Navigate reference PDF** in the reference header to choose a section. Use the section selector at the top of the popup.
+
+## Return to reading positions
+
+Open **Navigate reference PDF → Positions** to move backward or forward through the reference's navigation history. **Alt+Left** and **Alt+Right** do the same in the active reading. Input fields retain these keys. A new page jump after going back replaces the forward branch.
+
+Each A/B row has a bookmark icon labelled **Save position A** or **Save position B**. Use it to capture that reading's current page and position. Select **Go to A** or **Go to B** to return. The two readings keep independent marks, including when they show the same PDF. Marks are temporary reading positions; use **Bookmarks** for saved document bookmarks.
+
+The main navigator also includes **Positions**, and **Reading options → Positions** provides the same controls. The main navigator's selected section is retained by saved reading contexts. Small windows keep the controls in a scrollable menu. History navigation and A/B jumps respect your comparison synchronization settings.
 
 ## Browse reference contents
 
@@ -95,4 +104,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, zoom, chapter contents, page thumbnails, bookmarks, page text and copying, text search and PDF links. Reference text selection and annotation tools, shortcut customization, overlays and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text and copying, text search and PDF links. Reference text selection and annotation tools, shortcut customization, overlays and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

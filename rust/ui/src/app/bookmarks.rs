@@ -65,48 +65,41 @@ impl YamantakaApp {
             (outline::ReaderPanelTab::Find, "Buscar", "Find"),
             (outline::ReaderPanelTab::Text, "Texto", "Text"),
             (outline::ReaderPanelTab::Annotations, "Notas", "Notes"),
+            (
+                outline::ReaderPanelTab::Positions,
+                "Posiciones",
+                "Positions",
+            ),
         ];
-        if compact {
-            let selected = tabs
-                .iter()
-                .find(|(tab, _, _)| *tab == self.reader.reader_panel_tab)
-                .unwrap();
-            egui::ComboBox::from_id_salt("reader-panel-section")
-                .selected_text(self.tr(selected.1, selected.2))
-                .width(ui.available_width())
+        let selected = tabs
+            .iter()
+            .find(|(tab, _, _)| *tab == self.reader.reader_panel_tab)
+            .unwrap();
+        let selected_label = self.tr(selected.1, selected.2);
+        ui.horizontal(|ui| {
+            let response = egui::ComboBox::from_id_salt("reader-panel-section")
+                .selected_text(selected_label)
+                .width((ui.available_width() - 50.0).max(80.0))
                 .show_ui(ui, |ui| {
                     for (tab, es, en) in tabs {
                         let label = self.tr(es, en);
                         ui.selectable_value(&mut self.reader.reader_panel_tab, tab, label);
                     }
-                });
-        } else {
-            ui.horizontal_wrapped(|ui| {
-                for (tab, es, en) in tabs {
-                    if theme::navigation(
-                        ui,
-                        self.tr(es, en),
-                        self.reader.reader_panel_tab == tab,
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.reader.reader_panel_tab = tab;
-                    }
-                }
-                if theme::icon_button(
-                    ui,
-                    self.tr("Cerrar panel", "Close panel"),
-                    theme::Icon::Minus,
-                    p,
-                )
-                .clicked()
-                {
-                    self.reader.panel = false;
-                    self.reader.find.stop();
-                }
-            });
-        }
+                })
+                .response;
+            theme::record_control_bounds(ui, selected_label, response.rect);
+            if theme::icon_button(
+                ui,
+                self.tr("Cerrar panel", "Close panel"),
+                theme::Icon::Minus,
+                p,
+            )
+            .clicked()
+            {
+                self.reader.panel = false;
+                self.reader.find.stop();
+            }
+        });
         if previous_tab != self.reader.reader_panel_tab {
             self.reader.find.stop();
             self.reader.bookmarks.cancel_query();
@@ -120,6 +113,10 @@ impl YamantakaApp {
                 18.0
             },
         );
+        if self.reader.reader_panel_tab == outline::ReaderPanelTab::Positions {
+            self.navigation_menu(ui, p);
+            return;
+        }
         if self.reader.reader_panel_tab == outline::ReaderPanelTab::Annotations {
             self.annotation_panel(ui, info, p);
             return;
