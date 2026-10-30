@@ -1,0 +1,2538 @@
+{
+  "synthetic": true,
+  "libraryDocumentCount": 10,
+  "captureProcessId": 7604,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Biblioteca",
+      "rect": [
+        8.0,
+        2.0,
+        48.0,
+        42.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página anterior",
+      "rect": [
+        50.0,
+        2.0,
+        90.0,
+        42.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Página siguiente",
+      "rect": [
+        158.0,
+        2.0,
+        198.0,
+        42.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Opciones de lectura",
+      "rect": [
+        1350.0,
+        2.0,
+        1390.0,
+        42.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Navegador de lectura",
+      "rect": [
+        1392.0,
+        2.0,
+        1432.0,
+        42.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Notas",
+      "rect": [
+        8.0,
+        74.40625,
+        241.1875,
+        114.40625
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Cerrar panel",
+      "rect": [
+        251.1875,
+        74.40625,
+        291.1875,
+        114.40625
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Nota de página",
+      "rect": [
+        8.0,
+        234.0,
+        155.8125,
+        274.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Anotar selección",
+      "rect": [
+        8.0,
+        284.0,
+        138.15625,
+        324.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Markdown",
+      "rect": [
+        73.21875,
+        374.0,
+        167.21875,
+        414.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "JSON",
+      "rect": [
+        177.21875,
+        374.0,
+        238.6875,
+        414.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Filtros activos (4)",
+      "rect": [
+        8.0,
+        466.0,
+        139.625,
+        506.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Restablecer",
+      "rect": [
+        149.625,
+        466.0,
+        248.3125,
+        506.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Aplicar filtros",
+      "rect": [
+        8.0,
+        744.0,
+        117.25,
+        784.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar página",
+      "rect": [
+        8.0,
+        806.0,
+        151.78125,
+        846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 1",
+      "rect": [
+        8.0,
+        880.0,
+        146.875,
+        920.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        1006.0,
+        86.3125,
+        1046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        1006.0,
+        159.75,
+        1046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        1006.0,
+        246.96875,
+        1046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 2",
+      "rect": [
+        8.0,
+        1080.0,
+        149.125,
+        1120.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        1206.0,
+        86.3125,
+        1246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        1206.0,
+        159.75,
+        1246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        1206.0,
+        246.96875,
+        1246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 3",
+      "rect": [
+        8.0,
+        1280.0,
+        149.125,
+        1320.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        1406.0,
+        86.3125,
+        1446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        1406.0,
+        159.75,
+        1446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        1406.0,
+        246.96875,
+        1446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 4",
+      "rect": [
+        8.0,
+        1480.0,
+        149.125,
+        1520.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        1606.0,
+        86.3125,
+        1646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        1606.0,
+        159.75,
+        1646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        1606.0,
+        246.96875,
+        1646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 5",
+      "rect": [
+        8.0,
+        1680.0,
+        149.125,
+        1720.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        1806.0,
+        86.3125,
+        1846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        1806.0,
+        159.75,
+        1846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        1806.0,
+        246.96875,
+        1846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 6",
+      "rect": [
+        8.0,
+        1880.0,
+        149.125,
+        1920.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        2006.0,
+        86.3125,
+        2046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        2006.0,
+        159.75,
+        2046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        2006.0,
+        246.96875,
+        2046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 7",
+      "rect": [
+        8.0,
+        2080.0,
+        149.125,
+        2120.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        2206.0,
+        86.3125,
+        2246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        2206.0,
+        159.75,
+        2246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        2206.0,
+        246.96875,
+        2246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 8",
+      "rect": [
+        8.0,
+        2280.0,
+        149.125,
+        2320.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        2406.0,
+        86.3125,
+        2446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        2406.0,
+        159.75,
+        2446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        2406.0,
+        246.96875,
+        2446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 9",
+      "rect": [
+        8.0,
+        2480.0,
+        149.125,
+        2520.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        2606.0,
+        86.3125,
+        2646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        2606.0,
+        159.75,
+        2646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        2606.0,
+        246.96875,
+        2646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 10",
+      "rect": [
+        8.0,
+        2680.0,
+        154.4375,
+        2720.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        2806.0,
+        86.3125,
+        2846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        2806.0,
+        159.75,
+        2846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        2806.0,
+        246.96875,
+        2846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 11",
+      "rect": [
+        8.0,
+        2880.0,
+        152.1875,
+        2920.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        3006.0,
+        86.3125,
+        3046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        3006.0,
+        159.75,
+        3046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        3006.0,
+        246.96875,
+        3046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 12",
+      "rect": [
+        8.0,
+        3080.0,
+        154.4375,
+        3120.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        3206.0,
+        86.3125,
+        3246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        3206.0,
+        159.75,
+        3246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        3206.0,
+        246.96875,
+        3246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 13",
+      "rect": [
+        8.0,
+        3280.0,
+        154.4375,
+        3320.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        3406.0,
+        86.3125,
+        3446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        3406.0,
+        159.75,
+        3446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        3406.0,
+        246.96875,
+        3446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 14",
+      "rect": [
+        8.0,
+        3480.0,
+        154.4375,
+        3520.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        3606.0,
+        86.3125,
+        3646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        3606.0,
+        159.75,
+        3646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        3606.0,
+        246.96875,
+        3646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 15",
+      "rect": [
+        8.0,
+        3680.0,
+        154.4375,
+        3720.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        3806.0,
+        86.3125,
+        3846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        3806.0,
+        159.75,
+        3846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        3806.0,
+        246.96875,
+        3846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 16",
+      "rect": [
+        8.0,
+        3880.0,
+        154.4375,
+        3920.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        4006.0,
+        86.3125,
+        4046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        4006.0,
+        159.75,
+        4046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        4006.0,
+        246.96875,
+        4046.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 17",
+      "rect": [
+        8.0,
+        4080.0,
+        154.4375,
+        4120.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        4206.0,
+        86.3125,
+        4246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        4206.0,
+        159.75,
+        4246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        4206.0,
+        246.96875,
+        4246.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 18",
+      "rect": [
+        8.0,
+        4280.0,
+        154.4375,
+        4320.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        4406.0,
+        86.3125,
+        4446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        4406.0,
+        159.75,
+        4446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        4406.0,
+        246.96875,
+        4446.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 19",
+      "rect": [
+        8.0,
+        4480.0,
+        154.4375,
+        4520.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        4606.0,
+        86.3125,
+        4646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        4606.0,
+        159.75,
+        4646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        4606.0,
+        246.96875,
+        4646.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar nota 20",
+      "rect": [
+        8.0,
+        4680.0,
+        156.65625,
+        4720.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Página 1",
+      "rect": [
+        8.0,
+        4806.0,
+        86.3125,
+        4846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Editar",
+      "rect": [
+        96.3125,
+        4806.0,
+        159.75,
+        4846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Eliminar",
+      "rect": [
+        169.75,
+        4806.0,
+        246.96875,
+        4846.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Anteriores",
+      "rect": [
+        8.0,
+        4868.0,
+        99.59375,
+        4908.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Siguientes",
+      "rect": [
+        109.59375,
+        4868.0,
+        201.21875,
+        4908.0
+      ],
+      "clip": [
+        8.0,
+        74.0,
+        291.0,
+        938.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Abrir enlace externo…",
+      "rect": [
+        609.375,
+        171.0187530517578,
+        901.2750244140625,
+        191.86874389648438
+      ],
+      "clip": [
+        300.0,
+        58.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "libraryCovers": {
+    "resident": 0,
+    "bulkRegeneration": null,
+    "paused": 0,
+    "deferredUploads": 0,
+    "blockedBeforeRelease": 0,
+    "capacityPreview": 0,
+    "capacityRevision": 1,
+    "ready": 0,
+    "pending": 0,
+    "source": "PDF selected page",
+    "sourcePages": {},
+    "maximumVisible": 16
+  },
+  "coverPicker": {
+    "open": false
+  },
+  "coverPickerDemo": {
+    "action": null,
+    "complete": false,
+    "saved": false
+  },
+  "metadataReview": null,
+  "documentFind": null,
+  "documentLinks": {
+    "keyboardActivated": false,
+    "residentPages": 1,
+    "readyPages": 1,
+    "internalLinks": 0,
+    "externalLinks": 1,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "document": null,
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 20,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 4,
+      "text": "Synthetic",
+      "tag": "Study",
+      "kind": "highlight",
+      "review": "pending"
+    },
+    "resident": 20,
+    "total": 20,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "document": "demo-0",
+    "residentPages": 1,
+    "readyPages": 1,
+    "marks": 181,
+    "retainedPages": 0,
+    "details": [
+      {
+        "page": 0,
+        "kinds": [
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight",
+          "Highlight"
+        ],
+        "colors": [
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet",
+          "Violet"
+        ]
+      }
+    ]
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": false,
+    "count": 0,
+    "artifact": null
+  },
+  "fileComparison": {
+    "pending": false,
+    "equal": null,
+    "failed": false
+  },
+  "importRecovery": {
+    "pendingJobs": 0,
+    "loaded": true,
+    "unavailable": false,
+    "completed": 0
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 0,
+    "resident": 0,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": false,
+    "documents": 0
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": true,
+    "preferences": {
+      "document": "demo-0",
+      "zoom": 1.0,
+      "layout": "single",
+      "mode": "document",
+      "theme": "ivory",
+      "scroll": 0.0
+    }
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Off",
+    "pending": null,
+    "active": "9c325a9f-60bc-449b-9e84-089899eda295",
+    "tabs": [
+      {
+        "id": "9c325a9f-60bc-449b-9e84-089899eda295",
+        "document": "demo-0",
+        "page": 0,
+        "pinned": false,
+        "zoom": 1.0,
+        "zoomMode": "fitPage",
+        "rotation": 0,
+        "horizontalMargin": 32.0,
+        "verticalMargin": 24.0,
+        "scroll": 0.0
+      }
+    ]
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 0,
+  "readerZoom": 1.0,
+  "readerRenderEvents": [
+    {
+      "event": "submitted",
+      "document": "demo-0",
+      "page": 0,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        575,
+        768
+      ],
+      "target": [
+        781,
+        1042
+      ],
+      "viewport": [
+        1140.0,
+        882.0
+      ],
+      "retainedImage": false
+    },
+    {
+      "event": "installed",
+      "document": "demo-0",
+      "page": 0,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        575,
+        768
+      ],
+      "replacedImage": false
+    },
+    {
+      "event": "submitted",
+      "document": "demo-0",
+      "page": 0,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        781,
+        1042
+      ],
+      "target": [
+        781,
+        1042
+      ],
+      "viewport": [
+        1140.0,
+        882.0
+      ],
+      "retainedImage": true
+    },
+    {
+      "event": "installed",
+      "document": "demo-0",
+      "page": 0,
+      "generation": 2,
+      "rotation": 0,
+      "pixels": [
+        781,
+        1042
+      ],
+      "replacedImage": true
+    }
+  ],
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 8366628,
+    "pages": 8276816,
+    "tiles": 0,
+    "text": 89636,
+    "other": 176,
+    "cpu": 5111420,
+    "gpu": 3255208,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered.",
+  "bulkOrganization": null,
+  "bulkTargetPicker": {
+    "open": false
+  },
+  "libraryVisibleFavorites": 0,
+  "librarySelection": {
+    "removal": null,
+    "mode": false,
+    "ids": [],
+    "writing": false,
+    "notice": null,
+    "preview": null,
+    "verifiedFavoriteTargets": []
+  },
+  "libraryGrouping": {
+    "mode": "none",
+    "verified": false,
+    "visible": [
+      "demo-0",
+      "demo-1",
+      "demo-2",
+      "demo-3",
+      "demo-4",
+      "demo-5",
+      "demo-6",
+      "demo-7",
+      "demo-8",
+      "demo-9"
+    ],
+    "groups": [
+      {
+        "label": "",
+        "count": 10,
+        "collapsed": false
+      }
+    ]
+  },
+  "libraryFiltersActive": false,
+  "libraryQueryLoaded": true,
+  "smartView": null,
+  "libraryTags": {
+    "loaded": false,
+    "failed": false,
+    "total": 0,
+    "visible": 0,
+    "assigned": 0,
+    "annotationUses": 0,
+    "filters": [],
+    "filtersChecked": false,
+    "busy": false,
+    "managementVerified": false,
+    "mergeOpen": false,
+    "mergeTotal": null,
+    "mergeOffset": null,
+    "mergeVisible": null,
+    "reviewOpen": false,
+    "entries": []
+  },
+  "legacyImport": {
+    "open": false,
+    "busy": false,
+    "reviewed": false,
+    "copied": false,
+    "selectedNext": false,
+    "originalNext": false,
+    "failed": false,
+    "verified": false,
+    "books": null
+  },
+  "backup": {
+    "busy": false,
+    "saved": false,
+    "cancelled": false,
+    "failed": false,
+    "verified": false
+  },
+  "restore": {
+    "open": false,
+    "busy": false,
+    "reviewed": false,
+    "books": null,
+    "queued": false
+  },
+  "collections": {
+    "loaded": false,
+    "failed": false,
+    "total": 0,
+    "visible": 0,
+    "assigned": 0,
+    "pinned": 0,
+    "filter": null,
+    "filterChecked": false,
+    "confirmDelete": false,
+    "busy": false,
+    "orderVerified": false,
+    "entries": []
+  },
+  "workspaces": {
+    "startupFinished": true,
+    "bindingName": null,
+    "bindingId": null,
+    "paused": false,
+    "reference": null,
+    "focus": false,
+    "undoAvailable": false,
+    "queue": [
+      {
+        "document": "demo-0",
+        "title": "On the Nature of Things",
+        "status": "pending",
+        "nextAction": null
+      }
+    ]
+  },
+  "coverCache": {
+    "pending": false,
+    "failed": false,
+    "files": null,
+    "bytes": null,
+    "preserved": null,
+    "removedFiles": null,
+    "removedBytes": null,
+    "failedFiles": null,
+    "cancelled": null
+  },
+  "referenceShortcutPhase": 0,
+  "referenceNotesPhase": 0,
+  "primaryAnnotations": {
+    "document": "demo-0",
+    "pending": false,
+    "writing": false,
+    "editing": false,
+    "saved": false,
+    "stale": false,
+    "filterCount": 4,
+    "total": 20,
+    "entries": [
+      {
+        "id": "synthetic-mark-000",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-001",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-002",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-003",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-004",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-005",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-006",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-007",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-008",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-009",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-010",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-011",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-012",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-013",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-014",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-015",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-016",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-017",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-018",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      },
+      {
+        "id": "synthetic-mark-019",
+        "page": 0,
+        "note": "Synthetic mark",
+        "kind": "highlight"
+      }
+    ]
+  },
+  "referenceAnnotations": null,
+  "retiredAnnotationWrites": 0,
+  "referenceMarksPhase": 0,
+  "referenceMarks": null,
+  "referenceMarksRotation": null,
+  "referenceSelectionPhase": 0,
+  "referenceSelection": null,
+  "selectionClipboard": null,
+  "primaryNavigation": {
+    "page": 0,
+    "point": [
+      0.5,
+      0.0
+    ],
+    "back": false,
+    "forward": false,
+    "entries": 1,
+    "markA": null,
+    "markB": null
+  },
+  "referenceNavigation": null,
+  "readingFocus": "Primary",
+  "documentOutline": {
+    "entries": 0,
+    "rows": 0,
+    "pending": false
+  },
+  "documentBookmarks": {
+    "document": null,
+    "pending": false,
+    "saved": false,
+    "total": null,
+    "offset": null,
+    "entries": null
+  },
+  "reference": null,
+  "referenceSync": {
+    "demoStage": 0,
+    "linkedConfirmed": false,
+    "positionConfirmed": false,
+    "reverseConfirmed": false,
+    "differencesConfirmed": false,
+    "primaryScale": 1.0425000190734863
+  },
+  "referenceAdmission": {
+    "demoStage": 0,
+    "nativeCloses": 0,
+    "passwordAttempts": 0
+  },
+  "referenceChooser": null,
+  "fileCheck": {
+    "pending": false,
+    "state": null
+  },
+  "relocation": {
+    "pending": false,
+    "review": false,
+    "exact": null,
+    "applied": false,
+    "failed": false
+  },
+  "libraryCheck": {
+    "pending": false,
+    "phase": "Idle",
+    "checked": 0,
+    "available": 0,
+    "missing": 0,
+    "changed": 0,
+    "unverifiable": 0,
+    "failed": 0,
+    "error": false
+  }
+}

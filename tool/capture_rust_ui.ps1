@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-note-filters'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-filters','--light','--es') },
+    @{ name='reader-reference-note-filters-empty'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-filters','--reference-note-filters-empty') },
     @{ name='reader-reference-notes'; args=@('--reader','--reference','--reference-book','--reference-notes','--es') },
     @{ name='reader-reference-notes-shared-close'; args=@('--reader','--reference','--reference-notes','--es') },
     @{ name='reader-reference-notes-editor-small-200'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-notes-editor','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
@@ -398,6 +400,14 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -like 'reader-reference-note-filters*') {
+        $empty = $case.name -eq 'reader-reference-note-filters-empty'
+        $phase = if ($empty) { 26 } else { 25 }
+        $total = if ($empty) { 0 } else { 1 }
+        if ($controls.referenceNotesPhase -ne $phase -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.filterCount -ne 4 -or $controls.referenceAnnotations.total -ne $total -or $controls.primaryAnnotations.total -ne 2 -or $controls.primaryAnnotations.filterCount -ne 0) { throw 'Reference filters or reset affected the wrong records or document.' }
+        $labels = if ($empty) { @('Active filters (4)','Reset') } else { @('Filtros activos (4)','Restablecer') }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
     if ($case.name -eq 'reader-reference-notes') {
         if ($controls.referenceNotesPhase -ne 12 -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.total -ne 1 -or $controls.referenceAnnotations.entries[0].note -cne 'Final reference note' -or $controls.primaryAnnotations.total -ne 2 -or $controls.retiredAnnotationWrites -ne 0) { throw 'Reference note creation, editing, removal or document ownership failed.' }

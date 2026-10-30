@@ -1212,6 +1212,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             args.iter().any(|arg| arg == "--reference-notes-editor"),
                         );
                     }
+                    if args.iter().any(|arg| arg == "--reference-note-filters") {
+                        app.preview_reference_note_filters(
+                            args.iter()
+                                .any(|arg| arg == "--reference-note-filters-empty"),
+                        );
+                    }
                     if args.iter().any(|arg| arg == "--reference-marks") {
                         app.preview_reference_marks(
                             !args.iter().any(|arg| arg == "--reference-book"),

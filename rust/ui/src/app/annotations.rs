@@ -216,7 +216,7 @@ impl AnnotationState {
         }
     }
     pub(in crate::app) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"document":self.document,"pending":self.pending.is_some(),"writing":self.writing(),"editing":self.editing(),"saved":self.saved,"stale":self.stale,"total":self.page.as_ref().map(|page|page.total),"entries":self.page.as_ref().map(|page|page.entries().iter().map(|record|serde_json::json!({"id":record.data().id,"page":record.data().values.page_index,"note":record.data().values.note,"kind":record.data().values.kind})).collect::<Vec<_>>())})
+        serde_json::json!({"document":self.document,"pending":self.pending.is_some(),"writing":self.writing(),"editing":self.editing(),"saved":self.saved,"stale":self.stale,"filterCount":self.filters.count(),"total":self.page.as_ref().map(|page|page.total),"entries":self.page.as_ref().map(|page|page.entries().iter().map(|record|serde_json::json!({"id":record.data().id,"page":record.data().values.page_index,"note":record.data().values.note,"kind":record.data().values.kind})).collect::<Vec<_>>())})
     }
     pub(super) fn accept(&mut self, reply: AnnotationReply) -> Option<String> {
         let pending = self.pending.as_ref()?;

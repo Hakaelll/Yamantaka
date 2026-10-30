@@ -5,11 +5,12 @@ pub(in crate::app) struct NotesPreview {
     phase: u8,
     shared: bool,
     editor: bool,
+    filters: Option<bool>,
     id: Option<String>,
 }
 impl NotesPreview {
     pub fn ready(&self) -> bool {
-        matches!(self.phase, 0 | 10 | 12 | 16)
+        matches!(self.phase, 0 | 10 | 12 | 16 | 25 | 26)
     }
     pub fn phase(&self) -> u8 {
         self.phase
@@ -22,8 +23,14 @@ impl YamantakaApp {
                 phase: 1,
                 shared,
                 editor,
+                filters: None,
                 id: None,
             };
+        }
+    }
+    pub fn preview_reference_note_filters(&mut self, empty: bool) {
+        if self.demo && self.capture.is_some() {
+            self.reference_notes_preview.filters = Some(empty);
         }
     }
     pub(in crate::app) fn advance_reference_notes(&mut self) {
@@ -149,6 +156,7 @@ impl YamantakaApp {
                 view.set_page(0);
                 view.pane.begin_page_note();
                 view.pane.annotations.editor.as_mut().unwrap().note = "Final reference note".into();
+                view.pane.annotations.editor.as_mut().unwrap().tags = "Reference study".into();
                 let change = view.pane.annotations.mutation(&self.governor).unwrap();
                 self.apply_notes_action(true, NotesAction::Change(change, 0));
                 self.reference_notes_preview.phase = 6;
@@ -167,7 +175,64 @@ impl YamantakaApp {
                 );
                 assert_eq!(self.reader.annotations.page.as_ref().unwrap().total, 2);
                 assert_eq!(self.reader.page, 0);
-                self.reference_notes_preview.phase = 12;
+                if self.reference_notes_preview.filters.is_some() {
+                    view.pane.annotations.filter_draft = filters::Filters {
+                        text: "Final reference".into(),
+                        tag: "Reference study".into(),
+                        kind: Some(AnnotationKind::PageComment),
+                        review: Some(AnnotationReviewState::Pending),
+                    };
+                    assert!(view.pane.annotations.apply_filters());
+                    self.apply_notes_action(true, NotesAction::Read(0));
+                    self.reference_notes_preview.phase = 20;
+                } else {
+                    self.reference_notes_preview.phase = 12;
+                }
+            }
+            20 if view.pane.annotations.ready() => {
+                assert_eq!(view.pane.annotations.page.as_ref().unwrap().total, 1);
+                assert_eq!(view.pane.annotations.filters.count(), 4);
+                view.pane.annotations.filter_draft.text = "No matching reference note".into();
+                assert!(view.pane.annotations.apply_filters());
+                self.apply_notes_action(true, NotesAction::Read(0));
+                self.reference_notes_preview.phase = 21;
+            }
+            21 if view.pane.annotations.ready() => {
+                assert_eq!(view.pane.annotations.page.as_ref().unwrap().total, 0);
+                view.pane.annotations.filter_draft = Default::default();
+                assert!(view.pane.annotations.apply_filters());
+                self.apply_notes_action(true, NotesAction::Read(0));
+                self.reference_notes_preview.phase = 22;
+            }
+            22 if view.pane.annotations.ready() => {
+                assert_eq!(view.pane.annotations.page.as_ref().unwrap().total, 1);
+                assert_eq!(view.pane.annotations.filters.count(), 0);
+                let empty = self.reference_notes_preview.filters.unwrap();
+                view.pane.annotations.filter_draft = filters::Filters {
+                    text: if empty {
+                        "No matching reference note"
+                    } else {
+                        "Final reference"
+                    }
+                    .into(),
+                    tag: "Reference study".into(),
+                    kind: Some(AnnotationKind::PageComment),
+                    review: Some(AnnotationReviewState::Pending),
+                };
+                assert!(view.pane.annotations.apply_filters());
+                self.apply_notes_action(true, NotesAction::Read(0));
+                self.reference_notes_preview.phase = if empty { 24 } else { 23 };
+            }
+            23 | 24 if view.pane.annotations.ready() => {
+                let empty = self.reference_notes_preview.filters.unwrap();
+                assert_eq!(
+                    view.pane.annotations.page.as_ref().unwrap().total,
+                    if empty { 0 } else { 1 }
+                );
+                assert_eq!(self.reader.annotations.page.as_ref().unwrap().total, 2);
+                assert_eq!(self.reader.annotations.filters.count(), 0);
+                assert_eq!(self.reader.page, 0);
+                self.reference_notes_preview.phase = if empty { 26 } else { 25 };
             }
             _ => {}
         }

@@ -77,37 +77,42 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn annotation_filters_panel(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let count = self.reader.annotations.filters.count();
+        if let Some(action) = self.reader.annotations.show_filters(ui, self.english, p) {
+            self.apply_notes_action(false, action);
+        }
+    }
+}
+impl AnnotationState {
+    pub(in crate::app) fn show_filters(
+        &mut self,
+        ui: &mut egui::Ui,
+        english: bool,
+        p: Palette,
+    ) -> Option<NotesAction> {
+        let tr = |es, en| if english { en } else { es };
+        let count = self.filters.count();
         let caption = if count == 0 {
-            self.tr("Filtrar notas", "Filter notes").to_owned()
+            tr("Filtrar notas", "Filter notes").to_owned()
         } else {
-            format!("{} ({count})", self.tr("Filtros activos", "Active filters"))
+            format!("{} ({count})", tr("Filtros activos", "Active filters"))
         };
-        let enabled = !self.reader.annotations.editing()
-            && !self
-                .reader
-                .annotations
-                .pending
-                .as_ref()
-                .is_some_and(|pending| pending.writing);
+        let enabled =
+            !self.editing() && !self.pending.as_ref().is_some_and(|pending| pending.writing);
         let mut apply = false;
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal_wrapped(|ui| {
-                if theme::navigation(ui, &caption, self.reader.annotations.filters_open, p)
-                    .clicked()
-                {
-                    self.reader.annotations.filters_open = !self.reader.annotations.filters_open;
+                if theme::navigation(ui, &caption, self.filters_open, p).clicked() {
+                    self.filters_open = !self.filters_open;
                 }
                 if count > 0
-                    && theme::navigation(ui, self.tr("Restablecer", "Reset"), false, p).clicked()
+                    && theme::navigation(ui, tr("Restablecer", "Reset"), false, p).clicked()
                 {
-                    self.reader.annotations.filter_draft = Filters::default();
+                    self.filter_draft = Filters::default();
                     apply = true;
                 }
             });
-            if self.reader.annotations.filters_open {
-                let english = self.english;
-                let draft = &mut self.reader.annotations.filter_draft;
+            if self.filters_open {
+                let draft = &mut self.filter_draft;
                 let label = ui.label(if english { "Text" } else { "Texto" });
                 ui.add(
                     egui::TextEdit::singleline(&mut draft.text)
@@ -229,15 +234,12 @@ impl YamantakaApp {
                         .response
                         .labelled_by(label.id);
                 });
-                if theme::navigation(ui, self.tr("Aplicar filtros", "Apply filters"), false, p)
-                    .clicked()
+                if theme::navigation(ui, tr("Aplicar filtros", "Apply filters"), false, p).clicked()
                 {
                     apply = true;
                 }
             }
         });
-        if apply && self.reader.annotations.apply_filters() {
-            self.annotation_command(None, 0);
-        }
+        (apply && self.apply_filters()).then_some(NotesAction::Read(0))
     }
 }

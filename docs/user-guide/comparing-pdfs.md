@@ -96,7 +96,9 @@ Each editor belongs to its document. When both panes show the same PDF, saved ch
 
 Save or cancel an unsaved draft before closing or replacing the reference. An accepted write continues after reference closure. A failure appears in the editor, or in the main application if the editor has closed. Original PDFs remain unchanged.
 
-Use the main Notes panel or **Tools → Library notes** for advanced filtering, bulk operations, and export. Those controls are not duplicated in the reference popup.
+Choose **Filter notes** to combine passage or note text, an exact tag name, mark type, and review state. **Apply filters** updates the reference list from its first batch. Active filters show their count and **Reset** removes them. Filtering the list keeps the saved marks visible on the PDF and leaves the main reading's filters unchanged.
+
+Use the main Notes panel or **Tools → Library notes** for bulk operations and export. Those controls are not duplicated in the reference popup.
 
 ## Select and copy a passage
 
@@ -136,4 +138,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Advanced annotation filters, bulk operations, and export are available through the main or library Notes tools. Reference-specific advanced controls, shortcut customization, overlays, and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Reference notes support combined text, tag, mark, and review filters. Bulk operations and export are available through the main or library Notes tools. Reference-specific bulk and export controls, shortcut customization, overlays, and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

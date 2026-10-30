@@ -116,8 +116,11 @@ impl ReferenceView {
                         .min_scrolled_height(height.min(360.0));
                     scroll.show(ui, |ui| {
                         let action = self.pane.annotations.show_editor(ui, &context, p);
+                        ui.add_space(16.0);
+                        let filter_action = self.pane.annotations.show_filters(ui, english, p);
+                        ui.add_space(12.0);
                         let list_action = self.pane.annotations.show_list(ui, &context, p);
-                        self.notes_action = action.or(list_action);
+                        self.notes_action = action.or(filter_action).or(list_action);
                     });
                 }
                 ReaderPanelTab::Positions => {
