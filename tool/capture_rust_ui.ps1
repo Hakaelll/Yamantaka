@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-selection'; args=@('--reader','--reference','--reference-book','--reference-selection','--reference-swap','--es') },
+    @{ name='reader-reference-selection-shared'; args=@('--reader','--reference','--reference-selection','--reference-selection-shared','--es') },
+    @{ name='reader-reference-selection-small-200'; args=@('--reader','--reference','--reference-book','--reference-selection','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
+    @{ name='reader-reference-selection-close'; args=@('--reader','--reference','--reference-book','--reference-selection','--reference-selection-close','--es') },
     @{ name='reader-reference-history'; args=@('--reader','--reference','--reference-book','--reference-history','--reference-swap','--es') },
     @{ name='reader-reference-history-small-200'; args=@('--reader','--reference','--reference-book','--reference-history','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-primary-history'; args=@('--reader','--reference','--reference-book','--reference-history','--history-primary') },
@@ -346,12 +350,19 @@ foreach ($case in $cases) {
         if (Test-Path -LiteralPath $ownedPath) { Remove-Item -LiteralPath $ownedPath }
     }
     $arguments = @('--demo', "`"--capture=$imagePath`"") + $case.args
-    $process = Start-Process -FilePath $executablePath -ArgumentList $arguments -WorkingDirectory $repositoryPath -WindowStyle Hidden -PassThru
+    $stderrPath = Join-Path $outputPath "$($case.name).stderr.log"
+    $stdoutPath = Join-Path $outputPath "$($case.name).stdout.log"
+    $process = Start-Process -FilePath $executablePath -ArgumentList $arguments -WorkingDirectory $repositoryPath -WindowStyle Hidden -RedirectStandardError $stderrPath -RedirectStandardOutput $stdoutPath -PassThru
     if (-not $process.WaitForExit(45000)) {
         $process.Kill()
+        $process.WaitForExit()
+        Get-Content -LiteralPath $stderrPath -Tail 12 | Write-Output
         throw "Capture timed out: $($case.name)"
     }
-    if ($process.ExitCode -ne 0) { throw "Capture failed ($($process.ExitCode)): $($case.name)" }
+    if ($process.ExitCode -ne 0) {
+        Get-Content -LiteralPath $stderrPath -Tail 12 | Write-Output
+        throw "Capture failed ($($process.ExitCode)): $($case.name)"
+    }
     if (-not (Test-Path -LiteralPath $imagePath) -or -not (Test-Path -LiteralPath $controlPath)) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
@@ -381,6 +392,16 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -in @('reader-reference-selection','reader-reference-selection-shared','reader-reference-selection-small-200')) {
+        if ($controls.referenceSelectionPhase -ne 10 -or $controls.readingFocus -cne 'Reference' -or -not $controls.referenceSelection.enabled -or $controls.textSelection.start[0] -ne 0 -or $controls.textSelection.end[1] -ne 1 -or $controls.textSelection.residentPages -gt 2 -or $controls.referenceSelection.residentPages -gt 2) { throw 'Reference selection did not retain isolated source selection and bounded text ownership.' }
+        $expectedDocument = if ($case.name -eq 'reader-reference-selection-shared') { 'demo-0' } else { 'demo-1' }
+        $expectedText = if ($case.name -eq 'reader-reference-selection-shared') { 'Yamantaka Rust: text, links and vector geometry' } else { 'Mixed landscape page' }
+        if ($controls.selectionClipboard[0] -cne $expectedDocument -or $controls.selectionClipboard[1].Trim() -cne $expectedText) { throw 'The scoped selection copy command returned the wrong PDF passage.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Copiar','Borrar','Terminar')
+    }
+    if ($case.name -eq 'reader-reference-selection-close') {
+        if ($controls.referenceSelectionPhase -ne 14 -or $controls.reference -or $controls.referenceSelection -or $controls.selectionClipboard[0] -cne 'demo-0' -or $controls.selectionClipboard[1] -cne 'Y' -or $controls.referenceAdmission.nativeCloses -ne 1 -or $controls.textSelection.end[1] -ne 1) { throw 'Reference close did not preserve independent source selection and copy.' }
     }
     if ($case.name -in @('reader-reference-history','reader-reference-history-small-200','reader-primary-history')) {
         if ($controls.referenceShortcutPhase -ne 34 -or $controls.currentReaderPage -ne 1 -or $controls.reference.page -ne 1 -or $controls.primaryNavigation.markA -ne 1 -or $null -ne $controls.primaryNavigation.markB -or $controls.referenceNavigation.markA -ne 0 -or $controls.referenceNavigation.markB -ne 1 -or $controls.primaryNavigation.forward -or $controls.referenceNavigation.forward) { throw 'Independent history traversal, branch replacement or A/B marks failed.' }
@@ -601,7 +622,7 @@ foreach ($case in $cases) {
     }
     Write-Output "Captured $($case.name)"
 }
-$sources = @(Get-ChildItem -LiteralPath "$repositoryPath/rust/ui/src" -File -Recurse | Sort-Object FullName | ForEach-Object {
+$sources = @(Get-ChildItem -LiteralPath "$repositoryPath/rust" -File -Recurse | Where-Object { $_.Extension -in @('.rs','.toml') } | Sort-Object FullName | ForEach-Object {
     [ordered]@{ path=$_.FullName.Substring($repositoryPath.Length + 1).Replace('\','/'); sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
 })
 $manifest = [ordered]@{

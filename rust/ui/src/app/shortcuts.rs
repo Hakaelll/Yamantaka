@@ -31,9 +31,9 @@ pub(super) fn read(
     ctx: &egui::Context,
     modal_open: bool,
     reader_active: bool,
-    canvas_focused: bool,
+    document_focused: bool,
 ) -> Vec<Shortcut> {
-    let text_has_focus = ctx.egui_wants_keyboard_input() && !canvas_focused;
+    let text_has_focus = ctx.egui_wants_keyboard_input() && !document_focused;
     ctx.input_mut(|input| {
         let mut commands = Vec::new();
         if input.key_pressed(egui::Key::F11) {

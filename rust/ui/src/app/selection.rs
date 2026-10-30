@@ -1,6 +1,10 @@
 use super::*;
+mod comparison_preview;
 mod keyboard;
+mod view;
+pub(super) use comparison_preview::ComparisonSelectionPreview;
 use std::collections::BTreeMap;
+pub(super) use view::SelectionPage;
 use yamantaka_domain::{
     Failure, Result,
     pdf_text::PdfPageText,
@@ -14,6 +18,7 @@ pub(super) struct SelectionState {
     document: Option<String>,
     pages: BTreeMap<u32, text::TextState>,
     gesture: SelectionGesture,
+    focus_ids: BTreeMap<u32, egui::Id>,
 }
 impl SelectionState {
     pub(super) fn extend_preview(&mut self, end_page: u32) -> bool {
@@ -48,11 +53,6 @@ impl SelectionState {
                         .all(|character| character.region.is_none())
                 })
     }
-    pub(super) fn retain_visible(&mut self, document: &str, visible: &[u32]) {
-        if self.enabled {
-            self.retain(document, visible);
-        }
-    }
     pub(super) fn retry_page(&mut self, page: u32) {
         self.pages.remove(&page);
     }
@@ -66,8 +66,10 @@ impl SelectionState {
         if self.document.as_deref() != Some(document) {
             self.pages.clear();
             self.gesture = SelectionGesture::default();
+            self.focus_ids.clear();
             self.document = Some(document.into());
         }
+        self.focus_ids.retain(|page, _| visible.contains(page));
         let selection = self.range();
         self.pages.retain(|page, _| {
             visible.contains(page)
@@ -128,7 +130,7 @@ impl SelectionState {
             range, pages, governor,
         )
     }
-    fn copy(&self, governor: &MemoryGovernor) -> Result<SelectedText> {
+    pub(super) fn copy(&self, governor: &MemoryGovernor) -> Result<SelectedText> {
         Ok(self.annotation_source(governor)?.into_text())
     }
 }
@@ -141,137 +143,42 @@ impl YamantakaApp {
         }
     }
     pub(super) fn toggle_text_selection(&mut self) {
-        if self.reader.selection.enabled {
-            self.reader.selection.clear();
-        } else if let Some((document, _)) = &self.reader.active {
-            self.reader.selection.enabled = true;
-            self.reader.selection.document = Some(document.id.clone());
-            if self.reader.text.payload().is_some()
-                || self.reader.text.pending()
-                || self.reader.text.error().is_some()
-            {
-                self.reader
-                    .selection
-                    .pages
-                    .insert(self.reader.page, std::mem::take(&mut self.reader.text));
-            }
-        }
+        self.reader.toggle_selection();
     }
     pub(super) fn request_selection_pages(&mut self, document: &str, pages: &[u32]) {
-        if !self.reader.selection.enabled {
-            return;
-        }
-        for page in self.reader.selection.next_pages(pages) {
-            let state = self.reader.selection.pages.entry(page).or_default();
-            if let Some(cancel) = state.begin(document, page)
-                && let Err(error) =
-                    self.runtime
-                        .submit(Action::TextGeometry(document.into(), page, cancel.clone()))
-            {
-                state.accept(document, page, &cancel, Err(error.to_string()));
-            }
-        }
+        self.reader
+            .selection
+            .request(&self.runtime, document, pages);
     }
     pub(super) fn selection_toolbar(&mut self, ui: &mut egui::Ui, palette: Palette) {
-        if !self.reader.selection.enabled || self.reader.annotations.editing() {
+        if self.reference.is_none() {
+            self.selection_actions(ui, palette);
+        }
+    }
+    pub(super) fn selection_actions(&mut self, ui: &mut egui::Ui, palette: Palette) {
+        if self.reader.annotations.editing() {
             return;
         }
-        let compact = ui.ctx().content_rect().width() < 620.0;
-        let mut copy = false;
-        ui.horizontal_wrapped(|ui| {
-            if !compact {
-                ui.label(
-                    RichText::new(self.tr(
-                        "Arrastra sobre el texto para seleccionar un pasaje.",
-                        "Drag across text to select a passage.",
-                    ))
-                    .color(palette.secondary),
-                );
-            }
-            copy = ui
-                .add_enabled_ui(
-                    self.reader
-                        .selection
-                        .range()
-                        .is_some_and(|range| !range.is_empty()),
-                    |ui| {
-                        theme::navigation(
-                            ui,
-                            if compact {
-                                self.tr("Copiar", "Copy")
-                            } else {
-                                self.tr("Copiar pasaje", "Copy passage")
-                            },
-                            false,
-                            palette,
-                        )
-                    },
-                )
-                .inner
-                .clicked();
-            if theme::navigation(
-                ui,
-                if compact {
-                    self.tr("Anotar", "Annotate")
-                } else {
-                    self.tr("Anotar pasaje", "Annotate passage")
-                },
-                false,
-                palette,
-            )
-            .clicked()
-            {
-                self.annotate_selection();
-            }
-            if theme::navigation(
-                ui,
-                if compact {
-                    self.tr("Borrar", "Clear")
-                } else {
-                    self.tr("Borrar selección", "Clear selection")
-                },
-                false,
-                palette,
-            )
-            .clicked()
-            {
-                self.reader.selection.gesture = SelectionGesture::default();
-            }
-            if theme::navigation(ui, self.tr("Terminar", "Done"), false, palette).clicked() {
-                self.reader.selection.clear();
-            }
-        });
-        let modal = self.password.is_some() || self.link_confirmation_open();
-        copy |= self.reader.selection.edit_commands(ui.ctx(), modal);
-        if copy {
-            match self.reader.selection.copy(&self.governor) {
-                Ok(text) => ui.ctx().copy_text(text.text().into()),
-                Err(error) => self.error = Some(error.to_string()),
-            }
-        }
-        if let Some(error) = self
+        let compact = ui.available_width() < 620.0;
+        match self
             .reader
             .selection
-            .pages
-            .values()
-            .find_map(text::TextState::error)
+            .toolbar(ui, self.english, compact, true, palette)
         {
-            ui.label(RichText::new(error).color(palette.secondary));
-            if theme::navigation(
-                ui,
-                self.tr("Reintentar selección", "Retry selection"),
-                false,
-                palette,
-            )
-            .clicked()
-            {
-                self.reader
-                    .selection
-                    .pages
-                    .retain(|_, state| state.error().is_none());
+            Some(SelectionAction::Copy) => {
+                self.copy_selection(ui.ctx(), false);
+                if self.reference.is_some() {
+                    ui.close();
+                }
             }
+            Some(SelectionAction::Annotate) => {
+                self.annotate_selection();
+                if self.reference.is_some() {
+                    ui.close();
+                }
+            }
+            None => {}
         }
-        ui.add_space(8.0);
     }
     pub(super) fn selection_page(
         &mut self,
@@ -282,87 +189,86 @@ impl YamantakaApp {
         rotation: PageRotation,
         palette: Palette,
     ) {
-        if !self.reader.selection.enabled
-            || self.reader.selection.document.as_deref() != Some(document)
-            || self.password.is_some()
-            || self.link_confirmation_open()
-        {
+        if self.password.is_some() || self.link_confirmation_open() {
             return;
         }
-        let Some(payload) = self
-            .reader
-            .selection
-            .pages
-            .get(&page)
-            .and_then(text::TextState::payload)
-        else {
-            return;
-        };
-        if self.demo
-            && self.capture.is_some()
-            && self.selection_preview == SelectionPreview::Waiting
-        {
-            let mut bounds = payload
-                .characters()
-                .iter()
-                .filter_map(|character| character.region);
-            if let Some(first) = bounds.next() {
-                let last = bounds.next_back().unwrap_or(first);
-                let point = |bounds: yamantaka_domain::pdf_geometry::NormalizedPageRect,
-                             fraction: f64| {
-                    let min = bounds.min();
-                    let max = bounds.max();
-                    let point = rotation.rotate_point([
-                        min[0] + (max[0] - min[0]) * fraction,
-                        (min[1] + max[1]) * 0.5,
-                    ]);
-                    paper.min
-                        + egui::vec2(
-                            point[0] as f32 * paper.width(),
-                            point[1] as f32 * paper.height(),
-                        )
-                };
-                let start = point(first, 0.15);
-                let end = point(last, 0.85);
-                self.selection_preview = SelectionPreview::Move(start, end);
-            } else {
-                self.selection_preview = SelectionPreview::Complete;
-            }
-            ui.ctx().request_repaint();
-        }
-        selection_input(
+        let preview = (self.demo && self.capture.is_some()).then_some(&mut self.selection_preview);
+        self.reader.selection.show_page(
             ui,
-            payload,
-            paper,
-            rotation,
-            egui::Id::new(("select-pdf-text", document, page)),
-            self.tr("Seleccionar texto del PDF. Mayús+flechas amplía la selección; Ctrl+A selecciona la página; Ctrl+C copia el pasaje.", "Select PDF text. Shift+arrows extends the selection; Ctrl+A selects the page; Ctrl+C copies the passage."),
-            &mut self.reader.selection.gesture,
-        );
-        if ui.memory(|memory| memory.has_focus(egui::Id::new(("select-pdf-text", document, page))))
-        {
-            ui.painter().rect_stroke(
+            SelectionPage {
+                document,
+                page,
                 paper,
-                0,
-                egui::Stroke::new(1.0, palette.accent),
-                egui::StrokeKind::Inside,
-            );
-        }
-        if let Some(range) = self.reader.selection.range()
-            && let Ok(Some(selected)) = range.page(payload)
-        {
-            for bounds in selected.regions() {
-                ui.painter().rect_filled(
-                    reader_viewport::page_region(paper, rotation, bounds),
-                    1,
-                    palette.accent.gamma_multiply(0.25),
-                );
+                rotation,
+                english: self.english,
+            },
+            palette,
+            preview,
+        );
+    }
+    pub(super) fn copy_selection(&mut self, ctx: &egui::Context, reference: bool) {
+        let state = if reference {
+            let Some(reference) = &self.reference else {
+                return;
+            };
+            &reference.pane.selection
+        } else {
+            &self.reader.selection
+        };
+        match state.copy(&self.governor) {
+            Ok(text) => {
+                if self.demo && self.capture.is_some() {
+                    self.selection_copy_preview =
+                        Some((state.document.clone().unwrap(), text.text().into()));
+                } else {
+                    ctx.copy_text(text.text().into());
+                }
             }
+            Err(error) => self.error = Some(error.to_string()),
         }
     }
 }
 
-#[derive(Default, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy)]
+pub(super) enum SelectionAction {
+    Copy,
+    Annotate,
+}
+
+impl SelectionState {
+    pub(super) fn toggle(&mut self, document: &str, page: u32, text: &mut text::TextState) {
+        if self.enabled {
+            self.clear();
+            return;
+        }
+        self.enabled = true;
+        self.document = Some(document.into());
+        if text.is_for(document, page) {
+            self.pages.insert(page, std::mem::take(text));
+        }
+    }
+    pub(super) fn request(&mut self, runtime: &Runtime, document: &str, visible: &[u32]) {
+        if !self.enabled {
+            return;
+        }
+        self.retain(document, visible);
+        for page in self.next_pages(visible) {
+            self.pages
+                .entry(page)
+                .or_default()
+                .request(runtime, document, page);
+        }
+    }
+    pub(super) fn owns(&self, document: &str, page: u32, cancel: &Cancellation) -> bool {
+        self.document.as_deref() == Some(document)
+            && self
+                .pages
+                .get(&page)
+                .is_some_and(|state| state.owns(document, page, cancel))
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub(super) enum SelectionPreview {
     #[default]
     Off,
@@ -455,12 +361,26 @@ fn selection_input(
     label: &str,
     gesture: &mut SelectionGesture,
 ) {
-    let response = ui.interact(paper, id, egui::Sense::click_and_drag());
+    let visible = paper.intersect(ui.clip_rect());
+    if !visible.is_positive() {
+        return;
+    }
+    let response = ui.interact(visible, id, egui::Sense::click_and_drag());
     response
         .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Image, ui.is_enabled(), label));
     if response.clicked() || response.drag_started() {
         response.request_focus();
     }
+    ui.memory_mut(|memory| {
+        memory.set_focus_lock_filter(
+            id,
+            egui::EventFilter {
+                horizontal_arrows: true,
+                escape: true,
+                ..Default::default()
+            },
+        )
+    });
     if response.clicked()
         && let Some(point) = response.interact_pointer_pos()
         && let Some(index) = caret_at(payload, paper, rotation, point)

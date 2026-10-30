@@ -1194,6 +1194,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| arg == "--reference-selection") {
+                        app.preview_reference_selection(
+                            args.iter().any(|arg| arg == "--reference-selection-shared"),
+                            args.iter().any(|arg| arg == "--reference-selection-close"),
+                        );
+                    }
                     if args.iter().any(|arg| arg == "--reference-sync") {
                         app.preview_reference_sync();
                     }

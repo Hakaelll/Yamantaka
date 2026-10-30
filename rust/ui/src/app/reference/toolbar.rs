@@ -37,6 +37,36 @@ impl ReferenceView {
                 );
             });
         });
+        let was_selecting = self.pane.selection.enabled;
+        let selection = theme::icon_toggle(
+            ui,
+            tr("Seleccionar texto de referencia", "Select reference text"),
+            theme::Icon::TextSelection,
+            was_selecting,
+            p,
+        );
+        if !was_selecting && selection.clicked() {
+            self.pane.toggle_selection();
+            ui.close();
+        }
+        if was_selecting {
+            let mut popup = egui::Popup::menu(&selection)
+                .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+            if self.selection_tools_preview {
+                popup = popup.open(true);
+            }
+            popup.show(|ui| {
+                self.input_layers.insert(ui.layer_id());
+                let action = self.pane.selection.toolbar(ui, english, true, false, p);
+                if matches!(action, Some(selection::SelectionAction::Copy)) {
+                    self.copy_requested = true;
+                    ui.close();
+                }
+                if !self.pane.selection.enabled {
+                    ui.close();
+                }
+            });
+        }
         let out = theme::icon_button(
             ui,
             tr("Alejar referencia", "Zoom reference out"),

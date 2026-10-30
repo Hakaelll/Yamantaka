@@ -76,6 +76,16 @@ Open **Navigate reference PDF → Text** to read the current reference page's ex
 
 Image-only pages display a message when no text can be extracted. Extraction errors offer **Retry**. Closing the navigator or switching sections cancels its pending request and releases the reference text. The main reading keeps its own text and selection state.
 
+## Select and copy a passage
+
+Select the I-beam icon labelled **Select reference text** in the reference header. In small panes, find it inside **Reference options**. This activates text selection. Select that icon again to open **Copy**, **Clear** and **Done**.
+
+Drag over PDF text to select a passage. With the PDF selection focused, Shift+Left/Right extends it, Ctrl+A selects that page's text, and Ctrl+C copies the passage. Escape clears the passage while retaining selection mode and keyboard focus. Alt+Left/Right still traverses the active reading's history.
+
+Each reading keeps its own selection and text requests, including two views of the same PDF page. During comparison, main selection actions are available in **Reading options**, retaining the main passage without a toolbar above both PDFs. Reference actions stay in their popup. **Clear** removes its passage; **Done** exits selection mode. Closing the reference releases its text requests and keeps the main selection.
+
+The Text section reuses selection text already extracted for that page. Selection requires usable text geometry. For text without reliable positions, use **Navigate reference PDF → Text** to copy available page text. Image-only pages may have no extractable text. Original PDFs remain unchanged.
+
 ## Search the reference
 
 Open **Navigate reference PDF → Find**, enter a word or phrase, and press Enter or **Find**. **Match case** and **Whole words** refine the search.
@@ -104,4 +114,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text and copying, text search and PDF links. Reference text selection and annotation tools, shortcut customization, overlays and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Reference annotation tools, shortcut customization, overlays and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

@@ -119,9 +119,15 @@ impl ReferenceView {
                     let Some((document, _)) = &self.pane.active else {
                         return;
                     };
-                    self.pane
-                        .text
-                        .request(runtime, &document.id, self.pane.page);
+                    if self.pane.selection.enabled {
+                        self.pane
+                            .selection
+                            .request(runtime, &document.id, &[self.pane.page]);
+                    } else {
+                        self.pane
+                            .text
+                            .request(runtime, &document.id, self.pane.page);
+                    }
                     let height = (ui.ctx().content_rect().height() - 160.0).max(80.0);
                     let mut retry = false;
                     egui::ScrollArea::vertical()
@@ -129,10 +135,21 @@ impl ReferenceView {
                         .max_height(height)
                         .min_scrolled_height(height.min(360.0))
                         .show(ui, |ui| {
-                            retry = self.pane.text.show(ui, english, p);
+                            if self.pane.selection.enabled {
+                                if let Some(state) = self.pane.selection.text_state(self.pane.page)
+                                {
+                                    retry = state.show(ui, english, p);
+                                }
+                            } else {
+                                retry = self.pane.text.show(ui, english, p);
+                            }
                         });
                     if retry {
-                        self.pane.text.clear();
+                        if self.pane.selection.enabled {
+                            self.pane.selection.retry_page(self.pane.page);
+                        } else {
+                            self.pane.text.clear();
+                        }
                     }
                 }
                 ReaderPanelTab::Bookmarks => {

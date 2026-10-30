@@ -152,11 +152,19 @@ impl ReaderLayout {
             first[1].max(second[1]),
         ]
     }
+    fn viewport_margins(&self, viewport: [f64; 2]) -> [f64; 2] {
+        // Preserve room for the PDF when tools or comparison shrink the canvas.
+        [
+            self.preferences.horizontal_margin.min(viewport[0] / 8.0),
+            self.preferences.vertical_margin.min(viewport[1] / 8.0),
+        ]
+    }
     pub(crate) fn destination_viewport(&self, viewport: [f64; 2]) -> Result<[f64; 2]> {
         validate_viewport(viewport)?;
+        let [horizontal, vertical] = self.viewport_margins(viewport);
         Ok([
-            (viewport[0] - self.preferences.horizontal_margin * 2.0).max(1.0),
-            (viewport[1] - self.preferences.vertical_margin * 2.0).max(1.0),
+            (viewport[0] - horizontal * 2.0).max(1.0),
+            (viewport[1] - vertical * 2.0).max(1.0),
         ])
     }
     fn zoom_for(
@@ -210,10 +218,9 @@ impl ReaderLayout {
         } else {
             unit[0]
         };
-        let content_width =
-            (raw_width * zoom + self.preferences.horizontal_margin * 2.0).max(viewport[0]);
-        let content_height =
-            (raw_height * zoom + self.preferences.vertical_margin * 2.0).max(viewport[1]);
+        let [horizontal, vertical] = self.viewport_margins(viewport);
+        let content_width = (raw_width * zoom + horizontal * 2.0).max(viewport[0]);
+        let content_height = (raw_height * zoom + vertical * 2.0).max(viewport[1]);
         if !content_width.is_finite()
             || !content_height.is_finite()
             || content_width <= 0.0
@@ -395,4 +402,52 @@ fn validate_viewport(viewport: [f64; 2]) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn small_fit_page_has_visible_geometry_on_both_axes() {
+        let preferences = ReaderPreferences::new("small-canvas");
+        let layout =
+            ReaderLayout::new([[800.0, 600.0]], &preferences, ReadingDirection::Ltr, 24.0).unwrap();
+        for (viewport, expected) in [
+            ([320.0, 24.0], [148.0, 3.0, 24.0, 18.0]),
+            ([24.0, 320.0], [3.0, 153.25, 18.0, 13.5]),
+        ] {
+            let frame = layout
+                .frame(
+                    viewport,
+                    ReaderPosition::new(0, 0.0).unwrap(),
+                    ZoomMode::FitPage,
+                    1.0,
+                    [0.0, 0.0],
+                    0.0,
+                )
+                .unwrap();
+            assert_eq!(frame.content_size, viewport);
+            assert_eq!(frame.pages.len(), 1);
+            let rect = frame.pages[0].rect;
+            for (actual, expected) in [rect.left, rect.top, rect.width, rect.height]
+                .into_iter()
+                .zip(expected)
+            {
+                assert!((actual - expected).abs() < 1e-9);
+            }
+        }
+        let frame = layout
+            .frame(
+                [1000.0, 800.0],
+                ReaderPosition::new(0, 0.0).unwrap(),
+                ZoomMode::FitPage,
+                1.0,
+                [0.0, 0.0],
+                0.0,
+            )
+            .unwrap();
+        assert!((frame.pages[0].rect.width - 936.0).abs() < 1e-9);
+        assert!((frame.pages[0].rect.left - 32.0).abs() < 1e-9);
+    }
 }

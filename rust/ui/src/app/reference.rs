@@ -25,6 +25,10 @@ pub(super) struct ReferenceView {
     pub pane: reader_pane::ReaderPane,
     pub(in crate::app) input_layers: std::collections::HashSet<egui::LayerId>,
     pub(in crate::app) navigator_requested: bool,
+    pub(in crate::app) copy_requested: bool,
+    pub(in crate::app) selection_preview: selection::SelectionPreview,
+    pub(in crate::app) selection_keyboard_preview: bool,
+    pub(in crate::app) selection_tools_preview: bool,
     pub follow_page: bool,
     pub follow_zoom: bool,
     pub follow_position: bool,
@@ -94,6 +98,10 @@ impl ReferenceView {
             pane,
             input_layers: Default::default(),
             navigator_requested: false,
+            copy_requested: false,
+            selection_preview: Default::default(),
+            selection_keyboard_preview: false,
+            selection_tools_preview: false,
             follow_page: false,
             follow_zoom: false,
             follow_position: false,
@@ -200,7 +208,7 @@ impl ReferenceView {
                 );
                 let mut popup = egui::Popup::menu(&button)
                     .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-                if self.sync_preview || self.chooser.preview {
+                if self.sync_preview || self.chooser.preview || self.selection_tools_preview {
                     popup = popup.open(true);
                 }
                 popup.show(|ui| {
@@ -394,6 +402,12 @@ impl ReferenceView {
                 }
                 keep
             });
+            let selection_pages: Vec<u32> = frame.pages.iter().map(|page| page.page).collect();
+            if !self.busy() && !self.close_requested {
+                self.pane
+                    .selection
+                    .request(runtime, &document.id, &selection_pages);
+            }
             let origin = ui.max_rect().min;
             for page in &frame.pages {
                 let size = egui::vec2(page.rect.width as f32, page.rect.height as f32);
@@ -440,6 +454,20 @@ impl ReferenceView {
                 self.pane
                     .find
                     .paint(ui, page.page, paper, layout.rotation(), p);
+                if !self.busy() && !self.close_requested {
+                    self.pane.selection.show_page(
+                        ui,
+                        selection::SelectionPage {
+                            document: &document.id,
+                            page: page.page,
+                            paper,
+                            rotation: layout.rotation(),
+                            english,
+                        },
+                        p,
+                        Some(&mut self.selection_preview),
+                    );
+                }
                 if !self.busy() && !self.close_requested && !self.pane.selection.enabled {
                     match self.pane.links.regions(
                         ui,
@@ -636,6 +664,13 @@ impl YamantakaApp {
             self.english,
             p,
         );
+        let copy = self
+            .reference
+            .as_mut()
+            .is_some_and(|reference| std::mem::take(&mut reference.copy_requested));
+        if copy {
+            self.copy_selection(ui.ctx(), true);
+        }
         if close {
             self.request_reference_close();
         } else if drag.dragged() {

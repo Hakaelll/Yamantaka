@@ -207,6 +207,8 @@ pub struct YamantakaApp {
     annotation_multi_preview: bool,
     selection_preview: selection::SelectionPreview,
     selection_keyboard_preview: bool,
+    selection_copy_preview: Option<(String, String)>,
+    comparison_selection_preview: selection::ComparisonSelectionPreview,
     presenter: Option<PagePresenter>,
     governor: MemoryGovernor,
     bulk_organization_preview: Option<bulk_picker::OrganizationPreview>,
@@ -420,6 +422,8 @@ impl YamantakaApp {
             annotation_multi_preview: false,
             selection_preview: Default::default(),
             selection_keyboard_preview: false,
+            selection_copy_preview: None,
+            comparison_selection_preview: Default::default(),
             presenter,
             governor,
             bulk_organization_preview: None,
@@ -1344,6 +1348,12 @@ impl App for YamantakaApp {
             self.selection_preview
                 .input(input, self.selection_keyboard_preview);
             self.reference_shortcuts_preview.input(input);
+            self.comparison_selection_preview.input(input);
+            if let Some(reference) = &mut self.reference {
+                reference
+                    .selection_preview
+                    .input(input, reference.selection_keyboard_preview);
+            }
         }
         if self.demo
             && self.capture.is_some()
@@ -1734,40 +1744,26 @@ impl App for YamantakaApp {
                 Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::TextGeometry(id, payload, cancel) => {
-                    if let Some(reference) = &mut self.reference
-                        && reference.pane.text.owns(&id, payload.page(), &cancel)
-                    {
+                    let page = payload.page();
+                    if self.reference.as_mut().is_some_and(|reference| {
                         reference
                             .pane
-                            .text
-                            .accept(&id, payload.page(), &cancel, Ok(payload));
+                            .accept_text(&id, page, &cancel, Ok(payload.clone()))
+                    }) {
                         continue;
                     }
-
-                    self.reader
-                        .selection
-                        .accept(&id, payload.page(), &cancel, Ok(payload.clone()));
-                    self.reader
-                        .text
-                        .accept(&id, payload.page(), &cancel, Ok(payload));
+                    self.reader.accept_text(&id, page, &cancel, Ok(payload));
                 }
                 Update::TextGeometryFailed(id, page, error, cancel) => {
-                    if let Some(reference) = &mut self.reference
-                        && reference.pane.text.owns(&id, page, &cancel)
-                    {
+                    let error = error.to_string();
+                    if self.reference.as_mut().is_some_and(|reference| {
                         reference
                             .pane
-                            .text
-                            .accept(&id, page, &cancel, Err(error.to_string()));
+                            .accept_text(&id, page, &cancel, Err(error.clone()))
+                    }) {
                         continue;
                     }
-
-                    self.reader
-                        .selection
-                        .accept(&id, page, &cancel, Err(error.to_string()));
-                    self.reader
-                        .text
-                        .accept(&id, page, &cancel, Err(error.to_string()));
+                    self.reader.accept_text(&id, page, &cancel, Err(error));
                 }
                 Update::Text(..) => {}
                 Update::Imported(_, cancel) => {
@@ -2156,12 +2152,40 @@ impl App for YamantakaApp {
                 || self.reading_focus.reference()
                 || !matches!(self.surface, Surface::Reader),
         );
+        if let Some(reference) = &mut self.reference {
+            let reference_busy = reference.busy();
+            reference.pane.selection.keyboard_input(
+                &ctx,
+                shortcut_modal
+                    || reference_busy
+                    || !self.reading_focus.reference()
+                    || !matches!(self.surface, Surface::Reader),
+            );
+        }
+        let selection_blocked = shortcut_modal || !matches!(self.surface, Surface::Reader);
+        let reference_selection = self.reading_focus.reference();
+        let copy = if reference_selection {
+            self.reference.as_mut().is_some_and(|reference| {
+                let blocked = selection_blocked || reference.busy();
+                reference.pane.selection.edit_commands(&ctx, blocked)
+            })
+        } else {
+            self.reader.selection.edit_commands(&ctx, selection_blocked)
+        };
+        if copy {
+            self.copy_selection(&ctx, reference_selection);
+        }
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
             &ctx,
             shortcut_modal,
             matches!(self.surface, Surface::Reader),
-            self.reading_focus.canvas_focused(&ctx),
+            self.reading_focus.canvas_focused(&ctx)
+                || self.reader.selection.focused_page(&ctx).is_some()
+                || self
+                    .reference
+                    .as_ref()
+                    .is_some_and(|reference| reference.pane.selection.focused_page(&ctx).is_some()),
         ) {
             if self.dispatch_reading_shortcut(&ctx, &shortcut) {
                 continue;
@@ -2198,6 +2222,7 @@ impl App for YamantakaApp {
             }
         }
         self.advance_reference_shortcuts(&ctx);
+        self.advance_comparison_selection(&ctx);
         self.apply_annotation_preview();
         self.apply_annotation_filter_preview();
         self.apply_annotation_bulk_preview();
@@ -2408,6 +2433,7 @@ impl App for YamantakaApp {
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
                     && self.reference_shortcuts_preview.ready()
+                    && self.comparison_selection_preview.ready()
                     && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9 | 11 | 13 | 16 | 19 | 28 | 35 | 39 | 40)
                     && matches!(self.reference_chooser_demo, 0 | 3)
                     && matches!(self.reference_sync_demo, 0 | 10)
@@ -2539,6 +2565,9 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["referenceSelectionPhase"] = serde_json::json!(self.comparison_selection_preview.phase());
+                    record["referenceSelection"] = self.reference.as_ref().map(|reference| reference.pane.selection.capture_summary()).unwrap_or_default();
+                    record["selectionClipboard"] = serde_json::json!(self.selection_copy_preview);
                     record["primaryNavigation"] = navigation::summary(self.reader.navigation.as_ref());
                     record["referenceNavigation"] = navigation::summary(self.reference.as_ref().and_then(|reference| reference.pane.navigation.as_ref()));
                     record["readingFocus"] = serde_json::json!(format!("{:?}", self.reading_focus.target));

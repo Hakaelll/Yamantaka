@@ -2,21 +2,20 @@ use super::*;
 use unicode_segmentation::UnicodeSegmentation;
 
 impl SelectionState {
-    pub(super) fn focused_page(&self, ctx: &egui::Context) -> Option<u32> {
-        let document = self.document.as_deref()?;
+    pub(in crate::app) fn focused_page(&self, ctx: &egui::Context) -> Option<u32> {
         let focused = ctx.memory(|memory| memory.focused());
-        self.pages
-            .keys()
-            .copied()
-            .find(|page| focused == Some(egui::Id::new(("select-pdf-text", document, *page))))
+        self.focus_ids
+            .iter()
+            .find_map(|(page, id)| (focused == Some(*id)).then_some(*page))
     }
-    pub(super) fn edit_commands(&mut self, ctx: &egui::Context, modal: bool) -> bool {
+    pub(in crate::app) fn edit_commands(&mut self, ctx: &egui::Context, modal: bool) -> bool {
         if !self.enabled
             || modal
             || ctx.egui_wants_keyboard_input() && self.focused_page(ctx).is_none()
         {
             return false;
         }
+        let popup_open = egui::Popup::is_any_open(ctx);
         ctx.input_mut(|input| {
             let copy = input
                 .events
@@ -27,7 +26,7 @@ impl SelectionState {
                     .events
                     .retain(|event| !matches!(event, egui::Event::Copy));
             }
-            if input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
+            if !popup_open && input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
                 self.gesture = SelectionGesture::Empty;
             }
             copy

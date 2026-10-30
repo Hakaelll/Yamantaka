@@ -58,6 +58,28 @@ impl Default for ReaderPane {
 }
 
 impl ReaderPane {
+    pub fn toggle_selection(&mut self) {
+        if let Some((document, _)) = &self.active {
+            self.selection
+                .toggle(&document.id, self.page, &mut self.text);
+        }
+    }
+    pub fn accept_text(
+        &mut self,
+        document: &str,
+        page: u32,
+        cancel: &Cancellation,
+        result: std::result::Result<Arc<yamantaka_domain::pdf_text::PdfPageText>, String>,
+    ) -> bool {
+        if self.selection.owns(document, page, cancel) {
+            self.selection.accept(document, page, cancel, result);
+        } else if self.text.owns(document, page, cancel) {
+            self.text.accept(document, page, cancel, result);
+        } else {
+            return false;
+        }
+        true
+    }
     pub fn navigate_find(&mut self, target: find::FindTarget) -> bool {
         let changed = self
             .navigation

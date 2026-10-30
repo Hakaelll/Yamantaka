@@ -188,6 +188,9 @@ impl YamantakaApp {
             self.toggle_text_selection();
             ui.close();
         }
+        if self.reference.is_some() && self.reader.selection.enabled {
+            self.selection_actions(ui, p);
+        }
         ui.separator();
         let Some(mut preferences) = self.reader.reader_preferences.clone() else {
             ui.label(

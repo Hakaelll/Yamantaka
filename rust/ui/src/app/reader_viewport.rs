@@ -55,7 +55,11 @@ impl YamantakaApp {
         let anchor = navigation.position();
         ui.painter()
             .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
-        let mut scrolling = egui::ScrollArea::both().id_salt(("pdf-viewport", &document.id));
+        let mut scrolling = egui::ScrollArea::both()
+            .id_salt(("pdf-viewport", &document.id))
+            .max_height(viewport.y.max(1.0))
+            .min_scrolled_height(0.0)
+            .auto_shrink([false, false]);
         if self.reader.viewport.scroll_anchor {
             match layout.scroll_for_anchor(
                 viewport_size,
@@ -112,7 +116,6 @@ impl YamantakaApp {
             let link_pages: Vec<u32> = frame.pages.iter().map(|visible| visible.page).collect();
             self.reader.links.request_visible(&self.runtime, &document.id, &link_pages);
             self.request_annotation_marks(&document.id, &link_pages);
-            self.reader.selection.retain_visible(&document.id, &link_pages);
             self.request_selection_pages(&document.id, &link_pages);
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);

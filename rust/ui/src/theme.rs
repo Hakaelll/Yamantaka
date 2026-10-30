@@ -173,6 +173,7 @@ pub enum Icon {
     Check,
     Folder,
     Bookmark,
+    TextSelection,
     Archive,
     Star,
 }
@@ -197,6 +198,11 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
                 v(-7.0, -5.0),
             ];
             painter.add(egui::Shape::line(points.to_vec(), s));
+        }
+        Icon::TextSelection => {
+            line(v(-4.0, -7.0), v(4.0, -7.0));
+            line(v(0.0, -7.0), v(0.0, 7.0));
+            line(v(-4.0, 7.0), v(4.0, 7.0));
         }
         Icon::Bookmark => {
             painter.add(egui::Shape::line(

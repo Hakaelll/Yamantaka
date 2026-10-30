@@ -11,6 +11,11 @@ pub(super) struct TextState {
 }
 
 impl TextState {
+    pub(super) fn is_for(&self, document: &str, page: u32) -> bool {
+        self.identity
+            .as_ref()
+            .is_some_and(|(id, current)| id == document && *current == page)
+    }
     pub(super) fn ready(&self) -> bool {
         self.pending.is_none() && (self.page.is_some() || self.error.is_some())
     }
