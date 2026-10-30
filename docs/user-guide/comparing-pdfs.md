@@ -14,6 +14,23 @@ Drag the divider to change the main reading's share of the available space. Open
 
 **Swap positions** exchanges their locations while retaining each document, page, zoom and share of space.
 
+## Choose the keyboard target
+
+Click a pane or one of its controls to make it active. Keyboard focus entering a pane's controls also selects that pane. A thin accent border identifies the active reading. **F6** switches between the two reading canvases and closes transient popups. In a narrow window, switching to the reference hides a full-width main navigation drawer while retaining its contents.
+
+| Shortcut | Active-pane action |
+| --- | --- |
+| Left / Right, Page Up / Page Down | Previous / next page when the canvas has keyboard input |
+| Ctrl++ / Ctrl+- | Zoom in / out using the existing reader zoom controls |
+| Ctrl+0 | Fit page |
+| Ctrl+F | Open that PDF's search and focus its query field |
+| F3 / Shift+F3 | Next / previous result in that PDF |
+| Ctrl+W | Close the reference when it is active; otherwise close the main reading tab |
+
+Arrow keys stay with an input field while editing. Page keys also suppress the UI toolkit's spatial focus movement, so paging a left-hand reference keeps subsequent commands in that pane. The main reading's text-selection shortcuts are inactive while the reference owns keyboard input.
+
+Fullscreen (**F11**), Focus mode (**F8**) and global search (**Ctrl+Shift+F**) retain their application-wide behavior. Page and zoom commands still respect your comparison synchronization choices.
+
 ## Link navigation
 
 Enable **Follow page** or **Follow zoom** to follow the main reading. Manual reference changes restore independent control for that setting.
@@ -78,4 +95,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, zoom, chapter contents, page thumbnails, bookmarks, page text and copying, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, zoom, chapter contents, page thumbnails, bookmarks, page text and copying, text search and PDF links. Reference text selection and annotation tools, shortcut customization, overlays and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

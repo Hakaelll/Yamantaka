@@ -27,6 +27,7 @@ impl ReferenceView {
                 popup = popup.open(true);
             }
             popup.show(|ui| {
+                self.input_layers.insert(ui.layer_id());
                 self.selection = self.chooser.show(
                     ui,
                     runtime,
@@ -70,6 +71,9 @@ impl ReferenceView {
         if self.sync_preview {
             popup = popup.open(true);
         }
-        popup.show(|ui| self.options_menu(ui, primary, english, p));
+        popup.show(|ui| {
+            self.input_layers.insert(ui.layer_id());
+            self.options_menu(ui, primary, english, p);
+        });
     }
 }

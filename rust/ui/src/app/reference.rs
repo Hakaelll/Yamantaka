@@ -23,6 +23,8 @@ pub(super) struct ReferenceView {
     selection: Option<Document>,
     pub(super) chooser: chooser::ReferenceChooser,
     pub pane: reader_pane::ReaderPane,
+    pub(in crate::app) input_layers: std::collections::HashSet<egui::LayerId>,
+    pub(in crate::app) navigator_requested: bool,
     pub follow_page: bool,
     pub follow_zoom: bool,
     pub follow_position: bool,
@@ -90,6 +92,8 @@ impl ReferenceView {
             selection: None,
             chooser: Default::default(),
             pane,
+            input_layers: Default::default(),
+            navigator_requested: false,
             follow_page: false,
             follow_zoom: false,
             follow_position: false,
@@ -200,6 +204,7 @@ impl ReferenceView {
                     popup = popup.open(true);
                 }
                 popup.show(|ui| {
+                    self.input_layers.insert(ui.layer_id());
                     ui.set_width((ui.ctx().content_rect().width() - 40.0).clamp(120.0, 420.0));
                     ui.horizontal_wrapped(|ui| {
                         self.toolbar_tools(ui, runtime, primary, can_choose, english, p)
@@ -617,6 +622,20 @@ impl YamantakaApp {
                 },
             );
         }
+        self.reading_focus.register(
+            ui,
+            primary_rect,
+            shortcuts::ReadingTarget::Primary,
+            self.english,
+            p,
+        );
+        self.reading_focus.register(
+            ui,
+            reference_rect,
+            shortcuts::ReadingTarget::Reference,
+            self.english,
+            p,
+        );
         if close {
             self.request_reference_close();
         } else if drag.dragged() {

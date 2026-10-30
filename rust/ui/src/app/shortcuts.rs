@@ -1,4 +1,9 @@
 use eframe::egui;
+mod focus;
+pub(super) use focus::{ReadingFocus, ReadingTarget};
+mod preview;
+mod routing;
+pub(super) use preview::ShortcutPreview;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Shortcut {
@@ -8,6 +13,10 @@ pub(super) enum Shortcut {
     NextMatch,
     PreviousPage,
     NextPage,
+    SwitchPane,
+    ZoomIn,
+    ZoomOut,
+    FitPage,
     Fullscreen,
     Focus,
     NextTab,
@@ -16,8 +25,13 @@ pub(super) enum Shortcut {
     ReopenTab,
 }
 
-pub(super) fn read(ctx: &egui::Context, modal_open: bool, reader_active: bool) -> Vec<Shortcut> {
-    let text_has_focus = ctx.egui_wants_keyboard_input();
+pub(super) fn read(
+    ctx: &egui::Context,
+    modal_open: bool,
+    reader_active: bool,
+    canvas_focused: bool,
+) -> Vec<Shortcut> {
+    let text_has_focus = ctx.egui_wants_keyboard_input() && !canvas_focused;
     ctx.input_mut(|input| {
         let mut commands = Vec::new();
         if input.key_pressed(egui::Key::F11) {
@@ -35,6 +49,28 @@ pub(super) fn read(ctx: &egui::Context, modal_open: bool, reader_active: bool) -
             commands.push(Shortcut::ReopenTab);
         }
         if reader_active {
+            if input.consume_key(egui::Modifiers::NONE, egui::Key::F6) {
+                commands.push(Shortcut::SwitchPane);
+            }
+            if input.consume_key(egui::Modifiers::CTRL, egui::Key::Plus)
+                || input.consume_key(egui::Modifiers::CTRL, egui::Key::Equals)
+                || input.consume_key(
+                    egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+                    egui::Key::Plus,
+                )
+                || input.consume_key(
+                    egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+                    egui::Key::Equals,
+                )
+            {
+                commands.push(Shortcut::ZoomIn);
+            }
+            if input.consume_key(egui::Modifiers::CTRL, egui::Key::Minus) {
+                commands.push(Shortcut::ZoomOut);
+            }
+            if input.consume_key(egui::Modifiers::CTRL, egui::Key::Num0) {
+                commands.push(Shortcut::FitPage);
+            }
             if input.consume_key(egui::Modifiers::NONE, egui::Key::F8) {
                 commands.push(Shortcut::Focus);
             }
@@ -58,10 +94,14 @@ pub(super) fn read(ctx: &egui::Context, modal_open: bool, reader_active: bool) -
                 commands.push(Shortcut::NextMatch);
             }
             if !text_has_focus {
-                if input.key_pressed(egui::Key::ArrowRight) {
+                if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight)
+                    || input.consume_key(egui::Modifiers::NONE, egui::Key::PageDown)
+                {
                     commands.push(Shortcut::NextPage);
                 }
-                if input.key_pressed(egui::Key::ArrowLeft) {
+                if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowLeft)
+                    || input.consume_key(egui::Modifiers::NONE, egui::Key::PageUp)
+                {
                     commands.push(Shortcut::PreviousPage);
                 }
             }

@@ -117,6 +117,8 @@ impl PageImage {
 }
 pub struct YamantakaApp {
     reader: reader_pane::ReaderPane,
+    reading_focus: shortcuts::ReadingFocus,
+    reference_shortcuts_preview: shortcuts::ShortcutPreview,
     reference: Option<reference::ReferenceView>,
     reference_return: Option<Surface>,
     reference_demo: u8,
@@ -317,6 +319,8 @@ impl YamantakaApp {
             .unwrap_or(false);
         let mut app = Self {
             reader: Default::default(),
+            reading_focus: Default::default(),
+            reference_shortcuts_preview: Default::default(),
             reference: None,
             reference_return: None,
             reference_demo: 0,
@@ -1339,6 +1343,7 @@ impl App for YamantakaApp {
         if self.demo && self.capture.is_some() {
             self.selection_preview
                 .input(input, self.selection_keyboard_preview);
+            self.reference_shortcuts_preview.input(input);
         }
         if self.demo
             && self.capture.is_some()
@@ -2119,35 +2124,53 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
+        let shortcut_modal = self.password.is_some()
+            || self.link_confirmation_open()
+            || self.bulk_picker.is_some()
+            || self.selection_review_open()
+            || self.tag_dialog_open()
+            || self.legacy_import.open
+            || self.backup_restore.open
+            || self.reading_queue.open
+            || self.workspaces.open
+            || self.workspaces.close_after;
+        self.reading_focus.observe(
+            &ctx,
+            shortcut_modal,
+            self.reference
+                .as_ref()
+                .filter(|_| {
+                    matches!(self.surface, Surface::Reader)
+                        && !(self.reader.panel
+                            && !self.reader_focus
+                            && ctx.content_rect().width() < 620.0)
+                })
+                .map(|reference| &reference.input_layers),
+        );
+        if let Some(reference) = &mut self.reference {
+            reference.input_layers.clear();
+        }
         self.reader.selection.keyboard_input(
             &ctx,
-            self.password.is_some()
-                || self.link_confirmation_open()
-                || self.bulk_picker.is_some()
-                || self.selection_review_open()
-                || self.tag_dialog_open()
-                || self.legacy_import.open
-                || self.backup_restore.open
-                || self.reading_queue.open
-                || self.workspaces.open
-                || self.workspaces.close_after,
+            shortcut_modal
+                || self.reading_focus.reference()
+                || !matches!(self.surface, Surface::Reader),
         );
         self.library_selection_shortcuts(&ctx);
         for shortcut in shortcuts::read(
             &ctx,
-            self.password.is_some()
-                || self.link_confirmation_open()
-                || self.bulk_picker.is_some()
-                || self.selection_review_open()
-                || self.tag_dialog_open()
-                || self.legacy_import.open
-                || self.backup_restore.open
-                || self.reading_queue.open
-                || self.workspaces.open
-                || self.workspaces.close_after,
+            shortcut_modal,
             matches!(self.surface, Surface::Reader),
+            self.reading_focus.canvas_focused(&ctx),
         ) {
+            if self.dispatch_reading_shortcut(&ctx, &shortcut) {
+                continue;
+            }
             match shortcut {
+                shortcuts::Shortcut::SwitchPane
+                | shortcuts::Shortcut::ZoomIn
+                | shortcuts::Shortcut::ZoomOut
+                | shortcuts::Shortcut::FitPage => unreachable!(),
                 shortcuts::Shortcut::GlobalSearch => self.show_search(),
                 shortcuts::Shortcut::DocumentFind => self.show_find(),
                 shortcuts::Shortcut::PreviousMatch => self.step_find(false),
@@ -2172,6 +2195,7 @@ impl App for YamantakaApp {
                 }
             }
         }
+        self.advance_reference_shortcuts(&ctx);
         self.apply_annotation_preview();
         self.apply_annotation_filter_preview();
         self.apply_annotation_bulk_preview();
@@ -2380,6 +2404,7 @@ impl App for YamantakaApp {
                     && self.history.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
+                    && self.reference_shortcuts_preview.ready()
                     && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9 | 11 | 13 | 16 | 19 | 28 | 35 | 39 | 40)
                     && matches!(self.reference_chooser_demo, 0 | 3)
                     && matches!(self.reference_sync_demo, 0 | 10)
@@ -2510,6 +2535,8 @@ impl App for YamantakaApp {
                     record["collections"]=self.collections.summary();
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
+                    record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["readingFocus"] = serde_json::json!(format!("{:?}", self.reading_focus.target));
                     record["documentOutline"] = self.reader.outline.capture_summary();
                     record["documentBookmarks"] = self.reader.bookmarks.capture_summary();
                     record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"find":reference.pane.find.capture_summary(),"links":reference.pane.links.capture_summary(),"outline":reference.pane.outline.capture_summary(),"bookmarks":reference.pane.bookmarks.capture_summary(),"text":reference.pane.text.capture_summary(),"thumbnailSlots":reference.pane.thumbnails.resident_count(),"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();

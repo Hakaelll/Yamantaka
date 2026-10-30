@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-shortcuts'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--es') },
+    @{ name='reader-reference-shortcuts-small-200'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
+    @{ name='reader-reference-shortcuts-close'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--reference-swap','--reference-shortcuts-close','--es') },
     @{ name='reader-reference-text'; args=@('--reader','--reference','--reference-book','--reference-text','--text-panel','--es') },
     @{ name='reader-reference-text-small-200'; args=@('--reader','--reference','--reference-book','--reference-text','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-text-empty'; args=@('--reader','--reference','--reference-book','--reference-text','--reference-text-empty','--es','--light') },
@@ -375,6 +378,13 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -in @('reader-reference-shortcuts','reader-reference-shortcuts-small-200')) {
+        if ($controls.referenceShortcutPhase -ne 14 -or $controls.readingFocus -cne 'Reference' -or $controls.currentReaderPage -ne 1 -or $controls.reference.page -ne 0 -or $controls.reference.document -ne 'demo-1' -or $controls.documentFind -or $controls.reference.find.matches -lt 2) { throw 'Keyboard and pointer routing did not keep independent page, zoom and find state.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Lectura de referencia · F6 cambia de panel')
+    }
+    if ($case.name -eq 'reader-reference-shortcuts-close') {
+        if ($controls.referenceShortcutPhase -ne 16 -or $controls.readingFocus -cne 'Primary' -or $controls.reference -or $controls.currentReaderPage -ne 1 -or $controls.referenceAdmission.nativeCloses -ne 1) { throw 'Closing the focused swapped reference did not preserve the main reading.' }
     }
     if ($case.name -in @('reader-reference-text','reader-reference-text-small-200')) {
         if ($controls.referenceAdmission.demoStage -ne 39 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.page -ne 1 -or $controls.reference.text.document -ne 'demo-1' -or $controls.reference.text.page -ne 1 -or -not $controls.reference.text.ready -or $controls.reference.text.failed -or $controls.reference.text.characters -lt 1 -or $controls.currentReaderPage -ne 0) { throw 'Reference page text did not recover independently after cancelled requests and navigator closure.' }

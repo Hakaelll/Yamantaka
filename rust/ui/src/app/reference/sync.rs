@@ -14,7 +14,7 @@ impl ReferenceView {
         }
     }
 
-    pub(super) fn reference_navigation_changed(&mut self) {
+    pub(in crate::app) fn reference_navigation_changed(&mut self) {
         self.pane.navigation_changed();
         if self.bidirectional && self.follow_page {
             self.pending_primary_page = Some(self.pane.page);

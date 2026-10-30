@@ -40,6 +40,9 @@ impl ReferenceView {
         }
         let mut popup = egui::Popup::menu(&button)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+        if std::mem::take(&mut self.navigator_requested) {
+            popup = popup.open_memory(egui::SetOpenCommand::Bool(true));
+        }
         if self.search_preview
             || self.outline_preview
             || self.thumbnails_preview
@@ -49,6 +52,7 @@ impl ReferenceView {
             popup = popup.open(true);
         }
         let shown = popup.show(|ui| {
+            self.input_layers.insert(ui.layer_id());
             ui.set_width((ui.ctx().content_rect().width() - 40.0).clamp(120.0, 420.0));
             let previous = self.pane.reader_panel_tab;
             let sections = [
@@ -67,6 +71,7 @@ impl ReferenceView {
                 .selected_text(selected)
                 .width(ui.available_width())
                 .show_ui(ui, |ui| {
+                    self.input_layers.insert(ui.layer_id());
                     for (tab, label) in sections {
                         ui.selectable_value(&mut self.pane.reader_panel_tab, tab, label);
                     }
