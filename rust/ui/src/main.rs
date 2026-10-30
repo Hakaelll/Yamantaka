@@ -426,6 +426,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-notes") {
             db.execute_batch("INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) VALUES('source-note-a','demo-0',0,'pageComment','violet','Source note A','[]',0,'synthetic','attached','2026-10-30','2026-10-30','pending'),('source-note-b','demo-0',1,'pageComment','violet','Source note B','[]',0,'synthetic','attached','2026-10-30','2026-10-30','pending');")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--reference-note-bulk") {
+            db.execute_batch("WITH RECURSIVE notes(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM notes WHERE n<81) INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) SELECT printf('reference-bulk-%03d',n),'demo-1',n%2,'pageComment','violet',printf('Reference bulk note %03d',n),'[]',0,'synthetic','attached','2026-10-30','2026-10-30','pending' FROM notes; INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('reference-existing-tag','Existing study','existing study','blue','2026-10-30','2026-10-30'); INSERT INTO annotation_tags(annotation_id,tag_id) SELECT id,'reference-existing-tag' FROM annotations WHERE document_id='demo-1';")?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-marks") {
             db.execute_batch(r#"
                 INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state)
@@ -1210,6 +1213,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         app.preview_reference_notes(
                             !args.iter().any(|arg| arg == "--reference-book"),
                             args.iter().any(|arg| arg == "--reference-notes-editor"),
+                        );
+                    }
+                    if args.iter().any(|arg| arg == "--reference-note-bulk") {
+                        app.preview_reference_note_bulk(
+                            args.iter().any(|arg| arg == "--reference-note-bulk-save"),
                         );
                     }
                     if args.iter().any(|arg| arg == "--reference-note-filters") {

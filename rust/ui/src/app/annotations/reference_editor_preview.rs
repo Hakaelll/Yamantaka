@@ -6,11 +6,12 @@ pub(in crate::app) struct NotesPreview {
     shared: bool,
     editor: bool,
     filters: Option<bool>,
+    bulk: Option<bool>,
     id: Option<String>,
 }
 impl NotesPreview {
     pub fn ready(&self) -> bool {
-        matches!(self.phase, 0 | 10 | 12 | 16 | 25 | 26)
+        matches!(self.phase, 0 | 10 | 12 | 16 | 25 | 26 | 40 | 41)
     }
     pub fn phase(&self) -> u8 {
         self.phase
@@ -24,6 +25,7 @@ impl YamantakaApp {
                 shared,
                 editor,
                 filters: None,
+                bulk: None,
                 id: None,
             };
         }
@@ -31,6 +33,11 @@ impl YamantakaApp {
     pub fn preview_reference_note_filters(&mut self, empty: bool) {
         if self.demo && self.capture.is_some() {
             self.reference_notes_preview.filters = Some(empty);
+        }
+    }
+    pub fn preview_reference_note_bulk(&mut self, save: bool) {
+        if self.demo && self.capture.is_some() {
+            self.reference_notes_preview.bulk = Some(save);
         }
     }
     pub(in crate::app) fn advance_reference_notes(&mut self) {
@@ -83,6 +90,27 @@ impl YamantakaApp {
                 self.reference_notes_preview.phase = 2;
             }
             2 if view.pane.annotations.ready() => {
+                if let Some(save) = self.reference_notes_preview.bulk {
+                    assert_eq!(view.pane.annotations.page.as_ref().unwrap().total, 82);
+                    assert_eq!(
+                        view.pane.annotations.page.as_ref().unwrap().entries().len(),
+                        80
+                    );
+                    view.pane.annotations.selected.0.fill(true);
+                    view.pane.annotations.bulk_tag = "Reference batch".into();
+                    if save {
+                        let change = view
+                            .pane
+                            .annotations
+                            .review_mutation(AnnotationReviewState::Accepted)
+                            .unwrap();
+                        self.apply_notes_action(true, NotesAction::Change(change, 0));
+                        self.reference_notes_preview.phase = 30;
+                    } else {
+                        self.reference_notes_preview.phase = 40;
+                    }
+                    return;
+                }
                 view.pane.begin_page_note();
                 let editor = view.pane.annotations.editor.as_mut().unwrap();
                 editor.note = "Reference study note".into();
@@ -233,6 +261,71 @@ impl YamantakaApp {
                 assert_eq!(self.reader.annotations.filters.count(), 0);
                 assert_eq!(self.reader.page, 0);
                 self.reference_notes_preview.phase = if empty { 26 } else { 25 };
+            }
+            30 if view.pane.annotations.ready() && view.pane.annotations.saved => {
+                let page = view.pane.annotations.page.as_ref().unwrap();
+                assert_eq!(page.total, 82);
+                assert!(page.entries().iter().all(
+                    |entry| entry.data().values.review_state == AnnotationReviewState::Accepted
+                ));
+                view.pane.annotations.selected.0.fill(true);
+                view.pane.annotations.bulk_tag = "Reference batch".into();
+                let change = view.pane.annotations.tag_mutation().unwrap();
+                self.apply_notes_action(true, NotesAction::Change(change, 0));
+                self.reference_notes_preview.phase = 31;
+            }
+            31 if view.pane.annotations.ready() && view.pane.annotations.saved => {
+                let page = view.pane.annotations.page.as_ref().unwrap();
+                assert!(page.entries().iter().all(|entry| {
+                    entry.data().tags.iter().any(|tag| tag == "Reference batch")
+                        && entry.data().tags.iter().any(|tag| tag == "Existing study")
+                }));
+                self.apply_notes_action(true, NotesAction::Read(80));
+                self.reference_notes_preview.phase = 32;
+            }
+            32 if view.pane.annotations.ready() => {
+                let page = view.pane.annotations.page.as_ref().unwrap();
+                assert_eq!(page.offset, 80);
+                assert_eq!(page.entries().len(), 2);
+                assert!(
+                    page.entries()
+                        .iter()
+                        .all(|entry| entry.data().values.review_state
+                            == AnnotationReviewState::Pending
+                            && entry.data().tags == ["Existing study"])
+                );
+                assert_eq!(view.pane.annotations.selected.count(), 0);
+                self.apply_notes_action(true, NotesAction::Read(0));
+                self.reference_notes_preview.phase = 33;
+            }
+            33 if view.pane.annotations.ready() => {
+                let page = view.pane.annotations.page.as_ref().unwrap();
+                assert_eq!(page.total, 82);
+                assert_eq!(page.offset, 0);
+                assert_eq!(page.entries().len(), 80);
+                assert!(
+                    page.entries()
+                        .iter()
+                        .all(|entry| entry.data().values.review_state
+                            == AnnotationReviewState::Accepted
+                            && entry.data().tags.iter().any(|tag| tag == "Reference batch")
+                            && entry.data().tags.iter().any(|tag| tag == "Existing study"))
+                );
+                assert_eq!(view.pane.annotations.selected.count(), 0);
+                assert_eq!(self.reader.annotations.page.as_ref().unwrap().total, 2);
+                assert!(
+                    self.reader
+                        .annotations
+                        .page
+                        .as_ref()
+                        .unwrap()
+                        .entries()
+                        .iter()
+                        .all(|entry| entry.data().values.review_state
+                            == AnnotationReviewState::Pending
+                            && entry.data().tags.is_empty())
+                );
+                self.reference_notes_preview.phase = 41;
             }
             _ => {}
         }

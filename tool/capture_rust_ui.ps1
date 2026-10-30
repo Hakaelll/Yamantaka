@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-note-bulk'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--es') },
+    @{ name='reader-reference-note-bulk-saved'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--reference-note-bulk-save','--light') },
     @{ name='reader-reference-note-filters'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-filters','--light','--es') },
     @{ name='reader-reference-note-filters-empty'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-filters','--reference-note-filters-empty') },
     @{ name='reader-reference-notes'; args=@('--reader','--reference','--reference-book','--reference-notes','--es') },
@@ -399,6 +401,17 @@ foreach ($case in $cases) {
         if ($case.name -eq 'reader-reference-external') {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
+        }
+    }
+    if ($case.name -like 'reader-reference-note-bulk*') {
+        $saved = $case.name -eq 'reader-reference-note-bulk-saved'
+        $phase = if ($saved) { 41 } else { 40 }
+        $selected = if ($saved) { 0 } else { 80 }
+        if ($controls.referenceNotesPhase -ne $phase -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.total -ne 82 -or $controls.referenceAnnotations.offset -ne 0 -or $controls.referenceAnnotations.selected -ne $selected -or $controls.primaryAnnotations.total -ne 2 -or $controls.primaryAnnotations.selected -ne 0) { throw 'Reference bulk mutation or page-scoped selection failed.' }
+        if ($saved) {
+            if (@($controls.referenceAnnotations.entries | Where-Object { $_.review -ne 'accepted' -or 'Reference batch' -notin $_.tags -or 'Existing study' -notin $_.tags }).Count -ne 0) { throw 'Reference review and additive tags were not persisted together.' }
+        } else {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Quitar selección','Aceptar','Resolver')
         }
     }
     if ($case.name -like 'reader-reference-note-filters*') {

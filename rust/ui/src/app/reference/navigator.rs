@@ -104,7 +104,7 @@ impl ReferenceView {
                         page: self.pane.page,
                         page_count: info.pages.len(),
                         busy: notes_blocked,
-                        selectable: false,
+                        selectable: true,
                         reveal_actions: self.notes_scroll_preview,
                         governor,
                         marks_error: self.pane.annotation_paint.error().map(str::to_owned),
@@ -119,8 +119,13 @@ impl ReferenceView {
                         ui.add_space(16.0);
                         let filter_action = self.pane.annotations.show_filters(ui, english, p);
                         ui.add_space(12.0);
+                        let bulk_action =
+                            self.pane
+                                .annotations
+                                .show_bulk(ui, english, notes_blocked, p);
                         let list_action = self.pane.annotations.show_list(ui, &context, p);
-                        self.notes_action = action.or(filter_action).or(list_action);
+                        self.notes_action =
+                            action.or(filter_action).or(bulk_action).or(list_action);
                     });
                 }
                 ReaderPanelTab::Positions => {

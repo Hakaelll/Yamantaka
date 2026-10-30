@@ -72,49 +72,61 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn annotation_bulk_panel(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let Some(page) = self.reader.annotations.page.clone() else {
-            return;
+        let blocked = self.global_notes.writing()
+            || self.library_tags.writing()
+            || self
+                .reference
+                .as_ref()
+                .is_some_and(|view| view.pane.annotations.writing());
+        if let Some(action) = self
+            .reader
+            .annotations
+            .show_bulk(ui, self.english, blocked, p)
+        {
+            self.apply_notes_action(false, action);
+        }
+    }
+}
+impl AnnotationState {
+    pub(in crate::app) fn show_bulk(
+        &mut self,
+        ui: &mut egui::Ui,
+        english: bool,
+        blocked: bool,
+        p: Palette,
+    ) -> Option<NotesAction> {
+        let tr = |es, en| if english { en } else { es };
+        let mut action = None;
+        let Some(page) = self.page.clone() else {
+            return None;
         };
         if page.entries().is_empty() {
-            return;
+            return None;
         }
-        let enabled =
-            self.reader.annotations.pending.is_none() && !self.reader.annotations.editing();
+        let enabled = !blocked && self.pending.is_none() && !self.editing();
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal_wrapped(|ui| {
-                if theme::navigation(ui, self.tr("Seleccionar página", "Select page"), false, p)
+                if theme::navigation(ui, tr("Seleccionar página", "Select page"), false, p)
                     .clicked()
                 {
-                    self.reader.annotations.selected = Default::default();
-                    for selected in self
-                        .reader
-                        .annotations
-                        .selected
-                        .0
-                        .iter_mut()
-                        .take(page.entries().len())
-                    {
+                    self.selected = Default::default();
+                    for selected in self.selected.0.iter_mut().take(page.entries().len()) {
                         *selected = true;
                     }
                 }
-                if self.reader.annotations.selected.count() > 0
-                    && theme::navigation(
-                        ui,
-                        self.tr("Quitar selección", "Clear selection"),
-                        false,
-                        p,
-                    )
-                    .clicked()
+                if self.selected.count() > 0
+                    && theme::navigation(ui, tr("Quitar selección", "Clear selection"), false, p)
+                        .clicked()
                 {
-                    self.reader.annotations.selected = Default::default();
+                    self.selected = Default::default();
                 }
             });
-            let count = self.reader.annotations.selected.count();
+            let count = self.selected.count();
             if count == 0 {
                 return;
             }
             ui.label(
-                RichText::new(if self.english {
+                RichText::new(if english {
                     format!("{count} selected on this list page")
                 } else {
                     format!("{count} seleccionadas en esta página de la lista")
@@ -131,28 +143,22 @@ impl YamantakaApp {
                     (AnnotationReviewState::Accepted, "Accept", "Aceptar"),
                     (AnnotationReviewState::Resolved, "Resolve", "Resolver"),
                 ] {
-                    if theme::navigation(ui, if self.english { en } else { es }, false, p).clicked()
-                        && let Some(mutation) = self.reader.annotations.review_mutation(state)
+                    if theme::navigation(ui, if english { en } else { es }, false, p).clicked()
+                        && let Some(mutation) = self.review_mutation(state)
                     {
-                        self.annotation_command(Some(mutation), page.offset);
+                        action = Some(NotesAction::Change(mutation, page.offset));
                     }
                 }
             });
             ui.add_space(8.0);
-            let label = ui.label(self.tr("Añadir una etiqueta", "Add one tag"));
+            let label = ui.label(tr("Añadir una etiqueta", "Add one tag"));
             ui.add(
-                egui::TextEdit::singleline(&mut self.reader.annotations.bulk_tag)
+                egui::TextEdit::singleline(&mut self.bulk_tag)
                     .desired_width(f32::INFINITY)
                     .char_limit(4096),
             )
             .labelled_by(label.id);
-            let units = self
-                .reader
-                .annotations
-                .bulk_tag
-                .trim()
-                .graphemes(true)
-                .count();
+            let units = self.bulk_tag.trim().graphemes(true).count();
             ui.label(
                 RichText::new(format!("{units} / 80"))
                     .size(12.0)
@@ -160,13 +166,13 @@ impl YamantakaApp {
             );
             if ui
                 .add_enabled_ui(
-                    !self.reader.annotations.bulk_tag.trim().is_empty()
-                        && self.reader.annotations.bulk_tag.trim().len() <= 4096
+                    !self.bulk_tag.trim().is_empty()
+                        && self.bulk_tag.trim().len() <= 4096
                         && units <= 80,
                     |ui| {
                         theme::navigation(
                             ui,
-                            self.tr("Añadir a las seleccionadas", "Add to selected"),
+                            tr("Añadir a las seleccionadas", "Add to selected"),
                             false,
                             p,
                         )
@@ -174,11 +180,12 @@ impl YamantakaApp {
                 )
                 .inner
                 .clicked()
-                && let Some(mutation) = self.reader.annotations.tag_mutation()
+                && let Some(mutation) = self.tag_mutation()
             {
-                self.annotation_command(Some(mutation), page.offset);
+                action = Some(NotesAction::Change(mutation, page.offset));
             }
         });
+        action
     }
 }
 
