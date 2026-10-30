@@ -195,8 +195,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                         .join("../../build/rust-fixtures/outline.pdf")
                 });
+            let reference_text =
+                (index == 1 && args.iter().any(|arg| arg == "--reference-text-empty")).then(|| {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../build/rust-fixtures/scanned.pdf")
+                });
             let document_path = reference_protected
                 .as_ref()
+                .or(reference_text.as_ref())
                 .or(reference_outline.as_ref())
                 .or(reference_links.as_ref())
                 .or(cover_fixture.as_ref())
@@ -1205,6 +1211,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             args.iter().any(|arg| arg == "--reference-swap"),
                             args.iter().any(|arg| arg == "--reference-find"),
                         );
+                        if args.iter().any(|arg| arg == "--reference-text") {
+                            app.preview_reference_text();
+                        }
                         if args.iter().any(|arg| arg == "--reference-links") {
                             app.preview_reference_links();
                         }

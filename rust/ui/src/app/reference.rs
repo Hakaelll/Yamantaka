@@ -12,6 +12,7 @@ mod password;
 mod preview;
 mod saved;
 mod sync;
+mod text_preview;
 mod toolbar;
 use admission::Admission;
 
@@ -32,6 +33,7 @@ pub(super) struct ReferenceView {
     pub(in crate::app) outline_preview: bool,
     pub(in crate::app) thumbnails_preview: bool,
     pub(in crate::app) bookmarks_preview: bool,
+    pub(in crate::app) text_preview: bool,
     pending_primary_page: Option<u32>,
     pending_primary_zoom: bool,
     pub(in crate::app) differences: std::collections::BTreeSet<u32>,
@@ -98,6 +100,7 @@ impl ReferenceView {
             outline_preview: false,
             thumbnails_preview: false,
             bookmarks_preview: false,
+            text_preview: false,
             pending_primary_page: None,
             pending_primary_zoom: false,
             differences: Default::default(),

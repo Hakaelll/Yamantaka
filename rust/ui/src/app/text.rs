@@ -1,5 +1,6 @@
 use super::*;
 use yamantaka_domain::pdf_text::PdfPageText;
+mod view;
 
 #[derive(Default)]
 pub(super) struct TextState {
@@ -14,7 +15,7 @@ impl TextState {
         self.pending.is_none() && (self.page.is_some() || self.error.is_some())
     }
     pub(super) fn capture_summary(&self) -> serde_json::Value {
-        serde_json::json!({"ready": self.page.is_some(), "failed": self.error.is_some(), "page": self.page.as_ref().map(|page| page.page()), "characters": self.page.as_ref().map_or(0, |page| page.characters().len())})
+        serde_json::json!({"document": self.identity.as_ref().map(|(id,_)| id), "ready": self.page.is_some(), "failed": self.error.is_some(), "page": self.page.as_ref().map(|page| page.page()), "characters": self.page.as_ref().map_or(0, |page| page.characters().len())})
     }
     pub(super) fn begin(&mut self, document: &str, page: u32) -> Option<Cancellation> {
         if self
@@ -30,6 +31,27 @@ impl TextState {
         self.pending = Some(cancel.clone());
         Some(cancel)
     }
+    pub(super) fn owns(&self, document: &str, page: u32, cancel: &Cancellation) -> bool {
+        !cancel.is_cancelled()
+            && self
+                .identity
+                .as_ref()
+                .is_some_and(|(id, current)| id == document && *current == page)
+            && self
+                .pending
+                .as_ref()
+                .is_some_and(|current| current.same_request(cancel))
+    }
+
+    pub(super) fn request(&mut self, runtime: &Runtime, document: &str, page: u32) {
+        if let Some(cancel) = self.begin(document, page)
+            && let Err(error) =
+                runtime.submit(Action::TextGeometry(document.into(), page, cancel.clone()))
+        {
+            self.accept(document, page, &cancel, Err(error.to_string()));
+        }
+    }
+
     pub(super) fn payload(&self) -> Option<&Arc<PdfPageText>> {
         self.page.as_ref()
     }
@@ -54,16 +76,7 @@ impl TextState {
         cancel: &Cancellation,
         result: std::result::Result<Arc<PdfPageText>, String>,
     ) {
-        if cancel.is_cancelled()
-            || !self
-                .identity
-                .as_ref()
-                .is_some_and(|(id, current)| id == document && *current == page)
-            || !self
-                .pending
-                .as_ref()
-                .is_some_and(|current| current.same_request(cancel))
-        {
+        if !self.owns(document, page, cancel) {
             return;
         }
         self.pending = None;
@@ -86,17 +99,9 @@ impl YamantakaApp {
             self.request_selection_pages(document, &[self.reader.page]);
             return;
         }
-        if let Some(cancel) = self.reader.text.begin(document, self.reader.page)
-            && let Err(error) = self.runtime.submit(Action::TextGeometry(
-                document.into(),
-                self.reader.page,
-                cancel.clone(),
-            ))
-        {
-            self.reader
-                .text
-                .accept(document, self.reader.page, &cancel, Err(error.to_string()));
-        }
+        self.reader
+            .text
+            .request(&self.runtime, document, self.reader.page);
     }
     pub(super) fn text_panel_content(&mut self, ui: &mut egui::Ui, p: Palette) {
         let state = if self.reader.selection.enabled {
@@ -107,63 +112,13 @@ impl YamantakaApp {
         } else {
             &self.reader.text
         };
-        let compact = ui.ctx().content_rect().width() < 620.0;
-        if compact {
-            ui.horizontal_wrapped(|ui| {
-                ui.label(
-                    RichText::new(self.tr("Texto de la página", "Page text"))
-                        .size(20.0)
-                        .color(p.ink),
-                );
-                if let Some(page) = &state.page
-                    && !page.text().trim().is_empty()
-                    && theme::navigation(ui, self.tr("Copiar texto", "Copy text"), false, p)
-                        .clicked()
-                {
-                    ui.ctx().copy_text(page.text().into());
-                }
-            });
-        } else {
-            ui.heading(self.tr("Texto de la página", "Page text"));
-        }
-        if state.pending.is_some() {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(
-                    RichText::new(self.tr("Extrayendo texto…", "Extracting text…"))
-                        .color(p.secondary),
-                );
-            });
-            return;
-        }
-        if let Some(error) = &state.error {
-            ui.label(RichText::new(error).color(p.secondary));
-            if theme::navigation(ui, self.tr("Reintentar", "Retry"), false, p).clicked() {
-                if self.reader.selection.enabled {
-                    self.reader.selection.retry_page(self.reader.page);
-                } else {
-                    self.reader.text.clear();
-                }
+        let retry = state.show(ui, self.english, p);
+        if retry {
+            if self.reader.selection.enabled {
+                self.reader.selection.retry_page(self.reader.page);
+            } else {
+                self.reader.text.clear();
             }
-            return;
         }
-        let Some(page) = &state.page else { return };
-        if page.text().trim().is_empty() {
-            ui.label(
-                RichText::new(self.tr(
-                    "Esta página no contiene texto extraíble.",
-                    "This page contains no extractable text.",
-                ))
-                .color(p.secondary),
-            );
-            return;
-        }
-        if !compact
-            && theme::navigation(ui, self.tr("Copiar texto", "Copy text"), false, p).clicked()
-        {
-            ui.ctx().copy_text(page.text().into());
-        }
-        ui.add_space(8.0);
-        ui.add(egui::Label::new(RichText::new(page.text()).color(p.ink)).wrap());
     }
 }

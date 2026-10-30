@@ -22,7 +22,7 @@ Enable **In both directions** to keep the selected page or zoom link active when
 
 **Follow position** also follows the point within the main PDF page. This setting always runs from the main reading toward the reference. Its canvas may limit the point that can be displayed near page edges. Manual reference page navigation turns position following off.
 
-Open **Navigate reference PDF** in the reference header to choose a section. In narrow windows, use the section selector at the top of the popup.
+Open **Navigate reference PDF** in the reference header to choose a section. Use the section selector at the top of the popup.
 
 ## Browse reference contents
 
@@ -43,6 +43,12 @@ Open **Navigate reference PDF → Bookmarks**, then select **Bookmark page N**. 
 Bookmarks belong to their PDF. Distinct documents keep separate lists. When both panes show the same PDF, changes appear in both lists while each pane keeps its own navigation and editor. Selecting a bookmark follows the comparison's page synchronization options.
 
 Closing the navigator cancels an outstanding list query. An accepted save, rename or removal continues if you close the reference. A failed write remains visible in the owning editor, or in the main application if that editor has closed. Changing bookmarks also refreshes library results, including the Bookmarked view.
+
+## Read and copy page text
+
+Open **Navigate reference PDF → Text** to read the current reference page's extracted text. Change the reference page through its page field or another navigation tool; the text follows that page. **Copy text** copies the page's available text to the clipboard.
+
+Image-only pages display a message when no text can be extracted. Extraction errors offer **Retry**. Closing the navigator or switching sections cancels its pending request and releases the reference text. The main reading keeps its own text and selection state.
 
 ## Search the reference
 
@@ -72,4 +78,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, zoom, chapter contents, page thumbnails, bookmarks, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, zoom, chapter contents, page thumbnails, bookmarks, page text and copying, text search and PDF links. Its other reader tools, per-pane keyboard shortcut routing and overlays remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

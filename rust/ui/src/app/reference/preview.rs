@@ -237,6 +237,9 @@ impl YamantakaApp {
         if !self.demo {
             return;
         }
+        if self.advance_reference_text_demo() {
+            return;
+        }
         if self.advance_reference_bookmarks_demo() {
             return;
         }
@@ -342,6 +345,11 @@ impl YamantakaApp {
                     self.reference.as_mut().unwrap().pane.links.preview =
                         links::LinkPreview::Activate;
                     self.reference_demo = 12;
+                } else if self.reference_text_demo {
+                    let reference = self.reference.as_mut().unwrap();
+                    reference.text_preview = true;
+                    reference.set_page(0);
+                    self.reference_demo = 36;
                 } else if self.reference_bookmarks_demo {
                     let reference = self.reference.as_mut().unwrap();
                     reference.bookmarks_preview = true;

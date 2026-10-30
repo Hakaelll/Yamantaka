@@ -23,10 +23,13 @@ impl ReferenceView {
                 | ReaderPanelTab::Thumbnails
                 | ReaderPanelTab::Find
                 | ReaderPanelTab::Bookmarks
+                | ReaderPanelTab::Text
         ) {
             self.pane.reader_panel_tab = ReaderPanelTab::Outline;
         }
-        if self.bookmarks_preview {
+        if self.text_preview {
+            self.pane.reader_panel_tab = ReaderPanelTab::Text;
+        } else if self.bookmarks_preview {
             self.pane.reader_panel_tab = ReaderPanelTab::Bookmarks;
         } else if self.thumbnails_preview {
             self.pane.reader_panel_tab = ReaderPanelTab::Thumbnails;
@@ -41,6 +44,7 @@ impl ReferenceView {
             || self.outline_preview
             || self.thumbnails_preview
             || self.bookmarks_preview
+            || self.text_preview
         {
             popup = popup.open(true);
         }
@@ -52,34 +56,23 @@ impl ReferenceView {
                 (ReaderPanelTab::Thumbnails, tr("Páginas", "Pages")),
                 (ReaderPanelTab::Find, tr("Buscar", "Find")),
                 (ReaderPanelTab::Bookmarks, tr("Marcadores", "Bookmarks")),
+                (ReaderPanelTab::Text, tr("Texto", "Text")),
             ];
-            if ui.available_width() < 350.0 {
-                let selected = sections
-                    .iter()
-                    .find(|(tab, _)| *tab == self.pane.reader_panel_tab)
-                    .unwrap()
-                    .1;
-                let response = egui::ComboBox::from_id_salt("reference-navigator-section")
-                    .selected_text(selected)
-                    .width(ui.available_width())
-                    .show_ui(ui, |ui| {
-                        for (tab, label) in sections {
-                            ui.selectable_value(&mut self.pane.reader_panel_tab, tab, label);
-                        }
-                    })
-                    .response;
-                theme::record_control_bounds(ui, selected, response.rect);
-            } else {
-                ui.horizontal_wrapped(|ui| {
+            let selected = sections
+                .iter()
+                .find(|(tab, _)| *tab == self.pane.reader_panel_tab)
+                .unwrap()
+                .1;
+            let response = egui::ComboBox::from_id_salt("reference-navigator-section")
+                .selected_text(selected)
+                .width(ui.available_width())
+                .show_ui(ui, |ui| {
                     for (tab, label) in sections {
-                        if theme::navigation(ui, label, self.pane.reader_panel_tab == tab, p)
-                            .clicked()
-                        {
-                            self.pane.reader_panel_tab = tab;
-                        }
+                        ui.selectable_value(&mut self.pane.reader_panel_tab, tab, label);
                     }
-                });
-            }
+                })
+                .response;
+            theme::record_control_bounds(ui, selected, response.rect);
             ui.add_space(8.0);
             if previous != self.pane.reader_panel_tab {
                 self.stop_navigator_requests();
@@ -94,6 +87,26 @@ impl ReferenceView {
                         .show(ui, |ui| {
                             self.reference_search_contents(ui, runtime, english, p)
                         });
+                }
+                ReaderPanelTab::Text => {
+                    let Some((document, _)) = &self.pane.active else {
+                        return;
+                    };
+                    self.pane
+                        .text
+                        .request(runtime, &document.id, self.pane.page);
+                    let height = (ui.ctx().content_rect().height() - 160.0).max(80.0);
+                    let mut retry = false;
+                    egui::ScrollArea::vertical()
+                        .id_salt("reference-text")
+                        .max_height(height)
+                        .min_scrolled_height(height.min(360.0))
+                        .show(ui, |ui| {
+                            retry = self.pane.text.show(ui, english, p);
+                        });
+                    if retry {
+                        self.pane.text.clear();
+                    }
                 }
                 ReaderPanelTab::Bookmarks => {
                     let Some((document, info)) = &self.pane.active else {
@@ -171,6 +184,7 @@ impl ReferenceView {
         self.pane.find.stop();
         self.pane.outline.cancel();
         self.pane.thumbnails.clear();
+        self.pane.text.clear();
         self.pane.bookmarks.cancel_query();
         self.search_visible = false;
     }

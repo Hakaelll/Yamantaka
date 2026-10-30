@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-text'; args=@('--reader','--reference','--reference-book','--reference-text','--text-panel','--es') },
+    @{ name='reader-reference-text-small-200'; args=@('--reader','--reference','--reference-book','--reference-text','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
+    @{ name='reader-reference-text-empty'; args=@('--reader','--reference','--reference-book','--reference-text','--reference-text-empty','--es','--light') },
     @{ name='reader-reference-bookmarks'; args=@('--reader','--reference','--reference-book','--reference-bookmarks','--es') },
     @{ name='reader-reference-bookmarks-small-200'; args=@('--reader','--reference','--reference-book','--reference-bookmarks','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-bookmarks-shared'; args=@('--reader','--reference','--reference-bookmarks','--es') },
@@ -372,6 +375,18 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -in @('reader-reference-text','reader-reference-text-small-200')) {
+        if ($controls.referenceAdmission.demoStage -ne 39 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.page -ne 1 -or $controls.reference.text.document -ne 'demo-1' -or $controls.reference.text.page -ne 1 -or -not $controls.reference.text.ready -or $controls.reference.text.failed -or $controls.reference.text.characters -lt 1 -or $controls.currentReaderPage -ne 0) { throw 'Reference page text did not recover independently after cancelled requests and navigator closure.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Texto','Copiar texto')
+        if ($case.name -eq 'reader-reference-text') {
+            if ($controls.pageText.document -ne 'demo-0' -or $controls.pageText.page -ne 0 -or -not $controls.pageText.ready) { throw 'Reference text replaced the primary page payload.' }
+            if (@($controls.controls | Where-Object { $_.label -ceq 'Copiar texto' -and $_.enabled }).Count -lt 2) { throw 'Both independent text views must offer their own copy control.' }
+        }
+    }
+    if ($case.name -eq 'reader-reference-text-empty') {
+        if ($controls.referenceAdmission.demoStage -ne 40 -or $controls.reference.text.page -ne 0 -or -not $controls.reference.text.ready -or $controls.reference.text.failed -or $controls.reference.text.characters -ne 0 -or $controls.currentReaderPage -ne 0) { throw 'The scanned reference page did not reach its empty-text state.' }
+        if (@($controls.controls | Where-Object { $_.label -ceq 'Copiar texto' }).Count -ne 0) { throw 'An empty PDF page must not offer copying text.' }
     }
     if ($case.name -in @('reader-reference-bookmarks','reader-reference-bookmarks-small-200')) {
         if ($controls.referenceAdmission.demoStage -ne 28 -or $controls.reference.document -ne 'demo-1' -or $controls.reference.page -ne 1 -or $controls.reference.bookmarks.total -ne 1 -or $controls.reference.bookmarks.entries[0].label -cne 'Compare this passage' -or $controls.documentBookmarks.total -ne 2 -or $controls.currentReaderPage -ne 0) { throw 'Reference bookmark CRUD or independent navigation did not complete.' }
