@@ -57,9 +57,13 @@ impl ReferenceView {
             }
             popup.show(|ui| {
                 self.input_layers.insert(ui.layer_id());
-                let action = self.pane.selection.toolbar(ui, english, true, false, p);
+                let action = self.pane.selection.toolbar(ui, english, true, true, p);
                 if matches!(action, Some(selection::SelectionAction::Copy)) {
                     self.copy_requested = true;
+                    ui.close();
+                }
+                if matches!(action, Some(selection::SelectionAction::Annotate)) {
+                    self.notes_action = Some(annotations::NotesAction::Selection);
                     ui.close();
                 }
                 if !self.pane.selection.enabled {

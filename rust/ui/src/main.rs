@@ -423,6 +423,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if args.iter().any(|arg| arg == "--saved-cover-page") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',1,'','','2026-10-13T00:00:00Z','2026-10-08',1,'manual',1,'contain',0.75);")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--reference-notes") {
+            db.execute_batch("INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) VALUES('source-note-a','demo-0',0,'pageComment','violet','Source note A','[]',0,'synthetic','attached','2026-10-30','2026-10-30','pending'),('source-note-b','demo-0',1,'pageComment','violet','Source note B','[]',0,'synthetic','attached','2026-10-30','2026-10-30','pending');")?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-marks") {
             db.execute_batch(r#"
                 INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state)
@@ -1203,6 +1206,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| arg == "--reference-notes") {
+                        app.preview_reference_notes(
+                            !args.iter().any(|arg| arg == "--reference-book"),
+                            args.iter().any(|arg| arg == "--reference-notes-editor"),
+                        );
+                    }
                     if args.iter().any(|arg| arg == "--reference-marks") {
                         app.preview_reference_marks(
                             !args.iter().any(|arg| arg == "--reference-book"),

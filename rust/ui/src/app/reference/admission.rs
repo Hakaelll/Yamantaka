@@ -60,6 +60,16 @@ impl YamantakaApp {
         let Some(reference) = &mut self.reference else {
             return;
         };
+        if reference.pane.annotations.editing() && !reference.pane.annotations.writing() {
+            self.error = Some(
+                self.tr(
+                    "Guarda o cancela la nota antes de cambiar de referencia.",
+                    "Save or cancel the note before changing the reference.",
+                )
+                .into(),
+            );
+            return;
+        }
         if reference.busy()
             || reference.pane.active.as_ref().is_none_or(|(doc, _)| {
                 self.reader
@@ -253,6 +263,21 @@ impl YamantakaApp {
         let Some(reference) = &mut self.reference else {
             return true;
         };
+        if reference.pane.annotations.editing() && !reference.pane.annotations.writing() {
+            reference.pane.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+            reference.navigator_requested = true;
+            self.error = Some(
+                self.tr(
+                    "Guarda o cancela la nota antes de cerrar la referencia.",
+                    "Save or cancel the note before closing the reference.",
+                )
+                .into(),
+            );
+            return false;
+        }
+        if let Some(write) = reference.pane.annotations.retire_write() {
+            self.retired_annotation_writes.push(write);
+        }
         reference.close_requested = true;
         reference.pane.find.stop();
         reference.pane.links.clear();

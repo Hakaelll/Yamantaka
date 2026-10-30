@@ -7,6 +7,8 @@ impl ReferenceView {
         &mut self,
         ui: &mut egui::Ui,
         runtime: &Runtime,
+        governor: &MemoryGovernor,
+        notes_blocked: bool,
         english: bool,
         p: Palette,
     ) {
@@ -25,10 +27,13 @@ impl ReferenceView {
                 | ReaderPanelTab::Bookmarks
                 | ReaderPanelTab::Text
                 | ReaderPanelTab::Positions
+                | ReaderPanelTab::Annotations
         ) {
             self.pane.reader_panel_tab = ReaderPanelTab::Outline;
         }
-        if self.text_preview {
+        if self.notes_preview {
+            self.pane.reader_panel_tab = ReaderPanelTab::Annotations;
+        } else if self.text_preview {
             self.pane.reader_panel_tab = ReaderPanelTab::Text;
         } else if self.bookmarks_preview {
             self.pane.reader_panel_tab = ReaderPanelTab::Bookmarks;
@@ -49,6 +54,7 @@ impl ReferenceView {
             || self.thumbnails_preview
             || self.bookmarks_preview
             || self.text_preview
+            || self.notes_preview
         {
             popup = popup.open(true);
         }
@@ -62,6 +68,7 @@ impl ReferenceView {
                 (ReaderPanelTab::Find, tr("Buscar", "Find")),
                 (ReaderPanelTab::Bookmarks, tr("Marcadores", "Bookmarks")),
                 (ReaderPanelTab::Text, tr("Texto", "Text")),
+                (ReaderPanelTab::Annotations, tr("Notas", "Notes")),
                 (ReaderPanelTab::Positions, tr("Posiciones", "Positions")),
             ];
             let selected = sections
@@ -85,6 +92,34 @@ impl ReferenceView {
                 self.stop_navigator_requests();
             }
             match self.pane.reader_panel_tab {
+                ReaderPanelTab::Annotations => {
+                    let Some((document, info)) = &self.pane.active else {
+                        return;
+                    };
+                    self.pane
+                        .annotations
+                        .prepare(runtime, governor, &document.id);
+                    let context = annotations::NotesContext {
+                        english,
+                        page: self.pane.page,
+                        page_count: info.pages.len(),
+                        busy: notes_blocked,
+                        selectable: false,
+                        reveal_actions: self.notes_scroll_preview,
+                        governor,
+                        marks_error: self.pane.annotation_paint.error().map(str::to_owned),
+                    };
+                    let height = (ui.ctx().content_rect().height() - 100.0).max(80.0);
+                    let scroll = egui::ScrollArea::vertical()
+                        .id_salt("reference-notes")
+                        .max_height(height)
+                        .min_scrolled_height(height.min(360.0));
+                    scroll.show(ui, |ui| {
+                        let action = self.pane.annotations.show_editor(ui, &context, p);
+                        let list_action = self.pane.annotations.show_list(ui, &context, p);
+                        self.notes_action = action.or(list_action);
+                    });
+                }
                 ReaderPanelTab::Positions => {
                     // Popup placement depends on its height, so do not derive height from its cursor.
                     let height = (ui.ctx().content_rect().height() - 100.0).max(80.0);
@@ -230,6 +265,7 @@ impl ReferenceView {
         self.pane.thumbnails.clear();
         self.pane.text.clear();
         self.pane.bookmarks.cancel_query();
+        self.pane.annotations.cancel_query();
         self.search_visible = false;
     }
 }

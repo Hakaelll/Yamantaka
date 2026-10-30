@@ -204,6 +204,8 @@ pub struct YamantakaApp {
     library_check: library_check::CheckState,
     relocation: relocation::RelocationState,
     annotation_preview: u8,
+    retired_annotation_writes: Vec<(String, Cancellation)>,
+    reference_notes_preview: annotations::NotesPreview,
     reference_marks_preview: annotations::MarksPreview,
     annotation_multi_preview: bool,
     selection_preview: selection::SelectionPreview,
@@ -420,6 +422,8 @@ impl YamantakaApp {
             library_check: Default::default(),
             relocation: Default::default(),
             annotation_preview: 0,
+            retired_annotation_writes: Vec::new(),
+            reference_notes_preview: Default::default(),
             reference_marks_preview: Default::default(),
             annotation_multi_preview: false,
             selection_preview: Default::default(),
@@ -1498,26 +1502,7 @@ impl App for YamantakaApp {
                         self.reader.annotation_paint.accept(reply);
                     }
                 }
-                Update::Annotations(reply) => {
-                    if self.global_notes.matches(&reply) {
-                        self.accept_global_note_reply(reply);
-                        continue;
-                    }
-                    let settled_write = self.reader.annotations.writing_reply(&reply);
-                    let document = reply.document_id.clone();
-                    if let Some(error) = self.reader.annotations.accept(reply) {
-                        self.error = Some(format!(
-                            "{}: {error}",
-                            self.tr(
-                                "No se pudo guardar la nota del documento anterior",
-                                "Could not save the note in the previous document"
-                            )
-                        ));
-                    }
-                    if settled_write {
-                        self.invalidate_annotation_marks(document.as_deref());
-                    }
-                }
+                Update::Annotations(reply) => self.accept_annotation_reply(reply),
                 Update::Library(documents, count, memberships, cancel) => {
                     if self.reference.as_mut().is_some_and(|reference| {
                         reference.chooser.accept(&documents, count, &cancel)
@@ -2236,6 +2221,7 @@ impl App for YamantakaApp {
         self.advance_comparison_selection(&ctx);
         self.apply_annotation_preview();
         self.advance_reference_marks();
+        self.advance_reference_notes();
         self.apply_annotation_filter_preview();
         self.apply_annotation_bulk_preview();
         self.apply_annotation_tag_preview();
@@ -2426,6 +2412,7 @@ impl App for YamantakaApp {
                     && self.reader.reader_destination.is_none()
                     && self.annotation_preview == 0
                     && self.reference_marks_preview.ready()
+                    && self.reference_notes_preview.ready()
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
                     && self.bulk_organization_preview.is_none()
@@ -2578,6 +2565,10 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["referenceNotesPhase"] = serde_json::json!(self.reference_notes_preview.phase());
+                    record["primaryAnnotations"] = self.reader.annotations.summary();
+                    record["referenceAnnotations"] = self.reference.as_ref().map(|view|view.pane.annotations.summary()).unwrap_or_default();
+                    record["retiredAnnotationWrites"] = self.retired_annotation_writes.len().into();
                     record["referenceMarksPhase"] = serde_json::json!(self.reference_marks_preview.phase());
                     record["referenceMarks"] = self.reference.as_ref().map(|reference| reference.pane.annotation_paint.capture_summary()).unwrap_or_default();
                     record["referenceMarksRotation"] = self.reference.as_ref().and_then(|reference| reference.pane.viewport.layout.as_ref().map(|layout|layout.rotation().degrees())).into();

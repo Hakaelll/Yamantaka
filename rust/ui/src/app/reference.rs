@@ -26,6 +26,9 @@ pub(super) struct ReferenceView {
     pub(in crate::app) input_layers: std::collections::HashSet<egui::LayerId>,
     pub(in crate::app) navigator_requested: bool,
     pub(in crate::app) copy_requested: bool,
+    pub(in crate::app) notes_action: Option<annotations::NotesAction>,
+    pub(in crate::app) notes_preview: bool,
+    pub(in crate::app) notes_scroll_preview: bool,
     pub(in crate::app) selection_preview: selection::SelectionPreview,
     pub(in crate::app) selection_keyboard_preview: bool,
     pub(in crate::app) selection_tools_preview: bool,
@@ -99,6 +102,9 @@ impl ReferenceView {
             input_layers: Default::default(),
             navigator_requested: false,
             copy_requested: false,
+            notes_action: None,
+            notes_preview: false,
+            notes_scroll_preview: false,
             selection_preview: Default::default(),
             selection_keyboard_preview: false,
             selection_tools_preview: false,
@@ -140,6 +146,7 @@ impl ReferenceView {
         let mut close = false;
         let can_choose = self.pane.active.as_ref().map(|(doc, _)| &doc.id)
             == primary.active.as_ref().map(|(doc, _)| &doc.id);
+        let notes_blocked = primary.annotations.writing();
         let primary = primary.navigation.as_ref();
         let compact = ui.available_width() < 560.0 || ui.available_height() < 180.0;
         if !can_choose
@@ -181,7 +188,7 @@ impl ReferenceView {
             .as_ref()
             .map_or(1, ReaderNavigation::page_count);
         ui.horizontal_wrapped(|ui| {
-            self.navigator(ui, runtime, english, p);
+            self.navigator(ui, runtime, governor, notes_blocked, english, p);
             let page_label = ui.label(
                 RichText::new(tr("Referencia", "Reference"))
                     .color(p.secondary)
@@ -690,6 +697,13 @@ impl YamantakaApp {
             self.english,
             p,
         );
+        let notes_action = self
+            .reference
+            .as_mut()
+            .and_then(|view| view.notes_action.take());
+        if let Some(action) = notes_action {
+            self.apply_notes_action(true, action);
+        }
         let copy = self
             .reference
             .as_mut()

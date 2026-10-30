@@ -9,12 +9,17 @@ use yamantaka_domain::{
     text_selection::snapshot::TextSelectionSnapshot,
 };
 mod bulk;
+mod editor_view;
+mod pane;
+mod reference_editor_preview;
+pub(super) use reference_editor_preview::NotesPreview;
 pub(super) mod export;
 mod filters;
 pub(super) mod paint;
 pub(super) mod panel;
 mod reference_preview;
 mod tags;
+pub(super) use editor_view::{NotesAction, NotesContext};
 pub(super) use reference_preview::MarksPreview;
 
 pub(super) enum EditorSource {
@@ -76,6 +81,7 @@ pub(super) struct AnnotationState {
     editor: Option<AnnotationEditor>,
     error: Option<String>,
     saved: bool,
+    stale: bool,
     pub(super) revision: u64,
     filters: filters::Filters,
     filter_draft: filters::Filters,
@@ -121,6 +127,7 @@ impl AnnotationState {
         {
             self.pending.take().unwrap().cancel.cancel();
         }
+        self.stale = false;
         self.document = Some(document.into());
         self.selected = Default::default();
         self.bulk_tag.clear();
@@ -132,12 +139,84 @@ impl AnnotationState {
         self.error = None;
         self.saved = false;
     }
-    pub(super) fn writing_reply(&self, reply: &AnnotationReply) -> bool {
+    pub(in crate::app) fn owns(&self, reply: &AnnotationReply) -> bool {
         self.pending.as_ref().is_some_and(|pending| {
-            pending.writing
-                && reply.document_id.as_deref() == Some(&pending.document)
+            reply.document_id.as_deref() == Some(&pending.document)
                 && pending.cancel.same_request(&reply.cancel)
         })
+    }
+    pub(super) fn writing_reply(&self, reply: &AnnotationReply) -> bool {
+        self.owns(reply) && self.writing()
+    }
+    pub(in crate::app) fn cancel_query(&mut self) {
+        if self
+            .pending
+            .as_ref()
+            .is_some_and(|pending| !pending.writing)
+        {
+            self.pending.take().unwrap().cancel.cancel();
+            self.stale = true;
+        }
+    }
+    pub(in crate::app) fn retire_write(&mut self) -> Option<(String, Cancellation)> {
+        self.cancel_query();
+        let pending = self.pending.take()?;
+        Some((pending.document, pending.cancel))
+    }
+    pub(in crate::app) fn refresh(
+        &mut self,
+        document: Option<&str>,
+        origin: Option<&Cancellation>,
+    ) {
+        if document.is_some_and(|document| self.document.as_deref() != Some(document))
+            || origin.is_some_and(|origin| {
+                self.pending
+                    .as_ref()
+                    .is_some_and(|pending| pending.cancel.same_request(origin))
+            })
+        {
+            return;
+        }
+        self.cancel_query();
+        self.stale = true;
+    }
+    pub(in crate::app) fn prepare(
+        &mut self,
+        runtime: &Runtime,
+        governor: &MemoryGovernor,
+        document: &str,
+    ) {
+        self.bind(document);
+        if (self.page.is_none() || self.stale && !self.editing())
+            && self.pending.is_none()
+            && self.error.is_none()
+        {
+            let offset = self.page.as_ref().map_or(0, |page| page.offset);
+            self.command(runtime, governor, None, offset);
+        }
+    }
+    pub(in crate::app) fn command(
+        &mut self,
+        runtime: &Runtime,
+        governor: &MemoryGovernor,
+        change: Option<AnnotationMutation>,
+        offset: usize,
+    ) {
+        let Some(request) = self.request(governor, change, offset) else {
+            return;
+        };
+        let document_id = request.query.document_id.clone();
+        let cancel = request.cancel.clone();
+        if let Err(error) = runtime.submit(Action::Annotation(Box::new(request))) {
+            self.accept(AnnotationReply {
+                document_id,
+                result: Err(error),
+                cancel,
+            });
+        }
+    }
+    pub(in crate::app) fn summary(&self) -> serde_json::Value {
+        serde_json::json!({"document":self.document,"pending":self.pending.is_some(),"writing":self.writing(),"editing":self.editing(),"saved":self.saved,"stale":self.stale,"total":self.page.as_ref().map(|page|page.total),"entries":self.page.as_ref().map(|page|page.entries().iter().map(|record|serde_json::json!({"id":record.data().id,"page":record.data().values.page_index,"note":record.data().values.note,"kind":record.data().values.kind})).collect::<Vec<_>>())})
     }
     pub(super) fn accept(&mut self, reply: AnnotationReply) -> Option<String> {
         let pending = self.pending.as_ref()?;
@@ -183,6 +262,11 @@ impl AnnotationState {
         let cancel = Cancellation::default();
         let writing = mutation.is_some();
         if !writing {
+            self.stale = self.stale
+                && self
+                    .editor
+                    .as_ref()
+                    .is_some_and(|editor| editor.stored().is_some());
             self.bulk_tag.clear();
             self.selected = Default::default();
         }
@@ -329,33 +413,7 @@ impl YamantakaApp {
         if self.global_notes.writing() || self.library_tags.writing() {
             return;
         }
-        let Some((document, info)) = &self.reader.active else {
-            return;
-        };
-        if self.reader.page as usize >= info.pages.len() {
-            return;
-        }
-        self.reader.annotations.bind(&document.id);
-        self.reader.annotations.editor = Some(AnnotationEditor {
-            source: EditorSource::PageNote {
-                page: self.reader.page,
-                fingerprint: document.fingerprint.clone(),
-                rotation: self
-                    .reader
-                    .reader_preferences
-                    .as_ref()
-                    .map_or(PageRotation::Deg0, |prefs| prefs.page_rotation),
-            },
-            kind: AnnotationKind::PageComment,
-            color: AnnotationColor::Violet,
-            note: String::new(),
-            tags: String::new(),
-            review: AnnotationReviewState::Pending,
-            confirmed: false,
-        });
-        self.reader.annotations.error = None;
-        self.reader.panel = true;
-        self.reader.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+        self.reader.begin_page_note();
     }
     pub fn preview_annotation_list(&mut self) {
         if self.demo && self.capture.is_some() {
@@ -430,58 +488,27 @@ impl YamantakaApp {
         }
     }
     fn annotation_command(&mut self, mutation: Option<AnnotationMutation>, offset: usize) {
-        if mutation.is_some() && (self.global_notes.writing() || self.library_tags.writing()) {
+        if mutation.is_some()
+            && (self.global_notes.writing()
+                || self.library_tags.writing()
+                || self
+                    .reference
+                    .as_ref()
+                    .is_some_and(|reference| reference.pane.annotations.writing()))
+        {
             return;
         }
-        let Some(request) = self
-            .reader
+        self.reader
             .annotations
-            .request(&self.governor, mutation, offset)
-        else {
-            return;
-        };
-        let document_id = request.query.document_id.clone();
-        let cancel = request.cancel.clone();
-        if let Err(error) = self.runtime.submit(Action::Annotation(Box::new(request))) {
-            self.reader.annotations.accept(AnnotationReply {
-                document_id,
-                result: Err(error),
-                cancel,
-            });
-        }
+            .command(&self.runtime, &self.governor, mutation, offset);
     }
     pub(super) fn annotate_selection(&mut self) {
         if self.global_notes.writing() || self.library_tags.writing() {
             return;
         }
-        let Some((document, _)) = &self.reader.active else {
-            return;
-        };
-        match self.reader.selection.annotation_source(&self.governor) {
-            Ok(snapshot) => {
-                self.reader.annotations.bind(&document.id);
-                self.reader.annotations.editor = Some(AnnotationEditor {
-                    source: EditorSource::Selection {
-                        snapshot,
-                        fingerprint: document.fingerprint.clone(),
-                        rotation: self
-                            .reader
-                            .reader_preferences
-                            .as_ref()
-                            .map_or(PageRotation::Deg0, |prefs| prefs.page_rotation),
-                    },
-                    kind: AnnotationKind::Highlight,
-                    color: AnnotationColor::Violet,
-                    note: String::new(),
-                    tags: String::new(),
-                    review: AnnotationReviewState::Pending,
-                    confirmed: false,
-                });
-                self.reader.annotations.error = None;
-                self.reader.panel = true;
-                self.reader.reader_panel_tab = outline::ReaderPanelTab::Annotations;
-            }
-            Err(error) => self.error = Some(error.to_string()),
+        self.reader.annotate_selection(&self.governor);
+        if let Some(error) = &self.reader.annotations.error {
+            self.error = Some(error.clone());
         }
     }
 }

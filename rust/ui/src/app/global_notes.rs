@@ -221,6 +221,10 @@ impl YamantakaApp {
             self.reader.annotations.invalidate_records();
         }
         if writing {
+            self.reader.annotations.refresh(None, None);
+            if let Some(view) = &mut self.reference {
+                view.pane.annotations.refresh(None, None);
+            }
             self.invalidate_annotation_marks(None);
         }
         if let Some(error) = failure {
@@ -242,7 +246,10 @@ impl YamantakaApp {
             && (self.library_selection.removing()
                 || self.library_tags.writing()
                 || self.reader.annotations.editing()
-                || self.reader.annotations.writing())
+                || self.reader.annotations.writing()
+                || self.reference.as_ref().is_some_and(|view| {
+                    view.pane.annotations.editing() || view.pane.annotations.writing()
+                }))
         {
             return;
         }
@@ -437,11 +444,20 @@ impl YamantakaApp {
         self.send(Action::GetDocument(id, cancel));
     }
     fn global_notes_actions(&mut self, ui: &mut egui::Ui, p: Palette, offset: usize) {
+        let editing = self.reader.annotations.editing()
+            || self
+                .reference
+                .as_ref()
+                .is_some_and(|view| view.pane.annotations.editing());
         let enabled = self.global_notes.pending.is_none()
-            && !self.reader.annotations.editing()
+            && !editing
             && !self.reader.annotations.writing()
+            && !self
+                .reference
+                .as_ref()
+                .is_some_and(|view| view.pane.annotations.writing())
             && !self.library_tags.writing();
-        if self.reader.annotations.editing() {
+        if editing {
             ui.label(self.tr(
                 "Termina o cancela tu nota en el lector para editar estas notas.",
                 "Finish or cancel your note in the reader to edit these notes.",

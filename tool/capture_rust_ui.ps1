@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-notes'; args=@('--reader','--reference','--reference-book','--reference-notes','--es') },
+    @{ name='reader-reference-notes-shared-close'; args=@('--reader','--reference','--reference-notes','--es') },
+    @{ name='reader-reference-notes-editor-small-200'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-notes-editor','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-marks'; args=@('--reader','--reference','--reference-book','--reference-marks','--es') },
     @{ name='reader-reference-marks-shared'; args=@('--reader','--reference','--reference-marks','--es') },
     @{ name='reader-reference-marks-small-200'; args=@('--reader','--reference','--reference-marks','--rotation=90','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
@@ -395,6 +398,17 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -eq 'reader-reference-notes') {
+        if ($controls.referenceNotesPhase -ne 12 -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.total -ne 1 -or $controls.referenceAnnotations.entries[0].note -cne 'Final reference note' -or $controls.primaryAnnotations.total -ne 2 -or $controls.retiredAnnotationWrites -ne 0) { throw 'Reference note creation, editing, removal or document ownership failed.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Notas','Editar','Eliminar')
+    }
+    if ($case.name -eq 'reader-reference-notes-shared-close') {
+        if ($controls.referenceNotesPhase -ne 16 -or $controls.reference -or $controls.primaryAnnotations.total -ne 3 -or $controls.retiredAnnotationWrites -ne 0 -or @($controls.primaryAnnotations.entries | Where-Object note -CEQ 'Updated reference note').Count -ne 1 -or $controls.referenceAdmission.nativeCloses -ne 0) { throw 'An accepted reference write was lost or misrouted after shared-pane closure.' }
+    }
+    if ($case.name -eq 'reader-reference-notes-editor-small-200') {
+        if ($controls.referenceNotesPhase -ne 10 -or -not $controls.referenceAnnotations.editing -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.primaryAnnotations.total -ne 2) { throw 'The compact reference editor did not retain its own target.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Notas','Guardar nota','Cancelar')
     }
     if ($case.name -in @('reader-reference-marks','reader-reference-marks-shared','reader-reference-marks-small-200')) {
         $shared = $case.name -ne 'reader-reference-marks'

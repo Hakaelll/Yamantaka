@@ -84,9 +84,23 @@ When both readings show the same PDF, changes saved through the main annotation 
 
 The reference annotation editor is still in development. Create or edit individual notes through the main reading. Library notes provide the existing review, tagging and export tools. Page comments without geometry are not drawn as highlighted regions.
 
+## Add and edit reference notes
+
+Open **Navigate reference PDF → Notes**. Choose **Page note** to write about the current reference page. To mark a passage, select text in the reference and choose **Annotate selection** in its selection popup.
+
+The editor shares the main reading's mark types, colors, note, tags, and saved-note review state. If a passage lacks reliable geometry, confirm the offered page-note fallback before saving. A page note requires text. The editor accepts up to 4,000 UTF-16 units and 12 tags within the displayed tag limit.
+
+Choose **Save note** to store the annotation. **Cancel** discards the draft. The list provides **Edit**, **Remove**, and page navigation, with up to 80 records per batch. A narrow window keeps the editor in a scrollable popup.
+
+Each editor belongs to its document. When both panes show the same PDF, saved changes refresh their lists and visible marks. If a saved note changes while you edit an older copy, your draft stays available and Save is disabled. Cancel and reopen that note to edit the refreshed version.
+
+Save or cancel an unsaved draft before closing or replacing the reference. An accepted write continues after reference closure. A failure appears in the editor, or in the main application if the editor has closed. Original PDFs remain unchanged.
+
+Use the main Notes panel or **Tools → Library notes** for advanced filtering, bulk operations, and export. Those controls are not duplicated in the reference popup.
+
 ## Select and copy a passage
 
-Select the I-beam icon labelled **Select reference text** in the reference header. In small panes, find it inside **Reference options**. This activates text selection. Select that icon again to open **Copy**, **Clear** and **Done**.
+Select the I-beam icon labelled **Select reference text** in the reference header. In small panes, find it inside **Reference options**. This activates text selection. Select that icon again to open **Copy**, **Annotate selection**, **Clear**, and **Done**.
 
 Drag over PDF text to select a passage. With the PDF selection focused, Shift+Left/Right extends it, Ctrl+A selects that page's text, and Ctrl+C copies the passage. Escape clears the passage while retaining selection mode and keyboard focus. Alt+Left/Right still traverses the active reading's history.
 
@@ -122,4 +136,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Direct reference annotation editing, shortcut customization, overlays and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Advanced annotation filters, bulk operations, and export are available through the main or library Notes tools. Reference-specific advanced controls, shortcut customization, overlays, and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

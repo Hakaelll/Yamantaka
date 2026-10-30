@@ -51,13 +51,9 @@ pub(super) fn mark_color(color: AnnotationColor) -> Color32 {
 }
 impl YamantakaApp {
     pub(in crate::app) fn prepare_annotations(&mut self, document: &str) {
-        self.reader.annotations.bind(document);
-        if self.reader.annotations.page.is_none()
-            && self.reader.annotations.pending.is_none()
-            && self.reader.annotations.error.is_none()
-        {
-            self.annotation_command(None, 0);
-        }
+        self.reader
+            .annotations
+            .prepare(&self.runtime, &self.governor, document);
     }
     pub(in crate::app) fn annotation_panel(
         &mut self,
@@ -67,212 +63,24 @@ impl YamantakaApp {
     ) {
         let busy = self.reader.annotations.pending.is_some()
             || self.global_notes.writing()
-            || self.library_tags.writing();
-        let offset = self
-            .reader
-            .annotations
-            .page
-            .as_ref()
-            .map_or(0, |page| page.offset);
-        ui.label(
-            RichText::new(self.tr("Notas de lectura", "Reading notes"))
-                .size(22.0)
-                .color(p.ink),
-        );
-        ui.add_space(6.0);
-        ui.label(
-            RichText::new(self.tr(
-                "Conserva una idea y vuelve a su contexto.",
-                "Keep an idea and return to its context.",
-            ))
-            .color(p.secondary),
-        );
-        ui.add_space(16.0);
-        if busy {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(self.tr("Actualizando notas…", "Updating notes…"));
-            });
-        }
-        if self.reader.annotations.saved {
-            ui.label(
-                RichText::new(self.tr(
-                    "Notas actualizadas en tu biblioteca.",
-                    "Notes updated in your library.",
-                ))
-                .color(p.secondary),
-            );
-        }
-        if let Some(error) = self.reader.annotations.error.clone() {
-            ui.label(self.tr(
-                "No se pudieron actualizar las notas.",
-                "Notes could not be updated.",
-            ));
-            ui.collapsing(self.tr("Detalles", "Details"), |ui| {
-                ui.label(error);
-            });
-            if !busy
-                && theme::navigation(ui, self.tr("Volver a cargar", "Reload"), false, p).clicked()
-            {
-                self.annotation_command(None, offset);
-            }
-        }
-        if let Some(error) = self.reader.annotation_paint.error().map(str::to_owned) {
-            ui.label(self.tr(
-                "No se pudieron cargar las marcas de página.",
-                "Page marks could not be loaded.",
-            ));
-            ui.collapsing(self.tr("Detalles de las marcas", "Mark details"), |ui| {
-                ui.label(error);
-            });
-            if theme::navigation(ui, self.tr("Recargar marcas", "Reload marks"), false, p).clicked()
-            {
-                self.reader.annotation_paint.invalidate_document(None);
-            }
-        }
-        if self.reader.annotations.editor.is_some() {
-            let english = self.english;
-            let fallback = self.reader.annotations.fallback();
-            let editor = self.reader.annotations.editor.as_mut().unwrap();
-            ui.add_enabled_ui(!busy,|ui| {
-                if let EditorSource::Selection {snapshot,..}=&editor.source
-                    && snapshot.pages().len()>1
-                {
-                    ui.label(if english {format!("{} pages. Your note applies to each selected passage.",snapshot.pages().len())} else {format!("{} páginas. Tu nota se aplica a cada pasaje seleccionado.",snapshot.pages().len())});
-                    ui.add_space(8.0);
-                }
-                if let EditorSource::PageNote {page,..}=&editor.source {
-                    ui.label(if english {format!("Page {}. This note does not require selectable text.",u64::from(*page)+1)} else {format!("Página {}. Esta nota no necesita texto seleccionable.",u64::from(*page)+1)});
-                    ui.add_space(8.0);
-                }
-                let passage=editor.passage();
-                if !passage.is_empty() {
-                    egui::Frame::new().fill(p.raised).inner_margin(12).corner_radius(8).show(ui,|ui| {
-                        egui::ScrollArea::vertical().id_salt("annotation-passage").max_height(110.0).show(ui,|ui| {ui.label(RichText::new(passage).color(p.ink));});
-                    });
-                    ui.add_space(14.0);
-                }
-                let kinds=[AnnotationKind::Highlight,AnnotationKind::Underline,AnnotationKind::Strikeout,AnnotationKind::TextNote,AnnotationKind::PageMarker,AnnotationKind::PageComment];
-                let geometry=!matches!(&editor.source,EditorSource::PageNote {..}) && editor.stored().is_none_or(|record|!record.values.rects.is_empty());
-                ui.horizontal_wrapped(|ui| {
-                    let label=ui.label(if english {"Mark"} else {"Marca"});
-                    let response=egui::ComboBox::from_id_salt("annotation-kind").selected_text(kind_label(editor.kind,english)).show_ui(ui,|ui| {
-                        for kind in kinds {
-                            if (geometry || kind==AnnotationKind::PageComment)
-                                && ui.selectable_value(&mut editor.kind,kind,kind_label(kind,english)).changed()
-                            {editor.confirmed=false;}
-                        }
-                    });
-                    response.response.labelled_by(label.id);
-                });
-                ui.add_space(8.0);
-                ui.horizontal_wrapped(|ui| {
-                    for color in [AnnotationColor::Yellow,AnnotationColor::Green,AnnotationColor::Blue,AnnotationColor::Rose,AnnotationColor::Violet] {
-                        let response=theme::navigation(ui,color_label(color,english),editor.color==color,p);
-                        if response.clicked() {editor.color=color;}
-                    }
-                });
-                ui.add_space(14.0);
-                let label=ui.label(if english {"Your note"} else {"Tu nota"});
-                ui.add(egui::TextEdit::multiline(&mut editor.note).desired_rows(4).desired_width(f32::INFINITY).char_limit(4000).hint_text(if english {"What would you like to remember?"} else {"¿Qué te gustaría recordar?"})).labelled_by(label.id);
-                let units=editor.note.encode_utf16().count();
-                ui.label(RichText::new(format!("{units} / 4000")).size(12.0).color(p.secondary));
-                ui.add_space(8.0);
-                let label = ui.label(if english {"Tags, optional"} else {"Etiquetas, opcionales"});
-                ui.add(egui::TextEdit::singleline(&mut editor.tags).desired_width(f32::INFINITY).hint_text(if english {"Study, optics"} else {"Estudio, óptica"})).labelled_by(label.id);
-                let valid_tags = editor.tag_changes().is_ok();
-                ui.label(RichText::new(if valid_tags {
-                    if english {"Separate tags with commas. Up to 12 tags and 160 characters."} else {"Separa con comas. Hasta 12 etiquetas y 160 caracteres."}
-                } else {
-                    if english {"Shorten the tags to 160 characters and keep at most 12."} else {"Reduce las etiquetas a 160 caracteres y deja un máximo de 12."}
-                }).size(12.0).color(if valid_tags {p.secondary} else {p.ink}));
-                if editor.stored().is_some() {
-                    ui.add_space(8.0);
-                    let label=ui.label(if english {"Review"} else {"Revisión"});
-                    egui::ComboBox::from_id_salt("annotation-review").selected_text(match editor.review {AnnotationReviewState::Pending=>if english {"Pending"}else{"Pendiente"},AnnotationReviewState::Accepted=>if english {"Accepted"}else{"Aceptada"},AnnotationReviewState::Resolved=>if english {"Resolved"}else{"Resuelta"}}).show_ui(ui,|ui| {
-                        for (state,en,es) in [(AnnotationReviewState::Pending,"Pending","Pendiente"),(AnnotationReviewState::Accepted,"Accepted","Aceptada"),(AnnotationReviewState::Resolved,"Resolved","Resuelta")] {ui.selectable_value(&mut editor.review,state,if english {en}else{es});}
-                    }).response.labelled_by(label.id);
-                }
-                if fallback {
-                    ui.add_space(12.0);
-                    ui.label(if english {"Some selected passages have incomplete geometry. Keep those as page notes with their text."} else {"Algunos pasajes no tienen geometría completa. Consérvalos como notas de página con su texto."});
-                    ui.checkbox(&mut editor.confirmed,if english {"Save affected passages as page notes"}else{"Guardar los pasajes afectados como notas de página"});
-                }
-            });
-            ui.add_space(12.0);
-            let valid = self
-                .reader
-                .annotations
-                .editor
+            || self.library_tags.writing()
+            || self
+                .reference
                 .as_ref()
-                .is_some_and(|editor| {
-                    editor.note.encode_utf16().count() <= 4000
-                        && editor.tag_changes().is_ok()
-                        && (!fallback || editor.confirmed)
-                        && (!matches!(&editor.source, EditorSource::PageNote { .. })
-                            || !editor.note.trim().is_empty())
-                });
-            ui.horizontal_wrapped(|ui| {
-                if ui
-                    .add_enabled_ui(!busy && valid, |ui| {
-                        theme::control(
-                            ui,
-                            self.tr("Guardar nota", "Save note"),
-                            Some(theme::Icon::Add),
-                            false,
-                            true,
-                            p,
-                        )
-                    })
-                    .inner
-                    .clicked()
-                {
-                    match self.reader.annotations.mutation(&self.governor) {
-                        Ok(change) => self.annotation_command(Some(change), offset),
-                        Err(error) => self.reader.annotations.error = Some(error.to_string()),
-                    }
-                }
-                if !busy && theme::navigation(ui, self.tr("Cancelar", "Cancel"), false, p).clicked()
-                {
-                    self.reader.annotations.editor = None;
-                }
-            });
-        } else {
-            ui.add_enabled_ui(!busy, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    if theme::control(
-                        ui,
-                        self.tr("Nota de página", "Page note"),
-                        Some(theme::Icon::Add),
-                        false,
-                        true,
-                        p,
-                    )
-                    .on_hover_text(format!(
-                        "{} {}",
-                        self.tr("Añadir nota a la página", "Add note to page"),
-                        u64::from(self.reader.page) + 1
-                    ))
-                    .clicked()
-                    {
-                        self.begin_page_note();
-                    }
-                    if theme::navigation(
-                        ui,
-                        self.tr("Anotar selección", "Annotate selection"),
-                        false,
-                        p,
-                    )
-                    .on_hover_text(self.tr(
-                        "Selecciona un pasaje en el PDF para añadir una nota.",
-                        "Select a passage in the PDF to add a note.",
-                    ))
-                    .clicked()
-                    {
-                        self.annotate_selection();
-                    }
-                });
-            });
+                .is_some_and(|reference| reference.pane.annotations.writing());
+        let context = NotesContext {
+            english: self.english,
+            page: self.reader.page,
+            page_count: info.pages.len(),
+            busy,
+            selectable: true,
+            reveal_actions: false,
+            governor: &self.governor,
+            marks_error: self.reader.annotation_paint.error().map(str::to_owned),
+        };
+        let action = self.reader.annotations.show_editor(ui, &context, p);
+        if let Some(action) = action {
+            self.apply_notes_action(false, action);
         }
         if self.reader.annotations.editor.is_none() || self.annotation_export.busy() {
             ui.add_space(16.0);
@@ -281,147 +89,20 @@ impl YamantakaApp {
         ui.add_space(16.0);
         self.annotation_filters_panel(ui, p);
         ui.add_space(12.0);
-        let Some(page) = self.reader.annotations.page.clone() else {
-            return;
-        };
-        if page.total == 0 {
-            ui.label(
-                RichText::new(if self.reader.annotations.filters.count() > 0 {
-                    self.tr(
-                        "No hay notas que coincidan. Prueba otros filtros.",
-                        "No notes match. Try different filters.",
-                    )
-                } else {
-                    self.tr("Tus notas aparecerán aquí.", "Your notes will appear here.")
-                })
-                .color(p.secondary),
-            );
-        }
         self.annotation_bulk_panel(ui, p);
-        for (index, record) in page.entries().iter().enumerate() {
-            let data = record.data();
-            ui.push_id(&data.id, |ui| {
-                ui.separator();
-                ui.add_space(8.0);
-                ui.horizontal_wrapped(|ui| {
-                    let selected = self.reader.annotations.selected.0[index];
-                    let caption = format!(
-                        "{} {}",
-                        self.tr(
-                            if selected {
-                                "Nota seleccionada"
-                            } else {
-                                "Seleccionar nota"
-                            },
-                            if selected {
-                                "Selected note"
-                            } else {
-                                "Select note"
-                            }
-                        ),
-                        page.offset.saturating_add(index).saturating_add(1)
-                    );
-                    if ui
-                        .add_enabled_ui(
-                            self.reader.annotations.pending.is_none()
-                                && !self.reader.annotations.editing(),
-                            |ui| theme::navigation(ui, &caption, selected, p),
-                        )
-                        .inner
-                        .clicked()
-                    {
-                        self.reader.annotations.selected.0[index] = !selected;
-                    }
-                    ui.label(
-                        RichText::new(format!(
-                            "{} · {}",
-                            kind_label(data.values.kind, self.english),
-                            review_label(data.values.review_state, self.english)
-                        ))
-                        .color(p.ink),
-                    );
-                });
-                let passage = data
-                    .values
-                    .selected_text
-                    .as_deref()
-                    .or(data.values.note.as_deref())
-                    .unwrap_or("");
-                ui.add(egui::Label::new(RichText::new(passage).color(p.secondary)).truncate());
-                if !data.tags.is_empty() {
-                    ui.label(
-                        RichText::new(data.tags.join(" · "))
-                            .size(12.0)
-                            .color(p.secondary),
-                    );
-                }
-                ui.horizontal_wrapped(|ui| {
-                    let caption = format!(
-                        "{} {}",
-                        self.tr("Página", "Page"),
-                        u64::from(data.values.page_index) + 1
-                    );
-                    if ui
-                        .add_enabled_ui(
-                            (data.values.page_index as usize) < info.pages.len(),
-                            |ui| theme::navigation(ui, &caption, false, p),
-                        )
-                        .inner
-                        .clicked()
-                    {
-                        self.navigate(data.values.page_index);
-                        if ui.ctx().content_rect().width() < 620.0 {
-                            self.reader.panel = false;
-                        }
-                    }
-                    if !busy && theme::navigation(ui, self.tr("Editar", "Edit"), false, p).clicked()
-                    {
-                        self.reader.annotations.editor = Some(AnnotationEditor {
-                            source: EditorSource::Stored {
-                                page: page.clone(),
-                                index,
-                            },
-                            kind: data.values.kind,
-                            color: data.values.color,
-                            note: data.values.note.clone().unwrap_or_default(),
-                            tags: data.tags.join(", "),
-                            review: data.values.review_state,
-                            confirmed: false,
-                        });
-                    }
-                    if !busy
-                        && theme::navigation(ui, self.tr("Eliminar", "Remove"), false, p).clicked()
-                    {
-                        self.annotation_command(
-                            Some(AnnotationMutation::Remove {
-                                id: data.id.clone(),
-                            }),
-                            offset,
-                        );
-                    }
-                });
-            });
+        let context = NotesContext {
+            english: self.english,
+            page: self.reader.page,
+            page_count: info.pages.len(),
+            busy,
+            selectable: true,
+            reveal_actions: false,
+            governor: &self.governor,
+            marks_error: self.reader.annotation_paint.error().map(str::to_owned),
+        };
+        let action = self.reader.annotations.show_list(ui, &context, p);
+        if let Some(action) = action {
+            self.apply_notes_action(false, action);
         }
-        ui.add_space(12.0);
-        ui.horizontal_wrapped(|ui| {
-            if ui
-                .add_enabled_ui(!busy && page.offset > 0, |ui| {
-                    theme::navigation(ui, self.tr("Anteriores", "Previous"), false, p)
-                })
-                .inner
-                .clicked()
-            {
-                self.annotation_command(None, page.offset.saturating_sub(80));
-            }
-            if ui
-                .add_enabled_ui(!busy && (page.offset as u64 + 80) < page.total, |ui| {
-                    theme::navigation(ui, self.tr("Siguientes", "Next"), false, p)
-                })
-                .inner
-                .clicked()
-            {
-                self.annotation_command(None, page.offset.saturating_add(80));
-            }
-        });
     }
 }
