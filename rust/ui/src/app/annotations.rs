@@ -13,7 +13,9 @@ pub(super) mod export;
 mod filters;
 pub(super) mod paint;
 pub(super) mod panel;
+mod reference_preview;
 mod tags;
+pub(super) use reference_preview::MarksPreview;
 
 pub(super) enum EditorSource {
     PageNote {
@@ -129,6 +131,13 @@ impl AnnotationState {
         self.editor = None;
         self.error = None;
         self.saved = false;
+    }
+    pub(super) fn writing_reply(&self, reply: &AnnotationReply) -> bool {
+        self.pending.as_ref().is_some_and(|pending| {
+            pending.writing
+                && reply.document_id.as_deref() == Some(&pending.document)
+                && pending.cancel.same_request(&reply.cancel)
+        })
     }
     pub(super) fn accept(&mut self, reply: AnnotationReply) -> Option<String> {
         let pending = self.pending.as_ref()?;
@@ -473,6 +482,18 @@ impl YamantakaApp {
                 self.reader.reader_panel_tab = outline::ReaderPanelTab::Annotations;
             }
             Err(error) => self.error = Some(error.to_string()),
+        }
+    }
+}
+
+impl YamantakaApp {
+    pub(in crate::app) fn invalidate_annotation_marks(&mut self, document: Option<&str>) {
+        self.reader.annotation_paint.invalidate_document(document);
+        if let Some(reference) = &mut self.reference {
+            reference
+                .pane
+                .annotation_paint
+                .invalidate_document(document);
         }
     }
 }

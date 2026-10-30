@@ -423,6 +423,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if args.iter().any(|arg| arg == "--saved-cover-page") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',1,'','','2026-10-13T00:00:00Z','2026-10-08',1,'manual',1,'contain',0.75);")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--reference-marks") {
+            db.execute_batch(r#"
+                INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state)
+                VALUES('synthetic-primary-mark','demo-0',0,'highlight','yellow','Main passage','[{"left":0.08,"top":0.112,"right":0.55,"bottom":0.135}]',0,'synthetic','attached','2026-10-30','2026-10-30','pending'),
+                ('synthetic-reference-highlight','demo-1',0,'highlight','green','Reference highlight','[{"left":0.08,"top":0.112,"right":0.55,"bottom":0.135}]',0,'synthetic','attached','2026-10-30','2026-10-30','pending'),
+                ('synthetic-reference-underline','demo-1',0,'underline','green','Reference underline','[{"left":0.08,"top":0.16,"right":0.55,"bottom":0.18}]',0,'synthetic','attached','2026-10-30','2026-10-30','pending'),
+                ('synthetic-reference-strike','demo-1',0,'strikeout','green','Reference strikeout','[{"left":0.08,"top":0.21,"right":0.55,"bottom":0.23}]',0,'synthetic','attached','2026-10-30','2026-10-30','pending');
+            "#)?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--annotation-many") {
             db.execute_batch(r#"WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180)
                 INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state)
@@ -1194,6 +1203,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| arg == "--reference-marks") {
+                        app.preview_reference_marks(
+                            !args.iter().any(|arg| arg == "--reference-book"),
+                        );
+                    }
                     if args.iter().any(|arg| arg == "--reference-selection") {
                         app.preview_reference_selection(
                             args.iter().any(|arg| arg == "--reference-selection-shared"),

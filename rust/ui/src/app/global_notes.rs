@@ -211,14 +211,17 @@ impl Drop for GlobalNotes {
 }
 impl YamantakaApp {
     pub(super) fn accept_global_note_reply(&mut self, reply: AnnotationReply) {
-        let failure = if self.global_notes.writing() && !matches!(self.surface, Surface::Notes) {
+        let writing = self.global_notes.writing();
+        let failure = if writing && !matches!(self.surface, Surface::Notes) {
             reply.result.as_ref().err().map(ToString::to_string)
         } else {
             None
         };
         if self.global_notes.accept(reply) {
             self.reader.annotations.invalidate_records();
-            self.reader.annotation_paint.invalidate();
+        }
+        if writing {
+            self.invalidate_annotation_marks(None);
         }
         if let Some(error) = failure {
             self.error = Some(format!(

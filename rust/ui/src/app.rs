@@ -204,6 +204,7 @@ pub struct YamantakaApp {
     library_check: library_check::CheckState,
     relocation: relocation::RelocationState,
     annotation_preview: u8,
+    reference_marks_preview: annotations::MarksPreview,
     annotation_multi_preview: bool,
     selection_preview: selection::SelectionPreview,
     selection_keyboard_preview: bool,
@@ -419,6 +420,7 @@ impl YamantakaApp {
             library_check: Default::default(),
             relocation: Default::default(),
             annotation_preview: 0,
+            reference_marks_preview: Default::default(),
             annotation_multi_preview: false,
             selection_preview: Default::default(),
             selection_keyboard_preview: false,
@@ -1487,13 +1489,22 @@ impl App for YamantakaApp {
                 }
                 Update::FileComparison(reply) => self.file_comparison.accept(*reply),
                 Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
-                Update::AnnotationMarks(reply) => self.reader.annotation_paint.accept(reply),
+                Update::AnnotationMarks(reply) => {
+                    if let Some(reference) = &mut self.reference
+                        && reference.pane.annotation_paint.owns(&reply)
+                    {
+                        reference.pane.annotation_paint.accept(reply);
+                    } else {
+                        self.reader.annotation_paint.accept(reply);
+                    }
+                }
                 Update::Annotations(reply) => {
                     if self.global_notes.matches(&reply) {
                         self.accept_global_note_reply(reply);
                         continue;
                     }
-                    let revision = self.reader.annotations.revision;
+                    let settled_write = self.reader.annotations.writing_reply(&reply);
+                    let document = reply.document_id.clone();
                     if let Some(error) = self.reader.annotations.accept(reply) {
                         self.error = Some(format!(
                             "{}: {error}",
@@ -1503,8 +1514,8 @@ impl App for YamantakaApp {
                             )
                         ));
                     }
-                    if self.reader.annotations.revision != revision {
-                        self.reader.annotation_paint.invalidate();
+                    if settled_write {
+                        self.invalidate_annotation_marks(document.as_deref());
                     }
                 }
                 Update::Library(documents, count, memberships, cancel) => {
@@ -2224,6 +2235,7 @@ impl App for YamantakaApp {
         self.advance_reference_shortcuts(&ctx);
         self.advance_comparison_selection(&ctx);
         self.apply_annotation_preview();
+        self.advance_reference_marks();
         self.apply_annotation_filter_preview();
         self.apply_annotation_bulk_preview();
         self.apply_annotation_tag_preview();
@@ -2413,6 +2425,7 @@ impl App for YamantakaApp {
                             && self.reader.selection.preview_ready())
                     && self.reader.reader_destination.is_none()
                     && self.annotation_preview == 0
+                    && self.reference_marks_preview.ready()
                     && self.annotation_export.ready()
                     && self.file_comparison.ready()
                     && self.bulk_organization_preview.is_none()
@@ -2565,6 +2578,9 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["referenceMarksPhase"] = serde_json::json!(self.reference_marks_preview.phase());
+                    record["referenceMarks"] = self.reference.as_ref().map(|reference| reference.pane.annotation_paint.capture_summary()).unwrap_or_default();
+                    record["referenceMarksRotation"] = self.reference.as_ref().and_then(|reference| reference.pane.viewport.layout.as_ref().map(|layout|layout.rotation().degrees())).into();
                     record["referenceSelectionPhase"] = serde_json::json!(self.comparison_selection_preview.phase());
                     record["referenceSelection"] = self.reference.as_ref().map(|reference| reference.pane.selection.capture_summary()).unwrap_or_default();
                     record["selectionClipboard"] = serde_json::json!(self.selection_copy_preview);

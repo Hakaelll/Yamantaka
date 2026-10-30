@@ -260,6 +260,7 @@ impl YamantakaApp {
         reference.pane.thumbnails.clear();
         reference.pane.text.clear();
         reference.pane.selection.clear();
+        reference.pane.annotation_paint.invalidate();
         reference.pane.bookmarks.cancel_query();
         if matches!(reference.admission, Admission::Password { .. }) {
             reference.admission = Admission::Ready;

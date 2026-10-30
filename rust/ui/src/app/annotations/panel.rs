@@ -40,7 +40,7 @@ pub(in crate::app) fn color_label(color: AnnotationColor, english: bool) -> &'st
         (AnnotationColor::Violet, false) => "Violeta",
     }
 }
-fn mark_color(color: AnnotationColor) -> Color32 {
+pub(super) fn mark_color(color: AnnotationColor) -> Color32 {
     match color {
         AnnotationColor::Yellow => Color32::from_rgb(190, 139, 20),
         AnnotationColor::Green => Color32::from_rgb(35, 141, 87),
@@ -127,7 +127,7 @@ impl YamantakaApp {
             });
             if theme::navigation(ui, self.tr("Recargar marcas", "Reload marks"), false, p).clicked()
             {
-                self.reader.annotation_paint.invalidate();
+                self.reader.annotation_paint.invalidate_document(None);
             }
         }
         if self.reader.annotations.editor.is_some() {
@@ -423,48 +423,5 @@ impl YamantakaApp {
                 self.annotation_command(None, page.offset.saturating_add(80));
             }
         });
-    }
-    pub(in crate::app) fn paint_annotations(
-        &self,
-        ui: &egui::Ui,
-        page: u32,
-        paper: egui::Rect,
-        rotation: PageRotation,
-    ) {
-        let Some(records) = self.reader.annotation_paint.marks(page) else {
-            return;
-        };
-        for mark in records.marks() {
-            let color = mark_color(mark.color());
-            for rect in mark.rects() {
-                let region = reader_viewport::page_region(paper, rotation, rect.region());
-                match mark.kind() {
-                    AnnotationKind::Underline | AnnotationKind::Strikeout => {
-                        let native = rect.region();
-                        let y = if mark.kind() == AnnotationKind::Underline {
-                            native.max()[1]
-                        } else {
-                            (native.min()[1] + native.max()[1]) * 0.5
-                        };
-                        let a = rotation.rotate_point([native.min()[0], y]);
-                        let b = rotation.rotate_point([native.max()[0], y]);
-                        let map = |point: [f64; 2]| {
-                            paper.min
-                                + egui::vec2(
-                                    point[0] as f32 * paper.width(),
-                                    point[1] as f32 * paper.height(),
-                                )
-                        };
-                        ui.painter()
-                            .line_segment([map(a), map(b)], egui::Stroke::new(1.5, color));
-                    }
-                    AnnotationKind::PageComment => {}
-                    _ => {
-                        ui.painter()
-                            .rect_filled(region, 0, color.linear_multiply(0.2));
-                    }
-                }
-            }
-        }
     }
 }

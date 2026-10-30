@@ -115,7 +115,7 @@ impl YamantakaApp {
             });
             let link_pages: Vec<u32> = frame.pages.iter().map(|visible| visible.page).collect();
             self.reader.links.request_visible(&self.runtime, &document.id, &link_pages);
-            self.request_annotation_marks(&document.id, &link_pages);
+            self.reader.annotation_paint.request(&self.runtime, &self.governor, &document.id, &link_pages);
             self.request_selection_pages(&document.id, &link_pages);
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
@@ -154,7 +154,7 @@ impl YamantakaApp {
                     Err(error) => self.error = Some(error.to_string()),
                     _ => {}
                 }
-                self.paint_annotations(ui, visible.page, paper, layout.rotation());
+                self.reader.annotation_paint.paint(ui, visible.page, paper, layout.rotation());
                 if self.reference.as_ref().is_some_and(|reference| reference.differences.contains(&visible.page)) {
                     ui.painter().rect_stroke(paper, 1, egui::Stroke::new(2.0, p.accent), egui::StrokeKind::Inside);
                 }

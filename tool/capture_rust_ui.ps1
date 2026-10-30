@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-marks'; args=@('--reader','--reference','--reference-book','--reference-marks','--es') },
+    @{ name='reader-reference-marks-shared'; args=@('--reader','--reference','--reference-marks','--es') },
+    @{ name='reader-reference-marks-small-200'; args=@('--reader','--reference','--reference-marks','--rotation=90','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-selection'; args=@('--reader','--reference','--reference-book','--reference-selection','--reference-swap','--es') },
     @{ name='reader-reference-selection-shared'; args=@('--reader','--reference','--reference-selection','--reference-selection-shared','--es') },
     @{ name='reader-reference-selection-small-200'; args=@('--reader','--reference','--reference-book','--reference-selection','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
@@ -392,6 +395,14 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -in @('reader-reference-marks','reader-reference-marks-shared','reader-reference-marks-small-200')) {
+        $shared = $case.name -ne 'reader-reference-marks'
+        $expectedCount = if ($shared) { 1 } else { 3 }
+        $expectedDocument = if ($shared) { 'demo-0' } else { 'demo-1' }
+        $expectedColor = if ($shared) { 'Blue' } else { 'Green' }
+        if ($controls.referenceMarksPhase -ne 6 -or $controls.currentReaderPage -ne 0 -or $controls.reference.page -ne 0 -or $controls.annotationPaint.document -cne 'demo-0' -or $controls.annotationPaint.marks -ne 1 -or $controls.annotationPaint.details[0].colors[0] -cne 'Blue' -or $controls.referenceMarks.document -cne $expectedDocument -or $controls.referenceMarks.marks -ne $expectedCount -or $controls.referenceMarks.details[0].colors[0] -cne $expectedColor -or $controls.referenceMarks.residentPages -ne 1 -or $controls.referenceMarks.readyPages -ne 1) { throw 'Visible annotation marks did not retain document ownership, update across shared views or reload after navigation.' }
+        if ($case.name -eq 'reader-reference-marks-small-200' -and $controls.referenceMarksRotation -ne 90) { throw 'The compact reference did not retain its rotated annotation projection.' }
     }
     if ($case.name -in @('reader-reference-selection','reader-reference-selection-shared','reader-reference-selection-small-200')) {
         if ($controls.referenceSelectionPhase -ne 10 -or $controls.readingFocus -cne 'Reference' -or -not $controls.referenceSelection.enabled -or $controls.textSelection.start[0] -ne 0 -or $controls.textSelection.end[1] -ne 1 -or $controls.textSelection.residentPages -gt 2 -or $controls.referenceSelection.residentPages -gt 2) { throw 'Reference selection did not retain isolated source selection and bounded text ownership.' }

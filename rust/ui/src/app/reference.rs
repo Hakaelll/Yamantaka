@@ -131,7 +131,7 @@ impl ReferenceView {
         &mut self,
         ui: &mut egui::Ui,
         runtime: &Runtime,
-        bytes: usize,
+        governor: &MemoryGovernor,
         english: bool,
         p: Palette,
         primary: &reader_pane::ReaderPane,
@@ -172,7 +172,7 @@ impl ReferenceView {
                 close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
                     .clicked();
             });
-            self.viewport(ui, runtime, bytes, english, p);
+            self.viewport(ui, runtime, governor, english, p);
             return close;
         }
         let count = self
@@ -238,7 +238,20 @@ impl ReferenceView {
                 }
             });
         }
-        self.viewport(ui, runtime, bytes, english, p);
+        if let Some(error) = self.pane.annotation_paint.error().map(str::to_owned) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(tr(
+                    "No se pudieron cargar las marcas de página.",
+                    "Page marks could not be loaded.",
+                ))
+                .on_hover_text(error);
+                if theme::navigation(ui, tr("Recargar marcas", "Reload marks"), false, p).clicked()
+                {
+                    self.pane.annotation_paint.invalidate_document(None);
+                }
+            });
+        }
+        self.viewport(ui, runtime, governor, english, p);
         close
     }
 
@@ -308,7 +321,7 @@ impl ReferenceView {
         &mut self,
         ui: &mut egui::Ui,
         runtime: &Runtime,
-        bytes: usize,
+        governor: &MemoryGovernor,
         english: bool,
         p: Palette,
     ) {
@@ -342,6 +355,7 @@ impl ReferenceView {
             return;
         };
         let document = document.clone();
+        let bytes = governor.limits().pages.min(14 * 1024 * 1024) / 2;
         let anchor = navigation.position();
         let size = ui.available_size();
         let viewport = [f64::from(size.x.max(1.0)), f64::from(size.y.max(1.0))];
@@ -390,6 +404,9 @@ impl ReferenceView {
                 self.pane
                     .links
                     .request_visible(runtime, &document.id, &pages);
+                self.pane
+                    .annotation_paint
+                    .request(runtime, governor, &document.id, &pages);
             }
             ui.set_min_size(egui::vec2(
                 frame.content_size[0] as f32,
@@ -443,6 +460,9 @@ impl ReferenceView {
                 {
                     self.error = Some(error.to_string());
                 }
+                self.pane
+                    .annotation_paint
+                    .paint(ui, page.page, paper, layout.rotation());
                 if self.differences.contains(&page.page) {
                     ui.painter().rect_stroke(
                         paper,
@@ -630,7 +650,6 @@ impl YamantakaApp {
                 self.reader_viewport(ui, document, p);
             },
         );
-        let bytes = self.governor.limits().pages.min(14 * 1024 * 1024) / 2;
         let mut close = false;
         let mut selected = None;
         let mut difference = None;
@@ -644,7 +663,14 @@ impl YamantakaApp {
                     .id_salt("reference-pane"),
                 |ui| {
                     ui.set_clip_rect(reference_rect.intersect(ui.clip_rect()));
-                    close = reference.show(ui, &self.runtime, bytes, self.english, p, &self.reader);
+                    close = reference.show(
+                        ui,
+                        &self.runtime,
+                        &self.governor,
+                        self.english,
+                        p,
+                        &self.reader,
+                    );
                     selected = reference.selection.take();
                     difference = reference.difference_target.take();
                 },

@@ -76,6 +76,14 @@ Open **Navigate reference PDF → Text** to read the current reference page's ex
 
 Image-only pages display a message when no text can be extracted. Extraction errors offer **Retry**. Closing the navigator or switching sections cancels its pending request and releases the reference text. The main reading keeps its own text and selection state.
 
+## View saved annotations
+
+Geometry-backed saved annotations appear on the reference PDF, including highlights, underlines and strikeouts. Their positions follow that page's displayed rotation. Each reading retrieves marks for its own visible pages.
+
+When both readings show the same PDF, changes saved through the main annotation tools refresh both views. Changes made through library notes also refresh the open readings. Existing marks remain visible until updated data arrives. **Reload marks** retries a failed reference query. Closing the reference releases its mark requests and cached data.
+
+The reference annotation editor is still in development. Create or edit individual notes through the main reading. Library notes provide the existing review, tagging and export tools. Page comments without geometry are not drawn as highlighted regions.
+
 ## Select and copy a passage
 
 Select the I-beam icon labelled **Select reference text** in the reference header. In small panes, find it inside **Reference options**. This activates text selection. Select that icon again to open **Copy**, **Clear** and **Done**.
@@ -114,4 +122,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Reference annotation tools, shortcut customization, overlays and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Direct reference annotation editing, shortcut customization, overlays and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
