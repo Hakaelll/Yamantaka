@@ -4,6 +4,10 @@ use yamantaka_domain::reader_preferences::PageRotation;
 impl YamantakaApp {
     pub(super) fn advance_graphics_loss_preview(&mut self, ctx: &egui::Context) -> bool {
         let metadata_draft = std::env::args_os().any(|arg| arg == "--graphics-metadata-draft");
+        let selection_drafts = std::env::args_os().any(|arg| arg == "--graphics-selection-drafts");
+        if selection_drafts && self.comparison_selection_preview.phase() != 10 {
+            return false;
+        }
         let stored_edits = std::env::args_os().any(|arg| arg == "--graphics-stored-note-drafts");
         if stored_edits
             && (!self.reference_notes_preview.ready()
@@ -36,6 +40,24 @@ impl YamantakaApp {
         }
         if self.preview_reference || !matches!(self.reference_demo, 0 | 3) {
             return false;
+        }
+        if selection_drafts && !self.device_loss_configured && !self.reader.annotations.editing() {
+            self.reader.annotate_selection(&self.governor);
+            self.reader
+                .annotations
+                .seed_page_note_recovery("Unsaved primary selection note");
+            let view = self.reference.as_mut().unwrap();
+            view.pane.annotate_selection(&self.governor);
+            view.pane
+                .annotations
+                .seed_page_note_recovery("Unsaved reference selection note");
+            assert!(
+                self.reader
+                    .annotations
+                    .selection_note_draft(false)
+                    .is_some()
+            );
+            assert!(view.pane.annotations.selection_note_draft(true).is_some());
         }
         if self.reader.page == 0 {
             self.navigate(1);
@@ -123,12 +145,15 @@ impl YamantakaApp {
         {
             return false;
         }
-        let save_primary = std::env::args_os()
-            .any(|arg| arg == "--graphics-save-page-note" || arg == "--graphics-save-stored-note");
+        let save_primary = std::env::args_os().any(|arg| {
+            arg == "--graphics-save-page-note"
+                || arg == "--graphics-save-stored-note"
+                || arg == "--graphics-save-selection"
+        });
         if save_primary && !self.submit_annotation_recovery_preview() {
             return false;
         }
-        let expected = serde_json::json!({"synthetic":true,"comparison":self.capture_comparison(),"primaryPage":self.reader.page,"primaryZoom":self.reader.zoom,"pageNotes":self.page_note_recovery_summary(),"savedPrimaryNote":save_primary,"metadataDraft":self.metadata_draft_summary(),"storedNotes":self.stored_note_recovery_summary()});
+        let expected = serde_json::json!({"synthetic":true,"comparison":self.capture_comparison(),"primaryPage":self.reader.page,"primaryZoom":self.reader.zoom,"pageNotes":self.page_note_recovery_summary(),"savedPrimaryNote":save_primary,"metadataDraft":self.metadata_draft_summary(),"storedNotes":self.stored_note_recovery_summary(),"selectionNotes":self.selection_note_recovery_summary()});
         let path = self
             .capture
             .as_ref()

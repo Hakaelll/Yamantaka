@@ -129,6 +129,7 @@ pub enum Action {
     AnnotationMarks(Box<AnnotationMarksRequest>),
     Annotation(Box<AnnotationRequest>),
     RecoverAnnotation(Box<crate::annotation_draft_recovery::Request>),
+    RecoverSelection(Box<crate::selection_draft_recovery::Request>),
     Bookmarks(String, usize, Cancellation),
     ChangeBookmark(String, BookmarkChange, usize, Cancellation),
     GetDocument(String, Cancellation),
@@ -245,6 +246,7 @@ pub enum Update {
     AnnotationMarks(AnnotationMarksReply),
     Annotations(AnnotationReply),
     AnnotationRecovered(Box<crate::annotation_draft_recovery::Reply>),
+    SelectionRecovered(Box<crate::selection_draft_recovery::Reply>),
     Bookmarks(String, usize, BookmarkPage, Cancellation),
     BookmarkChanged(String, BookmarkPage, Cancellation),
     BookmarkFailed(String, Failure, Cancellation),
@@ -384,6 +386,7 @@ enum Pending {
     ImportReady(ImportState),
     ImportFolder(Box<FolderImport>, ImportState),
     FindDocument(Box<FindScan>, Permit),
+    SelectionRecovery(Box<crate::selection_draft_recovery::Scan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(String, PdfTicket<Arc<RenderedPage>>, Permit),
     Prefetch(RenderKey, PdfTicket<Arc<RenderedPage>>, Permit),
@@ -435,6 +438,7 @@ impl Pending {
             | Self::PageLinks(id, ..)
             | Self::FindPage(id, ..) => Some(id),
             Self::FindDocument(scan, _) => Some(&scan.request.document_id),
+            Self::SelectionRecovery(scan, _) => Some(&scan.request.draft.document),
             _ => None,
         }
     }
@@ -462,6 +466,9 @@ impl Pending {
             Self::ImportHash(job, _, _, _) => job.register(select),
             Self::ImportFolder(folder, _) => folder.register(select),
             Self::FindDocument(scan, _) => {
+                select.recv(scan.ticket().readiness());
+            }
+            Self::SelectionRecovery(scan, _) => {
                 select.recv(scan.ticket().readiness());
             }
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
@@ -506,6 +513,7 @@ impl Pending {
             Self::ImportHash(job, _, _, _) => job.ready(),
             Self::ImportFolder(folder, state) => state.cancel.is_cancelled() || folder.ready(),
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
+            Self::SelectionRecovery(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
             Self::Render(_, ticket, _) | Self::Prefetch(_, ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
@@ -528,6 +536,7 @@ impl Pending {
             | Self::ImportHashReady(_, _, state) => state.cancel.cancel(),
             Self::ImportHash(job, _, _, _) => job.cancel(),
             Self::FindDocument(scan, _) => scan.request.cancellation.cancel(),
+            Self::SelectionRecovery(scan, _) => scan.request.cancel.cancel(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
@@ -1591,6 +1600,12 @@ impl Runtime {
                                         }
                                     }
                                 }
+                                Action::RecoverSelection(request) => {
+                                    match crate::selection_draft_recovery::Scan::start(*request, &engine) {
+                                        Ok(scan) => pending.push(Pending::SelectionRecovery(Box::new(scan), permit)),
+                                        Err(reply) => emit(&events, &notify, Update::SelectionRecovered(reply), permit),
+                                    }
+                                }
                                 Action::FindDocument(request) => {
                                     let id = request.document_id.clone();
                                     let cancel = request.cancellation.clone();
@@ -1741,6 +1756,15 @@ impl Runtime {
                             continue;
                         }
                         match pending.remove(index) {
+                            Pending::SelectionRecovery(scan, permit) => {
+                                match scan.advance(&engine) {
+                                    crate::selection_draft_recovery::Step::Continue(scan) => {
+                                        pending.insert(index, Pending::SelectionRecovery(scan, permit));
+                                        index += 1;
+                                    }
+                                    crate::selection_draft_recovery::Step::Finished(reply) => emit(&events, &notify, Update::SelectionRecovered(reply), permit),
+                                }
+                            }
                             Pending::FindDocument(scan, permit) => {
                                 let id = scan.request.document_id.clone();
                                 let cancel = scan.request.cancellation.clone();

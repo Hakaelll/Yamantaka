@@ -1488,6 +1488,7 @@ impl App for YamantakaApp {
                 }
                 Update::Annotations(reply) => self.accept_annotation_reply(reply),
                 Update::AnnotationRecovered(reply) => self.accept_stored_note_recovery(*reply),
+                Update::SelectionRecovered(reply) => self.accept_selection_note_recovery(*reply),
                 Update::Library(documents, count, memberships, cancel) => {
                     if self.command_palette.owns(&cancel) {
                         self.command_palette.accept(documents, cancel);
@@ -2500,6 +2501,7 @@ impl App for YamantakaApp {
             if !self.capture_requested {
                 let ready = self.library_loaded
                     && self.stored_note_recovery_ready()
+                    && self.selection_note_recovery_ready()
                     && matches!(self.annotation_edit_conflict.phase,0|5)
                     && self.editor_close_capture_ready()
                     && self.managed_pages.settled()
@@ -2751,6 +2753,7 @@ impl App for YamantakaApp {
                     record["pageNoteRecovery"] = self.page_note_recovery_summary();
                     record["metadataDraftRecovery"] = self.metadata_draft_summary();
                     record["storedNoteRecovery"] = self.stored_note_recovery_summary();
+                    record["selectionNoteRecovery"] = self.selection_note_recovery_summary();
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();

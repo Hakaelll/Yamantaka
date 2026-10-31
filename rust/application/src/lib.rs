@@ -32,6 +32,7 @@ pub mod reading_sessions;
 pub mod relocation;
 pub mod runtime;
 pub mod search_index;
+pub mod selection_draft_recovery;
 mod temporary_document;
 pub mod workspaces;
 

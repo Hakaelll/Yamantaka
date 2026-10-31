@@ -184,6 +184,7 @@ impl Request {
             Self::TextGeometry { purpose, .. } => match purpose {
                 yamantaka_domain::pdf_text::TextGeometryPurpose::Reader => 4,
                 yamantaka_domain::pdf_text::TextGeometryPurpose::FrontMatter => 7,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Recovery => 6,
             },
         }
     }

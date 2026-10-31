@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='continuity-selection-drafts'; args=@('--reader','--reference','--reference-book','--reference-selection','--graphics-fail-runtime','--graphics-selection-drafts','--light','--es') },
+    @{ name='continuity-selection-saved'; args=@('--reader','--reference','--reference-book','--reference-selection','--graphics-fail-runtime','--graphics-selection-drafts','--graphics-save-selection','--es') },
     @{ name='continuity-stored-note-drafts'; args=@('--reader','--reference','--reference-book','--reference-notes','--graphics-fail-runtime','--graphics-stored-note-drafts','--light','--es') },
     @{ name='continuity-stored-note-saved'; args=@('--reader','--reference','--reference-book','--reference-notes','--graphics-fail-runtime','--graphics-stored-note-drafts','--graphics-save-stored-note','--es') },
     @{ name='annotation-edit-conflict'; args=@('--reader','--page-note','--annotation-save','--annotation-conflict','--light','--es') },
@@ -504,6 +506,23 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'continuity-selection-*') {
+        $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
+        $recovery = $controls.selectionNoteRecovery
+        if (-not $controls.graphicsRuntimeFallback -or $recovery.retained -ne 0 -or $recovery.pending -or $recovery.primaryConflict -or $recovery.referenceConflict) { throw 'Selection recovery did not settle in both panes.' }
+        foreach ($pane in @('primary','reference')) {
+            $saved = $expected.selectionNotes.$pane
+            $actual = $recovery.$pane
+            if (-not $saved) { throw 'The fixture did not freeze a selection draft.' }
+            if ($pane -eq 'primary' -and $expected.savedPrimaryNote) {
+                if ($actual) { throw 'Accepted selection save reopened a draft.' }
+            } elseif (($saved | ConvertTo-Json -Depth 10 -Compress) -ne ($actual | ConvertTo-Json -Depth 10 -Compress)) {
+                throw "Selection draft changed in $pane."
+            } elseif ($recovery.($pane+'GeometryPages') -ne ($saved.end[0]-$saved.start[0]+1)) {
+                throw "Selection geometry was not rebuilt in $pane."
+            }
+        }
+    }
     if ($case.name -like 'continuity-stored-note-*') {
         $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
         if (-not $controls.graphicsRuntimeFallback -or $controls.storedNoteRecovery.retained -ne 0 -or $controls.storedNoteRecovery.pending -or $controls.storedNoteRecovery.primaryConflict -or $controls.storedNoteRecovery.referenceConflict) { throw 'Stored-note recovery did not settle in both panes.' }

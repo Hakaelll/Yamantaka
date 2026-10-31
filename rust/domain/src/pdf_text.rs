@@ -7,12 +7,13 @@ pub const MAX_PAGE_TEXT_CHARACTERS: usize = 128_000;
 pub enum TextGeometryPurpose {
     Reader,
     FrontMatter,
+    Recovery,
 }
 
 impl TextGeometryPurpose {
     pub fn character_limit(self) -> usize {
         match self {
-            Self::Reader => MAX_PAGE_TEXT_CHARACTERS,
+            Self::Reader | Self::Recovery => MAX_PAGE_TEXT_CHARACTERS,
             Self::FrontMatter => 16_000,
         }
     }

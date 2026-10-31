@@ -5,6 +5,7 @@ use yamantaka_application::reader_continuity::{
 use yamantaka_domain::{
     Failure, Result, reader_continuity::ReaderContinuity, workspaces::WorkspaceComparison,
 };
+mod selection_notes;
 mod stored_notes;
 
 #[derive(Default)]
@@ -23,6 +24,9 @@ pub(in crate::app) struct ContinuityState {
     metadata_startup: Option<Document>,
     retained_edits: Vec<yamantaka_domain::annotations::stored_note_draft::StoredNoteDraft>,
     stored_restore: Option<stored_notes::PendingRestore>,
+    retained_selections:
+        Vec<yamantaka_domain::annotations::selection_note_draft::SelectionNoteDraft>,
+    selection_restore: Option<selection_notes::PendingRestore>,
     pending: Option<(u64, ReaderContinuity, Cancellation)>,
     due: Option<Instant>,
 }
@@ -32,6 +36,7 @@ impl YamantakaApp {
     }
     pub(in crate::app) fn forget_continuity_documents(&mut self, ids: &[String]) {
         self.forget_stored_note_documents(ids);
+        self.forget_selection_note_documents(ids);
         self.tabs
             .continuity
             .retained_metadata
@@ -101,7 +106,8 @@ impl YamantakaApp {
         )?
         .with_page_notes(drafts)?
         .with_metadata_drafts(metadata)?
-        .with_annotation_edits(self.capture_stored_note_drafts())
+        .with_annotation_edits(self.capture_stored_note_drafts())?
+        .with_selection_notes(self.capture_selection_note_drafts())
     }
     pub(in crate::app) fn retain_metadata_draft(
         &mut self,
@@ -285,6 +291,7 @@ impl YamantakaApp {
         self.tabs.continuity.retained_page_notes = restored.page_notes().to_vec();
         self.tabs.continuity.retained_metadata = restored.metadata_drafts().to_vec();
         self.tabs.continuity.retained_edits = restored.annotation_edits().to_vec();
+        self.tabs.continuity.retained_selections = restored.selection_notes().to_vec();
         let restore = crate::graphics_recovery::runtime_fallback()
             || self
                 .preferences
@@ -333,6 +340,7 @@ impl YamantakaApp {
         }
         self.restore_page_note_drafts();
         self.restore_stored_note_drafts();
+        self.restore_selection_note_drafts();
         self.restore_metadata_drafts();
         self.sync_tab_context();
         if self

@@ -23,11 +23,16 @@ mod history_preview;
 pub(super) mod paint;
 pub(super) mod panel;
 mod reference_preview;
+mod selection_note_recovery;
 mod stored_note_recovery;
 mod tags;
 pub(super) use editor_view::{NotesAction, NotesContext};
 pub(super) use reference_preview::MarksPreview;
 
+pub(super) enum RecoveredDraft {
+    Stored(yamantaka_domain::annotations::stored_note_draft::StoredNoteDraft),
+    Selection(yamantaka_domain::annotations::selection_note_draft::SelectionNoteDraft),
+}
 pub(super) enum EditorSource {
     PageNote {
         page: u32,
@@ -94,7 +99,7 @@ pub(super) struct AnnotationState {
     page: Option<Arc<AnnotationPage>>,
     pending: Option<Pending>,
     editor: Option<AnnotationEditor>,
-    recovered: Option<yamantaka_domain::annotations::stored_note_draft::StoredNoteDraft>,
+    recovered: Option<RecoveredDraft>,
     error: Option<String>,
     saved: bool,
     stale: bool,

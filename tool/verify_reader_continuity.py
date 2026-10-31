@@ -1,6 +1,7 @@
 """Probe ordinary restart using isolated copies of a synthetic comparison capture."""
 
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -52,13 +53,15 @@ def main():
     expected = read(output / f"{args.source_case}.expected-comparison.json")
     comparison = expected["comparison"]
     metadata = expected.get("metadataDraft", {}).get("active")
+    selections = expected.get("selectionNotes", {})
+    has_selections = bool(selections.get("primary") and selections.get("reference"))
     stored = expected.get("storedNotes", {})
     has_stored = bool(stored.get("primary") and stored.get("reference"))
     assert expected["synthetic"] and (metadata or comparison["primary"] != comparison["document"])
     files = ("export-preview.sqlite3", "preferences.json", "export-preview.reader-continuity.json")
     before = {name: digest(source / name) for name in files}
     results = []
-    modes = ("normal", "changed", "disabled") if metadata else (("normal", "missing", "changed", "disabled") if has_stored else ("normal", "missing", "disabled"))
+    modes = ("normal", "changed", "disabled") if metadata else (("normal", "missing", "changed", "disabled") if has_stored or has_selections else ("normal", "missing", "disabled"))
     for mode in modes:
         fixture = captures / f"continuity-{uuid.uuid4()}"
         fixture.mkdir()
@@ -68,7 +71,7 @@ def main():
                 if mode == "missing":
                     changed = copy.execute("UPDATE documents SET is_missing=1 WHERE id=?", (comparison["document"],))
                     assert changed.rowcount == 1
-                if mode == "changed":
+                if mode == "changed" and not has_selections:
                     if metadata:
                         changed = copy.execute("UPDATE documents SET title_override=? WHERE id=?", ("Another catalogue title",metadata["document"]))
                     else:
@@ -76,6 +79,13 @@ def main():
                     assert changed.rowcount == 1
         for name in files[1:]:
             shutil.copyfile(source / name, fixture / name)
+        selection_expected = deepcopy(selections)
+        if has_selections and mode == "changed":
+            selection_expected["primary"]["passage"] += " [changed frozen passage]"
+            snapshot = read(fixture / files[2])
+            primary = next(draft for draft in snapshot["selection_notes"] if not draft["reference"])
+            primary["passage"] = selection_expected["primary"]["passage"]
+            (fixture / files[2]).write_text(json.dumps(snapshot), encoding="utf-8")
         preferences = read(fixture / "preferences.json")
         preferences.setdefault("rust", {})["restoreLastSession"] = mode != "disabled"
         (fixture / "preferences.json").write_text(json.dumps(preferences), encoding="utf-8")
@@ -128,6 +138,23 @@ def main():
                 assert any(control["label"] == "Conservar valores actuales" for control in actual["controls"])
                 assert not any(control["label"] == "Guardar cambios" and control["enabled"] for control in actual["controls"])
         notes = expected.get("pageNotes", {})
+        if has_selections:
+            recovered = actual["selectionNoteRecovery"]
+            assert not recovered["pending"]
+            assert recovered["retained"] == {"normal":0,"missing":1,"changed":0,"disabled":2}[mode]
+            assert recovered["primary"] == (None if mode == "disabled" else selection_expected["primary"])
+            assert recovered["reference"] == (selection_expected["reference"] if mode in ("normal","changed") else None)
+            assert recovered["primaryConflict"] == (mode == "changed")
+            assert not recovered["referenceConflict"]
+            persisted = read(fixture / files[2])["selection_notes"]
+            assert sorted(persisted,key=lambda draft:draft["reference"]) == [selection_expected["primary"],selection_expected["reference"]]
+            if mode == "changed":
+                assert any(control["label"] == "Copiar borrador" for control in actual["controls"])
+            for pane in ("primary","reference"):
+                visible = mode != "disabled" and (pane == "primary" or mode != "missing")
+                matches = visible and not (pane == "primary" and mode == "changed")
+                draft = selection_expected[pane]
+                assert recovered[pane+"GeometryPages"] == (draft["end"][0]-draft["start"][0]+1 if matches else 0)
         if has_stored:
             recovered = actual["storedNoteRecovery"]
             assert not recovered["pending"]

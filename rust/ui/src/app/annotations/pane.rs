@@ -74,7 +74,7 @@ impl YamantakaApp {
     pub(in crate::app) fn apply_notes_action(&mut self, reference: bool, action: NotesAction) {
         if !reference {
             match action {
-                NotesAction::RetryDraft => self.retry_stored_note(false),
+                NotesAction::RetryDraft => self.retry_annotation_draft(false),
                 NotesAction::Export(format) => {
                     self.pick_annotation_export(export::ExportTarget::Primary, format)
                 }
@@ -95,7 +95,7 @@ impl YamantakaApp {
             return;
         }
         if matches!(&action, NotesAction::RetryDraft) {
-            self.retry_stored_note(true);
+            self.retry_annotation_draft(true);
             return;
         }
         if let NotesAction::Export(format) = action {

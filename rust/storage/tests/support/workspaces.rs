@@ -369,6 +369,65 @@ pub fn preserved_split_references(document: &str) {
             .with_annotation_edits(vec![stored_draft.clone(), stored_draft])
             .is_err()
     );
+    let selection_draft = yamantaka_domain::annotations::selection_note_draft::SelectionNoteDraft {
+        document: "original".into(),
+        reference: true,
+        fingerprint: "fixture".into(),
+        rotation: 270,
+        start: [0, 2],
+        end: [1, 8],
+        passage: "Passage 日本語\nsecond page".into(),
+        kind: yamantaka_domain::annotations::AnnotationKind::Underline,
+        color: yamantaka_domain::annotations::AnnotationColor::Blue,
+        note: "Unfinished selection note".into(),
+        tags: "Study, Recovery".into(),
+        confirmed: true,
+    };
+    let selection_context = with_edits
+        .clone()
+        .with_selection_notes(vec![selection_draft.clone()])
+        .unwrap();
+    yamantaka_storage::reader_continuity::save(&continuity_path, &selection_context).unwrap();
+    assert_eq!(
+        yamantaka_storage::reader_continuity::load(&continuity_path)
+            .unwrap()
+            .unwrap(),
+        selection_context
+    );
+    let selection_json: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&continuity_path).unwrap()).unwrap();
+    assert_eq!(selection_json["version"], 6);
+    assert_eq!(
+        selection_json["retainedExtension"],
+        current["retainedExtension"]
+    );
+    assert!(
+        context
+            .clone()
+            .with_selection_notes(vec![selection_draft.clone(), selection_draft.clone()])
+            .is_err()
+    );
+    for (start, end) in [([1, 8], [0, 2]), ([0, 2], [0, 2]), ([0, 128001], [1, 8])] {
+        let mut invalid = selection_draft.clone();
+        invalid.start = start;
+        invalid.end = end;
+        assert!(context.clone().with_selection_notes(vec![invalid]).is_err());
+    }
+    let mut forgotten = selection_context.clone();
+    forgotten.forget_documents(&["original".into()]);
+    assert!(forgotten.selection_notes().is_empty());
+    yamantaka_storage::reader_continuity::save(&continuity_path, &forgotten).unwrap();
+    let cleared: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&continuity_path).unwrap()).unwrap();
+    assert_eq!(cleared["version"], 6);
+    let mut invalid = selection_json;
+    invalid["selection_notes"][0]["end"] = serde_json::json!([0, 1]);
+    let invalid_bytes = serde_json::to_vec(&invalid).unwrap();
+    std::fs::write(&continuity_path, &invalid_bytes).unwrap();
+    assert!(yamantaka_storage::reader_continuity::load(&continuity_path).is_err());
+    assert!(yamantaka_storage::reader_continuity::save(&continuity_path, &context).is_err());
+    assert_eq!(std::fs::read(&continuity_path).unwrap(), invalid_bytes);
+    std::fs::write(&continuity_path, serde_json::to_vec(&edits_json).unwrap()).unwrap();
     let mut removed_edits = with_edits;
     removed_edits.forget_documents(&["original".into()]);
     assert!(removed_edits.annotation_edits().is_empty());
