@@ -1,0 +1,10 @@
+Origin: native screenshot of the Yamantaka Rust executable, not an AI-generated image.
+Captured with tool/capture_rust_ui.ps1; isolated synthetic study collection; PDF source is the repository's generated acceptance fixture. Write scenarios may use an isolated file-backed synthetic store. No personal library was opened.
+Case: rule-execution-failed
+Arguments: --demo --saved-rules --rule-simulation --rule-review --rule-execute --rule-execute-fail --light
+Capture UTC: 10/31/2026 11:21:46
+Executable SHA-256: 4F8EBD3D8A85C29C455B794D34E2B6951FBC934AF073AA71CC97C47B4D237EDF
+Original PNG SHA-256: 619327AB3FAF4079A1DF88A1C446B3C6F2CEC1BB3E97BCDEF2EAA94AB5FA27B8
+Logical viewport: 0, 0, 1440, 960
+Pixels per logical point: 1.25
+See capture-manifest.json for exact source hashes and conditions. These captures do not certify physical monitor DPI, Narrator, full functional parity or whole-rewrite acceptance.

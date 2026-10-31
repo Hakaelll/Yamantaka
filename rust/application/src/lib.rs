@@ -4,6 +4,7 @@ use yamantaka_domain::{Document, LibraryQuery, LibraryRepository, Result};
 pub mod annotation_export;
 pub mod annotations;
 mod automatic_cover;
+pub mod automation_execution;
 pub mod automation_plan;
 pub mod automation_simulation;
 pub mod cache_maintenance;

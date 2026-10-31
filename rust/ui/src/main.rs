@@ -1090,7 +1090,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--rule-simulation") {
                     app.preview_rule_simulation(
-                        if args.iter().any(|arg| arg == "--rule-review-missing") {
+                        if args.iter().any(|arg| arg == "--rule-execute-fail") {
+                            10
+                        } else if args.iter().any(|arg| arg == "--rule-execute-undo") {
+                            if args.iter().any(|arg| arg == "--text-scale=2") {
+                                9
+                            } else {
+                                8
+                            }
+                        } else if args.iter().any(|arg| arg == "--rule-execute") {
+                            7
+                        } else if args.iter().any(|arg| arg == "--rule-review-missing") {
                             6
                         } else if args.iter().any(|arg| arg == "--rule-review") {
                             if args.iter().any(|arg| arg == "--text-scale=2") {

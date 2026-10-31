@@ -28,6 +28,9 @@ pub fn seed(
             serde_json::to_string(&actions)?.replace('\'', "''")
         ))?;
     }
+    if args.iter().any(|arg| arg == "--rule-execute-fail") {
+        db.execute_batch("CREATE TRIGGER reject_rule_fixture BEFORE INSERT ON workspace_tabs WHEN NEW.document_id='demo-1' BEGIN SELECT RAISE(ABORT,'synthetic queue failure'); END;")?;
+    }
     if args.iter().any(|arg| arg == "--rule-simulation-duplicates") {
         db.execute_batch("DELETE FROM documents WHERE id NOT IN ('demo-0','demo-1','demo-2'); UPDATE automation_rules SET trigger_json='{\"kind\":\"exactDuplicate\",\"value\":null}' WHERE id='legacy-rule';")?;
         let mut bytes = std::fs::read(fixture)?;

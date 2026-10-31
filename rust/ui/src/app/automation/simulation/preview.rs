@@ -39,6 +39,53 @@ impl YamantakaApp {
                 assert_eq!(summary["documents"], 10);
                 assert_eq!(summary["actions"], 7);
             }
+            if self.automation.simulation.preview_mode >= 7 {
+                self.execute_reviewed_rule();
+                self.automation.simulation.preview = 5;
+                return;
+            }
+            self.automation.simulation.preview = 10;
+            return;
+        }
+        if matches!(phase, 5 | 6) && !self.automation.execution.busy() && self.library_loaded {
+            let receipt = self
+                .automation
+                .execution
+                .receipt()
+                .expect("Execution reply missing");
+            let mode = self.automation.simulation.preview_mode;
+            use yamantaka_domain::automation::execution::ExecutionStatus;
+            if phase == 5 {
+                if mode == 10 {
+                    assert_eq!(receipt.status, ExecutionStatus::Failed);
+                    assert!(!receipt.reversible);
+                } else {
+                    assert_eq!(receipt.status, ExecutionStatus::Completed);
+                    assert_eq!(receipt.completed, 10);
+                    assert!(
+                        self.documents
+                            .iter()
+                            .all(|document| document.reading_progress == 1.0)
+                    );
+                    if matches!(mode, 8 | 9) {
+                        self.start_rule_execution(
+                            yamantaka_application::automation_execution::ExecutionCommand::Undo(
+                                receipt.revision.clone(),
+                            ),
+                        );
+                        self.automation.simulation.preview = 6;
+                        return;
+                    }
+                }
+            } else {
+                assert_eq!(receipt.status, ExecutionStatus::RolledBack);
+                assert!(!receipt.reversible);
+                assert!(
+                    self.documents
+                        .iter()
+                        .any(|document| document.reading_progress < 1.0)
+                );
+            }
             self.automation.simulation.preview = 10;
             return;
         }

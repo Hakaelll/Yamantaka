@@ -94,6 +94,7 @@ pub(crate) fn verify(
         .unwrap(),
         0
     );
+    crate::automation_execution::verification_test::verify(db, plan.clone(), governor);
     let request = PlanRequest::new(report.clone(), governor.clone());
     request.cancel.cancel();
     assert!(matches!(review(db, request), Err(Failure::Cancelled)));

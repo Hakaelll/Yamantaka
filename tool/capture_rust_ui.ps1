@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='rule-execution-completed'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-execute','--es') },
+    @{ name='rule-execution-undone'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-execute','--rule-execute-undo','--light') },
+    @{ name='rule-execution-undone-small-200'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-execute','--rule-execute-undo','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='rule-execution-failed'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-execute','--rule-execute-fail','--light') },
     @{ name='rule-review-actions'; args=@('--saved-rules','--rule-simulation','--rule-review','--es') },
     @{ name='rule-review-small-200'; args=@('--saved-rules','--rule-simulation','--rule-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='rule-review-missing-workspace'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-review-missing','--light') },
@@ -421,6 +425,14 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -like 'rule-execution-*') {
+        $execution=$controls.ruleExecution
+        if ($controls.ruleSimulation.phase -ne 10 -or $execution.pending -or $execution.loading -or $execution.failed -or $execution.total -ne 1) {throw 'Rule execution or its durable journal did not settle.'}
+        $expected=if ($case.name -like '*undone*') {'RolledBack'} elseif ($case.name -eq 'rule-execution-failed') {'Failed'} else {'Completed'}
+        if ($execution.status -ne $expected -or $execution.reversible -ne ($expected -eq 'Completed')) {throw 'Execution or rollback state is incorrect.'}
+        $labels=if ($case.name -eq 'rule-execution-completed') {@('Revisar deshacer')} else {@()}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
     if ($case.name -like 'rule-review-*') {
         if ($controls.ruleSimulation.phase -ne 10 -or $controls.ruleReview.pending) {throw 'Rule review did not settle.'}

@@ -19,6 +19,9 @@ pub(super) struct SimulationState {
     preview_mode: u8,
 }
 impl SimulationState {
+    pub(super) fn execution_preview_done(&self) -> bool {
+        self.preview == 10 && self.preview_mode >= 7
+    }
     pub(super) fn compact_review_preview(&self) -> bool {
         self.preview == 10 && self.preview_mode == 5
     }

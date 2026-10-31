@@ -91,13 +91,15 @@ impl YamantakaApp {
                     ui.add_space(8.0);
                     ui.label(
                         RichText::new(tr(
-                            "La aplicación de cambios y deshacer siguen en desarrollo.",
-                            "Applying changes and undo are still in development.",
+                            "Simula, revisa las acciones y confirma antes de cambiar tu biblioteca.",
+                            "Simulate, review the actions, and confirm before changing your library.",
                         ))
                         .size(12.0)
                         .color(p.secondary),
                     );
                     ui.add_space(24.0);
+                    self.rule_execution_view(ui,p);
+                    self.rule_journal_view(ui,p);
                     if !self.rule_review_view(ui, p) {
                         self.rule_simulation_view(ui, p);
                     }

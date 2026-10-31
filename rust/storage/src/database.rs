@@ -433,6 +433,27 @@ impl LibraryRepository for Database {
     ) -> Result<String> {
         self.apply_tag(change, access, cancel)
     }
+    fn automation_executor(
+        &self,
+    ) -> Result<yamantaka_domain::automation::execution::ExecutionFactory> {
+        let path = self.file_path().ok_or_else(|| {
+            Failure::Unsupported("Rule execution requires a file-backed library".into())
+        })?;
+        Ok(Box::new(move || {
+            Ok(Box::new(Database::open(&path)?)
+                as Box<
+                    dyn yamantaka_domain::automation::execution::RuleExecutionStore,
+                >)
+        }))
+    }
+    fn automation_journals(
+        &self,
+        offset: usize,
+        governor: &yamantaka_domain::memory::MemoryGovernor,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::automation::execution::JournalPage> {
+        self.rule_journals(offset, governor, cancel)
+    }
     fn automation_reader(
         &self,
     ) -> Result<yamantaka_domain::automation::simulation::RuleScanFactory> {

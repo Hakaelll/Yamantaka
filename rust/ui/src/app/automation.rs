@@ -1,5 +1,6 @@
 use super::*;
 use yamantaka_domain::automation::*;
+mod execution;
 mod preview;
 mod review;
 mod simulation;
@@ -45,6 +46,7 @@ impl RuleEditor {
 }
 #[derive(Default)]
 pub(super) struct AutomationState {
+    execution: execution::ExecutionState,
     review: review::ReviewState,
     simulation: simulation::SimulationState,
     page: Option<Arc<RulePage>>,
@@ -60,6 +62,7 @@ pub(super) struct AutomationState {
 }
 impl AutomationState {
     pub(super) fn leave(&mut self) {
+        self.execution.leave();
         self.review.leave();
         self.simulation.leave();
         if let Some(cancel) = self.pending.take() {
@@ -73,12 +76,16 @@ impl AutomationState {
             || self.writing.is_some()
             || self.simulation.busy()
             || self.review.busy()
+            || self.execution.busy()
     }
     pub(super) fn ready(&self) -> bool {
         !self.busy() && self.simulation.ready() && matches!(self.preview, 0 | 10)
     }
     pub(super) fn simulation_summary(&self) -> serde_json::Value {
         self.simulation.summary()
+    }
+    pub(super) fn execution_summary(&self) -> serde_json::Value {
+        self.execution.summary()
     }
     pub(super) fn review_summary(&self) -> serde_json::Value {
         self.review.summary()
@@ -100,6 +107,7 @@ impl YamantakaApp {
         self.show_surface(Surface::Automation);
         if matches!(self.surface, Surface::Automation) {
             self.load_automation_rules();
+            self.load_rule_journals();
         }
     }
     fn load_automation_rules(&mut self) {
@@ -152,7 +160,11 @@ impl YamantakaApp {
         }
     }
     fn change_automation_rule(&mut self, change: RuleChange) {
-        if self.automation.writing.is_some() || self.automation.simulation.busy() {
+        if self.automation.writing.is_some()
+            || self.automation.simulation.busy()
+            || self.automation.review.busy()
+            || self.automation.execution.busy()
+        {
             return;
         }
         if let Some(cancel) = self.automation.pending.take() {

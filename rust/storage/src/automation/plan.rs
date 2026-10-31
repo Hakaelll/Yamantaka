@@ -32,7 +32,7 @@ pub(super) fn signature(row: &rusqlite::Row<'_>) -> Result<[u8; 32]> {
     }
     Ok(digest.finalize().into())
 }
-fn reserve(governor: &MemoryGovernor, bytes: usize) -> Result<ByteLease> {
+pub(super) fn reserve(governor: &MemoryGovernor, bytes: usize) -> Result<ByteLease> {
     governor
         .try_reserve_one(Cost::new(
             MemoryCategory::Other,
@@ -44,7 +44,7 @@ fn reserve(governor: &MemoryGovernor, bytes: usize) -> Result<ByteLease> {
 fn invalid(message: &str) -> Failure {
     Failure::Invalid(message.into())
 }
-fn record(db: &Connection, table: &str, id: &str) -> Result<[u8; 32]> {
+pub(super) fn record(db: &Connection, table: &str, id: &str) -> Result<[u8; 32]> {
     let mut query = db
         .prepare(&format!("SELECT * FROM {table} WHERE id=?"))
         .map_err(storage)?;

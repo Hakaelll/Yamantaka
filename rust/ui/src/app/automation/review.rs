@@ -11,6 +11,9 @@ pub(super) struct ReviewState {
     close_after: bool,
 }
 impl ReviewState {
+    pub(super) fn plan(&self) -> Option<Arc<RulePlan>> {
+        self.plan.clone()
+    }
     pub(super) fn busy(&self) -> bool {
         self.pending.is_some()
     }
@@ -36,6 +39,7 @@ impl YamantakaApp {
             return;
         }
         self.automation.review.leave();
+        self.automation.execution.collapse_history();
         let request = PlanRequest::new(report, self.governor.clone());
         let cancel = request.cancel.clone();
         match self.runtime.submit(Action::PrepareRule(Box::new(request))) {
@@ -77,6 +81,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn rule_review_view(&mut self, ui: &mut egui::Ui, p: Palette) -> bool {
+        let can_execute = !self.automation.busy();
         let english = self.english;
         let tr = |es, en| if english { en } else { es };
         let state = &mut self.automation.review;
@@ -99,6 +104,7 @@ impl YamantakaApp {
             return false;
         };
         let mut close = false;
+        let mut execute = false;
         egui::Frame::new().fill(p.raised).corner_radius(8).inner_margin(16).show(ui,|ui| {
             ui.set_min_width(ui.available_width());
             ui.label(RichText::new(tr("Revisar acciones","Review actions")).size(24.0).color(p.ink));
@@ -121,7 +127,8 @@ impl YamantakaApp {
                 ui.add_space(6.0);
             }
             ui.add_space(12.0);
-            ui.label(RichText::new(tr("La ejecución confirmada y deshacer siguen en desarrollo. Esta revisión no modifica la biblioteca.","Confirmed execution and undo are still in development. This review does not change the library.")).color(p.secondary));
+            ui.label(RichText::new(tr("Confirma para aplicar este plan. Cada cambio tendrá un recibo persistente para deshacerlo.","Confirm to apply this plan. Each change will have a persistent undo receipt.")).color(p.secondary));
+            execute=ui.add_enabled_ui(can_execute,|ui|theme::navigation(ui,tr("Confirmar ejecución","Confirm execution"),false,p)).inner.clicked();
             let response=theme::navigation(ui,tr("Cerrar revisión","Close review"),false,p);
             if self.automation.simulation.compact_review_preview() {response.scroll_to_me(Some(egui::Align::Center));}
             close=response.clicked();
@@ -130,6 +137,9 @@ impl YamantakaApp {
             state.plan = None;
         }
         ui.add_space(16.0);
+        if execute {
+            self.execute_reviewed_rule();
+        }
         true
     }
 }

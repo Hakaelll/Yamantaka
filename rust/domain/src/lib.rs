@@ -285,6 +285,17 @@ pub trait LibraryRepository {
     fn automation_reader(&self) -> Result<automation::simulation::RuleScanFactory> {
         Err(Failure::Unsupported("Independent rule simulation".into()))
     }
+    fn automation_executor(&self) -> Result<automation::execution::ExecutionFactory> {
+        Err(Failure::Unsupported("Independent rule execution".into()))
+    }
+    fn automation_journals(
+        &self,
+        _offset: usize,
+        _governor: &memory::MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<automation::execution::JournalPage> {
+        Err(Failure::Unsupported("Rule execution history".into()))
+    }
     fn automation_rules(
         &self,
         _query: &automation::RuleQuery,
