@@ -19,6 +19,7 @@ mod file_digest;
 mod folder_import;
 mod import_enrichment;
 mod import_hash;
+pub mod import_password;
 pub mod library_bulk;
 pub mod library_check;
 pub mod library_removal;

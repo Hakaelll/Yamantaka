@@ -177,6 +177,7 @@ pub struct YamantakaApp {
     password: Option<password::PasswordChallenge>,
     password_attempted: bool,
     preview_password_action: Option<&'static str>,
+    import_password_preview: Option<password::ImportPreview>,
     preview_password_target: Option<&'static str>,
     runtime: Runtime,
     preferences: Preferences,
@@ -406,6 +407,7 @@ impl YamantakaApp {
             password: None,
             password_attempted: false,
             preview_password_action: None,
+            import_password_preview: None,
             preview_password_target: None,
             smart_view: preferences
                 .get("librarySmartView")
@@ -2588,7 +2590,8 @@ impl App for YamantakaApp {
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
                     && !self.reader.loading
-                    && !self.importing.busy()
+                    && (!self.importing.busy() || self.import_password_waiting_capture())
+                    && self.import_password_capture_ready()
                     && self.importing.recovery_ready()
                     && self.opening.ready()
                     && self.tabs.ready()
@@ -2752,6 +2755,7 @@ impl App for YamantakaApp {
                     record["closeReview"] = self.editor_close_summary();
                     record["pageNoteRecovery"] = self.page_note_recovery_summary();
                     record["metadataDraftRecovery"] = self.metadata_draft_summary();
+                    record["importPassword"] = self.import_password_summary();
                     record["storedNoteRecovery"] = self.stored_note_recovery_summary();
                     record["selectionNoteRecovery"] = self.selection_note_recovery_summary();
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});

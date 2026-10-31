@@ -350,6 +350,7 @@ pub struct Runtime {
     outstanding: Arc<AtomicUsize>,
     control_outstanding: Arc<AtomicUsize>,
     pub updates: UpdateReceiver,
+    password_prompts: Receiver<crate::import_password::Challenge>,
     handle: Option<JoinHandle<()>>,
 }
 enum RuntimeControl {
@@ -363,6 +364,7 @@ enum RuntimeControl {
     PersistSessions(Vec<ReadingSessionRequest>, usize, Sender<Result<()>>),
 }
 struct ImportState {
+    password_attempted: bool,
     imported: Option<yamantaka_domain::automation::imported::ImportedDocuments>,
     source: Option<Box<HashedFile>>,
     job: Option<String>,
@@ -415,6 +417,12 @@ enum Pending {
     ),
     Close(ReaderCloseRequest, PdfTicket<()>, Permit),
     ImportOpen(PathBuf, String, PdfTicket<PdfInfo>, ImportState),
+    ImportPassword(
+        PathBuf,
+        String,
+        Receiver<yamantaka_domain::PdfPassword>,
+        ImportState,
+    ),
     ImportSource(
         PathBuf,
         String,
@@ -449,6 +457,7 @@ impl Pending {
             | Self::ImportHashReady(_, _, state)
             | Self::ImportHash(_, _, _, state)
             | Self::ImportFolder(_, state)
+            | Self::ImportPassword(_, _, _, state)
             | Self::ImportOpen(_, _, _, state)
             | Self::ImportSource(_, _, _, _, state)
             | Self::ImportScan(_, state)
@@ -467,6 +476,9 @@ impl Pending {
             Self::ImportFolder(folder, _) => folder.register(select),
             Self::FindDocument(scan, _) => {
                 select.recv(scan.ticket().readiness());
+            }
+            Self::ImportPassword(_, _, receive, _) => {
+                select.recv(receive);
             }
             Self::SelectionRecovery(scan, _) => {
                 select.recv(scan.ticket().readiness());
@@ -512,6 +524,11 @@ impl Pending {
             Self::ImportHashReady(_, _, state) => state.cancel.is_cancelled(),
             Self::ImportHash(job, _, _, _) => job.ready(),
             Self::ImportFolder(folder, state) => state.cancel.is_cancelled() || folder.ready(),
+            Self::ImportPassword(_, _, receive, state) => {
+                let mut select = Select::new();
+                select.recv(receive);
+                state.cancel.is_cancelled() || select.try_ready().is_ok()
+            }
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::SelectionRecovery(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
@@ -532,6 +549,7 @@ impl Pending {
     fn cancel(&self) {
         match self {
             Self::ImportReady(state)
+            | Self::ImportPassword(_, _, _, state)
             | Self::ImportFolder(_, state)
             | Self::ImportHashReady(_, _, state) => state.cancel.cancel(),
             Self::ImportHash(job, _, _, _) => job.cancel(),
@@ -695,6 +713,17 @@ fn open_import(
     events: &Sender<Event>,
     notify: &impl Fn(),
 ) {
+    open_import_with_password(engine, (path, id, None), state, pending, events, notify);
+}
+fn open_import_with_password(
+    engine: &impl AsyncPdfEngine,
+    request: (PathBuf, String, Option<yamantaka_domain::PdfPassword>),
+    state: ImportState,
+    pending: &mut Vec<Pending>,
+    events: &Sender<Event>,
+    notify: &impl Fn(),
+) {
+    let (path, id, password) = request;
     if let Err(error) = state.cancel.check() {
         import_failed(events, notify, error, state);
         return;
@@ -702,7 +731,7 @@ fn open_import(
     match engine.try_open(
         id.clone(),
         path.clone(),
-        None,
+        password,
         yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background,
         state.cancel.clone(),
     ) {
@@ -828,6 +857,7 @@ fn start_import(
             engine,
             repository,
             ImportState {
+                password_attempted: false,
                 imported: Some(Default::default()),
                 source: None,
                 job,
@@ -970,6 +1000,8 @@ impl Runtime {
         let (events, updates) = bounded(CAPACITY * 2);
         let (shutdown, stop) = bounded::<RuntimeControl>(1);
         let (wake, wakeups) = bounded::<()>(1);
+        let password_wake = wake.clone();
+        let (password_requests, password_prompts) = bounded(CAPACITY);
         let waiting_covers = Arc::new(AtomicUsize::new(0));
         let waiting_snapshot = waiting_covers.clone();
         let index_progress = Arc::new(Mutex::new(IndexProgress::default()));
@@ -1671,7 +1703,7 @@ impl Runtime {
                                         repository.get(&expected.document)?.filter(|d|!d.missing).ok_or_else(||Failure::Invalid("Metadata source is missing".into()))
                                     });
                                     match source {
-                                        Ok(document)=>advance_import(&engine,&mut repository,ImportState{imported:None,source:None,job:None,folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
+                                        Ok(document)=>advance_import(&engine,&mut repository,ImportState{password_attempted:false,imported:None,source:None,job:None,folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
                                         Err(error)=>emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)})),permit),
                                     }
                                 }
@@ -1925,12 +1957,26 @@ impl Runtime {
                                     Err(error) => import_failed(&events,&notify,error,state),
                                 }
                             }
-                            Pending::ImportOpen(path, id, ticket, state) => match ticket.wait() {
-                                Ok(info) => match engine.try_source_revision(id.clone(), state.cancel.clone()) {
+                            Pending::ImportPassword(path,id,receive,mut state) => {
+                                if let Err(error)=state.cancel.check() { import_failed(&events,&notify,error,state); continue; }
+                                match receive.recv() {
+                                    Ok(password) => { state.password_attempted=true; open_import_with_password(&engine,(path,id,Some(password)),state,&mut pending,&events,&notify); }
+                                    Err(_) => import_failed(&events,&notify,Failure::Cancelled,state),
+                                }
+                            }
+                            Pending::ImportOpen(path, id, ticket, mut state) => match ticket.wait() {
+                                Err(Failure::PasswordRequired) => {
+                                    let (challenge,receive)=crate::import_password::Challenge::channel(path.clone(),state.password_attempted,state.cancel.clone(),password_wake.clone());
+                                    match password_requests.try_send(challenge) {
+                                        Ok(()) => {pending.push(Pending::ImportPassword(path,id,receive,state));notify();}
+                                        Err(_) => import_failed(&events,&notify,Failure::QueueFull,state),
+                                    }
+                                }
+                                Ok(info) => { state.password_attempted=false; match engine.try_source_revision(id.clone(), state.cancel.clone()) {
                                     Ok(ticket) => pending.push(Pending::ImportSource(path,id,info,ticket,state)),
                                     Err(Failure::NativeDocumentUnavailable)=>open_import(&engine,path,id,state,&mut pending,&events,&notify),
                                     Err(error) => close_failed_import(&engine,id,error,state,&mut pending,&events,&notify),
-                                },
+                                }},
                                 Err(Failure::NativeSlotsBusy|Failure::NativeDocumentUnavailable)=>open_import(&engine,path,id,state,&mut pending,&events,&notify),
                                 Err(error) => close_failed_import(&engine,id,error,state,&mut pending,&events,&notify),
                             },
@@ -2153,8 +2199,12 @@ impl Runtime {
             outstanding: Arc::new(AtomicUsize::new(0)),
             control_outstanding: Arc::new(AtomicUsize::new(0)),
             updates: UpdateReceiver(updates),
+            password_prompts,
             handle: Some(handle),
         })
+    }
+    pub fn next_import_password(&self) -> Option<crate::import_password::Challenge> {
+        self.password_prompts.try_recv().ok()
     }
     pub fn flush_changes(&self) -> Result<()> {
         let (completed, reply) = bounded(1);

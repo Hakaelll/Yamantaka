@@ -1641,6 +1641,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if demo && args.iter().any(|arg| arg == "--open-replacement-failure") {
                 app.preview_failed_replacement();
             }
+            if demo && args.iter().any(|arg| arg == "--import-protected") {
+                app.preview_import_password(
+                    if args.iter().any(|arg| arg == "--import-password-unlock") {
+                        "unlock"
+                    } else if args.iter().any(|arg| arg == "--import-password-wrong") {
+                        "wrong"
+                    } else if args.iter().any(|arg| arg == "--import-password-cancel") {
+                        "cancel"
+                    } else {
+                        "prompt"
+                    },
+                );
+            }
             if demo && protected {
                 app.preview_password(if args.iter().any(|arg| arg == "--password-unlock") {
                     "unlock"

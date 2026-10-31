@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='import-password-prompt'; args=@('--import-protected','--es') },
+    @{ name='import-password-wrong'; args=@('--import-protected','--import-password-wrong','--light','--es','--size=640x480','--text-scale=2') },
+    @{ name='import-password-unlocked'; args=@('--import-protected','--import-password-unlock','--es') },
+    @{ name='import-password-cancelled'; args=@('--import-protected','--import-password-cancel','--light','--es') },
     @{ name='continuity-selection-drafts'; args=@('--reader','--reference','--reference-book','--reference-selection','--graphics-fail-runtime','--graphics-selection-drafts','--light','--es') },
     @{ name='continuity-selection-saved'; args=@('--reader','--reference','--reference-book','--reference-selection','--graphics-fail-runtime','--graphics-selection-drafts','--graphics-save-selection','--es') },
     @{ name='continuity-stored-note-drafts'; args=@('--reader','--reference','--reference-book','--reference-notes','--graphics-fail-runtime','--graphics-stored-note-drafts','--light','--es') },
@@ -506,6 +510,24 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'import-password-*') {
+        $state = $controls.importPassword
+        switch ($case.name) {
+            'import-password-prompt' { if (-not $state.waiting -or $state.rejected -or -not $state.busy) { throw 'Import prompt did not wait.' } }
+            'import-password-wrong' { if (-not $state.waiting -or -not $state.rejected -or $state.attempts -ne 1) { throw 'Import password retry was not rejected.' } }
+            'import-password-unlocked' { if ($state.waiting -or $state.busy -or $state.attempts -ne 2 -or $state.imported -ne 1) { throw 'Protected import did not finish exactly once.' } }
+            'import-password-cancelled' { if ($state.waiting -or $state.busy -or $state.imported -ne 0) { throw 'Cancelled protected import persisted a document.' } }
+        }
+        if ($case.name -in @('import-password-prompt','import-password-wrong')) {
+            $cancelControl = @($controls.controls | Where-Object { $_.label -eq 'Cancelar importación' -and $_.enabled })
+            $addControl = @($controls.controls | Where-Object { $_.label -eq 'Añadir PDF' -and $_.enabled })[-1]
+            if ($cancelControl.Count -ne 1 -or -not $addControl) { throw 'Import password actions are missing.' }
+            foreach ($action in @($cancelControl[0],$addControl)) {
+                if ($action.rect[0] -lt $action.clip[0] -or $action.rect[1] -lt $action.clip[1] -or $action.rect[2] -gt $action.clip[2]+1 -or $action.rect[3] -gt $action.clip[3]+1 -or $action.rect[1] -lt 0 -or $action.rect[3] -gt $controls.viewport[3]-12) { throw 'Import password action is clipped.' }
+            }
+        }
+        if ((Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8) -match 'fixture-password|synthetic incorrect credential') { throw 'A credential escaped into capture metadata.' }
+    }
     if ($case.name -like 'continuity-selection-*') {
         $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
         $recovery = $controls.selectionNoteRecovery

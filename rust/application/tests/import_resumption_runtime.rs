@@ -14,6 +14,8 @@ use yamantaka_pdf::{MemoryLimits, PdfWorker};
 use yamantaka_storage::Database;
 #[path = "import_resumption_runtime/engine.rs"]
 mod engine;
+#[path = "import_resumption_runtime/password.rs"]
+mod password;
 use engine::{Engine, open_reader, open_readers, requested, visible, wait};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -31,6 +33,7 @@ enum Outcome {
 
 #[test]
 fn native_reader_preemption_resumes_the_interrupted_page_and_keeps_prior_evidence() {
+    password::verify_protected_import();
     run(Operation::Import, Outcome::Resume);
 }
 #[test]
