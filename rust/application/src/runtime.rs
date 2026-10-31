@@ -55,6 +55,11 @@ pub enum Action {
     BulkSelection(Box<crate::library_bulk::BulkRequest>),
     Tags(yamantaka_domain::tags::TagQuery, Cancellation),
     ChangeTag(Box<yamantaka_domain::tags::TagChange>, Cancellation),
+    Relations(yamantaka_domain::relations::RelationQuery, Cancellation),
+    ChangeRelation(
+        Box<yamantaka_domain::relations::RelationChange>,
+        Cancellation,
+    ),
     Collections(yamantaka_domain::collections::CollectionQuery, Cancellation),
     ChangeCollection(
         Box<yamantaka_domain::collections::CollectionChange>,
@@ -148,6 +153,11 @@ pub enum Update {
     SelectionOrganized(Box<crate::library_bulk::BulkReply>),
     Tags(Result<yamantaka_domain::tags::TagPage>, Cancellation),
     TagChanged(Result<String>, Cancellation),
+    Relations(
+        Result<yamantaka_domain::relations::RelationPage>,
+        Cancellation,
+    ),
+    RelationChanged(Result<String>, Cancellation),
     Collections(
         Result<yamantaka_domain::collections::CollectionPage>,
         Cancellation,
@@ -1015,6 +1025,15 @@ impl Runtime {
                                     let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled} else {yamantaka_domain::search::IndexAccess::Disabled};
                                     let result=repository.change_tag(&change,access,&cancel);
                                     emit(&events,&notify,Update::TagChanged(result,cancel),permit);
+                                }
+                                Action::Relations(query,cancel)=> {
+                                    let result=repository.relations(&query,&cancel);
+                                    emit(&events,&notify,Update::Relations(result,cancel),permit);
+                                }
+                                Action::ChangeRelation(change,cancel)=> {
+                                    let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled} else {yamantaka_domain::search::IndexAccess::Disabled};
+                                    let result=repository.change_relation(&change,access,&cancel);
+                                    emit(&events,&notify,Update::RelationChanged(result,cancel),permit);
                                 }
                                 Action::Collections(query,cancel)=> {
                                     let result=repository.collections(&query,&cancel);

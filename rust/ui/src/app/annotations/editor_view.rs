@@ -250,9 +250,7 @@ impl AnnotationState {
         let tr = |es, en| if context.english { en } else { es };
         let busy = context.busy || self.pending.is_some() || self.editing();
         let mut action = None;
-        let Some(page) = self.page.clone() else {
-            return None;
-        };
+        let page = self.page.clone()?;
         if page.total == 0 {
             ui.label(
                 RichText::new(if self.filters.count() > 0 {

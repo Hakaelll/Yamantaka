@@ -207,6 +207,16 @@ impl YamantakaApp {
                         {
                             self.show_tags(Some(document.clone()));
                         }
+                        if theme::navigation(
+                            ui,
+                            self.tr("Relaciones entre documentos", "Document connections"),
+                            false,
+                            p,
+                        )
+                        .clicked()
+                        {
+                            self.show_relations(document.clone());
+                        }
                         self.reading_goal(ui, &document);
                         ui.add_space(8.0);
                         let path = display_path(&document.path);

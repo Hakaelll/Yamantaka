@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='relations-backlinks'; args=@('--relations') },
+    @{ name='relations-review-es'; args=@('--relations','--relations-review','--es','--light') },
+    @{ name='relations-review-small-200'; args=@('--relations','--relations-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='reader-reference-note-export-json'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--reference-note-bulk-save','--reference-export-json','--es') },
     @{ name='reader-reference-note-export-markdown'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--reference-note-bulk-save','--reference-export-md','--light') },
     @{ name='reader-reference-note-bulk'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--es') },
@@ -403,6 +406,16 @@ foreach ($case in $cases) {
         if ($case.name -eq 'reader-reference-external') {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
+        }
+    }
+    if ($case.name -like 'relations-*') {
+        if ($controls.relations.phase -ne 10 -or $controls.relations.pending -or $controls.relations.writing -or $controls.relations.failed) { throw 'The connected relation workflow did not settle.' }
+        if ($case.name -eq 'relations-backlinks') {
+            if ($controls.relations.document -cne 'demo-1' -or $controls.relations.total -ne 3 -or @($controls.relations.entries | Where-Object { -not $_.backlink -or $_.other -cne 'demo-0' }).Count -ne 0) { throw 'Inverse relation ownership or directional presentation failed.' }
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Back to library','Open document')
+        } else {
+            if ($controls.relations.document -cne 'demo-0' -or $controls.relations.total -ne 5 -or -not $controls.relations.confirmRemove) { throw 'Relation removal review must preserve records before confirmation.' }
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Confirmar eliminación','Cancelar')
         }
     }
     if ($case.name -like 'reader-reference-note-bulk*') {

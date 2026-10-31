@@ -90,9 +90,7 @@ impl BookmarkState {
             });
         }
         ui.add_space(20.0);
-        let Some(page) = self.current().cloned() else {
-            return None;
-        };
+        let page = self.current().cloned()?;
         if page.total == 0 {
             ui.label(
                 RichText::new(tr(

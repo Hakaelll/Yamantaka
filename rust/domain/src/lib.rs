@@ -37,6 +37,7 @@ pub mod reader_preferences;
 pub mod reader_tabs;
 pub mod reading_activity;
 pub mod reading_sessions;
+pub mod relations;
 pub mod relocation;
 pub mod search;
 pub mod source_revision;
@@ -278,6 +279,21 @@ pub trait LibraryRepository {
         _cancel: &Cancellation,
     ) -> Result<String> {
         Err(Failure::Unsupported("Library tag changes".into()))
+    }
+    fn relations(
+        &self,
+        _query: &relations::RelationQuery,
+        _cancel: &Cancellation,
+    ) -> Result<relations::RelationPage> {
+        Err(Failure::Unsupported("Document relations".into()))
+    }
+    fn change_relation(
+        &mut self,
+        _change: &relations::RelationChange,
+        _access: search::IndexAccess,
+        _cancel: &Cancellation,
+    ) -> Result<String> {
+        Err(Failure::Unsupported("Document relation changes".into()))
     }
     fn collections(
         &self,

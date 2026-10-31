@@ -62,15 +62,16 @@ impl YamantakaApp {
         } else {
             match replacement {
                 Ok(image) => {
-                    if let Some(replaced) = self.reader.viewport.install(page, cancel, image) {
-                        if self.capture.is_some() && self.capture_render_events.len() < 128 {
-                            self.capture_render_events.push(serde_json::json!({
-                                "event":"installed","document":page.key.document_id,
-                                "page":page.key.page,"generation":page.key.generation,
-                                "rotation":page.key.rotation,"pixels":[page.width,page.height],
-                                "replacedImage":replaced,
-                            }));
-                        }
+                    if let Some(replaced) = self.reader.viewport.install(page, cancel, image)
+                        && self.capture.is_some()
+                        && self.capture_render_events.len() < 128
+                    {
+                        self.capture_render_events.push(serde_json::json!({
+                            "event":"installed","document":page.key.document_id,
+                            "page":page.key.page,"generation":page.key.generation,
+                            "rotation":page.key.rotation,"pixels":[page.width,page.height],
+                            "replacedImage":replaced,
+                        }));
                     }
                 }
                 Err(error) => {

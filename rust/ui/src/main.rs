@@ -425,6 +425,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if args.iter().any(|arg| arg == "--saved-cover-page") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',1,'','','2026-10-13T00:00:00Z','2026-10-08',1,'manual',1,'contain',0.75);")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--relations") {
+            db.execute_batch("INSERT INTO document_relations(id,source_document_id,target_document_id,relation_type,source_anchor_kind,source_anchor_id,target_anchor_kind,target_anchor_id,created_at) VALUES('legacy-relation','demo-2','demo-0','sourceOf','annotation','legacy-annotation','page','1','2026-10-30T00:00:00Z');")?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-notes") {
             db.execute_batch("INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) VALUES('source-note-a','demo-0',0,'pageComment','violet','Source note A','[]',0,'synthetic','attached','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z','pending'),('source-note-b','demo-0',1,'pageComment','violet','Source note B','[]',0,'synthetic','attached','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z','pending');")?;
         }
@@ -1067,6 +1070,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_file_comparison(
                         args.iter().any(|arg| arg == "--compare-different"),
                     );
+                }
+                if args.iter().any(|arg| arg == "--relations") {
+                    app.preview_relations(args.iter().any(|arg| arg == "--relations-review"));
                 }
                 if args.iter().any(|arg| arg == "--annotation-many") {
                     app.preview_annotation_list();

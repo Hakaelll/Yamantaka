@@ -78,6 +78,30 @@ pub(crate) fn refresh_document_tags(db: &Connection, id: &str, access: IndexAcce
     db.execute(&format!("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT d.id,-1,'tag',{TITLE},'',t.name FROM document_tags dt JOIN tags t ON t.id=dt.tag_id JOIN documents d ON d.id=dt.document_id WHERE d.id=?"),[id]).map_err(storage)?;
     Ok(())
 }
+pub(crate) fn refresh_relations(db: &Connection, id: &str, access: IndexAccess) -> Result<()> {
+    let excluded:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM search_index_state WHERE document_id=? AND status='excluded')",[id],|row|row.get(0)).map_err(storage)?;
+    if excluded {
+        return Ok(());
+    }
+    if access == IndexAccess::Disabled
+        && !db
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM library_search WHERE document_id=?)",
+                [id],
+                |row| row.get::<_, bool>(0),
+            )
+            .map_err(storage)?
+    {
+        return Ok(());
+    }
+    db.execute(
+        "DELETE FROM library_search WHERE document_id=? AND kind='relation'",
+        [id],
+    )
+    .map_err(storage)?;
+    db.execute(&format!("INSERT INTO library_search(document_id,page_index,kind,title,body,tags) SELECT d.id,-1,'relation',{TITLE},r.relation_type || ' ' || COALESCE(other.title_override,other.title,other.source_title,other.file_name),'' FROM document_relations r JOIN documents d ON d.id=r.source_document_id JOIN documents other ON other.id=r.target_document_id WHERE d.id=? AND NOT EXISTS(SELECT 1 FROM search_index_state s WHERE s.document_id=other.id AND s.status='excluded')"),[id]).map_err(storage)?;
+    Ok(())
+}
 pub(crate) fn refresh_metadata(db: &Connection, id: &str) -> Result<()> {
     let excluded: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM search_index_state WHERE document_id=? AND status='excluded')",[id],|row|row.get(0)).map_err(storage)?;
     if !excluded {

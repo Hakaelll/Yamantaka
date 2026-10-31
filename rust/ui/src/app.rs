@@ -5,6 +5,7 @@ pub use backup_restore::RestoreHandover;
 mod bookmarks;
 mod bulk_picker;
 mod cache_maintenance;
+mod catalogue_chooser;
 mod collections;
 mod compact;
 mod cover_picker;
@@ -43,6 +44,7 @@ mod reader_surface;
 mod reader_viewport;
 mod reading_queue;
 mod reference;
+mod relations;
 mod relocation;
 mod render_plan;
 mod render_updates;
@@ -94,6 +96,7 @@ enum Surface {
     Reader,
     Settings,
     Collections,
+    Relations,
     Tags,
 }
 enum PageImage {
@@ -198,6 +201,7 @@ pub struct YamantakaApp {
     backups: backups::BackupState,
     backup_restore: backup_restore::RestoreState,
     collections: collections::CollectionState,
+    relations: relations::RelationState,
     library_tags: tags::TagState,
     smart_view: Option<yamantaka_domain::LibrarySmartView>,
     smart_menu_preview: bool,
@@ -371,6 +375,7 @@ impl YamantakaApp {
             smart_menu_preview: false,
             library_tags: tags::TagState::new(&preferences),
             collections: collections::CollectionState::new(&preferences),
+            relations: Default::default(),
             runtime,
             preferences,
             sessions: Default::default(),
@@ -689,6 +694,9 @@ impl YamantakaApp {
         }
         if matches!(self.surface, Surface::Collections) {
             self.collections.leave();
+        }
+        if matches!(self.surface, Surface::Relations) {
+            self.relations.leave();
         }
         if matches!(self.surface, Surface::Notes) {
             self.global_notes.leave();
@@ -1476,6 +1484,10 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::TagChanged(result, cancel) => self.accept_tag_change(result, cancel),
+                Update::Relations(result, cancel) => self.accept_relations(result, cancel),
+                Update::RelationChanged(result, cancel) => {
+                    self.accept_relation_change(result, cancel)
+                }
                 Update::Collections(result, cancel) => {
                     if self.bulk_target_matches(&cancel) {
                         self.accept_bulk_collections(result);
@@ -1504,6 +1516,9 @@ impl App for YamantakaApp {
                 }
                 Update::Annotations(reply) => self.accept_annotation_reply(reply),
                 Update::Library(documents, count, memberships, cancel) => {
+                    if self.relations.chooser.accept(&documents, count, &cancel) {
+                        continue;
+                    }
                     if self.reference.as_mut().is_some_and(|reference| {
                         reference.chooser.accept(&documents, count, &cancel)
                     }) {
@@ -1810,6 +1825,21 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Failed(error, cancel) => {
+                    if let Some(token) = &cancel {
+                        if self.relations.chooser.fail(token, &error) {
+                            continue;
+                        }
+                        if self
+                            .relations
+                            .context_lookup
+                            .as_ref()
+                            .is_some_and(|(_, pending)| pending.same_request(token))
+                        {
+                            self.relations.context_lookup = None;
+                            self.relations.error = Some(error.to_string());
+                            continue;
+                        }
+                    }
                     if let Some(token) = &cancel
                         && self
                             .reference
@@ -1954,6 +1984,9 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Document(id, document, cancel) => {
+                    if self.accept_relation_context(&id, document.as_ref(), &cancel) {
+                        continue;
+                    }
                     if self.accept_tab_lookup(&id, document.clone(), &cancel) {
                         continue;
                     }
@@ -2217,6 +2250,7 @@ impl App for YamantakaApp {
                 }
             }
         }
+        self.advance_relations_preview();
         self.advance_reference_shortcuts(&ctx);
         self.advance_comparison_selection(&ctx);
         self.apply_annotation_preview();
@@ -2341,6 +2375,7 @@ impl App for YamantakaApp {
                         Surface::Reader => self.reader(ui),
                         Surface::Settings => self.settings(ui),
                         Surface::Collections => self.collections_view(ui),
+                        Surface::Relations => self.relations_view(ui),
                         Surface::Tags => self.tags_view(ui),
                         Surface::Search => self.global_search(ui),
                         Surface::Notes => self.global_notes_panel(ui),
@@ -2420,6 +2455,7 @@ impl App for YamantakaApp {
                     && self.library_selection.ready()
                     && self.library_tags.ready()
                     && self.collections.ready()
+                    && self.relations.ready()
                     && self.cache_maintenance.ready()
                     && self.legacy_import.ready()
                     && self.backups.ready()
@@ -2565,6 +2601,7 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["relations"] = self.relations.summary();
                     record["referenceNotesPhase"] = serde_json::json!(self.reference_notes_preview.phase());
                     record["primaryAnnotations"] = self.reader.annotations.summary();
                     record["referenceAnnotations"] = self.reference.as_ref().map(|view|view.pane.annotations.summary()).unwrap_or_default();

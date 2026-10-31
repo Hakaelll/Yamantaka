@@ -433,6 +433,21 @@ impl LibraryRepository for Database {
     ) -> Result<String> {
         self.apply_tag(change, access, cancel)
     }
+    fn relations(
+        &self,
+        query: &yamantaka_domain::relations::RelationQuery,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::relations::RelationPage> {
+        self.relation_page(query, cancel)
+    }
+    fn change_relation(
+        &mut self,
+        change: &yamantaka_domain::relations::RelationChange,
+        access: yamantaka_domain::search::IndexAccess,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<String> {
+        self.apply_relation(change, access, cancel)
+    }
     fn collections(
         &self,
         query: &yamantaka_domain::collections::CollectionQuery,

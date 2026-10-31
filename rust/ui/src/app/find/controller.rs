@@ -111,9 +111,7 @@ impl FindState {
         if let Some(index) = inside {
             return self.choose(index);
         }
-        let Some(query) = self.query.clone() else {
-            return None;
-        };
+        let query = self.query.clone()?;
         let wrap = if forward {
             batch.next.is_some()
         } else {

@@ -4,7 +4,6 @@ use yamantaka_domain::workspaces::ComparisonLayout;
 use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
 mod bookmark_preview;
-mod chooser;
 mod differences;
 mod navigator;
 mod options;
@@ -26,7 +25,7 @@ pub(super) struct ReferenceView {
     close_requested: bool,
     password_attempted: bool,
     selection: Option<Document>,
-    pub(super) chooser: chooser::ReferenceChooser,
+    pub(super) chooser: catalogue_chooser::CatalogueChooser,
     pub pane: reader_pane::ReaderPane,
     pub(in crate::app) input_layers: std::collections::HashSet<egui::LayerId>,
     pub(in crate::app) navigator_requested: bool,

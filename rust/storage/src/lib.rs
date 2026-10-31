@@ -25,6 +25,7 @@ pub mod preferences;
 pub mod reader_continuity;
 pub mod reader_preferences;
 pub mod reading_sessions;
+mod relations;
 pub mod search;
 mod tags;
 mod workspaces;

@@ -10,9 +10,7 @@ impl LinkState {
     ) -> Option<String> {
         let tr = |es, en| if english { en } else { es };
         let mut error = None;
-        let Some(mut confirmation) = self.confirmation.take() else {
-            return None;
-        };
+        let mut confirmation = self.confirmation.take()?;
         let PdfLinkTarget::External(uri) =
             &confirmation.payload.links()[confirmation.link_index].target
         else {

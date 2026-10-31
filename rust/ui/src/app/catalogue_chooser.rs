@@ -1,6 +1,11 @@
 use super::*;
+#[derive(Clone, Copy)]
+pub(in crate::app) enum ChooserPurpose<'a> {
+    Reference(Option<&'a str>),
+    Relation(&'a str),
+}
 
-pub(in crate::app) struct ReferenceChooser {
+pub(in crate::app) struct CatalogueChooser {
     pub text: String,
     pub offset: usize,
     displayed_offset: usize,
@@ -14,7 +19,7 @@ pub(in crate::app) struct ReferenceChooser {
     focus: bool,
 }
 
-impl Default for ReferenceChooser {
+impl Default for CatalogueChooser {
     fn default() -> Self {
         Self {
             text: String::new(),
@@ -32,7 +37,7 @@ impl Default for ReferenceChooser {
     }
 }
 
-impl ReferenceChooser {
+impl CatalogueChooser {
     pub fn reopen(&mut self) {
         self.focus = true;
         self.schedule(self.offset, Duration::ZERO);
@@ -124,7 +129,7 @@ impl ReferenceChooser {
         runtime: &Runtime,
         english: bool,
         p: Palette,
-        active: Option<&str>,
+        purpose: ChooserPurpose<'_>,
     ) -> Option<Document> {
         let tr = |es, en| if english { en } else { es };
         ui.set_width((ui.ctx().content_rect().width() - 40.0).clamp(160.0, 420.0));
@@ -141,7 +146,14 @@ impl ReferenceChooser {
             egui::WidgetInfo::labeled(
                 egui::WidgetType::TextEdit,
                 ui.is_enabled(),
-                tr("Buscar libro de referencia", "Search reference books"),
+                match purpose {
+                    ChooserPurpose::Reference(_) => {
+                        tr("Buscar libro de referencia", "Search reference books")
+                    }
+                    ChooserPurpose::Relation(_) => {
+                        tr("Buscar documento relacionado", "Search related documents")
+                    }
+                },
             )
         });
         if self.focus {
@@ -167,11 +179,11 @@ impl ReferenceChooser {
             .show(ui, |ui| {
                 for document in &self.entries {
                     if ui
-                        .add_enabled_ui(ready && !document.missing, |ui| {
+                        .add_enabled_ui(ready && match purpose { ChooserPurpose::Reference(_) => !document.missing, ChooserPurpose::Relation(source) => document.id != source }, |ui| {
                             theme::navigation(
                                 ui,
                                 document.display_title(),
-                                active == Some(document.id.as_str()),
+                                matches!(purpose, ChooserPurpose::Reference(Some(active)) if active == document.id),
                                 p,
                             )
                         })
@@ -217,7 +229,7 @@ impl ReferenceChooser {
     }
 }
 
-impl Drop for ReferenceChooser {
+impl Drop for CatalogueChooser {
     fn drop(&mut self) {
         if let Some(token) = &self.pending {
             token.cancel();

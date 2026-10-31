@@ -33,7 +33,9 @@ impl ReferenceView {
                     runtime,
                     english,
                     p,
-                    self.pane.active.as_ref().map(|(doc, _)| doc.id.as_str()),
+                    catalogue_chooser::ChooserPurpose::Reference(
+                        self.pane.active.as_ref().map(|(doc, _)| doc.id.as_str()),
+                    ),
                 );
             });
         });

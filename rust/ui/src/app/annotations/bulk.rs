@@ -97,9 +97,7 @@ impl AnnotationState {
     ) -> Option<NotesAction> {
         let tr = |es, en| if english { en } else { es };
         let mut action = None;
-        let Some(page) = self.page.clone() else {
-            return None;
-        };
+        let page = self.page.clone()?;
         if page.entries().is_empty() {
             return None;
         }
