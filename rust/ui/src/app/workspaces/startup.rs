@@ -20,7 +20,7 @@ impl YamantakaApp {
         if self.workspaces.startup != Startup::Waiting {
             return;
         }
-        if self.demo {
+        if self.demo || self.startup_mode.is_safe() {
             self.workspaces.startup = Startup::Finished;
             return;
         }

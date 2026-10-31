@@ -44,6 +44,7 @@ pub mod relocation;
 pub mod revisions;
 pub mod search;
 pub mod source_revision;
+pub mod startup;
 pub mod tags;
 pub mod text_selection;
 pub mod workspaces;

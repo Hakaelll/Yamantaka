@@ -183,6 +183,12 @@ impl YamantakaApp {
         });
     }
     pub(super) fn operation_actions(&mut self, ui: &mut egui::Ui, p: Palette) {
+        if self.startup_mode.is_safe()
+            && theme::navigation(ui, self.tr("Modo seguro", "Safe mode"), true, p).clicked()
+        {
+            self.safe_notice = true;
+            ui.close();
+        }
         if theme::navigation(
             ui,
             &format!(

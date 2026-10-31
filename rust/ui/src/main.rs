@@ -70,6 +70,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
+    let requested_safe = args.iter().any(|arg| arg == "--safe-mode");
+    let mut startup = None;
     let (database, mut prefs, store) = if demo {
         let mut store = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/demo-store");
         // Captures have their own instance identity so QA does not forward to
@@ -626,6 +628,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         let active_store = yamantaka_storage::managed_imports::recover_and_select(&paths.store)?;
         std::fs::create_dir_all(&active_store)?;
+        startup = Some(yamantaka_storage::startup::StartupRun::begin(
+            &active_store,
+            requested_safe,
+        ));
         (
             Database::open(&active_store.join("yamantaka.sqlite3"))?,
             Preferences::load(&active_store.join("preferences.json"))?,
@@ -636,6 +642,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         prefs
             .rust
             .insert("recordReadingSessions".into(), false.into());
+    }
+    if demo
+        && capture.is_some()
+        && args
+            .iter()
+            .any(|arg| arg == "--safe-mode" || arg == "--safe-failures" || arg == "--safe-unknown")
+    {
+        prefs.rust.insert("globalIndexEnabled".into(), true.into());
     }
     let activations = if demo {
         store.join("activations")
@@ -651,6 +665,26 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         instance
     };
     let bundled = executable.parent().unwrap().join("pdfium.dll");
+    if demo
+        && capture.is_some()
+        && args
+            .iter()
+            .any(|arg| arg == "--safe-failures" || arg == "--safe-unknown")
+    {
+        std::fs::create_dir_all(&store)?;
+        let fixture = if args.iter().any(|arg| arg == "--safe-unknown") {
+            serde_json::json!({"version":99,"synthetic":true})
+        } else {
+            serde_json::json!({"version":1,"clean":false,"failures":2,"token":uuid::Uuid::new_v4().to_string()})
+        };
+        std::fs::write(
+            store.join("rust-startup-v1.json"),
+            serde_json::to_vec(&fixture)?,
+        )?;
+    }
+    let startup = startup
+        .unwrap_or_else(|| yamantaka_storage::startup::StartupRun::begin(&store, requested_safe));
+    let startup_mode = startup.mode();
     let library = if bundled.exists() || !cfg!(debug_assertions) {
         bundled
     } else {
@@ -678,12 +712,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             ..MemoryLimits::default()
         },
         governor.clone(),
-        Some(std::sync::Arc::new(
-            yamantaka_storage::cover_cache::CoverCache::new(
-                cover_cache_root.clone(),
-                cache_megabytes * 1024 * 1024,
-            ),
-        )),
+        if startup_mode.is_safe() {
+            None
+        } else {
+            Some(std::sync::Arc::new(
+                yamantaka_storage::cover_cache::CoverCache::new(
+                    cover_cache_root.clone(),
+                    cache_megabytes * 1024 * 1024,
+                ),
+            ))
+        },
     )?;
     if demo && capture.is_some() && args.iter().any(|arg| arg == "--cache-maintenance") {
         let fixture =
@@ -747,6 +785,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     .to_rgba8();
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
+            .with_title(if startup_mode.is_safe() {
+                if english {
+                    "Yamantaka · Safe mode"
+                } else {
+                    "Yamantaka · Modo seguro"
+                }
+            } else {
+                "Yamantaka"
+            })
             .with_inner_size([1440.0, 960.0])
             .with_min_inner_size([640.0, 480.0])
             .with_icon(egui::IconData {
@@ -832,7 +879,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 watch,
                 governor,
                 presenter,
+                startup_mode,
             );
+            if demo && startup_mode.is_safe() {
+                app.preview_safe_index();
+                app.preview_safe_dismiss(args.iter().any(|arg| arg == "--safe-dismiss"));
+            }
             app.configure_restore(
                 backup_source.as_ref().map(|_| store.clone()),
                 ui_restore_handover,
@@ -1584,6 +1636,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             yamantaka_windows::show_restore_complete(&safety, english);
         }
     }
+    startup.finish()?;
     drop(instance);
     Ok(())
 }

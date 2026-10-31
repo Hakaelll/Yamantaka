@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='safe-requested'; args=@('--safe-mode','--es','--pdf-covers') },
+    @{ name='safe-repeated'; args=@('--safe-failures','--light','--pdf-covers') },
+    @{ name='safe-unavailable-small-200'; args=@('--safe-unknown','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
+    @{ name='safe-reader'; args=@('--safe-mode','--safe-dismiss','--reader','--sessions-preview','--pdf-covers','--es') },
     @{ name='diagnostics-saved'; args=@('--settings','--diagnostics','--diagnostics-export','--es') },
     @{ name='diagnostics-occupied'; args=@('--settings','--diagnostics','--diagnostics-occupied','--light') },
     @{ name='diagnostics-cancelled'; args=@('--settings','--diagnostics','--diagnostics-cancel','--es','--light') },
@@ -633,6 +637,19 @@ foreach ($case in $cases) {
         if ($controls.referenceNotesPhase -ne $phase -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.filterCount -ne 4 -or $controls.referenceAnnotations.total -ne $total -or $controls.primaryAnnotations.total -ne 2 -or $controls.primaryAnnotations.filterCount -ne 0) { throw 'Reference filters or reset affected the wrong records or document.' }
         $labels = if ($empty) { @('Active filters (4)','Reset') } else { @('Filtros activos (4)','Restablecer') }
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
+    }
+    if ($case.name -like 'safe-*') {
+        if($controls.safeStartup.indexPhase -ne 'Idle' -or $controls.safeStartup.continuityLoading -or $controls.libraryCovers.resident -ne 0 -or $null -ne $controls.readingSession.document) { throw 'Safe startup admitted automatic work or recording.' }
+        if($case.name -eq 'safe-repeated') { if($controls.startupMode.repeatedUnclean.failures -ne 3) { throw 'Repeated unclean startup was not detected.' } }
+        elseif($case.name -eq 'safe-unavailable-small-200') { if($controls.startupMode -cne 'stateUnavailable') { throw 'Unknown recovery state was not preserved in safe mode.' } }
+        elseif($controls.startupMode -cne 'requested') { throw 'Requested safe mode was not applied.' }
+        if($case.name -eq 'safe-reader') {
+            if($controls.safeStartup.notice -or @($controls.readerRenderEvents | Where-Object { $_.event -eq 'installed' -and $_.document -eq 'demo-0' }).Count -lt 1) { throw 'Manual reading is unavailable in safe mode.' }
+        } else {
+            $close=if($case.args -contains '--es'){'Cerrar'}else{'Close'}
+            if(-not $controls.safeStartup.notice){throw 'Safe startup reason is hidden.'}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($close)
+        }
     }
     if ($case.name -like 'diagnostics-*') {
         $report=$controls.diagnostics

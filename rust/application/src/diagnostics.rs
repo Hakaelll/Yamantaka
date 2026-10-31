@@ -55,6 +55,7 @@ impl From<GlobalMemoryLimits> for MemoryBudgets {
 }
 #[derive(Serialize)]
 pub struct Report {
+    startup_mode: yamantaka_domain::startup::StartupMode,
     format: &'static str,
     version: u32,
     application_version: &'static str,
@@ -72,6 +73,7 @@ impl Report {
     pub fn collect(
         repository: &impl DiagnosticsRepository,
         renderer: Renderer,
+        startup_mode: yamantaka_domain::startup::StartupMode,
         governor: &MemoryGovernor,
         cancel: &Cancellation,
     ) -> Result<Self> {
@@ -79,6 +81,7 @@ impl Report {
         let memory = governor.snapshot();
         cancel.check()?;
         Ok(Self {
+            startup_mode,
             format: "yamantaka-rust-safe-diagnostics",
             version: 1,
             application_version: env!("CARGO_PKG_VERSION"),

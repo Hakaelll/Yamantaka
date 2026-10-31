@@ -30,6 +30,7 @@ pub mod reading_sessions;
 mod relations;
 mod revisions;
 pub mod search;
+pub mod startup;
 mod tags;
 mod workspaces;
 pub use database::Database;

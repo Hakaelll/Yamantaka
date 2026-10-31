@@ -221,6 +221,7 @@ impl YamantakaApp {
         if !matches!(self.surface, Surface::Library)
             || self.command_palette.open
             || self.diagnostics.open
+            || self.safe_notice
             || self.password.is_some()
             || self.link_confirmation_open()
             || self.bulk_picker.is_some()

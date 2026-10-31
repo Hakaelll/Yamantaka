@@ -35,7 +35,7 @@ impl YamantakaApp {
     }
 
     pub(in crate::app) fn begin_reader_continuity(&mut self) {
-        if self.demo {
+        if self.demo || self.startup_mode.is_safe() {
             return;
         }
         let cancel = Cancellation::default();
@@ -118,6 +118,9 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn pump_reader_continuity(&mut self, ctx: &egui::Context) {
+        if self.startup_mode.is_safe() {
+            return;
+        }
         if self.library_selection.removing()
             || !self.tabs.continuity.loaded
             || self.tabs.continuity.paused
@@ -173,6 +176,9 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn persist_reader_continuity_on_close(&mut self) -> Result<()> {
+        if self.startup_mode.is_safe() {
+            return Ok(());
+        }
         if !self.tabs.continuity.loaded {
             return Ok(());
         }

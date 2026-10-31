@@ -2,7 +2,7 @@
 
 Open **Settings → Privacy → Review diagnostics**. Yamantaka collects a report in the background using an independent read-only database connection. The window remains responsive during collection. Refresh the report when you need a newer snapshot.
 
-The report includes the application version, platform, architecture, renderer, database schema, logical database size, library record counts, a SQLite quick check, foreign-key checks, and governed memory usage and limits. Expand **View full report** to inspect the JSON before sharing it.
+The report includes the application version, platform, architecture, renderer, startup mode, database schema, logical database size, library record counts, a SQLite quick check, foreign-key checks, and governed memory usage and limits. Expand **View full report** to inspect the JSON before sharing it.
 
 It excludes document paths, filenames, titles, authors, search queries, note text, selected passages, passwords and raw errors. It contains no document IDs or machine/user names. It does include aggregate counts and memory values. No report is sent anywhere automatically.
 

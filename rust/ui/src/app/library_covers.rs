@@ -62,6 +62,10 @@ impl YamantakaApp {
         }
     }
     pub(super) fn pump_library_covers(&mut self, ctx: &egui::Context) {
+        if self.startup_mode.is_safe() {
+            ctx.data_mut(|data| data.remove::<Vec<Document>>(egui::Id::new("pdf-cover-requests")));
+            return;
+        }
         if self.cover_picker.is_some() {
             return;
         }

@@ -52,6 +52,7 @@ mod relocation;
 mod render_plan;
 mod render_updates;
 mod restoration;
+mod safety;
 mod search;
 mod selection;
 mod sessions;
@@ -123,6 +124,8 @@ impl PageImage {
     }
 }
 pub struct YamantakaApp {
+    startup_mode: yamantaka_domain::startup::StartupMode,
+    safe_notice: bool,
     shortcut_bindings: shortcuts::bindings::Bindings,
     shortcut_error: Option<String>,
     reader: reader_pane::ReaderPane,
@@ -269,6 +272,7 @@ impl YamantakaApp {
         watch: ActivationWatch,
         governor: MemoryGovernor,
         presenter: Option<PagePresenter>,
+        startup_mode: yamantaka_domain::startup::StartupMode,
     ) -> Self {
         let reduced_motion = preferences
             .get("reduceMotion")
@@ -341,6 +345,8 @@ impl YamantakaApp {
         let shortcut_bindings =
             shortcuts::bindings::Bindings::load(preferences.get("shortcutOverrides"));
         let mut app = Self {
+            startup_mode,
+            safe_notice: startup_mode.is_safe(),
             reader: Default::default(),
             reading_focus: Default::default(),
             reference_shortcuts_preview: Default::default(),
@@ -928,7 +934,15 @@ impl YamantakaApp {
                         );
                     }
                     if !compact && !narrow {
-                        ui.label(RichText::new("Yamantaka").size(16.0).strong());
+                        if self.startup_mode.is_safe() {
+                            if theme::navigation(ui, self.tr("Modo seguro", "Safe mode"), true, p)
+                                .clicked()
+                            {
+                                self.safe_notice = true;
+                            }
+                        } else {
+                            ui.label(RichText::new("Yamantaka").size(16.0).strong());
+                        }
                         ui.add_space(12.0);
                     }
                     let response = if narrow {
@@ -2268,6 +2282,7 @@ impl App for YamantakaApp {
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
         let shortcut_modal = self.command_palette.open
+            || self.safe_notice
             || self.diagnostics.open
             || self.page_jump.is_some()
             || self.password.is_some()
@@ -2503,6 +2518,7 @@ impl App for YamantakaApp {
         self.bulk_target_dialog(&ctx);
         self.command_palette_dialog(&ctx);
         self.diagnostics_dialog(&ctx);
+        self.safe_mode_dialog(&ctx);
         self.page_jump_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
@@ -2723,6 +2739,8 @@ impl App for YamantakaApp {
                     record["revisionGroups"] = self.revision_capture_summary();
                     record["commandPalette"]=self.command_palette.summary();
                     record["diagnostics"]=self.diagnostics.summary();
+                    record["startupMode"] = serde_json::to_value(self.startup_mode).unwrap();
+                    record["safeStartup"] = self.safe_summary();
                     record["annotationHistoryPhase"]=self.command_palette_preview.history_phase().into();
                     record["readerControls"]=serde_json::json!({"chromeHidden":self.reader_chrome_hidden,"immersive":self.reader_focus,"pageJump":self.page_jump.is_some(),"primaryPanel":self.reader.panel});
                     record["shortcutBindings"]=self.shortcut_bindings.summary();

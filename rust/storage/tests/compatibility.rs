@@ -21,6 +21,8 @@ mod removal_verification;
 mod revision_verification;
 #[path = "support/smart_views.rs"]
 mod smart_view_verification;
+#[path = "support/startup.rs"]
+mod startup_verification;
 #[path = "support/tags.rs"]
 mod tag_verification;
 #[path = "support/workspaces.rs"]
@@ -185,6 +187,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     verify_bookmark_toggle();
     annotation_history_verification::verify(DOCUMENT);
     diagnostics_verification::verify(DOCUMENT);
+    startup_verification::verify();
 }
 
 #[test]

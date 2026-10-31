@@ -18,6 +18,7 @@ pub struct Snapshot {
 pub enum Operation {
     Collect {
         renderer: Renderer,
+        startup_mode: yamantaka_domain::startup::StartupMode,
         governor: MemoryGovernor,
     },
     Save {
@@ -57,8 +58,13 @@ impl Job {
                         Some(db.diagnostics_interrupt());
                     token.check()?;
                     match operation {
-                        Operation::Collect { renderer, governor } => {
-                            let report = Report::collect(&db, renderer, &governor, &token)?;
+                        Operation::Collect {
+                            renderer,
+                            startup_mode,
+                            governor,
+                        } => {
+                            let report =
+                                Report::collect(&db, renderer, startup_mode, &governor, &token)?;
                             let json = report.to_json()?;
                             Ok(Outcome::Collected(Box::new(Snapshot {
                                 report,

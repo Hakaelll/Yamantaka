@@ -47,6 +47,7 @@ impl YamantakaApp {
             }
         } else {
             Operation::Collect {
+                startup_mode: self.startup_mode,
                 renderer: if self.presenter.is_some() {
                     Renderer::Wgpu
                 } else {

@@ -113,6 +113,11 @@ impl YamantakaApp {
             self.index_command(IndexCommand::Start { rebuild: false });
         }
     }
+    pub(crate) fn preview_safe_index(&mut self) {
+        if self.demo && self.capture.is_some() && self.startup_mode.is_safe() {
+            self.index_command(IndexCommand::Start { rebuild: true });
+        }
+    }
     pub(crate) fn preview_search_action(&mut self, action: &'static str) {
         self.search.preview_action = Some(action);
         self.search.preview_open_page = action == "open";
@@ -391,6 +396,14 @@ impl YamantakaApp {
         }
     }
     fn index_command(&mut self, command: IndexCommand) {
+        if self.startup_mode.is_safe()
+            && matches!(
+                &command,
+                IndexCommand::Start { .. } | IndexCommand::Pause(false)
+            )
+        {
+            return;
+        }
         if matches!(&command, IndexCommand::Start { .. }) {
             self.search.manual_paused = false;
             self.send(Action::Index(IndexCommand::Pause(false)));
@@ -476,6 +489,10 @@ impl YamantakaApp {
             });
     }
     fn search_index_controls(&mut self, ui: &mut egui::Ui, p: Palette) {
+        if self.startup_mode.is_safe() {
+            ui.label(self.tr("La indexación está detenida en modo seguro. El índice existente y tus preferencias se conservan.", "Indexing is stopped in safe mode. The existing index and your preferences are preserved."));
+            return;
+        }
         if !self.search.enabled {
             ui.label(
                 RichText::new(self.tr(

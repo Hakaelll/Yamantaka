@@ -142,6 +142,9 @@ impl YamantakaApp {
             && ctx.input(|i| i.focused && !i.viewport().minimized.unwrap_or(false))
     }
     pub(super) fn observe_reading_session(&mut self, ctx: &egui::Context) {
+        if self.startup_mode.is_safe() {
+            return;
+        }
         if self.demo && !self.sessions.capture_recording {
             return;
         }
@@ -165,6 +168,9 @@ impl YamantakaApp {
         );
     }
     pub(super) fn sync_reading_session(&mut self, ctx: &egui::Context) {
+        if self.startup_mode.is_safe() {
+            return;
+        }
         if self.demo && !self.sessions.capture_recording {
             return;
         }
@@ -231,6 +237,9 @@ impl YamantakaApp {
         }
     }
     pub(super) fn persist_reading_sessions_on_close(&mut self) -> Result<()> {
+        if self.startup_mode.is_safe() {
+            return Ok(());
+        }
         if self.demo && !self.sessions.capture_recording {
             return Ok(());
         }
