@@ -6,7 +6,7 @@ Open a book's details and choose **Document connections**. This screen shows con
 
 Choose **Choose document** to search the whole catalogue by title, author, or filename. Previous and Next browse batches of up to 80 documents. The current document cannot be selected as its own destination. A missing PDF can still participate in library connections.
 
-Select a connection type, then choose **Add connection**:
+Select a connection type. To point to specific pages, expand **Link pages (optional)**, enable either page field, and enter its displayed PDF page number. Leave a field unchecked to link that whole document. Then choose **Add connection**:
 
 | Type | Meaning from the current document | Incoming label |
 | --- | --- | --- |
@@ -15,11 +15,11 @@ Select a connection type, then choose **Add connection**:
 | Source of | The current document is a source for the destination | Source |
 | Attachment of | The current document accompanies the destination | Has attachment |
 
-Repeating the same source, destination, and type reuses the existing connection. Opposite directions remain distinct. Incoming labels describe the original connection without creating an inverse row.
+Repeating the same source, destination, type, and page locations reuses the existing connection. An explicit page proposal that differs from an existing connection is rejected; review and remove that link before creating its replacement. Creating a whole-document link never clears inherited anchors. Opposite directions remain distinct. Incoming labels describe the original connection without creating an inverse row.
 
 ## Follow and remove connections
 
-**Open document** opens the other reading through the normal reader. **View connections** keeps you in the manager and shows the other document's connections.
+**Open page N** opens the saved location in the other reading through the normal reader. Outgoing connections use the destination anchor; incoming connections use the source anchor. Page anchors and surviving bookmark or attached-annotation anchors resolve to their current page. If an anchor is missing, unsupported, detached, or outside the current page count, the screen says its location is unavailable and offers **Open document**. The original anchor stays stored. **Open document** also handles links without a saved location. **View connections** keeps you in the manager and shows the other document's connections.
 
 **Remove connection** opens an inline review. Choose **Confirm removal** to delete that connection, or **Cancel** to keep it. Both PDF files and their library records remain intact. If the connection changed elsewhere, reload before trying again.
 
@@ -37,8 +37,8 @@ A group that changed since it was loaded must be reloaded before another current
 
 ## Compatibility and current limits
 
-The manager reads the existing v11 relation rows, including incoming links and saved source or destination anchors. New connections link whole documents. Editing anchors, anchor-specific navigation, and rule automation remain in development. The revision manager creates groups and changes their current edition; group renaming, removal, and membership editing are not provided by this flow.
+The manager reads the existing v11 relation rows, including incoming links and saved source or destination anchors. New connections can link whole documents or explicit pages. Existing links cannot be edited in place, and new bookmark/annotation anchors are not exposed by this form. Saved-rule automation is documented separately in the [saved-rule guide](saved-rules.md). The revision manager creates groups and changes their current edition; group renaming, removal, and membership editing are not provided by this flow.
 
 When global indexing is enabled, creating or removing a connection updates the source document's relation search entries in the same transaction. Excluded documents remain excluded. With indexing disabled, creating a connection does not opt an unindexed document into search.
 
-See the [connections checkpoint](../validation/rust-document-connections-2026-10-31.md) and [revision-group checkpoint](../validation/rust-revision-groups-2026-10-31.md) for the executed evidence and remaining acceptance work.
+See the [page-location checkpoint](../validation/rust-relation-locations-2026-10-31.md), [connections checkpoint](../validation/rust-document-connections-2026-10-31.md) and [revision-group checkpoint](../validation/rust-revision-groups-2026-10-31.md) for the executed evidence and remaining acceptance work.

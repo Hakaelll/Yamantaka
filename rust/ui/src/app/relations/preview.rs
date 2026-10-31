@@ -1,8 +1,9 @@
 use super::*;
 impl YamantakaApp {
-    pub fn preview_relations(&mut self, review: bool) {
+    pub fn preview_relations(&mut self, review: bool, locations: u8) {
         if self.demo && self.capture.is_some() {
             self.relations.preview = 1;
+            self.relations.preview_locations = locations;
             self.relations.preview_review = review;
         }
     }
@@ -30,6 +31,19 @@ impl YamantakaApp {
             self.relations.preview = 2;
             return;
         }
+        if phase == 11 {
+            if !self.reader.loading
+                && self
+                    .reader
+                    .active
+                    .as_ref()
+                    .is_some_and(|(document, _)| document.id == "demo-1")
+            {
+                assert_eq!(self.reader.page, 1);
+                self.relations.preview = 10;
+            }
+            return;
+        }
         let Some(page) = self.relations.page.as_ref() else {
             return;
         };
@@ -40,6 +54,8 @@ impl YamantakaApp {
                     source: "demo-0".into(),
                     target: "demo-1".into(),
                     kind: RelationKind::ALL[usize::from(phase - 2)],
+                    source_page: (self.relations.preview_locations > 0).then_some(0),
+                    target_page: (self.relations.preview_locations > 0).then_some(1),
                 });
                 self.relations.preview += 1;
             }
@@ -60,11 +76,37 @@ impl YamantakaApp {
                     source: "demo-0".into(),
                     target: "demo-1".into(),
                     kind: RelationKind::Related,
+                    source_page: None,
+                    target_page: None,
                 });
                 self.relations.preview = 7;
             }
             7 => {
                 assert_eq!(page.total, 5);
+                if self.relations.preview_locations > 0 {
+                    let entry = page
+                        .entries
+                        .iter()
+                        .find(|entry| entry.relation.kind == RelationKind::Related)
+                        .unwrap()
+                        .clone();
+                    assert_eq!(entry.destination, RelationDestination::Page(1));
+                    assert_eq!(entry.relation.source_anchor_id.as_deref(), Some("0"));
+                    if self.relations.preview_locations == 2 {
+                        self.open_relation(&entry);
+                        self.relations.preview = 11;
+                    } else {
+                        self.relations.target = self
+                            .documents
+                            .iter()
+                            .find(|doc| doc.id == "demo-1")
+                            .cloned();
+                        self.relations.source_page = Some(0);
+                        self.relations.target_page = Some(1);
+                        self.relations.preview = 10;
+                    }
+                    return;
+                }
                 let expected = page
                     .entries
                     .iter()

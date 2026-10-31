@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Executable = "$PSScriptRoot/../target/debug/yamantaka-rust.exe",
     [string]$OutputDirectory = "$PSScriptRoot/../build/rust-visual/stage2",
     [string[]]$CaseNames = @()
@@ -36,6 +36,9 @@ $cases = @(
     @{ name='revision-groups-legacy'; args=@('--revision-groups','--es') },
     @{ name='revision-groups-created'; args=@('--revision-groups','--revision-create','--light') },
     @{ name='revision-groups-current-small-200'; args=@('--revision-groups','--revision-current','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='relations-locations'; args=@('--relations','--relation-locations','--es','--light') },
+    @{ name='relations-locations-small-200'; args=@('--relations','--relation-locations','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='relations-location-open'; args=@('--relations','--relation-locations','--relation-location-open') },
     @{ name='relations-backlinks'; args=@('--relations') },
     @{ name='relations-review-es'; args=@('--relations','--relations-review','--es','--light') },
     @{ name='relations-review-small-200'; args=@('--relations','--relations-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
@@ -520,7 +523,15 @@ foreach ($case in $cases) {
     }
     if ($case.name -like 'relations-*') {
         if ($controls.relations.phase -ne 10 -or $controls.relations.pending -or $controls.relations.writing -or $controls.relations.failed) { throw 'The connected relation workflow did not settle.' }
-        if ($case.name -eq 'relations-backlinks') {
+        if ($case.name -like 'relations-location*') {
+            if ($case.name -eq 'relations-location-open') {
+                if ($controls.currentReaderPage -ne 1) {throw 'The connection did not navigate to its persisted PDF page.'}
+            } else {
+                if ($controls.relations.total -ne 5 -or @($controls.relations.entries | Where-Object {$_.page -eq 1}).Count -ne 4) {throw 'Connection page anchors were not persisted and resolved.'}
+            }
+            $labels=if ($case.name -eq 'relations-locations-small-200') {@('Página de este libro','Página del documento elegido')} else {@()}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
+        } elseif ($case.name -eq 'relations-backlinks') {
             if ($controls.relations.document -cne 'demo-1' -or $controls.relations.total -ne 3 -or @($controls.relations.entries | Where-Object { -not $_.backlink -or $_.other -cne 'demo-0' }).Count -ne 0) { throw 'Inverse relation ownership or directional presentation failed.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Back to library','Open document')
         } else {

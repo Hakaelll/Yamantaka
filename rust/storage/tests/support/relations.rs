@@ -37,7 +37,9 @@ pub fn verify(seed: &str) {
             &RelationChange::Create {
                 source: "original".into(),
                 target: "original".into(),
-                kind: RelationKind::Related
+                kind: RelationKind::Related,
+                source_page: None,
+                target_page: None,
             },
             IndexAccess::Disabled,
             &cancel
@@ -48,6 +50,8 @@ pub fn verify(seed: &str) {
         source: "original".into(),
         target: "target".into(),
         kind: RelationKind::Replaces,
+        source_page: None,
+        target_page: None,
     };
     let id = db
         .change_relation(&change, IndexAccess::Disabled, &cancel)
@@ -112,5 +116,103 @@ pub fn verify(seed: &str) {
         .unwrap();
     assert_eq!(hits(&db), 0);
     assert_eq!(page(&db, "original").total, 1);
+    verify_locations(&mut db);
     db.integrity().unwrap();
+}
+
+fn verify_locations(db: &mut Database) {
+    let cancel = Cancellation::default();
+    let existing = page(db, "original").entries.remove(0).relation;
+    db.change_relation(
+        &RelationChange::Remove {
+            document: "original".into(),
+            expected: existing,
+        },
+        IndexAccess::Enabled,
+        &cancel,
+    )
+    .unwrap();
+    let change = RelationChange::Create {
+        source: "original".into(),
+        target: "target".into(),
+        kind: RelationKind::Related,
+        source_page: Some(1),
+        target_page: Some(4),
+    };
+    let id = db
+        .change_relation(&change, IndexAccess::Enabled, &cancel)
+        .unwrap();
+    assert_eq!(
+        page(db, "original").entries[0].destination,
+        RelationDestination::Page(4)
+    );
+    assert_eq!(
+        page(db, "target").entries[0].destination,
+        RelationDestination::Page(1)
+    );
+    assert_eq!(
+        db.change_relation(&change, IndexAccess::Enabled, &cancel)
+            .unwrap(),
+        id
+    );
+    for target_page in [Some(2), Some(7), Some(u32::MAX)] {
+        assert!(
+            db.change_relation(
+                &RelationChange::Create {
+                    source: "original".into(),
+                    target: "target".into(),
+                    kind: RelationKind::Related,
+                    source_page: Some(1),
+                    target_page
+                },
+                IndexAccess::Enabled,
+                &cancel
+            )
+            .is_err()
+        );
+        assert_eq!(
+            page(db, "original").entries[0].destination,
+            RelationDestination::Page(4)
+        );
+    }
+    db.execute_batch("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES('relation-bookmark','target',3,'Chapter','now','now'); UPDATE document_relations SET target_anchor_kind='bookmark',target_anchor_id='relation-bookmark';").unwrap();
+    assert_eq!(
+        page(db, "original").entries[0].destination,
+        RelationDestination::Page(3)
+    );
+    db.execute_batch("UPDATE bookmarks SET document_id='original' WHERE id='relation-bookmark'")
+        .unwrap();
+    assert_eq!(
+        page(db, "original").entries[0].destination,
+        RelationDestination::Unavailable
+    );
+    db.execute_batch("INSERT INTO annotations(id,document_id,page_index,type,color,document_fingerprint,created_at,updated_at) VALUES('relation-note','target',5,'pageComment','violet','legacy','now','now'); UPDATE document_relations SET target_anchor_kind='annotation',target_anchor_id='relation-note';").unwrap();
+    assert_eq!(
+        page(db, "original").entries[0].destination,
+        RelationDestination::Page(5)
+    );
+    db.execute_batch("UPDATE annotations SET status='orphaned' WHERE id='relation-note'")
+        .unwrap();
+    assert_eq!(
+        page(db, "original").entries[0].destination,
+        RelationDestination::Unavailable
+    );
+    for sql in [
+        "UPDATE document_relations SET target_anchor_kind='future',target_anchor_id='kept'",
+        "UPDATE document_relations SET target_anchor_kind='page',target_anchor_id='-1'",
+        "UPDATE document_relations SET target_anchor_id='7'",
+        "UPDATE document_relations SET target_anchor_id=NULL",
+    ] {
+        db.execute_batch(sql).unwrap();
+        assert_eq!(
+            page(db, "original").entries[0].destination,
+            RelationDestination::Unavailable
+        );
+    }
+    db.execute_batch("UPDATE document_relations SET target_anchor_kind=NULL,target_anchor_id=NULL")
+        .unwrap();
+    assert_eq!(
+        page(db, "original").entries[0].destination,
+        RelationDestination::Document
+    );
 }

@@ -22,6 +22,9 @@ pub(super) struct RelationState {
     pub(super) chooser: catalogue_chooser::CatalogueChooser,
     target: Option<Document>,
     kind: RelationKind,
+    source_page: Option<u32>,
+    target_page: Option<u32>,
+    preview_locations: u8,
     removing: Option<Relation>,
     pub(super) error: Option<String>,
     saved: bool,
@@ -51,7 +54,7 @@ impl RelationState {
             && (self.preview == 0 || self.preview == 10)
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"document":self.context.as_ref().map(|doc|&doc.id),"pending":self.pending.is_some(),"writing":self.writing.is_some(),"saved":self.saved,"failed":self.error.is_some(),"phase":self.preview,"offset":self.offset,"total":self.page.as_ref().map(|page|page.total),"confirmRemove":self.removing.is_some(),"entries":self.page.as_ref().map(|page|page.entries.iter().map(|entry|serde_json::json!({"id":entry.relation.id,"other":entry.other_document,"kind":entry.relation.kind.stored(),"backlink":entry.backlink,"sourceAnchor":entry.relation.source_anchor_id,"targetAnchor":entry.relation.target_anchor_id})).collect::<Vec<_>>())})
+        serde_json::json!({"document":self.context.as_ref().map(|doc|&doc.id),"pending":self.pending.is_some(),"writing":self.writing.is_some(),"saved":self.saved,"failed":self.error.is_some(),"phase":self.preview,"offset":self.offset,"total":self.page.as_ref().map(|page|page.total),"confirmRemove":self.removing.is_some(),"entries":self.page.as_ref().map(|page|page.entries.iter().map(|entry|serde_json::json!({"id":entry.relation.id,"other":entry.other_document,"kind":entry.relation.kind.stored(),"backlink":entry.backlink,"sourceAnchor":entry.relation.source_anchor_id,"targetAnchor":entry.relation.target_anchor_id,"page":match entry.destination {RelationDestination::Page(page)=>Some(page),_=>None}})).collect::<Vec<_>>())})
     }
 }
 impl Drop for RelationState {
@@ -126,6 +129,8 @@ impl YamantakaApp {
         self.relations.context = Some(document);
         self.relations.offset = 0;
         self.relations.target = None;
+        self.relations.source_page = None;
+        self.relations.target_page = None;
         self.relations.removing = None;
         self.relations.error = None;
         self.relations.saved = false;
@@ -177,6 +182,15 @@ impl YamantakaApp {
             Ok(page) => self.relations.page = Some(Arc::new(page)),
             Err(error) => self.relations.error = Some(error.to_string()),
         }
+    }
+    fn open_relation(&mut self, entry: &RelationEntry) {
+        let page = match entry.destination {
+            RelationDestination::Page(page) => Some(page),
+            _ => None,
+        };
+        let id = entry.other_document.clone();
+        let cancel = self.open_intent.lookup(id.clone(), page);
+        self.send(Action::GetDocument(id, cancel));
     }
     fn change_relation(&mut self, change: RelationChange) {
         if self.relations.writing() || self.relations.context_lookup.is_some() {

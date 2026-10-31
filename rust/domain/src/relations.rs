@@ -42,12 +42,19 @@ pub struct Relation {
     pub target_anchor_id: Option<String>,
     pub created_at: String,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RelationDestination {
+    Document,
+    Page(u32),
+    Unavailable,
+}
 #[derive(Clone, Debug)]
 pub struct RelationEntry {
     pub relation: Relation,
     pub other_document: String,
     pub title: String,
     pub backlink: bool,
+    pub destination: RelationDestination,
 }
 #[derive(Clone, Debug)]
 pub struct RelationQuery {
@@ -64,6 +71,8 @@ pub enum RelationChange {
         source: String,
         target: String,
         kind: RelationKind,
+        source_page: Option<u32>,
+        target_page: Option<u32>,
     },
     Remove {
         document: String,

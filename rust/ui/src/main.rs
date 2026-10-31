@@ -1171,7 +1171,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 }
                 if args.iter().any(|arg| arg == "--relations") {
-                    app.preview_relations(args.iter().any(|arg| arg == "--relations-review"));
+                    app.preview_relations(
+                        args.iter().any(|arg| arg == "--relations-review"),
+                        if args.iter().any(|arg| arg == "--relation-location-open") {
+                            2
+                        } else if args.iter().any(|arg| arg == "--relation-locations") {
+                            1
+                        } else {
+                            0
+                        },
+                    );
                 }
                 if args.iter().any(|arg| arg == "--annotation-many") {
                     app.preview_annotation_list();

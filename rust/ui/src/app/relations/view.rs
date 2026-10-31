@@ -104,6 +104,7 @@ impl YamantakaApp {
                                 .show(|ui| {
                                     if let Some(target) = self.relations.chooser.show(ui, &self.runtime, english, p, catalogue_chooser::ChooserPurpose::Relation(&context.id)) {
                                         self.relations.target = Some(target);
+                                        self.relations.target_page = None;
                                     }
                                 });
                             egui::ComboBox::from_id_salt("relation-kind")
@@ -121,6 +122,8 @@ impl YamantakaApp {
                                     source: context.id.clone(),
                                     target: self.relations.target.as_ref().unwrap().id.clone(),
                                     kind: self.relations.kind,
+                                    source_page: self.relations.source_page,
+                                    target_page: self.relations.target_page,
                                 });
                             }
                         });
@@ -128,6 +131,21 @@ impl YamantakaApp {
                     if let Some(target) = &self.relations.target {
                         ui.add_space(8.0);
                         ui.label(RichText::new(target.display_title()).color(p.secondary)).on_hover_text(tr("Documento elegido", "Selected document"));
+                    }
+                    let locations = ui.add_enabled_ui(!busy, |ui| {
+                        egui::CollapsingHeader::new(tr("Vincular páginas (opcional)", "Link pages (optional)"))
+                            .default_open(self.relations.preview_locations == 1)
+                            .show(ui, |ui| {
+                                page_choice(ui, tr("Página de este libro", "Page in this book"), &mut self.relations.source_page, context.page_count);
+                                if let Some(target) = &self.relations.target {
+                                    page_choice(ui, tr("Página del documento elegido", "Page in selected document"), &mut self.relations.target_page, target.page_count);
+                                } else {
+                                    ui.label(tr("Elige un documento para vincular su página.", "Choose a document to link its page."));
+                                }
+                            });
+                    });
+                    if self.relations.preview_locations == 1 && self.relations.preview == 10 && content_width < 620.0 {
+                        locations.response.scroll_to_me(Some(egui::Align::BOTTOM));
                     }
                     ui.add_space(24.0);
                     ui.separator();
@@ -144,8 +162,12 @@ impl YamantakaApp {
                                 ui.label(RichText::new(label(entry.relation.kind, entry.backlink, english)).color(p.secondary).size(12.0));
                                 ui.label(RichText::new(&entry.title).size(19.0).color(p.ink));
                                 ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 0.0), flow(), |ui| {
-                                    if theme::navigation(ui, tr("Abrir documento", "Open document"), false, p).clicked() {
-                                        open = Some(entry.other_document.clone());
+                                    let caption = match entry.destination {
+                                        RelationDestination::Page(page) => format!("{} {}",tr("Abrir página", "Open page"),page.saturating_add(1)),
+                                        _ => tr("Abrir documento", "Open document").to_owned(),
+                                    };
+                                    if theme::navigation(ui, &caption, false, p).clicked() {
+                                        open = Some(entry.clone());
                                     }
                                     if theme::navigation(ui, tr("Ver relaciones", "View connections"), false, p).clicked() {
                                         view = Some(entry.other_document.clone());
@@ -154,6 +176,9 @@ impl YamantakaApp {
                                         self.relations.removing = Some(entry.relation.clone());
                                     }
                                 });
+                                if entry.destination == RelationDestination::Unavailable {
+                                    ui.label(RichText::new(tr("La ubicación guardada ya no está disponible. Puedes abrir el documento.", "The saved location is unavailable. You can open the document.")).color(p.secondary));
+                                }
                                 if self.relations.removing.as_ref().is_some_and(|relation| relation.id == entry.relation.id) {
                                     ui.label(tr("Solo se elimina este vínculo. Los documentos se conservan.", "Only this connection is removed. Both documents are kept."));
                                     let actions = ui.add_enabled_ui(!busy, |ui| {
@@ -189,9 +214,8 @@ impl YamantakaApp {
                     if let Some(expected) = remove {
                         self.change_relation(RelationChange::Remove { document: context.id.clone(), expected });
                     }
-                    if let Some(id) = open {
-                        let cancel = self.open_intent.lookup(id.clone(), None);
-                        self.send(Action::GetDocument(id, cancel));
+                    if let Some(entry) = open {
+                        self.open_relation(&entry);
                     }
                     if let Some(id) = view {
                         self.load_relation_context(id);
@@ -199,4 +223,26 @@ impl YamantakaApp {
                 });
             });
     }
+}
+
+fn page_choice(ui: &mut egui::Ui, label: &str, page: &mut Option<u32>, count: u32) {
+    ui.horizontal_wrapped(|ui| {
+        let mut enabled = page.is_some();
+        let checkbox = ui.add_enabled(count > 0, egui::Checkbox::new(&mut enabled, label));
+        theme::record_control_bounds(ui, label, checkbox.rect);
+        if checkbox.changed() {
+            *page = enabled.then_some(0);
+        }
+        if let Some(index) = page {
+            let mut display = index.saturating_add(1);
+            let value = ui
+                .add(egui::DragValue::new(&mut display).range(1..=count.max(1)))
+                .labelled_by(checkbox.id);
+            theme::record_control_bounds(ui, &format!("{label}: {display}"), value.rect);
+            if value.changed() {
+                *index = display.saturating_sub(1);
+            }
+            ui.label(format!("/ {count}"));
+        }
+    });
 }
