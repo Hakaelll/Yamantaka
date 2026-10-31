@@ -213,8 +213,8 @@ impl YamantakaApp {
             .collapsed
             .retain(|key| groups.iter().any(|group| &group.key == key));
         if self.grouping.mode == Grouping::None {
-            if !self.list {
-                ui.add_space(24.0);
+            if !self.list && ui.ctx().content_rect().width() >= 420.0 {
+                ui.add_space(if compact { 8.0 } else { 24.0 });
             }
             self.library_document_page(ui, self.documents.clone(), compact, p);
             return;

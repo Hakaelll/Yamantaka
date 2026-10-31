@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='library-compact-dark-es'; args=@('--size=720x540','--pdf-covers','--es','--tilt-negative') },
+    @{ name='library-compact-light'; args=@('--size=900x600','--pdf-covers','--light') },
+    @{ name='library-short-wide'; args=@('--size=1440x600','--pdf-covers','--es','--tilt') },
+    @{ name='library-compact-view-menu'; args=@('--size=640x480','--text-scale=2','--library-view-menu','--pdf-covers','--reduce-motion') },
+    @{ name='library-compact-search-menu'; args=@('--size=640x480','--text-scale=2','--library-search-menu','--pdf-covers','--reduce-motion') },
+    @{ name='library-compact-filters-active'; args=@('--size=720x540','--pdf-covers','--smart-view=missing','--light','--es') },
+    @{ name='library-wide-light-pdf'; args=@('--pdf-covers','--light','--es') },
     @{ name='window-placement-cycle'; args=@('--window-placement','--es') },
     @{ name='window-placement-unknown'; args=@('--window-placement','--window-placement-unknown','--light') },
     @{ name='window-placement-backup-glow'; args=@('--window-placement','--window-placement-backup','--software','--light') },

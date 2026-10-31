@@ -8,6 +8,10 @@ use yamantaka_domain::Document;
 mod material;
 
 pub(crate) const CAPTION_HEIGHT: f32 = 102.0;
+const COVER_HEADROOM: f32 = 32.0;
+pub(crate) fn cover_height(width: f32) -> f32 {
+    width * 1.34 + COVER_HEADROOM - 10.0
+}
 
 #[derive(Clone)]
 pub(crate) struct PdfCover {
@@ -144,7 +148,11 @@ fn cover_impl(
     preview_pointer: Option<Vec2>,
     caption: bool,
 ) -> Response {
-    let height = width * 1.34;
+    let height = if caption {
+        cover_height(width)
+    } else {
+        width * 1.34
+    };
     let english = ui.ctx().data(|data| {
         data.get_temp::<bool>(egui::Id::new("yamantaka-english"))
             .unwrap_or(false)
@@ -192,8 +200,8 @@ fn cover_impl(
         data.insert_temp(egui::Id::new("pdf-cover-requests"), requests);
     });
     let book = Rect::from_min_size(
-        rect.min + egui::vec2(11.0, 10.0),
-        Vec2::new(width - 20.0, height - 14.0),
+        rect.min + egui::vec2(11.0, if caption { COVER_HEADROOM } else { 10.0 }),
+        Vec2::new(width - 20.0, width * 1.34 - 14.0),
     );
     let mut physics = ui.ctx().data_mut(|data| {
         data.get_temp::<BookPhysics>(response.id)
@@ -217,7 +225,13 @@ fn cover_impl(
     let hovering_book =
         response.hover_pos().is_some_and(|pos| book.contains(pos)) || preview_pointer.is_some();
     let lift_moving = physics.emphasis(
-        if hovering_book { 1.0 } else { 0.0 },
+        if !hovering_book {
+            0.0
+        } else if caption {
+            1.0
+        } else {
+            0.2
+        },
         ui.input(|i| i.stable_dt),
         reduced_motion,
     );
@@ -237,6 +251,28 @@ fn cover_impl(
         });
     let depth = (width * 0.13).clamp(12.0, 30.0);
     let project = |point| physics.project(point, depth * 0.5, book);
+    if ui.ctx().data(|data| {
+        data.get_temp::<bool>(egui::Id::new("capture-control-bounds"))
+            .unwrap_or(false)
+    }) {
+        let corners = [
+            book.left_top(),
+            book.right_top(),
+            book.left_bottom(),
+            book.right_bottom(),
+        ];
+        let mut points = [Pos2::ZERO; 8];
+        for (index, point) in corners.into_iter().enumerate() {
+            points[index] = project(point);
+            points[index + 4] = physics.project(point, -depth * 0.5, book);
+        }
+        crate::theme::record_control_bounds(
+            ui,
+            &format!("Book volume · {}", document.id),
+            Rect::from_points(&points),
+        );
+        crate::theme::record_control_bounds(ui, &format!("Book slot · {}", document.id), rect);
+    }
     let painter = ui.painter();
     let seed = document.id.bytes().fold(2166136261_u32, |hash, b| {
         hash.wrapping_mul(16777619) ^ b as u32

@@ -51,7 +51,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 || arg == "--links"
         });
     let light = args.iter().any(|arg| arg == "--light");
-    let tilt = args.iter().any(|arg| arg == "--tilt");
+    let tilt = args
+        .iter()
+        .any(|arg| arg == "--tilt" || arg == "--tilt-negative");
     let capture = args.iter().find_map(|arg| {
         arg.to_str()
             .and_then(|s| s.strip_prefix("--capture="))
@@ -912,6 +914,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Box::new(move |cc| {
             theme::load_fonts(&cc.egui_ctx);
             theme::install(&cc.egui_ctx, dark);
+            for (argument, key) in [
+                ("--library-view-menu", "preview-library-view-menu"),
+                ("--library-search-menu", "preview-library-search-menu"),
+            ] {
+                if demo && args.iter().any(|arg| arg == argument) {
+                    cc.egui_ctx
+                        .data_mut(|data| data.insert_temp(egui::Id::new(key), true));
+                }
+            }
             let notify = cc.egui_ctx.clone();
             if demo && args.iter().any(|arg| arg == "--cover-capacity-retry") {
                 let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1048,7 +1059,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
             if tilt {
-                app.preview_tilt();
+                app.preview_tilt(args.iter().any(|arg| arg == "--tilt-negative"));
             }
             if demo {
                 if args.iter().any(|arg| arg == "--reading-queue") {

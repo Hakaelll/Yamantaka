@@ -15,28 +15,22 @@ impl YamantakaApp {
         } else if ui.ctx().content_rect().width() < 420.0 {
             self.compact_covers(ui, documents, p);
         } else {
-            let columns = (ui.available_width() / if compact { 260.0 } else { 240.0 })
+            let gap = if compact { 28.0 } else { 36.0 };
+            let preferred = if compact { 180.0 } else { 228.0 };
+            let columns = ((ui.available_width() + gap) / (preferred + gap))
                 .floor()
                 .max(1.0) as usize;
             self.library_selection.columns = columns;
-            let gap = 36.0;
             let slot =
                 ((ui.available_width() - gap * (columns - 1) as f32) / columns as f32).max(100.0);
-            let width = if compact {
-                slot.min(
-                    ((ui.available_height() - book::CAPTION_HEIGHT - 5.0) / 1.34)
-                        .clamp(110.0, 180.0),
-                )
-            } else {
-                slot.min(228.0)
-            };
+            let width = slot.min(preferred);
             for row in documents.chunks(columns) {
                 ui.horizontal_top(|ui| {
                     ui.spacing_mut().item_spacing.x = gap;
                     for document in row {
                         let response = ui
                             .allocate_ui_with_layout(
-                                egui::vec2(slot, width * 1.34 + book::CAPTION_HEIGHT),
+                                egui::vec2(slot, book::cover_height(width) + book::CAPTION_HEIGHT),
                                 egui::Layout::top_down(egui::Align::Center),
                                 |ui| {
                                     ui.push_id(&document.id, |ui| {
@@ -47,11 +41,7 @@ impl YamantakaApp {
                                             self.library_selection.model.contains(&document.id),
                                             self.reduced_motion,
                                             p,
-                                            if self.preview_tilt && document.id == "demo-0" {
-                                                Some(egui::vec2(0.95, 0.75))
-                                            } else {
-                                                None
-                                            },
+                                            self.preview_tilt.filter(|_| document.id == "demo-0"),
                                         )
                                     })
                                     .inner
@@ -98,5 +88,39 @@ impl YamantakaApp {
                 ui.add_space(14.0);
             }
         }
+    }
+}
+
+impl YamantakaApp {
+    pub(super) fn library_catalogue(&mut self, ui: &mut egui::Ui, compact: bool, p: Palette) {
+        self.grouped_library(ui, compact, p);
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled(
+                    self.offset > 0,
+                    egui::Button::new(self.tr("Anterior", "Previous")),
+                )
+                .clicked()
+            {
+                self.offset = self.offset.saturating_sub(80);
+                self.refresh();
+            }
+            ui.label(format!(
+                "{}–{} / {}",
+                self.offset + 1,
+                (self.offset + self.documents.len()).min(self.count as usize),
+                self.count
+            ));
+            if ui
+                .add_enabled(
+                    self.offset + self.documents.len() < self.count as usize,
+                    egui::Button::new(self.tr("Siguiente", "Next")),
+                )
+                .clicked()
+            {
+                self.offset += 80;
+                self.refresh();
+            }
+        });
     }
 }

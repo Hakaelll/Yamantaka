@@ -8,6 +8,8 @@
 
 Yamantaka brings your documents into a personal library, keeps your reading context close, and stores your work locally. The native Rust rewrite pairs a gallery of physical 3D book covers with a focused PDF reader, warm paper environments, and a consistent desktop interface.
 
+The [responsive library](docs/user-guide/library-layout.md) keeps 3D covers readable in short windows and gathers search, filters and view choices into compact menus when space is limited.
+
 Choose **Reading options → Compare pages** to keep a reference beside your reading. Both panes provide navigation, bookmarks, search, text selection, and reading notes, with optional page, zoom, and position following. Workspaces retain the reference and view settings. See the [comparison guide](docs/user-guide/comparing-pdfs.md) for controls, export, and current limits.
 
 Use **Details → Document connections** to connect companion readings, sources, attachments, and replacement editions. Incoming links show the original direction; removing a connection keeps both documents. Its **Revision groups** section collects editions and lets you choose the current member. The [connections guide](docs/user-guide/document-connections.md) describes the workflow and compatibility.
@@ -67,7 +69,7 @@ No account is required. Documents and library data stay on your computer. The pr
 > **Development status:** the Rust rewrite is in progress. It is not yet a replacement release. Flutter 0.15.0+16 remains the recoverable reference implementation. The [acceptance matrix](docs/architecture/rust-rewrite-parity.md) distinguishes verified behavior, partial implementations, and outstanding work.
 
 <p align="center">
-  <img src="docs/screenshots/rust-quiet-chrome/pdf-covers-tilted.png" alt="Native Yamantaka library with PDF-derived 3D books, author captions and a discreet continue-reading action; synthetic PDF collection" width="1100" />
+  <img src="docs/screenshots/rust-compact-gallery/library-wide-light-pdf.png" alt="Native Yamantaka library with PDF-derived 3D books, author captions and a discreet continue-reading action; synthetic PDF collection" width="1100" />
 </p>
 
 *Native Windows capture of an isolated synthetic study collection. The capture demonstrates the current gallery; it is not a photograph of a personal library or proof of complete feature parity.*
