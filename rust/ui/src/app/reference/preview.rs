@@ -1,6 +1,9 @@
 use super::*;
 
 impl YamantakaApp {
+    pub fn preview_reference_regions(&mut self) {
+        self.reference_region_preview = self.demo;
+    }
     pub fn preview_reference_sync(&mut self) {
         if self.demo {
             self.reference_sync_demo = 1;
@@ -236,6 +239,14 @@ impl YamantakaApp {
     pub(in crate::app) fn advance_reference_demo(&mut self) {
         if !self.demo {
             return;
+        }
+        if self.reference_region_preview
+            && let Some(reference) = &mut self.reference
+            && !reference.busy()
+            && reference.pane.reader_preferences.is_some()
+        {
+            reference.set_zoom(ZoomMode::Custom, 4.0);
+            self.reference_region_preview = false;
         }
         if self.advance_reference_text_demo() {
             return;

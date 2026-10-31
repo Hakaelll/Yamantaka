@@ -470,11 +470,20 @@ impl ReferenceView {
                     },
                     page.page + 1
                 );
-                if let Err(error) =
-                    self.pane
-                        .viewport
-                        .paint_page(ui, runtime, &key, paper, &preferences, label)
-                {
+                if let Err(error) = self.pane.viewport.paint_page(
+                    ui,
+                    runtime,
+                    reader_surface::PagePaint {
+                        key: &key,
+                        paper,
+                        preferences: &preferences,
+                        label,
+                        limits: page_refinement::Limits {
+                            cap,
+                            bytes: governor.limits().tiles / 12 / frame.pages.len().max(1),
+                        },
+                    },
+                ) {
                     self.error = Some(error.to_string());
                 }
                 self.pane
@@ -542,7 +551,9 @@ impl ReferenceView {
                     bytes,
                 },
                 self.pane.viewport.generation,
-                !self.pane.viewport.retry && !self.pane.loading,
+                !self.pane.viewport.retry
+                    && !self.pane.loading
+                    && self.pane.viewport.refinements_settled(),
             );
             if let Ok(position) = layout.anchor_at_scroll(&frame, anchor)
                 && let Some(nav) = &mut self.pane.navigation

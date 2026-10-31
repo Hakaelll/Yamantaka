@@ -39,6 +39,7 @@ mod opening;
 mod operations;
 mod outline;
 mod page_prefetch;
+mod page_refinement;
 mod password;
 mod quarantine;
 mod reader_controls;
@@ -111,6 +112,7 @@ enum PageImage {
     Managed(TextureHandle),
 }
 struct ReaderPage {
+    refinement: page_refinement::State,
     requested: Option<RenderKey>,
     cancel: Cancellation,
     image: Option<PageImage>,
@@ -152,6 +154,7 @@ pub struct YamantakaApp {
     reference_chooser_demo: u8,
     reference_chooser_paged: usize,
     reference_sync_demo: u8,
+    reference_region_preview: bool,
     reference_sync_linked: bool,
     reference_sync_position: bool,
     reference_sync_reverse: bool,
@@ -373,6 +376,7 @@ impl YamantakaApp {
             reference_chooser_demo: 0,
             reference_chooser_paged: 0,
             reference_sync_demo: 0,
+            reference_region_preview: false,
             reference_sync_linked: false,
             reference_sync_position: false,
             reference_sync_reverse: false,
@@ -1808,6 +1812,14 @@ impl App for YamantakaApp {
                 }
                 Update::Failed(error, cancel) => {
                     if let Some(token) = &cancel
+                        && (self.reader.viewport.fail_refinement(token)
+                            || self.reference.as_mut().is_some_and(|reference| {
+                                reference.pane.viewport.fail_refinement(token)
+                            }))
+                    {
+                        continue;
+                    }
+                    if let Some(token) = &cancel
                         && self.command_palette.fail(token)
                     {
                         continue;
@@ -2117,8 +2129,10 @@ impl App for YamantakaApp {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut Frame) {
         let prefetch_allowed =
             !self.startup_mode.is_safe() && matches!(self.surface, Surface::Reader);
+        self.reader.viewport.regions_enabled = prefetch_allowed && self.presenter.is_some();
         self.reader.viewport.prefetch.set_enabled(prefetch_allowed);
         if let Some(reference) = &mut self.reference {
+            reference.pane.viewport.regions_enabled = prefetch_allowed && self.presenter.is_some();
             reference
                 .pane
                 .viewport
@@ -2433,6 +2447,8 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
+                    && self.reader.viewport.refinements_settled()
+                    && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.refinements_settled())
                     && self.reader.viewport.prefetch.settled()
                     && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.prefetch.settled())
                     && self.window_state.as_ref().is_none_or(crate::window_state::State::verification_ready)
@@ -2636,6 +2652,8 @@ impl App for YamantakaApp {
                     record["safeStartup"] = self.safe_summary();
                     record["quarantine"] = self.quarantine.summary();
                     record["pagePrefetch"] = self.reader.viewport.prefetch.summary();
+                    record["pageRefinement"] = self.reader.viewport.refinement_summary();
+                    record["referenceRefinement"] = self.reference.as_ref().map(|reference|reference.pane.viewport.refinement_summary()).unwrap_or(serde_json::Value::Null);
                     record["readerPresentationSlots"] = self.reader.viewport.pages.len().into();
                     record["referencePrefetch"] = self.reference.as_ref().map(|reference|reference.pane.viewport.prefetch.summary()).unwrap_or(serde_json::Value::Null);
                     record["windowPlacement"] = self.window_state.as_ref().map(crate::window_state::State::summary).unwrap_or(serde_json::Value::Null);

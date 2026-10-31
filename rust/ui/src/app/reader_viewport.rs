@@ -139,7 +139,7 @@ impl YamantakaApp {
                     displayed,
                 );
                 let label = format!("{} · {} {}", document.display_title(), page_label, visible.page + 1);
-                match self.reader.viewport.paint_page(ui, &self.runtime, &key, paper, &preferences, label) {
+                match self.reader.viewport.paint_page(ui, &self.runtime, reader_surface::PagePaint { key: &key, paper, preferences: &preferences, label, limits: page_refinement::Limits { cap: device_limit, bytes: self.governor.limits().tiles / 6 / if self.reference.is_some() { 2 } else { 1 } / count } }) {
                     Ok(Some(request)) if self.capture.is_some() && self.capture_render_events.len() < 128 => {
                         self.capture_render_events.push(serde_json::json!({
                             "event":"submitted", "document":request.document_id,
@@ -173,7 +173,7 @@ impl YamantakaApp {
             self.reader.viewport.prefetch.plan(ui.ctx(), &self.runtime, page_prefetch::View {
                 document:&document.id,layout:&layout,frame:&frame,preferences:&preferences,
                 dpr,cap:device_limit,bytes:preview_bytes,
-            }, self.reader.viewport.generation, !self.reader.viewport.retry && !self.reader.loading);
+            }, self.reader.viewport.generation, !self.reader.viewport.retry && !self.reader.loading && self.reader.viewport.refinements_settled());
             feedback = layout.anchor_at_scroll(&frame, anchor).ok();
         });
         if let Some(position) = feedback {

@@ -3,9 +3,10 @@ use yamantaka_domain::RenderedPage;
 
 impl ReaderPage {
     pub(super) fn accepts(&self, page: &RenderedPage, cancel: &Cancellation) -> bool {
-        !cancel.is_cancelled()
-            && self.cancel.same_request(cancel)
-            && self.requested.as_ref() == Some(&page.key)
+        self.refinement.accepts(page, cancel)
+            || (!cancel.is_cancelled()
+                && self.cancel.same_request(cancel)
+                && self.requested.as_ref() == Some(&page.key))
     }
 }
 
@@ -42,6 +43,15 @@ impl YamantakaApp {
                 TextureOptions::LINEAR,
             )))
         };
+        if replacement.is_err()
+            && (self.reader.viewport.fail_refinement(cancel)
+                || self
+                    .reference
+                    .as_mut()
+                    .is_some_and(|reference| reference.pane.viewport.fail_refinement(cancel)))
+        {
+            return;
+        }
         if reference {
             if let Some(reference) = &mut self.reference {
                 match replacement {
@@ -69,6 +79,7 @@ impl YamantakaApp {
                         self.capture_render_events.push(serde_json::json!({
                             "event":"installed","document":page.key.document_id,
                             "page":page.key.page,"generation":page.key.generation,
+                            "region":page.key.region,"canvas":[page.key.physical_width,page.key.physical_height],
                             "rotation":page.key.rotation,"pixels":[page.width,page.height],
                             "replacedImage":replaced,
                         }));

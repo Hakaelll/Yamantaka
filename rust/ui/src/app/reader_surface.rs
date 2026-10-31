@@ -2,6 +2,7 @@ use super::*;
 
 pub(super) struct ReaderSurface {
     pub prefetch: page_prefetch::State,
+    pub regions_enabled: bool,
     pub scale: f32,
     pub pages: HashMap<u32, ReaderPage>,
     pub layout: Option<Arc<ReaderLayout>>,
@@ -16,6 +17,7 @@ impl Default for ReaderSurface {
     fn default() -> Self {
         Self {
             prefetch: Default::default(),
+            regions_enabled: false,
             scale: 1.0,
             pages: HashMap::new(),
             layout: None,
@@ -28,25 +30,55 @@ impl Default for ReaderSurface {
     }
 }
 
+pub(super) struct PagePaint<'a> {
+    pub key: &'a RenderKey,
+    pub paper: egui::Rect,
+    pub preferences: &'a ReaderPreferences,
+    pub label: String,
+    pub limits: page_refinement::Limits,
+}
+
 impl ReaderSurface {
     pub fn paint_page(
         &mut self,
         ui: &mut egui::Ui,
         runtime: &Runtime,
-        key: &RenderKey,
-        paper: egui::Rect,
-        preferences: &ReaderPreferences,
-        label: String,
+        paint: PagePaint<'_>,
     ) -> yamantaka_domain::Result<Option<RenderKey>> {
+        let PagePaint {
+            key,
+            paper,
+            preferences,
+            label,
+            limits,
+        } = paint;
+        let region = self
+            .regions_enabled
+            .then(|| {
+                page_refinement::target(
+                    key,
+                    paper,
+                    ui.clip_rect(),
+                    ui.ctx().pixels_per_point(),
+                    limits,
+                )
+            })
+            .flatten();
         let slot = self.pages.entry(key.page).or_insert_with(|| ReaderPage {
             requested: None,
             cancel: Cancellation::default(),
             image: None,
             image_key: None,
             plan: Default::default(),
+            refinement: Default::default(),
         });
+        let base = if region.is_some() && !slot.refinement.blocked() {
+            render_plan::preview_key(key)
+        } else {
+            key.clone()
+        };
         let decision = slot.plan.next(
-            key,
+            &base,
             slot.image_key.as_ref(),
             slot.requested.as_ref(),
             Instant::now(),
@@ -109,6 +141,14 @@ impl ReaderSurface {
         } else {
             ui.painter().rect_filled(paper, 1, Color32::WHITE);
         }
+        slot.refinement.paint(
+            ui,
+            runtime,
+            region,
+            paper,
+            key.rotation,
+            slot.plan.ready(slot.image_key.as_ref()),
+        );
         match failure {
             Some(error) => Err(error),
             None => Ok(submitted),
@@ -131,10 +171,30 @@ impl ReaderSurface {
         if !slot.accepts(page, cancel) {
             return None;
         }
+        if slot.refinement.accepts(page, cancel) {
+            return Some(slot.refinement.install(page, image));
+        }
         let replaced = slot.image_key.is_some();
         slot.image = Some(image);
         slot.image_key = Some(page.key.clone());
         Some(replaced)
+    }
+
+    pub fn fail_refinement(&mut self, cancel: &Cancellation) -> bool {
+        self.pages
+            .values_mut()
+            .any(|slot| slot.refinement.fail(cancel))
+    }
+    pub fn refinements_settled(&self) -> bool {
+        self.pages.values().all(|slot| slot.refinement.settled())
+    }
+    pub fn refinement_summary(&self) -> serde_json::Value {
+        serde_json::Value::Array(
+            self.pages
+                .values()
+                .map(|slot| slot.refinement.summary())
+                .collect(),
+        )
     }
 
     pub fn reset_requests(&mut self) {
@@ -145,6 +205,7 @@ impl ReaderSurface {
         for page in self.pages.values_mut() {
             page.cancel.cancel();
             page.requested = None;
+            page.refinement.reset();
         }
     }
 

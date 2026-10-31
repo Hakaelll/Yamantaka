@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-region-zoom'; args=@('--reader','--reader-zoom=4','--es') },
+    @{ name='reader-region-rotated'; args=@('--reader','--reader-zoom=4','--rotation=90','--light') },
+    @{ name='reader-region-comparison'; args=@('--reader','--reader-zoom=4','--reference','--reference-regions','--light') },
+    @{ name='reader-region-glow'; args=@('--reader','--reader-zoom=4','--software') },
     @{ name='reader-prefetch-single'; args=@('--reader','--es') },
     @{ name='reader-prefetch-comparison'; args=@('--reader','--reference','--light') },
     @{ name='reader-prefetch-continuous'; args=@('--reader','--continuous') },
@@ -472,6 +476,25 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'reader-region-*') {
+        $regions = @($controls.pageRefinement)
+        $comparison = $case.name -eq 'reader-region-comparison'
+        if ($comparison) { $regions += @($controls.referenceRefinement) }
+        $allowance = if ($comparison) { 2MB } else { 4MB }
+        foreach ($region in $regions) {
+            if (-not $region.settled -or $region.blocked) { throw 'Visible crop did not settle successfully.' }
+            if ($case.name -eq 'reader-region-glow') {
+                if ($region.target -or $region.image) { throw 'Glow unexpectedly requested a region.' }
+                continue
+            }
+            if (-not $region.image -or ($region.target | ConvertTo-Json -Compress) -cne ($region.image | ConvertTo-Json -Compress)) { throw 'Visible crop was not installed.' }
+            $canvas = $region.image.canvas
+            $crop = $region.image.region
+            if ($crop.Count -ne 4 -or $crop[2] -le 0 -or $crop[3] -le 0 -or $crop[0] -lt 0 -or $crop[1] -lt 0 -or ($crop[0]+$crop[2]) -gt $canvas[0] -or ($crop[1]+$crop[3]) -gt $canvas[1] -or $canvas[0] -gt 16384 -or $canvas[1] -gt 16384 -or ([long]$crop[2]*$crop[3]*4) -gt $allowance) { throw 'Invalid or oversized visible crop.' }
+        }
+        if ($comparison -and $regions.Count -lt 2) { throw 'Comparison must exercise both panes.' }
+        if ($controls.trackedMemory.tiles -gt 24MB) { throw 'Tracked tile budget exceeded.' }
+    }
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
     if ($case.name -like 'startup-recovery-*') {
         $result = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'result.json')) -Raw -Encoding UTF8 | ConvertFrom-Json

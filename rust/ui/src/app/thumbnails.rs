@@ -287,6 +287,7 @@ impl ThumbnailState {
                         image: None,
                         image_key: None,
                         plan: Default::default(),
+                        refinement: Default::default(),
                     });
                     if slot.requested.as_ref() != Some(&key) {
                         slot.cancel.cancel();

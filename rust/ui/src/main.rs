@@ -606,6 +606,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             {
                 reading.reading_theme = ReaderTheme::from_persisted(value)?;
             }
+            if let Some(value) = arg
+                .to_str()
+                .and_then(|arg| arg.strip_prefix("--reader-zoom="))
+            {
+                reading.zoom_mode = ZoomMode::Custom;
+                reading.zoom_level = value.parse()?;
+            }
             if let Some(value) = arg.to_str().and_then(|arg| arg.strip_prefix("--rotation=")) {
                 reading.page_rotation = PageRotation::from_degrees(value.parse()?)?;
             }
@@ -1571,6 +1578,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| arg == "--reference-regions") {
+                        app.preview_reference_regions();
+                    }
                     if args.iter().any(|arg| arg == "--reference-notes") {
                         app.preview_reference_notes(
                             !args.iter().any(|arg| arg == "--reference-book"),
