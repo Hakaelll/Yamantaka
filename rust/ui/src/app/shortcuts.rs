@@ -1,6 +1,7 @@
 use eframe::egui;
 pub(super) mod bindings;
 mod focus;
+pub(super) mod reader_commands;
 mod settings;
 mod verification;
 pub(super) use focus::{ReadingFocus, ReadingTarget};
@@ -10,6 +11,12 @@ pub(super) use preview::ShortcutPreview;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Shortcut {
+    GoToPage,
+    Navigator,
+    TogglePanel,
+    ToggleBookmark,
+    ToggleChrome,
+    ToggleImmersive,
     OpenDocument,
     ActualSize,
     FitWidth,
@@ -108,4 +115,10 @@ pub(super) fn read(
         });
         commands
     })
+}
+
+pub(super) fn available_outside_reader(command: Shortcut) -> bool {
+    bindings::DEFINITIONS
+        .iter()
+        .any(|item| item.command == command && item.global)
 }

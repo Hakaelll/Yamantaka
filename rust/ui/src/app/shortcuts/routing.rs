@@ -7,6 +7,9 @@ impl YamantakaApp {
         ctx: &egui::Context,
         shortcut: &Shortcut,
     ) -> bool {
+        if self.dispatch_legacy_reader_command(ctx, *shortcut) {
+            return true;
+        }
         if matches!(
             shortcut,
             Shortcut::PreviousPage

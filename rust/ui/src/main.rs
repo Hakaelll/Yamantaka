@@ -855,6 +855,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 },
             );
             cc.egui_ctx.set_zoom_factor(app.text_scale());
+            if args.iter().any(|arg| arg == "--legacy-reader-commands") {
+                app.preview_legacy_reader_commands(
+                    args.iter().any(|arg| arg == "--page-jump-review"),
+                );
+            }
+
             if args
                 .iter()
                 .any(|arg| arg == "--shortcut-settings" || arg == "--custom-shortcuts")

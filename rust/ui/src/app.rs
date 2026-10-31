@@ -186,6 +186,8 @@ pub struct YamantakaApp {
     modified_only: bool,
     list: bool,
     library_density: yamantaka_domain::workspaces::WorkspaceDensity,
+    reader_chrome_hidden: bool,
+    page_jump: Option<shortcuts::reader_commands::PageJump>,
     reader_focus: bool,
     offset: usize,
     selected: Option<String>,
@@ -411,6 +413,8 @@ impl YamantakaApp {
             library_density,
             shortcut_bindings,
             shortcut_error: None,
+            reader_chrome_hidden: false,
+            page_jump: None,
             reader_focus: false,
             offset: 0,
             selected: None,
@@ -692,6 +696,7 @@ impl YamantakaApp {
         self.cover_picker = None;
         self.runtime.wake();
         if !matches!(surface, Surface::Reader) {
+            self.page_jump = None;
             if self.reference.is_some() {
                 self.reader.viewport.scroll_anchor = true;
             }
@@ -1345,6 +1350,8 @@ impl YamantakaApp {
             self.prepare_annotations(&document.id);
             self.reader.text.clear();
             self.reader.thumbnails.clear();
+        }
+        if self.reader_chrome_hidden {
             self.reader_focus_exit(ui, p);
         } else {
             self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
@@ -2187,7 +2194,8 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
-        let shortcut_modal = self.password.is_some()
+        let shortcut_modal = self.page_jump.is_some()
+            || self.password.is_some()
             || self.link_confirmation_open()
             || self.bulk_picker.is_some()
             || self.selection_review_open()
@@ -2255,6 +2263,14 @@ impl App for YamantakaApp {
                     .is_some_and(|reference| reference.pane.selection.focused_page(&ctx).is_some()),
             &self.shortcut_bindings,
         ) {
+            if self.page_jump.is_some() && shortcut != shortcuts::Shortcut::Fullscreen {
+                continue;
+            }
+            if !matches!(self.surface, Surface::Reader)
+                && !shortcuts::available_outside_reader(shortcut)
+            {
+                continue;
+            }
             if self.dispatch_reading_shortcut(&ctx, &shortcut) {
                 continue;
             }
@@ -2265,6 +2281,12 @@ impl App for YamantakaApp {
                 | shortcuts::Shortcut::FitPage
                 | shortcuts::Shortcut::HistoryBack
                 | shortcuts::Shortcut::HistoryForward => unreachable!(),
+                shortcuts::Shortcut::GoToPage
+                | shortcuts::Shortcut::Navigator
+                | shortcuts::Shortcut::TogglePanel
+                | shortcuts::Shortcut::ToggleBookmark
+                | shortcuts::Shortcut::ToggleChrome
+                | shortcuts::Shortcut::ToggleImmersive => unreachable!(),
                 shortcuts::Shortcut::OpenDocument => {
                     if let Some(paths) = yamantaka_windows::pick_pdfs() {
                         self.import(paths);
@@ -2290,8 +2312,7 @@ impl App for YamantakaApp {
                     ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
                 }
                 shortcuts::Shortcut::Focus => {
-                    self.reader_focus = !self.reader_focus;
-                    ctx.request_repaint();
+                    self.toggle_immersive_reader(&ctx);
                 }
             }
         }
@@ -2445,6 +2466,7 @@ impl App for YamantakaApp {
         self.reading_queue_dialog(&ctx);
         self.workspace_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
+        self.page_jump_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
         self.pump_library_covers(&ctx);
@@ -2660,6 +2682,7 @@ impl App for YamantakaApp {
                     record["ruleExecution"] = self.automation.execution_summary();
                     record["automationRules"] = self.automation.summary();
                     record["revisionGroups"] = self.revision_capture_summary();
+                    record["readerControls"]=serde_json::json!({"chromeHidden":self.reader_chrome_hidden,"immersive":self.reader_focus,"pageJump":self.page_jump.is_some(),"primaryPanel":self.reader.panel});
                     record["shortcutBindings"]=self.shortcut_bindings.summary();
                     record["shortcutConflict"]=self.shortcut_error.is_some().into();
                     record["relations"] = self.relations.summary();

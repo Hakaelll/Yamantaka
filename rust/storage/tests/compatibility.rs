@@ -178,6 +178,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     relation_verification::verify(DOCUMENT);
     revision_verification::verify(DOCUMENT);
     automation_verification::verify();
+    verify_bookmark_toggle();
 }
 
 #[test]
@@ -210,4 +211,52 @@ fn atomic_preferences_keep_unknown_keys_and_reject_future_versions() {
     );
     fs::write(&path, r#"{"version":2,"legacy":{}}"#).unwrap();
     assert!(Preferences::load(&path).is_err());
+}
+
+fn verify_bookmark_toggle() {
+    use yamantaka_domain::bookmarks::{BookmarkChange, BookmarkRepository};
+    use yamantaka_domain::search::IndexAccess;
+    let mut db = Database::in_memory_at(11).unwrap();
+    db.execute_batch(DOCUMENT).unwrap();
+    db.execute_batch("WITH RECURSIVE n(x) AS (SELECT 0 UNION ALL SELECT x+1 FROM n WHERE x<100) INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) SELECT printf('bookmark-%03d',x),'original',x,'Keep label','old','old' FROM n").unwrap();
+    let cancel = Cancellation::default();
+    let change = BookmarkChange::Toggle { page: 200 };
+    let page = db
+        .change_bookmark("original", &change, 0, IndexAccess::Disabled, &cancel)
+        .unwrap();
+    assert_eq!(page.total, 102);
+    assert!(
+        page.entries
+            .iter()
+            .all(|entry| entry.page_index < 80 && entry.label.as_deref() == Some("Keep label"))
+    );
+    assert_eq!(
+        db.change_bookmark("original", &change, 0, IndexAccess::Disabled, &cancel)
+            .unwrap()
+            .total,
+        101
+    );
+    let cancelled = Cancellation::default();
+    cancelled.cancel();
+    assert!(
+        db.change_bookmark(
+            "original",
+            &BookmarkChange::Toggle { page: 0 },
+            0,
+            IndexAccess::Disabled,
+            &cancelled
+        )
+        .is_err()
+    );
+    assert_eq!(
+        db.bookmarks("original", 0, &cancel).unwrap().entries[0].id,
+        "bookmark-000"
+    );
+    db.execute_batch("CREATE TEMP TRIGGER reject_toggle BEFORE INSERT ON bookmarks BEGIN SELECT RAISE(ABORT,'synthetic toggle failure'); END;").unwrap();
+    assert!(
+        db.change_bookmark("original", &change, 0, IndexAccess::Disabled, &cancel)
+            .is_err()
+    );
+    assert_eq!(db.bookmarks("original", 0, &cancel).unwrap().total, 101);
+    db.integrity().unwrap();
 }

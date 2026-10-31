@@ -144,10 +144,15 @@ impl ReferenceView {
         english: bool,
         p: Palette,
         primary: &reader_pane::ReaderPane,
+        hide_controls: bool,
     ) -> bool {
         let runtime = tools.runtime;
         let governor = tools.governor;
         let tr = |es, en| if english { en } else { es };
+        if hide_controls && !self.busy() {
+            self.viewport(ui, runtime, governor, english, p);
+            return false;
+        }
         let mut close = false;
         let can_choose = self.pane.active.as_ref().map(|(doc, _)| &doc.id)
             == primary.active.as_ref().map(|(doc, _)| &doc.id);
@@ -685,6 +690,7 @@ impl YamantakaApp {
                         self.english,
                         p,
                         &self.reader,
+                        self.reader_chrome_hidden,
                     );
                     selected = reference.selection.take();
                     difference = reference.difference_target.take();

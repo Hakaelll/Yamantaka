@@ -1,12 +1,16 @@
 use super::ReadingTarget;
 #[path = "history_preview.rs"]
 mod history;
+#[path = "legacy_preview.rs"]
+mod legacy;
 use crate::app::*;
 
 #[derive(Default)]
 pub(in crate::app) struct ShortcutPreview {
     phase: u8,
     pub(in crate::app) custom: bool,
+    legacy: bool,
+    jump_review: bool,
     close: bool,
     history: bool,
     primary_positions: bool,
@@ -19,7 +23,7 @@ pub(in crate::app) struct ShortcutPreview {
 
 impl ShortcutPreview {
     pub fn ready(&self) -> bool {
-        matches!(self.phase, 0 | 14 | 16 | 34)
+        matches!(self.phase, 0 | 14 | 16 | 34 | 50)
     }
     pub fn phase(&self) -> u8 {
         self.phase
@@ -29,6 +33,9 @@ impl ShortcutPreview {
     }
     fn key(&mut self, phase: u8, key: egui::Key, modifiers: egui::Modifiers) {
         self.phase = phase;
+        if self.legacy {
+            eprintln!("Reader command preview: phase {phase}");
+        }
         let (key, modifiers) = if self.custom {
             match (key, modifiers) {
                 (egui::Key::F6, egui::Modifiers::NONE) => (egui::Key::F7, egui::Modifiers::NONE),
@@ -41,6 +48,8 @@ impl ShortcutPreview {
         } else {
             (key, modifiers)
         };
+        let mut modifiers = modifiers;
+        modifiers.command = modifiers.ctrl;
         for pressed in [true, false] {
             self.pending.push(egui::Event::Key {
                 key,
@@ -81,6 +90,10 @@ impl YamantakaApp {
                     .as_ref()
                     .is_some_and(|(doc, _)| doc.id == "demo-1")
         });
+        if self.reference_shortcuts_preview.legacy {
+            self.advance_legacy_reader_preview(ctx, reference_ready);
+            return;
+        }
         if self.reference_shortcuts_preview.phase >= 20 {
             self.advance_history_preview(ctx, reference_ready);
             return;

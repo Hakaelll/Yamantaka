@@ -25,9 +25,13 @@ impl YamantakaApp {
                             &format!(
                                 "{} · {}",
                                 self.tr("Salir de concentración", "Exit focus mode"),
-                                shortcuts::bindings::caption(
-                                    self.shortcut_bindings.token(shortcuts::Shortcut::Focus)
-                                )
+                                shortcuts::bindings::caption(self.shortcut_bindings.token(
+                                    if self.reader_focus {
+                                        shortcuts::Shortcut::Focus
+                                    } else {
+                                        shortcuts::Shortcut::ToggleChrome
+                                    }
+                                ))
                             ),
                             theme::Icon::Panel,
                             p,
@@ -35,6 +39,7 @@ impl YamantakaApp {
                         .clicked()
                         {
                             self.reader_focus = false;
+                            self.reader_chrome_hidden = false;
                         }
                     });
             });

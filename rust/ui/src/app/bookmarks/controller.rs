@@ -41,6 +41,7 @@ impl BookmarkState {
         let writing = self.pending.take().unwrap().1;
         match result {
             Ok(page) => {
+                self.stale = false;
                 self.page = Some(page);
                 self.error = None;
                 self.saved = writing;
@@ -101,6 +102,17 @@ impl BookmarkState {
             "offset":self.page.as_ref().map(|page|page.offset),
             "entries":self.page.as_ref().map(|page|&page.entries)})
     }
+    pub(in crate::app) fn toggle(&mut self, runtime: &Runtime, document: &str, page: u32) {
+        self.bind(document);
+        if self.pending.as_ref().is_some_and(|(_, writing)| *writing) {
+            return;
+        }
+        if let Some((cancel, _)) = self.pending.take() {
+            cancel.cancel();
+        }
+        let offset = self.page.as_ref().map_or(0, |page| page.offset);
+        self.command(runtime, offset, Some(BookmarkChange::Toggle { page }));
+    }
     pub(in crate::app) fn command(
         &mut self,
         runtime: &Runtime,
@@ -116,7 +128,7 @@ impl BookmarkState {
         let cancel = Cancellation::default();
         let writing = change.is_some();
         self.clear_edit = self.editing.as_ref().is_some_and(|editing| {
-            matches!(&change, Some(BookmarkChange::Rename { id, .. } | BookmarkChange::Remove { id }) if id == &editing.id)
+            matches!(&change, Some(BookmarkChange::Rename { id, .. } | BookmarkChange::Remove { id }) if id == &editing.id) || matches!(&change,Some(BookmarkChange::Toggle {page}) if *page==editing.page_index)
         });
         let action = match change {
             Some(change) => Action::ChangeBookmark(document, change, offset, cancel.clone()),

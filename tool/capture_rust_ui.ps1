@@ -65,6 +65,8 @@ $cases = @(
     @{ name='reader-reference-history'; args=@('--reader','--reference','--reference-book','--reference-history','--reference-swap','--es') },
     @{ name='reader-reference-history-small-200'; args=@('--reader','--reference','--reference-book','--reference-history','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-primary-history'; args=@('--reader','--reference','--reference-book','--reference-history','--history-primary') },
+    @{ name='legacy-reader-commands'; args=@('--reader','--reference','--reference-book','--legacy-reader-commands','--es') },
+    @{ name='legacy-reader-jump-small-200'; args=@('--reader','--reference','--reference-book','--legacy-reader-commands','--page-jump-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='shortcut-settings'; args=@('--shortcut-settings','--es','--light') },
     @{ name='shortcut-conflict-small-200'; args=@('--shortcut-settings','--shortcut-conflict','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='reader-custom-shortcuts'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--custom-shortcuts','--es') },
@@ -545,9 +547,18 @@ foreach ($case in $cases) {
         $labels=if ($case.name -eq 'revision-groups-current-small-200') {@('Marcar como actual')} elseif ($case.name -eq 'revision-groups-created') {@('New group','View editions')} else {@('Nuevo grupo','Ver ediciones')}
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
+    if($case.name -like 'legacy-reader-*') {
+        if($controls.referenceShortcutPhase -ne 50 -or $controls.shortcutBindings.known -ne 27 -or $controls.currentReaderPage -ne 0){throw 'Legacy reader command sequence did not finish in the correct document.'}
+        if($case.name -eq 'legacy-reader-commands') {
+            if(-not $controls.readerControls.immersive -or $controls.readerControls.primaryPanel -or $controls.reference.page -ne 1 -or $controls.reference.bookmarks.total -ne 1 -or $controls.readerControls.pageJump){throw 'Focused page, bookmark, panel, or immersive state is inconsistent.'}
+        }else {
+            if(-not $controls.readerControls.pageJump -or $controls.reference.page -ne 0){throw 'Page jump review changed the reference before confirmation.'}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Ir a la página','Cancelar')
+        }
+    }
     if ($case.name -like 'shortcut-*' -or $case.name -eq 'reader-custom-shortcuts') {
         $keys=$controls.shortcutBindings
-        if($keys.warning -or $keys.known -ne 21 -or $keys.unavailable -ne 1 -or $keys.nextPage -ne 'ctrl-right' -or $keys.switchPane -ne 'f7' -or $keys.zoomIn -ne 'ctrl-d'){throw 'Shortcut assignment, preservation, or persisted reload failed.'}
+        if($keys.warning -or $keys.known -ne 27 -or $keys.unavailable -ne 1 -or $keys.nextPage -ne 'ctrl-right' -or $keys.switchPane -ne 'f7' -or $keys.zoomIn -ne 'ctrl-d'){throw 'Shortcut assignment, preservation, or persisted reload failed.'}
         if($controls.shortcutConflict -ne ($case.name -eq 'shortcut-conflict-small-200')){throw 'Conflicting shortcut changed the active map or did not report its owner.'}
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath)
     }

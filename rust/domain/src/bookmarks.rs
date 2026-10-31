@@ -23,6 +23,9 @@ pub struct BookmarkPage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BookmarkChange {
+    Toggle {
+        page: u32,
+    },
     /// Add an unnamed bookmark without overwriting an existing page's label.
     Ensure {
         page: u32,

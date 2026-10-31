@@ -272,7 +272,7 @@ impl ReferenceView {
         self.pane.panel = shown.is_some();
     }
 
-    pub(super) fn stop_navigator_requests(&mut self) {
+    pub(in crate::app) fn stop_navigator_requests(&mut self) {
         self.pane.find.stop();
         self.pane.outline.cancel();
         self.pane.thumbnails.clear();

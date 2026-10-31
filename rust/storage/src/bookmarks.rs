@@ -102,7 +102,9 @@ impl BookmarkRepository for Database {
             .map_err(storage)?;
         exists.ok_or_else(|| Failure::Invalid("Bookmark document no longer exists".into()))?;
         let target_page = match change {
-            BookmarkChange::Ensure { page } | BookmarkChange::Save { page, .. } => *page,
+            BookmarkChange::Toggle { page }
+            | BookmarkChange::Ensure { page }
+            | BookmarkChange::Save { page, .. } => *page,
             BookmarkChange::Rename { id, .. } | BookmarkChange::Remove { id } => tx
                 .query_row(
                     "SELECT page_index FROM bookmarks WHERE id=? AND document_id=?",
@@ -117,6 +119,17 @@ impl BookmarkRepository for Database {
         };
         let now = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
         match change {
+            BookmarkChange::Toggle { page } => {
+                let removed = tx
+                    .execute(
+                        "DELETE FROM bookmarks WHERE document_id=? AND page_index=?",
+                        params![document_id, page],
+                    )
+                    .map_err(storage)?;
+                if removed == 0 {
+                    tx.execute("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES(?,?,?,NULL,?,?)",params![uuid::Uuid::new_v4().to_string(),document_id,page,now,now]).map_err(storage)?;
+                }
+            }
             BookmarkChange::Ensure { page } => {
                 tx.execute("INSERT INTO bookmarks(id,document_id,page_index,label,created_at,updated_at) VALUES(?,?,?,NULL,?,?) ON CONFLICT(document_id,page_index) DO NOTHING", params![uuid::Uuid::new_v4().to_string(), document_id, page, now, now]).map_err(storage)?;
             }

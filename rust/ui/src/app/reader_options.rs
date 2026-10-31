@@ -180,7 +180,7 @@ impl YamantakaApp {
         )
         .clicked()
         {
-            self.reader_focus = !self.reader_focus;
+            self.toggle_immersive_reader(ui.ctx());
             ui.close();
         }
         if theme::navigation(
