@@ -4,6 +4,14 @@ use yamantaka_application::annotation_export::{
     worker::{AnnotationExportReply, AnnotationExportRequest, AnnotationExportScope},
 };
 
+mod view;
+#[derive(Clone, Copy)]
+pub(in crate::app) enum ExportTarget {
+    Primary,
+    Reference,
+    Review,
+}
+
 struct PendingExport {
     scope: AnnotationExportScope,
     cancel: Cancellation,
@@ -13,6 +21,7 @@ pub(in crate::app) struct ExportState {
     pending: Option<PendingExport>,
     outcome: Option<(AnnotationExportScope, yamantaka_domain::Result<u64>)>,
     preview: Option<AnnotationExportFormat>,
+    preview_target: Option<ExportTarget>,
     artifact: Option<String>,
 }
 impl ExportState {
@@ -32,7 +41,16 @@ impl ExportState {
             Some((_, Ok(count))) => (true, *count),
             _ => (false, 0),
         };
-        serde_json::json!({"pending":self.busy(),"saved":saved,"count":count,"artifact":self.artifact})
+        let scope = self
+            .pending
+            .as_ref()
+            .map(|pending| &pending.scope)
+            .or_else(|| self.outcome.as_ref().map(|(scope, _)| scope));
+        let document = match scope {
+            Some(AnnotationExportScope::Document(id)) => Some(id),
+            _ => None,
+        };
+        serde_json::json!({"pending":self.busy(),"saved":saved,"count":count,"artifact":self.artifact,"document":document})
     }
     pub(in crate::app) fn accept(&mut self, reply: AnnotationExportReply) {
         if !self.pending.as_ref().is_some_and(|pending| {
@@ -58,27 +76,6 @@ impl YamantakaApp {
             });
         }
     }
-    fn annotation_export_scope_label(&self, ui: &mut egui::Ui, scope: &AnnotationExportScope) {
-        match scope {
-            AnnotationExportScope::Review => {
-                ui.label(self.tr("Exportación de la revisión global", "Global review export"));
-            }
-            AnnotationExportScope::Document(id)
-                if matches!(self.surface, Surface::Notes)
-                    || self
-                        .reader
-                        .active
-                        .as_ref()
-                        .is_some_and(|(active, _)| active.id != *id) =>
-            {
-                ui.label(self.tr(
-                    "Exportación del documento anterior",
-                    "Export for the previous document",
-                ));
-            }
-            _ => {}
-        }
-    }
     pub fn preview_annotation_export(&mut self, markdown: bool) {
         if self.demo && self.capture.is_some() {
             self.preview_annotation_list();
@@ -89,11 +86,31 @@ impl YamantakaApp {
             });
         }
     }
+    pub fn preview_reference_annotation_export(&mut self, markdown: bool) {
+        if self.demo && self.capture.is_some() {
+            self.annotation_export.preview = Some(if markdown {
+                AnnotationExportFormat::Markdown
+            } else {
+                AnnotationExportFormat::Json
+            });
+            self.annotation_export.preview_target = Some(ExportTarget::Reference);
+        }
+    }
     pub(in crate::app) fn apply_annotation_export_preview(&mut self) {
-        let ready = if matches!(self.surface, Surface::Notes) {
-            self.global_notes.export_ready()
-        } else {
-            self.reader.annotations.ready()
+        let target = self
+            .annotation_export
+            .preview_target
+            .unwrap_or_else(|| self.current_export_target());
+        let ready = match target {
+            ExportTarget::Review => self.global_notes.export_ready(),
+            ExportTarget::Primary => self.reader.annotations.ready(),
+            ExportTarget::Reference => {
+                self.reference_notes_preview.ready()
+                    && self
+                        .reference
+                        .as_ref()
+                        .is_some_and(|view| view.pane.annotations.ready())
+            }
         };
         if self.annotation_preview != 0 || !ready || self.reader.annotations.editing() {
             return;
@@ -108,25 +125,37 @@ impl YamantakaApp {
         self.annotation_export.artifact = path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned());
-        self.start_annotation_export(path, format);
+        self.start_notes_export(target, path, format);
     }
-    fn start_annotation_export(&mut self, path: PathBuf, format: AnnotationExportFormat) {
-        if self.annotation_export.pending.is_some() {
+    fn start_notes_export(
+        &mut self,
+        target: ExportTarget,
+        path: PathBuf,
+        format: AnnotationExportFormat,
+    ) {
+        if self.annotation_export.pending.is_some() || !self.can_export_notes(target) {
             return;
         }
-        let request = if matches!(self.surface, Surface::Notes) {
+        let request = if matches!(target, ExportTarget::Review) {
             let Some(query) = self.global_notes.export_query() else {
                 return;
             };
             AnnotationExportRequest::review(query, path, format, self.governor.clone())
         } else {
-            let Some((document, info)) = self.reader.active.as_ref() else {
+            let pane = match target {
+                ExportTarget::Reference => match &self.reference {
+                    Some(view) => &view.pane,
+                    None => return,
+                },
+                _ => &self.reader,
+            };
+            let Some((document, info)) = pane.active.as_ref() else {
                 return;
             };
             let progress = if info.pages.is_empty() {
                 0.0
             } else {
-                (u64::from(self.reader.page) + 1) as f64 / info.pages.len() as f64
+                (u64::from(pane.page) + 1) as f64 / info.pages.len() as f64
             };
             AnnotationExportRequest::new(document, progress, path, format, self.governor.clone())
         };
@@ -140,152 +169,86 @@ impl YamantakaApp {
             Err(error) => self.annotation_export.outcome = Some((id, Err(error))),
         }
     }
-    pub(in crate::app) fn annotation_export_panel(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let review = matches!(self.surface, Surface::Notes);
-        ui.separator();
-        ui.add_space(8.0);
-        if let Some(pending) = &self.annotation_export.pending {
-            self.annotation_export_scope_label(ui, &pending.scope);
-            let cancel = pending.cancel.clone();
-            let cancelling = cancel.is_cancelled();
-            ui.horizontal_wrapped(|ui| {
-                ui.spinner();
-                ui.label(self.tr(
-                    if cancelling {
-                        "Cancelando exportación…"
-                    } else {
-                        "Guardando tus notas…"
-                    },
-                    if cancelling {
-                        "Cancelling export…"
-                    } else {
-                        "Saving your notes…"
-                    },
-                ));
-                if ui
-                    .add_enabled_ui(!cancelling, |ui| {
-                        theme::navigation(ui, self.tr("Cancelar", "Cancel"), false, p)
-                    })
-                    .inner
-                    .clicked()
-                {
-                    cancel.cancel();
-                }
-            });
+    fn current_export_target(&self) -> ExportTarget {
+        if matches!(self.surface, Surface::Notes) {
+            ExportTarget::Review
         } else {
-            let can_export = if review {
-                self.global_notes.export_ready() && !self.reader.annotations.editing()
-            } else {
-                self.reader.annotations.pending.is_none() && self.reader.active.is_some()
-            };
-            let mut selected = None;
-            ui.add_enabled_ui(can_export, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label(self.tr("Exportar", "Export"));
-                    for (format, label) in [
-                        (AnnotationExportFormat::Markdown, "Markdown"),
-                        (AnnotationExportFormat::Json, "JSON"),
-                    ] {
-                        if theme::navigation(ui, label, false, p)
-                            .on_hover_text(self.tr(
-                                if review {
-                                    "Exportar esta página filtrada, hasta 80 notas"
-                                } else {
-                                    "Exportar todas las notas del documento"
-                                },
-                                if review {
-                                    "Export this filtered page, up to 80 notes"
-                                } else {
-                                    "Export every note in this document"
-                                },
-                            ))
-                            .clicked()
-                        {
-                            selected = Some(format);
-                        }
-                    }
-                });
-            });
-            ui.label(
-                RichText::new(self.tr(
-                    if review {
-                        "Incluye esta página filtrada, hasta 80 notas. Elige un archivo nuevo."
-                    } else {
-                        "Incluye todas las páginas. Elige un archivo nuevo."
-                    },
-                    if review {
-                        "Includes this filtered page, up to 80 notes. Choose a new file."
-                    } else {
-                        "Includes every page. Choose a new file."
-                    },
-                ))
-                .size(12.0)
-                .color(p.secondary),
-            );
-            if let Some(format) = selected {
-                match yamantaka_windows::annotation_export::pick_annotation_export(
-                    self.tr(
-                        "Guardar notas en un archivo nuevo",
-                        "Save notes to a new file",
-                    ),
-                    format.extension(),
-                ) {
-                    Ok(Some(path)) => self.start_annotation_export(path, format),
-                    Ok(None) => {}
-                    Err(error) => {
-                        let scope = if review {
-                            Some(AnnotationExportScope::Review)
-                        } else {
-                            self.reader.active.as_ref().map(|(document, _)| {
-                                AnnotationExportScope::Document(document.id.clone())
-                            })
-                        };
-                        if let Some(scope) = scope {
-                            self.annotation_export.outcome = Some((scope, Err(error)));
-                        }
-                    }
-                }
-            }
+            ExportTarget::Primary
         }
-        if let Some((document, result)) = &self.annotation_export.outcome {
-            ui.add_space(8.0);
-            self.annotation_export_scope_label(ui, document);
-            match result {
-                Ok(count) => {
-                    ui.label(
-                        RichText::new(if self.english {
-                            format!("Saved {count} notes.")
-                        } else {
-                            format!("Se guardaron {count} notas.")
-                        })
-                        .color(p.ink),
-                    );
-                }
-                Err(Failure::Cancelled) => {
-                    ui.label(self.tr(
-                        "Exportación cancelada. No se guardó ningún archivo.",
-                        "Export cancelled. No file was saved.",
-                    ));
-                }
-                Err(Failure::DestinationOccupied) => {
-                    ui.label(self.tr(
-                        "Ese archivo ya existe. Elige otro nombre para conservarlo.",
-                        "That file already exists. Choose another name to keep it intact.",
-                    ));
-                }
-                Err(error) => {
-                    ui.label(self.tr(
-                        "No se pudieron exportar las notas. Vuelve a intentarlo con otro destino.",
-                        "Could not export your notes. Try another destination.",
-                    ));
-                    ui.collapsing(
-                        self.tr("Detalles de la exportación", "Export details"),
-                        |ui| {
-                            ui.label(error.to_string());
-                        },
-                    );
-                }
+    }
+    fn export_scope(&self, target: ExportTarget) -> Option<AnnotationExportScope> {
+        match target {
+            ExportTarget::Review => Some(AnnotationExportScope::Review),
+            ExportTarget::Primary => self
+                .reader
+                .active
+                .as_ref()
+                .map(|(doc, _)| AnnotationExportScope::Document(doc.id.clone())),
+            ExportTarget::Reference => self
+                .reference
+                .as_ref()?
+                .pane
+                .active
+                .as_ref()
+                .map(|(doc, _)| AnnotationExportScope::Document(doc.id.clone())),
+        }
+    }
+    fn can_export_notes(&self, target: ExportTarget) -> bool {
+        match target {
+            ExportTarget::Review => {
+                self.global_notes.export_ready()
+                    && !self.reader.annotations.editing()
+                    && !self
+                        .reference
+                        .as_ref()
+                        .is_some_and(|view| view.pane.annotations.editing())
             }
+            ExportTarget::Primary => {
+                self.reader.active.is_some()
+                    && self.reader.annotations.pending.is_none()
+                    && !self.reader.annotations.editing()
+            }
+            ExportTarget::Reference => self.reference.as_ref().is_some_and(|view| {
+                view.pane.active.is_some()
+                    && view.pane.annotations.pending.is_none()
+                    && !view.pane.annotations.editing()
+            }),
+        }
+    }
+    pub(in crate::app) fn pick_annotation_export(
+        &mut self,
+        target: ExportTarget,
+        format: AnnotationExportFormat,
+    ) {
+        if self.annotation_export.busy() || !self.can_export_notes(target) {
+            return;
+        }
+        let Some(scope) = self.export_scope(target) else {
+            return;
+        };
+        match yamantaka_windows::annotation_export::pick_annotation_export(
+            self.tr(
+                "Guardar notas en un archivo nuevo",
+                "Save notes to a new file",
+            ),
+            format.extension(),
+        ) {
+            Ok(Some(path)) => self.start_notes_export(target, path, format),
+            Ok(None) => {}
+            Err(error) => self.annotation_export.outcome = Some((scope, Err(error))),
+        }
+    }
+    pub(in crate::app) fn annotation_export_panel(&mut self, ui: &mut egui::Ui, p: Palette) {
+        let target = self.current_export_target();
+        let Some(scope) = self.export_scope(target) else {
+            return;
+        };
+        let can_export = self.can_export_notes(target);
+        if let Some(format) = self
+            .annotation_export
+            .show(ui, self.english, &scope, can_export, p)
+        {
+            self.pick_annotation_export(target, format);
         }
     }
 }

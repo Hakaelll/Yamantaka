@@ -6,12 +6,13 @@ impl ReferenceView {
     pub(super) fn navigator(
         &mut self,
         ui: &mut egui::Ui,
-        runtime: &Runtime,
-        governor: &MemoryGovernor,
+        tools: &mut ReferenceTools<'_>,
         notes_blocked: bool,
         english: bool,
         p: Palette,
     ) {
+        let runtime = tools.runtime;
+        let governor = tools.governor;
         let tr = |es, en| if english { en } else { es };
         let button = theme::icon_button(
             ui,
@@ -116,6 +117,10 @@ impl ReferenceView {
                         .min_scrolled_height(height.min(360.0));
                     scroll.show(ui, |ui| {
                         let action = self.pane.annotations.show_editor(ui, &context, p);
+                        let export_action = if !self.pane.annotations.editing() || tools.export.busy() {
+                            let scope = yamantaka_application::annotation_export::worker::AnnotationExportScope::Document(document.id.clone());
+                            tools.export.show(ui, english, &scope, self.pane.annotations.ready(), p).map(annotations::NotesAction::Export)
+                        } else {None};
                         ui.add_space(16.0);
                         let filter_action = self.pane.annotations.show_filters(ui, english, p);
                         ui.add_space(12.0);
@@ -125,7 +130,7 @@ impl ReferenceView {
                                 .show_bulk(ui, english, notes_blocked, p);
                         let list_action = self.pane.annotations.show_list(ui, &context, p);
                         self.notes_action =
-                            action.or(filter_action).or(bulk_action).or(list_action);
+                            action.or(export_action).or(filter_action).or(bulk_action).or(list_action);
                     });
                 }
                 ReaderPanelTab::Positions => {

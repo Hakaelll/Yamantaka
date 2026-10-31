@@ -1,0 +1,1495 @@
+{
+  "version": 1,
+  "capturedAtUtc": "2026-10-31T09:09:06.7795768Z",
+  "synthetic": true,
+  "executableSha256": "BD2FEBA520112089259388684A86BB59CD397D63AB5A38B489D5DDB637CCA6DA",
+  "cargoLockSha256": "1FB91F66DB35F83ADC8F3B1A1BA0A543D4709A74263D770E9827793FF47BD7E6",
+  "sources": [
+    {
+      "path": "rust/application/Cargo.toml",
+      "sha256": "F83FDBD73781FFE8FD519F3DAE25D8B8A0E67F4C6CFD5E80786DE92A3B676575"
+    },
+    {
+      "path": "rust/application/src/annotation_export.rs",
+      "sha256": "36D5E9C57E20CE41EF45156A89B2E16B843BA508DD2391B40F35298050781864"
+    },
+    {
+      "path": "rust/application/src/annotation_export/output.rs",
+      "sha256": "D2C10285F891BD142028492B6A3A50D018FF35DD64658BB6E9751F6D82689CEA"
+    },
+    {
+      "path": "rust/application/src/annotation_export/review.rs",
+      "sha256": "7A6171F7F70FE256F50D5282E4C6722D5411255E1213DE32DA82049B1FAD282E"
+    },
+    {
+      "path": "rust/application/src/annotation_export/worker.rs",
+      "sha256": "C76668A9A1979C3EEBF0AB842ED4A2D0B5B93C74ECE8A85962DCDB678BF1BC75"
+    },
+    {
+      "path": "rust/application/src/annotations.rs",
+      "sha256": "C716111FA4E674C7D40D153BDB9AA2D5603CDC07C6CA19DAA3F6EE9EC5BCFC8D"
+    },
+    {
+      "path": "rust/application/src/automatic_cover.rs",
+      "sha256": "00A2DBC128DAF7291E7CD6658EFF93C362FBDC38803876E6A3614315FF9A9AA6"
+    },
+    {
+      "path": "rust/application/src/cache_maintenance.rs",
+      "sha256": "EB920E83AC54A05AC194E0657C9FCFD478BCA9D5BBBBDA937169AC4560162B91"
+    },
+    {
+      "path": "rust/application/src/cover_job.rs",
+      "sha256": "8ECC251A1BA082A4AA53CA0DC2521826D9E64E684B3C7225F9DB9AC4C6EAFA7E"
+    },
+    {
+      "path": "rust/application/src/cover_regeneration.rs",
+      "sha256": "E12DDB8AAF6E57788E4194A01E970F33A7499D07824D80729E88349B9E498335"
+    },
+    {
+      "path": "rust/application/src/cover_regeneration/verification_test.rs",
+      "sha256": "FC061A15549A8457F48B7F2027D73FB06C090F7EA7C279891158663EC8EF1B21"
+    },
+    {
+      "path": "rust/application/src/cover_source.rs",
+      "sha256": "06B9B2C1C8AEA4F849FFB4EA8F252D709BF26F9AB92AA6439A0EBDF4A9C7F6B4"
+    },
+    {
+      "path": "rust/application/src/document_find.rs",
+      "sha256": "04B6423C1A9869F6EA51F28D475F768F4C15EA343D098D939512FB00621148AC"
+    },
+    {
+      "path": "rust/application/src/file_check.rs",
+      "sha256": "4DB16C0839DD8DFAC8AA0F0DAE2126AF554B02228815C24D4B37A68FAE417287"
+    },
+    {
+      "path": "rust/application/src/file_check/verification_test.rs",
+      "sha256": "C1C910A1BB3365763A477790531281766085CDFE47628BFB587774D424D39111"
+    },
+    {
+      "path": "rust/application/src/file_comparison.rs",
+      "sha256": "757EFE16D0B3806AE8502F9AF0E47A6C5D633C215B208E4DE05A72035FA915F9"
+    },
+    {
+      "path": "rust/application/src/file_digest.rs",
+      "sha256": "FD6461A879A01878DA45D270329CFDEE60C8496758FB502E57B91569C07CB335"
+    },
+    {
+      "path": "rust/application/src/folder_import.rs",
+      "sha256": "D8BF0300DF08270154A5312A461DE1E6CD2755575015BD55F7CFEC45E3F6AFC1"
+    },
+    {
+      "path": "rust/application/src/folder_import/recovery_test.rs",
+      "sha256": "88EF44B46B48ECA113F335CE93EC7A1FDEAD82E63AC32A6413FB7F5D641921DB"
+    },
+    {
+      "path": "rust/application/src/import_enrichment.rs",
+      "sha256": "CDF853AD1E8D0A728D3FB48DD52846BA7BF05A876180798EB76295EA85FEFF76"
+    },
+    {
+      "path": "rust/application/src/import_hash.rs",
+      "sha256": "3DBFA15FA5940EA9B0E5BD51AEDDAEA9CF9C2A18E85C6F4AEB0C7226B2AB070A"
+    },
+    {
+      "path": "rust/application/src/import_hash/verification_test.rs",
+      "sha256": "AD13040FCF6A16D7CD9093C794A651FD06EAD6603DE88439A128E70E17F80474"
+    },
+    {
+      "path": "rust/application/src/lib.rs",
+      "sha256": "6D9585BE4EAF716A23A74F92702951D8D350457F9D9F9C069C2F436F53EF5F3F"
+    },
+    {
+      "path": "rust/application/src/library_bulk.rs",
+      "sha256": "E3FB5437AC7B3B5F94EDCF029D4FF3BDBB6CBCA7BFE70E1E812576A0C24695CA"
+    },
+    {
+      "path": "rust/application/src/library_bulk/tests.rs",
+      "sha256": "215DF9D62C282BF92108F5DCB4C4C31F8A7D85A1051ADB6792F1CBA9B4396282"
+    },
+    {
+      "path": "rust/application/src/library_check.rs",
+      "sha256": "91D7A361352D0BAF701769BEDA5ABA198A7B4B6929B6DA66A874288CE7827AD0"
+    },
+    {
+      "path": "rust/application/src/library_check/verification_test.rs",
+      "sha256": "7EDC1EA2CCAAC8CD1AAE75D00526469D3CA448517347C99EAD1273EFE232E425"
+    },
+    {
+      "path": "rust/application/src/library_removal.rs",
+      "sha256": "EE21FA91B96B0D9A98D2796EB7567BC992602D8F15F655278AB19D8F5392E95C"
+    },
+    {
+      "path": "rust/application/src/library_removal/verification_test.rs",
+      "sha256": "D7C33CC336FCD40EFA91E557D721AC3B96F54E46F455245B27F25F18F97F6F7A"
+    },
+    {
+      "path": "rust/application/src/manual_cover.rs",
+      "sha256": "3E11436203AC937E28DC058383D07E2B3BC6D752345C2391708C20E6807FE724"
+    },
+    {
+      "path": "rust/application/src/metadata_review.rs",
+      "sha256": "C85AA63425C1874E0AE72637D311E6FF0249FE7FB54C74DAF80BB8946A2E6462"
+    },
+    {
+      "path": "rust/application/src/metadata_source.rs",
+      "sha256": "852DDAA2EF139937F37E14EEDDE4E1B136B504CAC8B84501E0BC6306542CB4A9"
+    },
+    {
+      "path": "rust/application/src/reader_close.rs",
+      "sha256": "8E4DA2288ED2374E8309C87BBB8F6185E2A408E21BC086F5B86F6069080529BB"
+    },
+    {
+      "path": "rust/application/src/reader_continuity.rs",
+      "sha256": "57439ABCC3025E314BD6E5444F5920D0EE58EE4EB1FFD19BEA14895361CB31D5"
+    },
+    {
+      "path": "rust/application/src/reading_sessions.rs",
+      "sha256": "2FC153D2ADF52BFCD09C3B925EC0BA50F565FC825F8742F243B405D4CCC3E9C8"
+    },
+    {
+      "path": "rust/application/src/reading_sessions/deletion.rs",
+      "sha256": "8F99E8D24F5CB43E51D33056327CC6436EBCF402362A6A4F6AECC4463D38CAED"
+    },
+    {
+      "path": "rust/application/src/reading_sessions/goals.rs",
+      "sha256": "3240349BBEAEC19EA3F2AF523C8022DF3EA2B2FE255095834A471A4FAE70BC9C"
+    },
+    {
+      "path": "rust/application/src/reading_sessions/lifecycle.rs",
+      "sha256": "D4BAB937618479C3448040FDB92FBBBC094F064199E1FFDEA72210317D23D58F"
+    },
+    {
+      "path": "rust/application/src/reading_sessions/restoration.rs",
+      "sha256": "EB266631B661BC8956A899F30ABC7C9273D652B9F29257BAE14505332371A811"
+    },
+    {
+      "path": "rust/application/src/relocation.rs",
+      "sha256": "C521118B979951E30A0C689665960999AAA179AB4853EE30E4E2DF9310E2E272"
+    },
+    {
+      "path": "rust/application/src/relocation/verification_test.rs",
+      "sha256": "D63FE0A6ECE8B07B240BC30375822EE97548FD6763BB74F3641C8AEF7BCD74AF"
+    },
+    {
+      "path": "rust/application/src/runtime.rs",
+      "sha256": "C5DF7464E4D09229BDB1080B3547D2321BDE6C396EDF73683FA092B95BA8FBB9"
+    },
+    {
+      "path": "rust/application/src/search_index.rs",
+      "sha256": "157E596874DD3C2D2BE786E0F460037F3EA9F29C564368B48EEB045DE33BF3EE"
+    },
+    {
+      "path": "rust/application/src/temporary_document.rs",
+      "sha256": "B3D3CA3BC51C89E8CE8F1DA162C69E96547DA296CE49A6B2D72CE2C096283BA0"
+    },
+    {
+      "path": "rust/application/src/workspaces.rs",
+      "sha256": "654B76A60AA0750101356AC147CA99168B7F87A5A998BD3735C77954F57301F7"
+    },
+    {
+      "path": "rust/application/tests/import_resumption_runtime.rs",
+      "sha256": "5A0FDDB324CB2B68778ABF5847609083C8333DB34F81F83D3AFB5AF3A0B88DD4"
+    },
+    {
+      "path": "rust/application/tests/import_resumption_runtime/engine.rs",
+      "sha256": "316508C91E3E40B3E4B15CBD198D20AC56768A1746339D6AB3A74B336DBE8CAB"
+    },
+    {
+      "path": "rust/domain/Cargo.toml",
+      "sha256": "306B4E97D052A03C201AB1D4655E595229F44CB84AB53DF57E57AC6BB89565D0"
+    },
+    {
+      "path": "rust/domain/src/annotations.rs",
+      "sha256": "9AAE9E9E14A19C2546AF959520C02EEC78F89AA137BE11C9313B24BE6E0109D8"
+    },
+    {
+      "path": "rust/domain/src/annotations/batch.rs",
+      "sha256": "026C12B32AA1648EA375D4B6B04DDDA4F75082037F751B22BD45B6C4ED2E71EC"
+    },
+    {
+      "path": "rust/domain/src/annotations/marks.rs",
+      "sha256": "039E7DE561B5C9D739BF02380EDF882507A213EE6B2E91F38DFD9F489650F77D"
+    },
+    {
+      "path": "rust/domain/src/annotations/repository.rs",
+      "sha256": "EEA90DCCE078BC33D95E165432BEC31A68EB1FDC0BF09218E65E05B5A98C90BE"
+    },
+    {
+      "path": "rust/domain/src/annotations/review.rs",
+      "sha256": "50C309F248533BC16AB0E5C431C4A7B181E8F5BB8E9B1CE7A2EA7E8E870D331C"
+    },
+    {
+      "path": "rust/domain/src/automatic_cover.rs",
+      "sha256": "6F0B2A545791FDCD381D7BF1A789ACDD6BFBDC3156CCA57C4263E49341BBF141"
+    },
+    {
+      "path": "rust/domain/src/bookmarks.rs",
+      "sha256": "3B01664F93F2F4D50CCFAF3FD72DC4CF4C6D2763BB6FF59E2B1E2F6C9D82A746"
+    },
+    {
+      "path": "rust/domain/src/collections.rs",
+      "sha256": "7B448A7CC02A898C909E9B4ABEE81E55D3EF73835A3F69A58D20088BA55B9C2E"
+    },
+    {
+      "path": "rust/domain/src/cover_cache.rs",
+      "sha256": "54ACE675306B8C36B641F4EA14DF7C0AD6D58D70585B569B0253A22CD9FA0FAD"
+    },
+    {
+      "path": "rust/domain/src/cover_policy.rs",
+      "sha256": "64928ACE63C16E7F98A4D29657F488331B0C96D1743F5B0E7E1DD3DE6E344E19"
+    },
+    {
+      "path": "rust/domain/src/cover_revision.rs",
+      "sha256": "41F081FFE45C06A772431E98D0B37380DF6266A7D54AC9319725055A087ECC83"
+    },
+    {
+      "path": "rust/domain/src/cover_selection.rs",
+      "sha256": "E81D89675D566AF4D8349D397427536C7742346B332E592177E30C17725D6C98"
+    },
+    {
+      "path": "rust/domain/src/cover_snapshot.rs",
+      "sha256": "30114D3D5EC9D638CBBE6408D6CCB7CBED1573CD53EDF690878FB27A8221E55D"
+    },
+    {
+      "path": "rust/domain/src/external_uri.rs",
+      "sha256": "95614697A21D4EC16FE8A82BA6A2740BA33E2BD19AA7941CBC7ABCDBA742D95D"
+    },
+    {
+      "path": "rust/domain/src/file_check.rs",
+      "sha256": "04E03999DEC3AB30A223BCA1EB2EAC215FD5754F2FAAF3F93DE6DAB4FBC5E265"
+    },
+    {
+      "path": "rust/domain/src/front_matter.rs",
+      "sha256": "86D3405E957E02E1827535D24D577AE5A6F6314A186CBBE948C4C4FF3F8CDC3C"
+    },
+    {
+      "path": "rust/domain/src/front_matter/lines.rs",
+      "sha256": "0FACC6EC081656CBE9DF45466EC72FFE88096E9D0171FEED53165FF5F50824E1"
+    },
+    {
+      "path": "rust/domain/src/import_metadata.rs",
+      "sha256": "91ADEC4A358201F62F089F39B1D6A71E0828F762CA4D5700E8226EBF42806B33"
+    },
+    {
+      "path": "rust/domain/src/import_recovery.rs",
+      "sha256": "1EDC298D270494A8002A3F07743D8DA8BE4B3029FB8B922834EEB19AD9862156"
+    },
+    {
+      "path": "rust/domain/src/lib.rs",
+      "sha256": "EC31A133DC9BD09E29CCC4BF9A6274177FF9B107FEA6C15FC0B8FAD53F40528F"
+    },
+    {
+      "path": "rust/domain/src/library_selection.rs",
+      "sha256": "CA9A85F6E3C562045BC0BC1E34BAC0D621CE28DCBF6551D34F6FF7243E5DF7B0"
+    },
+    {
+      "path": "rust/domain/src/library_smart_view.rs",
+      "sha256": "38E37B3905D1971A1235067F1FBEA1E132649A6D0718E4C69BCE5A56D492AAD8"
+    },
+    {
+      "path": "rust/domain/src/memory.rs",
+      "sha256": "B61D2C9E10CDFA3EF173C4EF7B0E91BC49B62DE863D1A1AFA7D4D9D1F9DB731E"
+    },
+    {
+      "path": "rust/domain/src/metadata_review.rs",
+      "sha256": "5E3DE3DC88CE4A7C5FA2C671BA5125CF14F6714E1F685EBA4947680131956AFF"
+    },
+    {
+      "path": "rust/domain/src/outline.rs",
+      "sha256": "BEEA1411B8F2DDC3E45B18EC2BB09F918BD926DC3A3EA8B0599C6AE8B5C04B9A"
+    },
+    {
+      "path": "rust/domain/src/password.rs",
+      "sha256": "F397E670A8FDD5863DDE615B309B4840A1C8422F1F9C8A1D22A8660FD44DC7A6"
+    },
+    {
+      "path": "rust/domain/src/pdf_destination.rs",
+      "sha256": "6B14704A35E67B2F223FE68CE8E2FD7472EFF6C4C59DA545C9AC648E9A5784A1"
+    },
+    {
+      "path": "rust/domain/src/pdf_find.rs",
+      "sha256": "07F5CD4ED4C10A2BEDB6A0A2B129C60813F9F2645468D9107306472F3CEF88E5"
+    },
+    {
+      "path": "rust/domain/src/pdf_geometry.rs",
+      "sha256": "5879A75E5412558F42E664CD30B10EEDC6DF304E7DCC0B8DF88C3C86C2503D10"
+    },
+    {
+      "path": "rust/domain/src/pdf_links.rs",
+      "sha256": "3BAFCCA8DF45E33A265169EA5C042B512DAB1BD1197A7657C11E51D97A9041CC"
+    },
+    {
+      "path": "rust/domain/src/pdf_pages.rs",
+      "sha256": "FC1652FAD06B6ADDADAC20981FC9695A5B43C96235B5B4D8785D401748F85986"
+    },
+    {
+      "path": "rust/domain/src/pdf_text.rs",
+      "sha256": "5B26797859331A924C3C76C830389ECEAC179318911F53FCC8A4E424997B6A03"
+    },
+    {
+      "path": "rust/domain/src/pdf_ticket.rs",
+      "sha256": "D728F572ADC108C4932D53069A34FAB4339D865EF098806560A2331F93BC82ED"
+    },
+    {
+      "path": "rust/domain/src/reader_destination.rs",
+      "sha256": "2FD486F6AFDA7C0FA1A5DAE9F13C2F66B0A283260FBE5451105DE2A24E86DC56"
+    },
+    {
+      "path": "rust/domain/src/reader_layout.rs",
+      "sha256": "121DB1CF95F0839C8141CD54BD3BEA9419957B83B00B9881AF6FFEDAF82B64CC"
+    },
+    {
+      "path": "rust/domain/src/reader_preferences.rs",
+      "sha256": "E29D5DDF87D430447B9DD9A68FAE659FF0E0AE4AB3F7C84FB6BC1AFA1906CB32"
+    },
+    {
+      "path": "rust/domain/src/reader_tabs.rs",
+      "sha256": "2EF205AEE7A1AC513C0E15AAF5AED540A5095B1D9B7A5982C463D809B144C2F9"
+    },
+    {
+      "path": "rust/domain/src/reader_tabs/commands.rs",
+      "sha256": "834AFD173CDD5646D1BE74FEB47A8CF5C09AC73F73713C75A449BFC8760B93B8"
+    },
+    {
+      "path": "rust/domain/src/reader_tabs/queue.rs",
+      "sha256": "4E16AB41C71F3CD6E51CB3D6B136DC57F0AC7AE61391B6875870E59E023A3787"
+    },
+    {
+      "path": "rust/domain/src/reader.rs",
+      "sha256": "B197E78541F36409747B4259525C49E30846037D39DE284DEB63B104BFC59FC0"
+    },
+    {
+      "path": "rust/domain/src/reading_activity.rs",
+      "sha256": "453E823693537E557BB4E2D0079F8FC4093AD0E18034ADABCD7EB4CA9EABCD53"
+    },
+    {
+      "path": "rust/domain/src/reading_sessions.rs",
+      "sha256": "42A54109ABEE0A107002EA8C824F5FAAD353C8CDBF22F1F4055CE6A0D1A03A0C"
+    },
+    {
+      "path": "rust/domain/src/reading_sessions/context_decode.rs",
+      "sha256": "E3FD6EA2EF9D3CA11A6D9E4FCD81D1D0C3FF8924EA028D565979FB57F020CB41"
+    },
+    {
+      "path": "rust/domain/src/reading_sessions/goals.rs",
+      "sha256": "B28E791E627434FA7279526C94300003244E5F252562B6CEF6EA4998F7D82ACD"
+    },
+    {
+      "path": "rust/domain/src/reading_sessions/history.rs",
+      "sha256": "D733CA34D4C89EC91327F980F3A6DA10F3E23AE249B95DE46490A6D1E9434CF0"
+    },
+    {
+      "path": "rust/domain/src/reading_sessions/restoration.rs",
+      "sha256": "3CF4769099FC5184E66E8CC5C4C26AE133CBD3304A7CB335A477C2C07D39F208"
+    },
+    {
+      "path": "rust/domain/src/relocation.rs",
+      "sha256": "6FD795A5263FF35E9E9BA75DBB6F0C1C072F7364DD11718D1FE8454481A022A7"
+    },
+    {
+      "path": "rust/domain/src/search.rs",
+      "sha256": "3D3C4CE1ADDADA09B7B3D16A51B1973FD2B6D413E080559966767FA0A783A0B8"
+    },
+    {
+      "path": "rust/domain/src/source_revision.rs",
+      "sha256": "D03F24C41CABAD3D5C61F9D32FBE98349BF315DD5EB66ED287FD4F35B2F3A80E"
+    },
+    {
+      "path": "rust/domain/src/tags.rs",
+      "sha256": "811571CA08CB3DBF8892EA980F593110E100C6C621D6C0255C1798A983B1288B"
+    },
+    {
+      "path": "rust/domain/src/text_selection.rs",
+      "sha256": "CEBC3404FC3BAF381A126DECFE3D2D55604939BF21C16A9AC9E27E9E39C6FDF3"
+    },
+    {
+      "path": "rust/domain/src/text_selection/snapshot.rs",
+      "sha256": "581042A97DDA6F9369EFD903068D185F58295689C24C022615909B870D0AB9D3"
+    },
+    {
+      "path": "rust/domain/src/workspaces.rs",
+      "sha256": "38D540A4FB20776C419900B5341C38282F2947F25FD8691303DD761281894689"
+    },
+    {
+      "path": "rust/domain/src/workspaces/comparison.rs",
+      "sha256": "CBEB0A7E24237DEDEB6B69D65CF627B295531DA54D53660985D7B0A62A57EE6B"
+    },
+    {
+      "path": "rust/domain/src/workspaces/view.rs",
+      "sha256": "1FF9BE2E37A52368B51E3EAA19EF6552DD362CC1D8852440128BEE3C50167A85"
+    },
+    {
+      "path": "rust/pdf/Cargo.toml",
+      "sha256": "80736274DC130C0DC02EC85365C2647C92CF27E02FB45D3C27896DFFB907A48F"
+    },
+    {
+      "path": "rust/pdf/examples/inspect_front_matter.rs",
+      "sha256": "A0934A6854D8525F4772733F02B45FF908A9DF0C97EAE76FC10B2B214C480345"
+    },
+    {
+      "path": "rust/pdf/src/bindings.rs",
+      "sha256": "70B1220AA87D2A99DB2BC8E8AAECE535FFFE76F6476C3CC0DB4FAF65F0E6FA43"
+    },
+    {
+      "path": "rust/pdf/src/cache.rs",
+      "sha256": "905CBD04D237A64DF529D1E5D5197AFA31F22FA912922D0529DB89DC80AC6931"
+    },
+    {
+      "path": "rust/pdf/src/cover_detection.rs",
+      "sha256": "B1C8FC11CA5F061F3F13A0794BB552D1A340698A2CAF2311732F4CB949EAE670"
+    },
+    {
+      "path": "rust/pdf/src/covers.rs",
+      "sha256": "76213BF19A42A9FEDA4E23F3A204F7A3C2D68EEF7C923AA3DA893B0883DFCE61"
+    },
+    {
+      "path": "rust/pdf/src/destination.rs",
+      "sha256": "99AF272088E6C4D790FB3E8C31C2351E1433D4262963E3149A9083D7DC12579E"
+    },
+    {
+      "path": "rust/pdf/src/find.rs",
+      "sha256": "56D653334E936F92671FD5FA5FBDFFAD906B1F6D504E4DA71BDFD5581918897B"
+    },
+    {
+      "path": "rust/pdf/src/lib.rs",
+      "sha256": "05252E2105C5580902A462A10EF283B58107B72CE48B33BE98A7FBC234B7DA12"
+    },
+    {
+      "path": "rust/pdf/src/links.rs",
+      "sha256": "BC0EA6DB73DCEB5655BA9203AE415465D122DCFD7CDD67C825F0395987570E4D"
+    },
+    {
+      "path": "rust/pdf/src/outline.rs",
+      "sha256": "297DA09D15E398F87CA8E920ADFBAF27FC927AAA89ECD48A72ECA74105228F41"
+    },
+    {
+      "path": "rust/pdf/src/page_geometry.rs",
+      "sha256": "F91AF1E21A426B298C2CD7F566531FA4EA62DE3BBFD28CB00341D83A104AF3CB"
+    },
+    {
+      "path": "rust/pdf/src/source.rs",
+      "sha256": "ADA1F21FBFD22F54E3B1B575720D3D94554C7BAF3BB629A49505B00C185F4231"
+    },
+    {
+      "path": "rust/pdf/src/text_geometry.rs",
+      "sha256": "38B108122C5346F107779690E1C3C0D36F8641ABF6828458BAAF6B39B5BF7866"
+    },
+    {
+      "path": "rust/pdf/src/worker.rs",
+      "sha256": "2E52D8D9D0F3647E279BBFB55F57AAE23A2F3644391E1A4FA0416464E5F2D300"
+    },
+    {
+      "path": "rust/pdf/tests/front_matter_pdfium.rs",
+      "sha256": "EFB9EDDEF0995BFB6C27683944EDE432E2F2F787042F8BFE4AA9BC163098F086"
+    },
+    {
+      "path": "rust/pdf/tests/native_pdfium.rs",
+      "sha256": "D384A5A495751F828867317DFB3C576B18F69677E0AD755A7B234E7AD4670101"
+    },
+    {
+      "path": "rust/storage/Cargo.toml",
+      "sha256": "CE1D80BF8A35B05B009BB566CB68CF3AEC04399ACEB44C4D05AE10DBC7911828"
+    },
+    {
+      "path": "rust/storage/examples/benchmark_catalog.rs",
+      "sha256": "D468D48901CAFF90C9E1DD10387E24261A2FF8F97F3F7C02B307A6D040411CDD"
+    },
+    {
+      "path": "rust/storage/src/annotation_export.rs",
+      "sha256": "1845529EEF1B5F4BE28B4C885E3440D2655A7AB59A2A726925E2A8BC7EF83AF2"
+    },
+    {
+      "path": "rust/storage/src/annotations.rs",
+      "sha256": "2E2AFA1E22C3625F88675289493B9C84E15F17048C59466AA0084BECAFEFD79B"
+    },
+    {
+      "path": "rust/storage/src/annotations/batch.rs",
+      "sha256": "AC1714552543672436CAF2CEC9E910E4F21B18741D89D42EA52F1AC69BFD1CF2"
+    },
+    {
+      "path": "rust/storage/src/annotations/marks.rs",
+      "sha256": "351B00C967A6679E7350431B8099D5AAEB719D6FF79372FAD11454239A40D109"
+    },
+    {
+      "path": "rust/storage/src/annotations/review.rs",
+      "sha256": "6895186C5727125FFB52A5B0C42122E9497271CB0768C54602D2A167207CA722"
+    },
+    {
+      "path": "rust/storage/src/annotations/writes.rs",
+      "sha256": "5602C3FC971464A0FF6153D7D9B0380EEC84AA0A0DAFA097F1088C178EA5E43C"
+    },
+    {
+      "path": "rust/storage/src/automatic_cover.rs",
+      "sha256": "31D44B9C9EB027148713D4A6F3A95040D139C36E04BA39113AE27AA57BBDDA1F"
+    },
+    {
+      "path": "rust/storage/src/backup.rs",
+      "sha256": "F172AE7BCB9801428D1FD56286CE8EE5611E25B0561B805B28B775E881F5D4B8"
+    },
+    {
+      "path": "rust/storage/src/backup/export.rs",
+      "sha256": "DEAF5C2B8D8067FBFD1238E566739C194AC53B4DB74B02B225F68B4560A3B2DC"
+    },
+    {
+      "path": "rust/storage/src/backup/restore.rs",
+      "sha256": "03566184E030D4E88A3C22F1C83861E1D744289D994D68B572A03450CDB52AC8"
+    },
+    {
+      "path": "rust/storage/src/backup/review.rs",
+      "sha256": "722057ABAF065EE27B05D2B2A854ABAEF5DF4ED69E7C18F6C9948BEDD0447C90"
+    },
+    {
+      "path": "rust/storage/src/bookmarks.rs",
+      "sha256": "D49A40D8A537836F80E06F8F5D0652406A77D2B3E2EF68C93DA7B3432635E68F"
+    },
+    {
+      "path": "rust/storage/src/collections.rs",
+      "sha256": "25B15C1FC1FFEBBF17E15A98B91166DCEFB8E82C311EF355634D91A5F7D59D6E"
+    },
+    {
+      "path": "rust/storage/src/collections/order.rs",
+      "sha256": "7D0FC04E4905EE4E9ACCB499A6FA71EE138E2410FE24B4EAF5BD97EB0FE15779"
+    },
+    {
+      "path": "rust/storage/src/cover_cache.rs",
+      "sha256": "C98D7708BA1AC9ED4680BC8A5BC3DA6C03207359A9FE8B1EDB07166B2A4DF9D0"
+    },
+    {
+      "path": "rust/storage/src/cover_cache/maintenance_test.rs",
+      "sha256": "A0C95004019BF3EBBB79B08DAF3DC158ED37CC6EE96565F6447792AF458302BF"
+    },
+    {
+      "path": "rust/storage/src/cover_cache/maintenance.rs",
+      "sha256": "46CB512933A726363825E1F72023C05837D343BD56CE2D90E84C8BD810463887"
+    },
+    {
+      "path": "rust/storage/src/cover_revision.rs",
+      "sha256": "548B3CD43E7F0A6305104A77BAA6A8BDB6E0A4E8A9EA5CC65C7101F74DD2C2EA"
+    },
+    {
+      "path": "rust/storage/src/cover_selection.rs",
+      "sha256": "0BF836526C194126A3213FFC4152BC976D28ED7AE1C2548E791AF16E1BA66FBA"
+    },
+    {
+      "path": "rust/storage/src/cover_snapshot.rs",
+      "sha256": "7D234C5907FCC4C4C4C63950A216FA6C47474A5BECF17FF49302BD4E44C93178"
+    },
+    {
+      "path": "rust/storage/src/database.rs",
+      "sha256": "3CCCACB769338C42827E24F855AC1A813F08E3F770B3BBEE4C9A7BBE972E7322"
+    },
+    {
+      "path": "rust/storage/src/file_check.rs",
+      "sha256": "050B923B4AA28FA22487F0E29D2BFBA41E7E99B22204E9A12BB373AD13194B96"
+    },
+    {
+      "path": "rust/storage/src/identity.rs",
+      "sha256": "C14D1954DD5532B61862057F41D5DB5E37364B8E738412922836312037AB9AB3"
+    },
+    {
+      "path": "rust/storage/src/import_document.rs",
+      "sha256": "A4E5E3F533868759FA515BE1D09A80092110B13B17D319F15B51BD959DF57A9C"
+    },
+    {
+      "path": "rust/storage/src/import_metadata.rs",
+      "sha256": "8FB05CCE86D07625655E2BFBA15AA879C9E7F64807A8168935DDE9A9029913D9"
+    },
+    {
+      "path": "rust/storage/src/import_recovery.rs",
+      "sha256": "8C7850C65F43D874885C467B8C5109C4D0C03419CE50D1419E64C0AAA2F6EEF4"
+    },
+    {
+      "path": "rust/storage/src/lib.rs",
+      "sha256": "DD37DCCFE7E84D27FA262F4C9182ABE2DFA555E1491719CD2CD342CEAC68DBC1"
+    },
+    {
+      "path": "rust/storage/src/library_grouping.rs",
+      "sha256": "0603A8FABDA733C48343D53709E6BFEDFF340FE02E67F2486810794EB2CE80BB"
+    },
+    {
+      "path": "rust/storage/src/library_removal.rs",
+      "sha256": "82DDC6C605F01D5A65E87BBA36FE2A207D4C6F1265E54E422D6DEF4004029435"
+    },
+    {
+      "path": "rust/storage/src/managed_imports.rs",
+      "sha256": "EC619D164117A1AEBB547FACA80C477D34F32CA2C98D053AA4B996137F2B4046"
+    },
+    {
+      "path": "rust/storage/src/metadata_reanalysis.rs",
+      "sha256": "1F8014626D59CAA2D89BC7DB5C39AEC5CF353694C70DEA2E7493D3E86EE60A13"
+    },
+    {
+      "path": "rust/storage/src/metadata_review.rs",
+      "sha256": "1D8FC8A5B63D6D6A0DB5C49C859CD3402DE50A36DDB2B5130F4691F28D8FD39F"
+    },
+    {
+      "path": "rust/storage/src/metadata_source.rs",
+      "sha256": "30DDE73BE735C00BFECC31D74B1B71527D4468D9B91878105193EBA5BCDDFE90"
+    },
+    {
+      "path": "rust/storage/src/migration.rs",
+      "sha256": "5276E53F8DCC6399DF6CC6A2CBEC283D35C4C44DF6E62AA4357B658FCDB988FF"
+    },
+    {
+      "path": "rust/storage/src/migration/review.rs",
+      "sha256": "9F886682E4D3D15CB15C96FD24B9627154F1724CCF2FC0378E37BF4AC957EB07"
+    },
+    {
+      "path": "rust/storage/src/preferences.rs",
+      "sha256": "F12EF4BF51E7B95549D581FE107425CA7A7A7861332784D1A77232A764B6CB0A"
+    },
+    {
+      "path": "rust/storage/src/reader_continuity.rs",
+      "sha256": "0E1A9FDDA42660C48865D8E19A3283678D6C039BD71C434041358F395A094F86"
+    },
+    {
+      "path": "rust/storage/src/reader_preferences.rs",
+      "sha256": "85E44164BF2537CC6E2FA42DE732FAE975A71140C96EFCF271F92378A9DE439D"
+    },
+    {
+      "path": "rust/storage/src/reading_sessions.rs",
+      "sha256": "3C66B6B01F1EC7BD40E3A2E02389E0F24176B59A14B39E776B339A1E7126E760"
+    },
+    {
+      "path": "rust/storage/src/reading_sessions/context_pruning.rs",
+      "sha256": "8BF1C2896E51F988542356AFD6A0BCE3E5740FE15F2900267FB973E8862E243D"
+    },
+    {
+      "path": "rust/storage/src/reading_sessions/goals.rs",
+      "sha256": "9C1820F49230938C781C8E4AD35567E25AB58AFAEFC5AFD99188DB862D674FA4"
+    },
+    {
+      "path": "rust/storage/src/reading_sessions/history.rs",
+      "sha256": "1F6D73F068CD6B3AB5DB730DE3FED635B36C8C35B648E3140113C27A423E2F92"
+    },
+    {
+      "path": "rust/storage/src/search.rs",
+      "sha256": "DC7B4EDE6B4CF30B5D0DF18A5E9D6E88B242F5E06BE094723C691F253769B1D2"
+    },
+    {
+      "path": "rust/storage/src/tags.rs",
+      "sha256": "2A95FC504195A090F9D971F3FFEFB7350235A581D759EDD08C339295FECE6D70"
+    },
+    {
+      "path": "rust/storage/src/tags/edits.rs",
+      "sha256": "8B13821C6E32D366FE794117BD00B322E8E99C55F82CBAFA00B289C3BA0FF6E0"
+    },
+    {
+      "path": "rust/storage/src/tags/search_cache.rs",
+      "sha256": "8CD25FEF9C8803124479599DA38E4B1030848BFC01C0B8D7CAF1E07A231A8D5C"
+    },
+    {
+      "path": "rust/storage/src/workspaces.rs",
+      "sha256": "A837FE71334879863A688A3B0D620C2A8A6ECEEBECDBE2020991443635242A5E"
+    },
+    {
+      "path": "rust/storage/src/workspaces/legacy_comparison.rs",
+      "sha256": "70AAF6EED33A095F7EA8B981784EA31771E1C2D43D62AB6CF12558D3CE6F02F0"
+    },
+    {
+      "path": "rust/storage/src/workspaces/readings.rs",
+      "sha256": "ABA13B3FC13C5BFE8BA4D00B9F673359B0924271FF6247A66BD5EC45B0987B94"
+    },
+    {
+      "path": "rust/storage/src/workspaces/undo.rs",
+      "sha256": "6D03853F4A2F7DD63B2702464BB9A882B91EC8C300D863C77A037B3729206739"
+    },
+    {
+      "path": "rust/storage/src/workspaces/write.rs",
+      "sha256": "2D830354C6586EE50D1EBE81A0A8DE79F1B75F561DA6B44DA74E37D32A670CA7"
+    },
+    {
+      "path": "rust/storage/tests/backups.rs",
+      "sha256": "E07BA2F5C7CE014ECC08BEB562CE35B5673779A643A29CE06A0D92D76EA29F08"
+    },
+    {
+      "path": "rust/storage/tests/compatibility.rs",
+      "sha256": "145B2687155B04CF4414CD13ACA09913EEB7E79C41D24847067F05E2F94F86CF"
+    },
+    {
+      "path": "rust/storage/tests/metadata_reanalysis_native.rs",
+      "sha256": "FA6D9FFADBE646D6DF309AD3E64A2CE336758FC531E2A15E4B232FC05D10D810"
+    },
+    {
+      "path": "rust/storage/tests/metadata_source_native.rs",
+      "sha256": "3CBBA839F7DA3286428E85168A0D600D65BA981CC15C6A199FB46F8D2A1B6541"
+    },
+    {
+      "path": "rust/storage/tests/populated_history.rs",
+      "sha256": "8A4EE5FE2D841ABD628E19FAE51ADC7C28FDA6454841481FC6CC6D23EA526EC6"
+    },
+    {
+      "path": "rust/storage/tests/support/collections.rs",
+      "sha256": "592BEEB5DDE82041A0D36C4EDAB2CE6BB71258682AD10C1B1F1BDAC31CDAE3D0"
+    },
+    {
+      "path": "rust/storage/tests/support/import.rs",
+      "sha256": "D138C9D0C1C621F026CE90C1EEB1CC2BBFFB8D67E93BF5397C903DAB1623985B"
+    },
+    {
+      "path": "rust/storage/tests/support/library_grouping.rs",
+      "sha256": "14E884F4ACD25618A355BB4462E4E9502CD905F8AECA6789FADC550C2CC4E29F"
+    },
+    {
+      "path": "rust/storage/tests/support/library_removal.rs",
+      "sha256": "CE0F86F315A44A7EFE8754D20DAC142FD8F23E7D56CEF18B982E0A2AD9B62358"
+    },
+    {
+      "path": "rust/storage/tests/support/managed_imports.rs",
+      "sha256": "FB587ACF8AEEFED391FB5AF30E1A6F91E549ACD25A0269C7453CBF57AAFFAF93"
+    },
+    {
+      "path": "rust/storage/tests/support/migration_review.rs",
+      "sha256": "0A221D0E93509E3CE20EA90E24FB600AFD05E4BFE67469DD5117567B894BCAF5"
+    },
+    {
+      "path": "rust/storage/tests/support/restore_review.rs",
+      "sha256": "A8D4770C994AEB5A4F475FE247AFACB4DD4EB176E85F6190333BDB03E14FE0C9"
+    },
+    {
+      "path": "rust/storage/tests/support/smart_views.rs",
+      "sha256": "89BCA8C886BFC8AEEE440460ABDF955A11A5465179EF320EDBD54E5C00816DDF"
+    },
+    {
+      "path": "rust/storage/tests/support/tags.rs",
+      "sha256": "CD2490644F8B9803BC38342B47E82448FA6FB479DF719612FE7182BD303F50DD"
+    },
+    {
+      "path": "rust/storage/tests/support/workspaces.rs",
+      "sha256": "B3C45690E059B0DF02EBAC59C2817B03BE11886A43E0A7412BF34A35103A9E2E"
+    },
+    {
+      "path": "rust/ui/Cargo.toml",
+      "sha256": "CB11AC28FCCB667C20D6738340142ACF60C470FB41F19C4A7A9BDDC98BC6F6C0"
+    },
+    {
+      "path": "rust/ui/src/app.rs",
+      "sha256": "CCDCBAF00561F79320567E61B4CB16B2E403947A1067450B69E35A6CC4532C93"
+    },
+    {
+      "path": "rust/ui/src/app/annotations.rs",
+      "sha256": "1CE846D612FB97042D5E75DFDC7DFFF5B2174895348946884911AE530556EFC5"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/bulk.rs",
+      "sha256": "9CD83BFDE06A22F2D404CDF5C0F321A67CF0AB3FDA28221B3312B09CA3DCCE3A"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/editor_view.rs",
+      "sha256": "ADE33B865CA6DE22297C550DAC262D03778CFF6384124ED64C4A45190DD81437"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/export.rs",
+      "sha256": "6C78A661E785820737541B1D3DD9AFD90340EBA72044EFB64F5B6E58D1B9400F"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/export/view.rs",
+      "sha256": "79C2BB67619BBCF9153F05E4F15A46E136CF8B99C2B9CADE187E3D0B48781AB3"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/filters.rs",
+      "sha256": "79576CE8EB94F1657A32D3C53443EAA4EBEADD8A75D5D6063AC5301F67D2128C"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/paint.rs",
+      "sha256": "CB3C0FB94E104E98C8CF7A55571E7E5AFE784C40B61BB33178EC7E3FB6FCFA15"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/pane.rs",
+      "sha256": "08A3FAA0887B853A792AF6154C818A189E5A51E2B4AF8EF99EFDC18F2B93F657"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/panel.rs",
+      "sha256": "87B312AD2DACA7F66BB7463E8F9DA00F8465C2A77509D6A08FFC04DB15842EE4"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/reference_editor_preview.rs",
+      "sha256": "F7AA9E05C343890C6E6FE786BD1EE3676D2A3E0FC3B708BAFFBE941A51F570F9"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/reference_preview.rs",
+      "sha256": "4AF1D9FA78B63A7D687B1466D1E51AC9BE700B9895381D8EE2531BC40639D830"
+    },
+    {
+      "path": "rust/ui/src/app/annotations/tags.rs",
+      "sha256": "FB3D8A143F46D2D884718F43C352FE7FF13B8C2EADFF455B475B889358E90C4F"
+    },
+    {
+      "path": "rust/ui/src/app/backup_restore.rs",
+      "sha256": "91FE0EADDE650DE83CA08717E1857C0C5B4C7E28CC397A4D8EA510ED317DD1BD"
+    },
+    {
+      "path": "rust/ui/src/app/backups.rs",
+      "sha256": "FEF9DB5B57B02DCE2841B2B4F0D8501D1979C2CC3589016B83EBD02DBD43C3AF"
+    },
+    {
+      "path": "rust/ui/src/app/bookmarks.rs",
+      "sha256": "114A2B2D9235B8487FCB9201837EFBC63C7A223E8BE3553908C3A8CBC460BA2C"
+    },
+    {
+      "path": "rust/ui/src/app/bookmarks/controller.rs",
+      "sha256": "ED34EA8FECBCE62DFAD9F88966D850DC8DB9619739C971C1B616827584FE3171"
+    },
+    {
+      "path": "rust/ui/src/app/bookmarks/view.rs",
+      "sha256": "C943CB51E079F14783B8E7EEFD3626D5270D93116B19A36586FB03F6A496E2AE"
+    },
+    {
+      "path": "rust/ui/src/app/bulk_picker.rs",
+      "sha256": "2B7989D66B5FF11AD520CA94BDB9C13B9581D2BB01D487C75E402CBD926C6F31"
+    },
+    {
+      "path": "rust/ui/src/app/bulk_picker/preview.rs",
+      "sha256": "AB85A9E5742EE8A5128F84626CEFAF77101E5BB7DE7187C78F28822F724DB9D9"
+    },
+    {
+      "path": "rust/ui/src/app/cache_maintenance.rs",
+      "sha256": "1E4D5F25D85E5BEEE7AA3CA01E3E1184E6ED267FE03CCC0F6376CA30511127C4"
+    },
+    {
+      "path": "rust/ui/src/app/collections.rs",
+      "sha256": "EDB507150642622B54F63791C356FC464B85C975A29FDA89B0424DC423EFA69E"
+    },
+    {
+      "path": "rust/ui/src/app/collections/preview.rs",
+      "sha256": "8F44413074C50706F5A141F1F596FCE56935B2285F208287D4FB73D27822A887"
+    },
+    {
+      "path": "rust/ui/src/app/collections/view.rs",
+      "sha256": "D7C46954FB2929334C89D842DDCE638E703A348CC9BB559A89DD81BF17916B46"
+    },
+    {
+      "path": "rust/ui/src/app/compact.rs",
+      "sha256": "6D021D94248F10D448C790B870C2F30B9713DF2F9C83343343BE730EBB851F43"
+    },
+    {
+      "path": "rust/ui/src/app/cover_picker_preview.rs",
+      "sha256": "0449BFF8047EFECEB71A0EA2EABC2FA4338EEA7B667B277F6F4D18D4E7DFA3F1"
+    },
+    {
+      "path": "rust/ui/src/app/cover_picker_view.rs",
+      "sha256": "BB4D9DDB83F8D628B34ADFDDBCA892A4838F4A4F43D788F0F518B22173E4CA78"
+    },
+    {
+      "path": "rust/ui/src/app/cover_picker.rs",
+      "sha256": "21458D5125166F96DE4B5C8DAADCBF805ED1E67B07C6C24A501F3FE2998D9EAD"
+    },
+    {
+      "path": "rust/ui/src/app/cover_restore.rs",
+      "sha256": "1FA71A43D33983CED6B0438834A310B28DDA492CBD075B22C7B813CA479B8A04"
+    },
+    {
+      "path": "rust/ui/src/app/details.rs",
+      "sha256": "84FE5C796439B9F3514619ED414EF1619DB262A7B395408FB7687D57EF3A44C9"
+    },
+    {
+      "path": "rust/ui/src/app/file_check.rs",
+      "sha256": "01AA7130532663317742D9179EB3337609C16779543C94B0CA58E29059581D7D"
+    },
+    {
+      "path": "rust/ui/src/app/file_comparison.rs",
+      "sha256": "567609E6DC61D2518AB2C0B4917DC84BFF4886070115C2B948349F16E48C13AE"
+    },
+    {
+      "path": "rust/ui/src/app/find.rs",
+      "sha256": "5F72004C1D2377083751FE7DFD8AD324156BA649BABA467073C3222F43C1850E"
+    },
+    {
+      "path": "rust/ui/src/app/find/controller.rs",
+      "sha256": "C62CBA29FC2540B192130D09A32BF5FD4C41CA1F4BDC022B13A23F5324455842"
+    },
+    {
+      "path": "rust/ui/src/app/find/reference.rs",
+      "sha256": "80C42A5D38FC3BEE5797265D547B86205C571FA5F95FE598A7F7DBA08DB7229D"
+    },
+    {
+      "path": "rust/ui/src/app/global_notes.rs",
+      "sha256": "DC2B167C1EE812DDBF8870260A33FAC0561F85E80C16036204E5BE230405E9DB"
+    },
+    {
+      "path": "rust/ui/src/app/global_notes/filters.rs",
+      "sha256": "E6C981D779272C1D70AFF16668620C7BF3051AC7A738A091F5A44A49A4FBBEE9"
+    },
+    {
+      "path": "rust/ui/src/app/global_notes/views.rs",
+      "sha256": "84DDF03F45A23A8576F85779C88C8B5D9A1FED103C2F36997A73753B1E783F26"
+    },
+    {
+      "path": "rust/ui/src/app/goals.rs",
+      "sha256": "C81F0BC34C36DF3005FEA2909B8AE2188CDB0D08450DA8104AD06B0286DB5E91"
+    },
+    {
+      "path": "rust/ui/src/app/goals/views.rs",
+      "sha256": "0D132A89F1632E9D4BC513D58805C97A807116B1367207CECCDEF2D29741D69F"
+    },
+    {
+      "path": "rust/ui/src/app/history.rs",
+      "sha256": "009B3C28A0CA93A43A0F2245842103BBB2F7D603A90DBA03C8B5990D344125D2"
+    },
+    {
+      "path": "rust/ui/src/app/history/views.rs",
+      "sha256": "6E9D8629891057FD36E11D5B37CA6E138C513188039BD2F46ECFDFF0BC055213"
+    },
+    {
+      "path": "rust/ui/src/app/legacy_import.rs",
+      "sha256": "000F8FE316F0581C1C95BC7791F233AFA06EBE73271913DA04C48140ED14D940"
+    },
+    {
+      "path": "rust/ui/src/app/legacy_import/preview.rs",
+      "sha256": "BA6938C79BEEF1BB2CC74EA17567A9C4D1ED5E2F33C1A3BD4420E9AFCE17B732"
+    },
+    {
+      "path": "rust/ui/src/app/legacy_import/view.rs",
+      "sha256": "6355FC79BBE5E1D280CF54E4F3436AD2AFC2D47EC3D52E3712F7888FD6AE2140"
+    },
+    {
+      "path": "rust/ui/src/app/library_check.rs",
+      "sha256": "D14598A6F4EAC5DA34CE2A4BBCFB756EBEDE707D92E5175CEE913158BF1C352A"
+    },
+    {
+      "path": "rust/ui/src/app/library_covers.rs",
+      "sha256": "9F55C6B3765FB80E1F43D2335C2CA23D77CECE03D3D81583F898310AD0082D76"
+    },
+    {
+      "path": "rust/ui/src/app/library_covers/preview.rs",
+      "sha256": "0C6ED4DD6FC30E987D2B69C907A9BC5003EBC74F17A87331D7C1C45212F0831C"
+    },
+    {
+      "path": "rust/ui/src/app/library_grouping_grid.rs",
+      "sha256": "D0CDB8A6BCA3C2FD95A9E272839FFA247687DBC0A3F9DC7847E7D99C9C0FE28D"
+    },
+    {
+      "path": "rust/ui/src/app/library_grouping_preview.rs",
+      "sha256": "7BF873218DDBCD9329D889925DD2041575398161FD05F71E6BCD2397FBF9C78C"
+    },
+    {
+      "path": "rust/ui/src/app/library_grouping.rs",
+      "sha256": "E72593302EE98A1C2272220152374792B92E41EC0D40C23713C663E5E96970F3"
+    },
+    {
+      "path": "rust/ui/src/app/library_intro.rs",
+      "sha256": "B943C96F65C4B08B11759BDCE1DE287C00D1F411AB8FE424C190C9C5E2055C7D"
+    },
+    {
+      "path": "rust/ui/src/app/library_selection.rs",
+      "sha256": "9A8252670FCDB9205458063D4DC095B140B591FB5392E098ED01D5CE0CD0DF90"
+    },
+    {
+      "path": "rust/ui/src/app/library_selection/covers.rs",
+      "sha256": "C95BC58FA4FCCEF4366428F66BD2486C90AD4898DE5845F4628D109FFA0902CF"
+    },
+    {
+      "path": "rust/ui/src/app/library_selection/menu.rs",
+      "sha256": "B191D0667A3258AFC57CDF154DBA6340E1EA1E597845994169C129F28B7B22C6"
+    },
+    {
+      "path": "rust/ui/src/app/library_selection/preview.rs",
+      "sha256": "85BF235B4FE75B9A528E8D15D3307B5D59489D52DA8E03B8807036C57FE76932"
+    },
+    {
+      "path": "rust/ui/src/app/library_selection/removal.rs",
+      "sha256": "5C692782BC17FBF1BA87E3C743129DBA0F295F05F783403C7BA5A0F76D609BA1"
+    },
+    {
+      "path": "rust/ui/src/app/library_selection/removal/preview.rs",
+      "sha256": "55AD26B266A2EBEC01677B2CDD358D760E9B35BD72EA20FAFF132FFCF5573836"
+    },
+    {
+      "path": "rust/ui/src/app/library_selection/review.rs",
+      "sha256": "163B92953172494C8C60DEDB66ED158949C3BFAFF82394760B8D1566BB9E7D61"
+    },
+    {
+      "path": "rust/ui/src/app/links.rs",
+      "sha256": "8406AF1B4218AC47BBD5CB3CB3852740F55E105A2B790580236E0858E7AA7C8D"
+    },
+    {
+      "path": "rust/ui/src/app/links/dialog.rs",
+      "sha256": "375958B96F5BFB6398E73BCCF479894E79AE595B479ACF0C6D4B9D40E15C2582"
+    },
+    {
+      "path": "rust/ui/src/app/links/regions.rs",
+      "sha256": "3E4655C4451F831B20ED2C741961105702F41150714EC5B722CC6D31A409354E"
+    },
+    {
+      "path": "rust/ui/src/app/list.rs",
+      "sha256": "8566ED5FCE8431494E165DB32CE8A77987BB6B5AFDF8F91D21DB789BC69B8BB1"
+    },
+    {
+      "path": "rust/ui/src/app/metadata.rs",
+      "sha256": "8D9EE883A805FFB2FD44134B644B7B64C3B62D6EB390356F713402965D23F382"
+    },
+    {
+      "path": "rust/ui/src/app/metadata/form.rs",
+      "sha256": "67BCAF3DA950CA2FE59112D08E2597174EE5827D1D998062A48A5DBA1B075E7C"
+    },
+    {
+      "path": "rust/ui/src/app/metadata/panel.rs",
+      "sha256": "2786D76B430C3F46436ACF12CB1D399C37B45FD9608D9AD91C64716E1D0A48FF"
+    },
+    {
+      "path": "rust/ui/src/app/metadata/reference.rs",
+      "sha256": "7EBD8195555CBD48E36179E1AC75284BA25895B4D91816A852848854E4D3FEF8"
+    },
+    {
+      "path": "rust/ui/src/app/metadata/view.rs",
+      "sha256": "3FB87619A96CD59ED59AEE674D33C23B8AFB5F5440EA61A536A245FE490C07D6"
+    },
+    {
+      "path": "rust/ui/src/app/navigation.rs",
+      "sha256": "573D41C08D8D0A71014ECE6AA13C89BB20C69CC3A7E36F035872DAA2ACC08045"
+    },
+    {
+      "path": "rust/ui/src/app/open_intent.rs",
+      "sha256": "ECE4C58FFBF7E21009C4AB99B5363366D1D33082956A6F9AAA6A4EEFDC4B83F5"
+    },
+    {
+      "path": "rust/ui/src/app/opening.rs",
+      "sha256": "55037347EFAED37BD40DFF0BAF3D8C6B078650526E77C51F840AF6045AC191E5"
+    },
+    {
+      "path": "rust/ui/src/app/operations.rs",
+      "sha256": "D2803A1C528BC5940E81CD1F90A7B14C97AEE4C6E71F1B3C2DDC69E21897B0EC"
+    },
+    {
+      "path": "rust/ui/src/app/outline.rs",
+      "sha256": "DCEE1D920BD5054776D201842450F701811980F4EC6EE710F3963742D44C2633"
+    },
+    {
+      "path": "rust/ui/src/app/outline/reference.rs",
+      "sha256": "CA3B2811415A6D62938775A3638ED1F51F0A6514DAE38D1244526BECA215F900"
+    },
+    {
+      "path": "rust/ui/src/app/outline/view.rs",
+      "sha256": "4AA5B383CE48A533941ECB995EAE632FCACE14B9B46E963EDB09D1FB5DE963E0"
+    },
+    {
+      "path": "rust/ui/src/app/password.rs",
+      "sha256": "CC3C61CF876DA8FB53E176271829BDB79E1E0685FC124B693301633770C532F2"
+    },
+    {
+      "path": "rust/ui/src/app/reader_controls.rs",
+      "sha256": "2F131ABE557695DF1A6E59BA2C5EE8985B7BD32AD7BC89CC5E5A3B9B9EBDF21D"
+    },
+    {
+      "path": "rust/ui/src/app/reader_destination.rs",
+      "sha256": "F17716D0E087374263DB1ECFA0A49EEFFA911041866B0CE6840CE25174F55421"
+    },
+    {
+      "path": "rust/ui/src/app/reader_options.rs",
+      "sha256": "BB922588549C783BE28EA351A63F824BD969706A07596C1B8E96EE6DD06F3EEE"
+    },
+    {
+      "path": "rust/ui/src/app/reader_pane.rs",
+      "sha256": "727FBFF2C97E77D82B547CC37D9BFEEDFC3FF73EC7CB502D449C7143A228D2BC"
+    },
+    {
+      "path": "rust/ui/src/app/reader_surface.rs",
+      "sha256": "617722D375D34C0D9A621434555C1C29E1593218E315D2935986BFE085B8DEDE"
+    },
+    {
+      "path": "rust/ui/src/app/reader_viewport.rs",
+      "sha256": "47BBDC2FE7F90FAF06BAE232AF3B2258FA929CF39D50A2D34C99A694B442A12C"
+    },
+    {
+      "path": "rust/ui/src/app/reading_queue.rs",
+      "sha256": "E87EFA86D048A64B0E764EED170CF0F51CAE16443E78E72D73B7FEA7105BDDEA"
+    },
+    {
+      "path": "rust/ui/src/app/reference.rs",
+      "sha256": "7C33C9C3952D5DACD0A06D6B0011829B8FF97B0D561D82DC27103ABA41CF3222"
+    },
+    {
+      "path": "rust/ui/src/app/reference/admission.rs",
+      "sha256": "23E49DE97C8E4A474B677BDE5A591EFCA24896FBEEFDA08E048A4EF36A2BE455"
+    },
+    {
+      "path": "rust/ui/src/app/reference/bookmark_preview.rs",
+      "sha256": "6A4BB62C3FD247AF7C1134A3BE4AD2482FD55153CF8AE6B95E302ADDFE8FBF2C"
+    },
+    {
+      "path": "rust/ui/src/app/reference/chooser.rs",
+      "sha256": "15DE32E44D209B4C0364898FD58B27F0FC8231A9ED6175FB73E1E7A4D0EC3F22"
+    },
+    {
+      "path": "rust/ui/src/app/reference/differences.rs",
+      "sha256": "25526B722774A29BE5BDE80A13B9D0C99EE23580791B617A1D61D50BAFF24493"
+    },
+    {
+      "path": "rust/ui/src/app/reference/navigator.rs",
+      "sha256": "D8C5153560A9076178BE360F41952BAB2FA7A077F06C91905AB0E5F5055CB835"
+    },
+    {
+      "path": "rust/ui/src/app/reference/options.rs",
+      "sha256": "48878FDC3047340B230530711E3D82813674C6CE3E60F4C430B26C1918F77BDC"
+    },
+    {
+      "path": "rust/ui/src/app/reference/password.rs",
+      "sha256": "0B0FB2C112E8AB85B18ED88326F639579979DFFFCCF3517E251832F2220B36B8"
+    },
+    {
+      "path": "rust/ui/src/app/reference/preview.rs",
+      "sha256": "1D492609CB62D86EEC0A55572C71792F8038632D14D54A064D84BA7F454186BE"
+    },
+    {
+      "path": "rust/ui/src/app/reference/saved.rs",
+      "sha256": "E096EE98E07FC9537B886C44FA837327F5BD7E8AEF6F6BC621C566F869AC6B69"
+    },
+    {
+      "path": "rust/ui/src/app/reference/sync.rs",
+      "sha256": "B0FC9360DB9065B5D29B02F501ED1734962B4FC987750DFA0CFEAE581CE55878"
+    },
+    {
+      "path": "rust/ui/src/app/reference/text_preview.rs",
+      "sha256": "DD8E172C236CE43F3D5E71BDC04EAFD711010C554B84D37E7EA92EB191B480A9"
+    },
+    {
+      "path": "rust/ui/src/app/reference/toolbar.rs",
+      "sha256": "CF4C37C2693CA891F3342CB359DACBFD161EE0048EB47AC9A584953A673A8B16"
+    },
+    {
+      "path": "rust/ui/src/app/relocation.rs",
+      "sha256": "1003B5C66613825C93F699C66D1A4A82FDD3BDDD38D90ED0AE3A421CD72F08F6"
+    },
+    {
+      "path": "rust/ui/src/app/render_plan.rs",
+      "sha256": "C72F0F52A3C10F119F5750898C89ACD6B90A4D2621C2D9AB215732A835B828C9"
+    },
+    {
+      "path": "rust/ui/src/app/render_updates.rs",
+      "sha256": "BA510D8F367A3338DACB8108AF4BCA8D969BF3430624D1FA1B138296FA026BA2"
+    },
+    {
+      "path": "rust/ui/src/app/restoration.rs",
+      "sha256": "F0E2695CDD3E8ABDA3861DD1B007678896210C77D11DEF2672DAA7665D0626D3"
+    },
+    {
+      "path": "rust/ui/src/app/search.rs",
+      "sha256": "11511749C2D77097B8E80CA3B4B309E2B62D56921DF09E8D2841DCC82CFB8A5C"
+    },
+    {
+      "path": "rust/ui/src/app/selection.rs",
+      "sha256": "C5FE0578FA03846376B748FF1453200F39437368A9657EEA2A26BA648548AE67"
+    },
+    {
+      "path": "rust/ui/src/app/selection/comparison_preview.rs",
+      "sha256": "8A55074A1203AEFCA7E627275E0323AFFAA182C9DFF6A26BC755BEF2A9BAAF20"
+    },
+    {
+      "path": "rust/ui/src/app/selection/keyboard.rs",
+      "sha256": "AFA7DC283ECF6188DC66257498F5CB1075C2C5DA5B0A10436462660CC13848D5"
+    },
+    {
+      "path": "rust/ui/src/app/selection/view.rs",
+      "sha256": "F21EC17FBAB291ACA2D4BFD491AAA4739275FC034106B07726364242888FD806"
+    },
+    {
+      "path": "rust/ui/src/app/sessions.rs",
+      "sha256": "B8B3977EF01469773C8267EEDC22607A3FB320A946853C22174623708DFD91CB"
+    },
+    {
+      "path": "rust/ui/src/app/settings.rs",
+      "sha256": "8178912D7988A4FFCF5270761F8D7463A988AE4C3283EBE4AB69D2581A6AD849"
+    },
+    {
+      "path": "rust/ui/src/app/shortcuts.rs",
+      "sha256": "2A57A4E7A02968DD3AB3E12A8BF6D88365D3AE18937481C9F26CFE2413611704"
+    },
+    {
+      "path": "rust/ui/src/app/shortcuts/focus.rs",
+      "sha256": "EB3AEC8811FFDEC6AD67A8D148C174D4AFBEEC307D01433909BA3967E24389A4"
+    },
+    {
+      "path": "rust/ui/src/app/shortcuts/history_preview.rs",
+      "sha256": "167E1E005DCD9FCE4BB8A28F52FD0DB769EB9D597EAAF4BD20F903A6DC1FC276"
+    },
+    {
+      "path": "rust/ui/src/app/shortcuts/preview.rs",
+      "sha256": "30402EF0603704FC725BC92417381BB46AD5B02F24C83B14FFAE0FA65F7C567B"
+    },
+    {
+      "path": "rust/ui/src/app/shortcuts/routing.rs",
+      "sha256": "C5120AA7BD21485DD379E3C0194E9E04176E6436FC021E20C15EEE17CF0DFE8F"
+    },
+    {
+      "path": "rust/ui/src/app/smart_views.rs",
+      "sha256": "5DB8DD09C25DE0F42A5BDB12E20292CD48E36C0821C6780267884B4DBE179AF5"
+    },
+    {
+      "path": "rust/ui/src/app/tabs.rs",
+      "sha256": "940B2C9A3DB9A5E4C5751F09FA4D43D04413C475F2370EE16FD7F6A4EE528B59"
+    },
+    {
+      "path": "rust/ui/src/app/tabs/bulk.rs",
+      "sha256": "72E0F86CC5A86BF817CEF6487FD29CC021C84E165D91D89155F3524341DC1F23"
+    },
+    {
+      "path": "rust/ui/src/app/tabs/closing.rs",
+      "sha256": "6925EB2DC7E9F920EE3B251F1C6C9F59F2C247257856B4BC3EC8F1E86A03B4EE"
+    },
+    {
+      "path": "rust/ui/src/app/tabs/closing/state.rs",
+      "sha256": "0DEB1F59EB4E2D2396F8372E39BBF79ED10B673A866A7961D80C05A8B404C0BA"
+    },
+    {
+      "path": "rust/ui/src/app/tabs/commands.rs",
+      "sha256": "03C2332921C6E5FB0CD72204CA2E6D606FA97C9B090E8AD62BA2D3462B5E40BC"
+    },
+    {
+      "path": "rust/ui/src/app/tabs/continuity.rs",
+      "sha256": "5A659F64F8D497A59C80D541BF5612A881BAFC2145565829AFC9BEAD005B7680"
+    },
+    {
+      "path": "rust/ui/src/app/tabs/preview_bulk.rs",
+      "sha256": "560E67E23117CD9A87DF39B4FCA6DC8039A2102E40C8C3BCEE8E0C642EB21A98"
+    },
+    {
+      "path": "rust/ui/src/app/tabs/preview.rs",
+      "sha256": "AF32E591AD12B475E921F4AC2F3E086130620456AFF1D17FD379A818F8DC9775"
+    },
+    {
+      "path": "rust/ui/src/app/tabs/view.rs",
+      "sha256": "5DD14967B84550BD2A716FC04E0A71E448CEB13DEA4418369D0A34DC586F84D2"
+    },
+    {
+      "path": "rust/ui/src/app/tags.rs",
+      "sha256": "39E8606D44E0DFE9F803FE005F8AD81F50CC0657F6605ED5ECCC8D9E224D789C"
+    },
+    {
+      "path": "rust/ui/src/app/tags/dialogs.rs",
+      "sha256": "51B0E92359D58A91F4DE3BBE0ACA6D64A7C94DC782FD77C55D2C51CBFE7098CD"
+    },
+    {
+      "path": "rust/ui/src/app/tags/editor.rs",
+      "sha256": "A4E427F0AE0F2511FCC42F73BFCA8F9190F83FAE71BF47BA4D601EDF7774D913"
+    },
+    {
+      "path": "rust/ui/src/app/tags/management.rs",
+      "sha256": "FB10157F25F0EED9AD57EF799F67223BEFC82C7B1061302A577CE50488393C31"
+    },
+    {
+      "path": "rust/ui/src/app/tags/preview_management.rs",
+      "sha256": "4D2C6577ED4B59B6DEEC0075038C77B7E00EFCF8E65A19B945649DFC642DFC2E"
+    },
+    {
+      "path": "rust/ui/src/app/tags/preview.rs",
+      "sha256": "FD6EF8CEE7D33881E4B9C372520962A1F84B1B9DBDE3F0556A639C9AE1726259"
+    },
+    {
+      "path": "rust/ui/src/app/tags/view.rs",
+      "sha256": "3EB23335993DD6B86DFF9496B1DB07843CC4135BDC98D2A9233F9606CC4CEB28"
+    },
+    {
+      "path": "rust/ui/src/app/text.rs",
+      "sha256": "C36265D872EC5A5C93EAA68272D519D79BC98EC587FD11AD945C0BCA57350B45"
+    },
+    {
+      "path": "rust/ui/src/app/text/view.rs",
+      "sha256": "CEB8EDCC2EA9FD22DF487AA4BFAACE32F4FE5BEA81F7319FC43B90B2E5806228"
+    },
+    {
+      "path": "rust/ui/src/app/thumbnails.rs",
+      "sha256": "2F3F94B9ADF9BF173AE4FF52C97B1210C658BB6DD9D830A3B5FCF21F71C3497A"
+    },
+    {
+      "path": "rust/ui/src/app/workspaces.rs",
+      "sha256": "112D38BA016A959A891EA23586E1D9C9AD23E3D6335936ACF1A55EBC42F7218D"
+    },
+    {
+      "path": "rust/ui/src/app/workspaces/binding.rs",
+      "sha256": "FDA22EE9047AFA329D05BE6DCAC1864C4BDEFB0299F37D4F497B6D1E6321EE19"
+    },
+    {
+      "path": "rust/ui/src/app/workspaces/comparison.rs",
+      "sha256": "0ECCA2FDD5FB7455919EBEA8CA4C55C8FEB13856F04E8C554617E8939A8C9F3A"
+    },
+    {
+      "path": "rust/ui/src/app/workspaces/context.rs",
+      "sha256": "D340E41BF5040C72ADD465A26CF0D06A8AC5D1C155472559E1AE75F383BC0936"
+    },
+    {
+      "path": "rust/ui/src/app/workspaces/opening.rs",
+      "sha256": "172A124B41E6B72BA01380E97E6715907533E5A066787D2479A393C2FD5B273D"
+    },
+    {
+      "path": "rust/ui/src/app/workspaces/preview.rs",
+      "sha256": "680D0C4172682DCDD84A951D09A7E8D1E52B88446CFAE1EAE1A02C8F31D63B2F"
+    },
+    {
+      "path": "rust/ui/src/app/workspaces/startup.rs",
+      "sha256": "6BBF17D514CC3ED8E892A8F55A0B7CEEE985D9D7406479114D14265338862488"
+    },
+    {
+      "path": "rust/ui/src/app/workspaces/view.rs",
+      "sha256": "18F88A99D050EAB4C57ABDD21305DC2E50E301E94988823D218C329F90F1B852"
+    },
+    {
+      "path": "rust/ui/src/backup_worker.rs",
+      "sha256": "0D32C5B509BB0FC1AF8B0644E5C892DB15113599E16000DCBB5B9DEE532D0B68"
+    },
+    {
+      "path": "rust/ui/src/book.rs",
+      "sha256": "F3FFCFEB8051D5BD1CBC201EDCF6F64A775EDFF88AAE0442296C6CD30451EF2D"
+    },
+    {
+      "path": "rust/ui/src/book/material.rs",
+      "sha256": "3B8583002606E735C99C4B22FDBDF7EF1BF8152915706A49B159D34DA0CB7249"
+    },
+    {
+      "path": "rust/ui/src/legacy_import_worker.rs",
+      "sha256": "76BCF33A4F1B4FC1EFB157066860372832CE0B851BA2253AD3FA4D70B8BFD4FB"
+    },
+    {
+      "path": "rust/ui/src/main.rs",
+      "sha256": "24694E21922FDCB1C35B15CD822433819EB61F2728144057B433D60F18AC2E27"
+    },
+    {
+      "path": "rust/ui/src/page_presenter.rs",
+      "sha256": "E29F88A42FB2D2BC936F42E57DBE95777DC226BF8B30AC4772610259E358E2A5"
+    },
+    {
+      "path": "rust/ui/src/restore_worker.rs",
+      "sha256": "370DFDB36AF652E8F6B219A1C0DE779F75BABE261707ADDE1DE0E2E9C08D9F45"
+    },
+    {
+      "path": "rust/ui/src/theme.rs",
+      "sha256": "6B5C8A72E8A64650BBF9F7244AB401DB863BD166AF4FAE7EDCFDE3EA9B822370"
+    },
+    {
+      "path": "rust/windows/Cargo.toml",
+      "sha256": "5A76738A7A00795DEBFBFDC4354FCF40B3B229D4E0C4B89FC0B472CE9BDBAE5C"
+    },
+    {
+      "path": "rust/windows/src/annotation_export.rs",
+      "sha256": "D5CDA1D7B58B4D7BB5D1D70D138566F006AF9D68B53D0585DE6322325DFA59F2"
+    },
+    {
+      "path": "rust/windows/src/lib.rs",
+      "sha256": "41AC73B2AF3080D315BACDD3FF153606B9150D2FF1204BB8096F0B9FBBE36069"
+    },
+    {
+      "path": "rust/windows/tests/native_instance.rs",
+      "sha256": "A03B15D9DC20C13A056A6D37C52A656180FD3679F6EA581A250F2C662ABB08CC"
+    }
+  ],
+  "captures": [
+    {
+      "name": "reader-reference-note-export-json",
+      "args": [
+        "--demo",
+        "--reader",
+        "--reference",
+        "--reference-book",
+        "--reference-notes",
+        "--reference-note-bulk",
+        "--reference-note-bulk-save",
+        "--reference-export-json",
+        "--es"
+      ],
+      "image": "reader-reference-note-export-json.png",
+      "imageSha256": "F904D9B16BC4B99B1EBBBCF95C684F8A1815805720D59B92F40F15897296F249",
+      "controls": "reader-reference-note-export-json.controls.json",
+      "controlsSha256": "63C8326484AD2F2DCA6A983D2188E87E2D931428EF628DBAA9C2B6E5A42D4C2F",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "annotationExport": {
+        "file": "reader-reference-note-export-json.14384.json",
+        "sha256": "1A60AC0D5F78E7CD646C56C3CEFBA6E948EA16218D71D4A6602217CB13A3C347",
+        "count": 82
+      },
+      "publishedImageSha256": "7368FA6C55A93F724DAEF7F00D988BBCCC4DD1E1133CEF8EB04A1C5A8BBBAD27"
+    },
+    {
+      "name": "reader-reference-note-export-markdown",
+      "args": [
+        "--demo",
+        "--reader",
+        "--reference",
+        "--reference-book",
+        "--reference-notes",
+        "--reference-note-bulk",
+        "--reference-note-bulk-save",
+        "--reference-export-md",
+        "--light"
+      ],
+      "image": "reader-reference-note-export-markdown.png",
+      "imageSha256": "0806C0EE0D2C6B2E4DD22EF9D2178439A119A636A6799F51B6028530CCC021B1",
+      "controls": "reader-reference-note-export-markdown.controls.json",
+      "controlsSha256": "E0CBB43500C6ACCDA231BAC99D52B58385D946BA679B39EB098E4271D67038E4",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "annotationExport": {
+        "file": "reader-reference-note-export-markdown.11868.md",
+        "sha256": "2C8063F99780CF18CD6E93D59040B2CDBE679F029F1AFABC31BE478303EEE3D7",
+        "count": 82
+      },
+      "publishedImageSha256": "5B4AA5F82672F252C2DB4DF6F5DD5A4B623533154B3257A11DCCDB404ECDBF9E"
+    },
+    {
+      "name": "global-notes-export-markdown-es",
+      "args": [
+        "--demo",
+        "--annotation-many",
+        "--global-notes-export-markdown",
+        "--light",
+        "--es"
+      ],
+      "image": "global-notes-export-markdown-es.png",
+      "imageSha256": "3D4D83D0B6B9C27F5CD69B3FD8AE5A9ABE9ABABF4AAE4E8E845531BB9FC96570",
+      "controls": "global-notes-export-markdown-es.controls.json",
+      "controlsSha256": "2154254CDFCCD40B55ABE4B1D63EFB69B29DA2BA4B5951715E4489993783AF06",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "annotationExport": {
+        "file": "global-notes-export-markdown-es.12020.md",
+        "sha256": "8940DDA4CABBB203C6B5A297BA9D0A6154D6AC162630D4390528497CFF255327",
+        "count": 80
+      },
+      "publishedImageSha256": "0E4F704F73FEC7F55A1247DEAE98A63918079D02E77289C2B4E205B979CFBB3D"
+    },
+    {
+      "name": "annotation-export-json",
+      "args": [
+        "--demo",
+        "--reader",
+        "--annotation-many",
+        "--export-json"
+      ],
+      "image": "annotation-export-json.png",
+      "imageSha256": "262808652AC95AA3EB9BA4F497BA5EF71BC302BD66E8F4B77DED6A87700DC038",
+      "controls": "annotation-export-json.controls.json",
+      "controlsSha256": "545DE4D7A44753E4A99682E650B063EDB60D0F478C6160693B13814C4731630F",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "exitCode": 0,
+      "annotationExport": {
+        "file": "annotation-export-json.11312.json",
+        "sha256": "E9731DB3FF621D8A43EF830DF01EBB94CC8EC7849E7DEF06155C949BFA4E647F",
+        "count": 181
+      },
+      "publishedImageSha256": "AA5702DF07317AF3F71FC1A9096314086A66D94FE13093B43E4095E4580BF293"
+    }
+  ],
+  "scope": "Native synthetic screenshots and custom-control bounds. Text zoom is not physical monitor DPI certification; no Narrator or multi-monitor acceptance is implied."
+}

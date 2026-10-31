@@ -100,7 +100,9 @@ Choose **Filter notes** to combine passage or note text, an exact tag name, mark
 
 Select individual notes in the reference list or choose **Select page** to select its current batch, up to 80 notes. **Clear selection** removes that selection. Choose **Mark pending**, **Accept**, or **Resolve** to update the selected notes together. To add a shared label, enter one tag and choose **Add to selected**. This preserves existing tags and limits the new tag to 80 displayed characters.
 
-Selection clears after a completed write, filter change, or list-page request. Notes outside the selected batch keep their values. Use the main Notes panel or **Tools → Library notes** for export; the reference popup does not duplicate export controls.
+Selection clears after a completed write, filter change, or list-page request. Notes outside the selected batch keep their values. Choose **Markdown** or **JSON** under **Export** in reference Notes, then select a new destination file. The export includes every saved note in the reference document, including records beyond the visible list page. List filters and selection do not restrict a document export. Unsaved draft changes are not exported.
+
+The request retains that document's title, author, and reading progress. Closing the popup or reference does not redirect an accepted export. Its status is shared with the main Notes and Library notes tools. If another document's export is shown, it has a separate scope label. **Cancel** stops a pending export; an existing destination is preserved and requests a different filename.
 
 ## Select and copy a passage
 
@@ -140,4 +142,4 @@ Opening a workspace recovers the main reading before the reference. A missing or
 
 ## Current development limits
 
-The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Reference notes support combined filters, page-scoped review changes, and additive tags. Export is available through the main or library Notes tools. Reference-specific export controls, shortcut customization, overlays, and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.
+The reference supports page navigation, history, temporary A/B positions, zoom, chapter contents, page thumbnails, bookmarks, page text, passage selection and copying, text search and PDF links. Reference notes support combined filters, page-scoped review changes, and additive tags. Both export formats are connected in the reference. Shortcut customization, overlays, and broader keyboard acceptance remain in development. Release, physical accessibility and performance acceptance remain pending. See the [development checkpoints](../validation/) for the recorded scope and evidence.

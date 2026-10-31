@@ -8,6 +8,7 @@ pub(in crate::app) enum NotesAction {
     Selection,
     Navigate(u32, bool),
     ReloadMarks,
+    Export(yamantaka_application::annotation_export::AnnotationExportFormat),
 }
 pub(in crate::app) struct NotesContext<'a> {
     pub english: bool,

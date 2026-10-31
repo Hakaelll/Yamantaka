@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-reference-note-export-json'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--reference-note-bulk-save','--reference-export-json','--es') },
+    @{ name='reader-reference-note-export-markdown'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--reference-note-bulk-save','--reference-export-md','--light') },
     @{ name='reader-reference-note-bulk'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--es') },
     @{ name='reader-reference-note-bulk-saved'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-bulk','--reference-note-bulk-save','--light') },
     @{ name='reader-reference-note-filters'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-filters','--light','--es') },
@@ -660,6 +662,17 @@ foreach ($case in $cases) {
         $artifactPath = Join-Path $outputPath $artifactName
         if (-not $controls.annotationExport.saved -or $controls.annotationExport.pending -or -not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) { throw 'Export capture must contain a successfully published file.' }
         $export = [ordered]@{ file=$artifactName; sha256=(Get-FileHash -LiteralPath $artifactPath -Algorithm SHA256).Hash; count=$controls.annotationExport.count }
+        if ($case.name -like 'reader-reference-note-export-*') {
+            if ($controls.annotationExport.document -cne 'demo-1' -or $controls.annotationExport.count -ne 82 -or $controls.referenceNotesPhase -ne 41 -or $controls.primaryAnnotations.total -ne 2) { throw 'Reference export lost its source identity or omitted records beyond the first list page.' }
+            if ($case.name -like '*-json') {
+                $document = Get-Content -LiteralPath $artifactPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                if ($document.metadata.documentId -cne 'demo-1' -or $document.annotations.Count -ne 82 -or @($document.annotations | Where-Object { $_.id -notlike 'reference-bulk-*' }).Count -ne 0) { throw 'Reference JSON contains the wrong document or incomplete records.' }
+            } else {
+                $markdown = Get-Content -LiteralPath $artifactPath -Raw -Encoding UTF8
+                if ($markdown -notmatch 'Reference bulk note 000' -or $markdown -notmatch 'Reference bulk note 081' -or $markdown -match 'Source note [AB]') { throw 'Reference Markdown omitted notes or included the primary document.' }
+            }
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Markdown','JSON')
+        }
     }
     $captures += [ordered]@{
         name=$case.name; args=@('--demo') + $case.args

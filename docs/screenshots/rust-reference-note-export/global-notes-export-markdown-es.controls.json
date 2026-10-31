@@ -1,0 +1,1851 @@
+{
+  "synthetic": true,
+  "libraryDocumentCount": 10,
+  "captureProcessId": 12020,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Biblioteca",
+      "rect": [
+        156.21875,
+        8.0,
+        268.5,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Herramientas",
+      "rect": [
+        1271.375,
+        8.0,
+        1406.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Añadir PDF",
+      "rect": [
+        1140.46875,
+        8.0,
+        1261.375,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Filtros",
+      "rect": [
+        20.0,
+        248.8125,
+        85.375,
+        288.8125
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Restablecer",
+      "rect": [
+        95.375,
+        248.8125,
+        194.0625,
+        288.8125
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Aplicar",
+      "rect": [
+        423.53125,
+        248.8125,
+        494.03125,
+        288.8125
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Seleccionar página",
+      "rect": [
+        20.0,
+        340.8125,
+        163.78125,
+        380.8125
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Markdown",
+      "rect": [
+        85.21875,
+        414.8125,
+        179.21875,
+        454.8125
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "JSON",
+      "rect": [
+        189.21875,
+        414.8125,
+        250.6875,
+        454.8125
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "On the Nature of Things",
+      "rect": [
+        32.0,
+        587.1875,
+        209.59375,
+        627.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "On the Nature of Things",
+      "rect": [
+        32.0,
+        733.1875,
+        209.59375,
+        773.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        879.1875,
+        234.03125,
+        919.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        1025.1875,
+        234.03125,
+        1065.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        1171.1875,
+        234.03125,
+        1211.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        1317.1875,
+        234.03125,
+        1357.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        1463.1875,
+        234.03125,
+        1503.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        1609.1875,
+        234.03125,
+        1649.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        1755.1875,
+        234.03125,
+        1795.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        1901.1875,
+        234.03125,
+        1941.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        2047.1875,
+        234.03125,
+        2087.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        2193.1875,
+        234.03125,
+        2233.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        2339.1875,
+        234.03125,
+        2379.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        2485.1875,
+        234.03125,
+        2525.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        2631.1875,
+        234.03125,
+        2671.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        2777.1875,
+        234.03125,
+        2817.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        2923.1875,
+        234.03125,
+        2963.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        3069.1875,
+        234.03125,
+        3109.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        3215.1875,
+        234.03125,
+        3255.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        3361.1875,
+        234.03125,
+        3401.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        3507.1875,
+        234.03125,
+        3547.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        3653.1875,
+        234.03125,
+        3693.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        3799.1875,
+        234.03125,
+        3839.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        3945.1875,
+        234.03125,
+        3985.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        4091.1875,
+        234.03125,
+        4131.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        4237.1875,
+        234.03125,
+        4277.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        4383.1875,
+        234.03125,
+        4423.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        4529.1875,
+        234.03125,
+        4569.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        4675.1875,
+        234.03125,
+        4715.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        4821.1875,
+        234.03125,
+        4861.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        4967.1875,
+        234.03125,
+        5007.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        5113.1875,
+        234.03125,
+        5153.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        5259.1875,
+        234.03125,
+        5299.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        5405.1875,
+        234.03125,
+        5445.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        5551.1875,
+        234.03125,
+        5591.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        5697.1875,
+        234.03125,
+        5737.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        5843.1875,
+        234.03125,
+        5883.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        5989.1875,
+        234.03125,
+        6029.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        6135.1875,
+        234.03125,
+        6175.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        6281.1875,
+        234.03125,
+        6321.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        6427.1875,
+        234.03125,
+        6467.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        6573.1875,
+        234.03125,
+        6613.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        6719.1875,
+        234.03125,
+        6759.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        6865.1875,
+        234.03125,
+        6905.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        7011.1875,
+        234.03125,
+        7051.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        7157.1875,
+        234.03125,
+        7197.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        7303.1875,
+        234.03125,
+        7343.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        7449.1875,
+        234.03125,
+        7489.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        7595.1875,
+        234.03125,
+        7635.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        7741.1875,
+        234.03125,
+        7781.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        7887.1875,
+        234.03125,
+        7927.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        8033.1875,
+        234.03125,
+        8073.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        8179.1875,
+        234.03125,
+        8219.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        8325.1875,
+        234.03125,
+        8365.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        8471.1875,
+        234.03125,
+        8511.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        8617.1875,
+        234.03125,
+        8657.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        8763.1875,
+        234.03125,
+        8803.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        8909.1875,
+        234.03125,
+        8949.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        9055.1875,
+        234.03125,
+        9095.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        9201.1875,
+        234.03125,
+        9241.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        9347.1875,
+        234.03125,
+        9387.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        9493.1875,
+        234.03125,
+        9533.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        9639.1875,
+        234.03125,
+        9679.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        9785.1875,
+        234.03125,
+        9825.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        9931.1875,
+        234.03125,
+        9971.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        10077.1875,
+        234.03125,
+        10117.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        10223.1875,
+        234.03125,
+        10263.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        10369.1875,
+        234.03125,
+        10409.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        10515.1875,
+        234.03125,
+        10555.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        10661.1875,
+        234.03125,
+        10701.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        10807.1875,
+        234.03125,
+        10847.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        10953.1875,
+        234.03125,
+        10993.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        11099.1875,
+        234.03125,
+        11139.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        11245.1875,
+        234.03125,
+        11285.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        11391.1875,
+        234.03125,
+        11431.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        11537.1875,
+        234.03125,
+        11577.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        11683.1875,
+        234.03125,
+        11723.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        11829.1875,
+        234.03125,
+        11869.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        11975.1875,
+        234.03125,
+        12015.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "The Architecture of Thought",
+      "rect": [
+        32.0,
+        12121.1875,
+        234.03125,
+        12161.1875
+      ],
+      "clip": [
+        0.0,
+        574.8125,
+        1440.0,
+        920.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Abrir en el documento",
+      "rect": [
+        749.0,
+        796.40625,
+        939.9375,
+        836.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Anteriores",
+      "rect": [
+        20.0,
+        942.0,
+        111.59375,
+        982.0
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": false
+    },
+    {
+      "label": "Siguientes",
+      "rect": [
+        121.59375,
+        942.0,
+        213.21875,
+        982.0
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "libraryCovers": {
+    "resident": 0,
+    "bulkRegeneration": null,
+    "paused": 0,
+    "deferredUploads": 0,
+    "blockedBeforeRelease": 0,
+    "capacityPreview": 0,
+    "capacityRevision": 0,
+    "ready": 0,
+    "pending": 0,
+    "source": "PDF selected page",
+    "sourcePages": {},
+    "maximumVisible": 16
+  },
+  "coverPicker": {
+    "open": false
+  },
+  "coverPickerDemo": {
+    "action": null,
+    "complete": false,
+    "saved": false
+  },
+  "metadataReview": null,
+  "documentFind": null,
+  "documentLinks": {
+    "keyboardActivated": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "internalLinks": 0,
+    "externalLinks": 0,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "document": null,
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 0,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 0,
+      "text": "",
+      "tag": "",
+      "kind": null,
+      "review": null
+    },
+    "resident": 0,
+    "total": 0,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "document": null,
+    "residentPages": 0,
+    "readyPages": 0,
+    "marks": 0,
+    "retainedPages": 0,
+    "details": []
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": true,
+    "count": 80,
+    "artifact": "global-notes-export-markdown-es.12020.md",
+    "document": null
+  },
+  "fileComparison": {
+    "pending": false,
+    "equal": null,
+    "failed": false
+  },
+  "importRecovery": {
+    "pendingJobs": 0,
+    "loaded": true,
+    "unavailable": false,
+    "completed": 0
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 181,
+    "resident": 80,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": true,
+    "documents": 2
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": true,
+    "preferences": null
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Off",
+    "pending": null,
+    "active": null,
+    "tabs": []
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 0,
+  "readerZoom": 1.0,
+  "readerRenderEvents": [],
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 83416,
+    "pages": 0,
+    "tiles": 0,
+    "text": 83416,
+    "other": 0,
+    "cpu": 83416,
+    "gpu": 0,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered.",
+  "bulkOrganization": null,
+  "bulkTargetPicker": {
+    "open": false
+  },
+  "libraryVisibleFavorites": 0,
+  "librarySelection": {
+    "removal": null,
+    "mode": false,
+    "ids": [],
+    "writing": false,
+    "notice": null,
+    "preview": null,
+    "verifiedFavoriteTargets": []
+  },
+  "libraryGrouping": {
+    "mode": "none",
+    "verified": false,
+    "visible": [
+      "demo-0",
+      "demo-1",
+      "demo-2",
+      "demo-3",
+      "demo-4",
+      "demo-5",
+      "demo-6",
+      "demo-7",
+      "demo-8",
+      "demo-9"
+    ],
+    "groups": [
+      {
+        "label": "",
+        "count": 10,
+        "collapsed": false
+      }
+    ]
+  },
+  "libraryFiltersActive": false,
+  "libraryQueryLoaded": true,
+  "smartView": null,
+  "libraryTags": {
+    "loaded": false,
+    "failed": false,
+    "total": 0,
+    "visible": 0,
+    "assigned": 0,
+    "annotationUses": 0,
+    "filters": [],
+    "filtersChecked": false,
+    "busy": false,
+    "managementVerified": false,
+    "mergeOpen": false,
+    "mergeTotal": null,
+    "mergeOffset": null,
+    "mergeVisible": null,
+    "reviewOpen": false,
+    "entries": []
+  },
+  "legacyImport": {
+    "open": false,
+    "busy": false,
+    "reviewed": false,
+    "copied": false,
+    "selectedNext": false,
+    "originalNext": false,
+    "failed": false,
+    "verified": false,
+    "books": null
+  },
+  "backup": {
+    "busy": false,
+    "saved": false,
+    "cancelled": false,
+    "failed": false,
+    "verified": false
+  },
+  "restore": {
+    "open": false,
+    "busy": false,
+    "reviewed": false,
+    "books": null,
+    "queued": false
+  },
+  "collections": {
+    "loaded": false,
+    "failed": false,
+    "total": 0,
+    "visible": 0,
+    "assigned": 0,
+    "pinned": 0,
+    "filter": null,
+    "filterChecked": false,
+    "confirmDelete": false,
+    "busy": false,
+    "orderVerified": false,
+    "entries": []
+  },
+  "workspaces": {
+    "startupFinished": true,
+    "bindingName": null,
+    "bindingId": null,
+    "paused": false,
+    "reference": null,
+    "focus": false,
+    "undoAvailable": false,
+    "queue": []
+  },
+  "coverCache": {
+    "pending": false,
+    "failed": false,
+    "files": null,
+    "bytes": null,
+    "preserved": null,
+    "removedFiles": null,
+    "removedBytes": null,
+    "failedFiles": null,
+    "cancelled": null
+  },
+  "referenceShortcutPhase": 0,
+  "referenceNotesPhase": 0,
+  "primaryAnnotations": {
+    "document": null,
+    "pending": false,
+    "writing": false,
+    "editing": false,
+    "saved": false,
+    "stale": false,
+    "filterCount": 0,
+    "selected": 0,
+    "offset": null,
+    "total": null,
+    "entries": null
+  },
+  "referenceAnnotations": null,
+  "retiredAnnotationWrites": 0,
+  "referenceMarksPhase": 0,
+  "referenceMarks": null,
+  "referenceMarksRotation": null,
+  "referenceSelectionPhase": 0,
+  "referenceSelection": null,
+  "selectionClipboard": null,
+  "primaryNavigation": null,
+  "referenceNavigation": null,
+  "readingFocus": "Primary",
+  "documentOutline": {
+    "entries": 0,
+    "rows": 0,
+    "pending": false
+  },
+  "documentBookmarks": {
+    "document": null,
+    "pending": false,
+    "saved": false,
+    "total": null,
+    "offset": null,
+    "entries": null
+  },
+  "reference": null,
+  "referenceSync": {
+    "demoStage": 0,
+    "linkedConfirmed": false,
+    "positionConfirmed": false,
+    "reverseConfirmed": false,
+    "differencesConfirmed": false,
+    "primaryScale": 1.0
+  },
+  "referenceAdmission": {
+    "demoStage": 0,
+    "nativeCloses": 0,
+    "passwordAttempts": 0
+  },
+  "referenceChooser": null,
+  "fileCheck": {
+    "pending": false,
+    "state": null
+  },
+  "relocation": {
+    "pending": false,
+    "review": false,
+    "exact": null,
+    "applied": false,
+    "failed": false
+  },
+  "libraryCheck": {
+    "pending": false,
+    "phase": "Idle",
+    "checked": 0,
+    "available": 0,
+    "missing": 0,
+    "changed": 0,
+    "unverifiable": 0,
+    "failed": 0,
+    "error": false
+  }
+}

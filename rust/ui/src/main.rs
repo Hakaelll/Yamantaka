@@ -95,6 +95,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             || value == "--restore-apply"
                             || value == "--workspaces"
                     }) || arg == "--export-json"
+                        || arg == "--reference-export-json"
+                        || arg == "--reference-export-md"
                         || arg == "--automatic-cover"
                         || arg == "--cover-picker-save"
                         || arg == "--cover-picker-cancel"
@@ -424,10 +426,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',1,'','','2026-10-13T00:00:00Z','2026-10-08',1,'manual',1,'contain',0.75);")?;
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-notes") {
-            db.execute_batch("INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) VALUES('source-note-a','demo-0',0,'pageComment','violet','Source note A','[]',0,'synthetic','attached','2026-10-30','2026-10-30','pending'),('source-note-b','demo-0',1,'pageComment','violet','Source note B','[]',0,'synthetic','attached','2026-10-30','2026-10-30','pending');")?;
+            db.execute_batch("INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) VALUES('source-note-a','demo-0',0,'pageComment','violet','Source note A','[]',0,'synthetic','attached','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z','pending'),('source-note-b','demo-0',1,'pageComment','violet','Source note B','[]',0,'synthetic','attached','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z','pending');")?;
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-note-bulk") {
-            db.execute_batch("WITH RECURSIVE notes(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM notes WHERE n<81) INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) SELECT printf('reference-bulk-%03d',n),'demo-1',n%2,'pageComment','violet',printf('Reference bulk note %03d',n),'[]',0,'synthetic','attached','2026-10-30','2026-10-30','pending' FROM notes; INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('reference-existing-tag','Existing study','existing study','blue','2026-10-30','2026-10-30'); INSERT INTO annotation_tags(annotation_id,tag_id) SELECT id,'reference-existing-tag' FROM annotations WHERE document_id='demo-1';")?;
+            db.execute_batch("WITH RECURSIVE notes(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM notes WHERE n<81) INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) SELECT printf('reference-bulk-%03d',n),'demo-1',n%2,'pageComment','violet',printf('Reference bulk note %03d',n),'[]',0,'synthetic','attached','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z','pending' FROM notes; INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('reference-existing-tag','Existing study','existing study','blue','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z'); INSERT INTO annotation_tags(annotation_id,tag_id) SELECT id,'reference-existing-tag' FROM annotations WHERE document_id='demo-1';")?;
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-marks") {
             db.execute_batch(r#"
@@ -1213,6 +1215,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         app.preview_reference_notes(
                             !args.iter().any(|arg| arg == "--reference-book"),
                             args.iter().any(|arg| arg == "--reference-notes-editor"),
+                        );
+                    }
+                    if args.iter().any(|arg| {
+                        arg == "--reference-export-json" || arg == "--reference-export-md"
+                    }) {
+                        app.preview_reference_annotation_export(
+                            args.iter().any(|arg| arg == "--reference-export-md"),
                         );
                     }
                     if args.iter().any(|arg| arg == "--reference-note-bulk") {

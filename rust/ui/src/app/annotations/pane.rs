@@ -68,6 +68,9 @@ impl YamantakaApp {
     pub(in crate::app) fn apply_notes_action(&mut self, reference: bool, action: NotesAction) {
         if !reference {
             match action {
+                NotesAction::Export(format) => {
+                    self.pick_annotation_export(export::ExportTarget::Primary, format)
+                }
                 NotesAction::Read(offset) => self.annotation_command(None, offset),
                 NotesAction::Change(change, offset) => {
                     self.annotation_command(Some(change), offset)
@@ -82,6 +85,10 @@ impl YamantakaApp {
                 }
                 NotesAction::ReloadMarks => self.reader.annotation_paint.invalidate_document(None),
             }
+            return;
+        }
+        if let NotesAction::Export(format) = action {
+            self.pick_annotation_export(export::ExportTarget::Reference, format);
             return;
         }
         let blocked = self.global_notes.writing()

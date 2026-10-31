@@ -16,6 +16,11 @@ mod text_preview;
 mod toolbar;
 use admission::Admission;
 
+struct ReferenceTools<'a> {
+    runtime: &'a Runtime,
+    governor: &'a MemoryGovernor,
+    export: &'a mut annotations::export::ExportState,
+}
 pub(super) struct ReferenceView {
     admission: Admission,
     close_requested: bool,
@@ -136,12 +141,13 @@ impl ReferenceView {
     fn show(
         &mut self,
         ui: &mut egui::Ui,
-        runtime: &Runtime,
-        governor: &MemoryGovernor,
+        tools: &mut ReferenceTools<'_>,
         english: bool,
         p: Palette,
         primary: &reader_pane::ReaderPane,
     ) -> bool {
+        let runtime = tools.runtime;
+        let governor = tools.governor;
         let tr = |es, en| if english { en } else { es };
         let mut close = false;
         let can_choose = self.pane.active.as_ref().map(|(doc, _)| &doc.id)
@@ -188,7 +194,7 @@ impl ReferenceView {
             .as_ref()
             .map_or(1, ReaderNavigation::page_count);
         ui.horizontal_wrapped(|ui| {
-            self.navigator(ui, runtime, governor, notes_blocked, english, p);
+            self.navigator(ui, tools, notes_blocked, english, p);
             let page_label = ui.label(
                 RichText::new(tr("Referencia", "Reference"))
                     .color(p.secondary)
@@ -672,8 +678,11 @@ impl YamantakaApp {
                     ui.set_clip_rect(reference_rect.intersect(ui.clip_rect()));
                     close = reference.show(
                         ui,
-                        &self.runtime,
-                        &self.governor,
+                        &mut ReferenceTools {
+                            runtime: &self.runtime,
+                            governor: &self.governor,
+                            export: &mut self.annotation_export,
+                        },
                         self.english,
                         p,
                         &self.reader,
