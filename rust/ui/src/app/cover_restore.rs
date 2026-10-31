@@ -72,11 +72,8 @@ impl YamantakaApp {
             self.invalidate_library_cover(ctx, id);
             return true;
         }
-        let uploaded = self
-            .presenter
-            .as_mut()
-            .ok_or_else(|| Failure::Unsupported("Cover preview compositor".into()))
-            .and_then(|presenter| presenter.upload(image));
+        let uploaded =
+            render_updates::upload_image(ctx, &mut self.presenter, &mut self.managed_pages, image);
         match uploaded {
             Ok(texture) => {
                 let picker = self.cover_picker.take().unwrap();
@@ -85,7 +82,7 @@ impl YamantakaApp {
                     &picker.document,
                     image.key.page,
                     f64::from(image.width) / f64::from(image.height),
-                    PageImage::Native(texture),
+                    texture,
                 );
             }
             Err(error) => {

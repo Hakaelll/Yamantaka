@@ -1,6 +1,18 @@
 use super::*;
 use yamantaka_domain::RenderedPage;
 
+pub(super) fn upload_image(
+    ctx: &egui::Context,
+    native: &mut Option<PagePresenter>,
+    managed: &mut crate::managed_pages::Presenter,
+    page: &RenderedPage,
+) -> yamantaka_domain::Result<PageImage> {
+    match native {
+        Some(presenter) => presenter.upload(page).map(PageImage::Native),
+        None => managed.upload(ctx, page).map(PageImage::Managed),
+    }
+}
+
 impl ReaderPage {
     pub(super) fn accepts(&self, page: &RenderedPage, cancel: &Cancellation) -> bool {
         self.refinement.accepts(page, cancel)
@@ -30,11 +42,7 @@ impl YamantakaApp {
         if !reader && !thumbnail && !reference && !reference_thumbnail {
             return;
         }
-        let replacement = if let Some(presenter) = &mut self.presenter {
-            presenter.upload(page).map(PageImage::Native)
-        } else {
-            self.managed_pages.upload(ctx, page).map(PageImage::Managed)
-        };
+        let replacement = upload_image(ctx, &mut self.presenter, &mut self.managed_pages, page);
         if replacement.is_err()
             && (self.reader.viewport.fail_refinement(cancel)
                 || self

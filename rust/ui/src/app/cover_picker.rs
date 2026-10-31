@@ -188,13 +188,10 @@ impl YamantakaApp {
         {
             return true;
         }
-        let Some(presenter) = &mut self.presenter else {
-            picker.error = Some(Failure::Unsupported("Cover preview compositor".into()));
-            return true;
-        };
-        match presenter.upload(page) {
+        match render_updates::upload_image(ctx, &mut self.presenter, &mut self.managed_pages, page)
+        {
             Ok(texture) => {
-                picker.image = Some(PageImage::Native(texture));
+                picker.image = Some(texture);
                 picker.image_page = Some(picker.page);
                 picker.aspect = Some(f64::from(page.width) / f64::from(page.height));
                 picker.error = None;

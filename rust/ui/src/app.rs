@@ -2690,7 +2690,7 @@ impl App for YamantakaApp {
                         "readerRenderEvents":self.capture_render_events,
                         "linkKeyboardActivated":self.reader.links.preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
-                        "memoryScope":"Tracked PDF buffers and document-page/thumbnail GPU payloads, wgpu staging and Glow image copies. Live text, cover/UI textures and opaque driver allocations are not covered."});
+                        "memoryScope":"Tracked PDF buffers and page/thumbnail/PDF-cover GPU payloads, wgpu staging and Glow image copies. Live text, UI/font textures and opaque driver allocations are not covered."});
                     record["bulkOrganization"]=self.bulk_organization_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["bulkTargetPicker"]=self.bulk_picker_summary();
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();
@@ -2823,6 +2823,8 @@ impl App for YamantakaApp {
         self.query_cancel.cancel();
         self.reader.reader_preferences_cancel.cancel();
         self.reader.thumbnails.clear();
+        self.cover_picker = None;
+        self.library_covers.clear();
         if let Some(gl) = gl {
             self.managed_pages.shutdown(gl);
         }

@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='covers-glow-library'; args=@('--pdf-covers','--software','--light','--es','--tilt-negative') },
+    @{ name='covers-glow-picker-saved'; args=@('--pdf-covers','--software','--cover-picker-save','--details') },
+    @{ name='covers-glow-restored'; args=@('--pdf-covers','--software','--automatic-cover','--automatic-cover-manual','--cover-picker-restore','--details') },
+    @{ name='covers-glow-pressure'; args=@('--pdf-covers','--software','--bulk-covers=pressure','--es','--light') },
     @{ name='managed-glow-reader'; args=@('--reader','--reader-zoom=4','--software') },
     @{ name='managed-glow-thumbnails'; args=@('--thumbnails','--software','--light','--es') },
     @{ name='graphics-runtime-reader'; args=@('--graphics-fail-runtime','--reader','--light','--es') },
@@ -484,6 +488,18 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'covers-glow-*') {
+        $covers = $controls.libraryCovers
+        if ($controls.pagePresenter -ne 'egui-glow' -or $covers.ready -le 0 -or $covers.ready -ne $covers.resident -or $covers.resident -gt 16 -or $covers.pending -ne 0 -or $covers.deferredUploads -ne 0) { throw 'Alternate-compositor PDF covers did not settle inside the visible limit.' }
+        if (-not $controls.managedPages.settled -or $controls.managedPages.failed -or $controls.trackedMemory.gpu -le 0 -or $controls.trackedMemory.transient -ne 0 -or $controls.trackedMemory.pages -gt 72MB) { throw 'Cover texture accounting did not settle within its budget.' }
+        if ($case.name -in @('covers-glow-picker-saved','covers-glow-restored')) {
+            if (-not $controls.coverPickerDemo.complete -or -not $controls.coverPickerDemo.saved -or $controls.coverPicker.open -or $covers.sourcePages.'demo-0' -ne 1) { throw 'The selected or restored PDF cover was not installed.' }
+        }
+        if ($case.name -eq 'covers-glow-pressure') {
+            $result = $covers.bulkRegeneration
+            if (-not $result.pressureRecovery -or -not $result.newImages -or $result.targets.Count -ne 3 -or $result.manualPageBefore -ne 1 -or $result.automaticPageAfter -ne 0 -or $controls.managedPages.retiredTextures -lt 3) { throw 'Cover regeneration did not recover with new governed textures after GPU pressure.' }
+        }
+    }
     if ($case.name -like 'managed-glow-*' -or $case.name -eq 'graphics-runtime-reader') {
         if ($controls.pagePresenter -ne 'egui-glow' -or -not $controls.managedPages.settled -or $controls.managedPages.failed -or $controls.managedPages.pendingCopies -ne 0 -or $controls.managedPages.pendingFences -ne 0 -or $controls.managedPages.retiredTextures -lt 1) { throw 'Managed uploads or texture retirement did not settle.' }
         if ($controls.trackedMemory.gpu -le 0 -or $controls.trackedMemory.transient -ne 0 -or $controls.trackedMemory.pages -gt 72MB) { throw 'Managed page accounting is missing or exceeds its budget.' }

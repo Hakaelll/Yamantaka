@@ -26,6 +26,12 @@ struct CoverSlot {
     deferred: Option<(Arc<yamantaka_domain::RenderedPage>, u64)>,
 }
 impl LibraryCovers {
+    pub(super) fn clear(&mut self) {
+        for slot in self.slots.values() {
+            slot.cancel.cancel();
+        }
+        self.slots.clear();
+    }
     pub(super) fn pause(&mut self, ids: &[String]) {
         for id in ids {
             self.paused.insert(id.clone());
@@ -93,16 +99,20 @@ impl YamantakaApp {
             self.runtime.wake();
         }
         let epoch = self.governor.capacity_epoch();
-        if let Some(presenter) = &mut self.presenter {
-            for (id, slot) in &mut self.library_covers.slots {
-                if slot
-                    .deferred
-                    .as_ref()
-                    .is_some_and(|(_, observed)| *observed != epoch)
-                {
-                    let (page, _) = slot.deferred.take().unwrap();
-                    upload_cover(ctx, presenter, slot, id, page, epoch);
-                }
+        for (id, slot) in &mut self.library_covers.slots {
+            if slot
+                .deferred
+                .as_ref()
+                .is_some_and(|(_, observed)| *observed != epoch)
+            {
+                let (page, _) = slot.deferred.take().unwrap();
+                let image = render_updates::upload_image(
+                    ctx,
+                    &mut self.presenter,
+                    &mut self.managed_pages,
+                    &page,
+                );
+                upload_cover(ctx, slot, id, page, epoch, image);
             }
         }
         for document in requested {
@@ -195,19 +205,9 @@ impl YamantakaApp {
         if page.key.document_id != id || page.key.generation != slot.generation {
             return;
         }
-        // The native presenter reserves CPU staging and GPU payload before upload.
-        // Keep a static jacket on the alternate compositor until it has governed uploads.
-        let Some(presenter) = &mut self.presenter else {
-            return;
-        };
-        upload_cover(
-            ctx,
-            presenter,
-            slot,
-            id,
-            page,
-            self.governor.capacity_epoch(),
-        );
+        let image =
+            render_updates::upload_image(ctx, &mut self.presenter, &mut self.managed_pages, &page);
+        upload_cover(ctx, slot, id, page, self.governor.capacity_epoch(), image);
     }
     pub(super) fn cover_summary(&self) -> serde_json::Value {
         serde_json::json!({"resident": self.library_covers.slots.len(),"bulkRegeneration": self.library_covers.verified,"paused": self.library_covers.paused.len(),"deferredUploads":self.library_covers.slots.values().filter(|slot|slot.deferred.is_some()).count(),
@@ -283,13 +283,13 @@ impl YamantakaApp {
 
 fn upload_cover(
     ctx: &egui::Context,
-    presenter: &mut PagePresenter,
     slot: &mut CoverSlot,
     id: &str,
     page: Arc<yamantaka_domain::RenderedPage>,
     epoch: u64,
+    image: yamantaka_domain::Result<PageImage>,
 ) {
-    match presenter.upload(&page) {
+    match image {
         Ok(texture) => {
             slot.source_page = Some(page.key.page);
             ctx.data_mut(|data| {
@@ -304,7 +304,7 @@ fn upload_cover(
                     },
                 )
             });
-            slot.image = Some(PageImage::Native(texture));
+            slot.image = Some(texture);
             slot.finished = true;
         }
         Err(yamantaka_domain::Failure::MemoryBudget) => {
