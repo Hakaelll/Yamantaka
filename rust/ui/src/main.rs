@@ -7,6 +7,7 @@ mod legacy_import_worker;
 mod page_presenter;
 mod restore_worker;
 mod rule_simulation_fixture;
+mod startup_recovery;
 mod theme;
 use eframe::egui;
 use std::{path::PathBuf, sync::mpsc};
@@ -56,6 +57,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .map(PathBuf::from)
     });
     let executable = std::env::current_exe()?;
+    if demo
+        && args.iter().any(|arg| {
+            arg.to_str()
+                .is_some_and(|s| s.starts_with("--startup-recovery="))
+        })
+    {
+        return startup_recovery::preview::run(
+            &args,
+            capture.ok_or("Recovery verification requires a capture path")?,
+        );
+    }
     let paths = AppPaths::discover(&executable)?;
     let initial: Vec<PathBuf> = args
         .iter()
@@ -642,11 +654,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             &active_store,
             requested_safe,
         ));
-        (
-            Database::open(&active_store.join("yamantaka.sqlite3"))?,
-            Preferences::load(&active_store.join("preferences.json"))?,
-            active_store,
-        )
+        match startup_recovery::load(&active_store) {
+            Ok((database, preferences)) => (database, preferences, active_store),
+            Err(stage) => {
+                let installed = startup_recovery::run(
+                    active_store,
+                    stage,
+                    args.iter().any(|arg| arg == "--en"),
+                    args.iter().any(|arg| arg == "--software"),
+                    None,
+                )?;
+                if !installed && let Some(startup) = startup.take() {
+                    startup.finish()?;
+                }
+                return Ok(());
+            }
+        }
     };
     if demo && args.iter().any(|arg| arg == "--sessions-disabled") {
         prefs

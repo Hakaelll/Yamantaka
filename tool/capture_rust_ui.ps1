@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='startup-recovery-review'; args=@('--startup-recovery=review','--es') },
+    @{ name='startup-recovery-invalid'; args=@('--startup-recovery=invalid') },
+    @{ name='startup-recovery-library-installed'; args=@('--startup-recovery=install','--broken-library','--es') },
+    @{ name='startup-recovery-preferences-installed'; args=@('--startup-recovery=install','--future-preferences') },
+    @{ name='startup-recovery-small-200'; args=@('--startup-recovery=review','--future-preferences','--text-scale=2') },
     @{ name='quarantine-review-small-200'; args=@('--quarantine','--quarantine-review','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
     @{ name='quarantine-released'; args=@('--quarantine','--quarantine-release','--pdf-covers','--light') },
     @{ name='quarantine-retry'; args=@('--quarantine','--quarantine-retry','--es') },
@@ -454,6 +459,15 @@ foreach ($case in $cases) {
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $controls.synthetic) { throw 'Only the isolated synthetic collection may be captured by this script.' }
+    if ($case.name -like 'startup-recovery-*') {
+        $result = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'result.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
+        $installed = $case.args -contains '--startup-recovery=install'
+        if (-not $result.synthetic -or -not $result.originalPreserved -or $result.installed -ne $installed) { throw 'Startup recovery did not preserve the failed store or complete the requested handover.' }
+        $labels = if ($case.args -contains '--es') { @('Elegir copia JSON…','Salir sin restaurar') } else { @('Choose JSON backup…','Exit without restoring') }
+        if ($case.args -notcontains '--startup-recovery=invalid') { $labels += if ($case.args -contains '--es') { 'Restaurar y cerrar' } else { 'Restore and close' } }
+        if ($case.name -eq 'startup-recovery-small-200') { $labels = @('JSON backup…','Restore','Exit') }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
+    }
     if ($case.name -in @('reader-reference','reader-reference-stacked')) {
         if (-not $controls.reference -or $controls.reference.images -lt 1 -or $controls.reference.page -ne 1 -or $controls.currentReaderPage -ne 0 -or $controls.reference.document -ne 'demo-0') { throw 'Page comparison did not retain independent pages and a native reference image.' }
     }
