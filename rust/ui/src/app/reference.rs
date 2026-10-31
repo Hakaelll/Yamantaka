@@ -575,9 +575,6 @@ impl YamantakaApp {
             self.request_reference_close();
             return;
         }
-        if self.presenter.is_none() {
-            return;
-        }
         match ReferenceView::new(&self.reader, self.reading_direction()) {
             Ok(reference) => self.reference = Some(reference),
             Err(error) => self.error = Some(error.to_string()),

@@ -149,17 +149,14 @@ impl YamantakaApp {
         ui.set_max_width(280.0);
         self.operation_actions(ui, p);
         if ui
-            .add_enabled_ui(
-                self.reader.reader_preferences.is_some() && self.presenter.is_some(),
-                |ui| {
-                    theme::navigation(
-                        ui,
-                        self.tr("Comparar páginas", "Compare pages"),
-                        self.reference.is_some(),
-                        p,
-                    )
-                },
-            )
+            .add_enabled_ui(self.reader.reader_preferences.is_some(), |ui| {
+                theme::navigation(
+                    ui,
+                    self.tr("Comparar páginas", "Compare pages"),
+                    self.reference.is_some(),
+                    p,
+                )
+            })
             .inner
             .clicked()
         {

@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='comparison-glow-pages'; args=@('--reader','--reference','--software','--es') },
+    @{ name='comparison-glow-thumbnails'; args=@('--reader','--reference','--reference-book','--reference-thumbnails','--software','--light','--es') },
+    @{ name='comparison-glow-sync'; args=@('--reader','--reference','--reference-sync','--software','--light') },
+    @{ name='comparison-glow-protected'; args=@('--reader','--reference','--reference-book','--reference-protected','--software','--es') },
     @{ name='covers-glow-library'; args=@('--pdf-covers','--software','--light','--es','--tilt-negative') },
     @{ name='covers-glow-picker-saved'; args=@('--pdf-covers','--software','--cover-picker-save','--details') },
     @{ name='covers-glow-restored'; args=@('--pdf-covers','--software','--automatic-cover','--automatic-cover-manual','--cover-picker-restore','--details') },
@@ -488,6 +492,14 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'comparison-glow-*') {
+        if ($controls.pagePresenter -ne 'egui-glow' -or -not $controls.reference -or $controls.reference.images -lt 1 -or $controls.readerPresentationSlots -lt 1) { throw 'Alternate-compositor comparison did not present both panes.' }
+        if (-not $controls.managedPages.settled -or $controls.managedPages.failed -or $controls.trackedMemory.gpu -le 0 -or $controls.trackedMemory.transient -ne 0 -or $controls.trackedMemory.pages -gt 72MB) { throw 'Comparison uploads did not settle within their governed budget.' }
+        if ($case.name -eq 'comparison-glow-pages' -and ($controls.currentReaderPage -ne 0 -or $controls.reference.page -ne 1 -or $controls.reference.document -ne 'demo-0')) { throw 'Shared-document comparison lost its independent page position.' }
+        if ($case.name -eq 'comparison-glow-thumbnails' -and ($controls.reference.document -ne 'demo-1' -or $controls.reference.thumbnailSlots -lt 1)) { throw 'Separate-document comparison did not load reference thumbnails.' }
+        if ($case.name -eq 'comparison-glow-sync' -and (-not $controls.referenceSync.linkedConfirmed -or -not $controls.referenceSync.positionConfirmed -or -not $controls.referenceSync.reverseConfirmed -or -not $controls.referenceSync.differencesConfirmed)) { throw 'Comparison synchronization did not complete.' }
+        if ($case.name -eq 'comparison-glow-protected' -and ($controls.reference.document -ne 'demo-1' -or $controls.referenceAdmission.passwordAttempts -ne 2)) { throw 'Protected reference admission did not finish.' }
+    }
     if ($case.name -like 'covers-glow-*') {
         $covers = $controls.libraryCovers
         if ($controls.pagePresenter -ne 'egui-glow' -or $covers.ready -le 0 -or $covers.ready -ne $covers.resident -or $covers.resident -gt 16 -or $covers.pending -ne 0 -or $covers.deferredUploads -ne 0) { throw 'Alternate-compositor PDF covers did not settle inside the visible limit.' }
