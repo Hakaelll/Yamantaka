@@ -3,6 +3,7 @@ mod app;
 mod backup_worker;
 mod book;
 mod diagnostics_worker;
+mod graphics_recovery;
 mod legacy_import_worker;
 mod page_presenter;
 mod restore_worker;
@@ -26,6 +27,24 @@ fn main() -> std::process::ExitCode {
     match run() {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
+            let args: Vec<_> = std::env::args_os().skip(1).collect();
+            if graphics_recovery::can_retry(error.as_ref(), &args) {
+                eprintln!(
+                    "The default graphics compositor could not start; trying the alternate compositor once."
+                );
+                match graphics_recovery::restart(&args) {
+                    Ok(status) => {
+                        return if status.success() {
+                            std::process::ExitCode::SUCCESS
+                        } else {
+                            std::process::ExitCode::FAILURE
+                        };
+                    }
+                    Err(restart_error) => eprintln!(
+                        "Could not start the alternate graphics compositor: {restart_error}"
+                    ),
+                }
+            }
             eprintln!("{error}");
             // Release GUI binaries have no console: make a failed startup
             // visible. Synthetic capture failures instead return a nonzero code.
@@ -873,6 +892,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut options.wgpu_options.wgpu_setup {
         setup.instance_descriptor.backends = eframe::wgpu::Backends::DX12;
+        if demo
+            && capture.is_some()
+            && !software
+            && args.iter().any(|arg| arg == "--graphics-fail-startup")
+        {
+            setup.native_adapter_selector = Some(std::sync::Arc::new(|_, _| {
+                Err("Synthetic adapter selection failure".into())
+            }));
+        }
     }
     let legacy_window = !demo && !startup_mode.is_safe();
     if legacy_window {
@@ -919,6 +947,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "Yamantaka",
         options,
         Box::new(move |cc| {
+            if demo
+                && capture.is_some()
+                && args.iter().any(|arg| arg == "--graphics-fail-application")
+            {
+                return Err("Synthetic application creation failure".into());
+            }
             theme::load_fonts(&cc.egui_ctx);
             theme::install(&cc.egui_ctx, dark);
             for (argument, key) in [

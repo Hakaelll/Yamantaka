@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='graphics-fallback-library'; args=@('--graphics-fail-startup','--pdf-covers') },
+    @{ name='graphics-fallback-reader'; args=@('--graphics-fail-startup','--reader','--light','--es') },
+    @{ name='graphics-explicit-alternate'; args=@('--graphics-fail-startup','--reader','--software','--es') },
     @{ name='reader-nearby-turn'; args=@('--reader','--nearby-turn','--es') },
     @{ name='reader-nearby-comparison'; args=@('--reader','--reference','--nearby-turn','--light') },
     @{ name='reader-region-zoom'; args=@('--reader','--reader-zoom=4','--es') },
@@ -478,6 +481,12 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'graphics-*') {
+        if ($controls.pagePresenter -ne 'egui-glow') { throw 'Alternate compositor did not start.' }
+        $automatic = $case.name -like 'graphics-fallback-*'
+        if ($controls.graphicsStartupFallback -ne $automatic) { throw 'Unexpected automatic graphics retry state.' }
+        if ($case.args -contains '--reader' -and $controls.readerPresentationSlots -lt 1) { throw 'Alternate compositor did not present a PDF.' }
+    }
     if ($case.name -like 'reader-nearby-*') {
         if ($controls.nearbyTurnPreview -ne 3 -or $controls.currentReaderPage -ne 1) { throw 'Nearby page-turn controller did not finish.' }
         $panes = @($controls.pagePrefetch)

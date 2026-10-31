@@ -2664,6 +2664,7 @@ impl App for YamantakaApp {
                     record["safeStartup"] = self.safe_summary();
                     record["quarantine"] = self.quarantine.summary();
                     record["nearbyTurnPreview"] = self.nearby_turn_preview.into();
+                    record["graphicsStartupFallback"] = crate::graphics_recovery::is_fallback().into();
                     record["pagePrefetch"] = self.reader.viewport.prefetch.summary();
                     record["pageRefinement"] = self.reader.viewport.refinement_summary();
                     record["referenceRefinement"] = self.reference.as_ref().map(|reference|reference.pane.viewport.refinement_summary()).unwrap_or(serde_json::Value::Null);

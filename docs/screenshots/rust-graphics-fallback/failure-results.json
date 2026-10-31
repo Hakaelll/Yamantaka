@@ -1,0 +1,18 @@
+{
+  "synthetic": true,
+  "executableSha256": "0380983125D17210069E2E6E694272732099634E88D82E10A8B769627CA44FE1",
+  "results": [
+    {
+      "case": "application",
+      "exitCode": 1,
+      "retries": 0,
+      "imageAbsent": true
+    },
+    {
+      "case": "both",
+      "exitCode": 1,
+      "retries": 1,
+      "imageAbsent": true
+    }
+  ]
+}

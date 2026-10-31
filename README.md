@@ -145,11 +145,13 @@ To open a document from the command line:
 ./target/debug/yamantaka-rust.exe "C:\Books\Example.pdf"
 ```
 
-The default compositor uses DirectX 12. A separately checked OpenGL route is available:
+The default compositor uses DirectX 12. If wgpu cannot initialize, Yamantaka tries the alternate OpenGL compositor once in a fresh process. You can also select it explicitly:
 
 ```powershell
 ./target/debug/yamantaka-rust.exe --opengl
 ```
+
+[Graphics recovery](docs/user-guide/graphics-recovery.md) describes the retry policy, alternate-compositor behavior and remaining device-loss work.
 
 A finished Release bundle must include `pdfium.dll` beside the executable. Do not copy only the executable out of a bundle. The final bundle, hashes, SBOM, notices and installation instructions will be added after the parity and validation gates pass.
 
