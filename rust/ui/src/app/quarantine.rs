@@ -15,7 +15,7 @@ pub(super) struct QuarantineState {
     health_pending: usize,
     preview: u8,
     preview_mode: u8,
-    close_after: bool,
+    pub(super) close_after: bool,
 }
 impl QuarantineState {
     pub(super) fn closing(&self) -> bool {

@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='close-review-note'; args=@('--reader','--page-note','--close-review','--es') },
+    @{ name='close-review-return'; args=@('--reader','--page-note','--close-review','--close-review-return','--light') },
+    @{ name='close-review-reference'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-notes-editor','--close-review','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
+    @{ name='close-review-metadata'; args=@('--metadata-review','--close-review','--light','--es') },
     @{ name='continuity-comparison-shared'; args=@('--reader','--reference','--graphics-fail-runtime','--light','--es') },
     @{ name='continuity-comparison-book'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--es') },
     @{ name='comparison-glow-pages'; args=@('--reader','--reference','--software','--es') },
@@ -494,6 +498,16 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'close-review-*') {
+        if ($controls.closeReview.preview -ne 3 -or -not $controls.closeReview.drafts -or $controls.closeReview.waiting) { throw 'Unsaved editor close protection did not settle with the draft intact.' }
+        if ($controls.closeReview.reviewing -ne ($case.name -ne 'close-review-return')) { throw 'Close review did not preserve the requested return/review state.' }
+        if ($case.name -ne 'close-review-return' -and -not ($controls.controls | Where-Object { $_.label -eq 'Descartar y cerrar' })) { throw 'The explicit discard action is missing.' }
+        if ($case.name -ne 'close-review-return') {
+            foreach ($button in @($controls.controls | Where-Object { $_.label -in @('Volver a editar','Descartar y cerrar') })) {
+                if ($button.rect[0] -lt $controls.viewport[0] -or $button.rect[1] -lt $controls.viewport[1] -or $button.rect[2] -gt $controls.viewport[2] -or $button.rect[3] -gt $controls.viewport[3]) { throw 'A close-review action extends outside the viewport.' }
+            }
+        }
+    }
     if ($case.name -like 'continuity-comparison-*') {
         $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
         $saved = $expected.comparison

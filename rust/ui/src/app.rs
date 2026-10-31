@@ -7,6 +7,7 @@ mod bookmarks;
 mod bulk_picker;
 mod cache_maintenance;
 mod catalogue_chooser;
+mod close_review;
 mod collections;
 mod command_palette;
 mod compact;
@@ -252,6 +253,7 @@ pub struct YamantakaApp {
     query_cancel: Cancellation,
     library_loaded: bool,
     error: Option<String>,
+    close_review: close_review::CloseReview,
     importing: operations::BackgroundImport,
     preview_tools_menu: bool,
     activation: Receiver<Vec<PathBuf>>,
@@ -490,6 +492,7 @@ impl YamantakaApp {
             query_cancel: Cancellation::default(),
             library_loaded: false,
             error: None,
+            close_review: Default::default(),
             importing: Default::default(),
             preview_tools_menu: false,
             activation,
@@ -1332,6 +1335,7 @@ impl App for YamantakaApp {
             return;
         }
         self.guard_workspace_close(ctx);
+        self.guard_editor_close(ctx);
         self.guard_quarantine_close(ctx);
         self.update_restore(ctx);
         if self.backup_restore.busy() && ctx.input(|input| input.viewport().close_requested()) {
@@ -2221,6 +2225,7 @@ impl App for YamantakaApp {
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
         let shortcut_modal = self.command_palette.open
+            || self.close_review.open()
             || self.safe_notice
             || self.quarantine.open
             || self.quarantine.closing()
@@ -2322,6 +2327,7 @@ impl App for YamantakaApp {
         self.apply_annotation_preview();
         self.advance_reference_marks();
         self.advance_reference_notes();
+        self.advance_editor_close_preview(&ctx);
         self.apply_annotation_filter_preview();
         self.apply_annotation_bulk_preview();
         self.apply_annotation_tag_preview();
@@ -2466,6 +2472,7 @@ impl App for YamantakaApp {
         self.page_jump_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
+        self.editor_close_dialog(&ctx);
         self.pump_library_covers(&ctx);
         if self.library_selection.close_after_removal && !self.library_selection.removing() {
             ctx.send_viewport_cmd(ViewportCommand::Close);
@@ -2488,6 +2495,7 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
+                    && self.editor_close_capture_ready()
                     && self.managed_pages.settled()
                     && self.preview_device_loss.is_none()
                     && matches!(self.nearby_turn_preview, 0 | 3)
@@ -2732,6 +2740,7 @@ impl App for YamantakaApp {
                     record["documentBookmarks"] = self.reader.bookmarks.capture_summary();
                     record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"find":reference.pane.find.capture_summary(),"links":reference.pane.links.capture_summary(),"outline":reference.pane.outline.capture_summary(),"bookmarks":reference.pane.bookmarks.capture_summary(),"text":reference.pane.text.capture_summary(),"thumbnailSlots":reference.pane.thumbnails.resident_count(),"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
                     record["referenceSync"]=serde_json::json!({"demoStage":self.reference_sync_demo,"linkedConfirmed":self.reference_sync_linked,"positionConfirmed":self.reference_sync_position,"reverseConfirmed":self.reference_sync_reverse,"differencesConfirmed":self.reference_sync_differences,"primaryScale":self.reader.viewport.scale});
+                    record["closeReview"] = self.editor_close_summary();
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();
@@ -2749,6 +2758,10 @@ impl App for YamantakaApp {
                     }
                 }
             }
+        }
+        if self.close_review.open() && !self.capture_requested && !self.graphics_recovery.faulted()
+        {
+            ctx.send_viewport_cmd(ViewportCommand::CancelClose);
         }
     }
     fn on_exit(&mut self, gl: Option<&eframe::glow::Context>) {

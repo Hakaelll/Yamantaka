@@ -1580,6 +1580,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--page-note") {
                     app.preview_page_note(args.iter().any(|arg| arg == "--annotation-save"));
                 }
+                if args.iter().any(|arg| arg == "--close-review") {
+                    app.preview_editor_close(args.iter().any(|arg| arg == "--close-review-return"));
+                }
                 if args.iter().any(|arg| arg == "--annotations") {
                     app.preview_annotations(
                         args.iter().any(|arg| arg == "--annotation-save"),

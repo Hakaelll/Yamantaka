@@ -127,6 +127,20 @@ impl AnnotationState {
     pub(super) fn editing(&self) -> bool {
         self.editor.is_some()
     }
+    pub(in crate::app) fn discard_editor(&mut self) {
+        self.editor = None;
+    }
+    pub(in crate::app) fn unsaved_editor(&self) -> bool {
+        self.editor.as_ref().is_some_and(|editor| {
+            editor.stored().is_none_or(|record| {
+                editor.kind != record.values.kind
+                    || editor.color != record.values.color
+                    || editor.review != record.values.review_state
+                    || editor.note != record.values.note.as_deref().unwrap_or("")
+                    || editor.tags != record.tags.join(", ")
+            })
+        })
+    }
     pub(super) fn ready(&self) -> bool {
         self.page.is_some() && self.pending.is_none()
     }

@@ -9,3 +9,5 @@ Disable **Restore last session** to start without reopening the saved readings. 
 Passwords and rendered page images are never part of the saved session. A protected document may require its password again. Saved workspaces remain separate named reading arrangements.
 
 See the [validation checkpoint](../validation/rust-comparison-continuity-2026-10-31.md) for the cases exercised and remaining acceptance work.
+
+When you close the window with an unsaved reading note or manual title/author correction, choose **Return to editing** to keep working. **Discard and close** abandons the open draft. An accepted save finishes before closing. This close review does not yet recover unsaved drafts after a crash or graphics failure.

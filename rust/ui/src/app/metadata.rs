@@ -34,6 +34,15 @@ impl Drop for MetadataEditor {
     }
 }
 impl MetadataEditor {
+    pub(in crate::app) fn unsaved(&self) -> bool {
+        self.snapshot.is_some() && !self.clean_draft()
+    }
+    pub(in crate::app) fn writing(&self) -> bool {
+        self.pending.as_ref().is_some_and(|(_, writing)| *writing)
+    }
+    pub(in crate::app) fn preview_unsaved_title(&mut self) {
+        self.title = "Unsaved study title".into();
+    }
     fn clean_draft(&self) -> bool {
         self.snapshot
             .as_ref()
