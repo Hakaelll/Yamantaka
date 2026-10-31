@@ -109,7 +109,7 @@ enum Surface {
 }
 enum PageImage {
     Native(PageTexture),
-    Managed(TextureHandle),
+    Managed(crate::managed_pages::Texture),
 }
 struct ReaderPage {
     refinement: page_refinement::State,
@@ -239,6 +239,7 @@ pub struct YamantakaApp {
     selection_copy_preview: Option<(String, String)>,
     comparison_selection_preview: selection::ComparisonSelectionPreview,
     presenter: Option<PagePresenter>,
+    managed_pages: crate::managed_pages::Presenter,
     pub(crate) graphics_recovery: crate::graphics_recovery::State,
     preview_device_loss: Option<eframe::wgpu::Device>,
     governor: MemoryGovernor,
@@ -477,6 +478,7 @@ impl YamantakaApp {
             selection_copy_preview: None,
             comparison_selection_preview: Default::default(),
             presenter,
+            managed_pages: crate::managed_pages::Presenter::new(governor.clone()),
             governor,
             bulk_organization_preview: None,
             bulk_organization_verified: None,
@@ -2179,6 +2181,11 @@ impl App for YamantakaApp {
         if self.graphics_recovery.faulted() {
             return;
         }
+        if let Some(gl) = frame.gl()
+            && let Err(error) = self.managed_pages.begin_frame(ui.ctx(), gl)
+        {
+            self.error = Some(error.to_string());
+        }
         let prefetch_allowed =
             !self.startup_mode.is_safe() && matches!(self.surface, Surface::Reader);
         self.reader.viewport.regions_enabled = prefetch_allowed && self.presenter.is_some();
@@ -2503,6 +2510,7 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
+                    && self.managed_pages.settled()
                     && self.preview_device_loss.is_none()
                     && matches!(self.nearby_turn_preview, 0 | 3)
                     && self.reader.viewport.refinements_settled()
@@ -2682,7 +2690,7 @@ impl App for YamantakaApp {
                         "readerRenderEvents":self.capture_render_events,
                         "linkKeyboardActivated":self.reader.links.preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
-                        "memoryScope":"Tracked PDF buffers and native wgpu page payload/staging only; live text, Glow uploads, UI atlas and opaque driver allocations are not covered."});
+                        "memoryScope":"Tracked PDF buffers and document-page/thumbnail GPU payloads, wgpu staging and Glow image copies. Live text, cover/UI textures and opaque driver allocations are not covered."});
                     record["bulkOrganization"]=self.bulk_organization_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["bulkTargetPicker"]=self.bulk_picker_summary();
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();
@@ -2712,6 +2720,7 @@ impl App for YamantakaApp {
                     record["nearbyTurnPreview"] = self.nearby_turn_preview.into();
                     record["graphicsStartupFallback"] = crate::graphics_recovery::is_fallback().into();
                     record["graphicsRuntimeFallback"] = crate::graphics_recovery::runtime_fallback().into();
+                    record["managedPages"] = self.managed_pages.summary();
                     record["graphicsRecoveryFavorite"] = self.reader.active.as_ref().map(|(document,_)|document.favorite).into();
                     record["graphicsRecoveryRestorePreference"] = self.preferences.get("restoreLastSession").cloned().unwrap_or(serde_json::Value::Null);
                     record["pagePrefetch"] = self.reader.viewport.prefetch.summary();
@@ -2762,7 +2771,7 @@ impl App for YamantakaApp {
             }
         }
     }
-    fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+    fn on_exit(&mut self, gl: Option<&eframe::glow::Context>) {
         self.graphics_recovery.begin_close();
         if self.graphics_recovery.faulted()
             && let Err(error) = self.runtime.flush_changes()
@@ -2814,6 +2823,9 @@ impl App for YamantakaApp {
         self.query_cancel.cancel();
         self.reader.reader_preferences_cancel.cancel();
         self.reader.thumbnails.clear();
+        if let Some(gl) = gl {
+            self.managed_pages.shutdown(gl);
+        }
         if let Some(presenter) = &mut self.presenter
             && let Err(error) = presenter.shutdown()
         {

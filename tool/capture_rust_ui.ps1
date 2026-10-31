@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='managed-glow-reader'; args=@('--reader','--reader-zoom=4','--software') },
+    @{ name='managed-glow-thumbnails'; args=@('--thumbnails','--software','--light','--es') },
     @{ name='graphics-runtime-reader'; args=@('--graphics-fail-runtime','--reader','--light','--es') },
     @{ name='graphics-fallback-library'; args=@('--graphics-fail-startup','--pdf-covers') },
     @{ name='graphics-fallback-reader'; args=@('--graphics-fail-startup','--reader','--light','--es') },
@@ -482,6 +484,15 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'managed-glow-*' -or $case.name -eq 'graphics-runtime-reader') {
+        if ($controls.pagePresenter -ne 'egui-glow' -or -not $controls.managedPages.settled -or $controls.managedPages.failed -or $controls.managedPages.pendingCopies -ne 0 -or $controls.managedPages.pendingFences -ne 0 -or $controls.managedPages.retiredTextures -lt 1) { throw 'Managed uploads or texture retirement did not settle.' }
+        if ($controls.trackedMemory.gpu -le 0 -or $controls.trackedMemory.transient -ne 0 -or $controls.trackedMemory.pages -gt 72MB) { throw 'Managed page accounting is missing or exceeds its budget.' }
+        if ($case.name -eq 'managed-glow-reader') {
+            $installed = @($controls.readerRenderEvents | Where-Object { $_.event -eq 'installed' })
+            $pixels = $installed[-1].pixels
+            if ($controls.trackedMemory.gpu -ne ([long]$pixels[0]*$pixels[1]*4)) { throw 'Managed visible texture payload differs from its GPU charge.' }
+        }
+    }
     if ($case.name -like 'graphics-*') {
         if ($controls.pagePresenter -ne 'egui-glow') { throw 'Alternate compositor did not start.' }
         $automatic = $case.name -like 'graphics-fallback-*' -or $case.name -like 'graphics-runtime-*'

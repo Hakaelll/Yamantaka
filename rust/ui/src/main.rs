@@ -5,6 +5,7 @@ mod book;
 mod diagnostics_worker;
 mod graphics_recovery;
 mod legacy_import_worker;
+mod managed_pages;
 mod page_presenter;
 mod restore_worker;
 mod rule_simulation_fixture;

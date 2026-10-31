@@ -33,15 +33,7 @@ impl YamantakaApp {
         let replacement = if let Some(presenter) = &mut self.presenter {
             presenter.upload(page).map(PageImage::Native)
         } else {
-            // The alternate compositor's GPU lifetime accounting remains pending.
-            Ok(PageImage::Managed(ctx.load_texture(
-                "pdf-page",
-                egui::ColorImage::from_rgba_unmultiplied(
-                    [page.width as usize, page.height as usize],
-                    page.pixels(),
-                ),
-                TextureOptions::LINEAR,
-            )))
+            self.managed_pages.upload(ctx, page).map(PageImage::Managed)
         };
         if replacement.is_err()
             && (self.reader.viewport.fail_refinement(cancel)

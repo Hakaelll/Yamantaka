@@ -76,7 +76,7 @@ fn layout_overflow() -> Failure {
     Failure::Invalid("Page upload layout overflow".into())
 }
 
-fn memory_failure(error: MemoryError) -> Failure {
+pub(super) fn memory_failure(error: MemoryError) -> Failure {
     match error {
         MemoryError::BudgetDenied { .. } => Failure::MemoryBudget,
         other => Failure::Invalid(other.to_string()),
@@ -450,6 +450,44 @@ mod tests {
         drop(upload);
         assert_eq!(governor.snapshot().usage.total, 8);
         drop(cpu);
+        assert_eq!(governor.snapshot().usage.total, 0);
+
+        let governor = MemoryGovernor::new(GlobalMemoryLimits {
+            total: 23,
+            pages: 23,
+            ..GlobalMemoryLimits::default()
+        });
+        let pixels = yamantaka_domain::memory::TrackedBytesBuilder::try_zeroed(
+            &governor,
+            MemoryCategory::Pages,
+            8,
+        )
+        .unwrap();
+        let page = RenderedPage::from_pixels(
+            yamantaka_domain::RenderKey {
+                document_id: "managed-admission".into(),
+                page: 0,
+                region: None,
+                physical_width: 1,
+                physical_height: 2,
+                rotation: 0,
+                generation: 1,
+            },
+            pixels.finish(),
+        )
+        .unwrap();
+        let context = egui::Context::default();
+        let allocated = context.tex_manager().read().num_allocated();
+        let mut managed = crate::managed_pages::Presenter::new(governor.clone());
+        assert!(matches!(
+            managed.upload(&context, &page),
+            Err(Failure::MemoryBudget)
+        ));
+        assert_eq!(context.tex_manager().read().num_allocated(), allocated);
+        assert_eq!(governor.snapshot().usage.total, 8);
+        assert_eq!(governor.snapshot().usage.gpu, 0);
+        assert_eq!(governor.snapshot().usage.transient, 0);
+        drop(page);
         assert_eq!(governor.snapshot().usage.total, 0);
     }
 

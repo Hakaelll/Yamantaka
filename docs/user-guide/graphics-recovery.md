@@ -12,6 +12,8 @@ To choose the alternate compositor yourself, close the running app and launch:
 
 `--software` is an alias for this alternate compositor; it does not promise CPU-only rasterization or a software OpenGL driver. PDFium still renders the PDF, and OpenGL composes the page and interface. The alternate route keeps whole-page rendering and CPU preview preparation; optional GPU crop refinement and nearby GPU preview residency use the default compositor.
 
+The alternate reader accounts for page and thumbnail textures, plus their temporary upload copies, against the PDF memory budget. Replaced textures retain their charge until GPU completion. [Managed page validation](../validation/rust-managed-pages-2026-10-31.md) records the scope; cover textures, UI assets and opaque driver allocations remain outside this accounting.
+
 A storage error, an error creating the application, or a failure of the alternate compositor is reported normally. It does not start a restart loop.
 
 If wgpu reports a device loss or an uncaptured rendering error during use, Yamantaka requests an orderly close. It confirms queued application commands, saves reading continuity and sessions, then releases the instance before trying the alternate compositor. A failed persistence checkpoint stops the automatic restart and reports an error.
