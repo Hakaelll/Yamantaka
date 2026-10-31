@@ -838,6 +838,8 @@ impl YamantakaApp {
             | shortcuts::Shortcut::ToggleChrome
             | shortcuts::Shortcut::ToggleImmersive => unreachable!(),
             shortcuts::Shortcut::CommandPalette => self.open_command_palette(ctx),
+            shortcuts::Shortcut::UndoAnnotation => self.annotation_history_command(false),
+            shortcuts::Shortcut::RedoAnnotation => self.annotation_history_command(true),
             shortcuts::Shortcut::OpenDocument => {
                 if let Some(paths) = yamantaka_windows::pick_pdfs() {
                     self.import(paths);
@@ -2713,6 +2715,7 @@ impl App for YamantakaApp {
                     record["automationRules"] = self.automation.summary();
                     record["revisionGroups"] = self.revision_capture_summary();
                     record["commandPalette"]=self.command_palette.summary();
+                    record["annotationHistoryPhase"]=self.command_palette_preview.history_phase().into();
                     record["readerControls"]=serde_json::json!({"chromeHidden":self.reader_chrome_hidden,"immersive":self.reader_focus,"pageJump":self.page_jump.is_some(),"primaryPanel":self.reader.panel});
                     record["shortcutBindings"]=self.shortcut_bindings.summary();
                     record["shortcutConflict"]=self.shortcut_error.is_some().into();

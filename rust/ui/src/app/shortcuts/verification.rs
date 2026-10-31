@@ -1,5 +1,36 @@
 use super::{Shortcut, bindings::Bindings, read};
 use crate::app::*;
+pub(in crate::app) fn verify_annotation_text_focus() {
+    let ctx = egui::Context::default();
+    let mut text = String::from("Draft note");
+    let mut output = ctx.run_ui(Default::default(), |ui| {
+        ui.add(egui::TextEdit::singleline(&mut text))
+            .request_focus();
+    });
+    output.textures_delta.clear();
+    let global_undo = Bindings::load(None)
+        .changed(Shortcut::UndoAnnotation, "ctrl-shift-k")
+        .unwrap()
+        .changed(Shortcut::OpenDocument, "ctrl-z")
+        .unwrap();
+    for modifiers in [
+        egui::Modifiers::CTRL,
+        egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+    ] {
+        let mut output = ctx.run_ui(events(egui::Key::Z, modifiers), |ui| {
+            assert!(
+                read(ui.ctx(), false, true, false, &Bindings::load(None)).is_empty(),
+                "Annotation history must not steal text editing undo/redo"
+            );
+            assert!(
+                read(ui.ctx(), false, true, false, &global_undo).is_empty(),
+                "A rebound global action must also preserve text undo"
+            );
+            ui.add(egui::TextEdit::singleline(&mut text));
+        });
+        output.textures_delta.clear();
+    }
+}
 fn events(key: egui::Key, modifiers: egui::Modifiers) -> egui::RawInput {
     egui::RawInput {
         events: vec![egui::Event::Key {

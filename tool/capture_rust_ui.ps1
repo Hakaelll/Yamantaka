@@ -9,6 +9,7 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-annotation-history'; args=@('--reader','--reference','--reference-book','--reference-notes','--annotation-history','--es') },
     @{ name='inherited-recovery-review-small-200'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='inherited-recovery-completed'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--inherited-recovery-apply','--es') },
     @{ name='inherited-recovery-undone'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--inherited-recovery-undo','--light') },
@@ -553,7 +554,7 @@ foreach ($case in $cases) {
     }
     if($case.name -like 'palette-*') {
         $palette=$controls.commandPalette
-        if($palette.pending -or $controls.shortcutBindings.known -ne 28){throw 'Command palette did not settle or register its inherited shortcut.'}
+        if($palette.pending -or $controls.shortcutBindings.known -ne 30){throw 'Command palette did not settle or register its inherited shortcut.'}
         if($case.name -eq 'palette-recent') {
             if($palette.open -or $palette.last -ne 'recentDocument' -or $controls.libraryDocumentCount -ne 0){throw 'Recent-document opening was incorrectly scoped to the filtered catalogue.'}
         }else {
@@ -564,7 +565,7 @@ foreach ($case in $cases) {
         }
     }
     if($case.name -like 'legacy-reader-*') {
-        if($controls.referenceShortcutPhase -ne 50 -or $controls.shortcutBindings.known -ne 28 -or $controls.currentReaderPage -ne 0){throw 'Legacy reader command sequence did not finish in the correct document.'}
+        if($controls.referenceShortcutPhase -ne 50 -or $controls.shortcutBindings.known -ne 30 -or $controls.currentReaderPage -ne 0){throw 'Legacy reader command sequence did not finish in the correct document.'}
         if($case.name -eq 'legacy-reader-commands') {
             if(-not $controls.readerControls.immersive -or $controls.readerControls.primaryPanel -or $controls.reference.page -ne 1 -or $controls.reference.bookmarks.total -ne 1 -or $controls.readerControls.pageJump){throw 'Focused page, bookmark, panel, or immersive state is inconsistent.'}
         }else {
@@ -574,7 +575,7 @@ foreach ($case in $cases) {
     }
     if ($case.name -like 'shortcut-*' -or $case.name -eq 'reader-custom-shortcuts') {
         $keys=$controls.shortcutBindings
-        if($keys.warning -or $keys.known -ne 28 -or $keys.unavailable -ne 1 -or $keys.nextPage -ne 'ctrl-right' -or $keys.switchPane -ne 'f7' -or $keys.zoomIn -ne 'ctrl-d'){throw 'Shortcut assignment, preservation, or persisted reload failed.'}
+        if($keys.warning -or $keys.known -ne 30 -or $keys.unavailable -ne 1 -or $keys.nextPage -ne 'ctrl-right' -or $keys.switchPane -ne 'f7' -or $keys.zoomIn -ne 'ctrl-d'){throw 'Shortcut assignment, preservation, or persisted reload failed.'}
         if($controls.shortcutConflict -ne ($case.name -eq 'shortcut-conflict-small-200')){throw 'Conflicting shortcut changed the active map or did not report its owner.'}
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath)
     }
@@ -614,6 +615,11 @@ foreach ($case in $cases) {
         if ($controls.referenceNotesPhase -ne $phase -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.filterCount -ne 4 -or $controls.referenceAnnotations.total -ne $total -or $controls.primaryAnnotations.total -ne 2 -or $controls.primaryAnnotations.filterCount -ne 0) { throw 'Reference filters or reset affected the wrong records or document.' }
         $labels = if ($empty) { @('Active filters (4)','Reset') } else { @('Filtros activos (4)','Restablecer') }
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
+    }
+    if ($case.name -eq 'reader-annotation-history') {
+        if($controls.annotationHistoryPhase -ne 90 -or $controls.shortcutBindings.known -ne 30 -or $controls.primaryAnnotations.total -ne 2 -or $controls.referenceAnnotations.total -ne 1 -or $controls.referenceAnnotations.entries[0].note -cne 'Branched reference note' -or $controls.referenceAnnotations.history.redo -ne 0) { throw 'Annotation undo/redo, branch history or pane independence failed.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Deshacer')
+        if(@($controls.controls | Where-Object { $_.label -ceq 'Rehacer' -and -not $_.enabled }).Count -ne 1) { throw 'Redo must be disabled after a new history branch.' }
     }
     if ($case.name -eq 'reader-reference-notes') {
         if ($controls.referenceNotesPhase -ne 12 -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.total -ne 1 -or $controls.referenceAnnotations.entries[0].note -cne 'Final reference note' -or $controls.primaryAnnotations.total -ne 2 -or $controls.retiredAnnotationWrites -ne 0) { throw 'Reference note creation, editing, removal or document ownership failed.' }

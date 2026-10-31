@@ -10,6 +10,7 @@ use yamantaka_domain::{
     search::IndexAccess,
 };
 mod batch;
+pub(crate) mod history;
 mod marks;
 mod review;
 mod writes;
@@ -362,6 +363,7 @@ impl AnnotationRepository for Database {
             import_journal: Default::default(),
             file_checks: Default::default(),
             workspace_undo: None,
+            annotation_history: Default::default(),
         }))
     }
 
@@ -420,7 +422,9 @@ impl AnnotationRepository for Database {
         cancel: &Cancellation,
     ) -> Result<AnnotationPage> {
         let tx = self.connection.unchecked_transaction().map_err(storage)?;
-        let result = read_page(&tx, query, governor, cancel)?;
+        let mut result = read_page(&tx, query, governor, cancel)?;
+        self.annotation_history
+            .decorate(query.document_id.as_deref(), &mut result);
         tx.commit().map_err(storage)?;
         Ok(result)
     }
@@ -443,6 +447,10 @@ impl AnnotationRepository for Database {
         governor: &MemoryGovernor,
         cancel: &Cancellation,
     ) -> Result<AnnotationPage> {
-        writes::change(self, document_id, change, query, access, governor, cancel)
+        let mut result =
+            writes::change(self, document_id, change, query, access, governor, cancel)?;
+        self.annotation_history
+            .decorate(Some(document_id), &mut result);
+        Ok(result)
     }
 }

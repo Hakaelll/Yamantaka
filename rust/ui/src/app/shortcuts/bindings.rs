@@ -14,6 +14,26 @@ pub(in crate::app) struct Definition {
 }
 pub(in crate::app) const DEFINITIONS: &[Definition] = &[
     Definition {
+        command: Shortcut::UndoAnnotation,
+        id: "undoAnnotation",
+        default: "ctrl-z",
+        es: "Deshacer cambio de anotación",
+        en: "Undo annotation change",
+        global: false,
+        canvas: true,
+        repeats: false,
+    },
+    Definition {
+        command: Shortcut::RedoAnnotation,
+        id: "redoAnnotation",
+        default: "ctrl-shift-z",
+        es: "Rehacer cambio de anotación",
+        en: "Redo annotation change",
+        global: false,
+        canvas: true,
+        repeats: false,
+    },
+    Definition {
         command: Shortcut::CommandPalette,
         id: "commandPalette",
         default: "ctrl-k",
@@ -295,6 +315,9 @@ pub(in crate::app) const DEFINITIONS: &[Definition] = &[
     },
 ];
 pub(super) const CHOICES: &[&str] = &[
+    "ctrl-z",
+    "ctrl-shift-z",
+    "ctrl-y",
     "ctrl-o",
     "ctrl-shift-o",
     "ctrl-f",
@@ -345,6 +368,8 @@ pub(super) fn chord(token: &str) -> Option<(Key, bool, bool, bool)> {
     }
     let key = match token.rsplit('-').next()? {
         "o" => Key::O,
+        "z" => Key::Z,
+        "y" => Key::Y,
         "f" => Key::F,
         "k" => Key::K,
         "l" => Key::L,

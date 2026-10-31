@@ -14,4 +14,4 @@ The last eight catalogue documents, ordered by last opened, appear as **Recent d
 
 Actions are available immediately while the recent-document snapshot is read in the background. A failed recent read leaves actions usable; close and reopen the palette to retry that snapshot. Closing cancels its outstanding query. A query with no matches shows an explicit empty state, and Enter does not run a background reader action.
 
-The native palette does not yet provide annotation undo/redo. Those remain required rewrite work. Physical accessibility, keyboard-layout and full performance acceptance are recorded separately from the native scenarios in the [validation checkpoint](../validation/rust-command-palette-2026-10-31.md).
+[Annotation undo/redo](annotation-history.md) is available when the focused document has a usable history entry. Physical accessibility, keyboard-layout and full performance acceptance are recorded separately from the native scenarios in the [validation checkpoint](../validation/rust-command-palette-2026-10-31.md).

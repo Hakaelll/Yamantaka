@@ -264,6 +264,7 @@ struct CreationContext<'a> {
 }
 fn create_draft(
     db: &Connection,
+    id: &str,
     draft: &AnnotationDraft,
     confirm_page_note: bool,
     tag_values: &[String],
@@ -290,10 +291,9 @@ fn create_draft(
             "Confirm the page-note fallback before saving".into(),
         ));
     }
-    let id = uuid::Uuid::new_v4().to_string();
     save(
         db,
-        &id,
+        id,
         draft.values(),
         SnapshotFields {
             created: now,
@@ -318,6 +318,19 @@ pub(super) fn change(
     cancel: &Cancellation,
 ) -> Result<AnnotationPage> {
     cancel.check()?;
+    if matches!(change, AnnotationChange::Undo | AnnotationChange::Redo) {
+        return history::travel(
+            db,
+            document,
+            matches!(change, AnnotationChange::Redo),
+            query,
+            access,
+            governor,
+            cancel,
+        );
+    }
+    let tracked = !matches!(change, AnnotationChange::CheckAttachment { .. });
+    db.annotation_history.prepare()?;
     let tx = db.connection.transaction().map_err(storage)?;
     if tx
         .query_row("SELECT 1 FROM documents WHERE id=?", [document], |row| {
@@ -332,6 +345,33 @@ pub(super) fn change(
         ));
     }
     let now = Utc::now().to_rfc3339_opts(SecondsFormat::Micros, true);
+    let ids: Vec<String> = match &change {
+        AnnotationChange::CreateBatch { batch, .. } => batch
+            .drafts()
+            .iter()
+            .map(|_| uuid::Uuid::new_v4().to_string())
+            .collect(),
+        AnnotationChange::Create { .. } => vec![uuid::Uuid::new_v4().to_string()],
+        AnnotationChange::Save { record } => vec![record.data().id.clone()],
+        AnnotationChange::Remove { id } | AnnotationChange::Edit { id, .. } => vec![(*id).into()],
+        AnnotationChange::Review { ids, .. } | AnnotationChange::AddTag { ids, .. } => {
+            validate_batch(ids.len())?;
+            ids.iter()
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .cloned()
+                .collect()
+        }
+        _ => Vec::new(),
+    };
+    let mut entry = history::Entry::new(document, governor)?;
+    let mut before = Vec::new();
+    before
+        .try_reserve_exact(ids.len())
+        .map_err(|_| Failure::MemoryBudget)?;
+    for id in &ids {
+        before.push(entry.capture(&tx, id, cancel)?);
+    }
     let mut pages = BTreeSet::new();
     let creation = CreationContext {
         document,
@@ -345,9 +385,10 @@ pub(super) fn change(
             confirm_page_note,
             tags,
         } => {
-            for draft in batch.drafts() {
+            for (draft, id) in batch.drafts().iter().zip(&ids) {
                 pages.insert(create_draft(
                     &tx,
+                    id,
                     draft,
                     confirm_page_note,
                     tags,
@@ -362,6 +403,7 @@ pub(super) fn change(
         } => {
             pages.insert(create_draft(
                 &tx,
+                &ids[0],
                 draft,
                 confirm_page_note,
                 tag_values,
@@ -437,6 +479,11 @@ pub(super) fn change(
         AnnotationChange::CheckAttachment { fingerprint } => {
             tx.execute("UPDATE annotations SET status=CASE WHEN document_fingerprint=? THEN 'attached' ELSE 'reviewRequired' END WHERE document_id=?",params![fingerprint,document]).map_err(storage)?;
         }
+        AnnotationChange::Undo | AnnotationChange::Redo => unreachable!(),
+    }
+    for snapshot in before {
+        let after = entry.capture(&tx, &snapshot.id, cancel)?;
+        entry.record(snapshot, after)?;
     }
     for page in pages {
         cancel.check()?;
@@ -445,6 +492,11 @@ pub(super) fn change(
     let result = read_page(&tx, query, governor, cancel)?;
     cancel.check()?;
     tx.commit().map_err(storage)?;
+    if tracked {
+        db.annotation_history.push(entry);
+    } else {
+        db.annotation_history.clear(document);
+    }
     Ok(result)
 }
 

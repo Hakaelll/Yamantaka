@@ -64,7 +64,28 @@ impl YamantakaApp {
                     item.es,
                     item.en,
                     Command::Shortcut(item.command),
-                    true,
+                    if matches!(
+                        item.command,
+                        Shortcut::UndoAnnotation | Shortcut::RedoAnnotation
+                    ) {
+                        let notes = if self
+                            .command_palette
+                            .context
+                            .as_ref()
+                            .is_some_and(|(target, _)| *target == ReadingTarget::Reference)
+                        {
+                            self.reference
+                                .as_ref()
+                                .map(|reference| &reference.pane.annotations)
+                        } else {
+                            Some(&self.reader.annotations)
+                        };
+                        notes.is_some_and(|notes| {
+                            notes.history_available(item.command == Shortcut::RedoAnnotation)
+                        })
+                    } else {
+                        true
+                    },
                     shortcuts::bindings::caption(self.shortcut_bindings.token(item.command)),
                 );
             }

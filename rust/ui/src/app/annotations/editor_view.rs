@@ -45,6 +45,22 @@ impl AnnotationState {
             .color(p.secondary),
         );
         ui.add_space(16.0);
+        ui.horizontal_wrapped(|ui| {
+            for (redo, es, en) in [(false, "Deshacer", "Undo"), (true, "Rehacer", "Redo")] {
+                ui.add_enabled_ui(!busy && self.history_available(redo), |ui| {
+                    if theme::navigation(ui, tr(es, en), false, p).clicked() {
+                        action = Some(NotesAction::Change(
+                            if redo {
+                                AnnotationMutation::Redo
+                            } else {
+                                AnnotationMutation::Undo
+                            },
+                            offset,
+                        ));
+                    }
+                });
+            }
+        });
         if busy {
             ui.horizontal(|ui| {
                 ui.spinner();

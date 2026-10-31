@@ -47,5 +47,8 @@ pub(super) fn change(
     let result = read_page(&tx, query, governor, cancel)?;
     cancel.check()?;
     tx.commit().map_err(storage)?;
+    for target in targets {
+        db.annotation_history.clear(&target.document_id);
+    }
     Ok(result)
 }

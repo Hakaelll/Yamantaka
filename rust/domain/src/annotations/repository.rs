@@ -122,10 +122,16 @@ impl AnnotationRecord {
         })
     }
 }
+#[derive(Clone, Copy, Default)]
+pub struct AnnotationHistory {
+    pub undo: usize,
+    pub redo: usize,
+}
 pub struct AnnotationPage {
     entries: Vec<AnnotationRecord>,
     pub total: u64,
     pub offset: usize,
+    pub history: AnnotationHistory,
     _lease: ByteLease,
 }
 impl AnnotationPage {
@@ -151,11 +157,14 @@ impl AnnotationPage {
             entries,
             total,
             offset,
+            history: AnnotationHistory::default(),
             _lease: lease,
         })
     }
 }
 pub enum AnnotationChange<'a> {
+    Undo,
+    Redo,
     CreateBatch {
         batch: &'a super::batch::AnnotationDraftBatch,
         confirm_page_note: bool,

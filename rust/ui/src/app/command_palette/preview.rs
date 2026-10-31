@@ -1,7 +1,7 @@
 use super::*;
 #[derive(Default)]
 pub(in crate::app) struct PalettePreview {
-    phase: u8,
+    pub(in crate::app) phase: u8,
     mode: u8,
     events: Vec<egui::Event>,
     wanted: Option<String>,
@@ -14,7 +14,15 @@ impl PalettePreview {
     pub fn input(&mut self, input: &mut egui::RawInput) {
         input.events.append(&mut self.events);
     }
-    fn key(&mut self, phase: u8, key: egui::Key, mut modifiers: egui::Modifiers) {
+    pub fn history_phase(&self) -> u8 {
+        if self.mode == 4 { self.phase } else { 0 }
+    }
+    pub(in crate::app) fn key(
+        &mut self,
+        phase: u8,
+        key: egui::Key,
+        mut modifiers: egui::Modifiers,
+    ) {
         self.phase = phase;
         eprintln!("Palette preview: phase {phase}");
         modifiers.command = modifiers.ctrl;
@@ -45,6 +53,10 @@ impl YamantakaApp {
         let phase = self.command_palette_preview.phase;
         let mode = self.command_palette_preview.mode;
         if self.command_palette_preview.ready() {
+            return;
+        }
+        if mode == 4 {
+            self.advance_annotation_history_preview(ctx);
             return;
         }
         let reference_ready = self.reference.as_ref().is_some_and(|reference| {

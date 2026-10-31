@@ -5,6 +5,7 @@ pub(super) mod reader_commands;
 mod settings;
 mod verification;
 pub(super) use focus::{ReadingFocus, ReadingTarget};
+pub(in crate::app) use verification::verify_annotation_text_focus;
 mod preview;
 mod routing;
 pub(super) use preview::ShortcutPreview;
@@ -12,6 +13,8 @@ pub(super) use preview::ShortcutPreview;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Shortcut {
     CommandPalette,
+    UndoAnnotation,
+    RedoAnnotation,
     GoToPage,
     Navigator,
     TogglePanel,
@@ -63,13 +66,13 @@ pub(super) fn read(
                 return true;
             };
             if text_focus
-                && matches!(
+                && (matches!(
                     key,
                     egui::Key::ArrowLeft
                         | egui::Key::ArrowRight
                         | egui::Key::PageUp
                         | egui::Key::PageDown
-                )
+                ) || modifiers.ctrl && matches!(key, egui::Key::Z | egui::Key::Y))
             {
                 return true;
             }

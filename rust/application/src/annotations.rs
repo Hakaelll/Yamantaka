@@ -13,6 +13,8 @@ use yamantaka_domain::{
 };
 
 pub enum AnnotationMutation {
+    Undo,
+    Redo,
     CreateBatch {
         batch: Arc<yamantaka_domain::annotations::batch::AnnotationDraftBatch>,
         confirm_page_note: bool,
@@ -52,6 +54,8 @@ pub enum AnnotationMutation {
 impl AnnotationMutation {
     fn borrowed(&self) -> AnnotationChange<'_> {
         match self {
+            Self::Undo => AnnotationChange::Undo,
+            Self::Redo => AnnotationChange::Redo,
             Self::CreateBatch {
                 batch,
                 confirm_page_note,

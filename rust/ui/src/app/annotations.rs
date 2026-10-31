@@ -15,6 +15,8 @@ mod reference_editor_preview;
 pub(super) use reference_editor_preview::NotesPreview;
 pub(super) mod export;
 mod filters;
+mod history;
+mod history_preview;
 pub(super) mod paint;
 pub(super) mod panel;
 mod reference_preview;
@@ -93,6 +95,18 @@ pub(super) struct AnnotationState {
     bulk_tag_preview: Option<bool>,
 }
 impl AnnotationState {
+    pub(in crate::app) fn history_available(&self, redo: bool) -> bool {
+        !self.stale
+            && !self.editing()
+            && self.pending.is_none()
+            && self.page.as_ref().is_some_and(|page| {
+                if redo {
+                    page.history.redo > 0
+                } else {
+                    page.history.undo > 0
+                }
+            })
+    }
     pub(in crate::app) fn writing(&self) -> bool {
         self.pending.as_ref().is_some_and(|p| p.writing)
     }
@@ -216,7 +230,7 @@ impl AnnotationState {
         }
     }
     pub(in crate::app) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"document":self.document,"pending":self.pending.is_some(),"writing":self.writing(),"editing":self.editing(),"saved":self.saved,"stale":self.stale,"filterCount":self.filters.count(),"selected":self.selected.count(),"offset":self.page.as_ref().map(|page|page.offset),"total":self.page.as_ref().map(|page|page.total),"entries":self.page.as_ref().map(|page|page.entries().iter().map(|record|serde_json::json!({"id":record.data().id,"page":record.data().values.page_index,"note":record.data().values.note,"tags":record.data().tags,"review":record.data().values.review_state,"kind":record.data().values.kind})).collect::<Vec<_>>())})
+        serde_json::json!({"history":self.page.as_ref().map(|page|serde_json::json!({"undo":page.history.undo,"redo":page.history.redo})),"document":self.document,"pending":self.pending.is_some(),"writing":self.writing(),"editing":self.editing(),"saved":self.saved,"stale":self.stale,"filterCount":self.filters.count(),"selected":self.selected.count(),"offset":self.page.as_ref().map(|page|page.offset),"total":self.page.as_ref().map(|page|page.total),"entries":self.page.as_ref().map(|page|page.entries().iter().map(|record|serde_json::json!({"id":record.data().id,"page":record.data().values.page_index,"note":record.data().values.note,"tags":record.data().tags,"review":record.data().values.review_state,"kind":record.data().values.kind})).collect::<Vec<_>>())})
     }
     pub(super) fn accept(&mut self, reply: AnnotationReply) -> Option<String> {
         let pending = self.pending.as_ref()?;
@@ -235,6 +249,7 @@ impl AnnotationState {
         }
         match reply.result {
             Ok(page) => {
+                self.stale = false;
                 self.selected = Default::default();
                 self.bulk_tag.clear();
                 self.page = Some(Arc::new(page));

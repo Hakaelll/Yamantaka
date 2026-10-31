@@ -27,6 +27,7 @@ pub struct Database {
     pub(crate) import_journal: std::cell::RefCell<Option<Connection>>,
     pub(crate) file_checks: std::cell::RefCell<Option<Connection>>,
     pub(crate) workspace_undo: Option<crate::workspaces::undo::WorkspaceUndoData>,
+    pub(crate) annotation_history: crate::annotations::history::History,
 }
 impl Database {
     pub fn file_path(&self) -> Option<std::path::PathBuf> {
@@ -55,6 +56,7 @@ impl Database {
             import_journal: Default::default(),
             file_checks: Default::default(),
             workspace_undo: None,
+            annotation_history: Default::default(),
         })
     }
     pub fn open(path: &Path) -> Result<Self> {
@@ -75,6 +77,7 @@ impl Database {
             import_journal: Default::default(),
             file_checks: Default::default(),
             workspace_undo: None,
+            annotation_history: Default::default(),
         })
     }
     pub fn in_memory_at(target: u32) -> Result<Self> {
@@ -86,6 +89,7 @@ impl Database {
             import_journal: Default::default(),
             file_checks: Default::default(),
             workspace_undo: None,
+            annotation_history: Default::default(),
         })
     }
     pub fn execute_batch(&self, sql: &str) -> Result<()> {

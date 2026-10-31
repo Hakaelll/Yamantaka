@@ -1,4 +1,6 @@
 use std::fs;
+#[path = "support/annotation_history.rs"]
+mod annotation_history_verification;
 #[path = "support/automation.rs"]
 mod automation_verification;
 #[path = "support/collections.rs"]
@@ -179,6 +181,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     revision_verification::verify(DOCUMENT);
     automation_verification::verify();
     verify_bookmark_toggle();
+    annotation_history_verification::verify(DOCUMENT);
 }
 
 #[test]
