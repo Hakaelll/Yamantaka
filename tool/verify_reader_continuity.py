@@ -52,11 +52,14 @@ def main():
     expected = read(output / f"{args.source_case}.expected-comparison.json")
     comparison = expected["comparison"]
     metadata = expected.get("metadataDraft", {}).get("active")
+    stored = expected.get("storedNotes", {})
+    has_stored = bool(stored.get("primary") and stored.get("reference"))
     assert expected["synthetic"] and (metadata or comparison["primary"] != comparison["document"])
     files = ("export-preview.sqlite3", "preferences.json", "export-preview.reader-continuity.json")
     before = {name: digest(source / name) for name in files}
     results = []
-    for mode in (("normal", "changed", "disabled") if metadata else ("normal", "missing", "disabled")):
+    modes = ("normal", "changed", "disabled") if metadata else (("normal", "missing", "changed", "disabled") if has_stored else ("normal", "missing", "disabled"))
+    for mode in modes:
         fixture = captures / f"continuity-{uuid.uuid4()}"
         fixture.mkdir()
         with sqlite3.connect(f"file:{(source / files[0]).as_posix()}?mode=ro", uri=True) as original:
@@ -66,7 +69,10 @@ def main():
                     changed = copy.execute("UPDATE documents SET is_missing=1 WHERE id=?", (comparison["document"],))
                     assert changed.rowcount == 1
                 if mode == "changed":
-                    changed = copy.execute("UPDATE documents SET title_override=? WHERE id=?", ("Another catalogue title",metadata["document"]))
+                    if metadata:
+                        changed = copy.execute("UPDATE documents SET title_override=? WHERE id=?", ("Another catalogue title",metadata["document"]))
+                    else:
+                        changed = copy.execute("UPDATE annotations SET note=? WHERE id=? AND document_id=?", ("Newer SQL annotation text",stored["primary"]["annotation"],stored["primary"]["document"]))
                     assert changed.rowcount == 1
         for name in files[1:]:
             shutil.copyfile(source / name, fixture / name)
@@ -103,7 +109,7 @@ def main():
             assert abs(active["zoom"] - expected["primaryZoom"]) < 0.00001
             if not comparison:
                 assert actual["reference"] is None
-            elif mode == "normal":
+            elif mode in ("normal", "changed"):
                 same_comparison(comparison, continuity["comparison"])
                 assert continuity["retainedComparison"] is None and actual["reference"]["images"] > 0
             else:
@@ -122,6 +128,19 @@ def main():
                 assert any(control["label"] == "Conservar valores actuales" for control in actual["controls"])
                 assert not any(control["label"] == "Guardar cambios" and control["enabled"] for control in actual["controls"])
         notes = expected.get("pageNotes", {})
+        if has_stored:
+            recovered = actual["storedNoteRecovery"]
+            assert not recovered["pending"]
+            assert recovered["retained"] == {"normal":0,"missing":1,"changed":0,"disabled":2}[mode]
+            assert recovered["primary"] == (None if mode == "disabled" else stored["primary"])
+            assert recovered["reference"] == (stored["reference"] if mode in ("normal","changed") else None)
+            assert recovered["primaryConflict"] == (mode == "changed")
+            assert not recovered["referenceConflict"]
+            persisted = read(fixture / files[2])["annotation_edits"]
+            assert sorted(persisted,key=lambda draft:draft["reference"]) == [stored["primary"],stored["reference"]]
+            if mode == "changed":
+                assert any(control["label"] == "Copiar borrador" for control in actual["controls"])
+                assert any(note["id"] == stored["primary"]["annotation"] and note["note"] == "Newer SQL annotation text" for note in actual["primaryAnnotations"]["entries"])
         if notes.get("primary") and notes.get("reference"):
             recovered = actual["pageNoteRecovery"]
             assert recovered["retained"] == {"normal": 0, "missing": 1, "disabled": 2}[mode]

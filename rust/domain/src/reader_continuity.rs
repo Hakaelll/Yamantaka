@@ -7,6 +7,7 @@ pub struct ReaderContinuity {
     comparison: Option<WorkspaceComparison>,
     page_notes: Vec<crate::annotations::page_note_draft::PageNoteDraft>,
     metadata_drafts: Vec<crate::metadata_review::draft::MetadataDraft>,
+    annotation_edits: Vec<crate::annotations::stored_note_draft::StoredNoteDraft>,
 }
 impl ReaderContinuity {
     pub fn new(tabs: DocumentTabs, comparison: Option<WorkspaceComparison>) -> Result<Self> {
@@ -24,6 +25,7 @@ impl ReaderContinuity {
             comparison,
             page_notes: Vec::new(),
             metadata_drafts: Vec::new(),
+            annotation_edits: Vec::new(),
         })
     }
     pub fn with_page_notes(
@@ -77,11 +79,36 @@ impl ReaderContinuity {
     pub fn tabs(&self) -> &DocumentTabs {
         &self.tabs
     }
+    pub fn with_annotation_edits(
+        mut self,
+        drafts: Vec<crate::annotations::stored_note_draft::StoredNoteDraft>,
+    ) -> Result<Self> {
+        if drafts.len() > 24 {
+            return Err(Failure::Invalid(
+                "Too many stored-note recovery drafts".into(),
+            ));
+        }
+        for (index, draft) in drafts.iter().enumerate() {
+            draft.validate()?;
+            if drafts[..index].iter().any(|old| old.same_editor(draft)) {
+                return Err(Failure::Invalid(
+                    "Duplicate stored-note recovery draft".into(),
+                ));
+            }
+        }
+        self.annotation_edits = drafts;
+        Ok(self)
+    }
+    pub fn annotation_edits(&self) -> &[crate::annotations::stored_note_draft::StoredNoteDraft] {
+        &self.annotation_edits
+    }
     pub fn comparison(&self) -> Option<&WorkspaceComparison> {
         self.comparison.as_ref()
     }
     pub fn forget_documents(&mut self, ids: &[String]) {
         self.tabs.forget_documents(ids);
+        self.annotation_edits
+            .retain(|draft| !ids.contains(&draft.document));
         self.metadata_drafts
             .retain(|draft| !ids.contains(&draft.document));
         self.page_notes
@@ -104,6 +131,7 @@ impl From<DocumentTabs> for ReaderContinuity {
             comparison: None,
             page_notes: Vec::new(),
             metadata_drafts: Vec::new(),
+            annotation_edits: Vec::new(),
         }
     }
 }

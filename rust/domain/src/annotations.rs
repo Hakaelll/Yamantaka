@@ -3,6 +3,7 @@ pub mod marks;
 pub mod page_note_draft;
 pub mod review;
 pub mod revision;
+pub mod stored_note_draft;
 use crate::{
     Failure, Result,
     memory::{ByteLease, Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},

@@ -147,6 +147,22 @@ pub fn verify(document: &str) {
     assert_eq!(found(&db, "editedword"), 1);
     drop(unchanged);
     let before_blob = revision(&db, &governor);
+    let editor_source = db
+        .annotation_for_edit("original", &id, &governor, &Cancellation::default())
+        .unwrap()
+        .unwrap();
+    assert_eq!(editor_source.revision(), &before_blob);
+    drop(editor_source);
+    assert!(
+        db.annotation_for_edit(
+            "different-document",
+            &id,
+            &governor,
+            &Cancellation::default()
+        )
+        .unwrap()
+        .is_none()
+    );
     db.execute_batch("UPDATE annotations SET inherited_blob=X'10';")
         .unwrap();
     assert!(matches!(

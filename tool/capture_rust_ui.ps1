@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='continuity-stored-note-drafts'; args=@('--reader','--reference','--reference-book','--reference-notes','--graphics-fail-runtime','--graphics-stored-note-drafts','--light','--es') },
+    @{ name='continuity-stored-note-saved'; args=@('--reader','--reference','--reference-book','--reference-notes','--graphics-fail-runtime','--graphics-stored-note-drafts','--graphics-save-stored-note','--es') },
     @{ name='annotation-edit-conflict'; args=@('--reader','--page-note','--annotation-save','--annotation-conflict','--light','--es') },
     @{ name='continuity-metadata-draft'; args=@('--reader','--metadata-review','--graphics-fail-runtime','--graphics-metadata-draft','--light','--es') },
     @{ name='continuity-page-notes'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--graphics-page-note-drafts','--light','--es') },
@@ -502,6 +504,18 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'continuity-stored-note-*') {
+        $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $controls.graphicsRuntimeFallback -or $controls.storedNoteRecovery.retained -ne 0 -or $controls.storedNoteRecovery.pending -or $controls.storedNoteRecovery.primaryConflict -or $controls.storedNoteRecovery.referenceConflict) { throw 'Stored-note recovery did not settle in both panes.' }
+        foreach ($pane in @('primary','reference')) {
+            $saved = $expected.storedNotes.$pane
+            $actual = $controls.storedNoteRecovery.$pane
+            if (-not $saved) { throw 'The fixture did not freeze a stored-note draft.' }
+            if ($pane -eq 'primary' -and $expected.savedPrimaryNote) {
+                if ($actual -or @($controls.primaryAnnotations.entries | Where-Object { $_.id -eq $saved.annotation -and $_.note -ceq $saved.note }).Count -ne 1) { throw 'A committed edit reopened as a draft or was lost.' }
+            } elseif (($saved|ConvertTo-Json -Depth 6 -Compress) -cne ($actual|ConvertTo-Json -Depth 6 -Compress)) { throw 'A recovered stored-note draft changed.' }
+        }
+    }
     if ($case.name -eq 'annotation-edit-conflict') {
         if ($controls.annotationEditConflict.phase -ne 5 -or $controls.annotationEditConflict.draft -cne 'Uncommitted older draft' -or -not $controls.primaryAnnotations.stale -or -not $controls.primaryAnnotations.editing) { throw 'The stale annotation edit did not retain its draft.' }
         if ($controls.primaryAnnotations.entries[0].note -cne 'Newer annotation text') { throw 'The stale editor overwrote the newer annotation.' }

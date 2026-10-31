@@ -128,6 +128,7 @@ pub enum Action {
     AnnotationExport(Box<AnnotationExportRequest>),
     AnnotationMarks(Box<AnnotationMarksRequest>),
     Annotation(Box<AnnotationRequest>),
+    RecoverAnnotation(Box<crate::annotation_draft_recovery::Request>),
     Bookmarks(String, usize, Cancellation),
     ChangeBookmark(String, BookmarkChange, usize, Cancellation),
     GetDocument(String, Cancellation),
@@ -243,6 +244,7 @@ pub enum Update {
     AnnotationExport(AnnotationExportReply),
     AnnotationMarks(AnnotationMarksReply),
     Annotations(AnnotationReply),
+    AnnotationRecovered(Box<crate::annotation_draft_recovery::Reply>),
     Bookmarks(String, usize, BookmarkPage, Cancellation),
     BookmarkChanged(String, BookmarkPage, Cancellation),
     BookmarkFailed(String, Failure, Cancellation),
@@ -1233,6 +1235,9 @@ impl Runtime {
                                     };
                                     let reply = request.execute(&mut repository, access);
                                     emit(&events, &notify, Update::Annotations(reply), permit);
+                                }
+                                Action::RecoverAnnotation(request) => {
+                                    emit(&events, &notify, Update::AnnotationRecovered(Box::new(request.execute(&repository))), permit);
                                 }
                                 Action::Bookmarks(id, offset, cancel) => {
                                     match repository.bookmarks(&id, offset, &cancel) {

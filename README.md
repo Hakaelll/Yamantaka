@@ -36,7 +36,7 @@ Open **Tools → Workspaces** to save the current readings under a name and reco
 
 Saving a workspace now also records the current library filters, sort, grouping, cover size, list/cover choice and concentration mode. These apply after its reader opens successfully. While that workspace is open, changes to its reading queue, active document and concentration mode are saved automatically. Use **F8** or **Reading options → Focus mode** to hide the toolbar and navigator; F8 or the floating exit button restores them. The library sorting menu includes comfortable and compact cover sizes. [Workspace context checkpoint](docs/validation/rust-workspace-context-2026-10-22.md).
 
-New page-note drafts in either reader and unfinished title/author corrections now persist locally without committing those edits. Changed metadata revisions require explicit recovery review. [Reading continuity](docs/user-guide/reading-continuity.md) describes supported recovery and its limits.
+New page notes, edits to existing annotations in either reader, and unfinished title/author corrections now persist locally without committing those edits. Changed metadata revisions require explicit recovery review. [Reading continuity](docs/user-guide/reading-continuity.md) describes supported recovery and its limits.
 
 The default session now preserves an active comparison atomically with its main reading. See [reading continuity](docs/user-guide/reading-continuity.md) for restart behavior and missing-reference recovery.
 

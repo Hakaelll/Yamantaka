@@ -2,6 +2,7 @@ use super::panel::{color_label, kind_label, review_label};
 use super::*;
 
 pub(in crate::app) enum NotesAction {
+    RetryDraft,
     Read(usize),
     Change(AnnotationMutation, usize),
     PageNote,
@@ -28,7 +29,7 @@ impl AnnotationState {
         p: Palette,
     ) -> Option<NotesAction> {
         let tr = |es, en| if context.english { en } else { es };
-        let busy = context.busy || self.pending.is_some();
+        let busy = context.busy || self.pending.is_some() || self.recovered.is_some();
         let offset = self.page.as_ref().map_or(0, |page| page.offset);
         let mut action = None;
         ui.label(
@@ -45,6 +46,9 @@ impl AnnotationState {
             .color(p.secondary),
         );
         ui.add_space(16.0);
+        if self.recovered.is_some() {
+            return self.stored_recovery_panel(ui, p, context.english);
+        }
         ui.horizontal_wrapped(|ui| {
             for (redo, es, en) in [(false, "Deshacer", "Undo"), (true, "Rehacer", "Redo")] {
                 ui.add_enabled_ui(!busy && self.history_available(redo), |ui| {
@@ -359,10 +363,23 @@ impl AnnotationState {
                             ui.close();
                         }
                     }
-                    if !busy && theme::navigation(ui, tr("Editar", "Edit"), false, p).clicked() {
+                    if !busy
+                        && ui
+                            .add_enabled_ui(!self.editing(), |ui| {
+                                theme::navigation(ui, tr("Editar", "Edit"), false, p)
+                            })
+                            .inner
+                            .clicked()
+                    {
                         self.edit_entry(index);
                     }
-                    if !busy && theme::navigation(ui, tr("Eliminar", "Remove"), false, p).clicked()
+                    if !busy
+                        && ui
+                            .add_enabled_ui(!self.editing(), |ui| {
+                                theme::navigation(ui, tr("Eliminar", "Remove"), false, p)
+                            })
+                            .inner
+                            .clicked()
                     {
                         action = Some(NotesAction::Change(
                             AnnotationMutation::Remove {
@@ -401,6 +418,9 @@ impl AnnotationState {
 
 impl AnnotationState {
     pub(in crate::app) fn edit_entry(&mut self, index: usize) {
+        if self.editing() || self.writing() {
+            return;
+        }
         let Some(page) = self.page.clone() else {
             return;
         };

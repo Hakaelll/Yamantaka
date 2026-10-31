@@ -2,6 +2,9 @@ use super::*;
 
 impl reader_pane::ReaderPane {
     pub(in crate::app) fn begin_page_note(&mut self) {
+        if self.annotations.editing() || self.annotations.writing() {
+            return;
+        }
         let Some((document, info)) = &self.active else {
             return;
         };
@@ -33,6 +36,9 @@ impl reader_pane::ReaderPane {
 
 impl reader_pane::ReaderPane {
     pub(in crate::app) fn annotate_selection(&mut self, governor: &MemoryGovernor) {
+        if self.annotations.editing() || self.annotations.writing() {
+            return;
+        }
         let Some((document, _)) = &self.active else {
             return;
         };
@@ -68,6 +74,7 @@ impl YamantakaApp {
     pub(in crate::app) fn apply_notes_action(&mut self, reference: bool, action: NotesAction) {
         if !reference {
             match action {
+                NotesAction::RetryDraft => self.retry_stored_note(false),
                 NotesAction::Export(format) => {
                     self.pick_annotation_export(export::ExportTarget::Primary, format)
                 }
@@ -85,6 +92,10 @@ impl YamantakaApp {
                 }
                 NotesAction::ReloadMarks => self.reader.annotation_paint.invalidate_document(None),
             }
+            return;
+        }
+        if matches!(&action, NotesAction::RetryDraft) {
+            self.retry_stored_note(true);
             return;
         }
         if let NotesAction::Export(format) = action {

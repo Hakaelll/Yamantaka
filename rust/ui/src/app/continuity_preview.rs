@@ -4,6 +4,17 @@ use yamantaka_domain::reader_preferences::PageRotation;
 impl YamantakaApp {
     pub(super) fn advance_graphics_loss_preview(&mut self, ctx: &egui::Context) -> bool {
         let metadata_draft = std::env::args_os().any(|arg| arg == "--graphics-metadata-draft");
+        let stored_edits = std::env::args_os().any(|arg| arg == "--graphics-stored-note-drafts");
+        if stored_edits
+            && (!self.reference_notes_preview.ready()
+                || !self.reader.annotations.ready()
+                || self
+                    .reference
+                    .as_ref()
+                    .is_none_or(|view| !view.pane.annotations.ready()))
+        {
+            return false;
+        }
         if metadata_draft
             && !self
                 .metadata
@@ -44,6 +55,19 @@ impl YamantakaApp {
         }
         if !self.device_loss_configured {
             self.device_loss_configured = true;
+            if stored_edits {
+                self.reader
+                    .annotations
+                    .seed_stored_note_recovery("Unsaved primary annotation edit");
+                self.reader.panel = true;
+                self.reader.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+                let view = self.reference.as_mut().unwrap();
+                view.pane
+                    .annotations
+                    .seed_stored_note_recovery("Unsaved reference annotation edit");
+                view.pane.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+                view.navigator_requested = true;
+            }
             if metadata_draft {
                 self.metadata.as_mut().unwrap().preview_unsaved_title();
             }
@@ -99,11 +123,12 @@ impl YamantakaApp {
         {
             return false;
         }
-        let save_primary = std::env::args_os().any(|arg| arg == "--graphics-save-page-note");
-        if save_primary && !self.submit_page_note_recovery_preview() {
+        let save_primary = std::env::args_os()
+            .any(|arg| arg == "--graphics-save-page-note" || arg == "--graphics-save-stored-note");
+        if save_primary && !self.submit_annotation_recovery_preview() {
             return false;
         }
-        let expected = serde_json::json!({"synthetic":true,"comparison":self.capture_comparison(),"primaryPage":self.reader.page,"primaryZoom":self.reader.zoom,"pageNotes":self.page_note_recovery_summary(),"savedPrimaryNote":save_primary,"metadataDraft":self.metadata_draft_summary()});
+        let expected = serde_json::json!({"synthetic":true,"comparison":self.capture_comparison(),"primaryPage":self.reader.page,"primaryZoom":self.reader.zoom,"pageNotes":self.page_note_recovery_summary(),"savedPrimaryNote":save_primary,"metadataDraft":self.metadata_draft_summary(),"storedNotes":self.stored_note_recovery_summary()});
         let path = self
             .capture
             .as_ref()

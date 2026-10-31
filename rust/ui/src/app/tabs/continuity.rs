@@ -5,6 +5,7 @@ use yamantaka_application::reader_continuity::{
 use yamantaka_domain::{
     Failure, Result, reader_continuity::ReaderContinuity, workspaces::WorkspaceComparison,
 };
+mod stored_notes;
 
 #[derive(Default)]
 pub(in crate::app) struct ContinuityState {
@@ -20,6 +21,8 @@ pub(in crate::app) struct ContinuityState {
     retained_page_notes: Vec<yamantaka_domain::annotations::page_note_draft::PageNoteDraft>,
     retained_metadata: Vec<yamantaka_domain::metadata_review::draft::MetadataDraft>,
     metadata_startup: Option<Document>,
+    retained_edits: Vec<yamantaka_domain::annotations::stored_note_draft::StoredNoteDraft>,
+    stored_restore: Option<stored_notes::PendingRestore>,
     pending: Option<(u64, ReaderContinuity, Cancellation)>,
     due: Option<Instant>,
 }
@@ -28,6 +31,7 @@ impl YamantakaApp {
         serde_json::json!({"loaded":self.tabs.continuity.loaded,"restoring":self.tabs.continuity.restoring_comparison,"retainedComparison":self.tabs.continuity.retained_comparison,"comparison":self.capture_comparison()})
     }
     pub(in crate::app) fn forget_continuity_documents(&mut self, ids: &[String]) {
+        self.forget_stored_note_documents(ids);
         self.tabs
             .continuity
             .retained_metadata
@@ -96,7 +100,8 @@ impl YamantakaApp {
             saved.or_else(|| self.capture_comparison()),
         )?
         .with_page_notes(drafts)?
-        .with_metadata_drafts(metadata)
+        .with_metadata_drafts(metadata)?
+        .with_annotation_edits(self.capture_stored_note_drafts())
     }
     pub(in crate::app) fn retain_metadata_draft(
         &mut self,
@@ -279,6 +284,7 @@ impl YamantakaApp {
         }
         self.tabs.continuity.retained_page_notes = restored.page_notes().to_vec();
         self.tabs.continuity.retained_metadata = restored.metadata_drafts().to_vec();
+        self.tabs.continuity.retained_edits = restored.annotation_edits().to_vec();
         let restore = crate::graphics_recovery::runtime_fallback()
             || self
                 .preferences
@@ -326,6 +332,7 @@ impl YamantakaApp {
             return;
         }
         self.restore_page_note_drafts();
+        self.restore_stored_note_drafts();
         self.restore_metadata_drafts();
         self.sync_tab_context();
         if self

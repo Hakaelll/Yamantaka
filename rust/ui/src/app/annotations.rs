@@ -23,6 +23,7 @@ mod history_preview;
 pub(super) mod paint;
 pub(super) mod panel;
 mod reference_preview;
+mod stored_note_recovery;
 mod tags;
 pub(super) use editor_view::{NotesAction, NotesContext};
 pub(super) use reference_preview::MarksPreview;
@@ -42,6 +43,9 @@ pub(super) enum EditorSource {
         page: Arc<AnnotationPage>,
         index: usize,
     },
+    RecoveredStored {
+        record: Arc<AnnotationRecord>,
+    },
 }
 pub(super) struct AnnotationEditor {
     source: EditorSource,
@@ -54,10 +58,10 @@ pub(super) struct AnnotationEditor {
 }
 impl AnnotationEditor {
     fn stored_record(&self) -> Option<&AnnotationRecord> {
-        if let EditorSource::Stored { page, index } = &self.source {
-            Some(&page.entries()[*index])
-        } else {
-            None
+        match &self.source {
+            EditorSource::Stored { page, index } => Some(&page.entries()[*index]),
+            EditorSource::RecoveredStored { record } => Some(record),
+            _ => None,
         }
     }
     fn stored(&self) -> Option<&AnnotationRecordData> {
@@ -72,6 +76,9 @@ impl AnnotationEditor {
                 .as_deref()
                 .unwrap_or(""),
             EditorSource::Selection { snapshot, .. } => snapshot.text(),
+            EditorSource::RecoveredStored { record } => {
+                record.data().values.selected_text.as_deref().unwrap_or("")
+            }
             EditorSource::PageNote { .. } => "",
         }
     }
@@ -87,6 +94,7 @@ pub(super) struct AnnotationState {
     page: Option<Arc<AnnotationPage>>,
     pending: Option<Pending>,
     editor: Option<AnnotationEditor>,
+    recovered: Option<yamantaka_domain::annotations::stored_note_draft::StoredNoteDraft>,
     error: Option<String>,
     saved: bool,
     stale: bool,
@@ -131,21 +139,23 @@ impl AnnotationState {
         self.revision = self.revision.wrapping_add(1);
     }
     pub(super) fn editing(&self) -> bool {
-        self.editor.is_some()
+        self.editor.is_some() || self.recovered.is_some()
     }
     pub(in crate::app) fn discard_editor(&mut self) {
         self.editor = None;
+        self.recovered = None;
     }
     pub(in crate::app) fn unsaved_editor(&self) -> bool {
-        self.editor.as_ref().is_some_and(|editor| {
-            editor.stored().is_none_or(|record| {
-                editor.kind != record.values.kind
-                    || editor.color != record.values.color
-                    || editor.review != record.values.review_state
-                    || editor.note != record.values.note.as_deref().unwrap_or("")
-                    || editor.tags != record.tags.join(", ")
+        self.recovered.is_some()
+            || self.editor.as_ref().is_some_and(|editor| {
+                editor.stored().is_none_or(|record| {
+                    editor.kind != record.values.kind
+                        || editor.color != record.values.color
+                        || editor.review != record.values.review_state
+                        || editor.note != record.values.note.as_deref().unwrap_or("")
+                        || editor.tags != record.tags.join(", ")
+                })
             })
-        })
     }
     pub(super) fn ready(&self) -> bool {
         self.page.is_some() && self.pending.is_none()
@@ -163,6 +173,7 @@ impl AnnotationState {
         }
         self.stale = false;
         self.document = Some(document.into());
+        self.recovered = None;
         self.selected = Default::default();
         self.bulk_tag.clear();
         self.filters = Default::default();
@@ -275,11 +286,10 @@ impl AnnotationState {
                         .as_ref()
                         .and_then(AnnotationEditor::stored_record)
                         .is_some_and(|old| {
-                            !page
-                                .entries()
+                            page.entries()
                                 .iter()
                                 .find(|record| record.data().id == old.data().id)
-                                .is_some_and(|record| old.revision() == record.revision())
+                                .map_or(self.stale, |record| old.revision() != record.revision())
                         });
                 self.selected = Default::default();
                 self.bulk_tag.clear();

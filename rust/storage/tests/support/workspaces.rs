@@ -330,6 +330,55 @@ pub fn preserved_split_references(document: &str) {
     let metadata_json: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&continuity_path).unwrap()).unwrap();
     assert_eq!(metadata_json["version"], 4);
+    let stored_draft = yamantaka_domain::annotations::stored_note_draft::StoredNoteDraft {
+        document: "original".into(),
+        annotation: "stored-note".into(),
+        reference: false,
+        revision: serde_json::from_value(serde_json::json!(vec![0u8; 32])).unwrap(),
+        fingerprint: "fixture".into(),
+        page: 1,
+        rotation: 90,
+        passage: "Original passage 日本語".into(),
+        kind: yamantaka_domain::annotations::AnnotationKind::Underline,
+        color: yamantaka_domain::annotations::AnnotationColor::Rose,
+        review: yamantaka_domain::annotations::AnnotationReviewState::Accepted,
+        note: "  Unsaved edit\n日本語  ".into(),
+        tags: "Study, draft, ".into(),
+    };
+    let with_edits = with_metadata
+        .clone()
+        .with_annotation_edits(vec![stored_draft.clone()])
+        .unwrap();
+    yamantaka_storage::reader_continuity::save(&continuity_path, &with_edits).unwrap();
+    assert_eq!(
+        yamantaka_storage::reader_continuity::load(&continuity_path)
+            .unwrap()
+            .unwrap(),
+        with_edits
+    );
+    let edits_json: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&continuity_path).unwrap()).unwrap();
+    assert_eq!(edits_json["version"], 5);
+    assert_eq!(
+        edits_json["retainedExtension"],
+        current["retainedExtension"]
+    );
+    assert!(
+        context
+            .clone()
+            .with_annotation_edits(vec![stored_draft.clone(), stored_draft])
+            .is_err()
+    );
+    let mut removed_edits = with_edits;
+    removed_edits.forget_documents(&["original".into()]);
+    assert!(removed_edits.annotation_edits().is_empty());
+    let mut invalid_edits = edits_json;
+    invalid_edits["annotation_edits"][0]["revision"] = serde_json::json!([0]);
+    let invalid_edit_bytes = serde_json::to_vec(&invalid_edits).unwrap();
+    std::fs::write(&continuity_path, &invalid_edit_bytes).unwrap();
+    assert!(yamantaka_storage::reader_continuity::load(&continuity_path).is_err());
+    assert!(yamantaka_storage::reader_continuity::save(&continuity_path, &context).is_err());
+    assert_eq!(std::fs::read(&continuity_path).unwrap(), invalid_edit_bytes);
     assert_eq!(
         metadata_json["retainedExtension"],
         current["retainedExtension"]

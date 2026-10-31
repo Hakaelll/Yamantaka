@@ -1,19 +1,19 @@
-# Resume a reading comparison
+# Resume reading and unfinished edits
 
-Enable **Restore last session** in Settings to reopen your readings on the next ordinary startup. An active comparison returns after the main PDF opens, including its reference page, zoom, appearance, divider and following options.
+Enable **Restore last session** in Settings to reopen your readings on ordinary startup. An active comparison returns after the main PDF opens, including its reference page, zoom, appearance, divider and following options.
 
-If the reference PDF is missing, the main reading still opens. Yamantaka keeps the reference configuration so a later restart can recover it after the file becomes available. Closing the reference explicitly discards its saved comparison configuration. Removing a document from the library also removes its comparison context.
+If the reference PDF is missing, the main reading still opens. Yamantaka retains the reference configuration and unfinished work for later recovery. Closing a reference explicitly discards its comparison configuration. Removing a document from the library also removes its recovery context.
 
-Disable **Restore last session** to start without reopening the saved readings. Recovery after a graphics failure still attempts to return to the interrupted reading session; it does not enable the preference permanently.
+New page notes and edits to existing annotations persist locally as drafts. Matching annotation revisions reopen in the editor without saving. If an annotation changed or is unavailable, its recovered edit stays separate. **Copy draft** includes the complete draft even when the panel shows a shortened preview. **Retry recovery** checks the source again. **Discard draft** abandons that recovered edit without changing the annotation in the library.
 
-Passwords and rendered page images are never part of the saved session. A protected document may require its password again. Saved workspaces remain separate named reading arrangements.
+If an annotation changes while you are editing it, Save is blocked and your text stays in the editor. Reloading the list does not make an older editor current. Preserve any text you need before cancelling and reopening the annotation.
 
-See the [validation checkpoint](../validation/rust-comparison-continuity-2026-10-31.md) for the cases exercised and remaining acceptance work.
+Unfinished title and author corrections also persist locally. If the catalogue review changed, compare the recovered text with the current values and choose **Use recovered text** or **Keep current values**. Recovered text remains unsaved until you choose **Save changes**.
 
-When you close the window with an unsaved reading note or manual title/author correction, choose **Return to editing** to keep working. **Discard and close** abandons the open draft. An accepted save finishes before closing. New page-note drafts in either reader are also saved locally with the session. They reopen as unsaved notes when the matching document is available, including after checked graphics recovery. Missing-reference drafts stay retained. Selection annotations and edits to existing notes still lack persistent recovery. A forced exit can lose edits made since the last background snapshot.
+When closing the window with an unfinished note or metadata correction, **Return to editing** keeps the app open. **Discard and close** abandons the open draft. An accepted save finishes before closing.
 
-See [page-note recovery validation](../validation/rust-page-note-recovery-2026-10-31.md) for the supported draft fields and limits.
+Disable **Restore last session** to start without reopening saved readings or editors. Drafts stay retained until their matching reading or editor becomes available. Recovery after a graphics failure still attempts to return to the interrupted session without enabling that preference permanently.
 
-Unfinished title and author corrections also persist locally. With session restoration enabled, the metadata editor reopens. If the catalogue review changed, compare the recovered text with the current values and choose **Use recovered text** or **Keep current values**. Recovered text remains unsaved until you choose **Save changes**. See [metadata draft recovery](../validation/rust-metadata-draft-recovery-2026-10-31.md).
+Passwords and rendered page images are not part of the saved session. Protected PDFs may require their password again. Named workspaces remain separate reading arrangements. A forced exit can lose edits made since the last background snapshot. Drafts for new selection-based annotations still lack persistent recovery.
 
-If an existing annotation changes while you are editing it, Yamantaka keeps your unsaved text and blocks Save. Reloading the note list does not overwrite the newer note or make the older editor current. Preserve the text you need before cancelling and reopening the annotation. Existing-note drafts still lack persistent recovery. See [annotation edit revisions](../validation/rust-annotation-edit-revisions-2026-10-31.md).
+Executed cases and limits are recorded in [comparison continuity](../validation/rust-comparison-continuity-2026-10-31.md), [page-note drafts](../validation/rust-page-note-recovery-2026-10-31.md), [metadata drafts](../validation/rust-metadata-draft-recovery-2026-10-31.md), and [edits to existing notes](../validation/rust-stored-note-recovery-2026-10-31.md).

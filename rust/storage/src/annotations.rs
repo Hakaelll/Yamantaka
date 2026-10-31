@@ -353,6 +353,19 @@ fn read_page(
     AnnotationPage::from_reserved(entries, total, offset, page_lease)
 }
 impl AnnotationRepository for Database {
+    fn annotation_for_edit(
+        &self,
+        document: &str,
+        annotation: &str,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<Option<AnnotationRecord>> {
+        let tx = self.connection.unchecked_transaction().map_err(storage)?;
+        let record = read_one(&tx, document, annotation, governor, cancel)?;
+        cancel.check()?;
+        tx.commit().map_err(storage)?;
+        Ok(record)
+    }
     fn annotation_review_snapshot(
         &self,
         query: &AnnotationQuery,

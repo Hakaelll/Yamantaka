@@ -96,3 +96,5 @@ The [page-note recovery checkpoint](../validation/rust-page-note-recovery-2026-1
 The [metadata draft recovery checkpoint](../validation/rust-metadata-draft-recovery-2026-10-31.md) adds version-four continuity with raw title/author input, guarded revision matching and explicit review of changed-catalogue drafts. Selection drafts and existing-annotation edits remain pending.
 
 The [annotation edit revision checkpoint](../validation/rust-annotation-edit-revisions-2026-10-31.md) adds mandatory frozen revisions to individual note edits in both panes, transactional rejection of stale writes and retained in-memory editor text. Persistent recovery for existing-note and selection drafts remains pending.
+
+The [stored-note recovery checkpoint](../validation/rust-stored-note-recovery-2026-10-31.md) adds version-five continuity for edits to existing annotations in both panes. Matching revisions reopen the editor; conflicts remain separate without overwriting current data. New selection-based drafts still need persistent recovery.

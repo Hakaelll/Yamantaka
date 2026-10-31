@@ -2,7 +2,7 @@ use super::*;
 use yamantaka_domain::annotations::page_note_draft::PageNoteDraft;
 
 impl YamantakaApp {
-    pub(in crate::app) fn submit_page_note_recovery_preview(&mut self) -> bool {
+    pub(in crate::app) fn submit_annotation_recovery_preview(&mut self) -> bool {
         if self.reader.annotations.pending.is_some() {
             return false;
         }

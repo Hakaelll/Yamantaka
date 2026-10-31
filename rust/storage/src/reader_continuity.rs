@@ -49,6 +49,8 @@ struct Snapshot {
     page_notes: Vec<yamantaka_domain::annotations::page_note_draft::PageNoteDraft>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     metadata_drafts: Vec<yamantaka_domain::metadata_review::draft::MetadataDraft>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    annotation_edits: Vec<yamantaka_domain::annotations::stored_note_draft::StoredNoteDraft>,
     active: Option<String>,
     tabs: Vec<StoredTab>,
     closed: Vec<StoredTab>,
@@ -90,10 +92,11 @@ impl Snapshot {
     fn continuity(&self) -> Result<ReaderContinuity> {
         ReaderContinuity::new(self.model()?, self.comparison.clone())?
             .with_page_notes(self.page_notes.clone())?
-            .with_metadata_drafts(self.metadata_drafts.clone())
+            .with_metadata_drafts(self.metadata_drafts.clone())?
+            .with_annotation_edits(self.annotation_edits.clone())
     }
     fn model(&self) -> Result<DocumentTabs> {
-        if !matches!(self.version, 1..=4) {
+        if !matches!(self.version, 1..=5) {
             return Err(Failure::Invalid(
                 "Unsupported reader continuity version; original file is preserved".into(),
             ));
@@ -223,6 +226,7 @@ pub(crate) fn encode_workspace(model: &DocumentTabs) -> Result<Value> {
         comparison: None,
         page_notes: Vec::new(),
         metadata_drafts: Vec::new(),
+        annotation_edits: Vec::new(),
         active: model.active().map(|tab| tab.id().into()),
         tabs: model
             .tabs()
@@ -242,6 +246,7 @@ pub(crate) fn decode_workspace(value: Value) -> Result<DocumentTabs> {
         || snapshot.comparison.is_some()
         || !snapshot.page_notes.is_empty()
         || !snapshot.metadata_drafts.is_empty()
+        || !snapshot.annotation_edits.is_empty()
     {
         return Err(Failure::Invalid(
             "Unsupported workspace reading context; stored data is preserved".into(),
@@ -262,7 +267,11 @@ pub fn save(path: &Path, continuity: &ReaderContinuity) -> Result<()> {
         StoredTab::capture(tab, old)
     };
     let snapshot = Snapshot {
-        version: if !continuity.metadata_drafts().is_empty()
+        version: if !continuity.annotation_edits().is_empty()
+            || previous.as_ref().is_some_and(|old| old.version == 5)
+        {
+            5
+        } else if !continuity.metadata_drafts().is_empty()
             || previous.as_ref().is_some_and(|old| old.version == 4)
         {
             4
@@ -281,6 +290,7 @@ pub fn save(path: &Path, continuity: &ReaderContinuity) -> Result<()> {
         comparison: continuity.comparison().cloned(),
         page_notes: continuity.page_notes().to_vec(),
         metadata_drafts: continuity.metadata_drafts().to_vec(),
+        annotation_edits: continuity.annotation_edits().to_vec(),
         active: model.active().map(|tab| tab.id().into()),
         tabs: model.tabs().iter().map(&capture).collect(),
         closed: model.closed().iter().map(capture).collect(),

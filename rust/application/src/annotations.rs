@@ -5,7 +5,7 @@ use yamantaka_domain::{
         AnnotationColor, AnnotationDraft, AnnotationKind, AnnotationReviewState,
         repository::{
             AnnotationBatchChange, AnnotationChange, AnnotationPage, AnnotationQuery,
-            AnnotationRecord, AnnotationRepository, AnnotationTarget,
+            AnnotationRepository, AnnotationTarget,
         },
     },
     memory::MemoryGovernor,
@@ -24,9 +24,6 @@ pub enum AnnotationMutation {
         draft: Arc<AnnotationDraft>,
         confirm_page_note: bool,
         tags: Vec<String>,
-    },
-    Save {
-        record: Arc<AnnotationRecord>,
     },
     Remove {
         id: String,
@@ -75,7 +72,6 @@ impl AnnotationMutation {
                 confirm_page_note: *confirm_page_note,
                 tags,
             },
-            Self::Save { record } => AnnotationChange::Save { record },
             Self::Remove { id } => AnnotationChange::Remove { id },
             Self::Edit {
                 id,

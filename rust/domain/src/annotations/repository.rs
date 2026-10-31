@@ -226,6 +226,17 @@ pub enum AnnotationBatchChange<'a> {
     },
 }
 pub trait AnnotationRepository {
+    fn annotation_for_edit(
+        &self,
+        _document: &str,
+        _annotation: &str,
+        _governor: &MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<Option<AnnotationRecord>> {
+        Err(Failure::Unsupported(
+            "Reading an annotation editor source".into(),
+        ))
+    }
     /// Captures one filtered review page and its document metadata in one read transaction.
     fn annotation_review_snapshot(
         &self,
