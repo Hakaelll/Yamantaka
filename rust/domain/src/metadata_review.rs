@@ -1,5 +1,6 @@
 use crate::source_revision::CataloguedFile;
 use crate::{Document, Failure, Result};
+pub mod draft;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetadataField {

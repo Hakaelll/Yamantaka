@@ -9,6 +9,7 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='continuity-metadata-draft'; args=@('--reader','--metadata-review','--graphics-fail-runtime','--graphics-metadata-draft','--light','--es') },
     @{ name='continuity-page-notes'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--graphics-page-note-drafts','--light','--es') },
     @{ name='continuity-page-notes-saved'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--graphics-page-note-drafts','--graphics-save-page-note','--es') },
     @{ name='close-review-note'; args=@('--reader','--page-note','--close-review','--es') },
@@ -500,6 +501,13 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -eq 'continuity-metadata-draft') {
+        $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $controls.graphicsRuntimeFallback -or $controls.metadataDraftRecovery.retained -ne 0 -or -not $controls.metadataDraftRecovery.active) { throw 'Metadata draft did not restore after graphics recovery.' }
+        foreach ($field in @('document','revision','title','author')) {
+            if ($expected.metadataDraft.active.$field -cne $controls.metadataDraftRecovery.active.$field) { throw "Recovered metadata draft changed: $field" }
+        }
+    }
     if ($case.name -like 'continuity-page-notes*') {
         $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
         if (-not $controls.graphicsRuntimeFallback -or $controls.pageNoteRecovery.retained -ne 0) { throw 'Page-note drafts did not restore after graphics recovery.' }

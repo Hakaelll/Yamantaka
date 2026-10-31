@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "executableSha256": "0915F72AE6F5DFD217515A5F6E05534F79746DC1553AA8592F70E6B98060373B",
+  "sourceUnchanged": true,
+  "cases": [
+    {
+      "mode": "normal",
+      "passed": true,
+      "artifacts": {
+        "continuity-restart-normal.png": "548D373953F6C99499751D5CED5098B5BD7485EA90F399C35494F53CAE07878B",
+        "continuity-restart-normal.controls.json": "E509597A1060323D2E6B1CC22ED799F8E4B8ABEAD4EE1D0730B82AE20796C98A"
+      }
+    },
+    {
+      "mode": "changed",
+      "passed": true,
+      "artifacts": {
+        "continuity-restart-changed.png": "851783FFBC5C17B5945CAD704422EBAA49EFDD80C2D48CD232270F1D96AFB5A1",
+        "continuity-restart-changed.controls.json": "5233359E1915CB67AA149AD5284C6F9CD23099CFE2EDB7A1C33D4198800E9C54"
+      }
+    },
+    {
+      "mode": "disabled",
+      "passed": true,
+      "artifacts": {
+        "continuity-restart-disabled.png": "E3C3061708DEA8A8FCA4502E22E6395FC259603E22D0C9C8F200FD5B24DE7090",
+        "continuity-restart-disabled.controls.json": "77BFDFFACAFB76A8BA1A7B232769A828BAF8616F9107282C7421EB9FD7714B0B"
+      }
+    }
+  ]
+}

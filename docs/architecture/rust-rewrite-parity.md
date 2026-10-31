@@ -92,3 +92,5 @@ The [atomic comparison continuity checkpoint](../validation/rust-comparison-cont
 The [editor close checkpoint](../validation/rust-editor-close-2026-10-31.md) protects unsaved reader notes in either pane and manual metadata corrections during ordinary window close. Persistent draft recovery after a crash or graphics fault remains pending.
 
 The [page-note recovery checkpoint](../validation/rust-page-note-recovery-2026-10-31.md) adds atomic draft persistence for new page notes in both readers, with retained missing-reference/restore-disabled context and accepted-write reconciliation. Selection drafts, existing-note edits and other editors still require persistent recovery.
+
+The [metadata draft recovery checkpoint](../validation/rust-metadata-draft-recovery-2026-10-31.md) adds version-four continuity with raw title/author input, guarded revision matching and explicit review of changed-catalogue drafts. Selection drafts and existing-annotation edits remain pending.

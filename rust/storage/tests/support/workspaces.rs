@@ -310,6 +310,49 @@ pub fn preserved_split_references(document: &str) {
     let draft_bytes = std::fs::read(&continuity_path).unwrap();
     let draft_json: serde_json::Value = serde_json::from_slice(&draft_bytes).unwrap();
     assert_eq!(draft_json["version"], 3);
+    let metadata_draft = yamantaka_domain::metadata_review::draft::MetadataDraft {
+        document: "original".into(),
+        revision: "a".repeat(64),
+        title: "  Unfinished title 日本語  ".into(),
+        author: "Author\nDraft ".into(),
+    };
+    let with_metadata = with_draft
+        .clone()
+        .with_metadata_drafts(vec![metadata_draft.clone()])
+        .unwrap();
+    yamantaka_storage::reader_continuity::save(&continuity_path, &with_metadata).unwrap();
+    assert_eq!(
+        yamantaka_storage::reader_continuity::load(&continuity_path)
+            .unwrap()
+            .unwrap(),
+        with_metadata
+    );
+    let metadata_json: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&continuity_path).unwrap()).unwrap();
+    assert_eq!(metadata_json["version"], 4);
+    assert_eq!(
+        metadata_json["retainedExtension"],
+        current["retainedExtension"]
+    );
+    assert!(
+        context
+            .clone()
+            .with_metadata_drafts(vec![metadata_draft.clone(), metadata_draft])
+            .is_err()
+    );
+    let mut removed_metadata = with_metadata;
+    removed_metadata.forget_documents(&["original".into()]);
+    assert!(removed_metadata.metadata_drafts().is_empty());
+    let mut invalid_metadata = metadata_json;
+    invalid_metadata["metadata_drafts"][0]["revision"] = "invalid".into();
+    let invalid_metadata_bytes = serde_json::to_vec(&invalid_metadata).unwrap();
+    std::fs::write(&continuity_path, &invalid_metadata_bytes).unwrap();
+    assert!(yamantaka_storage::reader_continuity::load(&continuity_path).is_err());
+    assert!(yamantaka_storage::reader_continuity::save(&continuity_path, &context).is_err());
+    assert_eq!(
+        std::fs::read(&continuity_path).unwrap(),
+        invalid_metadata_bytes
+    );
     assert_eq!(
         draft_json["retainedExtension"],
         current["retainedExtension"]

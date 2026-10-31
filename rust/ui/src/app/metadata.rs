@@ -1,6 +1,7 @@
 use super::*;
 mod form;
 mod panel;
+mod recovery;
 mod reference;
 mod view;
 use reference::MetadataReference;
@@ -22,6 +23,7 @@ pub(super) struct MetadataEditor {
     analyzing: bool,
     analyzed: bool,
     source_opened: bool,
+    recovery: Option<yamantaka_domain::metadata_review::draft::MetadataDraft>,
 }
 impl Drop for MetadataEditor {
     fn drop(&mut self) {
@@ -35,7 +37,7 @@ impl Drop for MetadataEditor {
 }
 impl MetadataEditor {
     pub(in crate::app) fn unsaved(&self) -> bool {
-        self.snapshot.is_some() && !self.clean_draft()
+        self.recovery.is_some() || self.snapshot.is_some() && !self.clean_draft()
     }
     pub(in crate::app) fn writing(&self) -> bool {
         self.pending.as_ref().is_some_and(|(_, writing)| *writing)
@@ -44,9 +46,11 @@ impl MetadataEditor {
         self.title = "Unsaved study title".into();
     }
     fn clean_draft(&self) -> bool {
-        self.snapshot
-            .as_ref()
-            .is_some_and(|s| self.title == s.title && self.author == s.author)
+        self.recovery.is_none()
+            && self
+                .snapshot
+                .as_ref()
+                .is_some_and(|s| self.title == s.title && self.author == s.author)
     }
     fn reanalyze(&mut self) -> Option<(Box<MetadataReview>, Cancellation)> {
         if self.pending.is_some()
@@ -93,7 +97,7 @@ impl MetadataEditor {
         }
     }
     fn apply(&mut self, mutation: MetadataMutation) -> Option<MetadataRequest> {
-        if self.pending.is_some() || self.source_pending.is_some() {
+        if self.recovery.is_some() || self.pending.is_some() || self.source_pending.is_some() {
             return None;
         }
         let expected = self.snapshot.clone()?;
@@ -294,6 +298,15 @@ impl YamantakaApp {
         if self.library_selection.removing_document(&document.id) {
             return;
         }
+        if let Some(draft) = self
+            .metadata
+            .as_ref()
+            .and_then(MetadataEditor::recovery_draft)
+            && let Err(error) = self.retain_metadata_draft(draft)
+        {
+            self.error = Some(error.to_string());
+            return;
+        }
         let mut editor = MetadataEditor {
             title: document.display_title().into(),
             author: document.author.clone().unwrap_or_default(),
@@ -308,6 +321,7 @@ impl YamantakaApp {
             analyzing: false,
             analyzed: false,
             source_opened: false,
+            recovery: None,
         };
         let request = editor.read();
         self.metadata = Some(editor);

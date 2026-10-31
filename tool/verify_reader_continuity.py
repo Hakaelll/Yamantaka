@@ -51,11 +51,12 @@ def main():
     assert source.parent == captures
     expected = read(output / f"{args.source_case}.expected-comparison.json")
     comparison = expected["comparison"]
-    assert expected["synthetic"] and comparison["primary"] != comparison["document"]
+    metadata = expected.get("metadataDraft", {}).get("active")
+    assert expected["synthetic"] and (metadata or comparison["primary"] != comparison["document"])
     files = ("export-preview.sqlite3", "preferences.json", "export-preview.reader-continuity.json")
     before = {name: digest(source / name) for name in files}
     results = []
-    for mode in ("normal", "missing", "disabled"):
+    for mode in (("normal", "changed", "disabled") if metadata else ("normal", "missing", "disabled")):
         fixture = captures / f"continuity-{uuid.uuid4()}"
         fixture.mkdir()
         with sqlite3.connect(f"file:{(source / files[0]).as_posix()}?mode=ro", uri=True) as original:
@@ -63,6 +64,9 @@ def main():
                 original.backup(copy)
                 if mode == "missing":
                     changed = copy.execute("UPDATE documents SET is_missing=1 WHERE id=?", (comparison["document"],))
+                    assert changed.rowcount == 1
+                if mode == "changed":
+                    changed = copy.execute("UPDATE documents SET title_override=? WHERE id=?", ("Another catalogue title",metadata["document"]))
                     assert changed.rowcount == 1
         for name in files[1:]:
             shutil.copyfile(source / name, fixture / name)
@@ -97,13 +101,26 @@ def main():
             assert actual["currentReaderPage"] == expected["primaryPage"]
             active = next(tab for tab in actual["readerTabs"]["tabs"] if tab["id"] == actual["readerTabs"]["active"])
             assert abs(active["zoom"] - expected["primaryZoom"]) < 0.00001
-            if mode == "normal":
+            if not comparison:
+                assert actual["reference"] is None
+            elif mode == "normal":
                 same_comparison(comparison, continuity["comparison"])
                 assert continuity["retainedComparison"] is None and actual["reference"]["images"] > 0
             else:
                 assert actual["reference"] is None
                 same_comparison(comparison, continuity["retainedComparison"])
                 same_comparison(comparison, read(fixture / files[2])["comparison"])
+        if metadata:
+            recovered = actual["metadataDraftRecovery"]
+            assert recovered["active"] == (None if mode == "disabled" else metadata)
+            assert recovered["retained"] == (1 if mode == "disabled" else 0)
+            assert read(fixture / files[2])["metadata_drafts"] == [metadata]
+            if mode == "normal":
+                assert actual["metadataReview"]["title"] == metadata["title"]
+            elif mode == "changed":
+                assert actual["metadataReview"]["title"] == "Another catalogue title"
+                assert any(control["label"] == "Conservar valores actuales" for control in actual["controls"])
+                assert not any(control["label"] == "Guardar cambios" and control["enabled"] for control in actual["controls"])
         notes = expected.get("pageNotes", {})
         if notes.get("primary") and notes.get("reference"):
             recovered = actual["pageNoteRecovery"]

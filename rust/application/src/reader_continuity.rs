@@ -18,6 +18,7 @@ pub struct ContinuityReply {
     pub result: Result<Option<ReaderContinuity>>,
     pub cancel: Cancellation,
     pub reference_document: Option<yamantaka_domain::Document>,
+    pub metadata_document: Option<yamantaka_domain::Document>,
 }
 #[derive(Default)]
 pub(crate) struct ContinuityWriter {
@@ -75,11 +76,26 @@ impl ContinuityWriter {
                 None
             }
         };
+        let metadata_document = result
+            .as_ref()
+            .ok()
+            .and_then(|saved| saved.as_ref())
+            .and_then(|saved| saved.metadata_drafts().last())
+            .map(|draft| repository.get(&draft.document))
+            .transpose();
+        let metadata_document = match metadata_document {
+            Ok(document) => document.flatten(),
+            Err(error) => {
+                result = Err(error);
+                None
+            }
+        };
         ContinuityReply {
             revision,
             result,
             cancel: request.cancel,
             reference_document,
+            metadata_document,
         }
     }
 }

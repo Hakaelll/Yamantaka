@@ -3,6 +3,15 @@ use yamantaka_domain::reader_preferences::PageRotation;
 
 impl YamantakaApp {
     pub(super) fn advance_graphics_loss_preview(&mut self, ctx: &egui::Context) -> bool {
+        let metadata_draft = std::env::args_os().any(|arg| arg == "--graphics-metadata-draft");
+        if metadata_draft
+            && !self
+                .metadata
+                .as_ref()
+                .is_some_and(metadata::MetadataEditor::capture_ready)
+        {
+            return false;
+        }
         if self.preview_device_loss.is_none()
             || self.reader.loading
             || self
@@ -35,6 +44,9 @@ impl YamantakaApp {
         }
         if !self.device_loss_configured {
             self.device_loss_configured = true;
+            if metadata_draft {
+                self.metadata.as_mut().unwrap().preview_unsaved_title();
+            }
             if self.reference.is_some() {
                 self.set_reader_zoom(1.25);
                 let direction = self.reading_direction();
@@ -91,7 +103,7 @@ impl YamantakaApp {
         if save_primary && !self.submit_page_note_recovery_preview() {
             return false;
         }
-        let expected = serde_json::json!({"synthetic":true,"comparison":self.capture_comparison(),"primaryPage":self.reader.page,"primaryZoom":self.reader.zoom,"pageNotes":self.page_note_recovery_summary(),"savedPrimaryNote":save_primary});
+        let expected = serde_json::json!({"synthetic":true,"comparison":self.capture_comparison(),"primaryPage":self.reader.page,"primaryZoom":self.reader.zoom,"pageNotes":self.page_note_recovery_summary(),"savedPrimaryNote":save_primary,"metadataDraft":self.metadata_draft_summary()});
         let path = self
             .capture
             .as_ref()

@@ -51,7 +51,10 @@ impl Drop for MetadataReference {
 
 impl MetadataEditor {
     pub(super) fn ready(&self) -> bool {
-        self.snapshot.is_some() && self.pending.is_none() && self.source_pending.is_none()
+        self.recovery.is_none()
+            && self.snapshot.is_some()
+            && self.pending.is_none()
+            && self.source_pending.is_none()
     }
     pub(super) fn source_request(&mut self, field: MetadataField) -> Option<MetadataSourceRequest> {
         if !self.ready() || !self.clean_draft() || self.document.missing || self.error.is_some() {

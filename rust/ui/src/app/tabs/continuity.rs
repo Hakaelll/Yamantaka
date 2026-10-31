@@ -18,6 +18,8 @@ pub(in crate::app) struct ContinuityState {
     retained_comparison: Option<WorkspaceComparison>,
     restoring_comparison: bool,
     retained_page_notes: Vec<yamantaka_domain::annotations::page_note_draft::PageNoteDraft>,
+    retained_metadata: Vec<yamantaka_domain::metadata_review::draft::MetadataDraft>,
+    metadata_startup: Option<Document>,
     pending: Option<(u64, ReaderContinuity, Cancellation)>,
     due: Option<Instant>,
 }
@@ -26,6 +28,19 @@ impl YamantakaApp {
         serde_json::json!({"loaded":self.tabs.continuity.loaded,"restoring":self.tabs.continuity.restoring_comparison,"retainedComparison":self.tabs.continuity.retained_comparison,"comparison":self.capture_comparison()})
     }
     pub(in crate::app) fn forget_continuity_documents(&mut self, ids: &[String]) {
+        self.tabs
+            .continuity
+            .retained_metadata
+            .retain(|draft| !ids.contains(&draft.document));
+        if self
+            .tabs
+            .continuity
+            .metadata_startup
+            .as_ref()
+            .is_some_and(|doc| ids.contains(&doc.id))
+        {
+            self.tabs.continuity.metadata_startup = None;
+        }
         self.tabs
             .continuity
             .retained_page_notes
@@ -67,11 +82,64 @@ impl YamantakaApp {
             drafts.retain(|old| old.document != draft.document || old.reference != draft.reference);
             drafts.push(draft);
         }
+        let mut metadata = self.tabs.continuity.retained_metadata.clone();
+        if let Some(draft) = self
+            .metadata
+            .as_ref()
+            .and_then(metadata::MetadataEditor::recovery_draft)
+        {
+            metadata.retain(|old| old.document != draft.document);
+            metadata.push(draft);
+        }
         ReaderContinuity::new(
             self.tabs.model.clone(),
             saved.or_else(|| self.capture_comparison()),
         )?
-        .with_page_notes(drafts)
+        .with_page_notes(drafts)?
+        .with_metadata_drafts(metadata)
+    }
+    pub(in crate::app) fn retain_metadata_draft(
+        &mut self,
+        draft: yamantaka_domain::metadata_review::draft::MetadataDraft,
+    ) -> Result<()> {
+        let mut drafts = self.tabs.continuity.retained_metadata.clone();
+        drafts.retain(|old| old.document != draft.document);
+        drafts.push(draft);
+        let checked = ReaderContinuity::default().with_metadata_drafts(drafts)?;
+        self.tabs.continuity.retained_metadata = checked.metadata_drafts().to_vec();
+        Ok(())
+    }
+    fn restore_metadata_drafts(&mut self) {
+        if self.opening.busy() || self.tabs.busy() || self.reader.reader_preferences_loading {
+            return;
+        }
+        if self.metadata.is_none()
+            && let Some(document) = self.tabs.continuity.metadata_startup.take()
+        {
+            self.begin_metadata_editor(document);
+            self.show_surface(Surface::Library);
+        }
+        let Some(editor) = self
+            .metadata
+            .as_mut()
+            .filter(|editor| editor.capture_ready())
+        else {
+            return;
+        };
+        if let Some(index) = self
+            .tabs
+            .continuity
+            .retained_metadata
+            .iter()
+            .position(|draft| editor.is_document(&draft.document))
+        {
+            let draft = self.tabs.continuity.retained_metadata.remove(index);
+            editor.restore_draft(draft);
+            self.tabs.continuity.metadata_startup = None;
+        }
+    }
+    pub(in crate::app) fn metadata_draft_summary(&self) -> serde_json::Value {
+        serde_json::json!({"retained":self.tabs.continuity.retained_metadata.len(),"active":self.metadata.as_ref().and_then(metadata::MetadataEditor::recovery_draft)})
     }
     fn restore_page_note_drafts(&mut self) {
         let mut remaining = Vec::new();
@@ -195,15 +263,22 @@ impl YamantakaApp {
                 return;
             }
         };
-        if (!restored.tabs().tabs().is_empty() || !restored.tabs().closed().is_empty())
+        if (!restored.tabs().tabs().is_empty()
+            || !restored.tabs().closed().is_empty()
+            || !restored.metadata_drafts().is_empty())
             && (self.reader.active.is_some()
                 || self.opening.busy()
-                || !self.tabs.model.tabs().is_empty())
+                || !self.tabs.model.tabs().is_empty()
+                || self
+                    .metadata
+                    .as_ref()
+                    .is_some_and(metadata::MetadataEditor::unsaved))
         {
             self.error = Some(self.tr("La lectura actual tiene prioridad. La sesión anterior se conserva para su recuperación.", "The current reading takes priority. The previous session is preserved for recovery.").into());
             return;
         }
         self.tabs.continuity.retained_page_notes = restored.page_notes().to_vec();
+        self.tabs.continuity.retained_metadata = restored.metadata_drafts().to_vec();
         let restore = crate::graphics_recovery::runtime_fallback()
             || self
                 .preferences
@@ -211,6 +286,7 @@ impl YamantakaApp {
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(true);
         if restore {
+            self.tabs.continuity.metadata_startup = reply.metadata_document;
             self.tabs.model = restored.tabs().clone();
             self.tabs.continuity.retained_comparison = restored.comparison().cloned();
         } else if let Err(error) =
@@ -250,6 +326,7 @@ impl YamantakaApp {
             return;
         }
         self.restore_page_note_drafts();
+        self.restore_metadata_drafts();
         self.sync_tab_context();
         if self
             .tabs

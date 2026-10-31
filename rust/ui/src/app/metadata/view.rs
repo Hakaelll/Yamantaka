@@ -61,6 +61,7 @@ impl YamantakaApp {
                             });
                         });
                         ui.add_space(if compact { 14.0 } else { 24.0 });
+                        editor.recovery_panel(ui, p, self.english);
                         if ui.available_width() >= 1040.0 {
                             let left = (ui.available_width() - 344.0).max(340.0);
                             ui.horizontal_top(|ui| {
@@ -100,6 +101,13 @@ impl YamantakaApp {
             });
         actions.close |= !writing && ui.input(|input| input.key_pressed(egui::Key::Escape));
         if actions.close {
+            if let Some(draft) = editor.recovery_draft()
+                && let Err(error) = self.retain_metadata_draft(draft)
+            {
+                self.error = Some(error.to_string());
+                self.metadata = Some(editor);
+                return;
+            }
             drop(editor);
             self.runtime.wake();
             return;

@@ -1177,7 +1177,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--cover-capacity-retry") {
                     app.preview_cover_capacity();
                 }
-                if args.iter().any(|arg| arg == "--metadata-review") {
+                if !graphics_recovery::continuity_resume()
+                    && args.iter().any(|arg| arg == "--metadata-review")
+                {
                     app.preview_metadata(
                         if args.iter().any(|arg| arg == "--metadata-source-stale") {
                             "source-stale"
