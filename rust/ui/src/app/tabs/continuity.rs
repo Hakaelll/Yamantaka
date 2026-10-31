@@ -114,7 +114,7 @@ impl YamantakaApp {
             && !self.tabs.continuity.overridden
             && let Some(id) = self.tabs.model.active().map(|tab| tab.id().to_owned())
         {
-            self.select_reader_tab(&id);
+            self.restore_reader_tab(&id);
         }
     }
     pub(in crate::app) fn pump_reader_continuity(&mut self, ctx: &egui::Context) {

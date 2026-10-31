@@ -32,6 +32,7 @@ pub mod pdf_pages;
 pub mod pdf_text;
 pub mod pdf_ticket;
 pub use password::PdfPassword;
+pub mod quarantine;
 pub mod reader;
 pub mod reader_destination;
 pub mod reader_layout;

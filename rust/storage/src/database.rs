@@ -168,6 +168,9 @@ pub(crate) fn migrate(connection: &mut Connection, target: u32) -> Result<()> {
     if target >= 2 {
         tx.execute_batch("CREATE INDEX IF NOT EXISTS idx_rust_collection_documents_document ON collection_documents(document_id,collection_id); CREATE INDEX IF NOT EXISTS idx_rust_document_tags_tag ON document_tags(tag_id,document_id); CREATE INDEX IF NOT EXISTS idx_rust_annotation_tags_tag ON annotation_tags(tag_id,annotation_id); CREATE INDEX IF NOT EXISTS idx_rust_tags_name ON tags(name COLLATE NOCASE,id);").map_err(storage)?;
     }
+    if target >= 11 {
+        tx.execute_batch("CREATE INDEX IF NOT EXISTS idx_rust_documents_quarantine ON documents(last_opened_at DESC,id) WHERE restore_blocked=1;").map_err(storage)?;
+    }
     validate(&tx)?;
     tx.commit().map_err(storage)
 }

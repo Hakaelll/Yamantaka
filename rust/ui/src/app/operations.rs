@@ -183,6 +183,17 @@ impl YamantakaApp {
         });
     }
     pub(super) fn operation_actions(&mut self, ui: &mut egui::Ui, p: Palette) {
+        if theme::navigation(
+            ui,
+            self.tr("Recuperación de documentos", "Document recovery"),
+            false,
+            p,
+        )
+        .clicked()
+        {
+            self.show_quarantine();
+            ui.close();
+        }
         if self.startup_mode.is_safe()
             && theme::navigation(ui, self.tr("Modo seguro", "Safe mode"), true, p).clicked()
         {

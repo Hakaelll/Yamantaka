@@ -39,6 +39,7 @@ mod opening;
 mod operations;
 mod outline;
 mod password;
+mod quarantine;
 mod reader_controls;
 mod reader_destination;
 mod reader_options;
@@ -126,6 +127,7 @@ impl PageImage {
 pub struct YamantakaApp {
     startup_mode: yamantaka_domain::startup::StartupMode,
     safe_notice: bool,
+    quarantine: quarantine::QuarantineState,
     shortcut_bindings: shortcuts::bindings::Bindings,
     shortcut_error: Option<String>,
     reader: reader_pane::ReaderPane,
@@ -347,6 +349,7 @@ impl YamantakaApp {
         let mut app = Self {
             startup_mode,
             safe_notice: startup_mode.is_safe(),
+            quarantine: Default::default(),
             reader: Default::default(),
             reading_focus: Default::default(),
             reference_shortcuts_preview: Default::default(),
@@ -1489,6 +1492,7 @@ impl App for YamantakaApp {
 
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
         self.guard_workspace_close(ctx);
+        self.guard_quarantine_close(ctx);
         self.update_restore(ctx);
         if self.backup_restore.busy() && ctx.input(|input| input.viewport().close_requested()) {
             self.backup_restore.close_after = true;
@@ -1557,6 +1561,7 @@ impl App for YamantakaApp {
         }
         while let Ok(update) = self.runtime.updates.try_recv() {
             match update {
+                Update::Quarantine(reply) => self.accept_quarantine(ctx, reply),
                 Update::PendingImports(result) => self.importing.accept_recovery(result),
                 Update::SelectionOrganized(reply) => self.accept_library_bulk(ctx, *reply),
                 Update::LibraryChecked(reply) => {
@@ -1719,6 +1724,20 @@ impl App for YamantakaApp {
                 }
                 Update::Opened(document, info, cancel) => {
                     if self.accept_reference_opened(&document, &info, &cancel) {
+                        if !cancel.is_cancelled()
+                            && self.reference.as_ref().is_some_and(|reference| {
+                                reference
+                                    .pane
+                                    .active
+                                    .as_ref()
+                                    .is_some_and(|(active, _)| active.id == document.id)
+                            })
+                        {
+                            self.record_reader_health(
+                                &document,
+                                yamantaka_domain::quarantine::ReaderHealth::Opened,
+                            );
+                        }
                         continue;
                     }
                     let editing = self.reader.annotations.editing()
@@ -1789,6 +1808,10 @@ impl App for YamantakaApp {
                         self.open_confirmation = Some((document.id.clone(), cancel));
                         continue;
                     };
+                    self.record_reader_health(
+                        &document,
+                        yamantaka_domain::quarantine::ReaderHealth::Opened,
+                    );
                     self.sync_tab_context();
                     self.tabs
                         .accept_open(&document.id, &cancel, preferences_cancel.clone());
@@ -1913,6 +1936,9 @@ impl App for YamantakaApp {
                 }
                 Update::OpenFailed(document, error, cancel) => {
                     if self.accept_reference_failure(&document, &cancel, &error) {
+                        if !cancel.is_cancelled() {
+                            self.record_reader_failure(&document, &error);
+                        }
                         continue;
                     }
                     let cancelled = cancel.is_cancelled();
@@ -1920,6 +1946,9 @@ impl App for YamantakaApp {
                         && self.open_intent.wants_reader();
                     if !self.opening.fail(&document.id, &cancel, password) {
                         continue;
+                    }
+                    if !cancelled {
+                        self.record_reader_failure(&document, &error);
                     }
                     self.reader.loading = false;
                     if !password || cancelled {
@@ -2283,6 +2312,8 @@ impl App for YamantakaApp {
         self.poll_search(&ctx);
         let shortcut_modal = self.command_palette.open
             || self.safe_notice
+            || self.quarantine.open
+            || self.quarantine.closing()
             || self.diagnostics.open
             || self.page_jump.is_some()
             || self.password.is_some()
@@ -2375,6 +2406,7 @@ impl App for YamantakaApp {
         self.advance_relations_preview();
         self.advance_reference_shortcuts(&ctx);
         self.advance_palette_preview(&ctx);
+        self.advance_quarantine_preview();
         self.advance_comparison_selection(&ctx);
         self.apply_annotation_preview();
         self.advance_reference_marks();
@@ -2519,6 +2551,7 @@ impl App for YamantakaApp {
         self.command_palette_dialog(&ctx);
         self.diagnostics_dialog(&ctx);
         self.safe_mode_dialog(&ctx);
+        self.quarantine_dialog(&ctx);
         self.page_jump_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
@@ -2589,6 +2622,7 @@ impl App for YamantakaApp {
                     && self.legacy_import.ready()
                     && self.backups.ready()
                     && self.diagnostics.ready()
+                    && self.quarantine.ready()
                     && self.backup_restore.ready()
                     && self.file_check.ready()
                     && self.library_check.ready()
@@ -2741,6 +2775,7 @@ impl App for YamantakaApp {
                     record["diagnostics"]=self.diagnostics.summary();
                     record["startupMode"] = serde_json::to_value(self.startup_mode).unwrap();
                     record["safeStartup"] = self.safe_summary();
+                    record["quarantine"] = self.quarantine.summary();
                     record["annotationHistoryPhase"]=self.command_palette_preview.history_phase().into();
                     record["readerControls"]=serde_json::json!({"chromeHidden":self.reader_chrome_hidden,"immersive":self.reader_focus,"pageJump":self.page_jump.is_some(),"primaryPanel":self.reader.panel});
                     record["shortcutBindings"]=self.shortcut_bindings.summary();

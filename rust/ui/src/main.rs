@@ -452,6 +452,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-notes") {
             db.execute_batch("INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) VALUES('source-note-a','demo-0',0,'pageComment','violet','Source note A','[]',0,'synthetic','attached','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z','pending'),('source-note-b','demo-0',1,'pageComment','violet','Source note B','[]',0,'synthetic','attached','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z','pending');")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--quarantine") {
+            db.execute_batch("UPDATE documents SET restore_blocked=1,last_failure_code='inheritedUnknownFailure' WHERE id IN ('demo-0','demo-1')")?;
+            std::fs::create_dir_all(&store)?;
+            let path = store.join("quarantine-broken.pdf");
+            std::fs::write(&path, b"This is not a valid PDF.")?;
+            db.execute_batch(&format!(
+                "UPDATE documents SET path='{}' WHERE id='demo-2'",
+                path.to_string_lossy().replace('\'', "''")
+            ))?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--reference-note-bulk") {
             db.execute_batch("WITH RECURSIVE notes(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM notes WHERE n<81) INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state) SELECT printf('reference-bulk-%03d',n),'demo-1',n%2,'pageComment','violet',printf('Reference bulk note %03d',n),'[]',0,'synthetic','attached','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z','pending' FROM notes; INSERT INTO tags(id,name,normalized_name,color,created_at,updated_at) VALUES('reference-existing-tag','Existing study','existing study','blue','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z'); INSERT INTO annotation_tags(annotation_id,tag_id) SELECT id,'reference-existing-tag' FROM annotations WHERE document_id='demo-1';")?;
         }
@@ -1165,6 +1175,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--privacy") {
                     app.preview_privacy(&cc.egui_ctx);
+                }
+                if args.iter().any(|arg| arg == "--quarantine") {
+                    app.preview_quarantine(
+                        if args.iter().any(|arg| arg == "--quarantine-review") {
+                            1
+                        } else if args.iter().any(|arg| arg == "--quarantine-release") {
+                            2
+                        } else if args.iter().any(|arg| arg == "--quarantine-retry") {
+                            3
+                        } else if args.iter().any(|arg| arg == "--quarantine-auto") {
+                            4
+                        } else if args.iter().any(|arg| arg == "--quarantine-failure") {
+                            5
+                        } else {
+                            0
+                        },
+                    );
                 }
                 if args.iter().any(|arg| arg == "--diagnostics") {
                     app.preview_diagnostics(

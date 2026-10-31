@@ -53,6 +53,8 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    Quarantine(Box<crate::quarantine::Request>),
+    GetRestorableDocument(String, Cancellation),
     RemoveFromLibrary(Box<crate::library_removal::RemovalRequest>),
     RegenerateCovers(Box<crate::cover_regeneration::RegenerationRequest>),
     BulkSelection(Box<crate::library_bulk::BulkRequest>),
@@ -175,6 +177,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    Quarantine(crate::quarantine::Reply),
     /// Some contains the committed protection set; None means a stale request.
     OpenConfirmed {
         document: String,
@@ -932,6 +935,7 @@ fn advance_import<E: AsyncPdfEngine>(
 impl Runtime {
     pub fn start<
         R: LibraryRepository
+            + yamantaka_domain::quarantine::QuarantineRepository
             + SearchRepository
             + BookmarkRepository
             + AnnotationRepository
@@ -1254,6 +1258,17 @@ impl Runtime {
                                         }
                                     }
                                 }
+                                Action::GetRestorableDocument(id, cancel) => {
+                                    let result = repository.automatic_restore_allowed(&id, &cancel).and_then(|allowed| {
+                                        if !allowed { return Err(Failure::Invalid("Automatic restoration is blocked. Review the document in Recovery.".into())); }
+                                        repository.get(&id)
+                                    });
+                                    match result {
+                                        Ok(document) => emit(&events, &notify, Update::Document(id,document,cancel),permit),
+                                        Err(error) => failed(&events,&notify,error,Some(cancel),permit),
+                                    }
+                                }
+                                Action::Quarantine(request) => emit(&events,&notify,Update::Quarantine(request.execute(&mut repository)),permit),
                                 Action::IndexState(id, cancel) => {
                                     let result = cancel
                                         .check()
@@ -1535,7 +1550,12 @@ impl Runtime {
                                 }
                                 Action::SaveManualCover(request) => emit(&events,&notify,Update::ManualCover(request.execute(&mut repository)),permit),
                                 Action::PreviewCover(source,page,generation,cancel) => covers.push((CoverJob::preview(source,page,generation,cancel),permit)),
-                                Action::Cover(source,generation,cancel) => covers.push((CoverJob::library(source,generation,cancel),permit)),
+                                Action::Cover(source,generation,cancel) => {
+                                    match repository.automatic_restore_allowed(source.id(),&cancel) {
+                                        Ok(true) => covers.push((CoverJob::library(source,generation,cancel),permit)),
+                                        result => { let error = result.err().unwrap_or_else(||Failure::Invalid("Automatic covers are blocked for this document".into())); emit(&events,&notify,Update::Cover(source.id().into(),Err(error),cancel),permit); }
+                                    }
+                                },
                                 Action::Render(key, priority, cancel) => {
                                     let document=key.document_id.clone();
                                     match engine.try_render(key, priority, cancel.clone())

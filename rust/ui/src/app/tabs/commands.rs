@@ -56,14 +56,26 @@ impl YamantakaApp {
         });
     }
     pub(in crate::app) fn select_reader_tab(&mut self, id: &str) -> bool {
+        self.select_tab_policy(id, false)
+    }
+    pub(in crate::app) fn restore_reader_tab(&mut self, id: &str) -> bool {
+        self.select_tab_policy(id, true)
+    }
+    fn select_tab_policy(&mut self, id: &str, automatic: bool) -> bool {
         self.sync_tab_context();
         let mut plan = self.tabs.model.clone();
         if !plan.activate(id) {
             return false;
         }
-        self.request_tab_plan(plan)
+        self.request_tab_plan_policy(plan, automatic)
     }
     pub(in crate::app) fn request_tab_plan(&mut self, plan: DocumentTabs) -> bool {
+        self.request_tab_plan_policy(plan, false)
+    }
+    pub(in crate::app) fn request_restored_tab_plan(&mut self, plan: DocumentTabs) -> bool {
+        self.request_tab_plan_policy(plan, true)
+    }
+    fn request_tab_plan_policy(&mut self, plan: DocumentTabs, automatic: bool) -> bool {
         if self.reference_blocks_switch() {
             return false;
         }
@@ -112,10 +124,11 @@ impl YamantakaApp {
             return true;
         }
         let token = Cancellation::default();
-        if let Err(error) = self
-            .runtime
-            .submit(Action::GetDocument(target.document().into(), token.clone()))
-        {
+        if let Err(error) = self.runtime.submit(if automatic {
+            Action::GetRestorableDocument(target.document().into(), token.clone())
+        } else {
+            Action::GetDocument(target.document().into(), token.clone())
+        }) {
             self.error = Some(error.to_string());
             return false;
         }

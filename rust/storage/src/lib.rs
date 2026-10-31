@@ -24,6 +24,7 @@ mod metadata_review;
 mod metadata_source;
 pub mod migration;
 pub mod preferences;
+mod quarantine;
 pub mod reader_continuity;
 pub mod reader_preferences;
 pub mod reading_sessions;

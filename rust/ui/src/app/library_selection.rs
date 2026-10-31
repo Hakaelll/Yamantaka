@@ -222,6 +222,8 @@ impl YamantakaApp {
             || self.command_palette.open
             || self.diagnostics.open
             || self.safe_notice
+            || self.quarantine.open
+            || self.quarantine.closing()
             || self.password.is_some()
             || self.link_confirmation_open()
             || self.bulk_picker.is_some()

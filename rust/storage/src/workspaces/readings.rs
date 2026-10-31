@@ -138,12 +138,23 @@ pub(super) fn load(
             Err(error) => comparison_warning = Some(error.to_string()),
         }
     }
-    let reference_document = view
+    let mut reference_document = view
         .parsed_query()?
         .comparison
         .map(|comparison| yamantaka_domain::LibraryRepository::get(database, &comparison.document))
         .transpose()?
         .flatten();
+    if let Some(document) = &reference_document
+        && !yamantaka_domain::quarantine::QuarantineRepository::automatic_restore_allowed(
+            database,
+            &document.id,
+            cancel,
+        )?
+    {
+        reference_document = None;
+        comparison_warning =
+            Some("Reference restoration is blocked. Review it in Document recovery.".into());
+    }
     cancel.check()?;
     Ok(WorkspaceReadings {
         workspace,

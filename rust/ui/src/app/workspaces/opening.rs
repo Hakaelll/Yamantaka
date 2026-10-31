@@ -62,7 +62,7 @@ impl YamantakaApp {
         for (id, title) in saved.captions {
             self.tabs.captions.insert(id, title);
         }
-        if self.request_tab_plan(plan) {
+        if self.request_restored_tab_plan(plan) {
             self.workspaces.pending_open = Some(PendingContext {
                 workspace: saved.workspace.clone(),
                 view: saved.view,

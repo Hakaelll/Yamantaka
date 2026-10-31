@@ -269,6 +269,16 @@ impl YamantakaApp {
         }
         ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(id)));
     }
+    pub(in crate::app) fn retry_failed_library_cover(&mut self, ctx: &egui::Context, id: &str) {
+        if self
+            .library_covers
+            .slots
+            .get(id)
+            .is_some_and(|slot| slot.finished && slot.image.is_none())
+        {
+            self.invalidate_library_cover(ctx, id);
+        }
+    }
 }
 
 fn upload_cover(

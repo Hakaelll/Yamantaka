@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='quarantine-review-small-200'; args=@('--quarantine','--quarantine-review','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
+    @{ name='quarantine-released'; args=@('--quarantine','--quarantine-release','--pdf-covers','--light') },
+    @{ name='quarantine-retry'; args=@('--quarantine','--quarantine-retry','--es') },
+    @{ name='quarantine-auto-blocked'; args=@('--quarantine','--quarantine-auto','--light') },
+    @{ name='quarantine-pdf-failed'; args=@('--quarantine','--quarantine-failure','--es') },
     @{ name='safe-requested'; args=@('--safe-mode','--es','--pdf-covers') },
     @{ name='safe-repeated'; args=@('--safe-failures','--light','--pdf-covers') },
     @{ name='safe-unavailable-small-200'; args=@('--safe-unknown','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
@@ -637,6 +642,19 @@ foreach ($case in $cases) {
         if ($controls.referenceNotesPhase -ne $phase -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.filterCount -ne 4 -or $controls.referenceAnnotations.total -ne $total -or $controls.primaryAnnotations.total -ne 2 -or $controls.primaryAnnotations.filterCount -ne 0) { throw 'Reference filters or reset affected the wrong records or document.' }
         $labels = if ($empty) { @('Active filters (4)','Reset') } else { @('Filtros activos (4)','Restablecer') }
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
+    }
+    if ($case.name -like 'quarantine-*') {
+        $q=$controls.quarantine
+        if($q.preview -ne 90 -or $q.pending -or $q.healthPending -ne 0 -or $q.error -or -not $q.open) { throw 'Quarantine request ownership or completion failed.' }
+        $expected=if($case.name -eq 'quarantine-pdf-failed'){3}elseif($case.name -in @('quarantine-released','quarantine-retry')){1}else{2}
+        if($q.total -ne $expected) {throw 'Quarantine changed the wrong document or failed to persist.'}
+        if($case.name -eq 'quarantine-released' -and (@($controls.libraryCovers.sourcePages.PSObject.Properties.Name) -notcontains 'demo-0' -or @($controls.libraryCovers.sourcePages.PSObject.Properties.Name) -contains 'demo-1')){throw 'Released cover work did not resume or an inherited quarantine was bypassed.'}
+        if($case.name -eq 'quarantine-review-small-200' -and -not $q.review){throw 'Release review was bypassed.'}
+        if($case.name -eq 'quarantine-auto-blocked' -and $controls.readerTabs.tabs.Count -ne 0){throw 'A quarantined reading was automatically opened.'}
+        if($case.name -eq 'quarantine-retry' -and @($controls.readerRenderEvents | Where-Object { $_.event -eq 'installed' -and $_.document -eq 'demo-0' }).Count -lt 1){throw 'Explicit retry did not install the native page.'}
+        if($case.name -eq 'quarantine-pdf-failed' -and @($q.entries | Where-Object { $_.id -eq 'demo-2' -and $_.native }).Count -ne 1){throw 'The native PDF failure was not recorded.'}
+        $close=if($case.args -contains '--es'){'Cerrar'}else{'Close'}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($close)
     }
     if ($case.name -like 'safe-*') {
         if($controls.safeStartup.indexPhase -ne 'Idle' -or $controls.safeStartup.continuityLoading -or $controls.libraryCovers.resident -ne 0 -or $null -ne $controls.readingSession.document) { throw 'Safe startup admitted automatic work or recording.' }

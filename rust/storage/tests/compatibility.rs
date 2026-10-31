@@ -13,6 +13,8 @@ mod grouping_verification;
 mod managed_import_verification;
 #[path = "support/migration_review.rs"]
 mod migration_review_verification;
+#[path = "support/quarantine.rs"]
+mod quarantine_verification;
 #[path = "support/relations.rs"]
 mod relation_verification;
 #[path = "support/library_removal.rs"]
@@ -188,6 +190,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     annotation_history_verification::verify(DOCUMENT);
     diagnostics_verification::verify(DOCUMENT);
     startup_verification::verify();
+    quarantine_verification::verify(DOCUMENT);
 }
 
 #[test]
