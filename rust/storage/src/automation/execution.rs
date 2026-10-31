@@ -3,6 +3,7 @@ use rusqlite::OptionalExtension;
 use std::time::{Duration, Instant};
 use yamantaka_domain::automation::{execution::*, plan::*};
 mod changes;
+mod inherited;
 mod journal;
 mod undo;
 mod undo_changes;
@@ -34,9 +35,19 @@ fn item_budget(
                 .and_then(|sum| sum.checked_add(target.name.len()))
         })
         .ok_or(Failure::MemoryBudget)?;
+    let rule_bytes = plan
+        .report()
+        .rule
+        .revision
+        .id
+        .len()
+        .checked_add(plan.report().rule.name.len())
+        .and_then(|bytes| bytes.checked_mul(16))
+        .ok_or(Failure::MemoryBudget)?;
     let bytes = longest
         .checked_add(destinations)
         .and_then(|bytes| bytes.checked_mul(128))
+        .and_then(|bytes| bytes.checked_add(rule_bytes))
         .and_then(|bytes| bytes.checked_add(65536))
         .ok_or(Failure::MemoryBudget)?;
     super::plan::reserve(&context.governor, bytes)

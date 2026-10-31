@@ -1,4 +1,5 @@
 use std::{ffi::OsString, path::Path};
+use yamantaka_domain::LibraryRepository;
 use yamantaka_storage::{Database, identity};
 
 pub fn seed(
@@ -7,6 +8,26 @@ pub fn seed(
     fixture: &Path,
     args: &[OsString],
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if args.iter().any(|arg| arg == "--inherited-journals") {
+        use yamantaka_domain::{Cancellation, automation::*, memory::MemoryGovernor};
+        let governor = MemoryGovernor::new(Default::default());
+        let page =
+            db.automation_rules(&RuleQuery::default(), &governor, &Cancellation::default())?;
+        let rule = page
+            .entries
+            .iter()
+            .find(|rule| rule.revision.id == "legacy-rule")
+            .unwrap();
+        let hash = if args.iter().any(|arg| arg == "--inherited-incompatible") {
+            String::from("different-rule")
+        } else {
+            flutter_compatibility_hash(&rule.revision.id, rule.definition().unwrap())?
+        };
+        db.execute_batch(&format!("INSERT INTO operation_journal(id,operation_kind,status,summary_json,total_items,completed_items,undo_json,started_at,updated_at,phase,resume_capability,compatibility_hash) VALUES('inherited-0-retry','automation','interrupted','{{\"ruleId\":\"legacy-rule\",\"scanned\":10}}',10,0,NULL,'2026-10-30','2026-10-30','cancelled','retry','{hash}'),('inherited-1-rollback','automation','interrupted','{{\"ruleId\":\"legacy-rule\"}}',10,1,'{{\"demo-0:0:setPriority\":{{\"kind\":\"restoreFavorite\",\"documentId\":\"demo-0\",\"value\":false}}}}','2026-10-30','2026-10-30','applying','rollback','{hash}'),('inherited-2-future','automation','interrupted','{{\"ruleId\":\"future-rule\",\"vendor\":7}}',10,1,'{{\"future\":{{\"kind\":\"futureUndo\",\"keep\":true}}}}','2026-10-30','2026-10-30','applying','rollback',NULL);"))?;
+        if args.iter().any(|arg| arg == "--inherited-paged") {
+            db.execute_batch("WITH RECURSIVE n(x) AS (SELECT 0 UNION ALL SELECT x+1 FROM n WHERE x<78) INSERT INTO operation_journal(id,operation_kind,status,summary_json,total_items,completed_items,started_at,updated_at,phase,resume_capability) SELECT printf('older-inherited-%03d',x),'automation','completed','{}',1,1,'2026-10-29','2026-10-29','completed','none' FROM n;")?;
+        }
+    }
     if args.iter().any(|arg| arg == "--rule-review") {
         db.execute_batch("INSERT INTO workspaces(id,name,created_at,updated_at) VALUES('review-workspace','Study desk','','')")?;
         let workspace = if args.iter().any(|arg| arg == "--rule-review-missing") {

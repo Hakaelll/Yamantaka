@@ -3,6 +3,7 @@ use yamantaka_application::automation_execution::{
     ExecutionCommand, ExecutionReply, ExecutionRequest,
 };
 use yamantaka_domain::{Failure, automation::execution::*};
+mod inherited;
 mod view;
 struct Pending {
     cancel: Cancellation,
@@ -13,6 +14,9 @@ struct Pending {
 pub(super) struct ExecutionState {
     pending: Option<Pending>,
     loading: Option<Cancellation>,
+    retrying: Option<Cancellation>,
+    inherited_preview: u8,
+    inherited_mode: u8,
     page: Option<Arc<JournalPage>>,
     offset: usize,
     history_open: bool,
@@ -26,13 +30,19 @@ impl ExecutionState {
         self.history_open = false;
     }
     pub(super) fn busy(&self) -> bool {
-        self.pending.is_some() || self.loading.is_some()
+        self.pending.is_some() || self.loading.is_some() || self.retrying.is_some()
+    }
+    pub(super) fn ready(&self) -> bool {
+        !self.busy() && matches!(self.inherited_preview, 0 | 10)
     }
     pub(super) fn leave(&mut self) {
         if let Some(pending) = &self.pending {
             pending.cancel.cancel();
         }
         if let Some(cancel) = self.loading.take() {
+            cancel.cancel();
+        }
+        if let Some(cancel) = self.retrying.take() {
             cancel.cancel();
         }
         self.page = None;
@@ -42,7 +52,7 @@ impl ExecutionState {
         self.receipt.clone()
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"pending":self.pending.is_some(),"loading":self.loading.is_some(),"failed":self.error.is_some(),"total":self.page.as_ref().map(|page|page.total),"status":self.receipt.as_ref().map(|entry|format!("{:?}",entry.status)),"completed":self.receipt.as_ref().map(|entry|entry.completed),"reversible":self.receipt.as_ref().map(|entry|entry.reversible)})
+        serde_json::json!({"inheritedPhase":self.inherited_preview,"retrying":self.retrying.is_some(),"entries":self.page.as_ref().map(|page|page.entries.iter().map(|entry|serde_json::json!({"id":entry.revision.id,"origin":if matches!(entry.origin,JournalOrigin::Native){"native"}else{"flutter"},"reversible":entry.reversible})).collect::<Vec<_>>()),"pending":self.pending.is_some(),"loading":self.loading.is_some(),"failed":self.error.is_some(),"total":self.page.as_ref().map(|page|page.total),"status":self.receipt.as_ref().map(|entry|format!("{:?}",entry.status)),"completed":self.receipt.as_ref().map(|entry|entry.completed),"reversible":self.receipt.as_ref().map(|entry|entry.reversible)})
     }
 }
 impl Drop for ExecutionState {

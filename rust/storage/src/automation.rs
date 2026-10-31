@@ -50,6 +50,51 @@ fn next_revision(previous: &str) -> String {
     }
     now.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
 }
+fn decode(row: &rusqlite::Row<'_>, governor: &MemoryGovernor) -> Result<Arc<SavedRule>> {
+    let trigger = field(row, 3)?;
+    let actions = field(row, 4)?;
+    let mut metadata = 0usize;
+    for index in [0, 1, 5, 6] {
+        metadata = metadata
+            .checked_add(field(row, index)?.len())
+            .ok_or(Failure::MemoryBudget)?;
+    }
+    let parse_bytes = trigger
+        .len()
+        .checked_add(actions.len())
+        .and_then(|size| size.checked_mul(3))
+        .ok_or(Failure::MemoryBudget)?;
+    let bytes = metadata
+        .checked_add(parse_bytes)
+        .and_then(|size| {
+            size.checked_add(
+                std::mem::size_of::<SavedRule>() + 8 * std::mem::size_of::<RuleAction>() + 128,
+            )
+        })
+        .ok_or(Failure::MemoryBudget)?;
+    let lease = governor
+        .try_reserve_one(Cost::new(
+            MemoryCategory::Other,
+            MemoryRepresentation::Cpu,
+            bytes,
+        ))
+        .map_err(|_| Failure::MemoryBudget)?;
+    let content = RuleDefinition::decode(trigger, actions)
+        .map_or(RuleContent::Unavailable, RuleContent::Supported);
+    let saved = SavedRule::new(
+        RuleRevision {
+            id: field(row, 0)?.into(),
+            hash: hash(row)?,
+        },
+        field(row, 1)?.into(),
+        row.get(2).map_err(storage)?,
+        field(row, 5)?.into(),
+        field(row, 6)?.into(),
+        content,
+        lease,
+    );
+    Ok(Arc::new(saved))
+}
 impl Database {
     pub(crate) fn rule_page(
         &self,
@@ -78,52 +123,9 @@ impl Database {
             let mut entries = Vec::new();
             while let Some(row) = rows.next().map_err(storage)? {
                 cancel.check()?;
-                let trigger = field(row, 3)?;
-                let actions = field(row, 4)?;
-                let mut metadata = 0usize;
-                for index in [0, 1, 5, 6] {
-                    metadata = metadata
-                        .checked_add(field(row, index)?.len())
-                        .ok_or(Failure::MemoryBudget)?;
-                }
-                let parse_bytes = trigger
-                    .len()
-                    .checked_add(actions.len())
-                    .and_then(|size| size.checked_mul(3))
-                    .ok_or(Failure::MemoryBudget)?;
-                let bytes = metadata
-                    .checked_add(parse_bytes)
-                    .and_then(|size| {
-                        size.checked_add(
-                            std::mem::size_of::<SavedRule>()
-                                + 8 * std::mem::size_of::<RuleAction>()
-                                + 128,
-                        )
-                    })
-                    .ok_or(Failure::MemoryBudget)?;
-                let lease = governor
-                    .try_reserve_one(Cost::new(
-                        MemoryCategory::Other,
-                        MemoryRepresentation::Cpu,
-                        bytes,
-                    ))
-                    .map_err(|_| Failure::MemoryBudget)?;
-                let content = RuleDefinition::decode(trigger, actions)
-                    .map_or(RuleContent::Unavailable, RuleContent::Supported);
-                let saved = SavedRule::new(
-                    RuleRevision {
-                        id: field(row, 0)?.into(),
-                        hash: hash(row)?,
-                    },
-                    field(row, 1)?.into(),
-                    row.get(2).map_err(storage)?,
-                    field(row, 5)?.into(),
-                    field(row, 6)?.into(),
-                    content,
-                    lease,
-                );
+                let saved = decode(row, governor)?;
                 entries.try_reserve(1).map_err(|_| Failure::MemoryBudget)?;
-                entries.push(Arc::new(saved));
+                entries.push(saved);
             }
             entries
         };

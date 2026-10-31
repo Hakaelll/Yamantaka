@@ -79,7 +79,10 @@ impl AutomationState {
             || self.execution.busy()
     }
     pub(super) fn ready(&self) -> bool {
-        !self.busy() && self.simulation.ready() && matches!(self.preview, 0 | 10)
+        !self.busy()
+            && self.execution.ready()
+            && self.simulation.ready()
+            && matches!(self.preview, 0 | 10)
     }
     pub(super) fn simulation_summary(&self) -> serde_json::Value {
         self.simulation.summary()

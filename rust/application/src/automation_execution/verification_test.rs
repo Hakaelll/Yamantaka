@@ -317,4 +317,5 @@ pub(crate) fn verify(db: &Database, plan: Arc<RulePlan>, governor: &MemoryGovern
     )
     .unwrap();
     assert_eq!(state(&sql), original);
+    super::inherited_verification::verify(db);
 }

@@ -446,6 +446,14 @@ impl LibraryRepository for Database {
                 >)
         }))
     }
+    fn inherited_automation_rule(
+        &self,
+        journal: &yamantaka_domain::automation::execution::JournalRevision,
+        governor: &yamantaka_domain::memory::MemoryGovernor,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<std::sync::Arc<yamantaka_domain::automation::SavedRule>> {
+        self.inherited_rule(journal, governor, cancel)
+    }
     fn automation_journals(
         &self,
         offset: usize,

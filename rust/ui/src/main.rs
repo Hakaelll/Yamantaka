@@ -1088,7 +1088,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         args.iter().any(|arg| arg == "--compare-different"),
                     );
                 }
-                if args.iter().any(|arg| arg == "--rule-simulation") {
+                if args.iter().any(|arg| arg == "--inherited-journals") {
+                    app.preview_inherited_journals(
+                        if args.iter().any(|arg| arg == "--inherited-paged") {
+                            4
+                        } else if args.iter().any(|arg| arg == "--inherited-incompatible") {
+                            2
+                        } else if args.iter().any(|arg| arg == "--inherited-retry") {
+                            1
+                        } else if args.iter().any(|arg| arg == "--text-scale=2") {
+                            3
+                        } else {
+                            0
+                        },
+                    );
+                } else if args.iter().any(|arg| arg == "--rule-simulation") {
                     app.preview_rule_simulation(
                         if args.iter().any(|arg| arg == "--rule-execute-fail") {
                             10

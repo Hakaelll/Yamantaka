@@ -1,0 +1,10 @@
+Origin: native screenshot of the Yamantaka Rust executable, not an AI-generated image.
+Captured with tool/capture_rust_ui.ps1; isolated synthetic study collection; PDF source is the repository's generated acceptance fixture. Write scenarios may use an isolated file-backed synthetic store. No personal library was opened.
+Case: inherited-journals-paged
+Arguments: --demo --saved-rules --rule-simulation --inherited-journals --inherited-paged
+Capture UTC: 10/31/2026 11:40:24
+Executable SHA-256: E918677FD75E4D532884BDCEFF97D9066642D9DA778EE7EC1D579CBC13BA63D1
+Original PNG SHA-256: 1D964497B31C253003B065C8BE4D077290F82DDCD828226AF2ADAFCD8A2F59C4
+Logical viewport: 0, 0, 1440, 960
+Pixels per logical point: 1.25
+See capture-manifest.json for exact source hashes and conditions. These captures do not certify physical monitor DPI, Narrator, full functional parity or whole-rewrite acceptance.

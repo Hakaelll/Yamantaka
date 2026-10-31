@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='inherited-journals-retry'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-retry','--es') },
+    @{ name='inherited-journals-incompatible'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-incompatible','--light') },
+    @{ name='inherited-journals-small-200'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='inherited-journals-paged'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-paged') },
     @{ name='rule-execution-completed'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-execute','--es') },
     @{ name='rule-execution-undone'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-execute','--rule-execute-undo','--light') },
     @{ name='rule-execution-undone-small-200'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-execute','--rule-execute-undo','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
@@ -425,6 +429,20 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -like 'inherited-journals-*') {
+        $history=$controls.ruleExecution
+        if ($history.inheritedPhase -ne 10 -or $history.pending -or $history.loading -or $history.retrying) {throw 'Inherited journal review did not settle.'}
+        $expectedCount=if ($case.name -eq 'inherited-journals-paged') {82} else {3}
+        if ($history.total -ne $expectedCount -or @($history.entries | Where-Object { $_.origin -ne 'flutter' -or $_.reversible }).Count -ne 0) {throw 'Inherited history was lost or exposed through native undo.'}
+        if ($case.name -eq 'inherited-journals-retry') {
+            if ($history.failed -or $controls.ruleSimulation.state -ne 'complete' -or $controls.ruleSimulation.matched -ne 10) {throw 'A compatible inherited rule did not produce a fresh simulation.'}
+        } elseif ($case.name -eq 'inherited-journals-incompatible') {
+            if (-not $history.failed -or $controls.ruleSimulation.state -ne 'idle') {throw 'An incompatible inherited rule must preserve history without simulation.'}
+        } elseif ($history.failed) {throw 'Inherited history failed to load.'}
+        if ($case.name -eq 'inherited-journals-paged' -and $history.entries.Count -ne 2) {throw 'Inherited history did not reach its bounded second page.'}
+        $labels=if ($case.name -eq 'inherited-journals-small-200') {@('Simular regla vinculada')} elseif ($case.name -eq 'inherited-journals-incompatible') {@('Simulate linked rule')} else {@()}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
     if ($case.name -like 'rule-execution-*') {
         $execution=$controls.ruleExecution

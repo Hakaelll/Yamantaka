@@ -23,7 +23,16 @@ pub enum ExecutionStatus {
     RolledBack,
     Failed,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JournalOrigin {
+    Native,
+    Flutter {
+        retry_candidate: bool,
+        has_undo: bool,
+    },
+}
 pub struct JournalEntry {
+    pub origin: JournalOrigin,
     pub revision: JournalRevision,
     pub rule_name: String,
     pub status: ExecutionStatus,
@@ -44,6 +53,7 @@ impl JournalEntry {
         lease: ByteLease,
     ) -> Self {
         Self {
+            origin: JournalOrigin::Native,
             revision,
             rule_name,
             status,
@@ -53,6 +63,10 @@ impl JournalEntry {
             error_code,
             _lease: lease,
         }
+    }
+    pub fn with_origin(mut self, origin: JournalOrigin) -> Self {
+        self.origin = origin;
+        self
     }
 }
 pub struct JournalPage {

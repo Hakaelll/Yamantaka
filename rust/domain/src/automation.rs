@@ -1,4 +1,6 @@
+mod compatibility;
 pub mod execution;
+pub use compatibility::flutter_compatibility_hash;
 pub mod plan;
 pub mod simulation;
 use crate::{Failure, Result, memory::ByteLease};

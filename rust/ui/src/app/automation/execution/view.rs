@@ -22,6 +22,13 @@ impl YamantakaApp {
         let english = self.english;
         let tr = |es, en| if english { en } else { es };
         let state = &mut self.automation.execution;
+        if state.retrying.is_some() {
+            ui.label(tr(
+                "Comprobando regla vinculada…",
+                "Checking the linked rule…",
+            ));
+            ui.add_space(12.0);
+        }
         if let Some(error) = &state.error {
             ui.label(error);
             if theme::navigation(ui, tr("Recargar historial", "Reload history"), false, p).clicked()
@@ -99,11 +106,21 @@ impl YamantakaApp {
             return;
         }
         let mut undo = None;
+        let mut retry = None;
         for entry in &page.entries {
             let frame=egui::Frame::new().fill(p.surface).corner_radius(8).inner_margin(16).show(ui,|ui| {
                 ui.set_min_width(ui.available_width());
                 ui.label(RichText::new(&entry.rule_name).size(19.0).color(p.ink));
                 ui.label(status(entry.status,english));
+                if let JournalOrigin::Flutter {retry_candidate,has_undo}=entry.origin {
+                    ui.label(RichText::new(tr("Conservada de Flutter","Preserved from Flutter")).size(12.0).color(p.secondary));
+                    if retry_candidate {
+                        let button=ui.add_enabled_ui(!busy,|ui|theme::navigation(ui,tr("Simular regla vinculada","Simulate linked rule"),false,p)).inner;
+                        if button.clicked(){retry=Some(entry.revision.clone());}
+                        if state.inherited_preview==10 && state.inherited_mode==3 && entry.revision.id=="inherited-0-retry" {button.scroll_to_me(Some(egui::Align::Center));}
+                    }
+                    if has_undo {ui.label(tr("Este recibo heredado necesita una revisión de recuperación antes de deshacer.","This inherited receipt needs a recovery review before undo."));}
+                }
                 ui.label(format!("{} / {} {}",entry.completed,entry.total,tr("documentos procesados","documents processed")));
                 if let Some(code)=&entry.error_code {ui.label(RichText::new(code).size(12.0).color(p.secondary));}
                 if entry.reversible&&ui.add_enabled_ui(!busy,|ui|theme::navigation(ui,tr("Revisar deshacer","Review undo"),false,p)).inner.clicked(){state.review=Some(entry.clone());}
@@ -113,7 +130,11 @@ impl YamantakaApp {
                     if theme::navigation(ui,tr("Cancelar","Cancel"),false,p).clicked(){state.review=None;}
                 }
             });
-            if self.automation.simulation.execution_preview_done() {
+            if (state.inherited_preview == 10
+                && state.inherited_mode == 0
+                && entry.revision.id == "inherited-0-retry")
+                || self.automation.simulation.execution_preview_done()
+            {
                 frame.response.scroll_to_me(Some(egui::Align::Min));
             }
             ui.add_space(8.0);
@@ -148,6 +169,9 @@ impl YamantakaApp {
         }
         if reload {
             self.load_rule_journals();
+        }
+        if let Some(revision) = retry {
+            self.check_inherited_rule(revision);
         }
         if let Some(revision) = undo {
             self.start_rule_execution(ExecutionCommand::Undo(revision));

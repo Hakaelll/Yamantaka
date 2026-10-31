@@ -60,6 +60,11 @@ pub enum Action {
     ChangeTag(Box<yamantaka_domain::tags::TagChange>, Cancellation),
     SimulateRule(Box<SimulationRequest>),
     PrepareRule(Box<PlanRequest>),
+    InheritedAutomationRule(
+        yamantaka_domain::automation::execution::JournalRevision,
+        yamantaka_domain::memory::MemoryGovernor,
+        Cancellation,
+    ),
     ExecuteRule(Box<ExecutionRequest>),
     AutomationJournals(
         usize,
@@ -181,6 +186,10 @@ pub enum Update {
     TagChanged(Result<String>, Cancellation),
     RuleSimulated(Box<SimulationReply>),
     RulePrepared(Box<PlanReply>),
+    InheritedAutomationRule(
+        Result<Arc<yamantaka_domain::automation::SavedRule>>,
+        Cancellation,
+    ),
     RuleExecuted(Box<ExecutionReply>),
     AutomationJournals(
         Result<yamantaka_domain::automation::execution::JournalPage>,
@@ -1082,6 +1091,10 @@ impl Runtime {
                                 Action::AutomationJournals(offset,governor,cancel)=> {
                                     let result=repository.automation_journals(offset,&governor,&cancel);
                                     emit(&events,&notify,Update::AutomationJournals(result,cancel),permit);
+                                }
+                                Action::InheritedAutomationRule(journal,governor,cancel)=> {
+                                    let result=repository.inherited_automation_rule(&journal,&governor,&cancel);
+                                    emit(&events,&notify,Update::InheritedAutomationRule(result,cancel),permit);
                                 }
                                 Action::PrepareRule(request)=> {
                                     let cancel=request.cancel.clone();

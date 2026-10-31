@@ -285,6 +285,16 @@ pub trait LibraryRepository {
     fn automation_reader(&self) -> Result<automation::simulation::RuleScanFactory> {
         Err(Failure::Unsupported("Independent rule simulation".into()))
     }
+    fn inherited_automation_rule(
+        &self,
+        _journal: &automation::execution::JournalRevision,
+        _governor: &memory::MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<std::sync::Arc<automation::SavedRule>> {
+        Err(Failure::Unsupported(
+            "Inherited automation retry review".into(),
+        ))
+    }
     fn automation_executor(&self) -> Result<automation::execution::ExecutionFactory> {
         Err(Failure::Unsupported("Independent rule execution".into()))
     }

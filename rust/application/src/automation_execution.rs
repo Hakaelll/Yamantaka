@@ -146,5 +146,8 @@ impl Drop for ExecutionJob {
     }
 }
 #[cfg(test)]
+#[path = "automation_execution/inherited_verification.rs"]
+pub(crate) mod inherited_verification;
+#[cfg(test)]
 #[path = "automation_execution/verification_test.rs"]
 pub(crate) mod verification_test;
