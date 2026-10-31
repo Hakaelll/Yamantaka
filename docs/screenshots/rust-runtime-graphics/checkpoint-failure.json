@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "executableSha256": "14790D5EB59301A3B1C9C1F78FD9EF10BE1432FCB8F69FF71A2A2BB36F5C500F",
+  "deviceDestroyed": true,
+  "checkpointFailureInjected": true,
+  "exitCode": 1,
+  "retries": 0,
+  "imageAbsent": true
+}

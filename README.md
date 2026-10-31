@@ -151,7 +151,7 @@ The default compositor uses DirectX 12. If wgpu cannot initialize, Yamantaka tri
 ./target/debug/yamantaka-rust.exe --opengl
 ```
 
-[Graphics recovery](docs/user-guide/graphics-recovery.md) describes the retry policy, alternate-compositor behavior and remaining device-loss work.
+[Graphics recovery](docs/user-guide/graphics-recovery.md) covers startup fallback, checked restart after a reported runtime GPU fault, alternate-compositor behavior and remaining physical device-loss acceptance.
 
 A finished Release bundle must include `pdfium.dll` beside the executable. Do not copy only the executable out of a bundle. The final bundle, hashes, SBOM, notices and installation instructions will be added after the parity and validation gates pass.
 

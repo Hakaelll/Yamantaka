@@ -29,10 +29,11 @@ fn main() -> std::process::ExitCode {
         Err(error) => {
             let args: Vec<_> = std::env::args_os().skip(1).collect();
             if graphics_recovery::can_retry(error.as_ref(), &args) {
-                eprintln!(
-                    "The default graphics compositor could not start; trying the alternate compositor once."
-                );
-                match graphics_recovery::restart(&args) {
+                eprintln!("Graphics failed; trying the alternate compositor once.");
+                match graphics_recovery::restart(
+                    &args,
+                    error.downcast_ref::<graphics_recovery::RuntimeFault>(),
+                ) {
                     Ok(status) => {
                         return if status.success() {
                             std::process::ExitCode::SUCCESS
@@ -106,7 +107,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     let requested_safe = args.iter().any(|arg| arg == "--safe-mode");
     let mut startup = None;
-    let (database, mut prefs, store) = if demo {
+    let demo_resume = if demo && capture.is_some() {
+        graphics_recovery::demo_store(&args)?
+    } else {
+        None
+    };
+    let (database, mut prefs, store) = if let Some(store) = demo_resume {
+        (
+            Database::open(&store.join("export-preview.sqlite3"))?,
+            Preferences::load(&store.join("preferences.json"))?,
+            store,
+        )
+    } else if demo {
         let mut store = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/demo-store");
         // Captures have their own instance identity so QA does not forward to
         // or interfere with a demonstration window the user is reviewing.
@@ -152,6 +164,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         || arg == "--cover-capacity-retry"
                         || arg == "--reference-bookmarks"
                         || arg == "--diagnostics"
+                        || arg == "--graphics-fail-runtime"
                 }) {
             std::fs::create_dir_all(&store).map_err(|_| {
                 yamantaka_domain::Failure::Storage("Synthetic export store could not open".into())
@@ -943,7 +956,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
-    eframe::run_native(
+    let graphics = graphics_recovery::State::default();
+    let app_graphics = graphics.clone();
+    let recovery_demo_store =
+        (demo && capture.is_some() && args.iter().any(|arg| arg == "--graphics-fail-runtime"))
+            .then(|| store.clone());
+    if recovery_demo_store.is_some() && !graphics_recovery::runtime_fallback() {
+        prefs.rust.insert("restoreLastSession".into(), false.into());
+        prefs.save(&store.join("preferences.json"))?;
+    }
+    let app_result = eframe::run_native(
         "Yamantaka",
         options,
         Box::new(move |cc| {
@@ -984,6 +1006,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let backup_source = database.file_path();
             let runtime = Runtime::start(database, engine, move || notify.request_repaint())?;
             let presenter = cc.wgpu_render_state.clone().map(|state| {
+                app_graphics.install(&state.device, &cc.egui_ctx);
                 page_presenter::PagePresenter::new(state, governor.clone(), cc.egui_ctx.clone())
             });
             let (tx, rx) = mpsc::channel();
@@ -992,6 +1015,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 let _ = tx.send(paths);
                 ctx.request_repaint();
             })?;
+            let preview_device_fault = demo
+                && capture.is_some()
+                && args.iter().any(|arg| arg == "--graphics-fail-runtime");
             let mut app = app::YamantakaApp::new(
                 runtime,
                 prefs,
@@ -1008,6 +1034,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 presenter,
                 startup_mode,
             );
+            app.graphics_recovery = app_graphics.clone();
+            if preview_device_fault && let Some(state) = &cc.wgpu_render_state {
+                app.preview_graphics_loss(state.device.clone());
+                if args.iter().any(|arg| arg == "--graphics-fail-checkpoint") {
+                    app_graphics.checkpoint_failed();
+                }
+            }
             if demo && startup_mode.is_safe() {
                 app.preview_safe_index();
                 app.preview_safe_dismiss(args.iter().any(|arg| arg == "--safe-dismiss"));
@@ -1608,7 +1641,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     "prompt"
                 });
             }
-            if demo && reader {
+            if demo && reader && !graphics_recovery::runtime_fallback() {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--nearby-turn") {
                     app.preview_nearby_turn();
@@ -1776,12 +1809,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if demo && args.iter().any(|arg| arg == "--tools-menu") {
                 app.preview_tools_menu();
             }
-            if !initial.is_empty() {
+            if !initial.is_empty() && !graphics_recovery::runtime_fallback() {
                 app.import(initial);
             }
             Ok(Box::new(app))
         }),
-    )?;
+    );
+    if graphics.faulted() {
+        graphics.handover()?;
+        startup.finish()?;
+        drop(instance);
+        return Err(Box::new(graphics_recovery::RuntimeFault {
+            demo_store: recovery_demo_store,
+        }));
+    }
+    app_result?;
     if let Some(commit) = restore_handover.borrow_mut().take() {
         let safety = yamantaka_storage::backup::install_preview(
             commit.preview,

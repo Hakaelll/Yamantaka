@@ -9,6 +9,7 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='graphics-runtime-reader'; args=@('--graphics-fail-runtime','--reader','--light','--es') },
     @{ name='graphics-fallback-library'; args=@('--graphics-fail-startup','--pdf-covers') },
     @{ name='graphics-fallback-reader'; args=@('--graphics-fail-startup','--reader','--light','--es') },
     @{ name='graphics-explicit-alternate'; args=@('--graphics-fail-startup','--reader','--software','--es') },
@@ -483,8 +484,10 @@ foreach ($case in $cases) {
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($case.name -like 'graphics-*') {
         if ($controls.pagePresenter -ne 'egui-glow') { throw 'Alternate compositor did not start.' }
-        $automatic = $case.name -like 'graphics-fallback-*'
+        $automatic = $case.name -like 'graphics-fallback-*' -or $case.name -like 'graphics-runtime-*'
         if ($controls.graphicsStartupFallback -ne $automatic) { throw 'Unexpected automatic graphics retry state.' }
+        if (($case.name -like 'graphics-runtime-*') -ne [bool]$controls.graphicsRuntimeFallback) { throw 'Unexpected runtime graphics retry state.' }
+        if ($case.name -like 'graphics-runtime-*' -and ($controls.currentReaderPage -ne 1 -or -not $controls.graphicsRecoveryFavorite -or $controls.graphicsRecoveryRestorePreference -ne $false)) { throw 'Runtime graphics recovery lost the queued edit, page context or restoration preference.' }
         if ($case.args -contains '--reader' -and $controls.readerPresentationSlots -lt 1) { throw 'Alternate compositor did not present a PDF.' }
     }
     if ($case.name -like 'reader-nearby-*') {

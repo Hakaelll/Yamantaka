@@ -239,6 +239,8 @@ pub struct YamantakaApp {
     selection_copy_preview: Option<(String, String)>,
     comparison_selection_preview: selection::ComparisonSelectionPreview,
     presenter: Option<PagePresenter>,
+    pub(crate) graphics_recovery: crate::graphics_recovery::State,
+    preview_device_loss: Option<eframe::wgpu::Device>,
     governor: MemoryGovernor,
     bulk_organization_preview: Option<bulk_picker::OrganizationPreview>,
     bulk_organization_verified: Option<serde_json::Value>,
@@ -493,6 +495,8 @@ impl YamantakaApp {
             capture_requested: false,
             capture_ready_since: None,
             capture_render_events: Vec::new(),
+            graphics_recovery: Default::default(),
+            preview_device_loss: None,
             nearby_turn_preview: 0,
             preview_reader: false,
             logo: None,
@@ -667,6 +671,12 @@ impl YamantakaApp {
     }
     pub fn preview_reader(&mut self) {
         self.preview_reader = true;
+    }
+    pub fn preview_graphics_loss(&mut self, device: eframe::wgpu::Device) {
+        if self.demo && self.capture.is_some() {
+            self.enable_continuity_capture();
+            self.preview_device_loss = Some(device);
+        }
     }
     pub fn text_scale(&self) -> f32 {
         self.text_scale
@@ -1312,6 +1322,38 @@ impl App for YamantakaApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _: &mut Frame) {
+        if self.graphics_recovery.faulted() {
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+            return;
+        }
+        if self.preview_device_loss.is_some()
+            && !self.reader.loading
+            && self
+                .reader
+                .viewport
+                .pages
+                .values()
+                .any(|page| page.image.is_some())
+        {
+            if self.reader.page == 0 {
+                self.navigate(1);
+                return;
+            }
+            if !self
+                .reader
+                .viewport
+                .pages
+                .get(&1)
+                .is_some_and(|slot| slot.image.is_some())
+            {
+                return;
+            }
+            self.send(Action::Favorite("demo-0".into(), true));
+            self.graphics_recovery.signal(ctx);
+            self.preview_device_loss.take().unwrap().destroy();
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+            return;
+        }
         self.guard_workspace_close(ctx);
         self.guard_quarantine_close(ctx);
         self.update_restore(ctx);
@@ -2134,6 +2176,9 @@ impl App for YamantakaApp {
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut Frame) {
+        if self.graphics_recovery.faulted() {
+            return;
+        }
         let prefetch_allowed =
             !self.startup_mode.is_safe() && matches!(self.surface, Surface::Reader);
         self.reader.viewport.regions_enabled = prefetch_allowed && self.presenter.is_some();
@@ -2458,6 +2503,7 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
+                    && self.preview_device_loss.is_none()
                     && matches!(self.nearby_turn_preview, 0 | 3)
                     && self.reader.viewport.refinements_settled()
                     && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.refinements_settled())
@@ -2665,6 +2711,9 @@ impl App for YamantakaApp {
                     record["quarantine"] = self.quarantine.summary();
                     record["nearbyTurnPreview"] = self.nearby_turn_preview.into();
                     record["graphicsStartupFallback"] = crate::graphics_recovery::is_fallback().into();
+                    record["graphicsRuntimeFallback"] = crate::graphics_recovery::runtime_fallback().into();
+                    record["graphicsRecoveryFavorite"] = self.reader.active.as_ref().map(|(document,_)|document.favorite).into();
+                    record["graphicsRecoveryRestorePreference"] = self.preferences.get("restoreLastSession").cloned().unwrap_or(serde_json::Value::Null);
                     record["pagePrefetch"] = self.reader.viewport.prefetch.summary();
                     record["pageRefinement"] = self.reader.viewport.refinement_summary();
                     record["referenceRefinement"] = self.reference.as_ref().map(|reference|reference.pane.viewport.refinement_summary()).unwrap_or(serde_json::Value::Null);
@@ -2714,12 +2763,20 @@ impl App for YamantakaApp {
         }
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        self.graphics_recovery.begin_close();
+        if self.graphics_recovery.faulted()
+            && let Err(error) = self.runtime.flush_changes()
+        {
+            self.graphics_recovery.checkpoint_failed();
+            eprintln!("{error}");
+        }
         if let Some(state) = &mut self.window_state
             && let Err(error) = state.finish()
         {
             eprintln!("{error}");
         }
         if let Err(error) = self.runtime.flush_import_recovery() {
+            self.graphics_recovery.checkpoint_failed();
             eprintln!("{error}");
             yamantaka_windows::show_startup_error(self.tr(
                 "No se han podido guardar todas las selecciones de importación pendientes. Abre Yamantaka y vuelve a seleccionar esos archivos o carpetas.",
@@ -2727,9 +2784,11 @@ impl App for YamantakaApp {
             ));
         }
         if let Err(error) = self.persist_reader_continuity_on_close() {
+            self.graphics_recovery.checkpoint_failed();
             eprintln!("{error}");
         }
         if let Err(error) = self.persist_reading_sessions_on_close() {
+            self.graphics_recovery.checkpoint_failed();
             eprintln!("{error}");
         }
         self.library_check.cancel();
@@ -2760,6 +2819,7 @@ impl App for YamantakaApp {
         {
             eprintln!("{error}");
         }
+        self.graphics_recovery.closed();
     }
 }
 

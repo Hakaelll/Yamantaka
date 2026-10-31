@@ -53,6 +53,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    FlushChanges(Sender<Result<()>>),
     Quarantine(Box<crate::quarantine::Request>),
     GetRestorableDocument(String, Cancellation),
     RemoveFromLibrary(Box<crate::library_removal::RemovalRequest>),
@@ -1048,6 +1049,13 @@ impl Runtime {
                             deferred.push_back(Command { action, permit });
                         } else {
                             match action {
+                                Action::FlushChanges(completed) => {
+                                    if deferred.is_empty() {
+                                        let _ = completed.try_send(Ok(()));
+                                    } else {
+                                        deferred.push_back(Command { action: Action::FlushChanges(completed), permit });
+                                    }
+                                }
                                 Action::ReadingHistory(request) => emit(&events, &notify, Update::ReadingHistory(request.execute(&repository)), permit),
                                 Action::DeleteReadingSession(request) => emit(&events,&notify,Update::ReadingSessionDeleted(request.execute(&mut repository)),permit),
                                 Action::MetadataSource(request)=>emit(&events,&notify,Update::MetadataSource(request.execute(&repository)),permit),
@@ -2118,6 +2126,23 @@ impl Runtime {
             updates: UpdateReceiver(updates),
             handle: Some(handle),
         })
+    }
+    pub fn flush_changes(&self) -> Result<()> {
+        let (completed, reply) = bounded(1);
+        self.sender
+            .send_timeout(
+                Command {
+                    action: Action::FlushChanges(completed),
+                    permit: Permit(Arc::new(AtomicUsize::new(1))),
+                },
+                Duration::from_secs(5),
+            )
+            .map_err(|_| {
+                Failure::Storage("Pending changes could not be fenced for graphics recovery".into())
+            })?;
+        reply.recv_timeout(Duration::from_secs(15)).map_err(|_| {
+            Failure::Storage("Pending changes did not finish before graphics recovery".into())
+        })?
     }
     pub fn flush_import_recovery(&self) -> Result<()> {
         let (send, receive) = bounded(1);

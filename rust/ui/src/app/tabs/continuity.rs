@@ -35,7 +35,9 @@ impl YamantakaApp {
     }
 
     pub(in crate::app) fn begin_reader_continuity(&mut self) {
-        if self.demo || self.startup_mode.is_safe() {
+        if (self.demo && !crate::graphics_recovery::runtime_fallback())
+            || self.startup_mode.is_safe()
+        {
             return;
         }
         let cancel = Cancellation::default();
@@ -93,11 +95,12 @@ impl YamantakaApp {
             self.error = Some(self.tr("La lectura actual tiene prioridad. La sesión anterior se conserva para su recuperación.", "The current reading takes priority. The previous session is preserved for recovery.").into());
             return;
         }
-        let restore = self
-            .preferences
-            .get("restoreLastSession")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(true);
+        let restore = crate::graphics_recovery::runtime_fallback()
+            || self
+                .preferences
+                .get("restoreLastSession")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(true);
         if restore {
             self.tabs.model = restored;
         } else if let Err(error) =
