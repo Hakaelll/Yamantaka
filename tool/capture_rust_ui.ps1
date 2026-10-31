@@ -9,6 +9,7 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='annotation-edit-conflict'; args=@('--reader','--page-note','--annotation-save','--annotation-conflict','--light','--es') },
     @{ name='continuity-metadata-draft'; args=@('--reader','--metadata-review','--graphics-fail-runtime','--graphics-metadata-draft','--light','--es') },
     @{ name='continuity-page-notes'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--graphics-page-note-drafts','--light','--es') },
     @{ name='continuity-page-notes-saved'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--graphics-page-note-drafts','--graphics-save-page-note','--es') },
@@ -501,6 +502,11 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -eq 'annotation-edit-conflict') {
+        if ($controls.annotationEditConflict.phase -ne 5 -or $controls.annotationEditConflict.draft -cne 'Uncommitted older draft' -or -not $controls.primaryAnnotations.stale -or -not $controls.primaryAnnotations.editing) { throw 'The stale annotation edit did not retain its draft.' }
+        if ($controls.primaryAnnotations.entries[0].note -cne 'Newer annotation text') { throw 'The stale editor overwrote the newer annotation.' }
+        if (@($controls.controls | Where-Object { $_.label -eq 'Guardar nota' -and $_.enabled }).Count -ne 0) { throw 'Saving a stale annotation must remain disabled.' }
+    }
     if ($case.name -eq 'continuity-metadata-draft') {
         $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
         if (-not $controls.graphicsRuntimeFallback -or $controls.metadataDraftRecovery.retained -ne 0 -or -not $controls.metadataDraftRecovery.active) { throw 'Metadata draft did not restore after graphics recovery.' }

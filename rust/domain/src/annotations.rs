@@ -2,6 +2,7 @@ pub mod batch;
 pub mod marks;
 pub mod page_note_draft;
 pub mod review;
+pub mod revision;
 use crate::{
     Failure, Result,
     memory::{ByteLease, Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},

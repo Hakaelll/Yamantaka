@@ -9,6 +9,8 @@ use yamantaka_domain::{
     text_selection::snapshot::TextSelectionSnapshot,
 };
 mod bulk;
+mod conflict_preview;
+pub(super) use conflict_preview::ConflictPreview;
 mod editor_view;
 mod page_note_recovery;
 mod pane;
@@ -51,12 +53,15 @@ pub(super) struct AnnotationEditor {
     confirmed: bool,
 }
 impl AnnotationEditor {
-    fn stored(&self) -> Option<&AnnotationRecordData> {
+    fn stored_record(&self) -> Option<&AnnotationRecord> {
         if let EditorSource::Stored { page, index } = &self.source {
-            Some(page.entries()[*index].data())
+            Some(&page.entries()[*index])
         } else {
             None
         }
+    }
+    fn stored(&self) -> Option<&AnnotationRecordData> {
+        self.stored_record().map(AnnotationRecord::data)
     }
     fn passage(&self) -> &str {
         match &self.source {
@@ -264,7 +269,18 @@ impl AnnotationState {
         }
         match reply.result {
             Ok(page) => {
-                self.stale = false;
+                self.stale = !pending.writing
+                    && self
+                        .editor
+                        .as_ref()
+                        .and_then(AnnotationEditor::stored_record)
+                        .is_some_and(|old| {
+                            !page
+                                .entries()
+                                .iter()
+                                .find(|record| record.data().id == old.data().id)
+                                .is_some_and(|record| old.revision() == record.revision())
+                        });
                 self.selected = Default::default();
                 self.bulk_tag.clear();
                 self.page = Some(Arc::new(page));
@@ -275,7 +291,12 @@ impl AnnotationState {
                     self.editor = None;
                 }
             }
-            Err(error) => self.error = Some(error.to_string()),
+            Err(error) => {
+                if matches!(error, Failure::StaleAnnotation) {
+                    self.stale = true;
+                }
+                self.error = Some(error.to_string());
+            }
         }
         None
     }
@@ -326,9 +347,10 @@ impl AnnotationState {
             .as_ref()
             .ok_or_else(|| Failure::Invalid("No annotation is being edited".into()))?;
         let tag_values = editor.tag_changes()?;
-        if let Some(record) = editor.stored() {
+        if let Some(record) = editor.stored_record() {
             return Ok(AnnotationMutation::Edit {
-                id: record.id.clone(),
+                id: record.data().id.clone(),
+                expected: record.revision().clone(),
                 kind: editor.kind,
                 color: editor.color,
                 note: Some(editor.note.clone()),

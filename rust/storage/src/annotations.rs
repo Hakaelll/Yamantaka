@@ -221,6 +221,25 @@ fn read_record(
         lease,
     )
 }
+fn read_one(
+    db: &Connection,
+    document: &str,
+    id: &str,
+    governor: &MemoryGovernor,
+    cancel: &Cancellation,
+) -> Result<Option<AnnotationRecord>> {
+    cancel.check()?;
+    let mut statement = db
+        .prepare(&format!(
+            "{SELECT_RECORDS} WHERE a.document_id=? AND a.id=?"
+        ))
+        .map_err(storage)?;
+    let mut rows = statement.query(params![document, id]).map_err(storage)?;
+    rows.next()
+        .map_err(storage)?
+        .map(|row| read_record(db, row, governor, cancel, false))
+        .transpose()
+}
 fn read_page(
     db: &Connection,
     query: &AnnotationQuery,

@@ -33,6 +33,7 @@ pub enum AnnotationMutation {
     },
     Edit {
         id: String,
+        expected: yamantaka_domain::annotations::revision::AnnotationRevision,
         kind: AnnotationKind,
         color: AnnotationColor,
         note: Option<String>,
@@ -78,6 +79,7 @@ impl AnnotationMutation {
             Self::Remove { id } => AnnotationChange::Remove { id },
             Self::Edit {
                 id,
+                expected,
                 kind,
                 color,
                 note,
@@ -85,6 +87,7 @@ impl AnnotationMutation {
                 tags,
             } => AnnotationChange::Edit {
                 id,
+                expected,
                 kind: *kind,
                 color: *color,
                 note: note.as_deref(),

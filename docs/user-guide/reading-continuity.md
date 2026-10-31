@@ -15,3 +15,5 @@ When you close the window with an unsaved reading note or manual title/author co
 See [page-note recovery validation](../validation/rust-page-note-recovery-2026-10-31.md) for the supported draft fields and limits.
 
 Unfinished title and author corrections also persist locally. With session restoration enabled, the metadata editor reopens. If the catalogue review changed, compare the recovered text with the current values and choose **Use recovered text** or **Keep current values**. Recovered text remains unsaved until you choose **Save changes**. See [metadata draft recovery](../validation/rust-metadata-draft-recovery-2026-10-31.md).
+
+If an existing annotation changes while you are editing it, Yamantaka keeps your unsaved text and blocks Save. Reloading the note list does not overwrite the newer note or make the older editor current. Preserve the text you need before cancelling and reopening the annotation. Existing-note drafts still lack persistent recovery. See [annotation edit revisions](../validation/rust-annotation-edit-revisions-2026-10-31.md).

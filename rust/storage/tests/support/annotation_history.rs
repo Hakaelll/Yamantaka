@@ -37,6 +37,23 @@ fn found(db: &Database, text: &str) -> usize {
     .unwrap()
     .len()
 }
+fn revision(
+    db: &Database,
+    governor: &MemoryGovernor,
+) -> yamantaka_domain::annotations::revision::AnnotationRevision {
+    db.annotations(
+        &AnnotationQuery {
+            document_id: Some("original".into()),
+            ..Default::default()
+        },
+        governor,
+        &Cancellation::default(),
+    )
+    .unwrap()
+    .entries()[0]
+        .revision()
+        .clone()
+}
 pub fn verify(document: &str) {
     let mut db = Database::in_memory_at(11).unwrap();
     db.execute_batch(document).unwrap();
@@ -83,8 +100,14 @@ pub fn verify(document: &str) {
     assert_eq!(found(&db, "initialword"), 1);
     drop(page);
     db.execute_batch("ALTER TABLE annotations ADD COLUMN inherited_blob BLOB; UPDATE annotations SET inherited_blob=X'001122FF',rects_json='[ {\"left\":0.1,\"top\":0.2,\"right\":0.4,\"bottom\":0.3} ]',origin_document_id='inherited';").unwrap();
+    let expected = revision(&db, &governor);
+    db.execute_batch("SAVEPOINT title_revision; UPDATE documents SET title_override='Changed catalogue title' WHERE id='original';").unwrap();
+    assert_eq!(revision(&db, &governor), expected);
+    db.execute_batch("ROLLBACK TO title_revision; RELEASE title_revision;")
+        .unwrap();
     let edit = || AnnotationChange::Edit {
         id: &id,
+        expected: &expected,
         kind: AnnotationKind::PageComment,
         color: AnnotationColor::Green,
         note: Some("editedword"),
@@ -97,7 +120,54 @@ pub fn verify(document: &str) {
         Some("editedword")
     );
     assert_eq!(found(&db, "initialword"), 0);
+    let history = page.history;
     drop(page);
+    assert!(matches!(
+        change(&mut db, edit(), &governor),
+        Err(yamantaka_domain::Failure::StaleAnnotation)
+    ));
+    let unchanged = db
+        .annotations(
+            &AnnotationQuery {
+                document_id: Some("original".into()),
+                ..Default::default()
+            },
+            &governor,
+            &Cancellation::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        unchanged.entries()[0].data().values.note.as_deref(),
+        Some("editedword")
+    );
+    assert_eq!(
+        (unchanged.history.undo, unchanged.history.redo),
+        (history.undo, history.redo)
+    );
+    assert_eq!(found(&db, "editedword"), 1);
+    drop(unchanged);
+    let before_blob = revision(&db, &governor);
+    db.execute_batch("UPDATE annotations SET inherited_blob=X'10';")
+        .unwrap();
+    assert!(matches!(
+        change(
+            &mut db,
+            AnnotationChange::Edit {
+                id: &id,
+                expected: &before_blob,
+                kind: AnnotationKind::PageComment,
+                color: AnnotationColor::Green,
+                note: Some("lostoverwrite"),
+                review: AnnotationReviewState::Accepted,
+                tags: None
+            },
+            &governor
+        ),
+        Err(yamantaka_domain::Failure::StaleAnnotation)
+    ));
+    assert_eq!(found(&db, "lostoverwrite"), 0);
+    db.execute_batch("UPDATE annotations SET inherited_blob=X'001122FF';")
+        .unwrap();
     let page = change(&mut db, AnnotationChange::Undo, &governor).unwrap();
     let record = page.entries()[0].data();
     assert_eq!(record.values.note.as_deref(), Some("initialword"));
@@ -159,8 +229,26 @@ pub fn verify(document: &str) {
         AnnotationReviewState::Accepted
     );
     drop(page);
+    let before_external = revision(&db, &governor);
     db.execute_batch("UPDATE annotations SET note='externalword'")
         .unwrap();
+    assert!(matches!(
+        change(
+            &mut db,
+            AnnotationChange::Edit {
+                id: &id,
+                expected: &before_external,
+                kind: AnnotationKind::PageComment,
+                color: AnnotationColor::Violet,
+                note: Some("staleoverwrite"),
+                review: AnnotationReviewState::Pending,
+                tags: None
+            },
+            &governor
+        ),
+        Err(yamantaka_domain::Failure::StaleAnnotation)
+    ));
+    assert_eq!(found(&db, "staleoverwrite"), 0);
     assert!(change(&mut db, AnnotationChange::Undo, &governor).is_err());
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("history.sqlite3");
@@ -180,11 +268,13 @@ pub fn verify(document: &str) {
     assert_eq!(blob, [0, 17, 34, 255]);
     assert_eq!(note, "externalword");
     for index in 0..105 {
+        let expected = revision(&db, &governor);
         drop(
             change(
                 &mut db,
                 AnnotationChange::Edit {
                     id: &id,
+                    expected: &expected,
                     kind: AnnotationKind::PageComment,
                     color: AnnotationColor::Violet,
                     note: Some(&format!("step{index}")),

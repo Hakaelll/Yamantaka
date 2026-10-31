@@ -43,9 +43,13 @@ pub enum AnnotationColumnValue {
 }
 pub struct AnnotationRecord {
     data: AnnotationRecordData,
+    revision: super::revision::AnnotationRevision,
     _lease: ByteLease,
 }
 impl AnnotationRecord {
+    pub fn revision(&self) -> &super::revision::AnnotationRevision {
+        &self.revision
+    }
     pub fn data(&self) -> &AnnotationRecordData {
         &self.data
     }
@@ -116,8 +120,10 @@ impl AnnotationRecord {
             .checked_add(extension_bytes)
             .ok_or(Failure::MemoryBudget)?;
         lease.try_resize(bytes).map_err(|_| Failure::MemoryBudget)?;
+        let revision = data.calculate_revision()?;
         Ok(Self {
             data,
+            revision,
             _lease: lease,
         })
     }
@@ -183,6 +189,7 @@ pub enum AnnotationChange<'a> {
     },
     Edit {
         id: &'a str,
+        expected: &'a super::revision::AnnotationRevision,
         kind: AnnotationKind,
         color: AnnotationColor,
         note: Option<&'a str>,

@@ -235,6 +235,7 @@ pub struct YamantakaApp {
     retired_annotation_writes: Vec<(String, Cancellation)>,
     reference_notes_preview: annotations::NotesPreview,
     reference_marks_preview: annotations::MarksPreview,
+    annotation_edit_conflict: annotations::ConflictPreview,
     annotation_multi_preview: bool,
     selection_preview: selection::SelectionPreview,
     selection_keyboard_preview: bool,
@@ -476,6 +477,7 @@ impl YamantakaApp {
             retired_annotation_writes: Vec::new(),
             reference_notes_preview: Default::default(),
             reference_marks_preview: Default::default(),
+            annotation_edit_conflict: Default::default(),
             annotation_multi_preview: false,
             selection_preview: Default::default(),
             selection_keyboard_preview: false,
@@ -2325,6 +2327,7 @@ impl App for YamantakaApp {
         self.advance_nearby_turn();
         self.advance_comparison_selection(&ctx);
         self.apply_annotation_preview();
+        self.advance_annotation_conflict();
         self.advance_reference_marks();
         self.advance_reference_notes();
         self.advance_editor_close_preview(&ctx);
@@ -2495,6 +2498,7 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
+                    && matches!(self.annotation_edit_conflict.phase,0|5)
                     && self.editor_close_capture_ready()
                     && self.managed_pages.settled()
                     && self.preview_device_loss.is_none()
@@ -2725,6 +2729,7 @@ impl App for YamantakaApp {
                     record["relations"] = self.relations.summary();
                     record["referenceNotesPhase"] = serde_json::json!(self.reference_notes_preview.phase());
                     record["primaryAnnotations"] = self.reader.annotations.summary();
+                    record["annotationEditConflict"] = self.annotation_conflict_summary();
                     record["referenceAnnotations"] = self.reference.as_ref().map(|view|view.pane.annotations.summary()).unwrap_or_default();
                     record["retiredAnnotationWrites"] = self.retired_annotation_writes.len().into();
                     record["referenceMarksPhase"] = serde_json::json!(self.reference_marks_preview.phase());

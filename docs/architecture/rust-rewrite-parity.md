@@ -94,3 +94,5 @@ The [editor close checkpoint](../validation/rust-editor-close-2026-10-31.md) pro
 The [page-note recovery checkpoint](../validation/rust-page-note-recovery-2026-10-31.md) adds atomic draft persistence for new page notes in both readers, with retained missing-reference/restore-disabled context and accepted-write reconciliation. Selection drafts, existing-note edits and other editors still require persistent recovery.
 
 The [metadata draft recovery checkpoint](../validation/rust-metadata-draft-recovery-2026-10-31.md) adds version-four continuity with raw title/author input, guarded revision matching and explicit review of changed-catalogue drafts. Selection drafts and existing-annotation edits remain pending.
+
+The [annotation edit revision checkpoint](../validation/rust-annotation-edit-revisions-2026-10-31.md) adds mandatory frozen revisions to individual note edits in both panes, transactional rejection of stale writes and retained in-memory editor text. Persistent recovery for existing-note and selection drafts remains pending.

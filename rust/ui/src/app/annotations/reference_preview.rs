@@ -99,9 +99,22 @@ impl YamantakaApp {
                 self.reference_marks_preview.phase = 7;
             }
             7 if ready && self.reader.annotations.ready() => {
+                let expected = self
+                    .reader
+                    .annotations
+                    .page
+                    .as_ref()
+                    .unwrap()
+                    .entries()
+                    .iter()
+                    .find(|record| record.data().id == "synthetic-primary-mark")
+                    .unwrap()
+                    .revision()
+                    .clone();
                 self.annotation_command(
                     Some(AnnotationMutation::Edit {
                         id: "synthetic-primary-mark".into(),
+                        expected,
                         kind: AnnotationKind::Highlight,
                         color: AnnotationColor::Blue,
                         note: Some("Updated in the main reading".into()),

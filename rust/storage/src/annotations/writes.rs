@@ -364,6 +364,13 @@ pub(super) fn change(
         }
         _ => Vec::new(),
     };
+    if let AnnotationChange::Edit { id, expected, .. } = &change {
+        let current =
+            read_one(&tx, document, id, governor, cancel)?.ok_or(Failure::StaleAnnotation)?;
+        if current.revision() != *expected {
+            return Err(Failure::StaleAnnotation);
+        }
+    }
     let mut entry = history::Entry::new(document, governor)?;
     let mut before = Vec::new();
     before
@@ -449,6 +456,7 @@ pub(super) fn change(
             note,
             review,
             tags: tag_values,
+            ..
         } => {
             if note.is_some_and(|note| note.encode_utf16().count() > MAX_ANNOTATION_NOTE_UTF16) {
                 return Err(Failure::Invalid(

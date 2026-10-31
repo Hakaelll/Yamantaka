@@ -67,6 +67,10 @@ pub const MAX_RENDER_DIMENSION: u32 = 16_384;
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Failure {
     #[error(
+        "The annotation changed. Reload it before saving another edit; your draft is retained."
+    )]
+    StaleAnnotation,
+    #[error(
         "The native PDF document is no longer loaded; reopen and verify its source before continuing"
     )]
     NativeDocumentUnavailable,
