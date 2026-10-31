@@ -1,6 +1,7 @@
 use super::*;
 use yamantaka_application::automation_simulation::{SimulationReply, SimulationRequest};
 use yamantaka_domain::automation::simulation::*;
+mod import_preview;
 mod preview;
 struct Pending {
     rule: Arc<SavedRule>,
@@ -62,7 +63,7 @@ impl SimulationState {
                 .collect::<Vec<_>>(),
             _ => Vec::new(),
         };
-        serde_json::json!({"phase":self.preview,"pending":self.busy(),"state":state,"scanned":progress.scanned,"matched":progress.matched,"unverified":progress.unverified,"ids":ids})
+        serde_json::json!({"phase":self.preview,"pending":self.busy(),"state":state,"scanned":progress.scanned,"matched":progress.matched,"unverified":progress.unverified,"ids":ids,"imported":match &self.outcome {Some(SimulationOutcome::Complete(report))=>report.imported.as_ref().map(|batch|batch.len()),_=>None}})
     }
 }
 impl Drop for SimulationState {
@@ -76,7 +77,13 @@ impl YamantakaApp {
             return;
         }
         self.automation.review.leave();
-        let request = SimulationRequest::new(rule.clone(), self.governor.clone());
+        let mut request = SimulationRequest::new(rule.clone(), self.governor.clone());
+        if rule
+            .definition()
+            .is_some_and(|definition| definition.trigger.kind == TriggerKind::DocumentImported)
+        {
+            request.imported = self.importing.last_batch.clone();
+        }
         let pending = Pending {
             rule,
             cancel: request.cancel.clone(),
@@ -155,11 +162,17 @@ impl YamantakaApp {
         let mut review = None;
         egui::Frame::new().fill(p.raised).corner_radius(8).inner_margin(16).show(ui,|ui| {
             ui.label(RichText::new(tr("Vista previa de coincidencias","Matching document preview")).size(21.0).color(p.ink));
+            if let SimulationOutcome::Complete(report)=outcome {
+                if let Some(batch)=&report.imported {
+                    ui.label(format!("{}: {}",tr("Lote de importación revisado", "Reviewed import batch"),batch.len()));
+                } else if report.rule.definition().is_some_and(|definition|definition.trigger.kind==TriggerKind::DocumentImported) {
+                    ui.label(tr("No hay un lote disponible en esta sesión. Importa PDF antes de simular esta condición.", "No batch is available in this session. Import PDFs before simulating this condition."));
+                }
+            }
             match outcome {
                 SimulationOutcome::Complete(report)=>{
                     ui.label(RichText::new(&report.rule.name).color(p.secondary));
                     ui.label(if english {format!("{} matches · {} documents scanned",report.progress.matched,report.progress.scanned)}else{format!("{} coincidencias · {} documentos revisados",report.progress.matched,report.progress.scanned)});
-                    if report.rule.definition().is_some_and(|definition|definition.trigger.kind==TriggerKind::DocumentImported) {ui.label(tr("Esta simulación manual no incluye un lote de importación.","This manual simulation has no import batch context."));}
                     if report.progress.unverified>0 {ui.label(if english {format!("{} files could not be verified.",report.progress.unverified)}else{format!("No se pudieron verificar {} archivos.",report.progress.unverified)});}
                     egui::ScrollArea::vertical().id_salt("rule-simulation-matches").max_height(240.0).show(ui,|ui| {
                         for matched in report.matches.iter().skip(state.offset).take(80) {ui.label(&matched.title);}
@@ -177,7 +190,7 @@ impl YamantakaApp {
                 SimulationOutcome::Failed {error,..}=>{ui.label(error.to_string());}
             }
             let close=theme::navigation(ui,tr("Cerrar vista previa","Close preview"),false,p);
-            if state.preview==10 && state.preview_mode==3 {close.scroll_to_me(Some(egui::Align::Center));}
+            if state.preview==10 && matches!(state.preview_mode,3|14) {close.scroll_to_me(Some(egui::Align::Center));}
             if close.clicked(){clear=true;}
         });
         if clear {

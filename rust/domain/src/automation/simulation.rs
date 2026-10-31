@@ -72,6 +72,14 @@ impl ScanEntry {
 }
 pub type RuleScanFactory = Box<dyn FnOnce() -> Result<Box<dyn RuleScanReader>> + Send>;
 pub trait RuleScanReader: Send {
+    fn imported(
+        &self,
+        _id: &str,
+        _governor: &MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<Option<Arc<ScanEntry>>> {
+        Err(Failure::Unsupported("Imported-document simulation".into()))
+    }
     fn prepare_legacy(
         &self,
         _journal: &super::execution::JournalRevision,
@@ -161,6 +169,7 @@ impl SimulationWatch {
     }
 }
 pub struct SimulationReport {
+    pub imported: Option<Arc<super::imported::ImportedDocuments>>,
     pub rule: Arc<SavedRule>,
     pub progress: SimulationProgress,
     pub matches: Vec<Arc<SimulationMatch>>,

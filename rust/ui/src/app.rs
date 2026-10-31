@@ -1808,10 +1808,11 @@ impl App for YamantakaApp {
                     self.reader.accept_text(&id, page, &cancel, Err(error));
                 }
                 Update::Text(..) => {}
-                Update::Imported(_, cancel) => {
+                Update::Imported(_, cancel, batch) => {
                     if !self.importing.finish(&cancel) {
                         continue;
                     }
+                    self.importing.last_batch = batch;
                     self.send(Action::PendingImports);
                     self.refresh();
                 }

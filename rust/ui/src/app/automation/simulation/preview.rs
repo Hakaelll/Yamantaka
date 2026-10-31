@@ -7,6 +7,10 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn advance_rule_simulation_preview(&mut self) {
+        if self.automation.simulation.preview_mode >= 11 {
+            self.advance_import_rule_preview();
+            return;
+        }
         let phase = self.automation.simulation.preview;
         if matches!(phase, 0 | 10) {
             return;

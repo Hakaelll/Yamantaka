@@ -286,7 +286,11 @@ pub enum Update {
         Cancellation,
     ),
     PageFindFailed(String, Failure, Cancellation),
-    Imported(usize, Cancellation),
+    Imported(
+        usize,
+        Cancellation,
+        Option<Arc<yamantaka_domain::automation::imported::ImportedDocuments>>,
+    ),
     ReaderPreferences(String, Option<ReaderPreferences>, Cancellation),
     Committed(String, WriteKind),
     Failed(Failure, Option<Cancellation>),
@@ -349,6 +353,7 @@ enum RuntimeControl {
     PersistSessions(Vec<ReadingSessionRequest>, usize, Sender<Result<()>>),
 }
 struct ImportState {
+    imported: Option<yamantaka_domain::automation::imported::ImportedDocuments>,
     source: Option<Box<HashedFile>>,
     job: Option<String>,
     folder: Option<Box<FolderImport>>,
@@ -802,6 +807,7 @@ fn start_import(
             engine,
             repository,
             ImportState {
+                imported: Some(Default::default()),
                 source: None,
                 job,
                 folder,
@@ -917,7 +923,7 @@ fn advance_import<E: AsyncPdfEngine>(
         emit(
             events,
             notify,
-            Update::Imported(state.count, state.cancel),
+            Update::Imported(state.count, state.cancel, state.imported.map(Arc::new)),
             state.permit,
         );
     }
@@ -1605,7 +1611,7 @@ impl Runtime {
                                         repository.get(&expected.document)?.filter(|d|!d.missing).ok_or_else(||Failure::Invalid("Metadata source is missing".into()))
                                     });
                                     match source {
-                                        Ok(document)=>advance_import(&engine,&mut repository,ImportState{source:None,job:None,folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
+                                        Ok(document)=>advance_import(&engine,&mut repository,ImportState{imported:None,source:None,job:None,folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
                                         Err(error)=>emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)})),permit),
                                     }
                                 }
@@ -1888,7 +1894,9 @@ impl Runtime {
                                     if let Some(job)=&state.job {repository.checkpoint_import(job,&document.path,&id)?;}
                                     Ok(id)
                                 }) {
-                                    Ok(_) => {
+                                    Ok(id) => {
+                                        if let Some(batch)=&mut state.imported
+                                            && engine.memory_governor().is_none_or(|governor|batch.insert(&id,&governor).is_err()) {state.imported=None;}
                                         state.count+=1;
                                         import_progress.fetch_add(1,Ordering::Release);
                                         notify();

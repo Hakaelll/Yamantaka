@@ -1118,7 +1118,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 } else if args.iter().any(|arg| arg == "--rule-simulation") {
                     app.preview_rule_simulation(
-                        if args.iter().any(|arg| arg == "--rule-execute-fail") {
+                        if args.iter().any(|arg| arg == "--rule-import-context") {
+                            if args.iter().any(|arg| arg == "--rule-import-no-context") {
+                                14
+                            } else if args.iter().any(|arg| arg == "--rule-import-undo") {
+                                13
+                            } else if args.iter().any(|arg| arg == "--rule-import-apply") {
+                                12
+                            } else {
+                                11
+                            }
+                        } else if args.iter().any(|arg| arg == "--rule-execute-fail") {
                             10
                         } else if args.iter().any(|arg| arg == "--rule-execute-undo") {
                             if args.iter().any(|arg| arg == "--text-scale=2") {

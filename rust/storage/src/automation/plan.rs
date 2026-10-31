@@ -211,6 +211,16 @@ fn build(
         .map_err(storage)?;
     for matched in &report.matches {
         cancel.check()?;
+        if trigger.kind == TriggerKind::DocumentImported
+            && !report
+                .imported
+                .as_ref()
+                .is_some_and(|batch| batch.contains(&matched.document))
+        {
+            return Err(invalid(
+                "A matched document is outside the reviewed import batch",
+            ));
+        }
         let mut rows = query
             .query(params![
                 matched.document,

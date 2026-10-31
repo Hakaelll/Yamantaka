@@ -164,7 +164,7 @@ mod tests {
                 .recv_timeout(Duration::from_secs(15))
                 .unwrap()
             {
-                Update::Imported(count, cancel) => {
+                Update::Imported(count, cancel, _) => {
                     assert!(!cancel.is_cancelled());
                     return Ok(count);
                 }

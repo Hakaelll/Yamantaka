@@ -98,7 +98,14 @@ pub(crate) fn verify(root: &Path, governor: &MemoryGovernor) {
             .query_row("PRAGMA data_version", [], |row| row.get(0))
             .unwrap();
         let result = report(run(&db, SimulationRequest::new(rule, governor.clone())));
-        assert_eq!(result.progress.scanned, 3);
+        assert_eq!(
+            result.progress.scanned,
+            if kind == TriggerKind::DocumentImported {
+                0
+            } else {
+                3
+            }
+        );
         assert_eq!(result.progress.unverified, 0);
         assert_eq!(
             result
@@ -123,6 +130,33 @@ pub(crate) fn verify(root: &Path, governor: &MemoryGovernor) {
             );
         }
         drop(result);
+        assert_eq!(governor.usage().total, 0);
+    }
+    {
+        let rule = saved(&mut db, governor, TriggerKind::DocumentImported, None);
+        let mut batch = yamantaka_domain::automation::imported::ImportedDocuments::default();
+        for id in ["book-2", "book-0", "book-2", "missing"] {
+            batch.insert(id, governor).unwrap();
+        }
+        let batch = Arc::new(batch);
+        let mut request = SimulationRequest::new(rule, governor.clone());
+        request.imported = Some(batch.clone());
+        let result = report(run(&db, request));
+        assert_eq!(result.progress.scanned, 3);
+        assert_eq!(
+            result
+                .matches
+                .iter()
+                .map(|item| item.document.as_str())
+                .collect::<Vec<_>>(),
+            ["book-0", "book-2"]
+        );
+        let reader = db.automation_reader().unwrap()().unwrap();
+        let plan = reader
+            .prepare(result.clone(), governor, &Cancellation::default())
+            .unwrap();
+        assert_eq!(plan.report().matches.len(), 2);
+        drop((plan, result, reader, batch));
         assert_eq!(governor.usage().total, 0);
     }
     crate::automation_plan::verification_test::verify(&db, &sql, governor, &originals);

@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Default)]
 pub(super) struct BackgroundImport {
+    pub(super) last_batch: Option<Arc<yamantaka_domain::automation::imported::ImportedDocuments>>,
     pending: Option<Cancellation>,
     catalogue_revision: u64,
     recovery: Vec<yamantaka_domain::import_recovery::PendingImport>,
@@ -41,6 +42,7 @@ impl BackgroundImport {
     }
 
     pub(super) fn begin(&mut self) -> Cancellation {
+        self.last_batch = None;
         self.cancel();
         let token = Cancellation::default();
         self.pending = Some(token.clone());
@@ -182,6 +184,25 @@ impl YamantakaApp {
     }
     pub(super) fn operation_actions(&mut self, ui: &mut egui::Ui, p: Palette) {
         if !self.importing.busy() {
+            if self
+                .importing
+                .last_batch
+                .as_ref()
+                .is_some_and(|batch| !batch.is_empty())
+                && theme::navigation(
+                    ui,
+                    self.tr(
+                        "Reglas guardadas: lote disponible",
+                        "Saved rules: batch available",
+                    ),
+                    false,
+                    p,
+                )
+                .clicked()
+            {
+                self.show_automation_rules();
+                ui.close();
+            }
             self.import_recovery_menu(ui, p);
         }
         if self.importing.pending.is_some()

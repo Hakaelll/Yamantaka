@@ -75,6 +75,38 @@ impl RuleScanReader for Database {
             .map_err(|_| Failure::MemoryBudget)?;
         Ok(ScanBound::new(value.map(str::to_owned), lease))
     }
+    fn imported(
+        &self,
+        id: &str,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<Option<Arc<ScanEntry>>> {
+        cancel.check()?;
+        let trigger = RuleTrigger {
+            kind: TriggerKind::DocumentImported,
+            value: None,
+        };
+        let mut statement = self
+            .connection
+            .prepare_cached(&select(
+                &trigger,
+                "d.id=?1 AND ?2 IS NULL AND ?3 IS NULL AND ?4 IS NULL AND ?5 IS NULL",
+            ))
+            .map_err(storage)?;
+        let mut rows = statement
+            .query(params![
+                id,
+                None::<String>,
+                None::<String>,
+                None::<String>,
+                None::<String>
+            ])
+            .map_err(storage)?;
+        rows.next()
+            .map_err(storage)?
+            .map(|row| scan_entry(row, governor))
+            .transpose()
+    }
     fn page(
         &self,
         after: Option<&str>,
@@ -105,43 +137,47 @@ impl RuleScanReader for Database {
         let mut entries = Vec::new();
         while let Some(row) = rows.next().map_err(storage)? {
             cancel.check()?;
-            let mut bytes = std::mem::size_of::<ScanEntry>() + 128;
-            for index in [0, 1, 2, 3, 4, 5, 7, 9] {
-                bytes = bytes
-                    .checked_add(
-                        optional(row, index)?
-                            .map_or(0, str::len)
-                            .checked_mul(2)
-                            .ok_or(Failure::MemoryBudget)?,
-                    )
-                    .ok_or(Failure::MemoryBudget)?;
-            }
-            let lease = governor
-                .try_reserve_one(Cost::new(
-                    MemoryCategory::Other,
-                    MemoryRepresentation::Cpu,
-                    bytes,
-                ))
-                .map_err(|_| Failure::MemoryBudget)?;
-            let size = u64::try_from(row.get::<_, i64>(8).map_err(storage)?)
-                .map_err(|_| Failure::Invalid("Invalid simulation file size".into()))?;
-            let data = ScanData {
-                revision: super::plan::signature(row)?,
-                id: field(row, 0)?.into(),
-                title: field(row, 1)?.into(),
-                path: PathBuf::from(field(row, 2)?),
-                normalized_path: field(row, 3)?.into(),
-                file_name: field(row, 4)?.into(),
-                author: optional(row, 5)?.map(str::to_owned),
-                missing: row.get(6).map_err(storage)?,
-                fingerprint: field(row, 7)?.into(),
-                size,
-                modified: field(row, 9)?.into(),
-                membership: row.get(10).map_err(storage)?,
-            };
             entries.try_reserve(1).map_err(|_| Failure::MemoryBudget)?;
-            entries.push(Arc::new(ScanEntry::new(data, lease)));
+            entries.push(scan_entry(row, governor)?);
         }
         Ok(entries)
     }
+}
+
+fn scan_entry(row: &rusqlite::Row<'_>, governor: &MemoryGovernor) -> Result<Arc<ScanEntry>> {
+    let mut bytes = std::mem::size_of::<ScanEntry>() + 128;
+    for index in [0, 1, 2, 3, 4, 5, 7, 9] {
+        bytes = bytes
+            .checked_add(
+                optional(row, index)?
+                    .map_or(0, str::len)
+                    .checked_mul(2)
+                    .ok_or(Failure::MemoryBudget)?,
+            )
+            .ok_or(Failure::MemoryBudget)?;
+    }
+    let lease = governor
+        .try_reserve_one(Cost::new(
+            MemoryCategory::Other,
+            MemoryRepresentation::Cpu,
+            bytes,
+        ))
+        .map_err(|_| Failure::MemoryBudget)?;
+    let size = u64::try_from(row.get::<_, i64>(8).map_err(storage)?)
+        .map_err(|_| Failure::Invalid("Invalid simulation file size".into()))?;
+    let data = ScanData {
+        revision: super::plan::signature(row)?,
+        id: field(row, 0)?.into(),
+        title: field(row, 1)?.into(),
+        path: PathBuf::from(field(row, 2)?),
+        normalized_path: field(row, 3)?.into(),
+        file_name: field(row, 4)?.into(),
+        author: optional(row, 5)?.map(str::to_owned),
+        missing: row.get(6).map_err(storage)?,
+        fingerprint: field(row, 7)?.into(),
+        size,
+        modified: field(row, 9)?.into(),
+        membership: row.get(10).map_err(storage)?,
+    };
+    Ok(Arc::new(ScanEntry::new(data, lease)))
 }

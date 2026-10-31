@@ -32,6 +32,9 @@ pub fn seed(
             db.execute_batch("WITH RECURSIVE n(x) AS (SELECT 0 UNION ALL SELECT x+1 FROM n WHERE x<78) INSERT INTO operation_journal(id,operation_kind,status,summary_json,total_items,completed_items,started_at,updated_at,phase,resume_capability) SELECT printf('older-inherited-%03d',x),'automation','completed','{}',1,1,'2026-10-29','2026-10-29','completed','none' FROM n;")?;
         }
     }
+    if args.iter().any(|arg| arg == "--rule-import-context") {
+        db.execute_batch("UPDATE automation_rules SET trigger_json='{\"kind\":\"documentImported\",\"value\":null}',actions_json='[{\"kind\":\"setPriority\",\"value\":\"1\"}]' WHERE id='legacy-rule'")?;
+    }
     if args.iter().any(|arg| arg == "--rule-review") {
         db.execute_batch("INSERT INTO workspaces(id,name,created_at,updated_at) VALUES('review-workspace','Study desk','','')")?;
         let workspace = if args.iter().any(|arg| arg == "--rule-review-missing") {

@@ -262,7 +262,15 @@ fn run(operation: Operation, outcome: Outcome) {
             );
         }
     } else if succeeds {
-        assert!(matches!(result,Update::Imported(1,token) if token.same_request(&cancel)));
+        match result {
+            Update::Imported(1, token, Some(batch)) => {
+                assert!(token.same_request(&cancel));
+                assert_eq!(batch.len(), 1);
+                let id = batch.ids().next().unwrap();
+                assert!(Database::open(&dbpath).unwrap().get(id).unwrap().is_some());
+            }
+            _ => panic!("Successful import did not publish its exact document context"),
+        }
     } else {
         assert!(
             matches!(&result,Update::Failed(Failure::Cancelled,Some(token)) if outcome==Outcome::Cancel&&token.same_request(&cancel))
@@ -338,7 +346,7 @@ fn run(operation: Operation, outcome: Outcome) {
                 Cancellation::default(),
             ))
             .unwrap();
-        assert!(matches!(wait(&runtime), Update::Imported(1, _)));
+        assert!(matches!(wait(&runtime), Update::Imported(1, _, _)));
         assert_eq!(runtime.import_revision(), revision);
         assert!(
             matches!(
@@ -439,7 +447,7 @@ fn the_import_read_guard_survives_losing_and_reloading_the_initial_native_owner(
         Some(32)
     );
     visible(&runtime, &["reader-a"]);
-    assert!(matches!(wait(&runtime),Update::Imported(1,token) if token.same_request(&cancel)));
+    assert!(matches!(wait(&runtime),Update::Imported(1,token,_) if token.same_request(&cancel)));
     let connection = rusqlite::Connection::open(&dbpath).unwrap();
     let (pages_count, size): (u32, i64) = connection
         .query_row(

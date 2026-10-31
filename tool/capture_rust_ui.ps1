@@ -25,6 +25,10 @@ $cases = @(
     @{ name='rule-review-actions'; args=@('--saved-rules','--rule-simulation','--rule-review','--es') },
     @{ name='rule-review-small-200'; args=@('--saved-rules','--rule-simulation','--rule-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='rule-review-missing-workspace'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-review-missing','--light') },
+    @{ name='import-rule-preview'; args=@('--saved-rules','--rule-simulation','--rule-import-context','--folder-import','--es','--light') },
+    @{ name='import-rule-applied'; args=@('--saved-rules','--rule-simulation','--rule-import-context','--folder-import','--rule-import-apply','--es') },
+    @{ name='import-rule-undone'; args=@('--saved-rules','--rule-simulation','--rule-import-context','--folder-import','--rule-import-undo','--light') },
+    @{ name='import-rule-no-context'; args=@('--saved-rules','--rule-simulation','--rule-import-context','--rule-import-no-context','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='rule-simulation-extension'; args=@('--saved-rules','--rule-simulation','--es') },
     @{ name='rule-simulation-duplicates'; args=@('--saved-rules','--rule-simulation','--rule-simulation-duplicates','--light') },
     @{ name='rule-simulation-cancel'; args=@('--saved-rules','--rule-simulation','--rule-simulation-cancel','--es') },
@@ -481,6 +485,23 @@ foreach ($case in $cases) {
         } elseif ($controls.ruleReview.failed -or $controls.ruleReview.documents -ne 10 -or $controls.ruleReview.actions -ne 7) {throw 'The reviewed document or action count is incorrect.'}
         $visible=if ($case.name -eq 'rule-review-missing-workspace') {@('Review actions')} else {@('Cerrar revisión')}
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $visible
+    }
+    if ($case.name -like 'import-rule-*') {
+        $result=$controls.ruleSimulation
+        $count=if($case.name -eq 'import-rule-no-context'){0}else{3}
+        $executed=$case.name -in @('import-rule-applied','import-rule-undone')
+        if($result.phase -ne 10 -or $result.pending){throw 'Import rule preview did not settle.'}
+        if(-not $executed -and ($result.state -ne 'complete' -or $result.scanned -ne $count -or $result.matched -ne $count -or @($result.ids | Where-Object {$_ -like 'demo-*'}).Count -gt 0)){throw 'Import context was lost or matched documents outside the batch.'}
+        if($executed -and $result.state -ne 'idle'){throw 'Completed execution retained a stale simulation.'}
+        if($count -eq 3 -and $controls.libraryDocumentCount -ne 13){throw 'The folder import did not retain the ten original catalogue records.'}
+        if($case.name -in @('import-rule-applied','import-rule-undone')) {
+            $expected=if($case.name -eq 'import-rule-applied'){'Completed'}else{'RolledBack'}
+            if($controls.ruleExecution.pending -or $controls.ruleExecution.status -ne $expected -or $controls.ruleExecution.completed -ne 3){throw 'The reviewed import rule did not execute or undo its exact batch.'}
+            $favorites=if($case.name -eq 'import-rule-applied'){3}else{0}
+            if($controls.libraryVisibleFavorites -ne $favorites){throw 'The import rule changed documents outside the three-record batch.'}
+        }
+        $labels=if($case.name -eq 'import-rule-no-context'){@('Cerrar vista previa')}else{@()}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
     if ($case.name -like 'rule-simulation-*') {
         $result=$controls.ruleSimulation

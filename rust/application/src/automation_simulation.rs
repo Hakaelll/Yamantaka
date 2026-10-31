@@ -13,6 +13,7 @@ use yamantaka_domain::{
     memory::{Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation, TrackedBytesBuilder},
 };
 pub struct SimulationRequest {
+    pub imported: Option<Arc<yamantaka_domain::automation::imported::ImportedDocuments>>,
     pub rule: Arc<SavedRule>,
     pub governor: MemoryGovernor,
     pub cancel: Cancellation,
@@ -21,6 +22,7 @@ pub struct SimulationRequest {
 impl SimulationRequest {
     pub fn new(rule: Arc<SavedRule>, governor: MemoryGovernor) -> Self {
         Self {
+            imported: None,
             rule,
             governor,
             cancel: Cancellation::default(),
@@ -135,6 +137,28 @@ fn execute(request: &SimulationRequest, reader: &dyn RuleScanReader) -> Simulati
             .ok_or_else(|| Failure::Invalid("This saved rule format needs review".into()))?;
         definition.validate()?;
         let bound = reader.begin(&request.rule, &request.governor, &request.cancel)?;
+        if definition.trigger.kind == TriggerKind::DocumentImported {
+            let mut matches = Vec::new();
+            if let Some(batch) = &request.imported {
+                for id in batch.ids() {
+                    check()?;
+                    progress.scanned += 1;
+                    if let Some(entry) = reader.imported(id, &request.governor, &request.cancel)? {
+                        if entry.id != id {
+                            return Err(Failure::Invalid(
+                                "Imported lookup returned another document".into(),
+                            ));
+                        }
+                        matches.try_reserve(1).map_err(|_| Failure::MemoryBudget)?;
+                        matches.push(candidate(&entry, None, &request.governor)?);
+                        progress.matched += 1;
+                    }
+                    request.watch.publish(progress);
+                }
+            }
+            check()?;
+            return Ok(Some(matches));
+        }
         let Some(upper) = bound.value.as_deref() else {
             return Ok(Some(Vec::new()));
         };
@@ -243,6 +267,7 @@ fn execute(request: &SimulationRequest, reader: &dyn RuleScanReader) -> Simulati
     };
     match run() {
         Ok(Some(matches)) => SimulationOutcome::Complete(Arc::new(SimulationReport {
+            imported: request.imported.clone(),
             rule: request.rule.clone(),
             progress,
             matches,

@@ -98,6 +98,13 @@ impl YamantakaApp {
                         .color(p.secondary),
                     );
                     ui.add_space(24.0);
+                    if let Some(batch)=&self.importing.last_batch {
+                        let count=batch.len();
+                        if count>0 {
+                            ui.label(format!("{}: {count}",tr("Documentos del último lote disponibles para simular", "Documents from the last batch available for simulation")));
+                            if theme::navigation(ui,tr("Olvidar lote", "Forget batch"),false,p).clicked() {self.importing.last_batch=None;}
+                        }
+                    }
                     self.rule_execution_view(ui,p);
                     self.rule_journal_view(ui,p);
                     if !self.legacy_recovery_view(ui,p) && !self.rule_review_view(ui, p) {
