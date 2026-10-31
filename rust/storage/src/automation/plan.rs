@@ -6,8 +6,14 @@ use yamantaka_domain::{
 };
 
 pub(super) fn signature(row: &rusqlite::Row<'_>) -> Result<[u8; 32]> {
+    signature_excluding(row, None)
+}
+pub(super) fn signature_excluding(row: &rusqlite::Row<'_>, skip: Option<&str>) -> Result<[u8; 32]> {
     let mut digest = Sha256::new();
     for index in 0..row.as_ref().column_count() {
+        if skip.is_some_and(|name| row.as_ref().column_name(index).ok() == Some(name)) {
+            continue;
+        }
         match row.get_ref(index).map_err(storage)? {
             ValueRef::Null => digest.update([0]),
             ValueRef::Integer(value) => {

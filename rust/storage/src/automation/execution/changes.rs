@@ -52,6 +52,8 @@ pub(super) struct DocumentUndo {
 pub(super) enum Undo {
     Targets { entries: Vec<CreatedTarget> },
     Document(DocumentUndo),
+    LegacyDocument(legacy::DocumentUndo),
+    LegacyJournal(legacy::JournalUndo),
 }
 pub(super) struct TargetGuard {
     pub kind: TargetKind,

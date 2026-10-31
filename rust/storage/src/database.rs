@@ -804,7 +804,7 @@ impl LibraryRepository for Database {
         Ok(())
     }
     fn save_position(&mut self, id: &str, page: u32) -> Result<()> {
-        self.connection.execute("UPDATE documents SET last_page_index=MIN(?1,MAX(page_count-1,0)),reading_progress=CASE WHEN page_count>0 THEN (MIN(?1,page_count-1)+1.0)/page_count ELSE 0 END,last_opened_at=?2 WHERE id=?3", params![page, chrono::Utc::now().to_rfc3339(), id]).map_err(storage)?;
+        self.connection.execute("UPDATE documents SET last_page_index=MIN(?1,MAX(page_count-1,0)),reading_progress=CASE WHEN page_count=1 THEN 1 WHEN page_count>1 THEN MIN(?1,page_count-1)*1.0/(page_count-1) ELSE 0 END,last_opened_at=?2 WHERE id=?3", params![page, chrono::Utc::now().to_rfc3339(), id]).map_err(storage)?;
         Ok(())
     }
     fn get(&self, id: &str) -> Result<Option<Document>> {

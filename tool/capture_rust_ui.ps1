@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='inherited-recovery-review-small-200'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='inherited-recovery-completed'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--inherited-recovery-apply','--es') },
+    @{ name='inherited-recovery-undone'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--inherited-recovery-undo','--light') },
+    @{ name='inherited-recovery-unknown'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--inherited-recovery-unknown') },
+    @{ name='inherited-recovery-failed'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--inherited-recovery-fail','--light') },
     @{ name='inherited-journals-retry'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-retry','--es') },
     @{ name='inherited-journals-incompatible'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-incompatible','--light') },
     @{ name='inherited-journals-small-200'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
@@ -429,6 +434,20 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -like 'inherited-recovery-*') {
+        $state=$controls.ruleExecution
+        if ($state.inheritedPhase -ne 10 -or $state.pending -or $state.loading -or $state.legacyReviewPending) {throw 'Inherited receipt recovery did not settle.'}
+        if ($case.name -eq 'inherited-recovery-review-small-200') {
+            if ($state.failed -or $state.total -ne 3 -or $state.legacyDocuments -ne 2 -or $state.legacyTargets -ne 3 -or $state.legacySkipped -ne 1) {throw 'Recovery review did not preserve the original journal and typed action plan.'}
+        } elseif ($case.name -eq 'inherited-recovery-unknown') {
+            if (-not $state.failed -or $state.total -ne 3 -or $null -ne $state.legacyDocuments) {throw 'Unknown inherited receipts must remain unmodified and unexecutable.'}
+        } else {
+            $expected=if ($case.name -eq 'inherited-recovery-undone') {'RolledBack'} elseif ($case.name -eq 'inherited-recovery-failed') {'Failed'} else {'Completed'}
+            if ($state.failed -or $state.total -ne 4 -or $state.status -ne $expected -or -not $state.recovery -or $state.reversible -ne ($expected -eq 'Completed')) {throw 'Journaled recovery or its undo did not reach the expected durable state.'}
+        }
+        $labels=if ($case.name -eq 'inherited-recovery-review-small-200') {@('Confirmar recuperación','Cerrar revisión')} elseif ($case.name -eq 'inherited-recovery-completed') {@('Revisar deshacer')} else {@()}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
     if ($case.name -like 'inherited-journals-*') {
         $history=$controls.ruleExecution

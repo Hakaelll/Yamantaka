@@ -182,6 +182,9 @@ mod tests {
     }
     #[test]
     fn background_comparison_rejects_partial_hash_collision_and_confirms_full_copy() {
+        if crate::automation_execution::legacy_recovery_verification::child_entry() {
+            return;
+        }
         let (dir, mut db, document) = setup();
         let candidate = dir.path().join("candidate.pdf");
         let governor = MemoryGovernor::new(Default::default());

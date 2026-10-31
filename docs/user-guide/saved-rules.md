@@ -62,7 +62,13 @@ For a journal with a retry/resume capability and a stored compatibility proof, c
 
 A successful check starts a fresh simulation against the current library. Review its matches and actions, then use the normal confirmation workflow if you want a new execution. This does not silently replay a previous document offset, apply old actions, or mark the inherited journal recovered.
 
-Journals with old undo payloads remain visible and identify the need for a recovery review. **Applying those inherited undo receipts is still pending.** Their original data is preserved and the native undo button is not offered for them.
+For a journal with undo capability, choose **Review recovery**. Known Flutter receipts support removing recorded tag, collection, and queue memberships, restoring a favorite flag, and restoring reading progress, mode, and theme. The review shows the current values and proposed restoration. Missing documents are listed without recreating them; receipts explicitly marked unchanged are skipped. Unknown kinds, extra fields, duplicate keys, and invalid values reject the review and preserve the original payload.
+
+Flutter receipts do not record every later value. Confirming recovery therefore explicitly authorizes the displayed restoration, including replacing current favorite or reading values and removing the listed memberships. Changes made after the review invalidate its frozen revisions. Review the proposal carefully if you have edited the library since the original execution.
+
+**Confirm recovery** runs in the background and creates a separate native recovery journal. Each document change commits with its new undo receipt. Cancellation or failure attempts to reverse the committed prefix. Only successful completion marks the inherited journal recovered. The original receipt JSON stays unchanged. A process interrupted after a document commit leaves a native journal that can be reviewed for undo after reopening.
+
+The recovery's **Review undo** action restores the captured values, complete removed membership rows, and queue selection/split state when its postconditions still match. Later conflicting edits are preserved and leave remaining receipts recoverable. Undo also restores the inherited journal's recovery capability. No original PDF is changed. Actions absent from the old receipts cannot be inferred or recovered.
 
 ## Review existing definitions
 
@@ -72,4 +78,4 @@ Journals with old undo payloads remain visible and identify the need for a recov
 
 The list retrieves up to 80 definitions per batch. Previous rules and More rules appear for longer lists. Reads run through the application worker, and their retained data uses the shared memory governor. A budget error offers Reload after releasing the previous list.
 
-See the [inherited-history checkpoint](../validation/rust-inherited-journals-2026-10-31.md), [execution checkpoint](../validation/rust-rule-execution-2026-10-31.md), [action-review checkpoint](../validation/rust-rule-review-2026-10-31.md), [simulation checkpoint](../validation/rust-rule-simulation-2026-10-31.md) and [saved-rule checkpoint](../validation/rust-saved-rules-2026-10-31.md) for the executed evidence and remaining work.
+See the [receipt-recovery checkpoint](../validation/rust-legacy-recovery-2026-10-31.md), [inherited-history checkpoint](../validation/rust-inherited-journals-2026-10-31.md), [execution checkpoint](../validation/rust-rule-execution-2026-10-31.md), [action-review checkpoint](../validation/rust-rule-review-2026-10-31.md), [simulation checkpoint](../validation/rust-rule-simulation-2026-10-31.md) and [saved-rule checkpoint](../validation/rust-saved-rules-2026-10-31.md) for the executed evidence and remaining work.

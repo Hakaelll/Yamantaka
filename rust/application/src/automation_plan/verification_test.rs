@@ -35,7 +35,10 @@ fn review(db: &Database, request: PlanRequest) -> Result<Arc<RulePlan>> {
     job.register(&mut select);
     select.ready_timeout(Duration::from_secs(10)).unwrap();
     drop(select);
-    job.poll().unwrap().result
+    job.poll().unwrap().result.map(|prepared| match prepared {
+        PreparedPlan::Rule(plan) => plan,
+        PreparedPlan::Legacy(_) => panic!("Unexpected inherited plan"),
+    })
 }
 pub(crate) fn verify(
     db: &Database,

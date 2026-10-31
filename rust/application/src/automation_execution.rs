@@ -13,6 +13,7 @@ use yamantaka_domain::{
 };
 
 pub enum ExecutionCommand {
+    RecoverInherited(Arc<yamantaka_domain::automation::legacy::LegacyRecoveryPlan>),
     Apply(Arc<RulePlan>),
     Undo(JournalRevision),
 }
@@ -41,6 +42,7 @@ fn execute(request: &ExecutionRequest, factory: ExecutionFactory) -> Result<Arc<
     request.context.cancel.check()?;
     let mut store = factory()?;
     match &request.command {
+        ExecutionCommand::RecoverInherited(plan) => store.recover_legacy(plan, &request.context),
         ExecutionCommand::Undo(revision) => store.undo(revision, &request.context),
         ExecutionCommand::Apply(plan) => {
             let exact = plan.report().rule.definition().is_some_and(|definition| {
@@ -148,6 +150,9 @@ impl Drop for ExecutionJob {
 #[cfg(test)]
 #[path = "automation_execution/inherited_verification.rs"]
 pub(crate) mod inherited_verification;
+#[cfg(test)]
+#[path = "automation_execution/legacy_recovery_verification.rs"]
+pub(crate) mod legacy_recovery_verification;
 #[cfg(test)]
 #[path = "automation_execution/verification_test.rs"]
 pub(crate) mod verification_test;

@@ -1,5 +1,5 @@
 use super::*;
-use yamantaka_application::automation_plan::{PlanReply, PlanRequest};
+use yamantaka_application::automation_plan::{PlanReply, PlanRequest, PreparedPlan};
 use yamantaka_domain::Failure;
 use yamantaka_domain::automation::{plan::*, simulation::SimulationReport};
 
@@ -48,6 +48,11 @@ impl YamantakaApp {
         }
     }
     pub(in crate::app) fn accept_rule_review(&mut self, reply: PlanReply) {
+        if self.legacy_review_matches(&reply.cancel) {
+            self.accept_legacy_review(reply);
+            return;
+        }
+
         let state = &mut self.automation.review;
         if !state
             .pending
@@ -61,7 +66,10 @@ impl YamantakaApp {
             return;
         }
         match reply.result {
-            Ok(plan) => state.plan = Some(plan),
+            Ok(PreparedPlan::Rule(plan)) => state.plan = Some(plan),
+            Ok(PreparedPlan::Legacy(_)) => {
+                state.error = Some("Unexpected inherited review response".into())
+            }
             Err(Failure::Cancelled) => {}
             Err(error) => state.error = Some(error.to_string()),
         }

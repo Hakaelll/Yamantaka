@@ -100,7 +100,7 @@ impl YamantakaApp {
                     ui.add_space(24.0);
                     self.rule_execution_view(ui,p);
                     self.rule_journal_view(ui,p);
-                    if !self.rule_review_view(ui, p) {
+                    if !self.legacy_recovery_view(ui,p) && !self.rule_review_view(ui, p) {
                         self.rule_simulation_view(ui, p);
                     }
                     let busy = self.automation.busy();

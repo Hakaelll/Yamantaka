@@ -22,6 +22,15 @@ pub(super) fn select(trigger: &RuleTrigger, condition: &str) -> String {
     )
 }
 impl RuleScanReader for Database {
+    fn prepare_legacy(
+        &self,
+        journal: &yamantaka_domain::automation::execution::JournalRevision,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<yamantaka_domain::automation::legacy::LegacyRecoveryPlan> {
+        self.legacy_recovery_plan(journal, governor, cancel)
+    }
+
     fn prepare(
         &self,
         report: Arc<SimulationReport>,

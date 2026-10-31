@@ -33,6 +33,7 @@ pub enum JournalOrigin {
 }
 pub struct JournalEntry {
     pub origin: JournalOrigin,
+    pub recovery: bool,
     pub revision: JournalRevision,
     pub rule_name: String,
     pub status: ExecutionStatus,
@@ -54,6 +55,7 @@ impl JournalEntry {
     ) -> Self {
         Self {
             origin: JournalOrigin::Native,
+            recovery: false,
             revision,
             rule_name,
             status,
@@ -63,6 +65,10 @@ impl JournalEntry {
             error_code,
             _lease: lease,
         }
+    }
+    pub fn with_recovery(mut self, value: bool) -> Self {
+        self.recovery = value;
+        self
     }
     pub fn with_origin(mut self, origin: JournalOrigin) -> Self {
         self.origin = origin;
@@ -95,6 +101,15 @@ pub type SourceGuard = Option<Box<dyn Send>>;
 pub type SourceVerifier<'a> = dyn FnMut(&SimulationMatch) -> Result<SourceGuard> + 'a;
 pub type ExecutionFactory = Box<dyn FnOnce() -> Result<Box<dyn RuleExecutionStore>> + Send>;
 pub trait RuleExecutionStore: Send {
+    fn recover_legacy(
+        &mut self,
+        _plan: &super::legacy::LegacyRecoveryPlan,
+        _context: &ExecutionContext,
+    ) -> Result<Arc<JournalEntry>> {
+        Err(crate::Failure::Unsupported(
+            "Inherited receipt recovery".into(),
+        ))
+    }
     fn apply(
         &mut self,
         plan: &RulePlan,

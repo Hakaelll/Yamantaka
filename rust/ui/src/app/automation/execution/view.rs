@@ -38,7 +38,7 @@ impl YamantakaApp {
             return;
         }
         if let Some(pending) = &state.pending {
-            let label = if pending.undo || pending.cancel.is_cancelled() {
+            let label = if pending.kind == PendingKind::Undo || pending.cancel.is_cancelled() {
                 tr("Revirtiendo cambios…", "Reverting changes…")
             } else {
                 tr(
@@ -47,7 +47,7 @@ impl YamantakaApp {
                 )
             };
             ui.label(RichText::new(label).size(20.0).color(p.ink));
-            if !pending.undo {
+            if pending.kind != PendingKind::Undo {
                 ui.label(format!(
                     "{} {}",
                     pending.watch.completed(),
@@ -107,11 +107,13 @@ impl YamantakaApp {
         }
         let mut undo = None;
         let mut retry = None;
+        let mut recover = None;
         for entry in &page.entries {
             let frame=egui::Frame::new().fill(p.surface).corner_radius(8).inner_margin(16).show(ui,|ui| {
                 ui.set_min_width(ui.available_width());
                 ui.label(RichText::new(&entry.rule_name).size(19.0).color(p.ink));
                 ui.label(status(entry.status,english));
+                if entry.recovery {ui.label(RichText::new(tr("Recuperación de recibos heredados","Inherited receipt recovery")).size(12.0).color(p.secondary));}
                 if let JournalOrigin::Flutter {retry_candidate,has_undo}=entry.origin {
                     ui.label(RichText::new(tr("Conservada de Flutter","Preserved from Flutter")).size(12.0).color(p.secondary));
                     if retry_candidate {
@@ -119,7 +121,7 @@ impl YamantakaApp {
                         if button.clicked(){retry=Some(entry.revision.clone());}
                         if state.inherited_preview==10 && state.inherited_mode==3 && entry.revision.id=="inherited-0-retry" {button.scroll_to_me(Some(egui::Align::Center));}
                     }
-                    if has_undo {ui.label(tr("Este recibo heredado necesita una revisión de recuperación antes de deshacer.","This inherited receipt needs a recovery review before undo."));}
+                    if has_undo && ui.add_enabled_ui(!busy,|ui|theme::navigation(ui,tr("Revisar recuperación","Review recovery"),false,p)).inner.clicked(){recover=Some(entry.revision.clone());}
                 }
                 ui.label(format!("{} / {} {}",entry.completed,entry.total,tr("documentos procesados","documents processed")));
                 if let Some(code)=&entry.error_code {ui.label(RichText::new(code).size(12.0).color(p.secondary));}
@@ -133,6 +135,9 @@ impl YamantakaApp {
             if (state.inherited_preview == 10
                 && state.inherited_mode == 0
                 && entry.revision.id == "inherited-0-retry")
+                || (state.inherited_preview == 10
+                    && matches!(state.inherited_mode, 6 | 7 | 10)
+                    && entry.recovery)
                 || self.automation.simulation.execution_preview_done()
             {
                 frame.response.scroll_to_me(Some(egui::Align::Min));
@@ -169,6 +174,9 @@ impl YamantakaApp {
         }
         if reload {
             self.load_rule_journals();
+        }
+        if let Some(revision) = recover {
+            self.prepare_legacy_review(revision);
         }
         if let Some(revision) = retry {
             self.check_inherited_rule(revision);

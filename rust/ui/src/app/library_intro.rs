@@ -2,10 +2,16 @@ use super::*;
 
 impl YamantakaApp {
     pub(super) fn reading_shortcut(&mut self, ui: &mut egui::Ui, p: Palette) {
+        let active = self.tabs.model.active().map(|tab| tab.document());
         let Some(document) = self
             .documents
             .iter()
-            .find(|document| document.reading_progress > 0.0)
+            .find(|document| Some(document.id.as_str()) == active)
+            .or_else(|| {
+                self.documents
+                    .iter()
+                    .find(|document| document.reading_progress > 0.0)
+            })
             .cloned()
         else {
             return;

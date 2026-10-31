@@ -5,6 +5,7 @@ use yamantaka_domain::automation::{execution::*, plan::*};
 mod changes;
 mod inherited;
 mod journal;
+mod legacy;
 mod undo;
 mod undo_changes;
 use changes::*;
@@ -53,6 +54,13 @@ fn item_budget(
     super::plan::reserve(&context.governor, bytes)
 }
 impl RuleExecutionStore for Database {
+    fn recover_legacy(
+        &mut self,
+        plan: &yamantaka_domain::automation::legacy::LegacyRecoveryPlan,
+        context: &ExecutionContext,
+    ) -> Result<Arc<JournalEntry>> {
+        legacy::recover(self, plan, context)
+    }
     fn apply(
         &mut self,
         plan: &RulePlan,
@@ -165,7 +173,7 @@ impl RuleExecutionStore for Database {
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(storage)?;
             journal::verify_revision(&tx, revision)?;
-            let compatible:bool=tx.query_row("SELECT compatibility_hash='yamantaka-rules-v1' AND resume_capability='rollback' FROM operation_journal WHERE id=? AND operation_kind=?",params![revision.id,journal::ROOT],|row|row.get(0)).map_err(storage)?;
+            let compatible:bool=tx.query_row("SELECT compatibility_hash IN ('yamantaka-rules-v1','yamantaka-legacy-recovery-v1') AND resume_capability='rollback' FROM operation_journal WHERE id=? AND operation_kind=?",params![revision.id,journal::ROOT],|row|row.get(0)).map_err(storage)?;
             if !compatible || uuid::Uuid::parse_str(&revision.id).is_err() {
                 return Err(invalid("This execution cannot be undone by this version"));
             }

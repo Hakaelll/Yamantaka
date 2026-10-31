@@ -4,17 +4,27 @@ use yamantaka_application::automation_execution::{
 };
 use yamantaka_domain::{Failure, automation::execution::*};
 mod inherited;
+mod legacy;
 mod view;
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PendingKind {
+    Rule,
+    Undo,
+    Recovery,
+}
 struct Pending {
     cancel: Cancellation,
     watch: Arc<ExecutionWatch>,
-    undo: bool,
+    kind: PendingKind,
 }
 #[derive(Default)]
 pub(super) struct ExecutionState {
     pending: Option<Pending>,
     loading: Option<Cancellation>,
     retrying: Option<Cancellation>,
+    legacy_pending: Option<Cancellation>,
+    legacy_plan: Option<Arc<yamantaka_domain::automation::legacy::LegacyRecoveryPlan>>,
+    legacy_offset: usize,
     inherited_preview: u8,
     inherited_mode: u8,
     page: Option<Arc<JournalPage>>,
@@ -30,12 +40,20 @@ impl ExecutionState {
         self.history_open = false;
     }
     pub(super) fn busy(&self) -> bool {
-        self.pending.is_some() || self.loading.is_some() || self.retrying.is_some()
+        self.pending.is_some()
+            || self.loading.is_some()
+            || self.retrying.is_some()
+            || self.legacy_pending.is_some()
     }
     pub(super) fn ready(&self) -> bool {
         !self.busy() && matches!(self.inherited_preview, 0 | 10)
     }
     pub(super) fn leave(&mut self) {
+        if let Some(cancel) = &self.legacy_pending {
+            cancel.cancel();
+        }
+        self.legacy_plan = None;
+
         if let Some(pending) = &self.pending {
             pending.cancel.cancel();
         }
@@ -52,7 +70,7 @@ impl ExecutionState {
         self.receipt.clone()
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"inheritedPhase":self.inherited_preview,"retrying":self.retrying.is_some(),"entries":self.page.as_ref().map(|page|page.entries.iter().map(|entry|serde_json::json!({"id":entry.revision.id,"origin":if matches!(entry.origin,JournalOrigin::Native){"native"}else{"flutter"},"reversible":entry.reversible})).collect::<Vec<_>>()),"pending":self.pending.is_some(),"loading":self.loading.is_some(),"failed":self.error.is_some(),"total":self.page.as_ref().map(|page|page.total),"status":self.receipt.as_ref().map(|entry|format!("{:?}",entry.status)),"completed":self.receipt.as_ref().map(|entry|entry.completed),"reversible":self.receipt.as_ref().map(|entry|entry.reversible)})
+        serde_json::json!({"legacyReviewPending":self.legacy_pending.is_some(),"legacyDocuments":self.legacy_plan.as_ref().map(|plan|plan.documents.len()),"legacyTargets":self.legacy_plan.as_ref().map(|plan|plan.targets.len()),"legacySkipped":self.legacy_plan.as_ref().map(|plan|plan.skipped),"recovery":self.receipt.as_ref().map(|entry|entry.recovery),"inheritedPhase":self.inherited_preview,"retrying":self.retrying.is_some(),"entries":self.page.as_ref().map(|page|page.entries.iter().map(|entry|serde_json::json!({"id":entry.revision.id,"origin":if matches!(entry.origin,JournalOrigin::Native){"native"}else{"flutter"},"reversible":entry.reversible})).collect::<Vec<_>>()),"pending":self.pending.is_some(),"loading":self.loading.is_some(),"failed":self.error.is_some(),"total":self.page.as_ref().map(|page|page.total),"status":self.receipt.as_ref().map(|entry|format!("{:?}",entry.status)),"completed":self.receipt.as_ref().map(|entry|entry.completed),"reversible":self.receipt.as_ref().map(|entry|entry.reversible)})
     }
 }
 impl Drop for ExecutionState {
@@ -74,12 +92,16 @@ impl YamantakaApp {
         if self.automation.execution.pending.is_some() {
             return;
         }
-        let undo = matches!(&command, ExecutionCommand::Undo(_));
+        let kind = match &command {
+            ExecutionCommand::Undo(_) => PendingKind::Undo,
+            ExecutionCommand::RecoverInherited(_) => PendingKind::Recovery,
+            ExecutionCommand::Apply(_) => PendingKind::Rule,
+        };
         let request = ExecutionRequest::new(command, self.governor.clone());
         let pending = Pending {
             cancel: request.context.cancel.clone(),
             watch: request.context.watch.clone(),
-            undo,
+            kind,
         };
         self.automation.execution.error = None;
         self.automation.execution.receipt = None;
@@ -100,6 +122,8 @@ impl YamantakaApp {
         state.pending = None;
         state.history_open = true;
         state.review = None;
+        state.legacy_plan = None;
+        state.offset = 0;
         match reply.result {
             Ok(receipt) => state.receipt = Some(receipt),
             Err(error) => {
@@ -163,11 +187,16 @@ impl YamantakaApp {
     }
     pub(in crate::app) fn poll_rule_execution(&mut self, ctx: &egui::Context) {
         let state = &mut self.automation.execution;
-        if let Some(pending) = &state.pending {
+        if let Some(cancel) = state
+            .pending
+            .as_ref()
+            .map(|pending| &pending.cancel)
+            .or(state.legacy_pending.as_ref())
+        {
             ctx.request_repaint_after(Duration::from_millis(100));
             if ctx.input(|input| input.viewport().close_requested()) {
                 state.close_after = true;
-                pending.cancel.cancel();
+                cancel.cancel();
                 ctx.send_viewport_cmd(ViewportCommand::CancelClose);
             }
         } else if state.close_after {

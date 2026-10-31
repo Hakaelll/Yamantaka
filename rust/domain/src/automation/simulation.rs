@@ -72,6 +72,14 @@ impl ScanEntry {
 }
 pub type RuleScanFactory = Box<dyn FnOnce() -> Result<Box<dyn RuleScanReader>> + Send>;
 pub trait RuleScanReader: Send {
+    fn prepare_legacy(
+        &self,
+        _journal: &super::execution::JournalRevision,
+        _governor: &MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<super::legacy::LegacyRecoveryPlan> {
+        Err(Failure::Unsupported("Inherited receipt review".into()))
+    }
     fn prepare(
         &self,
         _report: Arc<SimulationReport>,

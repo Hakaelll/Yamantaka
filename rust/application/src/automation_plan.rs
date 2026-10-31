@@ -10,15 +10,34 @@ use yamantaka_domain::{
     memory::{MemoryCategory, MemoryGovernor, TrackedBytesBuilder},
 };
 
+pub enum PlanPurpose {
+    Rule(Arc<SimulationReport>),
+    Legacy(yamantaka_domain::automation::execution::JournalRevision),
+}
+pub enum PreparedPlan {
+    Rule(Arc<RulePlan>),
+    Legacy(Arc<yamantaka_domain::automation::legacy::LegacyRecoveryPlan>),
+}
 pub struct PlanRequest {
-    pub report: Arc<SimulationReport>,
+    pub purpose: PlanPurpose,
     pub governor: MemoryGovernor,
     pub cancel: Cancellation,
 }
 impl PlanRequest {
+    pub fn new_legacy(
+        journal: yamantaka_domain::automation::execution::JournalRevision,
+        governor: MemoryGovernor,
+    ) -> Self {
+        Self {
+            purpose: PlanPurpose::Legacy(journal),
+            governor,
+            cancel: Cancellation::default(),
+        }
+    }
+
     pub fn new(report: Arc<SimulationReport>, governor: MemoryGovernor) -> Self {
         Self {
-            report,
+            purpose: PlanPurpose::Rule(report),
             governor,
             cancel: Cancellation::default(),
         }
@@ -26,17 +45,29 @@ impl PlanRequest {
 }
 pub struct PlanReply {
     pub cancel: Cancellation,
-    pub result: Result<Arc<RulePlan>>,
+    pub result: Result<PreparedPlan>,
 }
-fn prepare(request: &PlanRequest, factory: RuleScanFactory) -> Result<Arc<RulePlan>> {
+fn prepare(request: &PlanRequest, factory: RuleScanFactory) -> Result<PreparedPlan> {
+    let report = match &request.purpose {
+        PlanPurpose::Rule(report) => report,
+        PlanPurpose::Legacy(journal) => {
+            request.cancel.check()?;
+            let reader = factory()?;
+            return Ok(PreparedPlan::Legacy(Arc::new(reader.prepare_legacy(
+                journal,
+                &request.governor,
+                &request.cancel,
+            )?)));
+        }
+    };
     request.cancel.check()?;
-    if request.report.rule.definition().is_some_and(|definition| {
+    if report.rule.definition().is_some_and(|definition| {
         definition.trigger.kind == yamantaka_domain::automation::TriggerKind::ExactDuplicate
     }) {
         let mut buffer =
             TrackedBytesBuilder::try_zeroed(&request.governor, MemoryCategory::Other, 65536)
                 .map_err(|_| Failure::MemoryBudget)?;
-        for matched in &request.report.matches {
+        for matched in &report.matches {
             request.cancel.check()?;
             let proof = matched.proof.as_ref().ok_or_else(|| {
                 Failure::Invalid("The duplicate source has no full-content proof".into())
@@ -55,11 +86,11 @@ fn prepare(request: &PlanRequest, factory: RuleScanFactory) -> Result<Arc<RulePl
         }
     }
     let reader = factory()?;
-    Ok(Arc::new(reader.prepare(
-        request.report.clone(),
+    Ok(PreparedPlan::Rule(Arc::new(reader.prepare(
+        report.clone(),
         &request.governor,
         &request.cancel,
-    )?))
+    )?)))
 }
 pub(crate) struct PlanJob {
     cancel: Cancellation,

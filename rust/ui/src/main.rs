@@ -1090,7 +1090,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--inherited-journals") {
                     app.preview_inherited_journals(
-                        if args.iter().any(|arg| arg == "--inherited-paged") {
+                        if args.iter().any(|arg| arg == "--inherited-recovery-unknown") {
+                            8
+                        } else if args.iter().any(|arg| arg == "--inherited-recovery-fail") {
+                            10
+                        } else if args.iter().any(|arg| arg == "--inherited-recovery-undo") {
+                            7
+                        } else if args.iter().any(|arg| arg == "--inherited-recovery-apply") {
+                            6
+                        } else if args.iter().any(|arg| arg == "--inherited-recovery") {
+                            if args.iter().any(|arg| arg == "--text-scale=2") {
+                                9
+                            } else {
+                                5
+                            }
+                        } else if args.iter().any(|arg| arg == "--inherited-paged") {
                             4
                         } else if args.iter().any(|arg| arg == "--inherited-incompatible") {
                             2

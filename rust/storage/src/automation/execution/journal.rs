@@ -8,7 +8,7 @@ pub(super) fn entry(
     id: &str,
     governor: &MemoryGovernor,
 ) -> Result<Arc<JournalEntry>> {
-    let mut statement=db.prepare("SELECT id,updated_at,status,completed_items,total_items,resume_capability,error_code,COALESCE(CASE WHEN json_valid(summary_json) THEN json_extract(summary_json,'$.ruleName') END,(SELECT name FROM automation_rules WHERE id=CASE WHEN json_valid(summary_json) THEN json_extract(summary_json,'$.ruleId') END),'Inherited rule execution'),operation_kind,undo_json IS NOT NULL,compatibility_hash IS NOT NULL FROM operation_journal WHERE id=? AND operation_kind IN (?,?)").map_err(storage)?;
+    let mut statement=db.prepare("SELECT id,updated_at,status,completed_items,total_items,resume_capability,error_code,COALESCE(CASE WHEN json_valid(summary_json) THEN json_extract(summary_json,'$.ruleName') END,(SELECT name FROM automation_rules WHERE id=CASE WHEN json_valid(summary_json) THEN json_extract(summary_json,'$.ruleId') END),'Inherited rule execution'),operation_kind,undo_json IS NOT NULL,compatibility_hash IS NOT NULL,COALESCE(compatibility_hash='yamantaka-legacy-recovery-v1',0) FROM operation_journal WHERE id=? AND operation_kind IN (?,?)").map_err(storage)?;
     let mut rows = statement
         .query(params![id, ROOT, LEGACY])
         .map_err(storage)?;
@@ -69,7 +69,8 @@ pub(super) fn entry(
             error.map(str::to_owned),
             lease,
         )
-        .with_origin(origin),
+        .with_origin(origin)
+        .with_recovery(row.get(11).map_err(storage)?),
     ))
 }
 pub(super) fn verify_revision(db: &Connection, expected: &JournalRevision) -> Result<()> {

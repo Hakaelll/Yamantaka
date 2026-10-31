@@ -1,6 +1,8 @@
 use super::*;
 pub(super) fn revert(db: &Connection, undo: &Undo, context: &ExecutionContext) -> Result<()> {
     match undo {
+        Undo::LegacyDocument(undo) => legacy::revert_document(db, undo, context)?,
+        Undo::LegacyJournal(undo) => legacy::revert_journal(db, undo)?,
         Undo::Targets { entries } => {
             for target in entries.iter().rev() {
                 if super::super::plan::record(db, target.kind.table(), &target.id)?
