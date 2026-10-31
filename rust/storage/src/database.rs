@@ -433,6 +433,21 @@ impl LibraryRepository for Database {
     ) -> Result<String> {
         self.apply_tag(change, access, cancel)
     }
+    fn automation_rules(
+        &self,
+        query: &yamantaka_domain::automation::RuleQuery,
+        governor: &yamantaka_domain::memory::MemoryGovernor,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::automation::RulePage> {
+        self.rule_page(query, governor, cancel)
+    }
+    fn change_automation_rule(
+        &mut self,
+        change: &yamantaka_domain::automation::RuleChange,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<String> {
+        self.apply_rule(change, cancel)
+    }
     fn revision_groups(
         &self,
         query: &yamantaka_domain::revisions::RevisionQuery,

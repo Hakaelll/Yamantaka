@@ -425,6 +425,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if args.iter().any(|arg| arg == "--saved-cover-page") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',1,'','','2026-10-13T00:00:00Z','2026-10-08',1,'manual',1,'contain',0.75);")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--saved-rules") {
+            let actions = (0..8)
+                .map(|index| serde_json::json!({"kind":"addTag","value":format!("Study {index}")}))
+                .collect::<Vec<_>>();
+            db.execute_batch(&format!("INSERT INTO automation_rules(id,name,enabled,trigger_json,actions_json,created_at,updated_at) VALUES('legacy-rule','Inherited study rule',1,'{{\"kind\":\"extension\",\"value\":\".pdf\"}}','{}','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z'),('future-rule','Future saved rule',1,' {{\"kind\":\"futureTrigger\",\"value\":null,\"vendor\":7}} ','[{{\"kind\":\"futureAction\",\"value\":\"Keep me\"}}]','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z');",serde_json::to_string(&actions)?))?;
+            if args.iter().any(|arg| arg == "--saved-rules-many") {
+                db.execute_batch("WITH RECURSIVE n(x) AS (SELECT 0 UNION ALL SELECT x+1 FROM n WHERE x<79) INSERT INTO automation_rules(id,name,enabled,trigger_json,actions_json,created_at,updated_at) SELECT printf('paged-rule-%03d',x),printf('Study rule %03d',x),1,'{\"kind\":\"extension\",\"value\":\".pdf\"}','[{\"kind\":\"addTag\",\"value\":\"Study\"}]','2026-10-31T00:00:00Z','2026-10-31T00:00:00Z' FROM n;")?;
+            }
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--revision-groups") {
             db.execute_batch("INSERT INTO document_revision_groups(id,name,current_document_id,created_at,updated_at) VALUES('legacy-revisions','Inherited editions','demo-1','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z'); INSERT INTO document_revision_members(group_id,document_id,added_at) VALUES('legacy-revisions','demo-0','2026-10-30T00:00:00Z'),('legacy-revisions','demo-1','2026-10-30T00:00:00Z');")?;
         }
@@ -1072,6 +1081,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     app.preview_file_comparison(
                         args.iter().any(|arg| arg == "--compare-different"),
+                    );
+                }
+                if args.iter().any(|arg| arg == "--saved-rules") {
+                    app.preview_automation_rules(
+                        if args.iter().any(|arg| arg == "--saved-rules-many") {
+                            3
+                        } else if args.iter().any(|arg| arg == "--saved-rules-review") {
+                            2
+                        } else if args.iter().any(|arg| arg == "--saved-rules-change") {
+                            1
+                        } else {
+                            0
+                        },
                     );
                 }
                 if args.iter().any(|arg| arg == "--revision-groups") {

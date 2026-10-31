@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='saved-rules-legacy'; args=@('--saved-rules','--es') },
+    @{ name='saved-rules-changed'; args=@('--saved-rules','--saved-rules-change','--light') },
+    @{ name='saved-rules-review-small-200'; args=@('--saved-rules','--saved-rules-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='saved-rules-paged'; args=@('--saved-rules','--saved-rules-many') },
     @{ name='revision-groups-legacy'; args=@('--revision-groups','--es') },
     @{ name='revision-groups-created'; args=@('--revision-groups','--revision-create','--light') },
     @{ name='revision-groups-current-small-200'; args=@('--revision-groups','--revision-current','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
@@ -409,6 +413,26 @@ foreach ($case in $cases) {
         if ($case.name -eq 'reader-reference-external') {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
+        }
+    }
+    if ($case.name -like 'saved-rules-*') {
+        $state=$controls.automationRules
+        $total=if ($case.name -eq 'saved-rules-paged') {82} elseif ($case.name -eq 'saved-rules-review-small-200') {3} else {2}
+        if ($state.phase -ne 10 -or $state.pending -or $state.failed -or $state.total -ne $total) {throw 'Saved rule reads or guarded mutations did not settle.'}
+        if ($case.name -eq 'saved-rules-paged') {
+            if ($state.offset -ne 80 -or $state.entries.Count -ne 2) {throw 'Saved rules must retrieve the next bounded page.'}
+        } else {
+            if (@($state.entries | Where-Object { $_.id -ceq 'legacy-rule' -and $_.actions -eq 8 }).Count -ne 1 -or @($state.entries | Where-Object { $_.id -ceq 'future-rule' -and -not $_.available }).Count -ne 1) {throw 'Inherited multi-action or future-format rules were lost.'}
+        }
+        if ($case.name -eq 'saved-rules-review-small-200') {
+            if (-not $state.confirmDelete) {throw 'Rule deletion must remain at review before confirmation.'}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Confirmar eliminación','Cancelar')
+        } elseif ($case.name -eq 'saved-rules-changed') {
+            if (@($state.entries | Where-Object name -CEQ 'Reading PDFs').Count -ne 0 -or ($state.entries | Where-Object id -CEQ 'future-rule').enabled) {throw 'Rule creation, toggling or deletion failed.'}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('New rule')
+        } else {
+            $label=if ($case.name -eq 'saved-rules-legacy') {'Nueva regla'} else {'New rule'}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($label)
         }
     }
     if ($case.name -like 'revision-groups-*') {

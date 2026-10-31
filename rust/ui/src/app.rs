@@ -2,6 +2,7 @@ mod annotations;
 mod backup_restore;
 mod backups;
 pub use backup_restore::RestoreHandover;
+mod automation;
 mod bookmarks;
 mod bulk_picker;
 mod cache_maintenance;
@@ -97,6 +98,7 @@ enum Surface {
     Settings,
     Collections,
     Relations,
+    Automation,
     Tags,
 }
 enum PageImage {
@@ -202,6 +204,7 @@ pub struct YamantakaApp {
     backup_restore: backup_restore::RestoreState,
     collections: collections::CollectionState,
     relations: relations::RelationState,
+    automation: automation::AutomationState,
     library_tags: tags::TagState,
     smart_view: Option<yamantaka_domain::LibrarySmartView>,
     smart_menu_preview: bool,
@@ -376,6 +379,7 @@ impl YamantakaApp {
             library_tags: tags::TagState::new(&preferences),
             collections: collections::CollectionState::new(&preferences),
             relations: Default::default(),
+            automation: Default::default(),
             runtime,
             preferences,
             sessions: Default::default(),
@@ -688,6 +692,9 @@ impl YamantakaApp {
             self.reference = None;
             self.tabs.leave_destination();
             self.reader.restoration.clear();
+        }
+        if matches!(self.surface, Surface::Automation) {
+            self.automation.leave();
         }
         if matches!(self.surface, Surface::Tags) {
             self.library_tags.leave();
@@ -1484,6 +1491,12 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::TagChanged(result, cancel) => self.accept_tag_change(result, cancel),
+                Update::AutomationRules(result, cancel) => {
+                    self.accept_automation_rules(result, cancel)
+                }
+                Update::AutomationRuleChanged(result, cancel) => {
+                    self.accept_automation_change(result, cancel)
+                }
                 Update::RevisionGroups(result, cancel) => {
                     self.accept_revision_groups(result, cancel)
                 }
@@ -2259,6 +2272,7 @@ impl App for YamantakaApp {
                 }
             }
         }
+        self.advance_automation_preview();
         self.advance_revision_preview();
         self.advance_relations_preview();
         self.advance_reference_shortcuts(&ctx);
@@ -2386,6 +2400,7 @@ impl App for YamantakaApp {
                         Surface::Settings => self.settings(ui),
                         Surface::Collections => self.collections_view(ui),
                         Surface::Relations => self.relations_view(ui),
+                        Surface::Automation => self.automation_rules_view(ui),
                         Surface::Tags => self.tags_view(ui),
                         Surface::Search => self.global_search(ui),
                         Surface::Notes => self.global_notes_panel(ui),
@@ -2466,6 +2481,7 @@ impl App for YamantakaApp {
                     && self.library_tags.ready()
                     && self.collections.ready()
                     && self.relations.ready()
+                    && self.automation.ready()
                     && self.cache_maintenance.ready()
                     && self.legacy_import.ready()
                     && self.backups.ready()
@@ -2611,6 +2627,7 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["automationRules"] = self.automation.summary();
                     record["revisionGroups"] = self.revision_capture_summary();
                     record["relations"] = self.relations.summary();
                     record["referenceNotesPhase"] = serde_json::json!(self.reference_notes_preview.phase());

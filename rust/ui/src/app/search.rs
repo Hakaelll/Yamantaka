@@ -173,6 +173,17 @@ impl YamantakaApp {
                         self.show_tags(None);
                         ui.close();
                     }
+                    if theme::navigation(
+                        ui,
+                        self.tr("Reglas guardadas", "Saved rules"),
+                        matches!(self.surface, Surface::Automation),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_automation_rules();
+                        ui.close();
+                    }
                     if !self.tabs.model.tabs().is_empty() {
                         let label = format!(
                             "{} ({})",

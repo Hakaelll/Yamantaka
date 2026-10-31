@@ -55,6 +55,12 @@ pub enum Action {
     BulkSelection(Box<crate::library_bulk::BulkRequest>),
     Tags(yamantaka_domain::tags::TagQuery, Cancellation),
     ChangeTag(Box<yamantaka_domain::tags::TagChange>, Cancellation),
+    AutomationRules(
+        yamantaka_domain::automation::RuleQuery,
+        yamantaka_domain::memory::MemoryGovernor,
+        Cancellation,
+    ),
+    ChangeAutomationRule(Box<yamantaka_domain::automation::RuleChange>, Cancellation),
     RevisionGroups(yamantaka_domain::revisions::RevisionQuery, Cancellation),
     RevisionMembers(
         yamantaka_domain::revisions::RevisionMemberQuery,
@@ -162,6 +168,8 @@ pub enum Update {
     SelectionOrganized(Box<crate::library_bulk::BulkReply>),
     Tags(Result<yamantaka_domain::tags::TagPage>, Cancellation),
     TagChanged(Result<String>, Cancellation),
+    AutomationRules(Result<yamantaka_domain::automation::RulePage>, Cancellation),
+    AutomationRuleChanged(Result<String>, Cancellation),
     RevisionGroups(
         Result<yamantaka_domain::revisions::RevisionPage>,
         Cancellation,
@@ -1043,6 +1051,14 @@ impl Runtime {
                                     let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled} else {yamantaka_domain::search::IndexAccess::Disabled};
                                     let result=repository.change_tag(&change,access,&cancel);
                                     emit(&events,&notify,Update::TagChanged(result,cancel),permit);
+                                }
+                                Action::AutomationRules(query,governor,cancel)=> {
+                                    let result=repository.automation_rules(&query,&governor,&cancel);
+                                    emit(&events,&notify,Update::AutomationRules(result,cancel),permit);
+                                }
+                                Action::ChangeAutomationRule(change,cancel)=> {
+                                    let result=repository.change_automation_rule(&change,&cancel);
+                                    emit(&events,&notify,Update::AutomationRuleChanged(result,cancel),permit);
                                 }
                                 Action::RevisionGroups(query,cancel)=> {
                                     let result=repository.revision_groups(&query,&cancel);

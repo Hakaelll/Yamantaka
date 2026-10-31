@@ -1,6 +1,7 @@
 //! UI and FFI independent contracts and persisted domain semantics.
 pub mod annotations;
 pub mod automatic_cover;
+pub mod automation;
 pub mod bookmarks;
 pub mod collections;
 pub mod cover_cache;
@@ -280,6 +281,21 @@ pub trait LibraryRepository {
         _cancel: &Cancellation,
     ) -> Result<String> {
         Err(Failure::Unsupported("Library tag changes".into()))
+    }
+    fn automation_rules(
+        &self,
+        _query: &automation::RuleQuery,
+        _governor: &memory::MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<automation::RulePage> {
+        Err(Failure::Unsupported("Saved automation rules".into()))
+    }
+    fn change_automation_rule(
+        &mut self,
+        _change: &automation::RuleChange,
+        _cancel: &Cancellation,
+    ) -> Result<String> {
+        Err(Failure::Unsupported("Automation rule changes".into()))
     }
     fn revision_groups(
         &self,

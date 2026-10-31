@@ -1,4 +1,6 @@
 use std::fs;
+#[path = "support/automation.rs"]
+mod automation_verification;
 #[path = "support/collections.rs"]
 mod collection_verification;
 #[path = "support/library_grouping.rs"]
@@ -175,6 +177,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     grouping_verification::verify();
     relation_verification::verify(DOCUMENT);
     revision_verification::verify(DOCUMENT);
+    automation_verification::verify();
 }
 
 #[test]

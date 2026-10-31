@@ -1,6 +1,7 @@
 pub mod annotation_export;
 pub mod annotations;
 mod automatic_cover;
+mod automation;
 pub mod backup;
 pub mod bookmarks;
 mod collections;
