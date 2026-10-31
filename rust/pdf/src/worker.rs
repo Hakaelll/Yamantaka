@@ -1,4 +1,4 @@
-use crate::cache::Cache;
+use crate::cache::{Cache, RasterKey};
 use crate::source::{LoadedPdf, SourceStamp};
 use crossbeam_channel::{Receiver, Sender, bounded};
 use pdfium_render::prelude::*;
@@ -1087,8 +1087,13 @@ fn run(
                             limits.pages
                         },
                     )?;
-                    if let Some(cached) = cache.get(&key) {
-                        return Ok(cached);
+                    let raster_key = RasterKey::new(&key, epoch);
+                    if let Some(cached) = cache.get(&raster_key) {
+                        return Ok(if cached.key.generation == key.generation {
+                            cached
+                        } else {
+                            Arc::new(cached.at_generation(key.generation))
+                        });
                     }
                     let document = documents
                         .get(&key.document_id)
@@ -1151,7 +1156,7 @@ fn run(
                     }
                     let rendered =
                         Arc::new(RenderedPage::from_pixels(key.clone(), buffer.finish())?);
-                    cache.insert(key.clone(), rendered.clone(), rendered.pixels().len());
+                    cache.insert(raster_key, rendered.clone(), rendered.pixels().len());
                     Ok(rendered)
                 })();
                 let active = {
@@ -1397,13 +1402,13 @@ fn take_unprotected_victim<'a>(
 fn clear_document_state(
     id: &str,
     recency: &mut Vec<String>,
-    pages: &mut Cache<RenderKey, Arc<RenderedPage>>,
-    tiles: &mut Cache<RenderKey, Arc<RenderedPage>>,
+    pages: &mut Cache<RasterKey, Arc<RenderedPage>>,
+    tiles: &mut Cache<RasterKey, Arc<RenderedPage>>,
     text: &mut Cache<(String, u32), String>,
 ) {
     recency.retain(|old| old != id);
-    pages.retain(|key| key.document_id != id);
-    tiles.retain(|key| key.document_id != id);
+    pages.retain(|key| !key.document_is(id));
+    tiles.retain(|key| !key.document_is(id));
     text.retain(|key| key.0 != id);
 }
 

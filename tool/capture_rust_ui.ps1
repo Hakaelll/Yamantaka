@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-prefetch-single'; args=@('--reader','--es') },
+    @{ name='reader-prefetch-comparison'; args=@('--reader','--reference','--light') },
+    @{ name='reader-prefetch-continuous'; args=@('--reader','--continuous') },
+    @{ name='reader-prefetch-safe'; args=@('--reader','--safe-mode','--es') },
     @{ name='library-compact-dark-es'; args=@('--size=720x540','--pdf-covers','--es','--tilt-negative') },
     @{ name='library-compact-light'; args=@('--size=900x600','--pdf-covers','--light') },
     @{ name='library-short-wide'; args=@('--size=1440x600','--pdf-covers','--es','--tilt') },

@@ -38,6 +38,7 @@ mod open_intent;
 mod opening;
 mod operations;
 mod outline;
+mod page_prefetch;
 mod password;
 mod quarantine;
 mod reader_controls;
@@ -1717,6 +1718,17 @@ impl App for YamantakaApp {
                 Update::MetadataSource(reply) => self.accept_metadata_source(reply),
                 Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
+                Update::Prefetched(key, result, cancel) => {
+                    if !self.reader.viewport.prefetch.accept(&key, &cancel, &result)
+                        && let Some(reference) = &mut self.reference
+                    {
+                        reference
+                            .pane
+                            .viewport
+                            .prefetch
+                            .accept(&key, &cancel, &result);
+                    }
+                }
                 Update::TextGeometry(id, payload, cancel) => {
                     let page = payload.page();
                     if self.reference.as_mut().is_some_and(|reference| {
@@ -2103,6 +2115,17 @@ impl App for YamantakaApp {
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut Frame) {
+        let prefetch_allowed =
+            !self.startup_mode.is_safe() && matches!(self.surface, Surface::Reader);
+        self.reader.viewport.prefetch.set_enabled(prefetch_allowed);
+        if let Some(reference) = &mut self.reference {
+            reference
+                .pane
+                .viewport
+                .prefetch
+                .set_enabled(prefetch_allowed);
+        }
+
         if let Some(state) = &mut self.window_state
             && state.observe(ui.ctx(), frame).is_err()
         {
@@ -2410,6 +2433,8 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
+                    && self.reader.viewport.prefetch.settled()
+                    && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.prefetch.settled())
                     && self.window_state.as_ref().is_none_or(crate::window_state::State::verification_ready)
                     && (!matches!(self.surface, Surface::Reader)
                         || (!self.reader.panel && self.reader.reader_panel_tab != outline::ReaderPanelTab::Find)
@@ -2610,6 +2635,9 @@ impl App for YamantakaApp {
                     record["startupMode"] = serde_json::to_value(self.startup_mode).unwrap();
                     record["safeStartup"] = self.safe_summary();
                     record["quarantine"] = self.quarantine.summary();
+                    record["pagePrefetch"] = self.reader.viewport.prefetch.summary();
+                    record["readerPresentationSlots"] = self.reader.viewport.pages.len().into();
+                    record["referencePrefetch"] = self.reference.as_ref().map(|reference|reference.pane.viewport.prefetch.summary()).unwrap_or(serde_json::Value::Null);
                     record["windowPlacement"] = self.window_state.as_ref().map(crate::window_state::State::summary).unwrap_or(serde_json::Value::Null);
                     record["windowPlacementBackupSetting"] = self.preferences.get("nativeWindowPlacement").cloned().unwrap_or(serde_json::Value::Null);
                     record["annotationHistoryPhase"]=self.command_palette_preview.history_phase().into();

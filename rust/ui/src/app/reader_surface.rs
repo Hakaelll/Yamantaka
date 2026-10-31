@@ -1,6 +1,7 @@
 use super::*;
 
 pub(super) struct ReaderSurface {
+    pub prefetch: page_prefetch::State,
     pub scale: f32,
     pub pages: HashMap<u32, ReaderPage>,
     pub layout: Option<Arc<ReaderLayout>>,
@@ -14,6 +15,7 @@ pub(super) struct ReaderSurface {
 impl Default for ReaderSurface {
     fn default() -> Self {
         Self {
+            prefetch: Default::default(),
             scale: 1.0,
             pages: HashMap::new(),
             layout: None,
@@ -136,6 +138,7 @@ impl ReaderSurface {
     }
 
     pub fn reset_requests(&mut self) {
+        self.prefetch.clear();
         self.requested = None;
         self.retry = false;
         self.scroll_anchor = true;

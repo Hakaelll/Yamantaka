@@ -10,7 +10,7 @@ To request safe mode manually, close the running application and launch:
 
 The title bar and Tools identify safe mode. The startup notice explains why it is active. Close that notice or choose **Continue** to use the library.
 
-Safe mode skips restoration of saved tabs and workspaces, automatic PDF cover work and disk-cover-cache use, and new indexing runs. It leaves existing index data and the index preference intact. Governed reading-session recording is suspended, and the previous saved reading context is not replaced. Library books retain their procedural 3D representation until a normal startup.
+Safe mode skips restoration of saved tabs and workspaces, automatic PDF cover work and disk-cover-cache use, new indexing runs and nearby page preparation. It leaves existing index data and the index preference intact. Governed reading-session recording is suspended, and the previous saved reading context is not replaced. Library books retain their procedural 3D representation until a normal startup.
 
 You can explicitly open a PDF, read, search existing indexed content, use Notes, edit library data, create a backup or review local diagnostics. This mode is not a read-only library and does not repair PDF files. Original PDFs remain unchanged. Manual file/folder imports and explicit tool operations remain available.
 

@@ -609,7 +609,7 @@ pub struct RenderedPage {
     pub key: RenderKey,
     pub width: u32,
     pub height: u32,
-    pixels: memory::TrackedBytes,
+    pixels: Arc<memory::TrackedBytes>,
 }
 impl RenderedPage {
     pub fn from_pixels(key: RenderKey, pixels: memory::TrackedBytes) -> Result<Self> {
@@ -624,11 +624,21 @@ impl RenderedPage {
             width,
             height,
             key,
-            pixels,
+            pixels: Arc::new(pixels),
         })
     }
     pub fn pixels(&self) -> &[u8] {
         self.pixels.as_slice()
+    }
+    pub fn at_generation(&self, generation: u64) -> Self {
+        let mut key = self.key.clone();
+        key.generation = generation;
+        Self {
+            key,
+            width: self.width,
+            height: self.height,
+            pixels: self.pixels.clone(),
+        }
     }
 }
 #[derive(Debug, Clone)]

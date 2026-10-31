@@ -1,5 +1,23 @@
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
+use yamantaka_domain::RenderKey;
+
+/// Delivery generations share pixels only within the same native document epoch.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub(crate) struct RasterKey {
+    epoch: u64,
+    content: RenderKey,
+}
+impl RasterKey {
+    pub fn new(key: &RenderKey, epoch: u64) -> Self {
+        let mut content = key.clone();
+        content.generation = 0;
+        Self { epoch, content }
+    }
+    pub fn document_is(&self, id: &str) -> bool {
+        self.content.document_id == id
+    }
+}
 
 /// CPU cost only. Presentation must separately account GPU copies and live consumers.
 pub(crate) struct Cache<K, V> {

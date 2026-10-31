@@ -152,6 +152,7 @@ pub enum Action {
     Import(Vec<PathBuf>, Cancellation),
     ImportFolder(PathBuf, Cancellation),
     Render(RenderKey, Priority, Cancellation),
+    Prefetch(RenderKey, Cancellation),
     Navigate(String, u32),
     Text(String, u32, Cancellation),
     Outline(String, Cancellation),
@@ -262,6 +263,7 @@ pub enum Update {
     Opened(Box<Document>, PdfInfo, Cancellation),
     OpenFailed(Box<Document>, Failure, Cancellation),
     Page(Arc<RenderedPage>, Cancellation, u64, u64),
+    Prefetched(RenderKey, Result<()>, Cancellation),
     Text(String, u32, String, Cancellation),
     Outline(
         String,
@@ -381,6 +383,7 @@ enum Pending {
     FindDocument(Box<FindScan>, Permit),
     Open(Document, PdfTicket<PdfInfo>, Permit, u64),
     Render(String, PdfTicket<Arc<RenderedPage>>, Permit),
+    Prefetch(RenderKey, PdfTicket<Arc<RenderedPage>>, Permit),
     Text(String, u32, PdfTicket<String>, Permit),
     Outline(
         String,
@@ -421,6 +424,7 @@ impl Pending {
     fn reader_document(&self) -> Option<&str> {
         match self {
             Self::Open(document, ..) => Some(&document.id),
+            Self::Prefetch(key, ..) => Some(&key.document_id),
             Self::Render(id, ..)
             | Self::Text(id, ..)
             | Self::Outline(id, ..)
@@ -460,7 +464,7 @@ impl Pending {
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
-            Self::Render(_, ticket, _) => {
+            Self::Render(_, ticket, _) | Self::Prefetch(_, ticket, _) => {
                 select.recv(ticket.readiness());
             }
             Self::Text(_, _, ticket, _) => {
@@ -500,7 +504,7 @@ impl Pending {
             Self::ImportFolder(folder, state) => state.cancel.is_cancelled() || folder.ready(),
             Self::FindDocument(scan, _) => scan.ticket().is_ready(),
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => ticket.is_ready(),
-            Self::Render(_, ticket, _) => ticket.is_ready(),
+            Self::Render(_, ticket, _) | Self::Prefetch(_, ticket, _) => ticket.is_ready(),
             Self::Text(_, _, ticket, _) => ticket.is_ready(),
             Self::Outline(_, ticket, _) => ticket.is_ready(),
             Self::FindPage(_, ticket, _) => ticket.is_ready(),
@@ -524,7 +528,9 @@ impl Pending {
             Self::Open(_, ticket, _, _) | Self::ImportOpen(_, _, ticket, _) => {
                 ticket.cancellation.cancel()
             }
-            Self::Render(_, ticket, _) => ticket.cancellation.cancel(),
+            Self::Render(_, ticket, _) | Self::Prefetch(_, ticket, _) => {
+                ticket.cancellation.cancel()
+            }
             Self::Text(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::Outline(_, ticket, _) => ticket.cancellation.cancel(),
             Self::FindPage(_, ticket, _) => ticket.cancellation.cancel(),
@@ -1556,6 +1562,12 @@ impl Runtime {
                                         result => { let error = result.err().unwrap_or_else(||Failure::Invalid("Automatic covers are blocked for this document".into())); emit(&events,&notify,Update::Cover(source.id().into(),Err(error),cancel),permit); }
                                     }
                                 },
+                                Action::Prefetch(key, cancel) => {
+                                    match engine.try_render(key.clone(), Priority::Prefetch, cancel.clone()) {
+                                        Ok(ticket) => pending.push(Pending::Prefetch(key, ticket, permit)),
+                                        Err(error) => emit(&events,&notify,Update::Prefetched(key,Err(error),cancel),permit),
+                                    }
+                                }
                                 Action::Render(key, priority, cancel) => {
                                     let document=key.document_id.clone();
                                     match engine.try_render(key, priority, cancel.clone())
@@ -1763,6 +1775,11 @@ impl Runtime {
                                         emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit);
                                     }
                                 }
+                            }
+                            Pending::Prefetch(key, ticket, permit) => {
+                                let cancel = ticket.cancellation.clone();
+                                let result = ticket.wait().and_then(|_| cancel.check());
+                                emit(&events,&notify,Update::Prefetched(key,result,cancel),permit);
                             }
                             Pending::Render(_, ticket, permit) => {
                                 let cancel = ticket.cancellation.clone();

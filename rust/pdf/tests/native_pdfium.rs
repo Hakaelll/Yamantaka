@@ -17,6 +17,15 @@ fn visible_readers_survive_background_eviction_and_two_pins_reject_extra_opens()
             cancel.clone(),
         )
         .unwrap();
+    let preview = engine
+        .render(key("reader", 0, 20), Priority::Prefetch, cancel.clone())
+        .unwrap();
+    let reuse = engine
+        .render(key("reader", 0, 21), Priority::Visible, cancel.clone())
+        .unwrap();
+    assert_eq!(preview.key.generation, 20);
+    assert_eq!(reuse.key.generation, 21);
+    assert_eq!(preview.pixels().as_ptr(), reuse.pixels().as_ptr());
     // Reader is older than both background jobs. Only the background slot may
     // be replaced, regardless of LRU order.
     for id in ["import", "index"] {
@@ -58,6 +67,14 @@ fn visible_readers_survive_background_eviction_and_two_pins_reject_extra_opens()
         )
         .unwrap();
     assert_eq!(info.pages.len(), 2);
+    let reopened = engine
+        .render(key("reader", 0, 21), Priority::Visible, cancel.clone())
+        .unwrap();
+    assert_ne!(
+        reopened.pixels().as_ptr(),
+        reuse.pixels().as_ptr(),
+        "A replaced native document cannot reuse old pixels"
+    );
     engine
         .render(key("reader", 1, 2), Priority::Visible, cancel.clone())
         .unwrap();
@@ -516,6 +533,19 @@ fn native_tile_only_allocates_its_buffer_and_rejects_invalid_or_cancelled_region
     assert_eq!([tile.width, tile.height], [73, 91]);
     assert_eq!(governor.snapshot().usage.pages, 0);
     assert_eq!(governor.snapshot().usage.tiles, bytes);
+    let mut current_generation = tile_key.clone();
+    current_generation.generation += 1;
+    let reused = engine
+        .render(
+            current_generation,
+            Priority::Visible,
+            Cancellation::default(),
+        )
+        .unwrap();
+    assert_eq!(reused.key.generation, 2);
+    assert_eq!(tile.key.generation, 1);
+    assert_eq!(tile.pixels().as_ptr(), reused.pixels().as_ptr());
+    assert_eq!(governor.snapshot().usage.tiles, bytes);
     let mut another = tile_key.clone();
     another.region = Some([0, 0, 73, 91]);
     another.generation += 1;
@@ -545,6 +575,8 @@ fn native_tile_only_allocates_its_buffer_and_rejects_invalid_or_cancelled_region
     engine.close("tile-budget".into()).unwrap();
     assert_eq!(governor.snapshot().usage.tiles, bytes);
     drop(tile);
+    assert_eq!(governor.snapshot().usage.tiles, bytes);
+    drop(reused);
     assert_eq!(governor.snapshot().usage.tiles, 0);
     assert_eq!(hash(&path), before);
 }

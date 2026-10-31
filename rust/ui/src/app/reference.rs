@@ -529,6 +529,21 @@ impl ReferenceView {
                     .pages
                     .values()
                     .any(|slot| !slot.plan.ready(slot.image_key.as_ref()));
+            self.pane.viewport.prefetch.plan(
+                ui.ctx(),
+                runtime,
+                page_prefetch::View {
+                    document: &document.id,
+                    layout: &layout,
+                    frame: &frame,
+                    preferences: &preferences,
+                    dpr,
+                    cap,
+                    bytes,
+                },
+                self.pane.viewport.generation,
+                !self.pane.viewport.retry && !self.pane.loading,
+            );
             if let Ok(position) = layout.anchor_at_scroll(&frame, anchor)
                 && let Some(nav) = &mut self.pane.navigation
             {

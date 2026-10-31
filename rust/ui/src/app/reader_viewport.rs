@@ -46,10 +46,8 @@ impl YamantakaApp {
             self.reader.reader_preferences.clone(),
             self.reader.navigation.as_ref(),
         ) else {
-            ui.label(
-                RichText::new(self.tr("Preparando el documento…", "Preparing your document…"))
-                    .color(p.secondary),
-            );
+            ui.painter()
+                .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
             return;
         };
         let anchor = navigation.position();
@@ -119,8 +117,8 @@ impl YamantakaApp {
             self.request_selection_pages(&document.id, &link_pages);
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
-            let preview_budget =
-                (self.governor.limits().pages.min(14 * 1024 * 1024) / count / if self.reference.is_some() { 2 } else { 1 }).max(4);
+            let preview_bytes = self.governor.limits().pages.min(14 * 1024 * 1024) / if self.reference.is_some() { 2 } else { 1 };
+            let preview_budget = (preview_bytes/count).max(4);
             let page_label = self.tr("página", "page");
             for visible in &frame.pages {
                 let displayed = egui::vec2(visible.rect.width as f32, visible.rect.height as f32);
@@ -172,6 +170,10 @@ impl YamantakaApp {
                 && self.reader.viewport.pages
                     .values()
                     .any(|slot| !slot.plan.ready(slot.image_key.as_ref()));
+            self.reader.viewport.prefetch.plan(ui.ctx(), &self.runtime, page_prefetch::View {
+                document:&document.id,layout:&layout,frame:&frame,preferences:&preferences,
+                dpr,cap:device_limit,bytes:preview_bytes,
+            }, self.reader.viewport.generation, !self.reader.viewport.retry && !self.reader.loading);
             feedback = layout.anchor_at_scroll(&frame, anchor).ok();
         });
         if let Some(position) = feedback {

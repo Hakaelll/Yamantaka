@@ -40,19 +40,7 @@ impl RenderPlan {
         if image.is_none() {
             // Finish the first small raster rather than restarting it on resize.
             if requested.is_none() {
-                let mut preview = target.clone();
-                let longest = preview.physical_width.max(preview.physical_height);
-                if longest > PREVIEW_SIDE {
-                    preview.physical_width = ((u64::from(preview.physical_width)
-                        * u64::from(PREVIEW_SIDE))
-                        / u64::from(longest))
-                    .max(1) as u32;
-                    preview.physical_height = ((u64::from(preview.physical_height)
-                        * u64::from(PREVIEW_SIDE))
-                        / u64::from(longest))
-                    .max(1) as u32;
-                }
-                decision.request = Some(preview);
+                decision.request = Some(preview_key(target));
             }
             return decision;
         }
@@ -86,4 +74,18 @@ pub(super) fn page_mesh(
     }
     mesh.indices.extend_from_slice(&[0, 1, 2, 0, 2, 3]);
     mesh
+}
+
+pub(super) fn preview_key(target: &RenderKey) -> RenderKey {
+    let mut preview = target.clone();
+    let longest = preview.physical_width.max(preview.physical_height);
+    if longest > PREVIEW_SIDE {
+        preview.physical_width = ((u64::from(preview.physical_width) * u64::from(PREVIEW_SIDE))
+            / u64::from(longest))
+        .max(1) as u32;
+        preview.physical_height = ((u64::from(preview.physical_height) * u64::from(PREVIEW_SIDE))
+            / u64::from(longest))
+        .max(1) as u32;
+    }
+    preview
 }
