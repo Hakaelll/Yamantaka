@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='diagnostics-saved'; args=@('--settings','--diagnostics','--diagnostics-export','--es') },
+    @{ name='diagnostics-occupied'; args=@('--settings','--diagnostics','--diagnostics-occupied','--light') },
+    @{ name='diagnostics-cancelled'; args=@('--settings','--diagnostics','--diagnostics-cancel','--es','--light') },
+    @{ name='diagnostics-unavailable'; args=@('--settings','--diagnostics','--diagnostics-error') },
+    @{ name='diagnostics-small-200'; args=@('--settings','--diagnostics','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='reader-annotation-history'; args=@('--reader','--reference','--reference-book','--reference-notes','--annotation-history','--es') },
     @{ name='inherited-recovery-review-small-200'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='inherited-recovery-completed'; args=@('--saved-rules','--rule-simulation','--inherited-journals','--inherited-recovery','--inherited-recovery-apply','--es') },
@@ -404,6 +409,19 @@ $captures = @()
 foreach ($case in $cases) {
     $imagePath = Join-Path $outputPath "$($case.name).png"
     $controlPath = Join-Path $outputPath "$($case.name).controls.json"
+    if ($case.name -in @('diagnostics-saved','diagnostics-occupied')) {
+        $reportPath = [IO.Path]::ChangeExtension($imagePath,'diagnostics.json')
+        if (Test-Path -LiteralPath $reportPath) {
+            $oldReport = Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8
+            if ($case.name -eq 'diagnostics-occupied') {
+                if ($oldReport -cne 'previous complete report') { throw 'Refusing to replace an unknown report fixture.' }
+            } else {
+                $oldData = $oldReport | ConvertFrom-Json
+                if ($oldData.format -cne 'yamantaka-rust-safe-diagnostics' -or $oldData.database.counts.documents -ne 10 -or $oldData.contains_private_content -ne $false) { throw 'Refusing to remove an unknown diagnostic report.' }
+            }
+            Remove-Item -LiteralPath $reportPath
+        }
+    }
     # Delete only the two exact outputs this run owns, so stale evidence cannot pass.
     foreach ($ownedPath in @($imagePath, $controlPath)) {
         if (Test-Path -LiteralPath $ownedPath) { Remove-Item -LiteralPath $ownedPath }
@@ -615,6 +633,24 @@ foreach ($case in $cases) {
         if ($controls.referenceNotesPhase -ne $phase -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.filterCount -ne 4 -or $controls.referenceAnnotations.total -ne $total -or $controls.primaryAnnotations.total -ne 2 -or $controls.primaryAnnotations.filterCount -ne 0) { throw 'Reference filters or reset affected the wrong records or document.' }
         $labels = if ($empty) { @('Active filters (4)','Reset') } else { @('Filtros activos (4)','Restablecer') }
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
+    }
+    if ($case.name -like 'diagnostics-*') {
+        $report=$controls.diagnostics
+        if(-not $report.verified -or -not $report.open -or $report.busy) { throw 'Diagnostic worker did not finish its scoped review.' }
+        if($case.name -eq 'diagnostics-saved') {
+            if(-not $report.saved -or $report.failed) { throw 'Diagnostic JSON publication failed.' }
+            $data=Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'diagnostics.json')) -Raw -Encoding UTF8
+            $json=$data | ConvertFrom-Json
+            if($json.database.counts.documents -ne 10 -or $json.contains_private_content -or $data.Contains('PRIVATE_DIAGNOSTIC_CANARY') -or $data.Contains('.pdf') -or $data.Contains('C:')) { throw 'Diagnostic JSON has unexpected counts or private content.' }
+        } elseif($case.name -eq 'diagnostics-occupied') {
+            if(-not $report.occupied -or $report.saved) { throw 'An occupied report was replaced.' }
+        } elseif($case.name -eq 'diagnostics-cancelled') {
+            if(-not $report.cancelled -or $report.collected) { throw 'Cancelled diagnostic collection was published.' }
+        } elseif($case.name -eq 'diagnostics-unavailable') {
+            if(-not $report.failed -or $report.collected) { throw 'Unavailable diagnostic source was hidden.' }
+        } elseif(-not $report.collected -or $report.failed) { throw 'Diagnostic review did not retain its snapshot.' }
+        $close=if($case.args -contains '--es'){'Cerrar'}else{'Close'}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($close)
     }
     if ($case.name -eq 'reader-annotation-history') {
         if($controls.annotationHistoryPhase -ne 90 -or $controls.shortcutBindings.known -ne 30 -or $controls.primaryAnnotations.total -ne 2 -or $controls.referenceAnnotations.total -ne 1 -or $controls.referenceAnnotations.entries[0].note -cne 'Branched reference note' -or $controls.referenceAnnotations.history.redo -ne 0) { throw 'Annotation undo/redo, branch history or pane independence failed.' }

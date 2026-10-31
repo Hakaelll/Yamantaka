@@ -373,7 +373,7 @@ impl AnnotationRepository for Database {
         cancel: &Cancellation,
         write: &mut dyn FnMut(&mut dyn std::io::Write) -> Result<u64>,
     ) -> Result<u64> {
-        self.create_annotation_export(destination, cancel, |file| write(file))
+        self.publish_local_export(destination, cancel, |file| write(file))
     }
 
     fn visit_annotations(

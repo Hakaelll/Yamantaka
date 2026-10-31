@@ -9,6 +9,7 @@ pub mod cover_policy;
 pub mod cover_revision;
 pub mod cover_selection;
 pub mod cover_snapshot;
+pub mod diagnostics;
 pub mod external_uri;
 pub mod file_check;
 pub mod front_matter;

@@ -10,6 +10,7 @@ pub mod automation_simulation;
 pub mod cache_maintenance;
 pub mod cover_regeneration;
 pub mod cover_source;
+pub mod diagnostics;
 pub mod document_find;
 pub mod file_check;
 pub mod file_comparison;

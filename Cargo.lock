@@ -4407,6 +4407,7 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "rusqlite",
+ "serde",
  "serde_json",
  "sha2",
  "tempfile",

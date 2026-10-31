@@ -154,6 +154,12 @@ pub fn save_library_backup() -> Option<PathBuf> {
         .set_file_name("yamantaka-backup.json")
         .save_file()
 }
+pub fn save_diagnostics_report() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .set_file_name("yamantaka-diagnostics.json")
+        .save_file()
+}
 pub fn pick_library_backup() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .add_filter("JSON", &["json"])

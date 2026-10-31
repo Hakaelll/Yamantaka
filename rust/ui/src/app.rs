@@ -15,6 +15,7 @@ mod cover_picker_preview;
 mod cover_picker_view;
 mod cover_restore;
 mod details;
+mod diagnostics;
 mod file_check;
 mod file_comparison;
 mod find;
@@ -208,6 +209,7 @@ pub struct YamantakaApp {
     cache_maintenance: cache_maintenance::CacheState,
     legacy_import: legacy_import::ImportState,
     backups: backups::BackupState,
+    diagnostics: diagnostics::DiagnosticsState,
     backup_restore: backup_restore::RestoreState,
     collections: collections::CollectionState,
     relations: relations::RelationState,
@@ -442,6 +444,7 @@ impl YamantakaApp {
             cache_maintenance: Default::default(),
             legacy_import: Default::default(),
             backups: Default::default(),
+            diagnostics: Default::default(),
             backup_restore: Default::default(),
             library_check: Default::default(),
             relocation: Default::default(),
@@ -1480,6 +1483,7 @@ impl App for YamantakaApp {
             ctx.request_repaint_after(Duration::from_millis(50));
         }
         self.update_backup(ctx);
+        self.update_diagnostics(ctx);
         if self.backups.busy() && ctx.input(|input| input.viewport().close_requested()) {
             self.backups.close_after = true;
             self.backups.cancel();
@@ -2264,6 +2268,7 @@ impl App for YamantakaApp {
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
         let shortcut_modal = self.command_palette.open
+            || self.diagnostics.open
             || self.page_jump.is_some()
             || self.password.is_some()
             || self.link_confirmation_open()
@@ -2497,6 +2502,7 @@ impl App for YamantakaApp {
         self.workspace_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
         self.command_palette_dialog(&ctx);
+        self.diagnostics_dialog(&ctx);
         self.page_jump_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
@@ -2566,6 +2572,7 @@ impl App for YamantakaApp {
                     && self.cache_maintenance.ready()
                     && self.legacy_import.ready()
                     && self.backups.ready()
+                    && self.diagnostics.ready()
                     && self.backup_restore.ready()
                     && self.file_check.ready()
                     && self.library_check.ready()
@@ -2715,6 +2722,7 @@ impl App for YamantakaApp {
                     record["automationRules"] = self.automation.summary();
                     record["revisionGroups"] = self.revision_capture_summary();
                     record["commandPalette"]=self.command_palette.summary();
+                    record["diagnostics"]=self.diagnostics.summary();
                     record["annotationHistoryPhase"]=self.command_palette_preview.history_phase().into();
                     record["readerControls"]=serde_json::json!({"chromeHidden":self.reader_chrome_hidden,"immersive":self.reader_focus,"pageJump":self.page_jump.is_some(),"primaryPanel":self.reader.panel});
                     record["shortcutBindings"]=self.shortcut_bindings.summary();

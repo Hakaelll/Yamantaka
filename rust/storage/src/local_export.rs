@@ -3,12 +3,12 @@ use std::{fs::File, io::Write, path::Path};
 use yamantaka_domain::{Cancellation, Failure, Result};
 
 fn output_error(_: impl std::fmt::Display) -> Failure {
-    Failure::Storage("Annotation export file could not be published".into())
+    Failure::Storage("Export file could not be published".into())
 }
 
 impl Database {
     /// Publishes a complete export to a new file. Existing destinations are never replaced.
-    pub fn create_annotation_export<T>(
+    pub fn publish_local_export<T>(
         &self,
         destination: &Path,
         cancel: &Cancellation,
@@ -20,7 +20,7 @@ impl Database {
             value.eq_ignore_ascii_case("md") || value.eq_ignore_ascii_case("json")
         }) {
             return Err(Failure::Invalid(
-                "Annotation exports require a Markdown or JSON extension".into(),
+                "Exports require a Markdown or JSON extension".into(),
             ));
         }
         let parent = destination

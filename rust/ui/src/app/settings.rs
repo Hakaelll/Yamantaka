@@ -392,6 +392,7 @@ impl YamantakaApp {
                         ui.ctx().data_mut(|data| data.insert_temp(limit_id, limit));
                         quiet(ui, self.tr("Al aplicar un límite, se eliminan las sesiones completadas más antiguas. Las lecturas abiertas se mantienen.", "Applying a limit removes the oldest completed sessions. Open readings are kept."), p);
                     });
+                self.diagnostics_settings(ui, p);
                 ui.add_space(20.0);
 
                 if theme::control(

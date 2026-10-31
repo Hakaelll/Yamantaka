@@ -220,6 +220,7 @@ impl YamantakaApp {
     pub(super) fn library_selection_shortcuts(&mut self, ctx: &egui::Context) {
         if !matches!(self.surface, Surface::Library)
             || self.command_palette.open
+            || self.diagnostics.open
             || self.password.is_some()
             || self.link_confirmation_open()
             || self.bulk_picker.is_some()

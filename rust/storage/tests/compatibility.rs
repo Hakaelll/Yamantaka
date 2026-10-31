@@ -5,6 +5,8 @@ mod annotation_history_verification;
 mod automation_verification;
 #[path = "support/collections.rs"]
 mod collection_verification;
+#[path = "support/diagnostics.rs"]
+mod diagnostics_verification;
 #[path = "support/library_grouping.rs"]
 mod grouping_verification;
 #[path = "support/managed_imports.rs"]
@@ -182,6 +184,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     automation_verification::verify();
     verify_bookmark_toggle();
     annotation_history_verification::verify(DOCUMENT);
+    diagnostics_verification::verify(DOCUMENT);
 }
 
 #[test]

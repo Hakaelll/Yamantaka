@@ -2,6 +2,7 @@
 mod app;
 mod backup_worker;
 mod book;
+mod diagnostics_worker;
 mod legacy_import_worker;
 mod page_presenter;
 mod restore_worker;
@@ -114,6 +115,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         || arg == "--import-recovery"
                         || arg == "--cover-capacity-retry"
                         || arg == "--reference-bookmarks"
+                        || arg == "--diagnostics"
                 }) {
             std::fs::create_dir_all(&store).map_err(|_| {
                 yamantaka_domain::Failure::Storage("Synthetic export store could not open".into())
@@ -835,6 +837,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 backup_source.as_ref().map(|_| store.clone()),
                 ui_restore_handover,
             );
+            app.configure_diagnostics(
+                backup_source.clone(),
+                if demo {
+                    store.clone()
+                } else {
+                    paths.store.clone()
+                },
+            );
             app.configure_backup(
                 backup_source,
                 if demo {
@@ -1103,6 +1113,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--privacy") {
                     app.preview_privacy(&cc.egui_ctx);
+                }
+                if args.iter().any(|arg| arg == "--diagnostics") {
+                    app.preview_diagnostics(
+                        &cc.egui_ctx,
+                        if args.iter().any(|arg| arg == "--diagnostics-export") {
+                            1
+                        } else if args.iter().any(|arg| arg == "--diagnostics-occupied") {
+                            2
+                        } else if args.iter().any(|arg| arg == "--diagnostics-cancel") {
+                            3
+                        } else if args.iter().any(|arg| arg == "--diagnostics-error") {
+                            4
+                        } else {
+                            0
+                        },
+                    );
                 }
                 if args.iter().any(|arg| {
                     arg == "--goal-editor" || arg == "--goal-save" || arg == "--goal-clear"
