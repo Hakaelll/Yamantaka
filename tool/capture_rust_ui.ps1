@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='reader-nearby-turn'; args=@('--reader','--nearby-turn','--es') },
+    @{ name='reader-nearby-comparison'; args=@('--reader','--reference','--nearby-turn','--light') },
     @{ name='reader-region-zoom'; args=@('--reader','--reader-zoom=4','--es') },
     @{ name='reader-region-rotated'; args=@('--reader','--reader-zoom=4','--rotation=90','--light') },
     @{ name='reader-region-comparison'; args=@('--reader','--reader-zoom=4','--reference','--reference-regions','--light') },
@@ -476,6 +478,21 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'reader-nearby-*') {
+        if ($controls.nearbyTurnPreview -ne 3 -or $controls.currentReaderPage -ne 1) { throw 'Nearby page-turn controller did not finish.' }
+        $panes = @($controls.pagePrefetch)
+        if ($case.name -eq 'reader-nearby-comparison') {
+            if ($controls.reference.page -ne 0) { throw 'Reference page did not change independently.' }
+            $panes += @($controls.referencePrefetch)
+        }
+        foreach ($pane in $panes) {
+            if (-not $pane.gpu -or $pane.promotions -lt 1 -or $pane.lastPromotion.generation -le $pane.lastPromotion.preparedGeneration -or $pane.lastPromotion.texture -notlike 'User*') { throw 'Prepared GPU texture was not promoted across navigation generations.' }
+            if (@($pane.pages | Where-Object gpuReady).Count -gt 2) { throw 'Nearby GPU presentation exceeded two slots.' }
+        }
+        $previewRenders = @($controls.readerRenderEvents | Where-Object { $_.event -eq 'submitted' -and $_.page -eq 1 -and $_.pixels[0] -le 768 -and $_.pixels[1] -le 768 })
+        if ($previewRenders.Count -ne 0) { throw 'Promoted page unnecessarily requested another preview raster.' }
+        if ($controls.trackedMemory.pages -gt 72MB) { throw 'Tracked page budget exceeded.' }
+    }
     if ($case.name -like 'reader-region-*') {
         $regions = @($controls.pageRefinement)
         $comparison = $case.name -eq 'reader-region-comparison'

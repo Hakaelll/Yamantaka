@@ -56,6 +56,8 @@ The reader uses a small first raster and retains it while refining after zoom or
 
 At high zoom, the default wgpu reader can refine the visible region over a retained whole-page preview. Crop requests use bounded native and GPU memory, and comparison panes share the same pipeline. [Region refinement validation](docs/validation/rust-page-region-2026-10-31.md) describes the native cases and remaining performance work.
 
+The reader can also keep two nearby previews per pane ready on the GPU and transfer a matching texture when navigating. [Reader responsiveness](docs/user-guide/reader-responsiveness.md) explains preparation, memory-pressure behavior and compositor differences.
+
 New imports clean embedded title and author fields, then analyze text and layout on up to six opening pages in the background. Supported title blocks and explicit bylines can fill missing or rejected metadata. The detector joins aligned title lines and gives early cover evidence priority over later running headers. Conflicting accepted values remain saved proposals, with their source page and bounds. The original metadata stays available, and manual corrections retain priority. Each committed document becomes queryable before the batch finishes. [Title detection and reading refinements](docs/validation/rust-reading-refinement-2026-10-18.md) describes the current detector and validation scope.
 
 New imports also save a full content reference, so later checks can detect changes anywhere in the PDF. Already registered paths reuse their document without repeating PDF analysis or replacing manual decisions. See [guarded import verification](docs/validation/rust-import-hash-2026-10-19.md).

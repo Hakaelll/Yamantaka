@@ -1576,6 +1576,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             if demo && reader {
                 app.preview_reader();
+                if args.iter().any(|arg| arg == "--nearby-turn") {
+                    app.preview_nearby_turn();
+                }
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
                     if args.iter().any(|arg| arg == "--reference-regions") {

@@ -1,4 +1,4 @@
-//! Optional CPU previews share the native cache; visible pages own GPU presentation.
+//! Bounded nearby previews can retain native GPU presentation until navigation.
 use super::*;
 use yamantaka_domain::reader::ReaderPosition;
 use yamantaka_domain::reader_layout::{ReaderFrame, ReaderLayout};
@@ -89,19 +89,24 @@ struct Slot {
     key: RenderKey,
     cancel: Cancellation,
     phase: Phase,
+    image: Option<PageImage>,
 }
 #[derive(Default)]
 pub(super) struct State {
     enabled: bool,
+    gpu: bool,
+    promotions: u64,
+    last_promotion: Option<serde_json::Value>,
     slots: Vec<Slot>,
     since: Option<Instant>,
     was_ready: bool,
 }
 impl State {
-    pub fn set_enabled(&mut self, enabled: bool) {
-        if self.enabled != enabled {
+    pub fn set_enabled(&mut self, enabled: bool, gpu: bool) {
+        if self.enabled != enabled || self.gpu != gpu {
             self.clear();
             self.enabled = enabled;
+            self.gpu = gpu;
         }
     }
     pub fn clear(&mut self) {
@@ -111,6 +116,26 @@ impl State {
         self.slots.clear();
         self.since = None;
         self.was_ready = false;
+    }
+    pub fn cancel_pending(&mut self) {
+        self.slots.retain(|slot| {
+            slot.cancel.cancel();
+            matches!(slot.phase, Phase::Ready)
+        });
+        self.since = None;
+        self.was_ready = false;
+    }
+    pub fn take(&mut self, key: &RenderKey) -> Option<PageImage> {
+        let index = self.slots.iter().position(|slot| {
+            let mut cached = slot.key.clone();
+            cached.generation = key.generation;
+            cached == *key && slot.image.is_some()
+        })?;
+        self.last_promotion = Some(
+            serde_json::json!({"page":key.page,"preparedGeneration":self.slots[index].key.generation,"generation":key.generation,"texture":format!("{:?}",self.slots[index].image.as_ref().unwrap().id())}),
+        );
+        self.promotions += 1;
+        self.slots.remove(index).image
     }
     pub fn plan(
         &mut self,
@@ -132,6 +157,7 @@ impl State {
                     key,
                     cancel: Cancellation::default(),
                     phase: Phase::Planned,
+                    image: None,
                 })
                 .collect();
             self.since = Some(Instant::now());
@@ -155,7 +181,15 @@ impl State {
         for slot in &mut self.slots {
             if matches!(slot.phase, Phase::Planned) {
                 slot.phase = if runtime
-                    .submit(Action::Prefetch(slot.key.clone(), slot.cancel.clone()))
+                    .submit(Action::Prefetch(
+                        slot.key.clone(),
+                        if self.gpu {
+                            yamantaka_domain::Priority::Nearby
+                        } else {
+                            yamantaka_domain::Priority::Prefetch
+                        },
+                        slot.cancel.clone(),
+                    ))
                     .is_ok()
                 {
                     Phase::Pending
@@ -169,7 +203,8 @@ impl State {
         &mut self,
         key: &RenderKey,
         cancel: &Cancellation,
-        result: &yamantaka_domain::Result<()>,
+        result: &yamantaka_domain::Result<Arc<yamantaka_domain::RenderedPage>>,
+        presenter: Option<&mut crate::page_presenter::PagePresenter>,
     ) -> bool {
         let Some(slot) = self
             .slots
@@ -180,6 +215,13 @@ impl State {
         };
         if cancel.is_cancelled() {
             return false;
+        }
+        if self.gpu
+            && let Ok(page) = result
+            && page.key == *key
+            && let Some(presenter) = presenter
+        {
+            slot.image = presenter.upload(page).ok().map(PageImage::Native);
         }
         slot.phase = if result.is_ok() {
             Phase::Ready
@@ -194,11 +236,50 @@ impl State {
             .all(|slot| matches!(slot.phase, Phase::Ready | Phase::Skipped))
     }
     pub fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"enabled":self.enabled,"settled":self.settled(),"pages":self.slots.iter().map(|slot|serde_json::json!({"page":slot.key.page,"generation":slot.key.generation,"pixels":[slot.key.physical_width,slot.key.physical_height],"state":match slot.phase {Phase::Planned=>"planned",Phase::Pending=>"pending",Phase::Ready=>"ready",Phase::Skipped=>"skipped"}})).collect::<Vec<_>>()})
+        serde_json::json!({"enabled":self.enabled,"gpu":self.gpu,"promotions":self.promotions,"lastPromotion":self.last_promotion,"settled":self.settled(),"pages":self.slots.iter().map(|slot|serde_json::json!({"page":slot.key.page,"gpuReady":slot.image.is_some(),"generation":slot.key.generation,"pixels":[slot.key.physical_width,slot.key.physical_height],"state":match slot.phase {Phase::Planned=>"planned",Phase::Pending=>"pending",Phase::Ready=>"ready",Phase::Skipped=>"skipped"}})).collect::<Vec<_>>()})
     }
 }
 impl Drop for State {
     fn drop(&mut self) {
         self.clear();
+    }
+}
+
+impl YamantakaApp {
+    pub fn preview_nearby_turn(&mut self) {
+        if self.demo {
+            self.nearby_turn_preview = 1;
+        }
+    }
+    pub(super) fn advance_nearby_turn(&mut self) {
+        let ready = |state: &State, page| {
+            state
+                .slots
+                .iter()
+                .any(|slot| slot.key.page == page && slot.image.is_some())
+        };
+        match self.nearby_turn_preview {
+            1 if ready(&self.reader.viewport.prefetch, 1)
+                && self
+                    .reference
+                    .as_ref()
+                    .is_none_or(|reference| ready(&reference.pane.viewport.prefetch, 0)) =>
+            {
+                self.navigate(1);
+                if let Some(reference) = &mut self.reference {
+                    reference.set_page(0);
+                }
+                self.nearby_turn_preview = 2;
+            }
+            2 if self.reader.viewport.prefetch.promotions > 0
+                && self
+                    .reference
+                    .as_ref()
+                    .is_none_or(|reference| reference.pane.viewport.prefetch.promotions > 0) =>
+            {
+                self.nearby_turn_preview = 3;
+            }
+            _ => {}
+        }
     }
 }

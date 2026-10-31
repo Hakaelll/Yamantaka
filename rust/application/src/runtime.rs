@@ -152,7 +152,7 @@ pub enum Action {
     Import(Vec<PathBuf>, Cancellation),
     ImportFolder(PathBuf, Cancellation),
     Render(RenderKey, Priority, Cancellation),
-    Prefetch(RenderKey, Cancellation),
+    Prefetch(RenderKey, Priority, Cancellation),
     Navigate(String, u32),
     Text(String, u32, Cancellation),
     Outline(String, Cancellation),
@@ -263,7 +263,7 @@ pub enum Update {
     Opened(Box<Document>, PdfInfo, Cancellation),
     OpenFailed(Box<Document>, Failure, Cancellation),
     Page(Arc<RenderedPage>, Cancellation, u64, u64),
-    Prefetched(RenderKey, Result<()>, Cancellation),
+    Prefetched(RenderKey, Result<Arc<RenderedPage>>, Cancellation),
     Text(String, u32, String, Cancellation),
     Outline(
         String,
@@ -1562,8 +1562,8 @@ impl Runtime {
                                         result => { let error = result.err().unwrap_or_else(||Failure::Invalid("Automatic covers are blocked for this document".into())); emit(&events,&notify,Update::Cover(source.id().into(),Err(error),cancel),permit); }
                                     }
                                 },
-                                Action::Prefetch(key, cancel) => {
-                                    match engine.try_render(key.clone(), Priority::Prefetch, cancel.clone()) {
+                                Action::Prefetch(key, priority, cancel) => {
+                                    match engine.try_render(key.clone(), priority, cancel.clone()) {
                                         Ok(ticket) => pending.push(Pending::Prefetch(key, ticket, permit)),
                                         Err(error) => emit(&events,&notify,Update::Prefetched(key,Err(error),cancel),permit),
                                     }
@@ -1778,7 +1778,7 @@ impl Runtime {
                             }
                             Pending::Prefetch(key, ticket, permit) => {
                                 let cancel = ticket.cancellation.clone();
-                                let result = ticket.wait().and_then(|_| cancel.check());
+                                let result = ticket.wait().and_then(|page| cancel.check().map(|()|page));
                                 emit(&events,&notify,Update::Prefetched(key,result,cancel),permit);
                             }
                             Pending::Render(_, ticket, permit) => {

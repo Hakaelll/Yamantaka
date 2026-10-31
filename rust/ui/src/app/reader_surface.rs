@@ -64,6 +64,15 @@ impl ReaderSurface {
                 )
             })
             .flatten();
+        let prepared = if self
+            .pages
+            .get(&key.page)
+            .is_none_or(|slot| slot.image.is_none())
+        {
+            self.prefetch.take(&render_plan::preview_key(key))
+        } else {
+            None
+        };
         let slot = self.pages.entry(key.page).or_insert_with(|| ReaderPage {
             requested: None,
             cancel: Cancellation::default(),
@@ -72,6 +81,12 @@ impl ReaderSurface {
             plan: Default::default(),
             refinement: Default::default(),
         });
+        if let Some(image) = prepared {
+            slot.cancel.cancel();
+            slot.requested = None;
+            slot.image = Some(image);
+            slot.image_key = Some(render_plan::preview_key(key));
+        }
         let base = if region.is_some() && !slot.refinement.blocked() {
             render_plan::preview_key(key)
         } else {
@@ -198,7 +213,7 @@ impl ReaderSurface {
     }
 
     pub fn reset_requests(&mut self) {
-        self.prefetch.clear();
+        self.prefetch.cancel_pending();
         self.requested = None;
         self.retry = false;
         self.scroll_anchor = true;
@@ -210,6 +225,7 @@ impl ReaderSurface {
     }
 
     pub fn clear(&mut self) {
+        self.prefetch.clear();
         self.cancel.cancel();
         for page in self.pages.values() {
             page.cancel.cancel();

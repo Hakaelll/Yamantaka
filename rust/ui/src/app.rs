@@ -256,6 +256,7 @@ pub struct YamantakaApp {
     capture_requested: bool,
     capture_ready_since: Option<Instant>,
     capture_render_events: Vec<serde_json::Value>,
+    nearby_turn_preview: u8,
     preview_reader: bool,
     logo: Option<TextureHandle>,
     preview_tilt: Option<egui::Vec2>,
@@ -492,6 +493,7 @@ impl YamantakaApp {
             capture_requested: false,
             capture_ready_since: None,
             capture_render_events: Vec::new(),
+            nearby_turn_preview: 0,
             preview_reader: false,
             logo: None,
             preview_tilt: None,
@@ -1723,14 +1725,19 @@ impl App for YamantakaApp {
                 Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
                 Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
                 Update::Prefetched(key, result, cancel) => {
-                    if !self.reader.viewport.prefetch.accept(&key, &cancel, &result)
-                        && let Some(reference) = &mut self.reference
+                    if !self.reader.viewport.prefetch.accept(
+                        &key,
+                        &cancel,
+                        &result,
+                        self.presenter.as_mut(),
+                    ) && let Some(reference) = &mut self.reference
                     {
-                        reference
-                            .pane
-                            .viewport
-                            .prefetch
-                            .accept(&key, &cancel, &result);
+                        reference.pane.viewport.prefetch.accept(
+                            &key,
+                            &cancel,
+                            &result,
+                            self.presenter.as_mut(),
+                        );
                     }
                 }
                 Update::TextGeometry(id, payload, cancel) => {
@@ -2130,14 +2137,17 @@ impl App for YamantakaApp {
         let prefetch_allowed =
             !self.startup_mode.is_safe() && matches!(self.surface, Surface::Reader);
         self.reader.viewport.regions_enabled = prefetch_allowed && self.presenter.is_some();
-        self.reader.viewport.prefetch.set_enabled(prefetch_allowed);
+        self.reader
+            .viewport
+            .prefetch
+            .set_enabled(prefetch_allowed, self.presenter.is_some());
         if let Some(reference) = &mut self.reference {
             reference.pane.viewport.regions_enabled = prefetch_allowed && self.presenter.is_some();
             reference
                 .pane
                 .viewport
                 .prefetch
-                .set_enabled(prefetch_allowed);
+                .set_enabled(prefetch_allowed, self.presenter.is_some());
         }
 
         if let Some(state) = &mut self.window_state
@@ -2277,6 +2287,7 @@ impl App for YamantakaApp {
         self.advance_reference_shortcuts(&ctx);
         self.advance_palette_preview(&ctx);
         self.advance_quarantine_preview();
+        self.advance_nearby_turn();
         self.advance_comparison_selection(&ctx);
         self.apply_annotation_preview();
         self.advance_reference_marks();
@@ -2447,6 +2458,7 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
+                    && matches!(self.nearby_turn_preview, 0 | 3)
                     && self.reader.viewport.refinements_settled()
                     && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.refinements_settled())
                     && self.reader.viewport.prefetch.settled()
@@ -2651,6 +2663,7 @@ impl App for YamantakaApp {
                     record["startupMode"] = serde_json::to_value(self.startup_mode).unwrap();
                     record["safeStartup"] = self.safe_summary();
                     record["quarantine"] = self.quarantine.summary();
+                    record["nearbyTurnPreview"] = self.nearby_turn_preview.into();
                     record["pagePrefetch"] = self.reader.viewport.prefetch.summary();
                     record["pageRefinement"] = self.reader.viewport.refinement_summary();
                     record["referenceRefinement"] = self.reference.as_ref().map(|reference|reference.pane.viewport.refinement_summary()).unwrap_or(serde_json::Value::Null);
