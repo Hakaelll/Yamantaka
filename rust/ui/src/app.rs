@@ -10,6 +10,7 @@ mod catalogue_chooser;
 mod collections;
 mod command_palette;
 mod compact;
+mod continuity_preview;
 mod cover_picker;
 mod cover_picker_preview;
 mod cover_picker_view;
@@ -242,6 +243,7 @@ pub struct YamantakaApp {
     managed_pages: crate::managed_pages::Presenter,
     pub(crate) graphics_recovery: crate::graphics_recovery::State,
     preview_device_loss: Option<eframe::wgpu::Device>,
+    device_loss_configured: bool,
     governor: MemoryGovernor,
     bulk_organization_preview: Option<bulk_picker::OrganizationPreview>,
     bulk_organization_verified: Option<serde_json::Value>,
@@ -499,6 +501,7 @@ impl YamantakaApp {
             capture_render_events: Vec::new(),
             graphics_recovery: Default::default(),
             preview_device_loss: None,
+            device_loss_configured: false,
             nearby_turn_preview: 0,
             preview_reader: false,
             logo: None,
@@ -1328,34 +1331,6 @@ impl App for YamantakaApp {
             ctx.send_viewport_cmd(ViewportCommand::Close);
             return;
         }
-        if self.preview_device_loss.is_some()
-            && !self.reader.loading
-            && self
-                .reader
-                .viewport
-                .pages
-                .values()
-                .any(|page| page.image.is_some())
-        {
-            if self.reader.page == 0 {
-                self.navigate(1);
-                return;
-            }
-            if !self
-                .reader
-                .viewport
-                .pages
-                .get(&1)
-                .is_some_and(|slot| slot.image.is_some())
-            {
-                return;
-            }
-            self.send(Action::Favorite("demo-0".into(), true));
-            self.graphics_recovery.signal(ctx);
-            self.preview_device_loss.take().unwrap().destroy();
-            ctx.send_viewport_cmd(ViewportCommand::Close);
-            return;
-        }
         self.guard_workspace_close(ctx);
         self.guard_quarantine_close(ctx);
         self.update_restore(ctx);
@@ -2129,7 +2104,7 @@ impl App for YamantakaApp {
                 Update::ReadingHistory(reply) => {
                     self.history.accept(reply);
                 }
-                Update::ReaderContinuity(reply) => self.accept_reader_continuity(reply),
+                Update::ReaderContinuity(reply) => self.accept_reader_continuity(*reply),
                 Update::Workspace(reply) => self.accept_workspace(reply),
             }
         }
@@ -2149,6 +2124,9 @@ impl App for YamantakaApp {
         self.advance_reference_sync();
         self.poll_import_progress(ctx);
         self.sync_reading_session(ctx);
+        if self.advance_graphics_loss_preview(ctx) {
+            return;
+        }
         self.pump_reader_continuity(ctx);
         if self.demo
             && self.capture.is_some()
@@ -2719,6 +2697,8 @@ impl App for YamantakaApp {
                     record["quarantine"] = self.quarantine.summary();
                     record["nearbyTurnPreview"] = self.nearby_turn_preview.into();
                     record["graphicsStartupFallback"] = crate::graphics_recovery::is_fallback().into();
+                    record["readerContinuity"] = self.continuity_summary();
+                    record["continuityStoreToken"] = if self.demo {self.store.file_name().and_then(|name|name.to_str()).into()} else {serde_json::Value::Null};
                     record["graphicsRuntimeFallback"] = crate::graphics_recovery::runtime_fallback().into();
                     record["managedPages"] = self.managed_pages.summary();
                     record["graphicsRecoveryFavorite"] = self.reader.active.as_ref().map(|(document,_)|document.favorite).into();

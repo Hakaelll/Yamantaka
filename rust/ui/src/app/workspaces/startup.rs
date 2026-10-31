@@ -116,7 +116,7 @@ impl YamantakaApp {
                     saved.comparison_warning,
                 );
             } else {
-                let comparison = self.capture_workspace_comparison();
+                let comparison = self.capture_comparison();
                 self.workspaces.binding.as_mut().unwrap().comparison = comparison;
             }
         } else if unchanged && self.tabs.model.tabs().is_empty() && self.reader.active.is_none() {

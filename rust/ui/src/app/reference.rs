@@ -576,7 +576,10 @@ impl YamantakaApp {
             return;
         }
         match ReferenceView::new(&self.reader, self.reading_direction()) {
-            Ok(reference) => self.reference = Some(reference),
+            Ok(reference) => {
+                self.discard_retained_comparison();
+                self.reference = Some(reference);
+            }
             Err(error) => self.error = Some(error.to_string()),
         }
     }

@@ -397,7 +397,7 @@ pub(crate) fn verify() {
         .submit(Action::ReaderContinuity(Box::new(ContinuityRequest {
             change: ContinuityChange::Save {
                 revision: 1,
-                tabs: Box::new(tabs.clone()),
+                tabs: Box::new(tabs.clone().into()),
             },
             cancel: saved.clone(),
         })))
@@ -415,18 +415,24 @@ pub(crate) fn verify() {
     }
     let stored = inspector.reader_continuity().unwrap().unwrap();
     assert_eq!(
-        stored.tabs().iter().map(|tab| tab.id()).collect::<Vec<_>>(),
+        stored
+            .tabs()
+            .tabs()
+            .iter()
+            .map(|tab| tab.id())
+            .collect::<Vec<_>>(),
         ["b-live"]
     );
     assert_eq!(
         stored
+            .tabs()
             .closed()
             .iter()
             .map(|tab| tab.id())
             .collect::<Vec<_>>(),
         ["c-closed"]
     );
-    editor.save_reader_continuity(&tabs).unwrap();
+    editor.save_reader_continuity(&tabs.clone().into()).unwrap();
     let loaded = Cancellation::default();
     runtime
         .submit(Action::ReaderContinuity(Box::new(ContinuityRequest {
@@ -445,6 +451,7 @@ pub(crate) fn verify() {
             assert_eq!(
                 restored
                     .tabs()
+                    .tabs()
                     .iter()
                     .map(|tab| tab.id())
                     .collect::<Vec<_>>(),
@@ -452,6 +459,7 @@ pub(crate) fn verify() {
             );
             assert_eq!(
                 restored
+                    .tabs()
                     .closed()
                     .iter()
                     .map(|tab| tab.id())

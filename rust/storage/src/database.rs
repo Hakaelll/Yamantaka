@@ -715,7 +715,9 @@ impl LibraryRepository for Database {
     fn cover_source_page(&self, document_id: &str) -> Result<Option<u32>> {
         crate::cover_selection::source_page(self, document_id)
     }
-    fn reader_continuity(&self) -> Result<Option<yamantaka_domain::reader_tabs::DocumentTabs>> {
+    fn reader_continuity(
+        &self,
+    ) -> Result<Option<yamantaka_domain::reader_continuity::ReaderContinuity>> {
         let Some(path) = self.connection.path().filter(|path| !path.is_empty()) else {
             return Ok(None);
         };
@@ -723,7 +725,7 @@ impl LibraryRepository for Database {
     }
     fn save_reader_continuity(
         &mut self,
-        tabs: &yamantaka_domain::reader_tabs::DocumentTabs,
+        tabs: &yamantaka_domain::reader_continuity::ReaderContinuity,
     ) -> Result<()> {
         let path = self
             .connection

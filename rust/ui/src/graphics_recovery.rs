@@ -78,6 +78,10 @@ pub(super) fn runtime_fallback() -> bool {
     std::env::args_os().any(|arg| arg == "--graphics-runtime-fallback")
 }
 
+pub(super) fn continuity_resume() -> bool {
+    runtime_fallback() || std::env::args_os().any(|arg| arg == "--continuity-resume")
+}
+
 pub(super) fn is_fallback() -> bool {
     std::env::args_os().any(|arg| arg == "--graphics-fallback")
 }
@@ -114,14 +118,13 @@ pub(super) fn restart(
 }
 
 pub(super) fn demo_store(args: &[OsString]) -> Result<Option<std::path::PathBuf>, Box<dyn Error>> {
-    if !runtime_fallback() {
+    if !continuity_resume() {
         return Ok(None);
     }
-    let Some(path) = args
-        .iter()
-        .filter_map(|arg| arg.to_str())
-        .find_map(|arg| arg.strip_prefix("--graphics-resume-demo="))
-    else {
+    let Some(path) = args.iter().filter_map(|arg| arg.to_str()).find_map(|arg| {
+        arg.strip_prefix("--graphics-resume-demo=")
+            .or_else(|| arg.strip_prefix("--continuity-store="))
+    }) else {
         return Ok(None);
     };
     let store = std::path::Path::new(path).canonicalize()?;

@@ -10,6 +10,7 @@ use std::{
 };
 use yamantaka_domain::{
     Failure, Result,
+    reader_continuity::ReaderContinuity,
     reader_preferences::{
         CoverPolicy, InitialSide, PageRotation, ReaderMode, ReaderPreferences, ReaderTheme,
         ZoomMode,
@@ -42,6 +43,8 @@ struct Snapshot {
     version: u32,
     #[serde(default)]
     workspace: Option<yamantaka_domain::workspaces::WorkspaceRevision>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    comparison: Option<yamantaka_domain::workspaces::WorkspaceComparison>,
     active: Option<String>,
     tabs: Vec<StoredTab>,
     closed: Vec<StoredTab>,
@@ -80,8 +83,11 @@ struct StoredPreferences {
     unknown: BTreeMap<String, Value>,
 }
 impl Snapshot {
+    fn continuity(&self) -> Result<ReaderContinuity> {
+        ReaderContinuity::new(self.model()?, self.comparison.clone())
+    }
     fn model(&self) -> Result<DocumentTabs> {
-        if self.version != 1 {
+        if self.version != 1 && self.version != 2 {
             return Err(Failure::Invalid(
                 "Unsupported reader continuity version; original file is preserved".into(),
             ));
@@ -196,16 +202,19 @@ fn read(path: &Path) -> Result<Option<Snapshot>> {
         ));
     }
     let snapshot: Snapshot = serde_json::from_slice(&bytes).map_err(storage)?;
-    snapshot.model()?;
+    snapshot.continuity()?;
     Ok(Some(snapshot))
 }
-pub fn load(path: &Path) -> Result<Option<DocumentTabs>> {
-    read(path)?.map(|snapshot| snapshot.model()).transpose()
+pub fn load(path: &Path) -> Result<Option<ReaderContinuity>> {
+    read(path)?
+        .map(|snapshot| snapshot.continuity())
+        .transpose()
 }
 pub(crate) fn encode_workspace(model: &DocumentTabs) -> Result<Value> {
     let snapshot = Snapshot {
         version: 1,
         workspace: None,
+        comparison: None,
         active: model.active().map(|tab| tab.id().into()),
         tabs: model
             .tabs()
@@ -221,9 +230,15 @@ pub(crate) fn encode_workspace(model: &DocumentTabs) -> Result<Value> {
 }
 pub(crate) fn decode_workspace(value: Value) -> Result<DocumentTabs> {
     let snapshot: Snapshot = serde_json::from_value(value).map_err(storage)?;
+    if snapshot.version != 1 || snapshot.comparison.is_some() {
+        return Err(Failure::Invalid(
+            "Unsupported workspace reading context; stored data is preserved".into(),
+        ));
+    }
     snapshot.model()
 }
-pub fn save(path: &Path, model: &DocumentTabs) -> Result<()> {
+pub fn save(path: &Path, continuity: &ReaderContinuity) -> Result<()> {
+    let model = continuity.tabs();
     let previous = read(path)?;
     let capture = |tab: &ReaderTab| {
         let old = previous.as_ref().and_then(|s| {
@@ -235,14 +250,21 @@ pub fn save(path: &Path, model: &DocumentTabs) -> Result<()> {
         StoredTab::capture(tab, old)
     };
     let snapshot = Snapshot {
-        version: 1,
+        version: if continuity.comparison().is_some()
+            || previous.as_ref().is_some_and(|old| old.version == 2)
+        {
+            2
+        } else {
+            1
+        },
         workspace: model.workspace_reference().cloned(),
+        comparison: continuity.comparison().cloned(),
         active: model.active().map(|tab| tab.id().into()),
         tabs: model.tabs().iter().map(&capture).collect(),
         closed: model.closed().iter().map(capture).collect(),
         unknown: previous.map(|old| old.unknown).unwrap_or_default(),
     };
-    snapshot.model()?;
+    snapshot.continuity()?;
     serde_json::to_writer_pretty(OutputBudget(MAX_CONTINUITY_BYTES - 1), &snapshot)
         .map_err(storage)?;
     atomic_json(path, &snapshot)

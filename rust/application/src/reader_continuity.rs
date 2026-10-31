@@ -1,12 +1,12 @@
 use yamantaka_domain::{
-    Cancellation, Failure, LibraryRepository, Result, reader_tabs::DocumentTabs,
+    Cancellation, Failure, LibraryRepository, Result, reader_continuity::ReaderContinuity,
 };
 
 pub enum ContinuityChange {
     Load,
     Save {
         revision: u64,
-        tabs: Box<DocumentTabs>,
+        tabs: Box<ReaderContinuity>,
     },
 }
 pub struct ContinuityRequest {
@@ -15,8 +15,9 @@ pub struct ContinuityRequest {
 }
 pub struct ContinuityReply {
     pub revision: Option<u64>,
-    pub result: Result<Option<DocumentTabs>>,
+    pub result: Result<Option<ReaderContinuity>>,
     pub cancel: Cancellation,
+    pub reference_document: Option<yamantaka_domain::Document>,
 }
 #[derive(Default)]
 pub(crate) struct ContinuityWriter {
@@ -27,7 +28,7 @@ impl ContinuityWriter {
         &mut self,
         repository: &mut impl LibraryRepository,
         revision: u64,
-        tabs: &DocumentTabs,
+        tabs: &ReaderContinuity,
     ) -> Result<()> {
         if self.revision.is_some_and(|previous| revision <= previous) {
             return Err(Failure::Cancelled);
@@ -46,7 +47,7 @@ impl ContinuityWriter {
             ContinuityChange::Load => None,
             ContinuityChange::Save { revision, .. } => Some(*revision),
         };
-        let result = match request.change {
+        let mut result = match request.change {
             ContinuityChange::Load => (|| {
                 request.cancel.check()?;
                 let tabs = repository
@@ -60,20 +61,35 @@ impl ContinuityWriter {
                 self.save(repository, revision, &tabs).map(|_| None)
             }
         };
+        let reference_document = result
+            .as_ref()
+            .ok()
+            .and_then(|saved| saved.as_ref())
+            .and_then(|saved| saved.comparison())
+            .map(|saved| repository.get(&saved.document))
+            .transpose();
+        let reference_document = match reference_document {
+            Ok(document) => document.flatten(),
+            Err(error) => {
+                result = Err(error);
+                None
+            }
+        };
         ContinuityReply {
             revision,
             result,
             cancel: request.cancel,
+            reference_document,
         }
     }
 }
 
 fn retain_catalogued(
     repository: &impl LibraryRepository,
-    mut tabs: DocumentTabs,
-) -> Result<DocumentTabs> {
+    mut tabs: ReaderContinuity,
+) -> Result<ReaderContinuity> {
     let mut absent = Vec::new();
-    for tab in tabs.tabs().iter().chain(tabs.closed()) {
+    for tab in tabs.tabs().tabs().iter().chain(tabs.tabs().closed()) {
         if !absent.iter().any(|id| id == tab.document())
             && repository.get(tab.document())?.is_none()
         {

@@ -2,7 +2,9 @@ use super::*;
 use yamantaka_application::reader_continuity::{
     ContinuityChange, ContinuityReply, ContinuityRequest,
 };
-use yamantaka_domain::{Failure, Result};
+use yamantaka_domain::{
+    Failure, Result, reader_continuity::ReaderContinuity, workspaces::WorkspaceComparison,
+};
 
 #[derive(Default)]
 pub(in crate::app) struct ContinuityState {
@@ -12,11 +14,58 @@ pub(in crate::app) struct ContinuityState {
     had_snapshot: bool,
     paused: bool,
     revision: u64,
-    saved: DocumentTabs,
-    pending: Option<(u64, DocumentTabs, Cancellation)>,
+    saved: ReaderContinuity,
+    retained_comparison: Option<WorkspaceComparison>,
+    restoring_comparison: bool,
+    pending: Option<(u64, ReaderContinuity, Cancellation)>,
     due: Option<Instant>,
 }
 impl YamantakaApp {
+    pub(in crate::app) fn continuity_summary(&self) -> serde_json::Value {
+        serde_json::json!({"loaded":self.tabs.continuity.loaded,"restoring":self.tabs.continuity.restoring_comparison,"retainedComparison":self.tabs.continuity.retained_comparison,"comparison":self.capture_comparison()})
+    }
+    pub(in crate::app) fn forget_continuity_documents(&mut self, ids: &[String]) {
+        if self
+            .tabs
+            .continuity
+            .retained_comparison
+            .as_ref()
+            .is_some_and(|saved| ids.contains(&saved.primary) || ids.contains(&saved.document))
+        {
+            self.discard_retained_comparison();
+        }
+    }
+
+    fn capture_reader_continuity(&self) -> Result<ReaderContinuity> {
+        let saved = self
+            .tabs
+            .continuity
+            .retained_comparison
+            .as_ref()
+            .filter(|saved| {
+                self.tabs
+                    .model
+                    .active()
+                    .is_some_and(|tab| tab.document() == saved.primary)
+            })
+            .cloned();
+        ReaderContinuity::new(
+            self.tabs.model.clone(),
+            saved.or_else(|| self.capture_comparison()),
+        )
+    }
+    pub(in crate::app) fn discard_retained_comparison(&mut self) {
+        self.tabs.continuity.retained_comparison = None;
+        self.tabs.continuity.restoring_comparison = false;
+        self.cancel_continuity_comparison_restore();
+    }
+    pub(in crate::app) fn finish_continuity_comparison(&mut self, success: bool) {
+        self.tabs.continuity.restoring_comparison = false;
+        if success {
+            self.tabs.continuity.retained_comparison = None;
+        }
+    }
+
     pub(in crate::app) fn enable_continuity_capture(&mut self) {
         if self.demo && self.capture.is_some() {
             self.tabs.continuity.loaded = true;
@@ -24,18 +73,24 @@ impl YamantakaApp {
     }
     pub(in crate::app) fn continuity_settled(&self) -> bool {
         let state = &self.tabs.continuity;
-        state.loaded && !state.paused && state.pending.is_none() && state.saved == self.tabs.model
+        state.loaded
+            && !state.paused
+            && state.pending.is_none()
+            && self
+                .capture_reader_continuity()
+                .is_ok_and(|snapshot| snapshot == state.saved)
     }
     pub(in crate::app) fn continuity_available_for_workspace(&self) -> Option<bool> {
         let state = &self.tabs.continuity;
-        (state.loaded && !state.paused && !state.overridden).then_some(state.had_snapshot)
+        (state.loaded && !state.paused && !state.overridden && !state.restoring_comparison)
+            .then_some(state.had_snapshot)
     }
     pub(in crate::app) fn continuity_loading(&self) -> bool {
-        self.tabs.continuity.loading.is_some()
+        self.tabs.continuity.loading.is_some() || self.tabs.continuity.restoring_comparison
     }
 
     pub(in crate::app) fn begin_reader_continuity(&mut self) {
-        if (self.demo && !crate::graphics_recovery::runtime_fallback())
+        if (self.demo && !crate::graphics_recovery::continuity_resume())
             || self.startup_mode.is_safe()
         {
             return;
@@ -87,7 +142,7 @@ impl YamantakaApp {
                 return;
             }
         };
-        if (!restored.tabs().is_empty() || !restored.closed().is_empty())
+        if (!restored.tabs().tabs().is_empty() || !restored.tabs().closed().is_empty())
             && (self.reader.active.is_some()
                 || self.opening.busy()
                 || !self.tabs.model.tabs().is_empty())
@@ -102,22 +157,31 @@ impl YamantakaApp {
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(true);
         if restore {
-            self.tabs.model = restored;
+            self.tabs.model = restored.tabs().clone();
+            self.tabs.continuity.retained_comparison = restored.comparison().cloned();
         } else if let Err(error) =
             self.tabs
                 .model
-                .restore_continuity(vec![], None, restored.closed().to_vec())
+                .restore_continuity(vec![], None, restored.tabs().closed().to_vec())
         {
             self.error = Some(error.to_string());
             return;
         }
-        self.tabs.continuity.saved = self.tabs.model.clone();
+        self.tabs.continuity.saved = if restore {
+            restored
+        } else {
+            self.tabs.model.clone().into()
+        };
         self.tabs.continuity.loaded = true;
         if restore
             && !self.tabs.continuity.overridden
             && let Some(id) = self.tabs.model.active().map(|tab| tab.id().to_owned())
         {
             self.restore_reader_tab(&id);
+            if let Some(saved) = self.tabs.continuity.retained_comparison.clone() {
+                self.tabs.continuity.restoring_comparison = true;
+                self.schedule_continuity_comparison(saved, reply.reference_document);
+            }
         }
     }
     pub(in crate::app) fn pump_reader_continuity(&mut self, ctx: &egui::Context) {
@@ -127,15 +191,38 @@ impl YamantakaApp {
         if self.library_selection.removing()
             || !self.tabs.continuity.loaded
             || self.tabs.continuity.paused
+            || self.tabs.continuity.restoring_comparison
         {
             return;
         }
         self.sync_tab_context();
+        if self
+            .tabs
+            .continuity
+            .retained_comparison
+            .as_ref()
+            .is_some_and(|saved| {
+                self.tabs
+                    .model
+                    .active()
+                    .is_none_or(|tab| tab.document() != saved.primary)
+            })
+        {
+            self.tabs.continuity.retained_comparison = None;
+        }
+        let snapshot = match self.capture_reader_continuity() {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                self.error = Some(error.to_string());
+                self.tabs.continuity.paused = true;
+                return;
+            }
+        };
         let state = &mut self.tabs.continuity;
         if state.pending.is_some() {
             return;
         }
-        if self.tabs.model == state.saved {
+        if snapshot == state.saved {
             state.due = None;
             return;
         }
@@ -150,7 +237,6 @@ impl YamantakaApp {
             self.error = Some("Reader continuity revision exhausted".into());
             return;
         };
-        let snapshot = self.tabs.model.clone();
         let cancel = Cancellation::default();
         let request = ContinuityRequest {
             change: ContinuityChange::Save {
@@ -193,6 +279,6 @@ impl YamantakaApp {
             .checked_add(1)
             .ok_or_else(|| Failure::Invalid("Reader continuity revision exhausted".into()))?;
         self.runtime
-            .persist_reader_continuity(revision, self.tabs.model.clone())
+            .persist_reader_continuity(revision, self.capture_reader_continuity()?)
     }
 }

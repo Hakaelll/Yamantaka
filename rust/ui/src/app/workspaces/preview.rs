@@ -176,7 +176,7 @@ impl YamantakaApp {
                 assert_eq!(self.query, "Architecture");
                 assert!(self.list && self.reader_focus && self.workspaces.binding.is_some());
                 assert!(self.grouping.mode == super::super::library_grouping::Grouping::Author);
-                let comparison = self.capture_workspace_comparison().unwrap();
+                let comparison = self.capture_comparison().unwrap();
                 assert_eq!(comparison.document, "demo-1");
                 assert_eq!(comparison.primary, "demo-2");
                 assert_eq!(comparison.page, 1);
@@ -280,7 +280,7 @@ impl YamantakaApp {
                 assert!(self.tabs.model.workspace_reference().is_some());
                 yamantaka_storage::reader_continuity::save(
                     &self.store.join("export-preview.reader-continuity.json"),
-                    &self.tabs.model,
+                    &self.tabs.model.clone().into(),
                 )
                 .unwrap();
                 self.workspaces.preview = 0;

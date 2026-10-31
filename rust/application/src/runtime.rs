@@ -232,7 +232,7 @@ pub enum Update {
     CoverSourcePage(String, Result<Option<u32>>, Cancellation),
     ManualCover(crate::manual_cover::ManualCoverReply),
     Cover(String, Result<Arc<RenderedPage>>, Cancellation),
-    ReaderContinuity(ContinuityReply),
+    ReaderContinuity(Box<ContinuityReply>),
     Workspace(crate::workspaces::WorkspaceReply),
     ReaderClosed(ReaderCloseReply),
     ReadingHistory(ReadingHistoryReply),
@@ -353,7 +353,7 @@ enum RuntimeControl {
     FlushImportIntents(Sender<Result<()>>),
     PersistContinuity(
         u64,
-        Box<yamantaka_domain::reader_tabs::DocumentTabs>,
+        Box<yamantaka_domain::reader_continuity::ReaderContinuity>,
         Sender<Result<()>>,
     ),
     PersistSessions(Vec<ReadingSessionRequest>, usize, Sender<Result<()>>),
@@ -1422,7 +1422,7 @@ impl Runtime {
                                 }
                                 Action::ReaderContinuity(request) => {
                                     let reply = continuity.execute(&mut repository, *request);
-                                    emit(&events, &notify, Update::ReaderContinuity(reply), permit);
+                                    emit(&events, &notify, Update::ReaderContinuity(Box::new(reply)), permit);
                                 }
                                 Action::Workspace(request) => {
                                     let reply = crate::workspaces::execute(&mut repository, *request);
@@ -2221,7 +2221,7 @@ impl Runtime {
     pub fn persist_reader_continuity(
         &self,
         revision: u64,
-        tabs: yamantaka_domain::reader_tabs::DocumentTabs,
+        tabs: yamantaka_domain::reader_continuity::ReaderContinuity,
     ) -> Result<()> {
         let (completed, reply) = bounded(1);
         self.shutdown

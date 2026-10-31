@@ -78,3 +78,10 @@ impl ReferenceView {
         Ok(())
     }
 }
+
+impl YamantakaApp {
+    pub(in crate::app) fn capture_comparison(&self) -> Option<WorkspaceComparison> {
+        let (primary, _) = self.reader.active.as_ref()?;
+        self.reference.as_ref()?.snapshot(&primary.id)
+    }
+}

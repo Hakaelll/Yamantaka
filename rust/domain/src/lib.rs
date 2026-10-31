@@ -34,6 +34,7 @@ pub mod pdf_ticket;
 pub use password::PdfPassword;
 pub mod quarantine;
 pub mod reader;
+pub mod reader_continuity;
 pub mod reader_destination;
 pub mod reader_layout;
 pub mod reader_preferences;
@@ -488,10 +489,13 @@ pub trait LibraryRepository {
     fn cover_source_page(&self, _document_id: &str) -> Result<Option<u32>> {
         Ok(None)
     }
-    fn reader_continuity(&self) -> Result<Option<reader_tabs::DocumentTabs>> {
+    fn reader_continuity(&self) -> Result<Option<reader_continuity::ReaderContinuity>> {
         Ok(None)
     }
-    fn save_reader_continuity(&mut self, _tabs: &reader_tabs::DocumentTabs) -> Result<()> {
+    fn save_reader_continuity(
+        &mut self,
+        _tabs: &reader_continuity::ReaderContinuity,
+    ) -> Result<()> {
         Err(Failure::Unsupported("Reader continuity persistence".into()))
     }
     fn query(&self, query: &LibraryQuery) -> Result<Vec<Document>>;

@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='continuity-comparison-shared'; args=@('--reader','--reference','--graphics-fail-runtime','--light','--es') },
+    @{ name='continuity-comparison-book'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--es') },
     @{ name='comparison-glow-pages'; args=@('--reader','--reference','--software','--es') },
     @{ name='comparison-glow-thumbnails'; args=@('--reader','--reference','--reference-book','--reference-thumbnails','--software','--light','--es') },
     @{ name='comparison-glow-sync'; args=@('--reader','--reference','--reference-sync','--software','--light') },
@@ -492,6 +494,21 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'continuity-comparison-*') {
+        $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
+        $saved = $expected.comparison
+        $actual = $controls.readerContinuity.comparison
+        $primary = @($controls.readerTabs.tabs | Where-Object { $_.id -eq $controls.readerTabs.active })
+        if ($primary.Count -ne 1 -or [math]::Abs($primary[0].zoom-$expected.primaryZoom) -gt 0.00001) { throw 'Primary reading zoom was not restored.' }
+        if (-not $expected.synthetic -or -not $saved -or -not $actual -or -not $controls.graphicsRuntimeFallback -or -not $controls.readerContinuity.loaded -or $controls.readerContinuity.restoring -or $controls.readerContinuity.retainedComparison -or $controls.currentReaderPage -ne $expected.primaryPage -or $controls.reference.images -lt 1 -or $controls.graphicsRecoveryRestorePreference -ne $false) { throw 'Atomic comparison continuity was not restored after graphics recovery.' }
+        foreach ($field in @('primary','document','page','layout','zoomMode','theme','rotation','horizontalMargin','verticalMargin','followPage','followZoom','followPosition','bidirectional','swapped')) {
+            if ($saved.$field -cne $actual.$field) { throw "Restored comparison field changed: $field" }
+        }
+        foreach ($field in @('zoom','ratio')) { if ([math]::Abs($saved.$field-$actual.$field) -gt 0.00001) { throw "Restored comparison scale changed: $field" } }
+        for ($axis=0;$axis -lt 2;$axis++) { if ([math]::Abs($saved.point[$axis]-$actual.point[$axis]) -gt 0.0001) { throw 'Restored comparison anchor changed.' } }
+        if (($saved.differences|ConvertTo-Json -Compress) -cne ($actual.differences|ConvertTo-Json -Compress)) { throw 'Restored comparison differences changed.' }
+        if (-not $controls.managedPages.settled -or $controls.managedPages.failed -or $controls.trackedMemory.pages -gt 72MB) { throw 'Restored comparison did not settle within its payload budget.' }
+    }
     if ($case.name -like 'comparison-glow-*') {
         if ($controls.pagePresenter -ne 'egui-glow' -or -not $controls.reference -or $controls.reference.images -lt 1 -or $controls.readerPresentationSlots -lt 1) { throw 'Alternate-compositor comparison did not present both panes.' }
         if (-not $controls.managedPages.settled -or $controls.managedPages.failed -or $controls.trackedMemory.gpu -le 0 -or $controls.trackedMemory.transient -ne 0 -or $controls.trackedMemory.pages -gt 72MB) { throw 'Comparison uploads did not settle within their governed budget.' }

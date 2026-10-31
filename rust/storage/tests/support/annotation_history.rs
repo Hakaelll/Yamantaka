@@ -132,7 +132,7 @@ pub fn verify(document: &str) {
         change(
             &mut db,
             AnnotationChange::Review {
-                ids: &[id.clone()],
+                ids: std::slice::from_ref(&id),
                 state: AnnotationReviewState::Resolved,
             },
             &governor,

@@ -42,7 +42,7 @@ impl YamantakaApp {
                 && (binding.queue != QueueContext::capture(&self.tabs.model)
                     || binding.focus != self.reader_focus
                     || self.workspaces.comparison_restore.is_none()
-                        && binding.comparison != self.capture_workspace_comparison())
+                        && binding.comparison != self.capture_comparison())
         })
     }
     pub(in crate::app) fn guard_workspace_close(&mut self, ctx: &egui::Context) {
@@ -134,7 +134,7 @@ impl YamantakaApp {
                     enabled: self.reader_focus,
                 }
             } else {
-                let value = self.capture_workspace_comparison();
+                let value = self.capture_comparison();
                 let now = Instant::now();
                 if self
                     .workspaces

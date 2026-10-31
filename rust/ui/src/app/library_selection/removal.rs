@@ -153,6 +153,7 @@ impl YamantakaApp {
     pub(in crate::app) fn reconcile_removal(&mut self, ctx: &egui::Context, report: &BulkReport) {
         self.tabs.model.retire_documents(&report.retired);
         self.tabs.model.forget_documents(&report.succeeded);
+        self.forget_continuity_documents(&report.succeeded);
         let removed: Vec<_> = self
             .documents
             .iter()

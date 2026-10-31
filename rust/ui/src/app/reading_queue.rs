@@ -93,10 +93,12 @@ impl YamantakaApp {
             .update_queue("queue-2", QueueEntry::new(QueueStatus::InReview, "", ""))
             .unwrap();
         let file = self.capture.as_ref().unwrap().with_extension("queue.json");
-        yamantaka_storage::reader_continuity::save(&file, &model).unwrap();
+        yamantaka_storage::reader_continuity::save(&file, &model.clone().into()).unwrap();
         let loaded = yamantaka_storage::reader_continuity::load(&file)
             .unwrap()
-            .unwrap();
+            .unwrap()
+            .tabs()
+            .clone();
         assert_eq!(loaded.active().unwrap().id(), "queue-2");
         assert_eq!(loaded.tabs().len(), 3);
         for (saved, original) in loaded.tabs().iter().zip(model.tabs()) {

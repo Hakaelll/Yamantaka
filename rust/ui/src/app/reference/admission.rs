@@ -260,6 +260,10 @@ impl YamantakaApp {
     }
 
     pub(in crate::app) fn request_reference_close(&mut self) -> bool {
+        self.discard_retained_comparison();
+        self.close_reference_preserving_continuity()
+    }
+    pub(in crate::app) fn close_reference_preserving_continuity(&mut self) -> bool {
         let Some(reference) = &mut self.reference else {
             return true;
         };
@@ -381,7 +385,7 @@ impl YamantakaApp {
             .as_ref()
             .is_some_and(|reference| reference.close_requested && !reference.busy())
         {
-            self.request_reference_close();
+            self.close_reference_preserving_continuity();
         }
         if self.reference.is_none()
             && let Some(surface) = self.reference_return.take()

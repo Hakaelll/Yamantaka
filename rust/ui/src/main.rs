@@ -1642,7 +1642,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     "prompt"
                 });
             }
-            if demo && reader && !graphics_recovery::runtime_fallback() {
+            if demo && reader && !graphics_recovery::continuity_resume() {
                 app.preview_reader();
                 if args.iter().any(|arg| arg == "--nearby-turn") {
                     app.preview_nearby_turn();
@@ -1810,7 +1810,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if demo && args.iter().any(|arg| arg == "--tools-menu") {
                 app.preview_tools_menu();
             }
-            if !initial.is_empty() && !graphics_recovery::runtime_fallback() {
+            if !initial.is_empty() && !graphics_recovery::continuity_resume() {
                 app.import(initial);
             }
             Ok(Box::new(app))

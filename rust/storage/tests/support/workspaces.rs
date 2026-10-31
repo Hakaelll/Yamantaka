@@ -223,13 +223,13 @@ pub fn preserved_split_references(document: &str) {
         .set_workspace_reference(Some(reference.clone()))
         .unwrap();
     let continuity_path = root.path().join("continuity.json");
-    yamantaka_storage::reader_continuity::save(&continuity_path, &continuity).unwrap();
+    yamantaka_storage::reader_continuity::save(&continuity_path, &continuity.into()).unwrap();
     let reread = yamantaka_storage::reader_continuity::load(&continuity_path)
         .unwrap()
         .unwrap();
-    assert_eq!(reread.workspace_reference(), Some(&reference));
+    assert_eq!(reread.tabs().workspace_reference(), Some(&reference));
     assert_eq!(
-        reread.active().unwrap().panel(),
+        reread.tabs().active().unwrap().panel(),
         Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions)
     );
     let context: yamantaka_domain::reading_sessions::ReaderSessionContext =
@@ -264,6 +264,46 @@ pub fn preserved_split_references(document: &str) {
         follow_zoom: false,
         follow_position: false,
     };
+    let mut legacy: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&continuity_path).unwrap()).unwrap();
+    assert_eq!(legacy["version"], 1);
+    legacy["retainedExtension"] = serde_json::json!({"value":42});
+    std::fs::write(&continuity_path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+    let context = yamantaka_domain::reader_continuity::ReaderContinuity::new(
+        reread.tabs().clone(),
+        Some(comparison.clone()),
+    )
+    .unwrap();
+    yamantaka_storage::reader_continuity::save(&continuity_path, &context).unwrap();
+    let restored = yamantaka_storage::reader_continuity::load(&continuity_path)
+        .unwrap()
+        .unwrap();
+    assert_eq!(restored, context);
+    let encoded = std::fs::read(&continuity_path).unwrap();
+    let current: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+    assert_eq!(current["version"], 2);
+    assert_eq!(
+        current["retainedExtension"],
+        serde_json::json!({"value":42})
+    );
+    for invalid in [serde_json::json!(99), serde_json::json!(2)] {
+        let mut unsupported = current.clone();
+        unsupported["version"] = invalid.clone();
+        if invalid == 2 {
+            unsupported["comparison"]["primary"] = "different-reading".into();
+        }
+        let bytes = serde_json::to_vec(&unsupported).unwrap();
+        std::fs::write(&continuity_path, &bytes).unwrap();
+        assert!(yamantaka_storage::reader_continuity::load(&continuity_path).is_err());
+        assert!(yamantaka_storage::reader_continuity::save(&continuity_path, &context).is_err());
+        assert_eq!(std::fs::read(&continuity_path).unwrap(), bytes);
+    }
+    std::fs::write(&continuity_path, &encoded).unwrap();
+    let mut forgotten = context.clone();
+    forgotten.forget_documents(&["unrelated".into()]);
+    assert_eq!(forgotten.comparison(), Some(&comparison));
+    forgotten.forget_documents(&["original".into()]);
+    assert!(forgotten.comparison().is_none());
     let change = WorkspaceChange::Comparison {
         expected: reference.clone(),
         value: Some(comparison.clone()),
