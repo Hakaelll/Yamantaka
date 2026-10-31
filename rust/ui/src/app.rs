@@ -121,6 +121,8 @@ impl PageImage {
     }
 }
 pub struct YamantakaApp {
+    shortcut_bindings: shortcuts::bindings::Bindings,
+    shortcut_error: Option<String>,
     reader: reader_pane::ReaderPane,
     reading_focus: shortcuts::ReadingFocus,
     reference_shortcuts_preview: shortcuts::ShortcutPreview,
@@ -329,6 +331,8 @@ impl YamantakaApp {
             .get("libraryModifiedOnly")
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
+        let shortcut_bindings =
+            shortcuts::bindings::Bindings::load(preferences.get("shortcutOverrides"));
         let mut app = Self {
             reader: Default::default(),
             reading_focus: Default::default(),
@@ -405,6 +409,8 @@ impl YamantakaApp {
             modified_only,
             list,
             library_density,
+            shortcut_bindings,
+            shortcut_error: None,
             reader_focus: false,
             offset: 0,
             selected: None,
@@ -2247,6 +2253,7 @@ impl App for YamantakaApp {
                     .reference
                     .as_ref()
                     .is_some_and(|reference| reference.pane.selection.focused_page(&ctx).is_some()),
+            &self.shortcut_bindings,
         ) {
             if self.dispatch_reading_shortcut(&ctx, &shortcut) {
                 continue;
@@ -2258,6 +2265,12 @@ impl App for YamantakaApp {
                 | shortcuts::Shortcut::FitPage
                 | shortcuts::Shortcut::HistoryBack
                 | shortcuts::Shortcut::HistoryForward => unreachable!(),
+                shortcuts::Shortcut::OpenDocument => {
+                    if let Some(paths) = yamantaka_windows::pick_pdfs() {
+                        self.import(paths);
+                    }
+                }
+                shortcuts::Shortcut::ActualSize | shortcuts::Shortcut::FitWidth => unreachable!(),
                 shortcuts::Shortcut::GlobalSearch => self.show_search(),
                 shortcuts::Shortcut::DocumentFind => self.show_find(),
                 shortcuts::Shortcut::PreviousMatch => self.step_find(false),
@@ -2647,6 +2660,8 @@ impl App for YamantakaApp {
                     record["ruleExecution"] = self.automation.execution_summary();
                     record["automationRules"] = self.automation.summary();
                     record["revisionGroups"] = self.revision_capture_summary();
+                    record["shortcutBindings"]=self.shortcut_bindings.summary();
+                    record["shortcutConflict"]=self.shortcut_error.is_some().into();
                     record["relations"] = self.relations.summary();
                     record["referenceNotesPhase"] = serde_json::json!(self.reference_notes_preview.phase());
                     record["primaryAnnotations"] = self.reader.annotations.summary();

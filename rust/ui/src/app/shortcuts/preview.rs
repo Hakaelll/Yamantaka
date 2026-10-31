@@ -6,6 +6,7 @@ use crate::app::*;
 #[derive(Default)]
 pub(in crate::app) struct ShortcutPreview {
     phase: u8,
+    pub(in crate::app) custom: bool,
     close: bool,
     history: bool,
     primary_positions: bool,
@@ -28,6 +29,18 @@ impl ShortcutPreview {
     }
     fn key(&mut self, phase: u8, key: egui::Key, modifiers: egui::Modifiers) {
         self.phase = phase;
+        let (key, modifiers) = if self.custom {
+            match (key, modifiers) {
+                (egui::Key::F6, egui::Modifiers::NONE) => (egui::Key::F7, egui::Modifiers::NONE),
+                (egui::Key::ArrowRight, egui::Modifiers::NONE) => {
+                    (egui::Key::ArrowRight, egui::Modifiers::CTRL)
+                }
+                (egui::Key::Equals, egui::Modifiers::CTRL) => (egui::Key::D, egui::Modifiers::CTRL),
+                pair => pair,
+            }
+        } else {
+            (key, modifiers)
+        };
         for pressed in [true, false] {
             self.pending.push(egui::Event::Key {
                 key,

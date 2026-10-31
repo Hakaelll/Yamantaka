@@ -855,6 +855,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 },
             );
             cc.egui_ctx.set_zoom_factor(app.text_scale());
+            if args
+                .iter()
+                .any(|arg| arg == "--shortcut-settings" || arg == "--custom-shortcuts")
+            {
+                app.preview_binding_settings(
+                    &cc.egui_ctx,
+                    if args.iter().any(|arg| arg == "--custom-shortcuts") {
+                        2
+                    } else if args.iter().any(|arg| arg == "--shortcut-conflict") {
+                        1
+                    } else {
+                        0
+                    },
+                );
+            }
             if tilt {
                 app.preview_tilt();
             }

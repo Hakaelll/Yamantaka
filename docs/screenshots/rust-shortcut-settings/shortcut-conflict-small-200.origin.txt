@@ -1,0 +1,10 @@
+Origin: native screenshot of the Yamantaka Rust executable, not an AI-generated image.
+Captured with tool/capture_rust_ui.ps1; isolated synthetic study collection; PDF source is the repository's generated acceptance fixture. Write scenarios may use an isolated file-backed synthetic store. No personal library was opened.
+Case: shortcut-conflict-small-200
+Arguments: --demo --shortcut-settings --shortcut-conflict --es --light --reduce-motion --size=640x480 --text-scale=2
+Capture UTC: 10/31/2026 13:18:26
+Executable SHA-256: 93318B0162BDEE1CD5042215B7786F80D6EEADF22826A9B387C387545344E347
+Original PNG SHA-256: 5F55E8D777D69DA9B4875CB0116554AACD12B6A82D902DB6FA9128C8A1C0A585
+Logical viewport: 0, 0, 320, 240
+Pixels per logical point: 2.5
+See capture-manifest.json for exact source hashes and conditions. These captures do not certify physical monitor DPI, Narrator, full functional parity or whole-rewrite acceptance.

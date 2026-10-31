@@ -65,6 +65,9 @@ $cases = @(
     @{ name='reader-reference-history'; args=@('--reader','--reference','--reference-book','--reference-history','--reference-swap','--es') },
     @{ name='reader-reference-history-small-200'; args=@('--reader','--reference','--reference-book','--reference-history','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-primary-history'; args=@('--reader','--reference','--reference-book','--reference-history','--history-primary') },
+    @{ name='shortcut-settings'; args=@('--shortcut-settings','--es','--light') },
+    @{ name='shortcut-conflict-small-200'; args=@('--shortcut-settings','--shortcut-conflict','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='reader-custom-shortcuts'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--custom-shortcuts','--es') },
     @{ name='reader-reference-shortcuts'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--es') },
     @{ name='reader-reference-shortcuts-small-200'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-shortcuts-close'; args=@('--reader','--reference','--reference-book','--reference-shortcuts','--reference-swap','--reference-shortcuts-close','--es') },
@@ -542,6 +545,12 @@ foreach ($case in $cases) {
         $labels=if ($case.name -eq 'revision-groups-current-small-200') {@('Marcar como actual')} elseif ($case.name -eq 'revision-groups-created') {@('New group','View editions')} else {@('Nuevo grupo','Ver ediciones')}
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
+    if ($case.name -like 'shortcut-*' -or $case.name -eq 'reader-custom-shortcuts') {
+        $keys=$controls.shortcutBindings
+        if($keys.warning -or $keys.known -ne 21 -or $keys.unavailable -ne 1 -or $keys.nextPage -ne 'ctrl-right' -or $keys.switchPane -ne 'f7' -or $keys.zoomIn -ne 'ctrl-d'){throw 'Shortcut assignment, preservation, or persisted reload failed.'}
+        if($controls.shortcutConflict -ne ($case.name -eq 'shortcut-conflict-small-200')){throw 'Conflicting shortcut changed the active map or did not report its owner.'}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath)
+    }
     if ($case.name -like 'relations-*') {
         if ($controls.relations.phase -ne 10 -or $controls.relations.pending -or $controls.relations.writing -or $controls.relations.failed) { throw 'The connected relation workflow did not settle.' }
         if ($case.name -like 'relations-location*') {
@@ -616,9 +625,10 @@ foreach ($case in $cases) {
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Posiciones','Guardar posición A')
         }
     }
-    if ($case.name -in @('reader-reference-shortcuts','reader-reference-shortcuts-small-200')) {
+    if ($case.name -in @('reader-reference-shortcuts','reader-reference-shortcuts-small-200','reader-custom-shortcuts')) {
         if ($controls.referenceShortcutPhase -ne 14 -or $controls.readingFocus -cne 'Reference' -or $controls.currentReaderPage -ne 1 -or $controls.reference.page -ne 0 -or $controls.reference.document -ne 'demo-1' -or $controls.documentFind -or $controls.reference.find.matches -lt 2) { throw 'Keyboard and pointer routing did not keep independent page, zoom and find state.' }
-        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Lectura de referencia · F6 cambia de panel')
+        $key=if($case.name -eq 'reader-custom-shortcuts'){'F7'}else{'F6'}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @("Lectura de referencia · $key cambia de panel")
     }
     if ($case.name -eq 'reader-reference-shortcuts-close') {
         if ($controls.referenceShortcutPhase -ne 16 -or $controls.readingFocus -cne 'Primary' -or $controls.reference -or $controls.currentReaderPage -ne 1 -or $controls.referenceAdmission.nativeCloses -ne 1) { throw 'Closing the focused swapped reference did not preserve the main reading.' }

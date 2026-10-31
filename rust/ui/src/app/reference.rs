@@ -695,14 +695,30 @@ impl YamantakaApp {
             ui,
             primary_rect,
             shortcuts::ReadingTarget::Primary,
-            self.english,
+            &format!(
+                "{} · {} {}",
+                self.tr("Lectura principal", "Main reading"),
+                shortcuts::bindings::caption(
+                    self.shortcut_bindings
+                        .token(shortcuts::Shortcut::SwitchPane)
+                ),
+                self.tr("cambia de panel", "switches panes")
+            ),
             p,
         );
         self.reading_focus.register(
             ui,
             reference_rect,
             shortcuts::ReadingTarget::Reference,
-            self.english,
+            &format!(
+                "{} · {} {}",
+                self.tr("Lectura de referencia", "Reference reading"),
+                shortcuts::bindings::caption(
+                    self.shortcut_bindings
+                        .token(shortcuts::Shortcut::SwitchPane)
+                ),
+                self.tr("cambia de panel", "switches panes")
+            ),
             p,
         );
         let notes_action = self

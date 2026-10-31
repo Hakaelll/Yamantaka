@@ -56,6 +56,8 @@ impl YamantakaApp {
                     | Shortcut::HistoryBack
                     | Shortcut::HistoryForward
                     | Shortcut::FitPage
+                    | Shortcut::ActualSize
+                    | Shortcut::FitWidth
             ) {
                 return false;
             }
@@ -116,6 +118,8 @@ impl YamantakaApp {
                     .clamp(0.2, 8.0);
                     reference.set_zoom(ZoomMode::Custom, zoom);
                 }
+                Shortcut::ActualSize => reference.set_zoom(ZoomMode::Custom, 1.0),
+                Shortcut::FitWidth => reference.set_zoom(ZoomMode::FitWidth, reference.pane.zoom),
                 Shortcut::FitPage => reference.set_zoom(ZoomMode::FitPage, reference.pane.zoom),
                 _ => unreachable!(),
             }
@@ -147,9 +151,14 @@ impl YamantakaApp {
                     };
                 self.set_reader_zoom(zoom);
             }
-            Shortcut::FitPage => {
+            Shortcut::ActualSize => self.set_reader_zoom(1.0),
+            Shortcut::FitWidth | Shortcut::FitPage => {
                 if let Some(mut preferences) = self.reader.reader_preferences.clone() {
-                    preferences.zoom_mode = ZoomMode::FitPage;
+                    preferences.zoom_mode = if matches!(shortcut, Shortcut::FitWidth) {
+                        ZoomMode::FitWidth
+                    } else {
+                        ZoomMode::FitPage
+                    };
                     self.apply_reader_preferences(preferences);
                 }
             }

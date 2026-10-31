@@ -168,7 +168,13 @@ impl YamantakaApp {
         }
         if theme::navigation(
             ui,
-            self.tr("Modo concentración · F8", "Focus mode · F8"),
+            &format!(
+                "{} · {}",
+                self.tr("Modo concentración", "Focus mode"),
+                shortcuts::bindings::caption(
+                    self.shortcut_bindings.token(shortcuts::Shortcut::Focus)
+                )
+            ),
             self.reader_focus,
             p,
         )

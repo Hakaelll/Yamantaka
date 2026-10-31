@@ -22,7 +22,13 @@ impl YamantakaApp {
                     .show(ui, |ui| {
                         if theme::icon_button(
                             ui,
-                            self.tr("Salir de concentración · F8", "Exit focus mode · F8"),
+                            &format!(
+                                "{} · {}",
+                                self.tr("Salir de concentración", "Exit focus mode"),
+                                shortcuts::bindings::caption(
+                                    self.shortcut_bindings.token(shortcuts::Shortcut::Focus)
+                                )
+                            ),
                             theme::Icon::Panel,
                             p,
                         )

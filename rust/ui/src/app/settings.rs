@@ -21,7 +21,7 @@ impl YamantakaApp {
             .ctx()
             .data_mut(|data| data.get_temp::<usize>(egui::Id::new(CATEGORY_KEY)))
             .unwrap_or(0)
-            .min(4);
+            .min(5);
         let mut changed = false;
         egui::ScrollArea::vertical()
             .id_salt("settings-page")
@@ -67,6 +67,7 @@ impl YamantakaApp {
                                         "Idioma",
                                         "Privacidad",
                                         "Almacenamiento",
+                                        "Atajos",
                                     ][category],
                                     [
                                         "Appearance",
@@ -74,6 +75,7 @@ impl YamantakaApp {
                                         "Language",
                                         "Privacy",
                                         "Storage",
+                                        "Shortcuts",
                                     ][category],
                                 );
                                 let response = theme::navigation(ui, label, true, p);
@@ -135,6 +137,7 @@ impl YamantakaApp {
             self.tr("Idioma", "Language"),
             self.tr("Privacidad", "Privacy"),
             self.tr("Almacenamiento", "Storage"),
+            self.tr("Atajos", "Shortcuts"),
         ];
         let mut choices = |ui: &mut egui::Ui| {
             for (index, label) in labels.iter().enumerate() {
@@ -164,6 +167,9 @@ impl YamantakaApp {
         let mut changed = false;
         let cramped = ui.available_width() < 420.0;
         match category {
+            5 => {
+                self.shortcut_settings(ui, p);
+            }
             0 => {
                 if !cramped {
                     section_title(ui, self.tr("Apariencia", "Appearance"));

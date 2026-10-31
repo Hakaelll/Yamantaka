@@ -108,7 +108,7 @@ impl ReadingFocus {
         ui: &mut egui::Ui,
         rect: egui::Rect,
         target: ReadingTarget,
-        english: bool,
+        label: &str,
         p: Palette,
     ) {
         let index = usize::from(target == ReadingTarget::Reference);
@@ -119,12 +119,6 @@ impl ReadingFocus {
             self.reference_rect = Some(rect);
         }
         let response = ui.interact(rect, id, egui::Sense::focusable_noninteractive());
-        let label = match (target, english) {
-            (ReadingTarget::Primary, true) => "Main reading · F6 switches panes",
-            (ReadingTarget::Primary, false) => "Lectura principal · F6 cambia de panel",
-            (ReadingTarget::Reference, true) => "Reference reading · F6 switches panes",
-            (ReadingTarget::Reference, false) => "Lectura de referencia · F6 cambia de panel",
-        };
         response.widget_info(|| {
             egui::WidgetInfo::labeled(egui::WidgetType::Panel, ui.is_enabled(), label)
         });
