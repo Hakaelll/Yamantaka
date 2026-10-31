@@ -1,6 +1,7 @@
 use super::*;
 use yamantaka_domain::automation::*;
 mod preview;
+mod review;
 mod simulation;
 mod view;
 pub(super) struct RuleEditor {
@@ -44,6 +45,7 @@ impl RuleEditor {
 }
 #[derive(Default)]
 pub(super) struct AutomationState {
+    review: review::ReviewState,
     simulation: simulation::SimulationState,
     page: Option<Arc<RulePage>>,
     pending: Option<Cancellation>,
@@ -58,6 +60,7 @@ pub(super) struct AutomationState {
 }
 impl AutomationState {
     pub(super) fn leave(&mut self) {
+        self.review.leave();
         self.simulation.leave();
         if let Some(cancel) = self.pending.take() {
             cancel.cancel();
@@ -66,13 +69,19 @@ impl AutomationState {
         self.deleting = None;
     }
     fn busy(&self) -> bool {
-        self.pending.is_some() || self.writing.is_some() || self.simulation.busy()
+        self.pending.is_some()
+            || self.writing.is_some()
+            || self.simulation.busy()
+            || self.review.busy()
     }
     pub(super) fn ready(&self) -> bool {
         !self.busy() && self.simulation.ready() && matches!(self.preview, 0 | 10)
     }
     pub(super) fn simulation_summary(&self) -> serde_json::Value {
         self.simulation.summary()
+    }
+    pub(super) fn review_summary(&self) -> serde_json::Value {
+        self.review.summary()
     }
     pub(super) fn summary(&self) -> serde_json::Value {
         serde_json::json!({"phase":self.preview,"pending":self.busy(),"failed":self.error.is_some(),"saved":self.saved,"editing":self.editor.is_some(),"confirmDelete":self.deleting.is_some(),"total":self.page.as_ref().map(|page|page.total),"offset":self.offset,"entries":self.page.as_ref().map(|page|page.entries.iter().map(|rule|serde_json::json!({"id":rule.revision.id,"name":rule.name,"enabled":rule.enabled,"available":rule.definition().is_some(),"actions":rule.definition().map(|definition|definition.actions.len()),"created":rule.created_at,"updated":rule.updated_at})).collect::<Vec<_>>())})

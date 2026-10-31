@@ -94,6 +94,7 @@ fn candidate(
         ))
         .map_err(|_| Failure::MemoryBudget)?;
     Ok(Arc::new(SimulationMatch::new(
+        entry.revision,
         entry.id.clone(),
         entry.title.clone(),
         proof,
@@ -241,11 +242,11 @@ fn execute(request: &SimulationRequest, reader: &dyn RuleScanReader) -> Simulati
         Ok(Some(output))
     };
     match run() {
-        Ok(Some(matches)) => SimulationOutcome::Complete(SimulationReport {
+        Ok(Some(matches)) => SimulationOutcome::Complete(Arc::new(SimulationReport {
             rule: request.rule.clone(),
             progress,
             matches,
-        }),
+        })),
         Ok(None) => SimulationOutcome::LimitReached(progress),
         Err(Failure::Cancelled)
             if !request.cancel.is_cancelled()

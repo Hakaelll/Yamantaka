@@ -98,7 +98,9 @@ impl YamantakaApp {
                         .color(p.secondary),
                     );
                     ui.add_space(24.0);
-                    self.rule_simulation_view(ui, p);
+                    if !self.rule_review_view(ui, p) {
+                        self.rule_simulation_view(ui, p);
+                    }
                     let busy = self.automation.busy();
                     if let Some(error) = self.automation.error.clone() {
                         ui.label(error);

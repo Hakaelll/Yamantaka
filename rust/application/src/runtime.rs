@@ -2,6 +2,7 @@ use crate::annotation_export::worker::{AnnotationExportReply, AnnotationExportRe
 use crate::annotations::{
     AnnotationMarksReply, AnnotationMarksRequest, AnnotationReply, AnnotationRequest,
 };
+use crate::automation_plan::{PlanJob, PlanReply, PlanRequest};
 use crate::automation_simulation::{SimulationJob, SimulationReply, SimulationRequest};
 use crate::cache_maintenance::{
     CacheMaintenanceJob, CacheMaintenanceReply, CacheMaintenanceRequest,
@@ -57,6 +58,7 @@ pub enum Action {
     Tags(yamantaka_domain::tags::TagQuery, Cancellation),
     ChangeTag(Box<yamantaka_domain::tags::TagChange>, Cancellation),
     SimulateRule(Box<SimulationRequest>),
+    PrepareRule(Box<PlanRequest>),
     AutomationRules(
         yamantaka_domain::automation::RuleQuery,
         yamantaka_domain::memory::MemoryGovernor,
@@ -171,6 +173,7 @@ pub enum Update {
     Tags(Result<yamantaka_domain::tags::TagPage>, Cancellation),
     TagChanged(Result<String>, Cancellation),
     RuleSimulated(Box<SimulationReply>),
+    RulePrepared(Box<PlanReply>),
     AutomationRules(Result<yamantaka_domain::automation::RulePage>, Cancellation),
     AutomationRuleChanged(Result<String>, Cancellation),
     RevisionGroups(
@@ -940,6 +943,7 @@ impl Runtime {
                 let mut continuity = ContinuityWriter::default();
                 let mut export: Option<(ExportJob, Permit)> = None;
                 let mut rule_simulation: Option<(SimulationJob, Permit)> = None;
+                let mut rule_plan: Option<(PlanJob, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
                 let mut cache_maintenance: Option<(CacheMaintenanceJob, Permit)> = None;
                 let mut cover_regeneration:Option<(crate::cover_regeneration::RegenerationJob,Permit)>=None;
@@ -1055,6 +1059,14 @@ impl Runtime {
                                     let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled} else {yamantaka_domain::search::IndexAccess::Disabled};
                                     let result=repository.change_tag(&change,access,&cancel);
                                     emit(&events,&notify,Update::TagChanged(result,cancel),permit);
+                                }
+                                Action::PrepareRule(request)=> {
+                                    let cancel=request.cancel.clone();
+                                    let result=if rule_plan.is_some() {Err(Failure::QueueFull)} else {cancel.check().and_then(|()|repository.automation_reader()).and_then(|factory|PlanJob::start(*request,factory))};
+                                    match result {
+                                        Ok(job)=>rule_plan=Some((job,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::RulePrepared(Box::new(PlanReply {cancel,result:Err(error)})),permit),
+                                    }
                                 }
                                 Action::SimulateRule(request)=> {
                                     let rule=request.rule.revision.id.clone();let cancel=request.cancel.clone();
@@ -1584,6 +1596,10 @@ impl Runtime {
                             }
                         }
                     }
+                    if let Some(reply)=rule_plan.as_mut().and_then(|(job,_)|job.poll()) {
+                        let (_,permit)=rule_plan.take().unwrap();
+                        emit(&events,&notify,Update::RulePrepared(Box::new(reply)),permit);
+                    }
                     if let Some(reply)=rule_simulation.as_mut().and_then(|(job,_)|job.poll()) {
                         let (_,permit)=rule_simulation.take().unwrap();
                         emit(&events,&notify,Update::RuleSimulated(Box::new(reply)),permit);
@@ -1949,6 +1965,7 @@ impl Runtime {
                     select.recv(&commands);
                     select.recv(&wakeups);
                     if let Some((job,_))=&rule_simulation {job.register(&mut select);}
+                    if let Some((job,_))=&rule_plan {job.register(&mut select);}
                     if let Some((job, _)) = &export {
                         job.register(&mut select);
                     }
@@ -1980,6 +1997,7 @@ impl Runtime {
                 drop(covers);
                 drop(pending); // Drop tickets before engine join; no UI draining required.
                 drop(rule_simulation);
+                drop(rule_plan);
                 drop(export); // Cancel and join file work before releasing the actor.
                 drop(cache_maintenance);
                 drop(comparison);

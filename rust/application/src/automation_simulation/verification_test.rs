@@ -43,7 +43,7 @@ fn run(db: &Database, request: SimulationRequest) -> SimulationOutcome {
     drop(select);
     job.poll().unwrap().outcome
 }
-fn report(outcome: SimulationOutcome) -> SimulationReport {
+fn report(outcome: SimulationOutcome) -> Arc<SimulationReport> {
     match outcome {
         SimulationOutcome::Complete(report) => report,
         SimulationOutcome::Failed { error, .. } => panic!("{error}"),
@@ -125,6 +125,7 @@ pub(crate) fn verify(root: &Path, governor: &MemoryGovernor) {
         drop(result);
         assert_eq!(governor.usage().total, 0);
     }
+    crate::automation_plan::verification_test::verify(&db, &sql, governor, &originals);
     let rule = saved(&mut db, governor, TriggerKind::Extension, Some(".pdf"));
     let reader = db.automation_reader().unwrap()().unwrap();
     let cancel = Cancellation::default();

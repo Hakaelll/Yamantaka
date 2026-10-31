@@ -1090,7 +1090,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--rule-simulation") {
                     app.preview_rule_simulation(
-                        if args.iter().any(|arg| arg == "--rule-simulation-duplicates") {
+                        if args.iter().any(|arg| arg == "--rule-review-missing") {
+                            6
+                        } else if args.iter().any(|arg| arg == "--rule-review") {
+                            if args.iter().any(|arg| arg == "--text-scale=2") {
+                                5
+                            } else {
+                                4
+                            }
+                        } else if args.iter().any(|arg| arg == "--rule-simulation-duplicates") {
                             1
                         } else if args.iter().any(|arg| arg == "--rule-simulation-cancel") {
                             2

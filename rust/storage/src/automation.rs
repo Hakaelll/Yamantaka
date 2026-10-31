@@ -1,3 +1,4 @@
+mod plan;
 mod simulation;
 use crate::{Database, database::storage};
 use rusqlite::{Connection, TransactionBehavior, params};

@@ -9,6 +9,7 @@ struct Pending {
 }
 #[derive(Default)]
 pub(super) struct SimulationState {
+    discard: bool,
     pending: Option<Pending>,
     outcome: Option<SimulationOutcome>,
     rule: Option<Arc<SavedRule>>,
@@ -18,6 +19,9 @@ pub(super) struct SimulationState {
     preview_mode: u8,
 }
 impl SimulationState {
+    pub(super) fn compact_review_preview(&self) -> bool {
+        self.preview == 10 && self.preview_mode == 5
+    }
     pub(super) fn busy(&self) -> bool {
         self.pending.is_some()
     }
@@ -25,6 +29,7 @@ impl SimulationState {
         !self.busy() && matches!(self.preview, 0 | 10)
     }
     pub(super) fn leave(&mut self) {
+        self.discard = true;
         if let Some(pending) = &self.pending {
             pending.cancel.cancel();
         }
@@ -67,6 +72,7 @@ impl YamantakaApp {
         if self.automation.busy() {
             return;
         }
+        self.automation.review.leave();
         let request = SimulationRequest::new(rule.clone(), self.governor.clone());
         let pending = Pending {
             rule,
@@ -74,6 +80,7 @@ impl YamantakaApp {
             watch: request.watch.clone(),
         };
         self.automation.simulation.outcome = None;
+        self.automation.simulation.discard = false;
         self.automation.simulation.offset = 0;
         match self.runtime.submit(Action::SimulateRule(Box::new(request))) {
             Ok(()) => self.automation.simulation.pending = Some(pending),
@@ -93,7 +100,7 @@ impl YamantakaApp {
             return;
         }
         let pending = state.pending.take().unwrap();
-        if matches!(self.surface, Surface::Automation) {
+        if !state.discard && matches!(self.surface, Surface::Automation) {
             state.rule = Some(pending.rule);
             state.outcome = Some(reply.outcome);
         }
@@ -113,6 +120,7 @@ impl YamantakaApp {
         }
     }
     pub(super) fn rule_simulation_view(&mut self, ui: &mut egui::Ui, p: Palette) {
+        let busy = self.automation.busy();
         let english = self.english;
         let tr = |es, en| if english { en } else { es };
         let state = &mut self.automation.simulation;
@@ -141,6 +149,7 @@ impl YamantakaApp {
             return;
         };
         let mut clear = false;
+        let mut review = None;
         egui::Frame::new().fill(p.raised).corner_radius(8).inner_margin(16).show(ui,|ui| {
             ui.label(RichText::new(tr("Vista previa de coincidencias","Matching document preview")).size(21.0).color(p.ink));
             match outcome {
@@ -152,6 +161,7 @@ impl YamantakaApp {
                     egui::ScrollArea::vertical().id_salt("rule-simulation-matches").max_height(240.0).show(ui,|ui| {
                         for matched in report.matches.iter().skip(state.offset).take(80) {ui.label(&matched.title);}
                     });
+                    if ui.add_enabled_ui(!busy && !report.matches.is_empty(),|ui|theme::navigation(ui,tr("Revisar acciones","Review actions"),false,p)).inner.clicked(){review=Some(report.clone());}
                     if report.matches.len()>80 {
                         ui.vertical(|ui| {
                             if ui.add_enabled_ui(state.offset>0,|ui|theme::navigation(ui,tr("Coincidencias anteriores","Previous matches"),false,p)).inner.clicked(){state.offset=state.offset.saturating_sub(80);}
@@ -172,5 +182,8 @@ impl YamantakaApp {
             state.outcome = None;
         }
         ui.add_space(16.0);
+        if let Some(report) = review {
+            self.prepare_rule_review(report);
+        }
     }
 }

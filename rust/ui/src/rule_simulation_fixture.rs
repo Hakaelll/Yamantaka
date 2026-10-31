@@ -7,6 +7,27 @@ pub fn seed(
     fixture: &Path,
     args: &[OsString],
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if args.iter().any(|arg| arg == "--rule-review") {
+        db.execute_batch("INSERT INTO workspaces(id,name,created_at,updated_at) VALUES('review-workspace','Study desk','','')")?;
+        let workspace = if args.iter().any(|arg| arg == "--rule-review-missing") {
+            "Missing workspace"
+        } else {
+            "review-workspace"
+        };
+        let actions = serde_json::json!([
+            {"kind":"addTag","value":"Study notes"},
+            {"kind":"addCollection","value":"Reading seminar"},
+            {"kind":"addWorkspace","value":workspace},
+            {"kind":"addReadingQueue","value":workspace},
+            {"kind":"setReadingState","value":"finished"},
+            {"kind":"setPriority","value":"normal"},
+            {"kind":"addTag","value":"STUDY NOTES"}
+        ]);
+        db.execute_batch(&format!(
+            "UPDATE automation_rules SET actions_json='{}' WHERE id='legacy-rule'",
+            serde_json::to_string(&actions)?.replace('\'', "''")
+        ))?;
+    }
     if args.iter().any(|arg| arg == "--rule-simulation-duplicates") {
         db.execute_batch("DELETE FROM documents WHERE id NOT IN ('demo-0','demo-1','demo-2'); UPDATE automation_rules SET trigger_json='{\"kind\":\"exactDuplicate\",\"value\":null}' WHERE id='legacy-rule';")?;
         let mut bytes = std::fs::read(fixture)?;

@@ -7,7 +7,30 @@ fn optional<'a>(row: &'a rusqlite::Row<'_>, index: usize) -> Result<Option<&'a s
         value => value.as_str().map(Some).map_err(storage),
     }
 }
+pub(super) fn select(trigger: &RuleTrigger, condition: &str) -> String {
+    let membership = match trigger.kind {
+        TriggerKind::Tag => {
+            "EXISTS(SELECT 1 FROM document_tags m JOIN tags t ON t.id=m.tag_id WHERE m.document_id=d.id AND (t.id=?4 OR (t.normalized_name=?5 AND NOT EXISTS(SELECT 1 FROM tags WHERE id=?4))))"
+        }
+        TriggerKind::Collection => {
+            "EXISTS(SELECT 1 FROM collection_documents m JOIN collections c ON c.id=m.collection_id WHERE m.document_id=d.id AND (c.id=?4 OR (c.normalized_name=?5 AND NOT EXISTS(SELECT 1 FROM collections WHERE id=?4))))"
+        }
+        _ => "(?4 IS NOT NULL AND ?5 IS NULL)",
+    };
+    format!(
+        "SELECT d.id,COALESCE(d.title_override,d.title,d.source_title,d.file_name),d.path,d.normalized_path,d.file_name,COALESCE(d.author_override,d.author,d.source_author),d.is_missing,d.fingerprint,d.file_size,d.file_modified_at,{membership} FROM documents d WHERE {condition}"
+    )
+}
 impl RuleScanReader for Database {
+    fn prepare(
+        &self,
+        report: Arc<SimulationReport>,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<yamantaka_domain::automation::plan::RulePlan> {
+        super::plan::prepare(&self.connection, report, governor, cancel)
+    }
+
     fn begin(
         &self,
         expected: &SavedRule,
@@ -54,16 +77,13 @@ impl RuleScanReader for Database {
         cancel.check()?;
         let value = trigger.value.as_deref().unwrap_or("").trim();
         let normalized = value.to_lowercase();
-        let membership = match trigger.kind {
-            TriggerKind::Tag => {
-                "EXISTS(SELECT 1 FROM document_tags m JOIN tags t ON t.id=m.tag_id WHERE m.document_id=d.id AND (t.id=?4 OR (t.normalized_name=?5 AND NOT EXISTS(SELECT 1 FROM tags WHERE id=?4))))"
-            }
-            TriggerKind::Collection => {
-                "EXISTS(SELECT 1 FROM collection_documents m JOIN collections c ON c.id=m.collection_id WHERE m.document_id=d.id AND (c.id=?4 OR (c.normalized_name=?5 AND NOT EXISTS(SELECT 1 FROM collections WHERE id=?4))))"
-            }
-            _ => "(?4 IS NOT NULL AND ?5 IS NULL)",
-        };
-        let mut statement=self.connection.prepare(&format!("SELECT d.id,COALESCE(d.title_override,d.title,d.source_title,d.file_name),d.path,d.normalized_path,d.file_name,COALESCE(d.author_override,d.author,d.source_author),d.is_missing,d.fingerprint,d.file_size,d.file_modified_at,{membership} FROM documents d WHERE (?1 IS NULL OR d.id>?1) AND d.id<=?2 ORDER BY d.id LIMIT ?3")).map_err(storage)?;
+        let mut statement = self
+            .connection
+            .prepare(&select(
+                trigger,
+                "(?1 IS NULL OR d.id>?1) AND d.id<=?2 ORDER BY d.id LIMIT ?3",
+            ))
+            .map_err(storage)?;
         let mut rows = statement
             .query(params![
                 after,
@@ -97,6 +117,7 @@ impl RuleScanReader for Database {
             let size = u64::try_from(row.get::<_, i64>(8).map_err(storage)?)
                 .map_err(|_| Failure::Invalid("Invalid simulation file size".into()))?;
             let data = ScanData {
+                revision: super::plan::signature(row)?,
                 id: field(row, 0)?.into(),
                 title: field(row, 1)?.into(),
                 path: PathBuf::from(field(row, 2)?),

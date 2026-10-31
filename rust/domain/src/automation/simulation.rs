@@ -23,6 +23,7 @@ impl ScanBound {
     }
 }
 pub struct ScanEntry {
+    pub revision: [u8; 32],
     pub id: String,
     pub title: String,
     pub path: PathBuf,
@@ -37,6 +38,7 @@ pub struct ScanEntry {
     _lease: ByteLease,
 }
 pub struct ScanData {
+    pub revision: [u8; 32],
     pub id: String,
     pub title: String,
     pub path: PathBuf,
@@ -52,6 +54,7 @@ pub struct ScanData {
 impl ScanEntry {
     pub fn new(data: ScanData, lease: ByteLease) -> Self {
         Self {
+            revision: data.revision,
             id: data.id,
             title: data.title,
             path: data.path,
@@ -69,6 +72,14 @@ impl ScanEntry {
 }
 pub type RuleScanFactory = Box<dyn FnOnce() -> Result<Box<dyn RuleScanReader>> + Send>;
 pub trait RuleScanReader: Send {
+    fn prepare(
+        &self,
+        _report: Arc<SimulationReport>,
+        _governor: &MemoryGovernor,
+        _cancel: &Cancellation,
+    ) -> Result<super::plan::RulePlan> {
+        Err(Failure::Unsupported("Rule action review".into()))
+    }
     fn begin(
         &self,
         expected: &SavedRule,
@@ -90,6 +101,7 @@ pub struct ExactProof {
     pub digest: [u8; 32],
 }
 pub struct SimulationMatch {
+    pub revision: [u8; 32],
     pub document: String,
     pub title: String,
     pub proof: Option<ExactProof>,
@@ -97,12 +109,14 @@ pub struct SimulationMatch {
 }
 impl SimulationMatch {
     pub fn new(
+        revision: [u8; 32],
         document: String,
         title: String,
         proof: Option<ExactProof>,
         lease: ByteLease,
     ) -> Self {
         Self {
+            revision,
             document,
             title,
             proof,
@@ -144,7 +158,7 @@ pub struct SimulationReport {
     pub matches: Vec<Arc<SimulationMatch>>,
 }
 pub enum SimulationOutcome {
-    Complete(SimulationReport),
+    Complete(Arc<SimulationReport>),
     Cancelled(SimulationProgress),
     LimitReached(SimulationProgress),
     Failed {

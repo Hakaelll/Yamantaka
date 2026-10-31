@@ -1,6 +1,6 @@
 # Manage saved rules
 
-Open **Tools → Saved rules** to review the local rule definitions stored in your library. The native manager creates, enables, disables, and deletes definitions, and previews matching documents through a cancellable simulation. Reviewed application, execution cancellation, journals, and undo remain under development.
+Open **Tools → Saved rules** to review the local rule definitions stored in your library. The native manager creates, enables, disables, and deletes definitions, and previews matching documents through a cancellable simulation. Action review resolves all six saved action kinds into an immutable plan. Confirmed application, execution cancellation, journals, and undo remain under development.
 
 ## Create a definition
 
@@ -22,6 +22,18 @@ Exact-duplicate conditions read full SHA-256 hashes in the background. A shared 
 
 Scans stop after 100,000 documents or 30 seconds, with checks between records and file chunks. Cancellation or a reached limit discards partial matches. Slow operating-system file reads may delay cancellation. Result memory uses the shared governor, and the scan does not keep the interface repainting after it settles.
 
+## Review the planned actions
+
+After a nonempty simulation, choose **Review actions**. The application checks that the matched documents and rule still match the simulation, then captures the current document revisions and resolves the action destinations. A changed condition or matched document requires a new simulation. Exact duplicates are read and hashed again before review; incomplete duplicate verification cannot produce a plan.
+
+The review lists the document count, actions per document, resolved destination names, and destinations that would be created on confirmation. No destination or membership is created while reviewing. **Close review** releases the plan and returns to the matching preview.
+
+Tag and collection actions resolve an exact saved ID first, then a normalized name. Missing tags and collections are planned as new destinations. Repeated new names share the same planned identity. Workspace and reading-queue actions require an existing workspace. Workspace names support Unicode case matching; ambiguous names require an ID.
+
+Reading-state actions accept finished/terminado or pending/pendiente/notstarted. Priority follows the inherited favorite semantics: 0, false, and normal mean off; other nonempty values mean on. The review displays the interpreted effect. Unsupported reading-state values or unavailable workspaces reject the whole plan.
+
+The plan stays in memory with governed allocations. Its document and target revisions are retained for the execution boundary being connected next. **Confirmed execution, its journal, recovery, and undo are not available yet.** Reviewing actions does not modify documents or original PDF files.
+
 ## Review existing definitions
 
 **Enable** and **Disable** change the saved enabled flag. They preserve the original condition and action JSON. A definition whose format needs review can be disabled or removed, but cannot be newly enabled through this manager. It remains in the library with its original payload.
@@ -30,4 +42,4 @@ Scans stop after 100,000 documents or 30 seconds, with checks between records an
 
 The list retrieves up to 80 definitions per batch. Previous rules and More rules appear for longer lists. Reads run through the application worker, and their retained data uses the shared memory governor. A budget error offers Reload after releasing the previous list.
 
-See the [simulation checkpoint](../validation/rust-rule-simulation-2026-10-31.md) and [saved-rule checkpoint](../validation/rust-saved-rules-2026-10-31.md) for the executed evidence and remaining work.
+See the [action-review checkpoint](../validation/rust-rule-review-2026-10-31.md), [simulation checkpoint](../validation/rust-rule-simulation-2026-10-31.md) and [saved-rule checkpoint](../validation/rust-saved-rules-2026-10-31.md) for the executed evidence and remaining work.

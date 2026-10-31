@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='rule-review-actions'; args=@('--saved-rules','--rule-simulation','--rule-review','--es') },
+    @{ name='rule-review-small-200'; args=@('--saved-rules','--rule-simulation','--rule-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='rule-review-missing-workspace'; args=@('--saved-rules','--rule-simulation','--rule-review','--rule-review-missing','--light') },
     @{ name='rule-simulation-extension'; args=@('--saved-rules','--rule-simulation','--es') },
     @{ name='rule-simulation-duplicates'; args=@('--saved-rules','--rule-simulation','--rule-simulation-duplicates','--light') },
     @{ name='rule-simulation-cancel'; args=@('--saved-rules','--rule-simulation','--rule-simulation-cancel','--es') },
@@ -418,6 +421,14 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -like 'rule-review-*') {
+        if ($controls.ruleSimulation.phase -ne 10 -or $controls.ruleReview.pending) {throw 'Rule review did not settle.'}
+        if ($case.name -eq 'rule-review-missing-workspace') {
+            if (-not $controls.ruleReview.failed -or $null -ne $controls.ruleReview.documents) {throw 'A missing workspace must reject the plan.'}
+        } elseif ($controls.ruleReview.failed -or $controls.ruleReview.documents -ne 10 -or $controls.ruleReview.actions -ne 7) {throw 'The reviewed document or action count is incorrect.'}
+        $visible=if ($case.name -eq 'rule-review-missing-workspace') {@('Review actions')} else {@('Cerrar revisión')}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $visible
     }
     if ($case.name -like 'rule-simulation-*') {
         $result=$controls.ruleSimulation
