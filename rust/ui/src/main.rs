@@ -9,6 +9,7 @@ mod restore_worker;
 mod rule_simulation_fixture;
 mod startup_recovery;
 mod theme;
+mod window_state;
 use eframe::egui;
 use std::{path::PathBuf, sync::mpsc};
 use yamantaka_application::runtime::Runtime;
@@ -803,6 +804,24 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .insert("textScale".into(), scale.clamp(1.0, 2.0).into());
         }
     }
+    let mut saved_window_placement = prefs.get("nativeWindowPlacement").cloned();
+    let window_verification =
+        demo && capture.is_some() && args.iter().any(|arg| arg == "--window-placement");
+    let window_unknown = args.iter().any(|arg| arg == "--window-placement-unknown");
+    let window_capture = if window_verification {
+        capture.as_ref().map(|path| (store.clone(), path.clone()))
+    } else {
+        None
+    };
+    if window_verification
+        && let Some(placement) = window_state::preview::seed(
+            &store,
+            window_unknown,
+            args.iter().any(|arg| arg == "--window-placement-backup"),
+        )?
+    {
+        saved_window_placement = Some(placement);
+    }
     let english = if demo {
         !args.iter().any(|arg| arg == "--es")
     } else {
@@ -811,7 +830,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(serde_json::Value::as_str)
             == Some("en")
     };
-    let software = args.iter().any(|arg| arg == "--opengl");
+    let software = args
+        .iter()
+        .any(|arg| arg == "--opengl" || arg == "--software");
     let icon = image::load_from_memory(include_bytes!(
         "../../../assets/branding/yamantaka-logo-purple.png"
     ))?
@@ -843,6 +864,27 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut options.wgpu_options.wgpu_setup {
         setup.instance_descriptor.backends = eframe::wgpu::Backends::DX12;
+    }
+    let legacy_window = !demo && !startup_mode.is_safe();
+    if legacy_window {
+        let number = |key| {
+            prefs
+                .get(key)
+                .and_then(serde_json::Value::as_f64)
+                .filter(|value| value.is_finite())
+        };
+        if let (Some(width), Some(height)) = (number("windowWidth"), number("windowHeight")) {
+            options.viewport = options.viewport.with_inner_size([
+                width.clamp(640.0, 16_384.0) as f32,
+                height.clamp(480.0, 16_384.0) as f32,
+            ]);
+        }
+        if let (Some(x), Some(y)) = (number("windowX"), number("windowY")) {
+            options.viewport = options.viewport.with_position([
+                x.clamp(-100_000.0, 100_000.0) as f32,
+                y.clamp(-100_000.0, 100_000.0) as f32,
+            ]);
+        }
     }
     if let Some(size) = args
         .iter()
@@ -917,6 +959,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if demo && startup_mode.is_safe() {
                 app.preview_safe_index();
                 app.preview_safe_dismiss(args.iter().any(|arg| arg == "--safe-dismiss"));
+            }
+            if (!demo || window_verification) && !startup_mode.is_safe() {
+                let mut state = window_state::State::open(
+                    &store,
+                    cc,
+                    legacy_window,
+                    saved_window_placement.as_ref(),
+                );
+                if window_verification && !window_unknown {
+                    state
+                        .as_mut()
+                        .expect("Native window state must open")
+                        .start_verification();
+                }
+                app.configure_window_state(state);
             }
             app.configure_restore(
                 backup_source.as_ref().map(|_| store.clone()),
@@ -1685,6 +1742,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         } else if !demo {
             yamantaka_windows::show_restore_complete(&safety, english);
         }
+    }
+    if let Some((window_store, capture)) = window_capture {
+        window_state::preview::verify_saved(&window_store, &capture, window_unknown)?;
     }
     startup.finish()?;
     drop(instance);

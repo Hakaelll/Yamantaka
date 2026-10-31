@@ -125,6 +125,7 @@ impl PageImage {
     }
 }
 pub struct YamantakaApp {
+    window_state: Option<crate::window_state::State>,
     startup_mode: yamantaka_domain::startup::StartupMode,
     safe_notice: bool,
     quarantine: quarantine::QuarantineState,
@@ -349,6 +350,7 @@ impl YamantakaApp {
         let mut app = Self {
             startup_mode,
             safe_notice: startup_mode.is_safe(),
+            window_state: None,
             quarantine: Default::default(),
             reader: Default::default(),
             reading_focus: Default::default(),
@@ -661,6 +663,9 @@ impl YamantakaApp {
     }
     pub fn text_scale(&self) -> f32 {
         self.text_scale
+    }
+    pub fn configure_window_state(&mut self, state: Option<crate::window_state::State>) {
+        self.window_state = state;
     }
     /// Capture-only synthetic pointer, using the same spring and rigid transform.
     pub fn preview_tilt(&mut self) {
@@ -2288,7 +2293,26 @@ impl App for YamantakaApp {
             }
         }
     }
-    fn ui(&mut self, ui: &mut egui::Ui, _: &mut Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut Frame) {
+        if let Some(state) = &mut self.window_state
+            && state.observe(ui.ctx(), frame).is_err()
+        {
+            self.error = Some(
+                self.tr(
+                    "No se pudo guardar la posición de la ventana.",
+                    "Window placement could not be saved.",
+                )
+                .into(),
+            );
+        }
+        if let Some(state) = &mut self.window_state {
+            state.advance_verification(ui.ctx());
+            if let Some(snapshot) = state.take_snapshot() {
+                self.preferences
+                    .rust
+                    .insert("nativeWindowPlacement".into(), snapshot);
+            }
+        }
         if self.workspaces.close_after {
             ui.disable();
         }
@@ -2577,6 +2601,7 @@ impl App for YamantakaApp {
         if let Some(path) = &self.capture {
             if !self.capture_requested {
                 let ready = self.library_loaded
+                    && self.window_state.as_ref().is_none_or(crate::window_state::State::verification_ready)
                     && (!matches!(self.surface, Surface::Reader)
                         || (!self.reader.panel && self.reader.reader_panel_tab != outline::ReaderPanelTab::Find)
                         || match self.reader.reader_panel_tab {
@@ -2776,6 +2801,8 @@ impl App for YamantakaApp {
                     record["startupMode"] = serde_json::to_value(self.startup_mode).unwrap();
                     record["safeStartup"] = self.safe_summary();
                     record["quarantine"] = self.quarantine.summary();
+                    record["windowPlacement"] = self.window_state.as_ref().map(crate::window_state::State::summary).unwrap_or(serde_json::Value::Null);
+                    record["windowPlacementBackupSetting"] = self.preferences.get("nativeWindowPlacement").cloned().unwrap_or(serde_json::Value::Null);
                     record["annotationHistoryPhase"]=self.command_palette_preview.history_phase().into();
                     record["readerControls"]=serde_json::json!({"chromeHidden":self.reader_chrome_hidden,"immersive":self.reader_focus,"pageJump":self.page_jump.is_some(),"primaryPanel":self.reader.panel});
                     record["shortcutBindings"]=self.shortcut_bindings.summary();
@@ -2818,6 +2845,11 @@ impl App for YamantakaApp {
         }
     }
     fn on_exit(&mut self, _: Option<&eframe::glow::Context>) {
+        if let Some(state) = &mut self.window_state
+            && let Err(error) = state.finish()
+        {
+            eprintln!("{error}");
+        }
         if let Err(error) = self.runtime.flush_import_recovery() {
             eprintln!("{error}");
             yamantaka_windows::show_startup_error(self.tr(

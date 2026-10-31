@@ -14,6 +14,7 @@ yamantaka-storage.workspace = true
 yamantaka-pdf.workspace = true
 yamantaka-windows.workspace = true
 eframe.workspace = true
+raw-window-handle.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 uuid.workspace = true

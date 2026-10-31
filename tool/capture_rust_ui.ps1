@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='window-placement-cycle'; args=@('--window-placement','--es') },
+    @{ name='window-placement-unknown'; args=@('--window-placement','--window-placement-unknown','--light') },
+    @{ name='window-placement-backup-glow'; args=@('--window-placement','--window-placement-backup','--software','--light') },
     @{ name='startup-recovery-review'; args=@('--startup-recovery=review','--es') },
     @{ name='startup-recovery-invalid'; args=@('--startup-recovery=invalid') },
     @{ name='startup-recovery-library-installed'; args=@('--startup-recovery=install','--broken-library','--es') },

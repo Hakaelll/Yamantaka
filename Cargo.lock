@@ -4390,6 +4390,7 @@ dependencies = [
  "eframe",
  "image",
  "pollster 0.4.0",
+ "raw-window-handle",
  "serde_json",
  "unicode-segmentation",
  "uuid",
@@ -4459,6 +4460,7 @@ dependencies = [
 name = "yamantaka-windows"
 version = "0.16.0-alpha.1"
 dependencies = [
+ "raw-window-handle",
  "rfd",
  "serde_json",
  "sha2",

@@ -29,6 +29,7 @@ url = "=2.5.8"
 unicode-segmentation = "=1.13.3"
 pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881", "thread_safe", "image_025"] }
 eframe = { version = "=0.36.2", default-features = false, features = ["default_fonts", "wgpu", "glow", "accesskit"] }
+raw-window-handle = "=0.6.2"
 rfd = "=0.15.4"
 windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp", "Win32_Security", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Com"] }
 
