@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Clone, Copy)]
 pub(in crate::app) enum PositionAction {
+    Swap,
     Back,
     Forward,
     Save(MarkSlot),
@@ -11,6 +12,10 @@ pub(in crate::app) enum PositionAction {
 impl PositionAction {
     pub fn apply(self, navigation: &mut ReaderNavigation) -> bool {
         match self {
+            Self::Swap => {
+                navigation.swap_marks();
+                false
+            }
             Self::Back => navigation.back(),
             Self::Forward => navigation.forward(),
             Self::Save(slot) => {

@@ -451,6 +451,9 @@ impl ReaderNavigation {
     pub fn clear_mark(&mut self, slot: MarkSlot) {
         self.marks[slot.index()] = None;
     }
+    pub fn swap_marks(&mut self) {
+        self.marks.swap(0, 1);
+    }
     pub fn jump_to_mark(&mut self, slot: MarkSlot) -> bool {
         self.mark(slot)
             .is_some_and(|position| self.navigate_to(position))

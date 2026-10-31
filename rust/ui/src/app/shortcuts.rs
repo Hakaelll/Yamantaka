@@ -11,6 +11,7 @@ pub(super) use preview::ShortcutPreview;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Shortcut {
+    CommandPalette,
     GoToPage,
     Navigator,
     TogglePanel,

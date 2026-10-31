@@ -855,6 +855,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 },
             );
             cc.egui_ctx.set_zoom_factor(app.text_scale());
+            if args.iter().any(|arg| arg == "--palette-preview") {
+                app.preview_command_palette(if args.iter().any(|arg| arg == "--palette-execute") {
+                    1
+                } else if args.iter().any(|arg| arg == "--palette-recent") {
+                    2
+                } else if args.iter().any(|arg| arg == "--palette-empty") {
+                    3
+                } else {
+                    0
+                });
+            }
+
             if args.iter().any(|arg| arg == "--legacy-reader-commands") {
                 app.preview_legacy_reader_commands(
                     args.iter().any(|arg| arg == "--page-jump-review"),

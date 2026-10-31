@@ -2,7 +2,7 @@ use super::Shortcut;
 use eframe::egui::{Key, Modifiers};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
-pub(super) struct Definition {
+pub(in crate::app) struct Definition {
     pub command: Shortcut,
     pub id: &'static str,
     pub default: &'static str,
@@ -12,7 +12,17 @@ pub(super) struct Definition {
     pub canvas: bool,
     pub repeats: bool,
 }
-pub(super) const DEFINITIONS: &[Definition] = &[
+pub(in crate::app) const DEFINITIONS: &[Definition] = &[
+    Definition {
+        command: Shortcut::CommandPalette,
+        id: "commandPalette",
+        default: "ctrl-k",
+        es: "Paleta de comandos",
+        en: "Command palette",
+        global: true,
+        canvas: false,
+        repeats: false,
+    },
     Definition {
         command: Shortcut::GoToPage,
         id: "goToPage",

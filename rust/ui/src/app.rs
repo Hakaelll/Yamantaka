@@ -8,6 +8,7 @@ mod bulk_picker;
 mod cache_maintenance;
 mod catalogue_chooser;
 mod collections;
+mod command_palette;
 mod compact;
 mod cover_picker;
 mod cover_picker_preview;
@@ -187,6 +188,8 @@ pub struct YamantakaApp {
     list: bool,
     library_density: yamantaka_domain::workspaces::WorkspaceDensity,
     reader_chrome_hidden: bool,
+    command_palette_preview: command_palette::PalettePreview,
+    command_palette: command_palette::PaletteState,
     page_jump: Option<shortcuts::reader_commands::PageJump>,
     reader_focus: bool,
     offset: usize,
@@ -414,6 +417,8 @@ impl YamantakaApp {
             shortcut_bindings,
             shortcut_error: None,
             reader_chrome_hidden: false,
+            command_palette_preview: Default::default(),
+            command_palette: Default::default(),
             page_jump: None,
             reader_focus: false,
             offset: 0,
@@ -809,6 +814,57 @@ impl YamantakaApp {
     fn apply_navigation(&mut self) {
         if let Some((document, page)) = self.reader.navigation_changed() {
             self.send(Action::Navigate(document, page));
+        }
+    }
+    pub(in crate::app) fn execute_shortcut(
+        &mut self,
+        ctx: &egui::Context,
+        shortcut: shortcuts::Shortcut,
+    ) {
+        if self.dispatch_reading_shortcut(ctx, &shortcut) {
+            return;
+        }
+        match shortcut {
+            shortcuts::Shortcut::SwitchPane
+            | shortcuts::Shortcut::ZoomIn
+            | shortcuts::Shortcut::ZoomOut
+            | shortcuts::Shortcut::FitPage
+            | shortcuts::Shortcut::HistoryBack
+            | shortcuts::Shortcut::HistoryForward => unreachable!(),
+            shortcuts::Shortcut::GoToPage
+            | shortcuts::Shortcut::Navigator
+            | shortcuts::Shortcut::TogglePanel
+            | shortcuts::Shortcut::ToggleBookmark
+            | shortcuts::Shortcut::ToggleChrome
+            | shortcuts::Shortcut::ToggleImmersive => unreachable!(),
+            shortcuts::Shortcut::CommandPalette => self.open_command_palette(ctx),
+            shortcuts::Shortcut::OpenDocument => {
+                if let Some(paths) = yamantaka_windows::pick_pdfs() {
+                    self.import(paths);
+                }
+            }
+            shortcuts::Shortcut::ActualSize | shortcuts::Shortcut::FitWidth => unreachable!(),
+            shortcuts::Shortcut::GlobalSearch => self.show_search(),
+            shortcuts::Shortcut::DocumentFind => self.show_find(),
+            shortcuts::Shortcut::PreviousMatch => self.step_find(false),
+            shortcuts::Shortcut::NextMatch => self.step_find(true),
+            shortcuts::Shortcut::PreviousPage => self.step_reader(false),
+            shortcuts::Shortcut::NextPage => self.step_reader(true),
+            shortcuts::Shortcut::NextTab => self.relative_reader_tab(false),
+            shortcuts::Shortcut::PreviousTab => self.relative_reader_tab(true),
+            shortcuts::Shortcut::CloseTab => {
+                if let Some(id) = self.tabs.model.active().map(|t| t.id().to_owned()) {
+                    self.close_reader_tab(&id);
+                }
+            }
+            shortcuts::Shortcut::ReopenTab => self.reopen_reader_tab(),
+            shortcuts::Shortcut::Fullscreen => {
+                let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
+                ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
+            }
+            shortcuts::Shortcut::Focus => {
+                self.toggle_immersive_reader(ctx);
+            }
         }
     }
     fn settings_changed(&mut self, ctx: &egui::Context) {
@@ -1382,6 +1438,7 @@ impl App for YamantakaApp {
             self.selection_preview
                 .input(input, self.selection_keyboard_preview);
             self.reference_shortcuts_preview.input(input);
+            self.command_palette_preview.input(input);
             self.comparison_selection_preview.input(input);
             if let Some(reference) = &mut self.reference {
                 reference
@@ -1560,6 +1617,11 @@ impl App for YamantakaApp {
                 }
                 Update::Annotations(reply) => self.accept_annotation_reply(reply),
                 Update::Library(documents, count, memberships, cancel) => {
+                    if self.command_palette.owns(&cancel) {
+                        self.command_palette.accept(documents, cancel);
+                        continue;
+                    }
+
                     if self.relations.chooser.accept(&documents, count, &cancel) {
                         continue;
                     }
@@ -1870,6 +1932,11 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Failed(error, cancel) => {
+                    if let Some(token) = &cancel
+                        && self.command_palette.fail(token)
+                    {
+                        continue;
+                    }
                     if let Some(token) = &cancel {
                         if self.relations.chooser.fail(token, &error) {
                             continue;
@@ -2194,7 +2261,8 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
-        let shortcut_modal = self.page_jump.is_some()
+        let shortcut_modal = self.command_palette.open
+            || self.page_jump.is_some()
             || self.password.is_some()
             || self.link_confirmation_open()
             || self.bulk_picker.is_some()
@@ -2263,7 +2331,9 @@ impl App for YamantakaApp {
                     .is_some_and(|reference| reference.pane.selection.focused_page(&ctx).is_some()),
             &self.shortcut_bindings,
         ) {
-            if self.page_jump.is_some() && shortcut != shortcuts::Shortcut::Fullscreen {
+            if (self.command_palette.open || self.page_jump.is_some())
+                && shortcut != shortcuts::Shortcut::Fullscreen
+            {
                 continue;
             }
             if !matches!(self.surface, Surface::Reader)
@@ -2271,50 +2341,7 @@ impl App for YamantakaApp {
             {
                 continue;
             }
-            if self.dispatch_reading_shortcut(&ctx, &shortcut) {
-                continue;
-            }
-            match shortcut {
-                shortcuts::Shortcut::SwitchPane
-                | shortcuts::Shortcut::ZoomIn
-                | shortcuts::Shortcut::ZoomOut
-                | shortcuts::Shortcut::FitPage
-                | shortcuts::Shortcut::HistoryBack
-                | shortcuts::Shortcut::HistoryForward => unreachable!(),
-                shortcuts::Shortcut::GoToPage
-                | shortcuts::Shortcut::Navigator
-                | shortcuts::Shortcut::TogglePanel
-                | shortcuts::Shortcut::ToggleBookmark
-                | shortcuts::Shortcut::ToggleChrome
-                | shortcuts::Shortcut::ToggleImmersive => unreachable!(),
-                shortcuts::Shortcut::OpenDocument => {
-                    if let Some(paths) = yamantaka_windows::pick_pdfs() {
-                        self.import(paths);
-                    }
-                }
-                shortcuts::Shortcut::ActualSize | shortcuts::Shortcut::FitWidth => unreachable!(),
-                shortcuts::Shortcut::GlobalSearch => self.show_search(),
-                shortcuts::Shortcut::DocumentFind => self.show_find(),
-                shortcuts::Shortcut::PreviousMatch => self.step_find(false),
-                shortcuts::Shortcut::NextMatch => self.step_find(true),
-                shortcuts::Shortcut::PreviousPage => self.step_reader(false),
-                shortcuts::Shortcut::NextPage => self.step_reader(true),
-                shortcuts::Shortcut::NextTab => self.relative_reader_tab(false),
-                shortcuts::Shortcut::PreviousTab => self.relative_reader_tab(true),
-                shortcuts::Shortcut::CloseTab => {
-                    if let Some(id) = self.tabs.model.active().map(|t| t.id().to_owned()) {
-                        self.close_reader_tab(&id);
-                    }
-                }
-                shortcuts::Shortcut::ReopenTab => self.reopen_reader_tab(),
-                shortcuts::Shortcut::Fullscreen => {
-                    let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
-                    ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));
-                }
-                shortcuts::Shortcut::Focus => {
-                    self.toggle_immersive_reader(&ctx);
-                }
-            }
+            self.execute_shortcut(&ctx, shortcut);
         }
         self.poll_rule_simulation(&ctx);
         self.poll_rule_review(&ctx);
@@ -2325,6 +2352,7 @@ impl App for YamantakaApp {
         self.advance_revision_preview();
         self.advance_relations_preview();
         self.advance_reference_shortcuts(&ctx);
+        self.advance_palette_preview(&ctx);
         self.advance_comparison_selection(&ctx);
         self.apply_annotation_preview();
         self.advance_reference_marks();
@@ -2466,6 +2494,7 @@ impl App for YamantakaApp {
         self.reading_queue_dialog(&ctx);
         self.workspace_dialog(&ctx);
         self.bulk_target_dialog(&ctx);
+        self.command_palette_dialog(&ctx);
         self.page_jump_dialog(&ctx);
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
@@ -2545,6 +2574,7 @@ impl App for YamantakaApp {
                     && self.reader.restoration.ready()
                     && self.reference.as_ref().is_none_or(|reference| !reference.pane.loading && !reference.pane.viewport.pages.is_empty())
                     && self.reference_shortcuts_preview.ready()
+                    && self.command_palette_preview.ready()
                     && self.comparison_selection_preview.ready()
                     && matches!(self.reference_demo, 0 | 3 | 5 | 7 | 9 | 11 | 13 | 16 | 19 | 28 | 35 | 39 | 40)
                     && matches!(self.reference_chooser_demo, 0 | 3)
@@ -2682,6 +2712,7 @@ impl App for YamantakaApp {
                     record["ruleExecution"] = self.automation.execution_summary();
                     record["automationRules"] = self.automation.summary();
                     record["revisionGroups"] = self.revision_capture_summary();
+                    record["commandPalette"]=self.command_palette.summary();
                     record["readerControls"]=serde_json::json!({"chromeHidden":self.reader_chrome_hidden,"immersive":self.reader_focus,"pageJump":self.page_jump.is_some(),"primaryPanel":self.reader.panel});
                     record["shortcutBindings"]=self.shortcut_bindings.summary();
                     record["shortcutConflict"]=self.shortcut_error.is_some().into();

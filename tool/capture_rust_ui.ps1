@@ -65,6 +65,10 @@ $cases = @(
     @{ name='reader-reference-history'; args=@('--reader','--reference','--reference-book','--reference-history','--reference-swap','--es') },
     @{ name='reader-reference-history-small-200'; args=@('--reader','--reference','--reference-book','--reference-history','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-primary-history'; args=@('--reader','--reference','--reference-book','--reference-history','--history-primary') },
+    @{ name='palette-reader'; args=@('--reader','--palette-preview','--es') },
+    @{ name='palette-reference-actions'; args=@('--reader','--reference','--reference-book','--palette-preview','--palette-execute','--es','--light') },
+    @{ name='palette-recent'; args=@('--palette-preview','--palette-recent','--light') },
+    @{ name='palette-empty-small-200'; args=@('--reader','--palette-preview','--palette-empty','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='legacy-reader-commands'; args=@('--reader','--reference','--reference-book','--legacy-reader-commands','--es') },
     @{ name='legacy-reader-jump-small-200'; args=@('--reader','--reference','--reference-book','--legacy-reader-commands','--page-jump-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='shortcut-settings'; args=@('--shortcut-settings','--es','--light') },
@@ -547,8 +551,20 @@ foreach ($case in $cases) {
         $labels=if ($case.name -eq 'revision-groups-current-small-200') {@('Marcar como actual')} elseif ($case.name -eq 'revision-groups-created') {@('New group','View editions')} else {@('Nuevo grupo','Ver ediciones')}
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
+    if($case.name -like 'palette-*') {
+        $palette=$controls.commandPalette
+        if($palette.pending -or $controls.shortcutBindings.known -ne 28){throw 'Command palette did not settle or register its inherited shortcut.'}
+        if($case.name -eq 'palette-recent') {
+            if($palette.open -or $palette.last -ne 'recentDocument' -or $controls.libraryDocumentCount -ne 0){throw 'Recent-document opening was incorrectly scoped to the filtered catalogue.'}
+        }else {
+            if(-not $palette.open -or $palette.recentCount -ne 8){throw 'The command palette lost its recent-document snapshot.'}
+            if($case.name -eq 'palette-reference-actions' -and (-not $palette.info -or $palette.target -ne 'Reference' -or $palette.document -ne 'demo-1' -or $controls.currentReaderPage -ne 0 -or $controls.reference.page -ne 1)){throw 'Palette actions or information escaped the focused document.'}
+            $close=if($case.args -contains '--es'){'Cerrar'}else{'Close'}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($close)
+        }
+    }
     if($case.name -like 'legacy-reader-*') {
-        if($controls.referenceShortcutPhase -ne 50 -or $controls.shortcutBindings.known -ne 27 -or $controls.currentReaderPage -ne 0){throw 'Legacy reader command sequence did not finish in the correct document.'}
+        if($controls.referenceShortcutPhase -ne 50 -or $controls.shortcutBindings.known -ne 28 -or $controls.currentReaderPage -ne 0){throw 'Legacy reader command sequence did not finish in the correct document.'}
         if($case.name -eq 'legacy-reader-commands') {
             if(-not $controls.readerControls.immersive -or $controls.readerControls.primaryPanel -or $controls.reference.page -ne 1 -or $controls.reference.bookmarks.total -ne 1 -or $controls.readerControls.pageJump){throw 'Focused page, bookmark, panel, or immersive state is inconsistent.'}
         }else {
@@ -558,7 +574,7 @@ foreach ($case in $cases) {
     }
     if ($case.name -like 'shortcut-*' -or $case.name -eq 'reader-custom-shortcuts') {
         $keys=$controls.shortcutBindings
-        if($keys.warning -or $keys.known -ne 27 -or $keys.unavailable -ne 1 -or $keys.nextPage -ne 'ctrl-right' -or $keys.switchPane -ne 'f7' -or $keys.zoomIn -ne 'ctrl-d'){throw 'Shortcut assignment, preservation, or persisted reload failed.'}
+        if($keys.warning -or $keys.known -ne 28 -or $keys.unavailable -ne 1 -or $keys.nextPage -ne 'ctrl-right' -or $keys.switchPane -ne 'f7' -or $keys.zoomIn -ne 'ctrl-d'){throw 'Shortcut assignment, preservation, or persisted reload failed.'}
         if($controls.shortcutConflict -ne ($case.name -eq 'shortcut-conflict-small-200')){throw 'Conflicting shortcut changed the active map or did not report its owner.'}
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath)
     }

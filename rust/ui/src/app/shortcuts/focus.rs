@@ -81,11 +81,17 @@ impl ReadingFocus {
     }
 
     pub fn switch(&mut self, ctx: &egui::Context) {
-        self.target = if self.reference() {
-            ReadingTarget::Primary
-        } else {
-            ReadingTarget::Reference
-        };
+        self.resume(
+            ctx,
+            if self.reference() {
+                ReadingTarget::Primary
+            } else {
+                ReadingTarget::Reference
+            },
+        );
+    }
+    pub(in crate::app) fn resume(&mut self, ctx: &egui::Context, target: ReadingTarget) {
+        self.target = target;
         if let Some(id) = ctx.memory(|memory| memory.focused()) {
             ctx.memory_mut(|memory| memory.surrender_focus(id));
         }

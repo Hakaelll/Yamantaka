@@ -183,6 +183,25 @@ impl YamantakaApp {
         });
     }
     pub(super) fn operation_actions(&mut self, ui: &mut egui::Ui, p: Palette) {
+        if theme::navigation(
+            ui,
+            &format!(
+                "{} · {}",
+                self.tr("Comandos", "Commands"),
+                shortcuts::bindings::caption(
+                    self.shortcut_bindings
+                        .token(shortcuts::Shortcut::CommandPalette)
+                )
+            ),
+            false,
+            p,
+        )
+        .clicked()
+        {
+            self.open_command_palette(ui.ctx());
+            ui.close();
+        }
+
         if !self.importing.busy() {
             if self
                 .importing

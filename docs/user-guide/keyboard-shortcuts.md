@@ -2,12 +2,13 @@
 
 Open **Settings → Shortcuts**. Choose a combination beside an action. A valid change takes effect after the preferences file is saved successfully. If the combination is already used, the screen names its owner and keeps the previous assignment. Change that other action first to free the combination.
 
-The page currently configures 27 connected native actions. **Page Up** and **Page Down** remain reserved for structural reading navigation. Combinations are selected from a bounded list; normal text-editing shortcuts are not assignable choices. Page/history commands stay with text fields while editing. Reader commands apply to the focused comparison pane. Modal dialogs block commands except fullscreen.
+The page currently configures 28 connected native actions. **Page Up** and **Page Down** remain reserved for structural reading navigation. Combinations are selected from a bounded list; clipboard and undo combinations are not offered as assignments. Page/history commands stay with text fields while editing. Reader commands apply to the focused comparison pane. Modal dialogs block commands except fullscreen.
 
 ## Default assignments
 
 | Action | Default |
 | --- | --- |
+| Command palette | Ctrl+K |
 | Go to page | Ctrl+G |
 | Document navigator / toggle panel | Ctrl+J / Ctrl+Shift+J |
 | Add or remove current-page bookmark | Ctrl+B |
@@ -36,7 +37,7 @@ Ctrl++ also accepts Ctrl+= and the corresponding shifted plus-key events. Those 
 
 Known inherited assignments use the existing shortcutOverrides preference key and compatible command/token names. Invalid or conflicting active assignments use the complete native default map and show a warning. The raw values remain untouched until you choose a change. Restore the connected defaults before editing a conflicting map.
 
-The inherited command-palette assignment remains preserved but is not connected yet. It contributes to the unavailable-command count when present. This page does not establish complete Flutter command parity.
+The inherited command-palette assignment is now connected. [Commands](command-palette.md) provides searchable actions and eight recent documents. Unsupported future command entries remain preserved. Annotation undo/redo and broader interaction acceptance remain pending.
 
 **Go to page** opens a scoped dialog for the focused reader. Enter a displayed PDF page number and confirm with Enter or **Go to page**. Invalid values stay in the dialog. Opening it does not move either reader, and background page keys remain inactive while it is open.
 
