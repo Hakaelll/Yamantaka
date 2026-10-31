@@ -9,6 +9,9 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='revision-groups-legacy'; args=@('--revision-groups','--es') },
+    @{ name='revision-groups-created'; args=@('--revision-groups','--revision-create','--light') },
+    @{ name='revision-groups-current-small-200'; args=@('--revision-groups','--revision-current','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='relations-backlinks'; args=@('--relations') },
     @{ name='relations-review-es'; args=@('--relations','--relations-review','--es','--light') },
     @{ name='relations-review-small-200'; args=@('--relations','--relations-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
@@ -407,6 +410,14 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -like 'revision-groups-*') {
+        $state=$controls.revisionGroups
+        $total=if ($case.name -eq 'revision-groups-legacy') {1} else {2}
+        $current=if ($case.name -eq 'revision-groups-created') {'demo-0'} else {'demo-1'}
+        if ($state.phase -ne 10 -or $state.pending -or $state.failed -or $state.total -ne $total -or $state.memberTotal -ne 2 -or $state.current -cne $current -or @($state.groups | Where-Object id -CEQ 'legacy-revisions').Count -ne 1) {throw 'Revision groups lost inherited data, membership or current-edition state.'}
+        $labels=if ($case.name -eq 'revision-groups-current-small-200') {@('Marcar como actual')} elseif ($case.name -eq 'revision-groups-created') {@('New group','View editions')} else {@('Nuevo grupo','Ver ediciones')}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
     if ($case.name -like 'relations-*') {
         if ($controls.relations.phase -ne 10 -or $controls.relations.pending -or $controls.relations.writing -or $controls.relations.failed) { throw 'The connected relation workflow did not settle.' }

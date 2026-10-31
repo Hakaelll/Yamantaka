@@ -1484,6 +1484,15 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::TagChanged(result, cancel) => self.accept_tag_change(result, cancel),
+                Update::RevisionGroups(result, cancel) => {
+                    self.accept_revision_groups(result, cancel)
+                }
+                Update::RevisionMembers(result, cancel) => {
+                    self.accept_revision_members(result, cancel)
+                }
+                Update::RevisionChanged(result, cancel) => {
+                    self.accept_revision_change(result, cancel)
+                }
                 Update::Relations(result, cancel) => self.accept_relations(result, cancel),
                 Update::RelationChanged(result, cancel) => {
                     self.accept_relation_change(result, cancel)
@@ -2250,6 +2259,7 @@ impl App for YamantakaApp {
                 }
             }
         }
+        self.advance_revision_preview();
         self.advance_relations_preview();
         self.advance_reference_shortcuts(&ctx);
         self.advance_comparison_selection(&ctx);
@@ -2601,6 +2611,7 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["revisionGroups"] = self.revision_capture_summary();
                     record["relations"] = self.relations.summary();
                     record["referenceNotesPhase"] = serde_json::json!(self.reference_notes_preview.phase());
                     record["primaryAnnotations"] = self.reader.annotations.summary();

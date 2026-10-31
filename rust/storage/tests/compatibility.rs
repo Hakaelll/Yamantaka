@@ -11,6 +11,8 @@ mod migration_review_verification;
 mod relation_verification;
 #[path = "support/library_removal.rs"]
 mod removal_verification;
+#[path = "support/revisions.rs"]
+mod revision_verification;
 #[path = "support/smart_views.rs"]
 mod smart_view_verification;
 #[path = "support/tags.rs"]
@@ -172,6 +174,7 @@ fn overrides_win_and_queries_are_bounded_and_escape_wildcards() {
     removal_verification::verify();
     grouping_verification::verify();
     relation_verification::verify(DOCUMENT);
+    revision_verification::verify(DOCUMENT);
 }
 
 #[test]

@@ -425,6 +425,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if args.iter().any(|arg| arg == "--saved-cover-page") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',1,'','','2026-10-13T00:00:00Z','2026-10-08',1,'manual',1,'contain',0.75);")?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--revision-groups") {
+            db.execute_batch("INSERT INTO document_revision_groups(id,name,current_document_id,created_at,updated_at) VALUES('legacy-revisions','Inherited editions','demo-1','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z'); INSERT INTO document_revision_members(group_id,document_id,added_at) VALUES('legacy-revisions','demo-0','2026-10-30T00:00:00Z'),('legacy-revisions','demo-1','2026-10-30T00:00:00Z');")?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--relations") {
             db.execute_batch("INSERT INTO document_relations(id,source_document_id,target_document_id,relation_type,source_anchor_kind,source_anchor_id,target_anchor_kind,target_anchor_id,created_at) VALUES('legacy-relation','demo-2','demo-0','sourceOf','annotation','legacy-annotation','page','1','2026-10-30T00:00:00Z');")?;
         }
@@ -1069,6 +1072,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     app.preview_file_comparison(
                         args.iter().any(|arg| arg == "--compare-different"),
+                    );
+                }
+                if args.iter().any(|arg| arg == "--revision-groups") {
+                    app.preview_revision_groups(
+                        if args.iter().any(|arg| arg == "--revision-current") {
+                            2
+                        } else if args.iter().any(|arg| arg == "--revision-create") {
+                            1
+                        } else {
+                            0
+                        },
                     );
                 }
                 if args.iter().any(|arg| arg == "--relations") {

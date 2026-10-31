@@ -39,6 +39,7 @@ pub mod reading_activity;
 pub mod reading_sessions;
 pub mod relations;
 pub mod relocation;
+pub mod revisions;
 pub mod search;
 pub mod source_revision;
 pub mod tags;
@@ -279,6 +280,27 @@ pub trait LibraryRepository {
         _cancel: &Cancellation,
     ) -> Result<String> {
         Err(Failure::Unsupported("Library tag changes".into()))
+    }
+    fn revision_groups(
+        &self,
+        _query: &revisions::RevisionQuery,
+        _cancel: &Cancellation,
+    ) -> Result<revisions::RevisionPage> {
+        Err(Failure::Unsupported("Revision groups".into()))
+    }
+    fn revision_members(
+        &self,
+        _query: &revisions::RevisionMemberQuery,
+        _cancel: &Cancellation,
+    ) -> Result<revisions::RevisionMemberPage> {
+        Err(Failure::Unsupported("Revision members".into()))
+    }
+    fn change_revision(
+        &mut self,
+        _change: &revisions::RevisionChange,
+        _cancel: &Cancellation,
+    ) -> Result<String> {
+        Err(Failure::Unsupported("Revision changes".into()))
     }
     fn relations(
         &self,

@@ -4,7 +4,7 @@ use yamantaka_domain::{
     Cancellation, Failure, MAX_LIBRARY_PAGE, Result, relations::*, search::IndexAccess,
 };
 
-fn exists(db: &Connection, id: &str) -> Result<()> {
+pub(crate) fn exists(db: &Connection, id: &str) -> Result<()> {
     if !db
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM documents WHERE id=?)",

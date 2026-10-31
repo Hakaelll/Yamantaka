@@ -1,9 +1,18 @@
 use super::*;
 use yamantaka_domain::relations::*;
 mod preview;
+mod revisions;
 mod view;
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum RelationSection {
+    #[default]
+    Connections,
+    Revisions,
+}
 #[derive(Default)]
 pub(super) struct RelationState {
+    revisions: revisions::RevisionState,
+    section: RelationSection,
     pub(super) context_lookup: Option<(String, Cancellation)>,
     context: Option<Document>,
     page: Option<Arc<RelationPage>>,
@@ -20,7 +29,11 @@ pub(super) struct RelationState {
     preview_review: bool,
 }
 impl RelationState {
+    fn writing(&self) -> bool {
+        self.writing.is_some() || self.revisions.writing()
+    }
     pub(super) fn leave(&mut self) {
+        self.revisions.leave();
         if let Some((_, cancel)) = self.context_lookup.take() {
             cancel.cancel();
         }
@@ -33,7 +46,8 @@ impl RelationState {
     pub(super) fn ready(&self) -> bool {
         self.context_lookup.is_none()
             && self.pending.is_none()
-            && self.writing.is_none()
+            && !self.writing()
+            && self.revisions.ready()
             && (self.preview == 0 || self.preview == 10)
     }
     pub(super) fn summary(&self) -> serde_json::Value {
@@ -50,7 +64,7 @@ impl Drop for RelationState {
 }
 impl YamantakaApp {
     fn load_relation_context(&mut self, id: String) {
-        if self.relations.writing.is_some() {
+        if self.relations.writing() {
             return;
         }
         let cancel = Cancellation::default();
@@ -94,7 +108,7 @@ impl YamantakaApp {
         true
     }
     pub(super) fn show_relations(&mut self, document: Document) {
-        if self.relations.writing.is_some() {
+        if self.relations.writing() {
             self.error = Some(
                 self.tr(
                     "Espera a que termine el cambio de relación.",
@@ -115,7 +129,10 @@ impl YamantakaApp {
         self.relations.removing = None;
         self.relations.error = None;
         self.relations.saved = false;
-        self.load_relations();
+        match self.relations.section {
+            RelationSection::Connections => self.load_relations(),
+            RelationSection::Revisions => self.load_revision_groups(),
+        }
     }
     fn load_relations(&mut self) {
         if let Some(previous) = self.relations.pending.take() {
@@ -162,7 +179,7 @@ impl YamantakaApp {
         }
     }
     fn change_relation(&mut self, change: RelationChange) {
-        if self.relations.writing.is_some() || self.relations.context_lookup.is_some() {
+        if self.relations.writing() || self.relations.context_lookup.is_some() {
             return;
         }
         if let Some(cancel) = self.relations.pending.take() {

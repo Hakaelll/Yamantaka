@@ -31,7 +31,7 @@ impl YamantakaApp {
         };
 
         let busy = self.relations.pending.is_some()
-            || self.relations.writing.is_some()
+            || self.relations.writing()
             || self.relations.context_lookup.is_some();
 
         let width = ui.available_width();
@@ -64,14 +64,33 @@ impl YamantakaApp {
                     ui.label(RichText::new(context.display_title()).color(p.secondary));
                     ui.add_space(8.0);
                     ui.label(tr("Conecta fuentes, versiones y lecturas complementarias.", "Connect sources, editions, and companion readings."));
+                    ui.add_space(16.0);
+                    let previous=self.relations.section;
+                    ui.add_enabled_ui(!self.relations.writing(), |ui| {
+                        egui::ComboBox::from_id_salt("connection-section")
+                            .selected_text(match self.relations.section {RelationSection::Connections=>tr("Relaciones", "Connections"),RelationSection::Revisions=>tr("Grupos de revisiones", "Revision groups")})
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.relations.section,RelationSection::Connections,tr("Relaciones", "Connections"));
+                                ui.selectable_value(&mut self.relations.section,RelationSection::Revisions,tr("Grupos de revisiones", "Revision groups"));
+                            });
+                    });
+                    if previous!=self.relations.section {
+                        if let Some(cancel)=self.relations.pending.take() {cancel.cancel();}
+                        self.relations.revisions.leave();
+                        match self.relations.section {RelationSection::Connections=>self.load_relations(),RelationSection::Revisions=>self.load_revision_groups()}
+                    }
                     ui.add_space(24.0);
+                    if self.relations.section==RelationSection::Revisions {
+                        self.revision_groups_view(ui,p);
+                        return;
+                    }
                     if let Some(error) = self.relations.error.clone() {
                         ui.label(error);
                         if theme::navigation(ui, tr("Recargar", "Reload"), false, p).clicked() {
                             self.load_relations();
                         }
                     }
-                    if self.relations.writing.is_some() {
+                    if self.relations.writing() {
                         ui.label(tr("Guardando relación…", "Saving connection…"));
                     } else if self.relations.saved {
                         ui.label(tr("Relaciones actualizadas.", "Connections updated."));

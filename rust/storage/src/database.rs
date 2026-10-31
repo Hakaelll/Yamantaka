@@ -433,6 +433,27 @@ impl LibraryRepository for Database {
     ) -> Result<String> {
         self.apply_tag(change, access, cancel)
     }
+    fn revision_groups(
+        &self,
+        query: &yamantaka_domain::revisions::RevisionQuery,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::revisions::RevisionPage> {
+        self.revision_page(query, cancel)
+    }
+    fn revision_members(
+        &self,
+        query: &yamantaka_domain::revisions::RevisionMemberQuery,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<yamantaka_domain::revisions::RevisionMemberPage> {
+        self.revision_member_page(query, cancel)
+    }
+    fn change_revision(
+        &mut self,
+        change: &yamantaka_domain::revisions::RevisionChange,
+        cancel: &yamantaka_domain::Cancellation,
+    ) -> Result<String> {
+        self.apply_revision(change, cancel)
+    }
     fn relations(
         &self,
         query: &yamantaka_domain::relations::RelationQuery,

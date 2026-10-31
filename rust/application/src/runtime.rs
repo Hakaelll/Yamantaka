@@ -55,6 +55,15 @@ pub enum Action {
     BulkSelection(Box<crate::library_bulk::BulkRequest>),
     Tags(yamantaka_domain::tags::TagQuery, Cancellation),
     ChangeTag(Box<yamantaka_domain::tags::TagChange>, Cancellation),
+    RevisionGroups(yamantaka_domain::revisions::RevisionQuery, Cancellation),
+    RevisionMembers(
+        yamantaka_domain::revisions::RevisionMemberQuery,
+        Cancellation,
+    ),
+    ChangeRevision(
+        Box<yamantaka_domain::revisions::RevisionChange>,
+        Cancellation,
+    ),
     Relations(yamantaka_domain::relations::RelationQuery, Cancellation),
     ChangeRelation(
         Box<yamantaka_domain::relations::RelationChange>,
@@ -153,6 +162,15 @@ pub enum Update {
     SelectionOrganized(Box<crate::library_bulk::BulkReply>),
     Tags(Result<yamantaka_domain::tags::TagPage>, Cancellation),
     TagChanged(Result<String>, Cancellation),
+    RevisionGroups(
+        Result<yamantaka_domain::revisions::RevisionPage>,
+        Cancellation,
+    ),
+    RevisionMembers(
+        Result<yamantaka_domain::revisions::RevisionMemberPage>,
+        Cancellation,
+    ),
+    RevisionChanged(Result<String>, Cancellation),
     Relations(
         Result<yamantaka_domain::relations::RelationPage>,
         Cancellation,
@@ -1025,6 +1043,18 @@ impl Runtime {
                                     let access=if indexer.progress().enabled {yamantaka_domain::search::IndexAccess::Enabled} else {yamantaka_domain::search::IndexAccess::Disabled};
                                     let result=repository.change_tag(&change,access,&cancel);
                                     emit(&events,&notify,Update::TagChanged(result,cancel),permit);
+                                }
+                                Action::RevisionGroups(query,cancel)=> {
+                                    let result=repository.revision_groups(&query,&cancel);
+                                    emit(&events,&notify,Update::RevisionGroups(result,cancel),permit);
+                                }
+                                Action::RevisionMembers(query,cancel)=> {
+                                    let result=repository.revision_members(&query,&cancel);
+                                    emit(&events,&notify,Update::RevisionMembers(result,cancel),permit);
+                                }
+                                Action::ChangeRevision(change,cancel)=> {
+                                    let result=repository.change_revision(&change,&cancel);
+                                    emit(&events,&notify,Update::RevisionChanged(result,cancel),permit);
                                 }
                                 Action::Relations(query,cancel)=> {
                                     let result=repository.relations(&query,&cancel);
