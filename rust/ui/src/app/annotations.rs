@@ -10,6 +10,7 @@ use yamantaka_domain::{
 };
 mod bulk;
 mod editor_view;
+mod page_note_recovery;
 mod pane;
 mod reference_editor_preview;
 pub(super) use reference_editor_preview::NotesPreview;

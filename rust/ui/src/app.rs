@@ -2741,6 +2741,7 @@ impl App for YamantakaApp {
                     record["reference"]=self.reference.as_ref().map(|reference|serde_json::json!({"page":reference.pane.page,"zoom":reference.pane.zoom,"scale":reference.pane.viewport.scale,"images":reference.pane.viewport.pages.values().filter(|slot|slot.image.is_some()).count(),"followPage":reference.follow_page,"followZoom":reference.follow_zoom,"followPosition":reference.follow_position,"bidirectional":reference.bidirectional,"swapped":reference.swapped,"find":reference.pane.find.capture_summary(),"links":reference.pane.links.capture_summary(),"outline":reference.pane.outline.capture_summary(),"bookmarks":reference.pane.bookmarks.capture_summary(),"text":reference.pane.text.capture_summary(),"thumbnailSlots":reference.pane.thumbnails.resident_count(),"differences":reference.differences,"layout":reference.layout,"stacked":reference.stacked,"document":reference.pane.active.as_ref().map(|(doc,_)|&doc.id)})).unwrap_or_default();
                     record["referenceSync"]=serde_json::json!({"demoStage":self.reference_sync_demo,"linkedConfirmed":self.reference_sync_linked,"positionConfirmed":self.reference_sync_position,"reverseConfirmed":self.reference_sync_reverse,"differencesConfirmed":self.reference_sync_differences,"primaryScale":self.reader.viewport.scale});
                     record["closeReview"] = self.editor_close_summary();
+                    record["pageNoteRecovery"] = self.page_note_recovery_summary();
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();
@@ -2771,6 +2772,13 @@ impl App for YamantakaApp {
         {
             self.graphics_recovery.checkpoint_failed();
             eprintln!("{error}");
+        }
+        if self.graphics_recovery.faulted() {
+            while let Ok(update) = self.runtime.updates.try_recv() {
+                if let Update::Annotations(reply) = update {
+                    self.accept_annotation_reply(reply);
+                }
+            }
         }
         if let Some(state) = &mut self.window_state
             && let Err(error) = state.finish()

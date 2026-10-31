@@ -56,6 +56,18 @@ impl YamantakaApp {
                 reference.follow_position = false;
                 reference.differences.insert(0);
             }
+            if std::env::args_os().any(|arg| arg == "--graphics-page-note-drafts") {
+                self.reader.begin_page_note();
+                self.reader
+                    .annotations
+                    .seed_page_note_recovery("Unsaved primary study note");
+                if let Some(view) = &mut self.reference {
+                    view.pane.begin_page_note();
+                    view.pane
+                        .annotations
+                        .seed_page_note_recovery("Unsaved reference study note");
+                }
+            }
             return false;
         }
         if self
@@ -75,7 +87,11 @@ impl YamantakaApp {
         {
             return false;
         }
-        let expected = serde_json::json!({"synthetic":true,"comparison":self.capture_comparison(),"primaryPage":self.reader.page,"primaryZoom":self.reader.zoom});
+        let save_primary = std::env::args_os().any(|arg| arg == "--graphics-save-page-note");
+        if save_primary && !self.submit_page_note_recovery_preview() {
+            return false;
+        }
+        let expected = serde_json::json!({"synthetic":true,"comparison":self.capture_comparison(),"primaryPage":self.reader.page,"primaryZoom":self.reader.zoom,"pageNotes":self.page_note_recovery_summary(),"savedPrimaryNote":save_primary});
         let path = self
             .capture
             .as_ref()

@@ -90,3 +90,5 @@ The [compact gallery checkpoint](../validation/rust-compact-gallery-2026-10-31.m
 The [atomic comparison continuity checkpoint](../validation/rust-comparison-continuity-2026-10-31.md) connects the default session to reference restoration and preserves unavailable-reference context. Synthetic normal, restore-disabled and missing-reference restarts passed, alongside injected graphics recovery in both comparison arrangements. This does not close the remaining whole-workspace, migration or physical acceptance gates.
 
 The [editor close checkpoint](../validation/rust-editor-close-2026-10-31.md) protects unsaved reader notes in either pane and manual metadata corrections during ordinary window close. Persistent draft recovery after a crash or graphics fault remains pending.
+
+The [page-note recovery checkpoint](../validation/rust-page-note-recovery-2026-10-31.md) adds atomic draft persistence for new page notes in both readers, with retained missing-reference/restore-disabled context and accepted-write reconciliation. Selection drafts, existing-note edits and other editors still require persistent recovery.

@@ -10,4 +10,6 @@ Passwords and rendered page images are never part of the saved session. A protec
 
 See the [validation checkpoint](../validation/rust-comparison-continuity-2026-10-31.md) for the cases exercised and remaining acceptance work.
 
-When you close the window with an unsaved reading note or manual title/author correction, choose **Return to editing** to keep working. **Discard and close** abandons the open draft. An accepted save finishes before closing. This close review does not yet recover unsaved drafts after a crash or graphics failure.
+When you close the window with an unsaved reading note or manual title/author correction, choose **Return to editing** to keep working. **Discard and close** abandons the open draft. An accepted save finishes before closing. New page-note drafts in either reader are also saved locally with the session. They reopen as unsaved notes when the matching document is available, including after checked graphics recovery. Missing-reference drafts stay retained. Selection annotations, edits to existing notes and metadata drafts still lack persistent recovery. A forced exit can lose edits made since the last background snapshot.
+
+See [page-note recovery validation](../validation/rust-page-note-recovery-2026-10-31.md) for the supported draft fields and limits.

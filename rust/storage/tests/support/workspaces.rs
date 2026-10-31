@@ -286,6 +286,51 @@ pub fn preserved_split_references(document: &str) {
         current["retainedExtension"],
         serde_json::json!({"value":42})
     );
+    let draft = yamantaka_domain::annotations::page_note_draft::PageNoteDraft {
+        document: "original".into(),
+        fingerprint: "fixture-fingerprint".into(),
+        reference: false,
+        page: 1,
+        rotation: 90,
+        color: yamantaka_domain::annotations::AnnotationColor::Rose,
+        note: "  Unsaved reading idea\nUnicode: 日本語  ".into(),
+        tags: "Study, draft, ".into(),
+    };
+    let with_draft = context
+        .clone()
+        .with_page_notes(vec![draft.clone()])
+        .unwrap();
+    yamantaka_storage::reader_continuity::save(&continuity_path, &with_draft).unwrap();
+    assert_eq!(
+        yamantaka_storage::reader_continuity::load(&continuity_path)
+            .unwrap()
+            .unwrap(),
+        with_draft
+    );
+    let draft_bytes = std::fs::read(&continuity_path).unwrap();
+    let draft_json: serde_json::Value = serde_json::from_slice(&draft_bytes).unwrap();
+    assert_eq!(draft_json["version"], 3);
+    assert_eq!(
+        draft_json["retainedExtension"],
+        current["retainedExtension"]
+    );
+    assert!(
+        context
+            .clone()
+            .with_page_notes(vec![draft.clone(), draft])
+            .is_err()
+    );
+    let mut invalid_draft = draft_json;
+    invalid_draft["page_notes"][0]["rotation"] = 45.into();
+    let invalid_bytes = serde_json::to_vec(&invalid_draft).unwrap();
+    std::fs::write(&continuity_path, &invalid_bytes).unwrap();
+    assert!(yamantaka_storage::reader_continuity::load(&continuity_path).is_err());
+    assert!(yamantaka_storage::reader_continuity::save(&continuity_path, &context).is_err());
+    assert_eq!(std::fs::read(&continuity_path).unwrap(), invalid_bytes);
+    let mut removed_draft = with_draft;
+    removed_draft.forget_documents(&["original".into()]);
+    assert!(removed_draft.page_notes().is_empty());
+    std::fs::write(&continuity_path, &encoded).unwrap();
     for invalid in [serde_json::json!(99), serde_json::json!(2)] {
         let mut unsupported = current.clone();
         unsupported["version"] = invalid.clone();

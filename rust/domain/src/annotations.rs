@@ -1,5 +1,6 @@
 pub mod batch;
 pub mod marks;
+pub mod page_note_draft;
 pub mod review;
 use crate::{
     Failure, Result,

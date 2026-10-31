@@ -35,19 +35,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--executable", required=True, type=Path)
     parser.add_argument("--capture-directory", required=True, type=Path)
+    parser.add_argument("--source-case", default="continuity-comparison-book")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parent.parent
     captures = (repo / "build/demo-store/captures").resolve(strict=True)
     output = args.capture_directory.resolve(strict=True)
     assert output.is_relative_to(repo / "build"), "Evidence must stay in build"
     executable = args.executable.resolve(strict=True)
-    source_controls = read(output / "continuity-comparison-book.controls.json")
+    assert re.fullmatch(r"[a-z0-9-]+", args.source_case), "Unexpected source case"
+    source_controls = read(output / f"{args.source_case}.controls.json")
     assert source_controls["synthetic"] is True
     token = source_controls["continuityStoreToken"]
     assert re.fullmatch(r"[0-9]+-[0-9a-f-]{36}", token), "Unexpected fixture token"
     source = (captures / token).resolve(strict=True)
     assert source.parent == captures
-    expected = read(output / "continuity-comparison-book.expected-comparison.json")
+    expected = read(output / f"{args.source_case}.expected-comparison.json")
     comparison = expected["comparison"]
     assert expected["synthetic"] and comparison["primary"] != comparison["document"]
     files = ("export-preview.sqlite3", "preferences.json", "export-preview.reader-continuity.json")
@@ -102,6 +104,14 @@ def main():
                 assert actual["reference"] is None
                 same_comparison(comparison, continuity["retainedComparison"])
                 same_comparison(comparison, read(fixture / files[2])["comparison"])
+        notes = expected.get("pageNotes", {})
+        if notes.get("primary") and notes.get("reference"):
+            recovered = actual["pageNoteRecovery"]
+            assert recovered["retained"] == {"normal": 0, "missing": 1, "disabled": 2}[mode]
+            assert recovered["primary"] == (None if mode == "disabled" else notes["primary"])
+            assert recovered["reference"] == (notes["reference"] if mode == "normal" else None)
+            persisted = read(fixture / files[2])["page_notes"]
+            assert sorted(persisted, key=lambda note: note["reference"]) == [notes["primary"], notes["reference"]]
         results.append({"mode": mode, "passed": True, "artifacts": {
             path.name: digest(path) for path in (image, controls_path)
         }})

@@ -5,6 +5,7 @@ use crate::{Failure, Result, reader_tabs::DocumentTabs, workspaces::WorkspaceCom
 pub struct ReaderContinuity {
     tabs: DocumentTabs,
     comparison: Option<WorkspaceComparison>,
+    page_notes: Vec<crate::annotations::page_note_draft::PageNoteDraft>,
 }
 impl ReaderContinuity {
     pub fn new(tabs: DocumentTabs, comparison: Option<WorkspaceComparison>) -> Result<Self> {
@@ -17,7 +18,37 @@ impl ReaderContinuity {
                 return Err(Failure::Invalid("Saved comparison does not belong to the active reading; original continuity is preserved".into()));
             }
         }
-        Ok(Self { tabs, comparison })
+        Ok(Self {
+            tabs,
+            comparison,
+            page_notes: Vec::new(),
+        })
+    }
+    pub fn with_page_notes(
+        mut self,
+        drafts: Vec<crate::annotations::page_note_draft::PageNoteDraft>,
+    ) -> Result<Self> {
+        if drafts.len() > 24 {
+            return Err(Failure::Invalid(
+                "Too many recovered page-note drafts; original session is preserved".into(),
+            ));
+        }
+        for (index, draft) in drafts.iter().enumerate() {
+            draft.validate()?;
+            if drafts[..index]
+                .iter()
+                .any(|other| other.document == draft.document && other.reference == draft.reference)
+            {
+                return Err(Failure::Invalid(
+                    "Duplicate recovered page-note editor".into(),
+                ));
+            }
+        }
+        self.page_notes = drafts;
+        Ok(self)
+    }
+    pub fn page_notes(&self) -> &[crate::annotations::page_note_draft::PageNoteDraft] {
+        &self.page_notes
     }
     pub fn tabs(&self) -> &DocumentTabs {
         &self.tabs
@@ -27,6 +58,8 @@ impl ReaderContinuity {
     }
     pub fn forget_documents(&mut self, ids: &[String]) {
         self.tabs.forget_documents(ids);
+        self.page_notes
+            .retain(|draft| !ids.contains(&draft.document));
         if self.comparison.as_ref().is_some_and(|saved| {
             ids.contains(&saved.document)
                 || self
@@ -43,6 +76,7 @@ impl From<DocumentTabs> for ReaderContinuity {
         Self {
             tabs,
             comparison: None,
+            page_notes: Vec::new(),
         }
     }
 }

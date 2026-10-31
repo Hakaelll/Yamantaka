@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='continuity-page-notes'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--graphics-page-note-drafts','--light','--es') },
+    @{ name='continuity-page-notes-saved'; args=@('--reader','--reference','--reference-book','--graphics-fail-runtime','--graphics-page-note-drafts','--graphics-save-page-note','--es') },
     @{ name='close-review-note'; args=@('--reader','--page-note','--close-review','--es') },
     @{ name='close-review-return'; args=@('--reader','--page-note','--close-review','--close-review-return','--light') },
     @{ name='close-review-reference'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-notes-editor','--close-review','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
@@ -498,6 +500,22 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'continuity-page-notes*') {
+        $expected = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'expected-comparison.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $controls.graphicsRuntimeFallback -or $controls.pageNoteRecovery.retained -ne 0) { throw 'Page-note drafts did not restore after graphics recovery.' }
+        foreach ($pane in @('primary','reference')) {
+            if ($pane -eq 'primary' -and $expected.savedPrimaryNote) {
+                if ($controls.pageNoteRecovery.primary -or @($controls.primaryAnnotations.entries | Where-Object { $_.note -ceq 'Unsaved primary study note' }).Count -ne 1) { throw 'A committed page note was lost or restored as a duplicate draft.' }
+                continue
+            }
+            $saved = $expected.pageNotes.$pane
+            $actual = $controls.pageNoteRecovery.$pane
+            if (-not $saved -or -not $actual) { throw 'A page-note editor was lost.' }
+            foreach ($field in @('document','fingerprint','reference','page','rotation','color','note','tags')) {
+                if ($saved.$field -cne $actual.$field) { throw "Recovered page-note field changed: $pane/$field" }
+            }
+        }
+    }
     if ($case.name -like 'close-review-*') {
         if ($controls.closeReview.preview -ne 3 -or -not $controls.closeReview.drafts -or $controls.closeReview.waiting) { throw 'Unsaved editor close protection did not settle with the draft intact.' }
         if ($controls.closeReview.reviewing -ne ($case.name -ne 'close-review-return')) { throw 'Close review did not preserve the requested return/review state.' }

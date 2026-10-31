@@ -17,6 +17,7 @@ pub(in crate::app) struct ContinuityState {
     saved: ReaderContinuity,
     retained_comparison: Option<WorkspaceComparison>,
     restoring_comparison: bool,
+    retained_page_notes: Vec<yamantaka_domain::annotations::page_note_draft::PageNoteDraft>,
     pending: Option<(u64, ReaderContinuity, Cancellation)>,
     due: Option<Instant>,
 }
@@ -25,6 +26,10 @@ impl YamantakaApp {
         serde_json::json!({"loaded":self.tabs.continuity.loaded,"restoring":self.tabs.continuity.restoring_comparison,"retainedComparison":self.tabs.continuity.retained_comparison,"comparison":self.capture_comparison()})
     }
     pub(in crate::app) fn forget_continuity_documents(&mut self, ids: &[String]) {
+        self.tabs
+            .continuity
+            .retained_page_notes
+            .retain(|draft| !ids.contains(&draft.document));
         if self
             .tabs
             .continuity
@@ -49,10 +54,58 @@ impl YamantakaApp {
                     .is_some_and(|tab| tab.document() == saved.primary)
             })
             .cloned();
+        let mut drafts = self.tabs.continuity.retained_page_notes.clone();
+        for draft in [
+            self.reader.annotations.page_note_draft(false),
+            self.reference
+                .as_ref()
+                .and_then(|view| view.pane.annotations.page_note_draft(true)),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            drafts.retain(|old| old.document != draft.document || old.reference != draft.reference);
+            drafts.push(draft);
+        }
         ReaderContinuity::new(
             self.tabs.model.clone(),
             saved.or_else(|| self.capture_comparison()),
-        )
+        )?
+        .with_page_notes(drafts)
+    }
+    fn restore_page_note_drafts(&mut self) {
+        let mut remaining = Vec::new();
+        for draft in std::mem::take(&mut self.tabs.continuity.retained_page_notes) {
+            let pane = if draft.reference {
+                self.reference
+                    .as_mut()
+                    .filter(|view| !view.busy())
+                    .map(|view| &mut view.pane)
+            } else {
+                Some(&mut self.reader)
+            };
+            let result = pane.map_or(Ok(false), |pane| pane.restore_page_note(&draft));
+            match result {
+                Ok(true) => {
+                    if draft.reference
+                        && let Some(view) = &mut self.reference
+                    {
+                        view.navigator_requested = true;
+                    }
+                }
+                Ok(false) => remaining.push(draft),
+                Err(error) => {
+                    if self.error.is_none() {
+                        self.error = Some(error.to_string());
+                    }
+                    remaining.push(draft);
+                }
+            }
+        }
+        self.tabs.continuity.retained_page_notes = remaining;
+    }
+    pub(in crate::app) fn page_note_recovery_summary(&self) -> serde_json::Value {
+        serde_json::json!({"retained":self.tabs.continuity.retained_page_notes.len(),"primary":self.reader.annotations.page_note_draft(false),"reference":self.reference.as_ref().and_then(|view|view.pane.annotations.page_note_draft(true))})
     }
     pub(in crate::app) fn discard_retained_comparison(&mut self) {
         self.tabs.continuity.retained_comparison = None;
@@ -150,6 +203,7 @@ impl YamantakaApp {
             self.error = Some(self.tr("La lectura actual tiene prioridad. La sesión anterior se conserva para su recuperación.", "The current reading takes priority. The previous session is preserved for recovery.").into());
             return;
         }
+        self.tabs.continuity.retained_page_notes = restored.page_notes().to_vec();
         let restore = crate::graphics_recovery::runtime_fallback()
             || self
                 .preferences
@@ -195,6 +249,7 @@ impl YamantakaApp {
         {
             return;
         }
+        self.restore_page_note_drafts();
         self.sync_tab_context();
         if self
             .tabs
