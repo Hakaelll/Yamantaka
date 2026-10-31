@@ -282,6 +282,9 @@ pub trait LibraryRepository {
     ) -> Result<String> {
         Err(Failure::Unsupported("Library tag changes".into()))
     }
+    fn automation_reader(&self) -> Result<automation::simulation::RuleScanFactory> {
+        Err(Failure::Unsupported("Independent rule simulation".into()))
+    }
     fn automation_rules(
         &self,
         _query: &automation::RuleQuery,

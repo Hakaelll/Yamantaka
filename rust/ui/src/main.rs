@@ -5,6 +5,7 @@ mod book;
 mod legacy_import_worker;
 mod page_presenter;
 mod restore_worker;
+mod rule_simulation_fixture;
 mod theme;
 use eframe::egui;
 use std::{path::PathBuf, sync::mpsc};
@@ -94,7 +95,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             || value == "--restore-preview"
                             || value == "--restore-apply"
                             || value == "--workspaces"
-                    }) || arg == "--export-json"
+                    }) || arg == "--rule-simulation"
+                        || arg == "--export-json"
                         || arg == "--reference-export-json"
                         || arg == "--reference-export-md"
                         || arg == "--automatic-cover"
@@ -433,6 +435,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if args.iter().any(|arg| arg == "--saved-rules-many") {
                 db.execute_batch("WITH RECURSIVE n(x) AS (SELECT 0 UNION ALL SELECT x+1 FROM n WHERE x<79) INSERT INTO automation_rules(id,name,enabled,trigger_json,actions_json,created_at,updated_at) SELECT printf('paged-rule-%03d',x),printf('Study rule %03d',x),1,'{\"kind\":\"extension\",\"value\":\".pdf\"}','[{\"kind\":\"addTag\",\"value\":\"Study\"}]','2026-10-31T00:00:00Z','2026-10-31T00:00:00Z' FROM n;")?;
             }
+        }
+        if capture.is_some() && args.iter().any(|arg| arg == "--rule-simulation") {
+            rule_simulation_fixture::seed(&db, &store, &fixture, &args)?;
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--revision-groups") {
             db.execute_batch("INSERT INTO document_revision_groups(id,name,current_document_id,created_at,updated_at) VALUES('legacy-revisions','Inherited editions','demo-1','2026-10-30T00:00:00Z','2026-10-30T00:00:00Z'); INSERT INTO document_revision_members(group_id,document_id,added_at) VALUES('legacy-revisions','demo-0','2026-10-30T00:00:00Z'),('legacy-revisions','demo-1','2026-10-30T00:00:00Z');")?;
@@ -1083,7 +1088,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         args.iter().any(|arg| arg == "--compare-different"),
                     );
                 }
-                if args.iter().any(|arg| arg == "--saved-rules") {
+                if args.iter().any(|arg| arg == "--rule-simulation") {
+                    app.preview_rule_simulation(
+                        if args.iter().any(|arg| arg == "--rule-simulation-duplicates") {
+                            1
+                        } else if args.iter().any(|arg| arg == "--rule-simulation-cancel") {
+                            2
+                        } else if args.iter().any(|arg| arg == "--text-scale=2") {
+                            3
+                        } else {
+                            0
+                        },
+                    );
+                } else if args.iter().any(|arg| arg == "--saved-rules") {
                     app.preview_automation_rules(
                         if args.iter().any(|arg| arg == "--saved-rules-many") {
                             3

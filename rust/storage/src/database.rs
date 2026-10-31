@@ -433,6 +433,19 @@ impl LibraryRepository for Database {
     ) -> Result<String> {
         self.apply_tag(change, access, cancel)
     }
+    fn automation_reader(
+        &self,
+    ) -> Result<yamantaka_domain::automation::simulation::RuleScanFactory> {
+        let path = self.file_path().ok_or_else(|| {
+            Failure::Unsupported("Rule simulation requires a file-backed library".into())
+        })?;
+        Ok(Box::new(move || {
+            Ok(Box::new(Database::open_read_only(&path)?)
+                as Box<
+                    dyn yamantaka_domain::automation::simulation::RuleScanReader,
+                >)
+        }))
+    }
     fn automation_rules(
         &self,
         query: &yamantaka_domain::automation::RuleQuery,

@@ -149,4 +149,5 @@ pub(crate) fn verify(root: &Path, governor: &MemoryGovernor) {
         .unwrap()
     );
     assert!(!db.get("085").unwrap().unwrap().missing);
+    crate::automation_simulation::verification_test::verify(root, governor);
 }

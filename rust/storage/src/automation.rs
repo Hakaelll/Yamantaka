@@ -1,3 +1,4 @@
+mod simulation;
 use crate::{Database, database::storage};
 use rusqlite::{Connection, TransactionBehavior, params};
 use sha2::{Digest, Sha256};

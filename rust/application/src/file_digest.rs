@@ -23,7 +23,14 @@ pub(crate) struct HashedFile {
 }
 impl HashedFile {
     pub(crate) fn read(path: &Path, buffer: &mut [u8], cancel: &Cancellation) -> Result<Self> {
-        cancel.check()?;
+        Self::read_checked(path, buffer, &|| cancel.check())
+    }
+    pub(crate) fn read_checked(
+        path: &Path,
+        buffer: &mut [u8],
+        check: &impl Fn() -> Result<()>,
+    ) -> Result<Self> {
+        check()?;
         let requested_path = path.to_owned();
         let path = path.canonicalize().map_err(io_error)?;
         let mut options = OpenOptions::new();
@@ -46,7 +53,7 @@ impl HashedFile {
         let mut head = Sha256::new();
         let mut count = 0u64;
         loop {
-            cancel.check()?;
+            check()?;
             let read = file.read(buffer).map_err(io_error)?;
             if read == 0 {
                 break;
@@ -87,6 +94,14 @@ impl HashedFile {
             source: source.clone(),
             digest: self.digest,
         })
+    }
+    pub(crate) fn source_revision(&self) -> yamantaka_domain::source_revision::SourceRevision {
+        yamantaka_domain::source_revision::SourceRevision {
+            canonical_path: self.path.clone(),
+            size: self.size,
+            modified: self.modified,
+            head_sha256: self.head,
+        }
     }
     pub(crate) fn path(&self) -> &Path {
         &self.path

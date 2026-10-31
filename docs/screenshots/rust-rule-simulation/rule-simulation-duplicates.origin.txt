@@ -1,0 +1,10 @@
+Origin: native screenshot of the Yamantaka Rust executable, not an AI-generated image.
+Captured with tool/capture_rust_ui.ps1; isolated synthetic study collection; PDF source is the repository's generated acceptance fixture. Write scenarios may use an isolated file-backed synthetic store. No personal library was opened.
+Case: rule-simulation-duplicates
+Arguments: --demo --saved-rules --rule-simulation --rule-simulation-duplicates --light
+Capture UTC: 10/31/2026 10:36:22
+Executable SHA-256: 09667BAC06B929072D02D10C9A867043122E6B72D8C926DE5E0C6E43D8DDD9D5
+Original PNG SHA-256: E5277537248290D7DB819A1EB597930608708C610CB61D63CA72E3D23FF58DE2
+Logical viewport: 0, 0, 1440, 960
+Pixels per logical point: 1.25
+See capture-manifest.json for exact source hashes and conditions. These captures do not certify physical monitor DPI, Narrator, full functional parity or whole-rewrite acceptance.

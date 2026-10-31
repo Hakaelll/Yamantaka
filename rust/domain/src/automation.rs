@@ -1,3 +1,4 @@
+pub mod simulation;
 use crate::{Failure, Result, memory::ByteLease};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

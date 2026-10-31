@@ -9,6 +9,10 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='rule-simulation-extension'; args=@('--saved-rules','--rule-simulation','--es') },
+    @{ name='rule-simulation-duplicates'; args=@('--saved-rules','--rule-simulation','--rule-simulation-duplicates','--light') },
+    @{ name='rule-simulation-cancel'; args=@('--saved-rules','--rule-simulation','--rule-simulation-cancel','--es') },
+    @{ name='rule-simulation-small-200'; args=@('--saved-rules','--rule-simulation','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='saved-rules-legacy'; args=@('--saved-rules','--es') },
     @{ name='saved-rules-changed'; args=@('--saved-rules','--saved-rules-change','--light') },
     @{ name='saved-rules-review-small-200'; args=@('--saved-rules','--saved-rules-review','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
@@ -414,6 +418,17 @@ foreach ($case in $cases) {
             if (-not $controls.reference.links.confirmationOpen -or $controls.reference.page -ne 0) { throw 'The reference external link must await its own confirmation.' }
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Abrir')
         }
+    }
+    if ($case.name -like 'rule-simulation-*') {
+        $result=$controls.ruleSimulation
+        if ($result.phase -ne 10 -or $result.pending) { throw 'Rule simulation did not settle.' }
+        if ($case.name -eq 'rule-simulation-cancel') {
+            if ($result.state -ne 'cancelled' -or $result.scanned -le 0 -or $result.ids.Count -ne 0) { throw 'Cancellation retained an incomplete simulation plan.' }
+        } elseif ($case.name -eq 'rule-simulation-duplicates') {
+            if ($result.state -ne 'complete' -or $result.scanned -ne 3 -or $result.matched -ne 2 -or $result.unverified -ne 0 -or ($result.ids -join '|') -ne 'demo-0|demo-1') { throw 'Full-hash duplicate verification is incorrect.' }
+        } elseif ($result.state -ne 'complete' -or $result.scanned -ne 10 -or $result.matched -ne 10) { throw 'Extension simulation lost matching documents.' }
+        $closeLabel=if ($case.args -contains '--es') {'Cerrar vista previa'} else {'Close preview'}
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @($closeLabel)
     }
     if ($case.name -like 'saved-rules-*') {
         $state=$controls.automationRules

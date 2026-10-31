@@ -1491,6 +1491,7 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::TagChanged(result, cancel) => self.accept_tag_change(result, cancel),
+                Update::RuleSimulated(reply) => self.accept_rule_simulation(*reply),
                 Update::AutomationRules(result, cancel) => {
                     self.accept_automation_rules(result, cancel)
                 }
@@ -2272,6 +2273,8 @@ impl App for YamantakaApp {
                 }
             }
         }
+        self.poll_rule_simulation(&ctx);
+        self.advance_rule_simulation_preview();
         self.advance_automation_preview();
         self.advance_revision_preview();
         self.advance_relations_preview();
@@ -2627,6 +2630,7 @@ impl App for YamantakaApp {
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());
+                    record["ruleSimulation"] = self.automation.simulation_summary();
                     record["automationRules"] = self.automation.summary();
                     record["revisionGroups"] = self.revision_capture_summary();
                     record["relations"] = self.relations.summary();

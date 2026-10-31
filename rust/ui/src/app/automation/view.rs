@@ -91,13 +91,14 @@ impl YamantakaApp {
                     ui.add_space(8.0);
                     ui.label(
                         RichText::new(tr(
-                            "La simulación y ejecución siguen en desarrollo.",
-                            "Simulation and execution are still in development.",
+                            "La aplicación de cambios y deshacer siguen en desarrollo.",
+                            "Applying changes and undo are still in development.",
                         ))
                         .size(12.0)
                         .color(p.secondary),
                     );
                     ui.add_space(24.0);
+                    self.rule_simulation_view(ui, p);
                     let busy = self.automation.busy();
                     if let Some(error) = self.automation.error.clone() {
                         ui.label(error);
@@ -140,6 +141,7 @@ impl YamantakaApp {
                             ));
                         }
                         let mut change = None;
+                        let mut simulate = None;
                         for rule in &page.entries {
                             egui::Frame::new()
                                 .fill(p.surface)
@@ -185,6 +187,23 @@ impl YamantakaApp {
                                         egui::vec2(ui.available_width(), 0.0),
                                         flow(),
                                         |ui| {
+                                            if ui
+                                                .add_enabled_ui(
+                                                    !busy && rule.definition().is_some(),
+                                                    |ui| {
+                                                        theme::navigation(
+                                                            ui,
+                                                            tr("Simular", "Simulate"),
+                                                            false,
+                                                            p,
+                                                        )
+                                                    },
+                                                )
+                                                .inner
+                                                .clicked()
+                                            {
+                                                simulate = Some(rule.clone());
+                                            }
                                             if ui
                                                 .add_enabled_ui(
                                                     !busy
@@ -277,6 +296,9 @@ impl YamantakaApp {
                                     }
                                 });
                             ui.add_space(10.0);
+                        }
+                        if let Some(rule) = simulate {
+                            self.simulate_automation_rule(rule);
                         }
                         if let Some(change) = change {
                             self.change_automation_rule(change);
