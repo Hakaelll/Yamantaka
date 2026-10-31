@@ -38,6 +38,13 @@ fn terminal(runtime: &Runtime, success: bool) {
         }
     }
 }
+fn metadata_evidence(database: &std::path::Path, source: &std::path::Path) -> serde_json::Value {
+    let connection =
+        rusqlite::Connection::open_with_flags(database, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .unwrap();
+    let text:String=connection.query_row("SELECT a.value FROM app_metadata a JOIN documents d ON a.key='rust.frontMatterEvidence.v1:'||d.id WHERE d.path=?",[source.to_string_lossy().as_ref()],|row|row.get(0)).unwrap();
+    serde_json::from_str(&text).unwrap()
+}
 pub(super) fn verify_protected_import() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let source = root
@@ -45,6 +52,7 @@ pub(super) fn verify_protected_import() {
         .canonicalize()
         .unwrap();
     let original = std::fs::read(&source).unwrap();
+    let mut uninterrupted_evidence = None;
     for mode in ["unlock", "drop", "cancel", "shutdown"] {
         let dir = tempfile::tempdir().unwrap();
         let dbpath = dir.path().join("library.sqlite3");
@@ -99,6 +107,7 @@ pub(super) fn verify_protected_import() {
                 assert_eq!(db.count(&LibraryQuery::default()).unwrap(), 2);
                 assert!(db.pending_imports().unwrap().is_empty());
                 let documents = db.query(&LibraryQuery::default()).unwrap();
+                uninterrupted_evidence = Some(metadata_evidence(&dbpath, &source));
                 assert!(
                     documents
                         .iter()
@@ -145,55 +154,89 @@ pub(super) fn verify_protected_import() {
             }
         }
     }
-    let dir = tempfile::tempdir().unwrap();
-    let dbpath = dir.path().join("resume.sqlite3");
-    let worker = PdfWorker::start(
-        &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
-        MemoryLimits::default(),
-    )
-    .unwrap();
-    let control = worker.clone();
-    let (source_send, source_receive) = bounded(1);
-    let (opens, _opened) = crossbeam_channel::unbounded();
-    let runtime = Runtime::start(
-        Database::open(&dbpath).unwrap(),
-        Engine {
-            worker,
-            hold: Arc::new(Mutex::new(None)),
-            source_hold: Mutex::new(Some(source_send)),
-            opens,
-            pages: Arc::new(Mutex::new(Vec::new())),
-        },
-        || {},
-    )
-    .unwrap();
-    runtime
-        .submit(Action::Import(
-            vec![source.clone(), root.join("build/rust-fixtures/textual.pdf")],
-            Cancellation::default(),
-        ))
+    for text_phase in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let dbpath = dir.path().join("resume.sqlite3");
+        let worker = PdfWorker::start(
+            &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
+            MemoryLimits::default(),
+        )
         .unwrap();
-    challenge(&runtime)
-        .answer("fixture-password".into())
+        let control = worker.clone();
+        let (source_send, source_receive) = bounded(1);
+        let (text_send, text_receive) = bounded(1);
+        let pages = Arc::new(Mutex::new(Vec::new()));
+        let (opens, _opened) = crossbeam_channel::unbounded();
+        let runtime = Runtime::start(
+            Database::open(&dbpath).unwrap(),
+            Engine {
+                worker,
+                hold: Arc::new(Mutex::new(if text_phase { Some(text_send) } else { None })),
+                source_hold: Mutex::new(if text_phase { None } else { Some(source_send) }),
+                opens,
+                pages: pages.clone(),
+            },
+            || {},
+        )
         .unwrap();
-    let held = source_receive
-        .recv_timeout(Duration::from_secs(10))
-        .unwrap();
-    control.close(held.id).unwrap();
-    held.reply
-        .send(Err(Failure::NativeDocumentUnavailable))
-        .unwrap();
-    let again = challenge(&runtime);
-    assert!(
-        !again.rejected(),
-        "reopening must not report a previously correct password as rejected"
-    );
-    again.answer("fixture-password".into()).unwrap();
-    terminal(&runtime, true);
-    drop(runtime);
-    drop(control);
-    let db = Database::open_read_only(&dbpath).unwrap();
-    assert_eq!(db.count(&LibraryQuery::default()).unwrap(), 2);
-    assert!(db.pending_imports().unwrap().is_empty());
+        runtime
+            .submit(Action::Import(
+                vec![source.clone(), root.join("build/rust-fixtures/textual.pdf")],
+                Cancellation::default(),
+            ))
+            .unwrap();
+        challenge(&runtime)
+            .answer("fixture-password".into())
+            .unwrap();
+        if text_phase {
+            let held = text_receive.recv_timeout(Duration::from_secs(10)).unwrap();
+            assert_eq!(held.page, 1);
+            control.close(held.id).unwrap();
+            held.reply
+                .send(Err(Failure::NativeDocumentUnavailable))
+                .unwrap();
+        } else {
+            let held = source_receive
+                .recv_timeout(Duration::from_secs(10))
+                .unwrap();
+            control.close(held.id).unwrap();
+            held.reply
+                .send(Err(Failure::NativeDocumentUnavailable))
+                .unwrap();
+        }
+        let again = challenge(&runtime);
+        assert!(
+            !again.rejected(),
+            "reopening must not report a previously correct password as rejected"
+        );
+        if text_phase {
+            again
+                .answer("synthetic incorrect credential".into())
+                .unwrap();
+            let rejected = challenge(&runtime);
+            assert!(rejected.rejected());
+            rejected.answer("fixture-password".into()).unwrap();
+        } else {
+            again.answer("fixture-password".into()).unwrap();
+        }
+        terminal(&runtime, true);
+        drop(runtime);
+        drop(control);
+        let db = Database::open_read_only(&dbpath).unwrap();
+        assert_eq!(db.count(&LibraryQuery::default()).unwrap(), 2);
+        assert!(db.pending_imports().unwrap().is_empty());
+        assert_eq!(
+            metadata_evidence(&dbpath, &source),
+            *uninterrupted_evidence.as_ref().unwrap(),
+            "reopening lost previously collected bibliographic evidence"
+        );
+        if text_phase {
+            assert_eq!(
+                *pages.lock().unwrap(),
+                [0, 1, 1, 0, 1],
+                "reopening must resume the interrupted metadata page"
+            );
+        }
+    }
     assert_eq!(std::fs::read(source).unwrap(), original);
 }

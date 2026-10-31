@@ -1994,7 +1994,7 @@ impl Runtime {
                             },
                             Pending::ImportScan(scan,state) => {
                                 let id=scan.id.clone();
-                                let step=scan.advance(&engine);
+                                let step=scan.advance(&engine,&password_requests,&password_wake,&notify);
                                 queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
                             },
                             Pending::ImportClose(document,ticket,mut state) => {

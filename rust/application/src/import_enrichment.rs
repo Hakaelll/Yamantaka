@@ -1,4 +1,4 @@
-use crossbeam_channel::Select;
+use crossbeam_channel::{Receiver, Select, Sender};
 use std::sync::Arc;
 use yamantaka_domain::{
     Cancellation, Failure, NewDocument, PdfInfo,
@@ -17,7 +17,8 @@ pub(crate) enum ImportStep {
 enum Work {
     RequestPage,
     Text(PdfTicket<Arc<PdfPageText>>),
-    Reopen(PdfTicket<PdfInfo>),
+    Reopen(PdfTicket<PdfInfo>, bool),
+    Password(Receiver<yamantaka_domain::PdfPassword>),
     Source(PdfTicket<SourceRevision>),
 }
 
@@ -104,7 +105,12 @@ impl ImportEnrichment {
         match &self.work {
             Work::RequestPage => true,
             Work::Text(ticket) => ticket.is_ready(),
-            Work::Reopen(ticket) => ticket.is_ready(),
+            Work::Reopen(ticket, _) => ticket.is_ready(),
+            Work::Password(receive) => {
+                let mut select = Select::new();
+                select.recv(receive);
+                self.cancel.is_cancelled() || select.try_ready().is_ok()
+            }
             Work::Source(ticket) => ticket.is_ready(),
         }
     }
@@ -114,11 +120,14 @@ impl ImportEnrichment {
             Work::Text(ticket) => {
                 select.recv(ticket.readiness());
             }
-            Work::Reopen(ticket) => {
+            Work::Reopen(ticket, _) => {
                 select.recv(ticket.readiness());
             }
             Work::Source(ticket) => {
                 select.recv(ticket.readiness());
+            }
+            Work::Password(receive) => {
+                select.recv(receive);
             }
         }
     }
@@ -143,25 +152,39 @@ impl ImportEnrichment {
             Err(error) => unavailable(self.document, error),
         }
     }
-    fn reopen(mut self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
+    fn reopen(self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
+        self.open(engine, None)
+    }
+    fn open(
+        mut self: Box<Self>,
+        engine: &impl AsyncPdfEngine,
+        password: Option<yamantaka_domain::PdfPassword>,
+    ) -> ImportStep {
         if let Err(error) = self.cancel.check() {
             return ImportStep::Failed(error);
         }
+        let attempted = password.is_some();
         match engine.try_open(
             self.id.clone(),
             self.document.path.clone(),
-            None,
+            password,
             PdfOpenPurpose::Background,
             self.cancel.clone(),
         ) {
             Ok(ticket) => {
-                self.work = Work::Reopen(ticket);
+                self.work = Work::Reopen(ticket, attempted);
                 ImportStep::Pending(self)
             }
             Err(error) => ImportStep::Failed(error),
         }
     }
-    pub fn advance(mut self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
+    pub fn advance(
+        mut self: Box<Self>,
+        engine: &impl AsyncPdfEngine,
+        passwords: &Sender<crate::import_password::Challenge>,
+        wake: &Sender<()>,
+        notify: &impl Fn(),
+    ) -> ImportStep {
         if let Err(error) = self.cancel.check() {
             return ImportStep::Failed(error);
         }
@@ -213,7 +236,27 @@ impl ImportEnrichment {
                     }
                 }
             }
-            Work::Reopen(ticket) => match ticket.wait() {
+            Work::Password(receive) => match receive.recv() {
+                Ok(password) => self.open(engine, Some(password)),
+                Err(_) => ImportStep::Failed(Failure::Cancelled),
+            },
+            Work::Reopen(ticket, attempted) => match ticket.wait() {
+                Err(Failure::PasswordRequired) => {
+                    let (challenge, receive) = crate::import_password::Challenge::channel(
+                        self.document.path.clone(),
+                        attempted,
+                        self.cancel.clone(),
+                        wake.clone(),
+                    );
+                    match passwords.try_send(challenge) {
+                        Ok(()) => {
+                            self.work = Work::Password(receive);
+                            notify();
+                            ImportStep::Pending(self)
+                        }
+                        Err(_) => ImportStep::Failed(Failure::QueueFull),
+                    }
+                }
                 Ok(info) => {
                     if info.pages[..] != self.document.info.pages[..] {
                         return ImportStep::Failed(Failure::Invalid(

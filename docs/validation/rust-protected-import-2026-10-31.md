@@ -19,3 +19,5 @@ Five final native synthetic captures passed: the initial import prompt, rejected
 ## Remaining acceptance
 
 Physical password entry, Narrator, actual DPI changes, multiple simultaneous protected batches, capacity-pressure reopening, protected-file corruption and hostile-input stress need broader acceptance. Persistent import recovery retains its ordinary file/folder intent and no credential; a complete protected restart matrix remains pending. Automatic covers, full-text indexing and other background reopening of closed encrypted PDFs still need explicit unlock coordination and acceptance. Resource accounting does not yet include every UI/password/channel allocation. This checkpoint does not certify the entire rewrite or Release readiness.
+
+A later [metadata-resume correction](rust-protected-metadata-resume-2026-10-31.md) also handles native-owner loss during the front-matter scan. The earlier source-handoff scenario above did not cover that separate reopening path. The focused real-PDFium check now compares resumed bibliographic evidence with uninterrupted import and confirms the interrupted page is retried.
