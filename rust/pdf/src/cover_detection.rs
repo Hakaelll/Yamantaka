@@ -131,3 +131,42 @@ pub(crate) fn capture_import<'a>(
     cancel.check()?;
     Ok(detected)
 }
+
+pub(crate) fn capture_page<'a>(
+    pdfium: &'a Pdfium,
+    loaded: &crate::source::LoadedPdf<'a>,
+    source: crate::covers::CoverSource<'_>,
+    expected: &yamantaka_domain::source_revision::SourceRevision,
+    cancel: &Cancellation,
+    governor: &MemoryGovernor,
+    cache: Option<&dyn yamantaka_domain::cover_cache::CoverImageCache>,
+) -> Result<std::sync::Arc<yamantaka_domain::RenderedPage>> {
+    cancel.check()?;
+    if loaded.source.snapshot() != *expected {
+        return Err(crate::source::source_changed());
+    }
+    loaded.source.verify(source.path, cancel)?;
+    let cache = cache.ok_or_else(|| Failure::Unsupported("Cover cache is disabled".into()))?;
+    let identity = cache.identity(source.path, source.page, cancel)?;
+    let image = crate::covers::render(
+        pdfium,
+        Some(&loaded.document),
+        crate::covers::CoverSource {
+            id: source.id.clone(),
+            path: source.path,
+            page: source.page,
+            generation: source.generation,
+        },
+        cancel,
+        governor,
+        None,
+    )?;
+    loaded.source.verify(source.path, cancel)?;
+    if cache.identity(source.path, source.page, cancel)? != identity {
+        return Err(crate::source::source_changed());
+    }
+    cache.save(identity, &image, cancel)?;
+    loaded.source.verify(source.path, cancel)?;
+    cancel.check()?;
+    Ok(image)
+}

@@ -12,6 +12,8 @@ use yamantaka_domain::{
 };
 use yamantaka_pdf::{MemoryLimits, PdfWorker};
 use yamantaka_storage::Database;
+#[path = "import_resumption_runtime/cover_rebuild.rs"]
+mod cover_rebuild;
 #[path = "import_resumption_runtime/engine.rs"]
 mod engine;
 #[path = "import_resumption_runtime/password.rs"]

@@ -79,6 +79,7 @@ enum Request {
         path: PathBuf,
         page: u32,
         generation: u64,
+        expected: Option<yamantaka_domain::source_revision::SourceRevision>,
         cancel: Cancellation,
         reply: Reply<Arc<RenderedPage>>,
     },
@@ -529,6 +530,25 @@ impl AsyncPdfEngine for PdfWorker {
         })?;
         Ok(ticket)
     }
+    fn try_capture_import_cover_page(
+        &self,
+        id: String,
+        source: yamantaka_domain::source_revision::SourceRevision,
+        page: u32,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<RenderedPage>>> {
+        let (reply, ticket) = self.reply(0, cancel.clone(), false)?;
+        self.enqueue(Request::Cover {
+            id,
+            path: source.canonical_path.clone(),
+            page,
+            generation: 0,
+            expected: Some(source),
+            cancel,
+            reply,
+        })?;
+        Ok(ticket)
+    }
     fn try_cover(
         &self,
         id: String,
@@ -543,6 +563,7 @@ impl AsyncPdfEngine for PdfWorker {
             path,
             page,
             generation,
+            expected: None,
             cancel,
             reply,
         })?;
@@ -894,11 +915,32 @@ fn run(
                 path,
                 page,
                 generation,
+                expected,
                 cancel,
                 reply,
             } => {
                 let result = (|| {
                     cancel.check()?;
+                    if let Some(expected) = expected {
+                        let loaded = documents
+                            .get(&id)
+                            .ok_or(Failure::NativeDocumentUnavailable)?;
+                        return super::cover_detection::capture_page(
+                            pdfium,
+                            loaded,
+                            super::covers::CoverSource {
+                                id,
+                                path: &path,
+                                page,
+                                generation,
+                            },
+                            &expected,
+                            &cancel,
+                            &governor,
+                            cover_cache.as_deref(),
+                        );
+                    }
+
                     let revision = SourceStamp::read(&path, &cancel)?;
                     let source = super::covers::CoverSource {
                         id: id.clone(),

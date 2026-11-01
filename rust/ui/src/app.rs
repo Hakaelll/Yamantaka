@@ -15,6 +15,7 @@ mod continuity_preview;
 mod cover_picker;
 mod cover_picker_preview;
 mod cover_picker_view;
+mod cover_rebuild;
 mod cover_restore;
 mod details;
 mod diagnostics;
@@ -257,6 +258,9 @@ pub struct YamantakaApp {
     error: Option<String>,
     close_review: close_review::CloseReview,
     importing: operations::BackgroundImport,
+    cover_rebuild: cover_rebuild::State,
+    cover_rebuild_preview: bool,
+    inspector_actions_preview: bool,
     preview_tools_menu: bool,
     activation: Receiver<Vec<PathBuf>>,
     _instance: std::rc::Rc<Instance>,
@@ -498,6 +502,9 @@ impl YamantakaApp {
             error: None,
             close_review: Default::default(),
             importing: Default::default(),
+            cover_rebuild: Default::default(),
+            cover_rebuild_preview: false,
+            inspector_actions_preview: false,
             preview_tools_menu: false,
             activation,
             _instance: instance,
@@ -1489,6 +1496,7 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Annotations(reply) => self.accept_annotation_reply(reply),
+                Update::CoverRebuilt(reply) => self.accept_cover_rebuilt(*reply, ctx),
                 Update::AnnotationRecovered(reply) => self.accept_stored_note_recovery(*reply),
                 Update::SelectionRecovered(reply) => self.accept_selection_note_recovery(*reply),
                 Update::Library(documents, count, memberships, cancel) => {
@@ -2477,6 +2485,7 @@ impl App for YamantakaApp {
         self.safe_mode_dialog(&ctx);
         self.quarantine_dialog(&ctx);
         self.page_jump_dialog(&ctx);
+        self.advance_cover_rebuild_preview();
         self.password_dialog(&ctx);
         self.external_link_dialog(&ctx);
         self.editor_close_dialog(&ctx);
@@ -2592,6 +2601,7 @@ impl App for YamantakaApp {
                     && !self.reader.loading
                     && (!self.importing.busy() || self.import_password_waiting_capture())
                     && self.import_password_capture_ready()
+                    && self.cover_rebuild_capture_ready()
                     && self.importing.recovery_ready()
                     && self.opening.ready()
                     && self.tabs.ready()
@@ -2755,6 +2765,7 @@ impl App for YamantakaApp {
                     record["closeReview"] = self.editor_close_summary();
                     record["pageNoteRecovery"] = self.page_note_recovery_summary();
                     record["metadataDraftRecovery"] = self.metadata_draft_summary();
+                    record["coverRebuild"] = self.cover_rebuild_summary();
                     record["importPassword"] = self.import_password_summary();
                     record["storedNoteRecovery"] = self.stored_note_recovery_summary();
                     record["selectionNoteRecovery"] = self.selection_note_recovery_summary();

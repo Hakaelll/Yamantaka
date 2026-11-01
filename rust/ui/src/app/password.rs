@@ -6,7 +6,7 @@ enum PasswordTarget {
         document: Box<Document>,
         reference: bool,
     },
-    Import(yamantaka_application::import_password::Challenge),
+    Background(yamantaka_application::background_password::Challenge),
 }
 
 pub(super) struct PasswordChallenge {
@@ -38,10 +38,10 @@ impl PasswordChallenge {
             focus: true,
         }
     }
-    fn import(request: yamantaka_application::import_password::Challenge) -> Self {
+    fn background(request: yamantaka_application::background_password::Challenge) -> Self {
         Self {
             rejected: request.rejected(),
-            target: PasswordTarget::Import(request),
+            target: PasswordTarget::Background(request),
             value: PdfPassword::default(),
             focus: true,
         }
@@ -51,15 +51,40 @@ impl PasswordChallenge {
             PasswordTarget::Reader { document, .. } => {
                 std::borrow::Cow::Borrowed(document.display_title())
             }
-            PasswordTarget::Import(request) => request
+            PasswordTarget::Background(request) => request
                 .path()
                 .file_name()
                 .unwrap_or_default()
                 .to_string_lossy(),
         }
     }
+    pub(super) fn background_purpose(
+        &self,
+    ) -> Option<yamantaka_application::background_password::Purpose> {
+        match &self.target {
+            PasswordTarget::Background(request) => Some(request.purpose()),
+            _ => None,
+        }
+    }
     fn importing(&self) -> bool {
-        matches!(&self.target, PasswordTarget::Import(_))
+        matches!(&self.target, PasswordTarget::Background(request) if request.purpose()==yamantaka_application::background_password::Purpose::Import)
+    }
+    fn labels(&self, english: bool) -> (&'static str, &'static str) {
+        use yamantaka_application::background_password::Purpose;
+        match (&self.target, english) {
+            (PasswordTarget::Background(request), true) => match request.purpose() {
+                Purpose::Import => ("Add PDF", "Cancel import"),
+                Purpose::Metadata => ("Reanalyse", "Cancel analysis"),
+                Purpose::Cover => ("Rebuild cover", "Cancel rebuild"),
+            },
+            (PasswordTarget::Background(request), false) => match request.purpose() {
+                Purpose::Import => ("Añadir PDF", "Cancelar importación"),
+                Purpose::Metadata => ("Reanalizar", "Cancelar análisis"),
+                Purpose::Cover => ("Regenerar portada", "Cancelar regeneración"),
+            },
+            (_, true) => ("Open PDF", "Cancel"),
+            (_, false) => ("Abrir PDF", "Cancelar"),
+        }
     }
     pub(super) fn reference_document(&self) -> Option<&Document> {
         match &self.target {
@@ -104,11 +129,13 @@ impl YamantakaApp {
 
     pub(super) fn password_dialog(&mut self, ctx: &egui::Context) {
         while self.password.is_none() {
-            let Some(request) = self.runtime.next_import_password() else {
+            let Some(request) = self.runtime.next_background_password() else {
                 break;
             };
             if !request.cancelled() {
-                if let Some(preview) = &mut self.import_password_preview {
+                if request.purpose() == yamantaka_application::background_password::Purpose::Import
+                    && let Some(preview) = &mut self.import_password_preview
+                {
                     let answer = match preview.mode {
                         "unlock" => Some(if preview.attempts == 0 {
                             "synthetic incorrect credential"
@@ -129,13 +156,13 @@ impl YamantakaApp {
                         continue;
                     }
                 }
-                self.password = Some(PasswordChallenge::import(request));
+                self.password = Some(PasswordChallenge::background(request));
             }
         }
         let Some(mut challenge) = self.password.take() else {
             return;
         };
-        if matches!(&challenge.target,PasswordTarget::Import(request) if request.cancelled()) {
+        if matches!(&challenge.target,PasswordTarget::Background(request) if request.cancelled()) {
             ctx.memory_mut(|memory| {
                 memory.surrender_focus(egui::Id::new("ephemeral-pdf-password"))
             });
@@ -268,11 +295,7 @@ impl YamantakaApp {
                 ui.horizontal_wrapped(|ui| {
                     if theme::control(
                         ui,
-                        if challenge.importing() {
-                            self.tr("Añadir PDF", "Add PDF")
-                        } else {
-                            self.tr("Abrir PDF", "Open PDF")
-                        },
+                        challenge.labels(self.english).0,
                         Some(theme::Icon::Right),
                         true,
                         false,
@@ -282,18 +305,7 @@ impl YamantakaApp {
                     {
                         submit = true;
                     }
-                    if theme::navigation(
-                        ui,
-                        if challenge.importing() {
-                            self.tr("Cancelar importación", "Cancel import")
-                        } else {
-                            self.tr("Cancelar", "Cancel")
-                        },
-                        false,
-                        p,
-                    )
-                    .clicked()
-                    {
+                    if theme::navigation(ui, challenge.labels(self.english).1, false, p).clicked() {
                         cancel = true;
                     }
                 });
@@ -312,7 +324,7 @@ impl YamantakaApp {
                     document,
                     reference: true,
                 } => self.cancel_reference_password(&document.id),
-                PasswordTarget::Import(request) => drop(request),
+                PasswordTarget::Background(request) => drop(request),
             }
         } else if submit {
             match challenge.target {
@@ -324,7 +336,7 @@ impl YamantakaApp {
                     document,
                     reference: true,
                 } => self.retry_reference_password(*document, challenge.value),
-                PasswordTarget::Import(request) => {
+                PasswordTarget::Background(request) => {
                     let _ = request.answer(challenge.value);
                 }
             }

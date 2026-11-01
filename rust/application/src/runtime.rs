@@ -53,6 +53,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    RebuildCover(Box<crate::cover_rebuild::Request>),
     FlushChanges(Sender<Result<()>>),
     Quarantine(Box<crate::quarantine::Request>),
     GetRestorableDocument(String, Cancellation),
@@ -181,6 +182,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    CoverRebuilt(Box<crate::cover_rebuild::Reply>),
     Quarantine(crate::quarantine::Reply),
     /// Some contains the committed protection set; None means a stale request.
     OpenConfirmed {
@@ -350,7 +352,7 @@ pub struct Runtime {
     outstanding: Arc<AtomicUsize>,
     control_outstanding: Arc<AtomicUsize>,
     pub updates: UpdateReceiver,
-    password_prompts: Receiver<crate::import_password::Challenge>,
+    password_prompts: Receiver<crate::background_password::Challenge>,
     handle: Option<JoinHandle<()>>,
 }
 enum RuntimeControl {
@@ -384,6 +386,7 @@ struct RejectedOpen {
     revision: u64,
 }
 enum Pending {
+    CoverRebuild(Box<crate::cover_rebuild::Job>, Permit),
     RejectedOpen(Box<RejectedOpen>, PdfTicket<()>, Permit),
     ImportHashReady(PathBuf, String, ImportState),
     ImportHash(Box<ImportHashJob>, PathBuf, String, ImportState),
@@ -519,6 +522,7 @@ impl Pending {
             Self::ImportScan(scan, _) => {
                 scan.register(select);
             }
+            Self::CoverRebuild(job, _) => job.register(select),
             Self::ImportCover(_, _, ticket, _) => {
                 select.recv(ticket.readiness());
             }
@@ -552,6 +556,7 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.is_ready(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.is_ready(),
             Self::ImportScan(scan, _) => scan.ready(),
+            Self::CoverRebuild(job, _) => job.ready(),
             Self::ImportCover(_, _, ticket, _) => ticket.is_ready(),
             Self::RejectedOpen(_, ticket, _)
             | Self::Close(_, ticket, _)
@@ -581,6 +586,7 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportScan(scan, _) => scan.cancel(),
+            Self::CoverRebuild(job, _) => job.cancel(),
             Self::ImportCover(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::RejectedOpen(_, ticket, _)
             | Self::Close(_, ticket, _)
@@ -1126,7 +1132,7 @@ impl Runtime {
                         if (index_busy
                             && matches!(
                                 &action,
-                                Action::RemoveFromLibrary(..) | Action::Open(..)
+                                Action::RemoveFromLibrary(..) | Action::Open(..) | Action::RebuildCover(..)
                                     | Action::ResumeImport(..)
                                     | Action::ImportFolder(..)
                                     | Action::Import(..)
@@ -1678,6 +1684,16 @@ impl Runtime {
                                         }
                                     }
                                 }
+                                Action::RebuildCover(request) => {
+                                    let id=request.document.id.clone();let cancel=request.cancel.clone();
+                                    let started=if visible.len()>=yamantaka_domain::MAX_HOT_DOCUMENTS {Err(Failure::NativeSlotsBusy)}
+                                        else if pending.iter().any(|item|matches!(item,Pending::CoverRebuild(..))) {Err(Failure::QueueFull)}
+                                        else {crate::cover_rebuild::Job::start(*request,&repository,&engine)};
+                                    match started {
+                                        Ok(job)=>pending.push(Pending::CoverRebuild(job,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::CoverRebuilt(Box::new(crate::cover_rebuild::Reply{document:id,result:Err(error),cancel})),permit),
+                                    }
+                                }
                                 Action::RecoverSelection(request) => {
                                     match crate::selection_draft_recovery::Scan::start(*request, &engine) {
                                         Ok(scan) => pending.push(Pending::SelectionRecovery(Box::new(scan), permit)),
@@ -1834,6 +1850,10 @@ impl Runtime {
                             continue;
                         }
                         match pending.remove(index) {
+                            Pending::CoverRebuild(job,permit)=>match job.advance(&mut repository,&engine,&password_requests,&password_wake,&notify) {
+                                crate::cover_rebuild::Step::Pending(job)=>{pending.insert(index,Pending::CoverRebuild(job,permit));index+=1;},
+                                crate::cover_rebuild::Step::Finished(reply,released)=>{if released {pdf_capacity.fetch_add(1,Ordering::Release);}emit(&events,&notify,Update::CoverRebuilt(reply),permit);},
+                            },
                             Pending::SelectionRecovery(scan, permit) => {
                                 match scan.advance(&engine) {
                                     crate::selection_draft_recovery::Step::Continue(scan) => {
@@ -2013,7 +2033,7 @@ impl Runtime {
                             Pending::ImportOpen(path, id, ticket, mut state) => match ticket.wait() {
                                 Err(Failure::PasswordRequired) => {
                                     state.unlocked=true;
-                                    let (challenge,receive)=crate::import_password::Challenge::channel(path.clone(),state.password_attempted,state.cancel.clone(),password_wake.clone());
+                                    let (challenge,receive)=crate::background_password::Challenge::channel(if state.reanalysis.is_some(){crate::background_password::Purpose::Metadata}else{crate::background_password::Purpose::Import},path.clone(),state.password_attempted,state.cancel.clone(),password_wake.clone());
                                     match password_requests.try_send(challenge) {
                                         Ok(()) => {pending.push(Pending::ImportPassword(path,id,receive,state));notify();}
                                         Err(_) => import_failed(&events,&notify,Failure::QueueFull,state),
@@ -2148,7 +2168,7 @@ impl Runtime {
                     let native_admission_pending = removal.is_some() || cover_regeneration.is_some() || !covers.is_empty() || pending.iter().any(|item| {
                         matches!(
                             item,
-                            Pending::Open(..) | Pending::ImportReady(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportCover(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
+                            Pending::Open(..) | Pending::CoverRebuild(..) | Pending::ImportReady(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportCover(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
                         )
                     });
                     indexer.set_slot_available(
@@ -2259,7 +2279,7 @@ impl Runtime {
             handle: Some(handle),
         })
     }
-    pub fn next_import_password(&self) -> Option<crate::import_password::Challenge> {
+    pub fn next_background_password(&self) -> Option<crate::background_password::Challenge> {
         self.password_prompts.try_recv().ok()
     }
     pub fn flush_changes(&self) -> Result<()> {

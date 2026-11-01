@@ -1,12 +1,12 @@
 use super::*;
 use std::time::Instant;
-use yamantaka_application::import_password::Challenge;
+use yamantaka_application::background_password::Challenge;
 use yamantaka_domain::LibraryQuery;
 
-fn challenge(runtime: &Runtime) -> Challenge {
+pub(super) fn challenge(runtime: &Runtime) -> Challenge {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
-        if let Some(challenge) = runtime.next_import_password() {
+        if let Some(challenge) = runtime.next_background_password() {
             return challenge;
         }
         assert!(
@@ -122,6 +122,7 @@ pub(super) fn verify_protected_import() {
                 let documents = db.query(&LibraryQuery::default()).unwrap();
                 uninterrupted_evidence = Some(metadata_evidence(&dbpath, &source));
                 verify_cover_cache(&db, &source, &root, cache.clone());
+                super::cover_rebuild::verify(&dbpath, &source, &root, cache.clone());
                 assert!(
                     documents
                         .iter()

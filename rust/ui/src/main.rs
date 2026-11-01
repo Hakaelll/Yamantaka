@@ -62,6 +62,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let demo = args.iter().any(|arg| arg == "--demo");
     let settings = args.iter().any(|arg| arg == "--settings");
     let protected = args.iter().any(|arg| arg == "--protected");
+    let cover_rebuild = args.iter().any(|arg| arg == "--cover-rebuild");
     let reader = protected
         || args.iter().any(|arg| {
             arg == "--reader"
@@ -183,7 +184,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     "../../build/rust-fixtures/front-matter-missing.pdf"
                 }
-            } else if protected {
+            } else if protected || cover_rebuild {
                 "../../build/rust-fixtures/protected.pdf"
             } else if args.iter().any(|arg| arg == "--links") {
                 if args.iter().any(|arg| arg == "--rejected-link") {
@@ -427,6 +428,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         if args.iter().any(|arg| arg == "--bulk-remove=failure") {
             db.execute_batch("CREATE TRIGGER synthetic_remove_failure BEFORE DELETE ON documents WHEN OLD.id='demo-0' BEGIN SELECT RAISE(ABORT,'synthetic removal failure'); END;")?;
+        }
+        if cover_rebuild {
+            let metadata = fixture.metadata()?;
+            let fingerprint = yamantaka_storage::identity::legacy_fingerprint(&fixture)?;
+            let modified = chrono::DateTime::<chrono::Utc>::from(metadata.modified()?).to_rfc3339();
+            let source = fixture
+                .canonicalize()?
+                .to_string_lossy()
+                .replace('\'', "''");
+            let normalized = source.to_lowercase();
+            db.execute_batch(&format!("UPDATE documents SET path='{source}',normalized_path='{normalized}',file_name='protected.pdf',fingerprint='{fingerprint}',file_size={},file_modified_at='{modified}' WHERE id='demo-0';",metadata.len()))?;
         }
         if args.iter().any(|arg| arg == "--automatic-cover-manual") {
             db.execute_batch("INSERT INTO document_covers VALUES('demo-0',0,'','','2026-10-13','2026-10-08',1,'manual',4,'contain',0.7142857142857143);")?;
@@ -1653,6 +1665,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         "prompt"
                     },
                 );
+            }
+            if demo && args.iter().any(|arg| arg == "--cover-rebuild-menu") {
+                app.preview_inspector_actions();
+            }
+            if demo && cover_rebuild {
+                app.preview_cover_rebuild();
             }
             if demo && protected {
                 app.preview_password(if args.iter().any(|arg| arg == "--password-unlock") {

@@ -1,5 +1,6 @@
 //! Presentation commands dispatch only through use cases.
 mod cover_job;
+pub mod cover_rebuild;
 use yamantaka_domain::{Document, LibraryQuery, LibraryRepository, Result};
 pub mod annotation_draft_recovery;
 pub mod annotation_export;
@@ -8,6 +9,7 @@ mod automatic_cover;
 pub mod automation_execution;
 pub mod automation_plan;
 pub mod automation_simulation;
+pub mod background_password;
 pub mod cache_maintenance;
 pub mod cover_regeneration;
 pub mod cover_source;
@@ -20,7 +22,6 @@ mod folder_import;
 mod import_cover;
 mod import_enrichment;
 mod import_hash;
-pub mod import_password;
 pub mod library_bulk;
 pub mod library_check;
 pub mod library_removal;

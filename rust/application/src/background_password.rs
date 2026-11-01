@@ -3,7 +3,15 @@ use crossbeam_channel::{Receiver, Sender, bounded};
 use std::path::{Path, PathBuf};
 use yamantaka_domain::{Cancellation, Failure, PdfPassword, Result};
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Purpose {
+    Import,
+    Metadata,
+    Cover,
+}
+
 pub struct Challenge {
+    purpose: Purpose,
     path: PathBuf,
     rejected: bool,
     cancel: Cancellation,
@@ -12,6 +20,7 @@ pub struct Challenge {
 }
 impl Challenge {
     pub(crate) fn channel(
+        purpose: Purpose,
         path: PathBuf,
         rejected: bool,
         cancel: Cancellation,
@@ -20,6 +29,7 @@ impl Challenge {
         let (reply, receive) = bounded(1);
         (
             Self {
+                purpose,
                 path,
                 rejected,
                 cancel,
@@ -28,6 +38,9 @@ impl Challenge {
             },
             receive,
         )
+    }
+    pub fn purpose(&self) -> Purpose {
+        self.purpose
     }
     pub fn path(&self) -> &Path {
         &self.path

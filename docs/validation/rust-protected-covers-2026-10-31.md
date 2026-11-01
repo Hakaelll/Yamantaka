@@ -21,3 +21,5 @@ Two synthetic native captures passed: successful import with the imported UUID p
 ## Remaining acceptance
 
 Unlock-driven durable rebuilding for existing protected entries after cache removal or corruption, protected manual-page selection, full-text indexing, repeated capacity-pressure eviction, disk-failure UX and full resource/performance acceptance remain pending. The imported-cover path does not retain a reusable credential or establish complete protected-document parity. This checkpoint does not satisfy the complete rewrite or Release gates.
+
+A later [explicit rebuild checkpoint](rust-cover-rebuild-2026-11-01.md) adds durable cache recovery for existing entries, including the saved manual page and transient password retry. The earlier remaining-work list above describes this checkpoint's original scope; indexing and broader acceptance remain open.

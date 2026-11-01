@@ -96,6 +96,18 @@ pub trait AsyncPdfEngine: PdfEngine {
             "Unlocked import cover capture".into(),
         ))
     }
+    /// Render a chosen cover page while the caller holds its source read guard.
+    fn try_capture_import_cover_page(
+        &self,
+        _id: String,
+        _source: crate::source_revision::SourceRevision,
+        _page: u32,
+        _cancel: Cancellation,
+    ) -> Result<PdfTicket<Arc<RenderedPage>>> {
+        Err(crate::Failure::Unsupported(
+            "Guarded selected cover capture".into(),
+        ))
+    }
     fn try_detect_cover(
         &self,
         _id: String,

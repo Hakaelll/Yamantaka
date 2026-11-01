@@ -24,6 +24,7 @@ enum Work {
 
 pub(crate) struct ImportEnrichment {
     pub id: String,
+    purpose: crate::background_password::Purpose,
     document: Box<NewDocument>,
     page: u32,
     scan: FrontMatter,
@@ -89,6 +90,11 @@ impl ImportEnrichment {
         })();
         match result {
             Ok(scan) => Box::new(Self {
+                purpose: if previous.is_some() {
+                    crate::background_password::Purpose::Metadata
+                } else {
+                    crate::background_password::Purpose::Import
+                },
                 id,
                 document,
                 page: 0,
@@ -181,7 +187,7 @@ impl ImportEnrichment {
     pub fn advance(
         mut self: Box<Self>,
         engine: &impl AsyncPdfEngine,
-        passwords: &Sender<crate::import_password::Challenge>,
+        passwords: &Sender<crate::background_password::Challenge>,
         wake: &Sender<()>,
         notify: &impl Fn(),
     ) -> ImportStep {
@@ -242,7 +248,8 @@ impl ImportEnrichment {
             },
             Work::Reopen(ticket, attempted) => match ticket.wait() {
                 Err(Failure::PasswordRequired) => {
-                    let (challenge, receive) = crate::import_password::Challenge::channel(
+                    let (challenge, receive) = crate::background_password::Challenge::channel(
+                        self.purpose,
                         self.document.path.clone(),
                         attempted,
                         self.cancel.clone(),

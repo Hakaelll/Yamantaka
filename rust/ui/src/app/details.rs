@@ -135,37 +135,28 @@ impl YamantakaApp {
                                     ));
                                     self.refresh();
                                 }
-                                if ui
-                                    .add_enabled_ui(!document.missing, |ui| {
-                                        theme::control(
-                                            ui,
-                                            self.tr("Elegir portada", "Choose cover"),
-                                            None,
-                                            false,
-                                            false,
-                                            p,
-                                        )
-                                    })
-                                    .inner
-                                    .clicked()
-                                {
-                                    self.begin_cover_picker(document.clone());
-                                }
-                                if theme::navigation(
+                                let response = theme::navigation(
                                     ui,
-                                    self.tr("Título y autor", "Title and author"),
+                                    self.tr("Más acciones", "More actions"),
                                     false,
                                     p,
-                                )
-                                .clicked()
-                                {
-                                    self.begin_metadata_editor(document.clone());
+                                );
+                                let mut popup = egui::Popup::menu(&response)
+                                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+                                if self.inspector_actions_preview {
+                                    popup = popup.open(true);
                                 }
-                                if theme::navigation(ui, "Explorer", false, p).clicked()
-                                    && let Err(error) = yamantaka_windows::reveal(&document.path)
-                                {
-                                    self.error = Some(error.to_string());
-                                }
+                                popup.show(|ui| {
+                                    let width = (ui.ctx().content_rect().width() - 32.0)
+                                        .clamp(120.0, 260.0);
+                                    ui.set_min_width(width);
+                                    ui.set_max_width(width);
+                                    egui::ScrollArea::vertical()
+                                        .max_height(
+                                            (ui.ctx().content_rect().height() - 48.0).max(60.0),
+                                        )
+                                        .show(ui, |ui| self.inspector_actions(ui, &document, p));
+                                });
                                 if theme::icon_button(
                                     ui,
                                     self.tr("Cerrar detalles", "Close details"),
@@ -251,5 +242,38 @@ fn display_path(path: &std::path::Path) -> String {
         format!(r"\\{unc}")
     } else {
         text.strip_prefix(r"\\?\").unwrap_or(&text).to_owned()
+    }
+}
+
+impl YamantakaApp {
+    fn inspector_actions(&mut self, ui: &mut egui::Ui, document: &Document, p: Palette) {
+        if ui
+            .add_enabled_ui(!document.missing, |ui| {
+                theme::control(
+                    ui,
+                    self.tr("Elegir portada", "Choose cover"),
+                    None,
+                    false,
+                    false,
+                    p,
+                )
+            })
+            .inner
+            .clicked()
+        {
+            self.begin_cover_picker(document.clone());
+            ui.close();
+        }
+        self.cover_rebuild_control(ui, document, p);
+        if theme::navigation(ui, self.tr("Título y autor", "Title and author"), false, p).clicked()
+        {
+            self.begin_metadata_editor(document.clone());
+            ui.close();
+        }
+        if theme::navigation(ui, "Explorer", false, p).clicked()
+            && let Err(error) = yamantaka_windows::reveal(&document.path)
+        {
+            self.error = Some(error.to_string());
+        }
     }
 }
