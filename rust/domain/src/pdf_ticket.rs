@@ -85,6 +85,17 @@ pub trait AsyncPdfEngine: PdfEngine {
     ) -> Result<PdfTicket<crate::source_revision::SourceRevision>> {
         Err(crate::Failure::Unsupported("PDF source revision".into()))
     }
+    /// Capture while the importer retains its source read guard; credentials never escape the native owner.
+    fn try_capture_import_cover(
+        &self,
+        _id: String,
+        _source: crate::source_revision::SourceRevision,
+        _cancel: Cancellation,
+    ) -> Result<PdfTicket<crate::cover_policy::DetectedCover>> {
+        Err(crate::Failure::Unsupported(
+            "Unlocked import cover capture".into(),
+        ))
+    }
     fn try_detect_cover(
         &self,
         _id: String,

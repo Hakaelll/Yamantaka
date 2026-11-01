@@ -364,6 +364,8 @@ enum RuntimeControl {
     PersistSessions(Vec<ReadingSessionRequest>, usize, Sender<Result<()>>),
 }
 struct ImportState {
+    unlocked: bool,
+    cover: Option<yamantaka_domain::cover_policy::DetectedCover>,
     password_attempted: bool,
     imported: Option<yamantaka_domain::automation::imported::ImportedDocuments>,
     source: Option<Box<HashedFile>>,
@@ -417,6 +419,12 @@ enum Pending {
     ),
     Close(ReaderCloseRequest, PdfTicket<()>, Permit),
     ImportOpen(PathBuf, String, PdfTicket<PdfInfo>, ImportState),
+    ImportCover(
+        String,
+        Box<NewDocument>,
+        PdfTicket<yamantaka_domain::cover_policy::DetectedCover>,
+        ImportState,
+    ),
     ImportPassword(
         PathBuf,
         String,
@@ -460,6 +468,7 @@ impl Pending {
             | Self::ImportPassword(_, _, _, state)
             | Self::ImportOpen(_, _, _, state)
             | Self::ImportSource(_, _, _, _, state)
+            | Self::ImportCover(_, _, _, state)
             | Self::ImportScan(_, state)
             | Self::ImportClose(_, _, state)
             | Self::ImportAbort(_, _, state) => Some(state),
@@ -510,6 +519,9 @@ impl Pending {
             Self::ImportScan(scan, _) => {
                 scan.register(select);
             }
+            Self::ImportCover(_, _, ticket, _) => {
+                select.recv(ticket.readiness());
+            }
             Self::RejectedOpen(_, ticket, _)
             | Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
@@ -540,6 +552,7 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.is_ready(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.is_ready(),
             Self::ImportScan(scan, _) => scan.ready(),
+            Self::ImportCover(_, _, ticket, _) => ticket.is_ready(),
             Self::RejectedOpen(_, ticket, _)
             | Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
@@ -568,6 +581,7 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.cancellation.cancel(),
             Self::ImportScan(scan, _) => scan.cancel(),
+            Self::ImportCover(_, _, ticket, _) => ticket.cancellation.cancel(),
             Self::RejectedOpen(_, ticket, _)
             | Self::Close(_, ticket, _)
             | Self::ImportClose(_, ticket, _)
@@ -589,10 +603,37 @@ fn queue_import_step(
         ImportStep::Failed(error) => {
             close_failed_import(engine, id, error, state, pending, events, notify)
         }
-        ImportStep::Ready(document) => match engine.try_close(id) {
-            Ok(ticket) => pending.push(Pending::ImportClose(document, ticket, state)),
-            Err(error) => import_failed(events, notify, error, state),
-        },
+        ImportStep::Ready(document)
+            if state.unlocked
+                && state.reanalysis.is_none()
+                && engine.cover_cache_handle().is_some() =>
+        {
+            match engine.try_capture_import_cover(
+                id.clone(),
+                document.source.clone(),
+                state.cancel.clone(),
+            ) {
+                Ok(ticket) => pending.push(Pending::ImportCover(id, document, ticket, state)),
+                Err(_) => close_import_ready(engine, id, document, state, pending, events, notify),
+            }
+        }
+        ImportStep::Ready(document) => {
+            close_import_ready(engine, id, document, state, pending, events, notify)
+        }
+    }
+}
+fn close_import_ready(
+    engine: &impl AsyncPdfEngine,
+    id: String,
+    document: Box<NewDocument>,
+    state: ImportState,
+    pending: &mut Vec<Pending>,
+    events: &Sender<Event>,
+    notify: &impl Fn(),
+) {
+    match engine.try_close(id) {
+        Ok(ticket) => pending.push(Pending::ImportClose(document, ticket, state)),
+        Err(error) => import_failed(events, notify, error, state),
     }
 }
 fn close_failed_import(
@@ -857,6 +898,8 @@ fn start_import(
             engine,
             repository,
             ImportState {
+                unlocked: false,
+                cover: None,
                 password_attempted: false,
                 imported: Some(Default::default()),
                 source: None,
@@ -894,6 +937,9 @@ fn advance_import<E: AsyncPdfEngine>(
     }
     let mut skipped = 0;
     while let Some(path) = state.paths.pop_front() {
+        state.unlocked = false;
+        state.cover = None;
+        state.password_attempted = false;
         if let Some(job) = &state.job {
             match repository.import_already_committed(job, &path) {
                 Ok(true) => {
@@ -1703,7 +1749,7 @@ impl Runtime {
                                         repository.get(&expected.document)?.filter(|d|!d.missing).ok_or_else(||Failure::Invalid("Metadata source is missing".into()))
                                     });
                                     match source {
-                                        Ok(document)=>advance_import(&engine,&mut repository,ImportState{password_attempted:false,imported:None,source:None,job:None,folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
+                                        Ok(document)=>advance_import(&engine,&mut repository,ImportState{unlocked:false,cover:None,password_attempted:false,imported:None,source:None,job:None,folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
                                         Err(error)=>emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)})),permit),
                                     }
                                 }
@@ -1966,6 +2012,7 @@ impl Runtime {
                             }
                             Pending::ImportOpen(path, id, ticket, mut state) => match ticket.wait() {
                                 Err(Failure::PasswordRequired) => {
+                                    state.unlocked=true;
                                     let (challenge,receive)=crate::import_password::Challenge::channel(path.clone(),state.password_attempted,state.cancel.clone(),password_wake.clone());
                                     match password_requests.try_send(challenge) {
                                         Ok(()) => {pending.push(Pending::ImportPassword(path,id,receive,state));notify();}
@@ -1997,6 +2044,14 @@ impl Runtime {
                                 let step=scan.advance(&engine,&password_requests,&password_wake,&notify);
                                 queue_import_step(&engine,id,step,state,&mut pending,&events,&notify);
                             },
+                            Pending::ImportCover(id,document,ticket,mut state) => {
+                                match ticket.wait().and_then(|cover|state.cancel.check().map(|()|cover)) {
+                                    Ok(cover) => {state.cover=Some(cover);close_import_ready(&engine,id,document,state,&mut pending,&events,&notify);},
+                                    Err(Failure::NativeDocumentUnavailable) => open_import(&engine,document.path,id,state,&mut pending,&events,&notify),
+                                    Err(Failure::Cancelled) => close_failed_import(&engine,id,Failure::Cancelled,state,&mut pending,&events,&notify),
+                                    Err(_) => close_import_ready(&engine,id,document,state,&mut pending,&events,&notify),
+                                }
+                            }
                             Pending::ImportClose(document,ticket,mut state) => {
                                 let closed=ticket.wait();
                                 if closed.is_ok() {pdf_capacity.fetch_add(1,Ordering::Release);}
@@ -2011,6 +2066,7 @@ impl Runtime {
                                     let guard=state.source.take().ok_or_else(||Failure::Invalid("Import content guard is missing".into()))?;
                                     let reference=guard.reference(&document.source)?;
                                     let id=repository.import(&document,&reference,&state.cancel)?;
+                                    if let Some(cover)=state.cover.take() {let _=crate::import_cover::persist(&mut repository,&id,&document,cover);}
                                     if let Some(job)=&state.job {repository.checkpoint_import(job,&document.path,&id)?;}
                                     Ok(id)
                                 }) {
@@ -2092,7 +2148,7 @@ impl Runtime {
                     let native_admission_pending = removal.is_some() || cover_regeneration.is_some() || !covers.is_empty() || pending.iter().any(|item| {
                         matches!(
                             item,
-                            Pending::Open(..) | Pending::ImportReady(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
+                            Pending::Open(..) | Pending::ImportReady(..) | Pending::ImportFolder(..) | Pending::ImportOpen(..) | Pending::ImportSource(..) | Pending::ImportCover(..) | Pending::ImportScan(..) | Pending::ImportClose(..) | Pending::ImportAbort(..)
                         )
                     });
                     indexer.set_slot_available(

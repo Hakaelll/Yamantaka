@@ -70,6 +70,7 @@ enum Request {
         id: String,
         path: PathBuf,
         generation: u64,
+        expected: Option<yamantaka_domain::source_revision::SourceRevision>,
         cancel: Cancellation,
         reply: Reply<yamantaka_domain::cover_policy::DetectedCover>,
     },
@@ -454,6 +455,23 @@ impl AsyncPdfEngine for PdfWorker {
         })?;
         Ok(ticket)
     }
+    fn try_capture_import_cover(
+        &self,
+        id: String,
+        source: yamantaka_domain::source_revision::SourceRevision,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<yamantaka_domain::cover_policy::DetectedCover>> {
+        let (reply, ticket) = self.reply(0, cancel.clone(), false)?;
+        self.enqueue(Request::DetectCover {
+            id,
+            path: source.canonical_path.clone(),
+            generation: 0,
+            expected: Some(source),
+            cancel,
+            reply,
+        })?;
+        Ok(ticket)
+    }
     fn try_detect_cover(
         &self,
         id: String,
@@ -466,6 +484,7 @@ impl AsyncPdfEngine for PdfWorker {
             id,
             path,
             generation,
+            expected: None,
             cancel,
             reply,
         })?;
@@ -824,11 +843,27 @@ fn run(
                 id,
                 path,
                 generation,
+                expected,
                 cancel,
                 reply,
             } => {
                 let result = (|| {
                     cancel.check()?;
+                    if let Some(expected) = expected {
+                        let loaded = documents
+                            .get(&id)
+                            .ok_or(Failure::NativeDocumentUnavailable)?;
+                        return super::cover_detection::capture_import(
+                            pdfium,
+                            loaded,
+                            id,
+                            &expected,
+                            &cancel,
+                            &governor,
+                            cover_cache.as_deref(),
+                        );
+                    }
+
                     let revision = SourceStamp::read(&path, &cancel)?;
                     if let Some((old, handle)) =
                         take_cover_victim(&mut documents, &recency, &scheduler, &id, &revision)?

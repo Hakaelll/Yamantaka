@@ -57,21 +57,34 @@ pub(super) fn verify_protected_import() {
         let dir = tempfile::tempdir().unwrap();
         let dbpath = dir.path().join("library.sqlite3");
         let database = Database::open(&dbpath).unwrap();
-        let worker = PdfWorker::start(
+        let cache = Arc::new(yamantaka_storage::cover_cache::CoverCache::new(
+            dir.path().join("covers"),
+            16 * 1024 * 1024,
+        ));
+        let worker = PdfWorker::start_with_cover_cache(
             &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
             MemoryLimits::default(),
+            yamantaka_domain::memory::MemoryGovernor::new(Default::default()),
+            Some(cache.clone()),
         )
         .unwrap();
         let runtime = Runtime::start(database, worker, || {}).unwrap();
         let cancel = Cancellation::default();
         runtime
             .submit(Action::Import(
-                vec![source.clone(), root.join("build/rust-fixtures/textual.pdf")],
+                vec![
+                    if mode == "unlock" {
+                        root.join("build/rust-fixtures/protected.pdf")
+                    } else {
+                        source.clone()
+                    },
+                    root.join("build/rust-fixtures/textual.pdf"),
+                ],
                 cancel.clone(),
             ))
             .unwrap();
         let first = challenge(&runtime);
-        assert_eq!(first.path(), source);
+        assert_eq!(first.path().canonicalize().unwrap(), source);
         assert!(!first.rejected());
         runtime
             .submit(Action::Query(
@@ -108,6 +121,7 @@ pub(super) fn verify_protected_import() {
                 assert!(db.pending_imports().unwrap().is_empty());
                 let documents = db.query(&LibraryQuery::default()).unwrap();
                 uninterrupted_evidence = Some(metadata_evidence(&dbpath, &source));
+                verify_cover_cache(&db, &source, &root, cache.clone());
                 assert!(
                     documents
                         .iter()
@@ -239,4 +253,101 @@ pub(super) fn verify_protected_import() {
         }
     }
     assert_eq!(std::fs::read(source).unwrap(), original);
+}
+
+fn verify_cover_cache(
+    db: &Database,
+    source: &std::path::Path,
+    root: &std::path::Path,
+    cache: Arc<yamantaka_storage::cover_cache::CoverCache>,
+) {
+    let document = db
+        .query(&LibraryQuery::default())
+        .unwrap()
+        .into_iter()
+        .find(|doc| doc.path == source)
+        .unwrap();
+    assert_eq!(db.cover_source_page(&document.id).unwrap(), Some(0));
+    let fresh = PdfWorker::start_with_cover_cache(
+        &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
+        MemoryLimits::default(),
+        yamantaka_domain::memory::MemoryGovernor::new(Default::default()),
+        Some(cache),
+    )
+    .unwrap();
+    assert!(matches!(
+        fresh.open(
+            "locked-probe".into(),
+            source.into(),
+            None,
+            Cancellation::default()
+        ),
+        Err(Failure::PasswordRequired)
+    ));
+    let image = fresh
+        .try_cover(
+            document.id.clone(),
+            source.into(),
+            0,
+            19,
+            Cancellation::default(),
+        )
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(image.key.document_id, document.id);
+    assert_eq!(image.key.generation, 19);
+    let plain = fresh
+        .try_cover(
+            "plain-reference".into(),
+            root.join("build/rust-fixtures/textual.pdf"),
+            0,
+            19,
+            Cancellation::default(),
+        )
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!([image.width, image.height], [plain.width, plain.height]);
+    assert_eq!(
+        image.pixels(),
+        plain.pixels(),
+        "cached encrypted cover differs from the original page"
+    );
+    assert!(
+        image
+            .pixels()
+            .chunks_exact(4)
+            .any(|pixel| pixel[0] < 200 && pixel[1] < 200 && pixel[2] < 200)
+    );
+    fresh
+        .open(
+            "guarded-cover".into(),
+            source.into(),
+            Some("fixture-password".into()),
+            Cancellation::default(),
+        )
+        .unwrap();
+    let expected = fresh
+        .try_source_revision("guarded-cover".into(), Cancellation::default())
+        .unwrap()
+        .wait()
+        .unwrap();
+    let mut changed = expected.clone();
+    changed.head_sha256[0] ^= 1;
+    assert!(matches!(
+        fresh
+            .try_capture_import_cover("guarded-cover".into(), changed, Cancellation::default())
+            .unwrap()
+            .wait(),
+        Err(Failure::Invalid(_))
+    ));
+    fresh.close("guarded-cover".into()).unwrap();
+    assert!(matches!(
+        fresh
+            .try_capture_import_cover("guarded-cover".into(), expected, Cancellation::default())
+            .unwrap()
+            .wait(),
+        Err(Failure::NativeDocumentUnavailable)
+    ));
 }

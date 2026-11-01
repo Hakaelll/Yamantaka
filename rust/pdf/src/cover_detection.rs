@@ -90,3 +90,44 @@ pub(crate) fn detect<'a>(
     cancel.check()?;
     Ok(DetectedCover { image, choice })
 }
+
+/// The importing actor holds a full-content read guard until confirmed close and persistence.
+/// Other existing-handle rendering keeps its stricter no-cache policy.
+pub(crate) fn capture_import<'a>(
+    pdfium: &'a Pdfium,
+    loaded: &crate::source::LoadedPdf<'a>,
+    id: String,
+    expected: &yamantaka_domain::source_revision::SourceRevision,
+    cancel: &Cancellation,
+    governor: &MemoryGovernor,
+    cache: Option<&dyn yamantaka_domain::cover_cache::CoverImageCache>,
+) -> Result<DetectedCover> {
+    cancel.check()?;
+    if loaded.source.snapshot() != *expected {
+        return Err(crate::source::source_changed());
+    }
+    loaded.source.verify(&expected.canonical_path, cancel)?;
+    let detected = detect(
+        pdfium,
+        Some(&loaded.document),
+        crate::covers::CoverSource {
+            id,
+            path: &expected.canonical_path,
+            page: 0,
+            generation: 0,
+        },
+        cancel,
+        governor,
+        None,
+    )?;
+    loaded.source.verify(&expected.canonical_path, cancel)?;
+    if let Some(cache) = cache
+        && let Ok(identity) = cache.identity(&expected.canonical_path, detected.choice.page, cancel)
+    {
+        loaded.source.verify(&expected.canonical_path, cancel)?;
+        let _ = cache.save(identity, &detected.image, cancel);
+        loaded.source.verify(&expected.canonical_path, cancel)?;
+    }
+    cancel.check()?;
+    Ok(detected)
+}

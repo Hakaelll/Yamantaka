@@ -515,7 +515,12 @@ foreach ($case in $cases) {
         switch ($case.name) {
             'import-password-prompt' { if (-not $state.waiting -or $state.rejected -or -not $state.busy) { throw 'Import prompt did not wait.' } }
             'import-password-wrong' { if (-not $state.waiting -or -not $state.rejected -or $state.attempts -ne 1) { throw 'Import password retry was not rejected.' } }
-            'import-password-unlocked' { if ($state.waiting -or $state.busy -or $state.attempts -ne 2 -or $state.imported -ne 1) { throw 'Protected import did not finish exactly once.' } }
+            'import-password-unlocked' {
+                if ($state.waiting -or $state.busy -or $state.attempts -ne 2 -or $state.imported -ne 1) { throw 'Protected import did not finish exactly once.' }
+                foreach ($importedId in $state.ids) {
+                    if (-not $controls.libraryCovers.sourcePages.PSObject.Properties[$importedId]) { throw 'The imported encrypted PDF cover was not restored from cache.' }
+                }
+            }
             'import-password-cancelled' { if ($state.waiting -or $state.busy -or $state.imported -ne 0) { throw 'Cancelled protected import persisted a document.' } }
         }
         if ($case.name -in @('import-password-prompt','import-password-wrong')) {

@@ -372,7 +372,7 @@ impl YamantakaApp {
             })
     }
     pub(super) fn import_password_summary(&self) -> serde_json::Value {
-        serde_json::json!({"waiting":self.password.as_ref().is_some_and(PasswordChallenge::importing),
+        serde_json::json!({"ids":self.importing.last_batch.as_ref().map(|batch|batch.ids().collect::<Vec<_>>()).unwrap_or_default(),"waiting":self.password.as_ref().is_some_and(PasswordChallenge::importing),
             "rejected":self.password.as_ref().is_some_and(|p|p.importing()&&p.rejected),
             "busy":self.importing.busy(),"attempts":self.import_password_preview.as_ref().map_or(0,|p|p.attempts),
             "imported":self.importing.last_batch.as_ref().map_or(0,|batch|batch.len())})
