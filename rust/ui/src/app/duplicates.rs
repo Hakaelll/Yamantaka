@@ -1,3 +1,5 @@
+mod merge_flow;
+mod merge_view;
 use super::*;
 use std::sync::Arc;
 use yamantaka_application::duplicates::{Reply, Request};
@@ -5,6 +7,7 @@ use yamantaka_domain::duplicates::{Report, Watch};
 
 #[derive(Default)]
 pub(super) struct State {
+    merge: merge_flow::MergeState,
     pending: Option<Cancellation>,
     watch: Arc<Watch>,
     report: Option<Arc<Report>>,
@@ -20,9 +23,13 @@ impl State {
             cancel.cancel();
         }
         self.report = None;
+        self.merge.cancel();
+    }
+    pub(super) fn merge_open(&self) -> bool {
+        self.merge.open()
     }
     pub(super) fn ready(&self) -> bool {
-        self.pending.is_none() && self.preview.is_none()
+        self.pending.is_none() && self.preview.is_none() && self.merge.ready()
     }
     pub(super) fn accept(&mut self, reply: Reply) {
         if !self
@@ -47,7 +54,7 @@ impl State {
     }
     pub(super) fn summary(&self) -> serde_json::Value {
         let progress = self.watch.snapshot();
-        serde_json::json!({"pending":self.pending.is_some(),"failed":self.failed,"cancelled":self.cancelled,"groups":self.report.as_ref().map(|report|report.groups.len()),"checked":progress.checked,"matched":progress.matched,"unverified":progress.unverified,"detail":self.selected.is_some()})
+        serde_json::json!({"pending":self.pending.is_some(),"failed":self.failed,"cancelled":self.cancelled,"groups":self.report.as_ref().map(|report|report.groups.len()),"checked":progress.checked,"matched":progress.matched,"unverified":progress.unverified,"detail":self.selected.is_some(),"merge":self.merge.summary()})
     }
 }
 impl Drop for State {
@@ -128,6 +135,13 @@ impl YamantakaApp {
                 });
                 if self.duplicates.failed { ui.label(self.tr("No se pudo terminar. Comprueba el acceso y la memoria disponible y vuelve a intentarlo.", "Could not finish. Check file access and available memory, then try again.")); }
                 if self.duplicates.cancelled { ui.label(self.tr("Búsqueda cancelada. Puedes volver a iniciarla.", "Search cancelled. You can start it again.")); }
+                if let Some(notice)=&self.duplicates.merge.notice {ui.label(notice);}
+                if self.duplicates.merge.receipt.is_some() {
+                    ui.horizontal_wrapped(|ui|{
+                        if theme::navigation(ui,self.tr("Deshacer con el backup","Undo with backup"),false,p).clicked(){self.undo_duplicate_merge(ui.ctx());}
+                    });
+                    ui.label(RichText::new(self.tr("Deshacer restaura toda la biblioteca anterior y reemplaza los cambios posteriores.","Undo restores the whole previous library and replaces later changes.")).size(13.0).color(p.secondary));
+                }
                 let Some(report) = self.duplicates.report.clone() else { return; };
                 ui.add_space(12.0);
                 ui.label(RichText::new(format!("{} {} · {} {}", report.groups.len(), if report.groups.len() == 1 {self.tr("grupo", "group")} else {self.tr("grupos", "groups")}, report.progress.checked, self.tr("candidatos comprobados", "candidates checked"))).color(p.secondary));
@@ -138,6 +152,7 @@ impl YamantakaApp {
                     if theme::navigation(ui, self.tr("Todos los grupos", "All groups"), false, p).clicked() { self.duplicates.selected = None; self.duplicates.offset = 0; }
                     ui.heading(&group.sources[0].catalogue.title);
                     ui.label(format!("{} {} · {:.1} MiB", group.sources.len(), self.tr("copias idénticas", "identical copies"), group.size as f64 / 1048576.0));
+                    let kept=self.duplicates.merge.kept.clone().filter(|id|group.sources.iter().any(|source|source.catalogue.document==*id)).unwrap_or_else(||group.sources[0].catalogue.document.clone());
                     for source in group.sources.iter().skip(self.duplicates.offset).take(80) {
                         ui.add_space(12.0); ui.separator();
                         ui.horizontal_wrapped(|ui| {
@@ -147,6 +162,11 @@ impl YamantakaApp {
                                 let cancel = self.open_intent.lookup(id.clone(), None);
                                 self.send(Action::GetDocument(id, cancel));
                             }
+                        });
+                        ui.horizontal_wrapped(|ui|{
+                            let chosen=source.catalogue.document==kept;
+                            if theme::navigation(ui,self.tr("Conservar este registro","Keep this record"),chosen,p).clicked(){self.duplicates.merge.kept=Some(source.catalogue.document.clone());}
+                            if !chosen && theme::navigation(ui,self.tr("Revisar consolidación","Review consolidation"),false,p).clicked(){self.review_duplicate_pair(index,&kept,&source.catalogue.document);}
                         });
                         let path = if self.demo && self.capture.is_some() { format!("Study library / {}", source.catalogue.file.path.file_name().unwrap_or_default().to_string_lossy()) } else { source.catalogue.file.path.to_string_lossy().into_owned() };
                         ui.label(RichText::new(path).size(13.0).color(p.secondary));

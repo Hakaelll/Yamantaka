@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='corporate-brand-dark'; args=@('--pdf-covers','--es','--reduce-motion') },
+    @{ name='corporate-brand-light'; args=@('--pdf-covers','--light','--reduce-motion') },
+    @{ name='duplicates-merge-review'; args=@('--duplicates','--duplicates-merge') },
+    @{ name='duplicates-merge-small'; args=@('--duplicates','--duplicates-merge','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
+    @{ name='duplicates-merge-completed'; args=@('--duplicates','--duplicates-merge','--duplicates-merge-apply','--es') },
+    @{ name='duplicates-merge-cancelled'; args=@('--duplicates','--duplicates-merge','--duplicates-merge-cancel') },
+    @{ name='duplicates-merge-undo'; args=@('--duplicates','--duplicates-merge','--duplicates-merge-undo','--es','--light') },
     @{ name='duplicates-groups'; args=@('--duplicates') },
     @{ name='duplicates-members'; args=@('--duplicates','--duplicates-members','--es') },
     @{ name='duplicates-small'; args=@('--duplicates','--duplicates-members','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
@@ -521,6 +528,20 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'duplicates-merge-*') {
+        if ($controls.duplicates.merge.pending -or $controls.duplicates.merge.writing) { throw 'Duplicate consolidation did not settle.' }
+        $completed = $case.name -in @('duplicates-merge-completed','duplicates-merge-undo')
+        if ([bool]$controls.duplicates.merge.merged -ne $completed) { throw 'Unexpected consolidation write result.' }
+        $expectedBooks = if ($completed) {2} else {3}
+        if ($controls.libraryDocumentCount -ne $expectedBooks) { throw 'Consolidation changed the wrong catalogue records.' }
+        if ($case.name -in @('duplicates-merge-review','duplicates-merge-small')) {
+            if (-not $controls.duplicates.merge.reviewed) { throw 'The metadata review was not opened.' }
+            $labels = if ($case.args -contains '--es') {@('Cancelar','Consolidar')} else {@('Cancel','Consolidate')}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
+        }
+        if ($completed -and (-not $controls.duplicates.merge.titleIncoming -or $controls.duplicates.groups -ne 0)) { throw 'The chosen metadata or refreshed duplicate groups were lost.' }
+        if ($case.name -eq 'duplicates-merge-undo' -and (-not $controls.restore.reviewed -or $controls.restore.books -ne 3 -or $controls.restore.queued)) { throw 'Undo did not review the verified pre-merge library.' }
+    }
     if ($case.name -in @('duplicates-groups','duplicates-members','duplicates-small','duplicates-empty')) {
         $expectedGroups = if ($case.name -eq 'duplicates-empty') { 0 } else { 1 }
         $expectedMatches = if ($case.name -eq 'duplicates-empty') { 0 } else { 2 }
@@ -1253,6 +1274,7 @@ $sources = @(Get-ChildItem -LiteralPath "$repositoryPath/rust" -File -Recurse | 
 $manifest = [ordered]@{
     version=1; capturedAtUtc=[DateTime]::UtcNow.ToString('o'); synthetic=$true
     executableSha256=(Get-FileHash -LiteralPath $executablePath -Algorithm SHA256).Hash
+    brandManifestSha256=(Get-FileHash -LiteralPath "$repositoryPath/assets/branding/manifest.json" -Algorithm SHA256).Hash
     cargoLockSha256=(Get-FileHash -LiteralPath "$repositoryPath/Cargo.lock" -Algorithm SHA256).Hash
     sources=$sources; captures=$captures
     scope='Native synthetic screenshots and custom-control bounds. Text zoom is not physical monitor DPI certification; no Narrator or multi-monitor acceptance is implied.'

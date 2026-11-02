@@ -469,6 +469,9 @@ impl LibraryRepository for Database {
     ) -> Result<yamantaka_domain::automation::execution::JournalPage> {
         self.rule_journals(offset, governor, cancel)
     }
+    fn canonical_document_id(&self, id: &str) -> Result<Option<String>> {
+        crate::duplicates::aliases::resolve(self, id)
+    }
     fn duplicate_merge_store(
         &self,
         preferences: serde_json::Value,

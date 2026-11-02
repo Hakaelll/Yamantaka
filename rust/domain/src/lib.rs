@@ -291,6 +291,9 @@ pub trait LibraryRepository {
     ) -> Result<String> {
         Err(Failure::Unsupported("Library tag changes".into()))
     }
+    fn canonical_document_id(&self, id: &str) -> Result<Option<String>> {
+        Ok(self.get(id)?.map(|document| document.id))
+    }
     fn duplicate_merge_store(
         &self,
         _preferences: serde_json::Value,

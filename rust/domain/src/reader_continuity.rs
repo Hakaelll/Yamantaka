@@ -132,6 +132,39 @@ impl ReaderContinuity {
     pub fn comparison(&self) -> Option<&WorkspaceComparison> {
         self.comparison.as_ref()
     }
+    pub fn has_drafts_for(&self, ids: &[&str]) -> bool {
+        self.page_notes
+            .iter()
+            .any(|draft| ids.contains(&draft.document.as_str()))
+            || self
+                .metadata_drafts
+                .iter()
+                .any(|draft| ids.contains(&draft.document.as_str()))
+            || self
+                .annotation_edits
+                .iter()
+                .any(|draft| ids.contains(&draft.document.as_str()))
+            || self
+                .selection_notes
+                .iter()
+                .any(|draft| ids.contains(&draft.document.as_str()))
+    }
+    pub fn remap_document(&mut self, incoming: &str, kept: &str) -> Result<()> {
+        if self.has_drafts_for(&[incoming]) {
+            return Err(Failure::Invalid("A consolidated reading still has recovery drafts; original continuity is preserved".into()));
+        }
+        self.tabs.remap_document(incoming, kept)?;
+        if let Some(comparison) = &mut self.comparison {
+            if comparison.primary == incoming {
+                comparison.primary = kept.into();
+            }
+            if comparison.document == incoming {
+                comparison.document = kept.into();
+            }
+            comparison.validate()?;
+        }
+        Ok(())
+    }
     pub fn forget_documents(&mut self, ids: &[String]) {
         self.tabs.forget_documents(ids);
         self.selection_notes

@@ -1,3 +1,4 @@
+pub(crate) mod aliases;
 pub(crate) mod merge;
 use crate::{Database, database::storage};
 use std::sync::Arc;

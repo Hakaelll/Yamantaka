@@ -54,7 +54,7 @@ impl YamantakaApp {
     pub(super) fn editor_close_summary(&self) -> serde_json::Value {
         serde_json::json!({"reviewing":self.close_review.reviewing,"waiting":self.close_review.waiting,"preview":self.close_review.preview,"drafts":self.editor_drafts_open()})
     }
-    fn editor_writes_pending(&self) -> bool {
+    pub(in crate::app) fn editor_writes_pending(&self) -> bool {
         self.reader.annotations.writing()
             || self
                 .reference
@@ -144,6 +144,7 @@ impl YamantakaApp {
             });
         if keep || modal.should_close() {
             self.cancel_restore_handover();
+            self.cancel_duplicate_merge_close();
             self.close_review = Default::default();
             self.workspaces.close_after = false;
             self.quarantine.close_after = false;

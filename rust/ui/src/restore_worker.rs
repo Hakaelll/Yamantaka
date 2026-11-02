@@ -49,6 +49,7 @@ impl Prepared {
 }
 pub enum Command {
     Review(PathBuf),
+    ReviewExpected { path: PathBuf, sha256: String },
     ReviewRollback { active: PathBuf, source: PathBuf },
     Prepare(Review),
 }
@@ -73,6 +74,14 @@ impl Job {
                     Command::Review(path) => backup::review(&path, &token)
                         .map(Review::Json)
                         .map(Outcome::Reviewed),
+                    Command::ReviewExpected { path, sha256 } => backup::review(&path, &token)
+                        .and_then(|review| {
+                            if review.sha256() == sha256 {
+                                Ok(Outcome::Reviewed(Review::Json(review)))
+                            } else {
+                                Err(Failure::BackupSourceChanged)
+                            }
+                        }),
                     Command::ReviewRollback { active, source } => {
                         backup::review_rollback(&active, &source, &token)
                             .map(Review::Rollback)

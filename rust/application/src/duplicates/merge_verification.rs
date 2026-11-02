@@ -14,7 +14,7 @@ pub(crate) fn verify(source: &Database, governor: &MemoryGovernor) {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("merge.sqlite3");
     source.snapshot(&path).unwrap();
-    let db = Database::open(&path).unwrap();
+    let mut db = Database::open(&path).unwrap();
     db.execute_batch(r#"
         UPDATE documents SET title_override=CASE WHEN id='book-0' THEN 'Kept correction' ELSE 'Incoming correction' END,author_override=CASE WHEN id='book-0' THEN 'Kept author' ELSE 'Incoming author' END,is_favorite=(id='book-1'),reading_progress=CASE WHEN id='book-0' THEN 0.2 ELSE 0.8 END,last_page_index=(id='book-1') WHERE id IN ('book-0','book-1');
         INSERT INTO document_notes VALUES('book-0','Kept note',''),('book-1','Incoming note','');
@@ -53,6 +53,36 @@ pub(crate) fn verify(source: &Database, governor: &MemoryGovernor) {
     let plan = store.prepare(selection(), governor, &cancel).unwrap();
     assert!(plan.title.conflict() && plan.author.conflict() && plan.note.conflict());
     assert_eq!(plan.affected["annotations"], 1);
+    let mut tabs = yamantaka_domain::reader_tabs::DocumentTabs::default();
+    let mut preferences = yamantaka_domain::reader_preferences::ReaderPreferences::new("book-1");
+    preferences.zoom_level = 1.5;
+    tabs.open(
+        yamantaka_domain::reader_tabs::ReaderTab::new(
+            "recovered-tab".into(),
+            "book-1".into(),
+            1,
+            preferences.clone(),
+            None,
+        )
+        .unwrap(),
+        true,
+    )
+    .unwrap();
+    tabs.open(
+        yamantaka_domain::reader_tabs::ReaderTab::new(
+            "closed-tab".into(),
+            "book-1".into(),
+            0,
+            preferences,
+            None,
+        )
+        .unwrap(),
+        true,
+    )
+    .unwrap();
+    tabs.close("closed-tab");
+    db.save_reader_continuity(&yamantaka_domain::reader_continuity::ReaderContinuity::from(tabs))
+        .unwrap();
     let before = state(&db, &root.path().join("before.json"));
     let original_path = &plan.selection.incoming.file.path;
     let original_bytes = std::fs::read(original_path).unwrap();
@@ -131,6 +161,70 @@ pub(crate) fn verify(source: &Database, governor: &MemoryGovernor) {
         ),
         before
     );
+    assert_eq!(
+        db.canonical_document_id("book-1").unwrap().as_deref(),
+        Some("book-0")
+    );
+    assert_eq!(
+        db.reader_continuity()
+            .unwrap()
+            .unwrap()
+            .tabs()
+            .active()
+            .unwrap()
+            .document(),
+        "book-1"
+    );
+    let recovered = crate::reader_continuity::ContinuityWriter::default()
+        .execute(
+            &mut Database::open(&path).unwrap(),
+            crate::reader_continuity::ContinuityRequest {
+                change: crate::reader_continuity::ContinuityChange::Load,
+                cancel: Cancellation::default(),
+            },
+        )
+        .result
+        .unwrap()
+        .unwrap();
+    assert_eq!(recovered.tabs().active().unwrap().id(), "recovered-tab");
+    assert_eq!(recovered.tabs().active().unwrap().document(), "book-0");
+    assert_eq!(recovered.tabs().active().unwrap().page(), 1);
+    assert_eq!(
+        recovered.tabs().active().unwrap().preferences().zoom_level,
+        1.5
+    );
+    assert_eq!(recovered.tabs().closed()[0].document(), "book-0");
+    assert_eq!(
+        db.reader_continuity()
+            .unwrap()
+            .unwrap()
+            .tabs()
+            .active()
+            .unwrap()
+            .document(),
+        "book-1"
+    );
+    let proof_db = rusqlite::Connection::open(&path).unwrap();
+    let proof: String = proof_db
+        .query_row(
+            "SELECT summary_json FROM operation_journal WHERE id=?",
+            [&receipt.history],
+            |row| row.get(0),
+        )
+        .unwrap();
+    proof_db
+        .execute(
+            "UPDATE operation_journal SET summary_json='{}' WHERE id=?",
+            [&receipt.history],
+        )
+        .unwrap();
+    assert!(db.canonical_document_id("book-1").is_err());
+    proof_db
+        .execute(
+            "UPDATE operation_journal SET summary_json=?1 WHERE id=?2",
+            rusqlite::params![proof, receipt.history],
+        )
+        .unwrap();
     let after = state(&db, &root.path().join("after.json"));
     let tables = &after["tables"];
     assert_eq!(tables["documents"].as_array().unwrap().len(), 2);
@@ -190,7 +284,6 @@ pub(crate) fn verify(source: &Database, governor: &MemoryGovernor) {
         "collections",
         "reading_profiles",
         "automation_rules",
-        "operation_journal",
         "annotation_tags",
     ] {
         assert_eq!(
@@ -218,6 +311,26 @@ pub(crate) fn verify(source: &Database, governor: &MemoryGovernor) {
     assert_eq!(
         db.cover_snapshot("book-0").unwrap().plan,
         yamantaka_domain::cover_snapshot::CoverPlan::Render(1)
+    );
+    let original_journals = tables["operation_journal"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["operation_kind"] != "rustDuplicateMerge.v1")
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        serde_json::json!(original_journals),
+        before["tables"]["operation_journal"]
+    );
+    assert_eq!(
+        tables["operation_journal"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| row["operation_kind"] == "rustDuplicateMerge.v1")
+            .count(),
+        1
     );
     let sql = rusqlite::Connection::open(&path).unwrap();
     assert_eq!(

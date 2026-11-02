@@ -1489,7 +1489,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         },
                     );
                 } else if args.iter().any(|arg| arg == "--duplicates") {
-                    app.preview_duplicates(args.iter().any(|arg| arg == "--duplicates-members"));
+                    if args.iter().any(|arg| arg == "--duplicates-merge") {
+                        app.preview_duplicate_merge(
+                            if args.iter().any(|arg| arg == "--duplicates-merge-undo") {
+                                4
+                            } else if args.iter().any(|arg| arg == "--duplicates-merge-cancel") {
+                                3
+                            } else if args.iter().any(|arg| arg == "--duplicates-merge-apply") {
+                                2
+                            } else {
+                                1
+                            },
+                        );
+                    } else {
+                        app.preview_duplicates(
+                            args.iter().any(|arg| arg == "--duplicates-members"),
+                        );
+                    }
                 } else if args.iter().any(|arg| arg == "--rule-simulation") {
                     app.preview_rule_simulation(
                         if args.iter().any(|arg| arg == "--rule-import-context") {

@@ -104,12 +104,34 @@ fn retain_catalogued(
     repository: &impl LibraryRepository,
     mut tabs: ReaderContinuity,
 ) -> Result<ReaderContinuity> {
-    let mut absent = Vec::new();
+    let mut ids = std::collections::BTreeSet::new();
     for tab in tabs.tabs().tabs().iter().chain(tabs.tabs().closed()) {
-        if !absent.iter().any(|id| id == tab.document())
-            && repository.get(tab.document())?.is_none()
-        {
-            absent.push(tab.document().to_owned());
+        ids.insert(tab.document().to_owned());
+    }
+    let tab_ids = ids.clone();
+    if let Some(comparison) = tabs.comparison() {
+        ids.insert(comparison.primary.clone());
+        ids.insert(comparison.document.clone());
+    }
+    for draft in tabs.page_notes() {
+        ids.insert(draft.document.clone());
+    }
+    for draft in tabs.metadata_drafts() {
+        ids.insert(draft.document.clone());
+    }
+    for draft in tabs.annotation_edits() {
+        ids.insert(draft.document.clone());
+    }
+    for draft in tabs.selection_notes() {
+        ids.insert(draft.document.clone());
+    }
+    let mut absent = Vec::new();
+    for id in ids {
+        match repository.canonical_document_id(&id)? {
+            Some(canonical) if canonical != id => tabs.remap_document(&id, &canonical)?,
+            Some(_) => {}
+            None if tab_ids.contains(&id) => absent.push(id),
+            None => {}
         }
     }
     tabs.forget_documents(&absent);

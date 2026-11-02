@@ -1354,6 +1354,7 @@ impl App for YamantakaApp {
             ctx.send_viewport_cmd(ViewportCommand::Close);
             return;
         }
+        self.guard_duplicate_merge_close(ctx);
         self.guard_workspace_close(ctx);
         self.guard_editor_close(ctx);
         self.guard_quarantine_close(ctx);
@@ -1493,6 +1494,7 @@ impl App for YamantakaApp {
                     self.file_check.accept(*reply);
                     self.refresh();
                 }
+                Update::DuplicateMerge(reply) => self.accept_duplicate_merge(ctx, *reply),
                 Update::Duplicates(reply) => self.duplicates.accept(*reply),
                 Update::FileComparison(reply) => self.file_comparison.accept(*reply),
                 Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
@@ -2248,7 +2250,8 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
-        let shortcut_modal = self.command_palette.open
+        let shortcut_modal = self.duplicates.merge_open()
+            || self.command_palette.open
             || self.close_review.open()
             || self.safe_notice
             || self.quarantine.open
@@ -2369,6 +2372,7 @@ impl App for YamantakaApp {
         self.update_file_check();
         self.update_relocation();
         self.update_library_check();
+        self.pump_duplicate_merge_preview(&ctx);
         self.apply_import_recovery_preview();
         let dropped = ctx.input(|i| {
             i.raw
@@ -2487,6 +2491,7 @@ impl App for YamantakaApp {
         self.selection_review_dialog(&ctx);
         self.tag_management_dialogs(&ctx);
         self.legacy_import_dialog(&ctx);
+        self.duplicate_merge_dialog(&ctx);
         self.restore_dialog(&ctx);
         self.reading_queue_dialog(&ctx);
         self.workspace_dialog(&ctx);

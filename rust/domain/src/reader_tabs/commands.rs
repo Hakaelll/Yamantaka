@@ -92,6 +92,26 @@ impl DocumentTabs {
             self.close(&id);
         }
     }
+    pub fn remap_document(&mut self, incoming: &str, kept: &str) -> Result<()> {
+        if incoming.is_empty() || kept.is_empty() || incoming.len() > 4096 || kept.len() > 4096 {
+            return Err(Failure::Invalid(
+                "Invalid consolidated reading identity".into(),
+            ));
+        }
+        let mut changed = false;
+        for tab in self.tabs.iter_mut().chain(&mut self.closed) {
+            if tab.document == incoming {
+                tab.document = kept.into();
+                tab.preferences.document_id = kept.into();
+                changed = true;
+            }
+        }
+        if changed {
+            self.workspace = None;
+            self.resources();
+        }
+        Ok(())
+    }
     /// Removed catalogue records must not survive in either continuity stack.
     pub fn forget_documents(&mut self, documents: &[String]) {
         self.tabs.retain(|tab| !documents.contains(&tab.document));

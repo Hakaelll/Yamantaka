@@ -37,3 +37,7 @@ Formatting, retained application library tests, all-target workspace Clippy with
 The next integration must retire affected live readers and writers, retain or resolve unsaved editors, flush live sessions/preferences, reconcile continuity and in-memory histories, and accept a committed write receipt even if cancellation arrives after commit. Historical unfinished sessions must not be guessed to be live. A confirmation view must expose conflicts and collision precedence, preserve the recovery path and make whole-library undo consequences clear.
 
 Physical interaction, forced-process interruption, broader malformed data and recovery races, large-catalogue timing, full memory accounting and final Release acceptance remain pending. PDFs are not embedded in the JSON backup and original PDF contents are never written by the consolidation operation.
+
+## Connected UI follow-up
+
+[Native consolidation UI](rust-duplicate-consolidation-ui-2026-11-02.md) records the later confirmation flow, atomic native journal, continuity recovery and immediate backup review. The earlier evidence above retains its original storage-only scope.

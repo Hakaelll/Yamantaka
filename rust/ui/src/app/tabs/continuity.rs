@@ -31,6 +31,45 @@ pub(in crate::app) struct ContinuityState {
     due: Option<Instant>,
 }
 impl YamantakaApp {
+    pub(in crate::app) fn merge_continuity_preflight(&self, ids: &[&str]) -> Result<()> {
+        let snapshot = self.capture_reader_continuity()?;
+        if snapshot.has_drafts_for(ids) {
+            return Err(Failure::Invalid(
+                self.tr(
+                    "Guarda o recupera los borradores de estas copias antes de unirlas.",
+                    "Save or recover drafts for these copies before consolidating.",
+                )
+                .into(),
+            ));
+        }
+        if !self.demo && !self.continuity_settled() {
+            return Err(Failure::Invalid(
+                self.tr(
+                    "La sesión se está guardando. Vuelve a intentarlo en un momento.",
+                    "The session is being saved. Try again in a moment.",
+                )
+                .into(),
+            ));
+        }
+        Ok(())
+    }
+    pub(in crate::app) fn reconcile_merge_continuity(
+        &mut self,
+        incoming: &str,
+        kept: &str,
+    ) -> Result<()> {
+        self.tabs.model.remap_document(incoming, kept)?;
+        self.tabs.continuity.saved.remap_document(incoming, kept)?;
+        if let Some(comparison) = &mut self.tabs.continuity.retained_comparison {
+            if comparison.primary == incoming {
+                comparison.primary = kept.into();
+            }
+            if comparison.document == incoming {
+                comparison.document = kept.into();
+            }
+        }
+        Ok(())
+    }
     pub(in crate::app) fn continuity_summary(&self) -> serde_json::Value {
         serde_json::json!({"loaded":self.tabs.continuity.loaded,"restoring":self.tabs.continuity.restoring_comparison,"retainedComparison":self.tabs.continuity.retained_comparison,"comparison":self.capture_comparison()})
     }

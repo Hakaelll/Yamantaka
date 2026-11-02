@@ -408,6 +408,24 @@ enum ControlLabel {
     Bounded(f32),
 }
 
+pub fn bounded_choice(
+    ui: &mut egui::Ui,
+    label: &str,
+    selected: bool,
+    p: Palette,
+) -> egui::Response {
+    let width = ui.available_width();
+    control_impl(
+        ui,
+        label,
+        if selected { Some(Icon::Check) } else { None },
+        selected,
+        false,
+        ControlLabel::Bounded(width),
+        p,
+    )
+}
+
 pub fn bounded_navigation(ui: &mut egui::Ui, label: &str, p: Palette) -> egui::Response {
     let width = ui.available_width();
     control_impl(

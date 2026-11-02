@@ -43,7 +43,7 @@ impl RestoreState {
         self.rollback = match &command {
             Command::ReviewRollback { .. } => true,
             Command::Prepare(r) => r.rollback(),
-            Command::Review(_) => false,
+            Command::Review(_) | Command::ReviewExpected { .. } => false,
         };
         self.error = None;
         self.open = true;
@@ -126,6 +126,18 @@ impl YamantakaApp {
         }
         if self.backup_restore.queued {
             ctx.send_viewport_cmd(ViewportCommand::Close);
+        }
+    }
+    pub(in crate::app) fn review_duplicate_undo(
+        &mut self,
+        ctx: &egui::Context,
+        path: PathBuf,
+        sha256: String,
+    ) {
+        if self.backup_restore.store.is_some() && !self.backup_restore.busy() {
+            self.backup_restore.review = None;
+            self.backup_restore
+                .start(Command::ReviewExpected { path, sha256 }, ctx);
         }
     }
     pub(super) fn restore_button(&mut self, ui: &mut egui::Ui, p: Palette) {

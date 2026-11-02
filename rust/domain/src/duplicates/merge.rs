@@ -73,13 +73,13 @@ impl Selection {
         })
     }
 }
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub enum Choice {
     #[default]
     Kept,
     Incoming,
 }
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct Choices {
     pub title: Choice,
     pub author: Choice,

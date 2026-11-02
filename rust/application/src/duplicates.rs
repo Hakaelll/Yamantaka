@@ -1,3 +1,4 @@
+pub mod merge_job;
 pub mod merge_sources;
 use crate::file_digest::HashedFile;
 use crossbeam_channel::{Receiver, Select, TryRecvError, bounded};

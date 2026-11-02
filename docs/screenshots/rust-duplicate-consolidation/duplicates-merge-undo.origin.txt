@@ -1,0 +1,6 @@
+Native synthetic duplicate consolidation capture.
+Case: duplicates-merge-undo
+Only synthetic library data is shown.
+PNG pixels unchanged; synthetic provenance text added.
+Native PNG SHA-256: 9d12e3165ef3280f842cd835c32f25582bdea43eaef2eb6c5ba787d028ece409
+Published PNG SHA-256: 32afc1172d96424f58ff096aff178656e8f97df46ee4816ba7175515cdcd8768

@@ -53,6 +53,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    MergeDuplicates(Box<crate::duplicates::merge_job::MergeRequest>),
     DiscoverDuplicates(Box<crate::duplicates::Request>),
     RebuildCover(Box<crate::cover_rebuild::Request>),
     FlushChanges(Sender<Result<()>>),
@@ -183,6 +184,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    DuplicateMerge(Box<crate::duplicates::merge_job::MergeReply>),
     Duplicates(Box<crate::duplicates::Reply>),
     CoverRebuilt(Box<crate::cover_rebuild::Reply>),
     Quarantine(crate::quarantine::Reply),
@@ -1080,6 +1082,7 @@ impl Runtime {
                 let mut rule_simulation: Option<(SimulationJob, Permit)> = None;
                 let mut rule_plan: Option<(PlanJob, Permit)> = None;
                 let mut rule_execution: Option<(ExecutionJob, Permit)> = None;
+                let mut duplicate_merge: Option<(crate::duplicates::merge_job::MergeJob, Permit)> = None;
                 let mut duplicates: Option<(crate::duplicates::Job, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
                 let mut cache_maintenance: Option<(CacheMaintenanceJob, Permit)> = None;
@@ -1121,8 +1124,9 @@ impl Runtime {
                     }
                     let index_busy =
                         indexer.native_document_id().is_some() || index_cleanup.is_some();
-                    let deferred_ready = !index_busy && deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open, removal.is_some()));
-                    let command = if deferred_ready {
+                    let merge_locked = duplicate_merge.as_ref().is_some_and(|(job,_)|job.writing());
+                    let deferred_ready = !merge_locked && !index_busy && deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open, removal.is_some()));
+                    let command = if merge_locked { None } else if deferred_ready {
                         deferred.pop_front()
                     } else {
                         commands.try_recv().ok()
@@ -1289,6 +1293,16 @@ impl Runtime {
                                         Ok(job)=>file_check=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::FileChecked(Box::new(FileCheckReply{document,result:Err(error),cancel})),permit),
                                     }
+                                }
+                                Action::MergeDuplicates(request) => {
+                                    let cancel=request.cancel.clone();
+                                    let writing=request.writing();
+                                    let blocked=writing && (!pending.is_empty() || !deferred.is_empty() || !covers.is_empty() || awaiting_open.is_some() || request.documents().iter().any(|id|visible.iter().any(|visible|visible==id))
+                                        || export.is_some() || rule_execution.is_some() || rule_plan.is_some() || rule_simulation.is_some() || duplicates.is_some() || comparison.is_some()
+                                        || cache_maintenance.is_some() || cover_regeneration.is_some() || removal.is_some() || bulk_selection.is_some() || library_check.is_some() || relocation.is_some() || file_check.is_some() || index_cleanup.is_some()
+                                        || !matches!(indexer.progress().phase,crate::search_index::IndexPhase::Disabled|crate::search_index::IndexPhase::Idle|crate::search_index::IndexPhase::Cancelled|crate::search_index::IndexPhase::Completed));
+                                    let result=if duplicate_merge.is_some() || blocked {Err(Failure::QueueFull)} else {repository.duplicate_merge_store(request.preferences.clone()).and_then(|factory|crate::duplicates::merge_job::MergeJob::start(*request,factory))};
+                                    match result {Ok(job)=>duplicate_merge=Some((job,permit)),Err(error)=>emit(&events,&notify,Update::DuplicateMerge(Box::new(crate::duplicates::merge_job::MergeReply{cancel,result:Err(error)})),permit)}
                                 }
                                 Action::DiscoverDuplicates(request) => {
                                     let cancel = request.cancel.clone();
@@ -1850,6 +1864,10 @@ impl Runtime {
                         let (_,permit)=file_check.take().unwrap();
                         emit(&events,&notify,Update::FileChecked(Box::new(reply)),permit);
                     }
+                    if let Some(reply)=duplicate_merge.as_mut().and_then(|(job,_)|job.step(&engine)) {
+                        let (_,permit)=duplicate_merge.take().unwrap();
+                        emit(&events,&notify,Update::DuplicateMerge(Box::new(reply)),permit);
+                    }
                     if let Some(reply) = duplicates.as_mut().and_then(|(job,_)|job.poll()) {
                         let (_,permit) = duplicates.take().unwrap();
                         emit(&events,&notify,Update::Duplicates(Box::new(reply)),permit);
@@ -2195,7 +2213,7 @@ impl Runtime {
                             && index_cleanup.is_none(),
                     );
                     let released=indexer.released_native_revision();
-                    if let Err(error) = indexer.step(&mut repository, &engine) {
+                    if !duplicate_merge.as_ref().is_some_and(|(job,_)|job.writing()) && let Err(error) = indexer.step(&mut repository, &engine) {
                         index_cleanup = indexer.abort(&error, &engine).ok().flatten();
                     }
                     if indexer.released_native_revision()!=released {pdf_capacity.fetch_add(1,Ordering::Release);notify();}
@@ -2207,14 +2225,15 @@ impl Runtime {
                     // or PDF completion. SQL is never held behind native rendering.
                     if pending.iter().any(|item|matches!(item,Pending::ImportReady(_)))
                         || covers.iter().any(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
-                        || !commands.is_empty()
+                        || (!duplicate_merge.as_ref().is_some_and(|(job,_)|job.writing()) && !commands.is_empty())
                         || (pending.iter().any(|item|matches!(item,Pending::ImportHashReady(..))) && !pending.iter().any(|item|matches!(item,Pending::ImportHash(..))))
                         || cover_regeneration.as_ref().is_some_and(|(job,_)|job.ready(pdf_capacity.load(Ordering::Acquire)))
                         || removal.as_ref().is_some_and(|(job,_)|job.ready())
                         || bulk_selection.is_some()
                         || indexer.needs_step()
                         || library_check.as_ref().is_some_and(|(job,_)|job.needs_step())
-                        || (deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open, removal.is_some()))
+                        || duplicate_merge.as_ref().is_some_and(|(job,_)|job.needs_step())
+                        || (!duplicate_merge.as_ref().is_some_and(|(job,_)|job.writing()) && deferred.front().is_some_and(|command| foreground_admissible(&command.action, &pending, &awaiting_open, removal.is_some()))
                             && indexer.native_document_id().is_none()
                             && index_cleanup.is_none())
                     {
@@ -2222,7 +2241,7 @@ impl Runtime {
                     }
                     let mut select = Select::new();
                     select.recv(&stop);
-                    select.recv(&commands);
+                    if !duplicate_merge.as_ref().is_some_and(|(job,_)|job.writing()) {select.recv(&commands);}
                     select.recv(&wakeups);
                     if let Some((job,_))=&rule_simulation {job.register(&mut select);}
                     if let Some((job,_))=&rule_plan {job.register(&mut select);}
@@ -2231,6 +2250,7 @@ impl Runtime {
                         job.register(&mut select);
                     }
                     if let Some((job,_)) = &cache_maintenance { job.register(&mut select); }
+                    if let Some((job,_)) = &duplicate_merge {job.register(&mut select);}
                     if let Some((job,_)) = &duplicates { job.register(&mut select); }
                     if let Some((job,_)) = &comparison { job.register(&mut select); }
                     if let Some((job,_)) = &file_check {job.register(&mut select);}
@@ -2263,6 +2283,7 @@ impl Runtime {
                 drop(rule_execution);
                 drop(export); // Cancel and join file work before releasing the actor.
                 drop(cache_maintenance);
+                drop(duplicate_merge);
                 drop(duplicates);
                 drop(comparison);
                 drop(file_check);

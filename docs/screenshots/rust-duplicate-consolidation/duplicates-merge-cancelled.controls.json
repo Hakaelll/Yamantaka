@@ -1,0 +1,774 @@
+{
+  "synthetic": true,
+  "libraryDocumentCount": 3,
+  "captureProcessId": 20468,
+  "viewport": [
+    0.0,
+    0.0,
+    1440.0,
+    960.0
+  ],
+  "pixelsPerPoint": 1.25,
+  "controls": [
+    {
+      "label": "Library",
+      "rect": [
+        156.21875,
+        8.0,
+        250.0625,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Tools",
+      "rect": [
+        1322.28125,
+        8.0,
+        1406.0,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Add PDFs",
+      "rect": [
+        1200.5,
+        8.0,
+        1312.28125,
+        48.0
+      ],
+      "clip": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Back to library",
+      "rect": [
+        309.8125,
+        111.625,
+        425.65625,
+        151.625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Find copies",
+      "rect": [
+        40.0,
+        220.8125,
+        161.78125,
+        260.8125
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "All groups",
+      "rect": [
+        40.0,
+        390.40625,
+        131.0625,
+        430.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Open reading",
+      "rect": [
+        242.34375,
+        548.40625,
+        355.3125,
+        588.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Keep this record",
+      "rect": [
+        40.0,
+        598.40625,
+        168.4375,
+        638.40625
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Open reading",
+      "rect": [
+        273.75,
+        704.0,
+        386.71875,
+        744.0
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Keep this record",
+      "rect": [
+        40.0,
+        754.0,
+        168.4375,
+        794.0
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    },
+    {
+      "label": "Review consolidation",
+      "rect": [
+        178.4375,
+        754.0,
+        336.25,
+        794.0
+      ],
+      "clip": [
+        0.0,
+        66.0,
+        1440.0,
+        940.0
+      ],
+      "enabled": true
+    }
+  ],
+  "pagePresenter": "native-wgpu",
+  "readingSession": {
+    "enabled": true,
+    "document": null,
+    "snapshot": null,
+    "syntheticStore": null
+  },
+  "visibleThumbnailSlots": 0,
+  "libraryCovers": {
+    "resident": 0,
+    "bulkRegeneration": null,
+    "paused": 0,
+    "deferredUploads": 0,
+    "blockedBeforeRelease": 0,
+    "capacityPreview": 0,
+    "capacityRevision": 0,
+    "ready": 0,
+    "pending": 0,
+    "source": "PDF selected page",
+    "sourcePages": {},
+    "maximumVisible": 16
+  },
+  "coverPicker": {
+    "open": false
+  },
+  "coverPickerDemo": {
+    "action": null,
+    "complete": false,
+    "saved": false
+  },
+  "metadataReview": null,
+  "documentFind": null,
+  "documentLinks": {
+    "keyboardActivated": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "internalLinks": 0,
+    "externalLinks": 0,
+    "rejectedLinks": 0,
+    "confirmationOpen": false
+  },
+  "pageText": {
+    "document": null,
+    "ready": false,
+    "failed": false,
+    "page": null,
+    "characters": 0
+  },
+  "textSelection": {
+    "enabled": false,
+    "residentPages": 0,
+    "readyPages": 0,
+    "start": null,
+    "end": null
+  },
+  "annotations": {
+    "studyTaggedResident": 0,
+    "selected": 0,
+    "acceptedResident": 0,
+    "filters": {
+      "active": 0,
+      "text": "",
+      "tag": "",
+      "kind": null,
+      "review": null
+    },
+    "resident": 0,
+    "total": 0,
+    "pending": false,
+    "editing": false,
+    "fallback": false,
+    "saved": false
+  },
+  "annotationPaint": {
+    "document": null,
+    "residentPages": 0,
+    "readyPages": 0,
+    "marks": 0,
+    "retainedPages": 0,
+    "details": []
+  },
+  "annotationExport": {
+    "pending": false,
+    "saved": false,
+    "count": 0,
+    "artifact": null,
+    "document": null
+  },
+  "fileComparison": {
+    "pending": false,
+    "equal": null,
+    "failed": false
+  },
+  "importRecovery": {
+    "pendingJobs": 0,
+    "loaded": true,
+    "unavailable": false,
+    "completed": 0
+  },
+  "globalNotes": {
+    "accepted": 0,
+    "studyTagged": 0,
+    "total": 0,
+    "resident": 0,
+    "selected": 0,
+    "pending": false,
+    "saved": false,
+    "ready": false,
+    "documents": 0
+  },
+  "readingHistory": {
+    "ready": false,
+    "resident": 0,
+    "total": 0,
+    "offset": 0,
+    "cursor": 0,
+    "pending": false,
+    "deleting": false,
+    "deleted": false
+  },
+  "readingRestoration": {
+    "pending": false,
+    "scrollPending": null,
+    "panelOpen": false,
+    "preferences": null
+  },
+  "readerOpening": {
+    "pending": null,
+    "password": false,
+    "replacementPreview": "Off"
+  },
+  "readerTabs": {
+    "bulkPreview": "Off",
+    "nativeClosures": {
+      "pending": null,
+      "queued": [],
+      "failed": null,
+      "completed": 0
+    },
+    "closePending": false,
+    "closed": [],
+    "preview": "Off",
+    "pending": null,
+    "active": null,
+    "tabs": []
+  },
+  "readingGoal": {
+    "ready": false,
+    "document": null,
+    "pages": null,
+    "minutes": null,
+    "editing": false,
+    "pendingRead": false,
+    "pendingWrite": false,
+    "error": null
+  },
+  "currentReaderPage": 0,
+  "readerZoom": 1.0,
+  "readerRenderEvents": [],
+  "linkKeyboardActivated": false,
+  "trackedMemory": {
+    "total": 3608,
+    "pages": 0,
+    "tiles": 0,
+    "text": 0,
+    "other": 3608,
+    "cpu": 3608,
+    "gpu": 0,
+    "transient": 0
+  },
+  "memoryScope": "Tracked PDF buffers and page/thumbnail/PDF-cover GPU payloads, wgpu staging and Glow image copies. Live text, UI/font textures and opaque driver allocations are not covered.",
+  "bulkOrganization": null,
+  "bulkTargetPicker": {
+    "open": false
+  },
+  "libraryVisibleFavorites": 0,
+  "librarySelection": {
+    "removal": null,
+    "mode": false,
+    "ids": [],
+    "writing": false,
+    "notice": null,
+    "preview": null,
+    "verifiedFavoriteTargets": []
+  },
+  "libraryGrouping": {
+    "mode": "none",
+    "verified": false,
+    "visible": [
+      "demo-0",
+      "demo-1",
+      "demo-2"
+    ],
+    "groups": [
+      {
+        "label": "",
+        "count": 3,
+        "collapsed": false
+      }
+    ]
+  },
+  "libraryFiltersActive": false,
+  "libraryQueryLoaded": true,
+  "smartView": null,
+  "libraryTags": {
+    "loaded": false,
+    "failed": false,
+    "total": 0,
+    "visible": 0,
+    "assigned": 0,
+    "annotationUses": 0,
+    "filters": [],
+    "filtersChecked": false,
+    "busy": false,
+    "managementVerified": false,
+    "mergeOpen": false,
+    "mergeTotal": null,
+    "mergeOffset": null,
+    "mergeVisible": null,
+    "reviewOpen": false,
+    "entries": []
+  },
+  "legacyImport": {
+    "open": false,
+    "busy": false,
+    "reviewed": false,
+    "copied": false,
+    "selectedNext": false,
+    "originalNext": false,
+    "failed": false,
+    "verified": false,
+    "books": null
+  },
+  "backup": {
+    "busy": false,
+    "saved": false,
+    "cancelled": false,
+    "failed": false,
+    "verified": false
+  },
+  "restore": {
+    "open": false,
+    "busy": false,
+    "reviewed": false,
+    "books": null,
+    "queued": false,
+    "rollback": false
+  },
+  "collections": {
+    "loaded": false,
+    "failed": false,
+    "total": 0,
+    "visible": 0,
+    "assigned": 0,
+    "pinned": 0,
+    "filter": null,
+    "filterChecked": false,
+    "confirmDelete": false,
+    "busy": false,
+    "orderVerified": false,
+    "entries": []
+  },
+  "workspaces": {
+    "startupFinished": true,
+    "bindingName": null,
+    "bindingId": null,
+    "paused": false,
+    "reference": null,
+    "focus": false,
+    "undoAvailable": false,
+    "queue": []
+  },
+  "coverCache": {
+    "pending": false,
+    "failed": false,
+    "files": null,
+    "bytes": null,
+    "preserved": null,
+    "removedFiles": null,
+    "removedBytes": null,
+    "failedFiles": null,
+    "cancelled": null
+  },
+  "referenceShortcutPhase": 0,
+  "ruleSimulation": {
+    "phase": 0,
+    "pending": false,
+    "state": "idle",
+    "scanned": 0,
+    "matched": 0,
+    "unverified": 0,
+    "ids": [],
+    "imported": null
+  },
+  "ruleReview": {
+    "pending": false,
+    "failed": false,
+    "documents": null,
+    "actions": null
+  },
+  "ruleExecution": {
+    "legacyReviewPending": false,
+    "legacyDocuments": null,
+    "legacyTargets": null,
+    "legacySkipped": null,
+    "recovery": null,
+    "inheritedPhase": 0,
+    "retrying": false,
+    "entries": null,
+    "pending": false,
+    "loading": false,
+    "failed": false,
+    "total": null,
+    "status": null,
+    "completed": null,
+    "reversible": null
+  },
+  "automationRules": {
+    "phase": 0,
+    "pending": false,
+    "failed": false,
+    "saved": false,
+    "editing": false,
+    "confirmDelete": false,
+    "total": null,
+    "offset": 0,
+    "entries": null
+  },
+  "revisionGroups": {
+    "phase": 0,
+    "pending": false,
+    "failed": false,
+    "total": null,
+    "selected": null,
+    "current": null,
+    "memberTotal": null,
+    "members": null,
+    "groups": null
+  },
+  "commandPalette": {
+    "open": false,
+    "query": "",
+    "recentCount": 0,
+    "pending": false,
+    "info": false,
+    "selected": 0,
+    "last": null,
+    "target": null,
+    "document": null
+  },
+  "diagnostics": {
+    "open": false,
+    "busy": false,
+    "collected": false,
+    "saved": false,
+    "copied": false,
+    "cancelled": false,
+    "occupied": false,
+    "failed": false,
+    "verified": false
+  },
+  "startupMode": "normal",
+  "safeStartup": {
+    "notice": false,
+    "indexPhase": "Disabled",
+    "indexEnabled": false,
+    "continuityLoading": false
+  },
+  "quarantine": {
+    "preview": 0,
+    "healthPending": 0,
+    "open": false,
+    "pending": false,
+    "error": false,
+    "review": false,
+    "total": null,
+    "offset": null,
+    "entries": null
+  },
+  "nearbyTurnPreview": 0,
+  "graphicsStartupFallback": false,
+  "readerContinuity": {
+    "loaded": true,
+    "restoring": false,
+    "retainedComparison": null,
+    "comparison": null
+  },
+  "continuityStoreToken": "20468-105ed470-e647-4d69-9436-97333c6ceef3",
+  "graphicsRuntimeFallback": false,
+  "managedPages": {
+    "settled": true,
+    "pendingCopies": 0,
+    "pendingFences": 0,
+    "retiredTextures": 0,
+    "failed": false
+  },
+  "graphicsRecoveryFavorite": null,
+  "graphicsRecoveryRestorePreference": null,
+  "pagePrefetch": {
+    "enabled": false,
+    "gpu": true,
+    "promotions": 0,
+    "lastPromotion": null,
+    "settled": true,
+    "pages": []
+  },
+  "pageRefinement": [],
+  "referenceRefinement": null,
+  "readerPresentationSlots": 0,
+  "referencePrefetch": null,
+  "windowPlacement": null,
+  "windowPlacementBackupSetting": null,
+  "annotationHistoryPhase": 0,
+  "readerControls": {
+    "chromeHidden": false,
+    "immersive": false,
+    "pageJump": false,
+    "primaryPanel": false
+  },
+  "shortcutBindings": {
+    "warning": false,
+    "known": 30,
+    "unavailable": 0,
+    "nextPage": "arrow-right",
+    "switchPane": "f6",
+    "zoomIn": "ctrl-plus"
+  },
+  "shortcutConflict": false,
+  "relations": {
+    "document": null,
+    "pending": false,
+    "writing": false,
+    "saved": false,
+    "failed": false,
+    "phase": 0,
+    "offset": 0,
+    "total": null,
+    "confirmRemove": false,
+    "entries": null
+  },
+  "referenceNotesPhase": 0,
+  "primaryAnnotations": {
+    "history": null,
+    "document": null,
+    "pending": false,
+    "writing": false,
+    "editing": false,
+    "saved": false,
+    "stale": false,
+    "filterCount": 0,
+    "selected": 0,
+    "offset": null,
+    "total": null,
+    "entries": null
+  },
+  "annotationEditConflict": {
+    "phase": 0,
+    "draft": null
+  },
+  "referenceAnnotations": null,
+  "retiredAnnotationWrites": 0,
+  "referenceMarksPhase": 0,
+  "referenceMarks": null,
+  "referenceMarksRotation": null,
+  "referenceSelectionPhase": 0,
+  "referenceSelection": null,
+  "selectionClipboard": null,
+  "primaryNavigation": null,
+  "referenceNavigation": null,
+  "readingFocus": "Primary",
+  "documentOutline": {
+    "entries": 0,
+    "rows": 0,
+    "pending": false
+  },
+  "documentBookmarks": {
+    "document": null,
+    "pending": false,
+    "saved": false,
+    "total": null,
+    "offset": null,
+    "entries": null
+  },
+  "reference": null,
+  "referenceSync": {
+    "demoStage": 0,
+    "linkedConfirmed": false,
+    "positionConfirmed": false,
+    "reverseConfirmed": false,
+    "differencesConfirmed": false,
+    "primaryScale": 1.0
+  },
+  "closeReview": {
+    "reviewing": false,
+    "waiting": false,
+    "preview": 0,
+    "drafts": false
+  },
+  "pageNoteRecovery": {
+    "retained": 0,
+    "primary": null,
+    "reference": null
+  },
+  "metadataDraftRecovery": {
+    "retained": 0,
+    "active": null
+  },
+  "coverRebuild": {
+    "pending": false,
+    "success": false,
+    "password": false
+  },
+  "importPassword": {
+    "ids": [],
+    "waiting": false,
+    "rejected": false,
+    "busy": false,
+    "attempts": 0,
+    "imported": 0
+  },
+  "storedNoteRecovery": {
+    "retained": 0,
+    "pending": false,
+    "primary": null,
+    "reference": null,
+    "primaryConflict": false,
+    "referenceConflict": false
+  },
+  "selectionNoteRecovery": {
+    "primaryGeometryPages": 0,
+    "referenceGeometryPages": 0,
+    "retained": 0,
+    "pending": false,
+    "primary": null,
+    "reference": null,
+    "primaryConflict": false,
+    "referenceConflict": false
+  },
+  "referenceAdmission": {
+    "demoStage": 0,
+    "nativeCloses": 0,
+    "passwordAttempts": 0
+  },
+  "referenceChooser": null,
+  "fileCheck": {
+    "pending": false,
+    "state": null
+  },
+  "relocation": {
+    "pending": false,
+    "review": false,
+    "exact": null,
+    "applied": false,
+    "failed": false
+  },
+  "duplicates": {
+    "pending": false,
+    "failed": false,
+    "cancelled": false,
+    "groups": 1,
+    "checked": 3,
+    "matched": 2,
+    "unverified": 0,
+    "detail": true,
+    "merge": {
+      "pending": false,
+      "writing": false,
+      "reviewed": false,
+      "merged": false,
+      "titleIncoming": false,
+      "notice": "Consolidation cancelled."
+    }
+  },
+  "libraryCheck": {
+    "pending": false,
+    "phase": "Idle",
+    "checked": 0,
+    "available": 0,
+    "missing": 0,
+    "changed": 0,
+    "unverifiable": 0,
+    "failed": 0,
+    "error": false
+  }
+}

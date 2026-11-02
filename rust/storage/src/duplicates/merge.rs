@@ -181,6 +181,10 @@ impl Store for MergeStore {
             .to_str()
             .ok_or_else(|| invalid("Backup path is not valid Unicode"))?;
         tx.execute("INSERT INTO duplicate_merge_history(id,kept_document_id,incoming_document_id,backup_path,status,created_at,updated_at) VALUES(?1,?2,?3,?4,'completed',?5,?5)",params![history,kept,incoming,backup_name,now]).map_err(storage)?;
+        let digest: sha2::digest::Output<Sha256> = plan.selection.kept_proof.digest.into();
+        let summary = serde_json::json!({"version":1,"keptDocument":kept,"incomingDocument":incoming,"sourceSha256":format!("{digest:x}"),"backupSha256":backup_sha256});
+        let undo = serde_json::json!({"version":1,"backupPath":backup_name,"sha256":backup_sha256});
+        tx.execute("INSERT INTO operation_journal(id,operation_kind,status,summary_json,total_items,completed_items,undo_json,started_at,updated_at,phase,resume_capability,compatibility_hash) VALUES(?1,'rustDuplicateMerge.v1','completed',?2,2,2,?3,?4,?4,'completed','rollback','rust-duplicate-merge-v1')",params![history,summary.to_string(),undo.to_string(),now]).map_err(storage)?;
         crate::database::validate(&tx)?;
         guard.verify()?;
         cancel.check()?;
