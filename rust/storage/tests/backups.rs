@@ -8,6 +8,8 @@ use yamantaka_storage::{
 };
 #[path = "support/restore_review.rs"]
 mod restore_review;
+#[path = "support/rollback.rs"]
+mod rollback_verification;
 
 fn payload(version: u64) -> Value {
     let tables = TABLE_ORDER
@@ -194,6 +196,9 @@ fn bounded_export_keeps_existing_backup(root: &std::path::Path) {
 }
 #[test]
 fn replacement_keeps_complete_safety_store_and_cancel_does_not_write() {
+    if rollback_verification::child() {
+        return;
+    }
     if restore_review::child() {
         return;
     }
@@ -214,6 +219,7 @@ fn replacement_keeps_complete_safety_store_and_cancel_does_not_write() {
     assert!(install_preview(restored, &active, &cancel).is_err());
     assert!(active.join("yamantaka.sqlite3").exists());
     restore_review::verify(root.path());
+    rollback_verification::verify(root.path());
 }
 
 #[test]

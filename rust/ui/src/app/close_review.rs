@@ -143,6 +143,7 @@ impl YamantakaApp {
                 });
             });
         if keep || modal.should_close() {
+            self.cancel_restore_handover();
             self.close_review = Default::default();
             self.workspaces.close_after = false;
             self.quarantine.close_after = false;

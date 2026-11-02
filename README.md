@@ -199,6 +199,8 @@ Open **Settings → Storage → Export JSON backup** to save the current library
 
 To restore, choose **Settings → Storage → Restore JSON backup**, review the version and record counts, then choose **Restore and close**. Yamantaka prepares the data in the background, closes its readers, and installs the backup. It retains the previous library in a safety directory and shows that location on completion. Reopen Yamantaka to use the restored library. A changed backup requires another review. Manual rollback and recovery controls for ambiguous interrupted operations remain pending; see [restoration and recovery verification](docs/validation/rust-restore-ui-2026-10-22.md).
 
+To return to a complete pre-restore library, choose **Previous library** in Storage or **Previous copy** in startup recovery. The selected folder becomes active and the current folder remains as a new safety copy. See [returning to a previous library](docs/user-guide/previous-library.md).
+
 The rewrite must preserve identifiers, relationships, progress, annotations, manual corrections, cover decisions, workspaces, sessions and automation journals. Originals are never PDF editing targets.
 
 | Data | Compatibility contract |

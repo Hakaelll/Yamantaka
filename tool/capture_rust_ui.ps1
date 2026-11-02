@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='rollback-review'; args=@('--rollback-preview','--es') },
+    @{ name='rollback-review-small'; args=@('--rollback-preview','--es','--light','--size=640x480','--text-scale=2') },
     @{ name='index-protected-prompt'; args=@('--index-protected','--es','--light','--size=640x480','--text-scale=2') },
     @{ name='index-protected-prompt-wide'; args=@('--index-protected') },
     @{ name='cover-rebuild-details'; args=@('--cover-rebuild-menu','--details','--es','--light','--pdf-covers') },
@@ -1091,6 +1093,14 @@ foreach ($case in $cases) {
             if ($controls.bulkTargetPicker.open -or $controls.bulkOrganization.members -ne $expectedMembers -or $controls.libraryDocumentCount -ne $expectedMembers -or $controls.librarySelection.ids.Count -ne 0) { throw 'Bulk organization membership or filtered readback is incorrect.' }
             if ($case.name -eq 'bulk-tags-applied' -and $controls.bulkOrganization.annotationUses -ne 1) { throw 'Document tag assignment must preserve the existing annotation membership.' }
         }
+    }
+    if ($case.name -eq 'startup-recovery-small-200') {
+        $first=@($controls.controls | Where-Object label -eq 'JSON backup…')[0]
+        if (-not $first -or $first.rect[1] -lt $controls.viewport[3]*0.4) { throw 'Recovery actions hide the document recovery context.' }
+    }
+    if ($case.name -like 'rollback-*') {
+        if (-not $controls.restore.rollback -or $controls.restore.books -ne 10 -or $controls.restore.busy -or -not $controls.restore.reviewed -or $controls.restore.queued) { throw 'Rollback did not wait for reviewed confirmation.' }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar','Volver y cerrar')
     }
     if ($case.name -eq 'restore-review') {
         if (-not $controls.restore.reviewed -or $controls.restore.busy -or $controls.restore.books -ne 10) { throw 'Restore review did not load the synthetic backup.' }

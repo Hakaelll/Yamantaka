@@ -1,6 +1,6 @@
 //! Recovery does not need the failed library, a PDF engine, or saved preferences.
 use crate::{
-    restore_worker::{Command, Job, Outcome},
+    restore_worker::{Command, Job, Outcome, Prepared, Review},
     theme,
 };
 use eframe::egui;
@@ -9,11 +9,7 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
 };
-use yamantaka_storage::{
-    Database,
-    backup::{self, RestorePreview, RestoreReview},
-    preferences::Preferences,
-};
+use yamantaka_storage::{Database, preferences::Preferences};
 
 pub mod preview;
 
@@ -39,7 +35,7 @@ pub fn run(
     software: bool,
     verification: Option<preview::Verification>,
 ) -> std::result::Result<bool, Box<dyn std::error::Error>> {
-    let handover: Rc<RefCell<Option<RestorePreview>>> = Default::default();
+    let handover: Rc<RefCell<Option<Prepared>>> = Default::default();
     let output = handover.clone();
     let install_store = store.clone();
     let verification_result = verification.clone();
@@ -68,6 +64,7 @@ pub fn run(
             theme::load_fonts(&cc.egui_ctx);
             theme::install(&cc.egui_ctx, true);
             let mut app = Recovery {
+                store: store.clone(),
                 stage,
                 english,
                 job: None,
@@ -83,7 +80,7 @@ pub fn run(
     let prepared = handover.borrow_mut().take();
     let installed = prepared.is_some();
     if let Some(preview) = prepared {
-        let safety = backup::install_preview(preview, &install_store, &Default::default())?;
+        let safety = preview.install(&install_store, &Default::default())?;
         if let Some(verification) = &verification_result {
             verification.verify_installed(&install_store, &safety)?;
         } else {
@@ -96,12 +93,13 @@ pub fn run(
 }
 
 struct Recovery {
+    store: PathBuf,
     stage: FailedStage,
     english: bool,
     job: Option<Job>,
-    review: Option<RestoreReview>,
+    review: Option<Review>,
     failed: bool,
-    handover: Rc<RefCell<Option<RestorePreview>>>,
+    handover: Rc<RefCell<Option<Prepared>>>,
     verification: Option<preview::Verification>,
 }
 impl Recovery {
@@ -171,37 +169,89 @@ impl eframe::App for Recovery {
         } else {
             self.tr("Salir sin restaurar", "Exit without restoring")
         };
-        egui::Panel::bottom("recovery-actions")
+        let enabled = self.job.is_none();
+        let reviewed = self.review.is_some();
+        let previous_label = self.tr("Copia anterior…", "Previous copy…");
+        let actions = egui::Panel::bottom("recovery-actions")
             .frame(egui::Frame::new().fill(p.surface).inner_margin(16.0))
             .show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.add_enabled_ui(self.job.is_none(), |ui| {
-                        if theme::bounded_navigation(ui, choose_label, p).clicked()
-                            && let Some(path) = yamantaka_windows::pick_library_backup()
-                        {
-                            self.review = None;
-                            self.start(Command::Review(path), ctx);
-                        }
-                        if let Some(review) = self.review.clone()
-                            && theme::bounded_navigation(ui, restore_label, p).clicked()
-                        {
-                            self.start(Command::Prepare(review), ctx);
-                        }
-                    });
-                    if theme::bounded_navigation(ui, exit_label, p).clicked() {
-                        self.handover.borrow_mut().take();
-                        if let Some(job) = &self.job {
-                            job.cancel();
-                        }
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                let mut restore = false;
+                let mut exit = false;
+                let mut finish = |ui: &mut egui::Ui| {
+                    if reviewed {
+                        restore = ui
+                            .add_enabled_ui(enabled, |ui| {
+                                theme::bounded_navigation(ui, restore_label, p)
+                            })
+                            .inner
+                            .clicked();
+                    }
+                    exit = theme::bounded_navigation(ui, exit_label, p).clicked();
+                };
+                let mut choose = false;
+                let mut previous = false;
+                ui.horizontal(|ui| {
+                    choose = ui
+                        .add_enabled_ui(enabled, |ui| {
+                            theme::bounded_navigation(ui, choose_label, p)
+                        })
+                        .inner
+                        .clicked();
+                    previous = ui
+                        .add_enabled_ui(enabled, |ui| {
+                            theme::bounded_navigation(ui, previous_label, p)
+                        })
+                        .inner
+                        .clicked();
+                    if !compact {
+                        finish(ui);
                     }
                 });
-            });
+                if compact {
+                    ui.horizontal(finish);
+                }
+                (choose, previous, restore, exit)
+            })
+            .inner;
+        if actions.0
+            && let Some(path) = yamantaka_windows::pick_library_backup()
+        {
+            self.review = None;
+            self.start(Command::Review(path), ctx);
+        }
+        if actions.1
+            && let Some(parent) = self.store.parent()
+            && let Some(source) = yamantaka_windows::pick_library_safety_folder(parent)
+        {
+            self.review = None;
+            self.start(
+                Command::ReviewRollback {
+                    active: self.store.clone(),
+                    source,
+                },
+                ctx,
+            );
+        }
+        if actions.2
+            && let Some(review) = self.review.clone()
+        {
+            self.start(Command::Prepare(review), ctx);
+        }
+        if actions.3 {
+            self.handover.borrow_mut().take();
+            if let Some(job) = &self.job {
+                job.cancel();
+            }
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
         egui::CentralPanel::default().frame(egui::Frame::new().fill(p.canvas).inner_margin(16.0)).show(ui, |ui| {
-            ui.label(egui::RichText::new("YAMANTAKA").small().color(p.secondary));
-            ui.add_space(12.0);
-            theme::display(ui, self.tr("Recupera tu biblioteca", "Recover your library"), 28.0);
             egui::ScrollArea::vertical().id_salt("startup-recovery").show(ui, |ui| {
+                if !compact {
+                    ui.label(egui::RichText::new("YAMANTAKA").small().color(p.secondary));
+                    ui.add_space(12.0);
+                }
+                theme::display(ui,self.tr("Recupera tu biblioteca","Recover your library"),if compact {20.0}else{28.0});
+                ui.add_space(if compact {6.0}else{10.0});
                 ui.label(self.tr(match self.stage {
                     FailedStage::Preferences => "No se pudieron leer las preferencias guardadas.",
                     FailedStage::Library => "No se pudo abrir la biblioteca guardada.",
@@ -210,7 +260,7 @@ impl eframe::App for Recovery {
                     FailedStage::Library => "The saved library could not be opened.",
                 }));
                 ui.add_space(10.0);
-                ui.label(self.tr("Puedes salir y revisar los archivos, o restaurar una copia JSON. La restauración conserva la carpeta actual completa como respaldo y no modifica tus PDF.", "You can exit and inspect your files, or restore a JSON backup. Restoration keeps the entire current folder as a safety copy and does not change your PDFs."));
+                ui.label(self.tr("Puedes revisar los archivos, restaurar una copia JSON o volver a una biblioteca anterior. La restauración conserva la carpeta actual completa como respaldo y no modifica tus PDF.", "You can inspect your files, restore a JSON backup, or return to a previous library. Restoration keeps the entire current folder as a safety copy and does not change your PDFs."));
                 ui.add_space(14.0);
                 if self.failed {
                     ui.colored_label(p.accent, self.tr("No se pudo validar esta copia. Los archivos actuales se conservan. Selecciona otra copia.", "This backup could not be validated. Current files are kept. Choose another backup."));
@@ -221,6 +271,7 @@ impl eframe::App for Recovery {
                         for (table, es, en) in [("documents", "Libros", "Books"), ("annotations", "Anotaciones", "Annotations"), ("bookmarks", "Marcadores", "Bookmarks")] {
                             ui.label(format!("{}: {}", self.tr(es, en), review.counts().get(table).copied().unwrap_or(0)));
                         }
+                        if review.rollback() {ui.label(self.tr("La carpeta elegida pasará a ser la biblioteca activa. Cierra otras instancias que la estén utilizando.","The selected folder will become the active library. Close other instances using it."));}
                         ui.label(self.tr("Al confirmar, Yamantaka se cerrará para instalar la copia. Después podrás volver a abrir la aplicación.", "On confirmation, Yamantaka will close to install the backup. You can then reopen the application."));
                     });
                 }

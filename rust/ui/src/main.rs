@@ -144,6 +144,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     arg.to_str().is_some_and(|value| {
                         value.starts_with("--bulk-remove=")
                             || value.starts_with("--backup-export=")
+                            || value == "--rollback-preview"
+                            || value == "--rollback-apply"
                             || value == "--restore-preview"
                             || value == "--restore-apply"
                             || value == "--workspaces"
@@ -730,6 +732,31 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     };
+    let rollback_source = if demo
+        && capture.is_some()
+        && args
+            .iter()
+            .any(|arg| arg == "--rollback-preview" || arg == "--rollback-apply")
+    {
+        let source = store
+            .parent()
+            .ok_or("Synthetic rollback parent is missing")?
+            .join(format!("pre-restore-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&source)?;
+        database.snapshot(&source.join("yamantaka.sqlite3"))?;
+        Preferences::default().save(&source.join("preferences.json"))?;
+        std::fs::write(
+            source.join("rollback-sentinel.bin"),
+            b"synthetic previous library resource",
+        )?;
+        std::fs::write(
+            store.join("current-sentinel.bin"),
+            b"synthetic current library resource",
+        )?;
+        Some(source)
+    } else {
+        None
+    };
     if demo && args.iter().any(|arg| arg == "--sessions-disabled") {
         prefs
             .rust
@@ -965,10 +992,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let app_instance = instance.clone();
     let restore_handover: app::RestoreHandover = Default::default();
     let ui_restore_handover = restore_handover.clone();
+    let rollback_smoke = demo && args.iter().any(|arg| arg == "--rollback-apply");
     let restore_smoke = if demo {
         capture
             .as_ref()
-            .filter(|_| args.iter().any(|arg| arg == "--restore-apply"))
+            .filter(|_| {
+                args.iter()
+                    .any(|arg| arg == "--restore-apply" || arg == "--rollback-apply")
+            })
             .map(|path| path.with_extension("restore-result.json"))
     } else {
         None
@@ -1167,6 +1198,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         &cc.egui_ctx,
                         store.join("synthetic-backup.json"),
                         args.iter().any(|arg| arg == "--restore-apply"),
+                    );
+                }
+                if let Some(source) = rollback_source.clone() {
+                    app.preview_rollback(
+                        &cc.egui_ctx,
+                        source,
+                        args.iter().any(|arg| arg == "--rollback-apply"),
                     );
                 }
                 if let Some(mode) = args
@@ -1871,13 +1909,22 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }));
     }
     app_result?;
+    startup.finish()?;
     if let Some(commit) = restore_handover.borrow_mut().take() {
-        let safety = yamantaka_storage::backup::install_preview(
-            commit.preview,
-            &commit.store,
-            &yamantaka_domain::Cancellation::default(),
-        )?;
+        let safety = commit
+            .preview
+            .install(&commit.store, &yamantaka_domain::Cancellation::default())?;
         if let Some(result) = restore_smoke {
+            if rollback_smoke {
+                assert_eq!(
+                    std::fs::read(commit.store.join("rollback-sentinel.bin"))?,
+                    b"synthetic previous library resource"
+                );
+                assert_eq!(
+                    std::fs::read(safety.join("current-sentinel.bin"))?,
+                    b"synthetic current library resource"
+                );
+            }
             let database = Database::open_read_only(&commit.store.join("yamantaka.sqlite3"))?;
             let books = database.count(&yamantaka_domain::LibraryQuery::default())?;
             std::fs::write(
@@ -1893,7 +1940,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if let Some((window_store, capture)) = window_capture {
         window_state::preview::verify_saved(&window_store, &capture, window_unknown)?;
     }
-    startup.finish()?;
     drop(instance);
     Ok(())
 }

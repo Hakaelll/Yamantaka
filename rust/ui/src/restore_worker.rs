@@ -1,18 +1,60 @@
+use std::{collections::BTreeMap, path::Path};
 use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, TryRecvError},
     thread::{self, JoinHandle},
 };
 use yamantaka_domain::{Cancellation, Failure, Result};
-use yamantaka_storage::backup::{self, RestorePreview, RestoreReview};
+use yamantaka_storage::backup::{self, RestorePreview, RestoreReview, RollbackReview};
 
+#[derive(Clone)]
+pub enum Review {
+    Json(RestoreReview),
+    Rollback(RollbackReview),
+}
+impl Review {
+    pub fn source(&self) -> &Path {
+        match self {
+            Self::Json(r) => r.source(),
+            Self::Rollback(r) => r.source(),
+        }
+    }
+    pub fn counts(&self) -> &BTreeMap<String, usize> {
+        match self {
+            Self::Json(r) => r.counts(),
+            Self::Rollback(r) => r.counts(),
+        }
+    }
+    pub fn version(&self) -> u64 {
+        match self {
+            Self::Json(r) => r.version(),
+            Self::Rollback(_) => yamantaka_domain::SCHEMA_VERSION.into(),
+        }
+    }
+    pub fn rollback(&self) -> bool {
+        matches!(self, Self::Rollback(_))
+    }
+}
+pub enum Prepared {
+    Json(Box<RestorePreview>),
+    Rollback(RollbackReview),
+}
+impl Prepared {
+    pub fn install(self, active: &Path, cancel: &Cancellation) -> Result<PathBuf> {
+        match self {
+            Self::Json(p) => backup::install_preview(*p, active, cancel),
+            Self::Rollback(r) => backup::install_rollback(&r, active, cancel),
+        }
+    }
+}
 pub enum Command {
     Review(PathBuf),
-    Prepare(RestoreReview),
+    ReviewRollback { active: PathBuf, source: PathBuf },
+    Prepare(Review),
 }
 pub enum Outcome {
-    Reviewed(RestoreReview),
-    Prepared(Box<RestorePreview>),
+    Reviewed(Review),
+    Prepared(Box<Prepared>),
 }
 pub struct Job {
     cancel: Cancellation,
@@ -28,9 +70,23 @@ impl Job {
             .name("restore-review".into())
             .spawn(move || {
                 let result = match command {
-                    Command::Review(path) => backup::review(&path, &token).map(Outcome::Reviewed),
-                    Command::Prepare(review) => backup::prepare_reviewed(&review, &token)
-                        .map(|preview| Outcome::Prepared(Box::new(preview))),
+                    Command::Review(path) => backup::review(&path, &token)
+                        .map(Review::Json)
+                        .map(Outcome::Reviewed),
+                    Command::ReviewRollback { active, source } => {
+                        backup::review_rollback(&active, &source, &token)
+                            .map(Review::Rollback)
+                            .map(Outcome::Reviewed)
+                    }
+                    Command::Prepare(Review::Json(review)) => {
+                        backup::prepare_reviewed(&review, &token)
+                            .map(|p| Prepared::Json(Box::new(p)))
+                            .map(|p| Outcome::Prepared(Box::new(p)))
+                    }
+                    Command::Prepare(Review::Rollback(review)) => {
+                        backup::verify_rollback(&review, &token)
+                            .map(|_| Outcome::Prepared(Box::new(Prepared::Rollback(review))))
+                    }
                 };
                 let _ = sender.send(result);
                 notify();

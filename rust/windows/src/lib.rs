@@ -201,6 +201,12 @@ pub fn pick_pdfs() -> Option<Vec<PathBuf>> {
         .add_filter("PDF", &["pdf"])
         .pick_files()
 }
+pub fn pick_library_safety_folder(parent: &std::path::Path) -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Yamantaka")
+        .set_directory(parent)
+        .pick_folder()
+}
 pub fn pick_folder() -> Option<PathBuf> {
     rfd::FileDialog::new().pick_folder()
 }

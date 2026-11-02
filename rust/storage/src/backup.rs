@@ -268,3 +268,8 @@ pub use restore::{
 };
 mod review;
 pub use review::{RestoreReview, install_reviewed, prepare_reviewed, review};
+
+mod rollback;
+pub use rollback::{
+    RollbackReview, install_rollback, install_rollback_progress, review_rollback, verify_rollback,
+};

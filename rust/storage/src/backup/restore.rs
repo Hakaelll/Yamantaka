@@ -40,7 +40,7 @@ pub fn install_preview_progress(
         ordinary(active, true)?;
     }
     let journal = restore_journal_path(active)?;
-    if present(&journal)? {
+    if present(&journal)? || present(&super::rollback::journal_path(active)?)? {
         return Err(Failure::Invalid(
             "Recover the interrupted restore before starting another".into(),
         ));
@@ -131,7 +131,7 @@ struct RestoreJournal {
     #[serde(default)]
     staging: Option<std::path::PathBuf>,
 }
-fn restore_journal_path(active: &Path) -> Result<std::path::PathBuf> {
+pub(super) fn restore_journal_path(active: &Path) -> Result<std::path::PathBuf> {
     let name = active
         .file_name()
         .ok_or_else(|| Failure::Invalid("Invalid active store".into()))?
@@ -142,6 +142,14 @@ fn restore_journal_path(active: &Path) -> Result<std::path::PathBuf> {
 /// back to the complete safety store. A committed new store keeps its safety copy.
 pub fn recover_interrupted_restore(active: &Path) -> Result<bool> {
     let journal_path = restore_journal_path(active)?;
+    if present(&super::rollback::journal_path(active)?)? {
+        if present(&journal_path)? {
+            return Err(Failure::Invalid(
+                "Multiple pending library operations; files preserved".into(),
+            ));
+        }
+        return super::rollback::recover(active);
+    }
     if !present(&journal_path)? {
         return Ok(false);
     }
