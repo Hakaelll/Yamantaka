@@ -85,4 +85,67 @@ fn portable_identity_uses_its_own_data_and_does_not_reuse_flutter_marker() {
         !directory.path().join("rust-data").exists(),
         "path discovery unexpectedly created a store"
     );
+    verify_visible_source_monitor(directory.path());
+}
+
+fn verify_visible_source_monitor(root: &std::path::Path) {
+    use std::{fs::FileTimes, io::Write};
+    use yamantaka_windows::source_monitor::{FileState, Monitor, Target};
+    let path = root.join("文献 con espacios.pdf");
+    std::fs::write(&path, b"before").unwrap();
+    let modified = path.metadata().unwrap().modified().unwrap();
+    let (send, notifications) = mpsc::sync_channel(16);
+    let monitor = Monitor::start(move || {
+        let _ = send.try_send(());
+    })
+    .unwrap();
+    let target = Target {
+        document: "registered".into(),
+        path: path.clone(),
+        generation: 1,
+    };
+    monitor.set_targets(vec![target.clone()]).unwrap();
+    let next = || {
+        notifications.recv_timeout(Duration::from_secs(5)).unwrap();
+        monitor.take().unwrap()
+    };
+    let first = next();
+    assert!(matches!(first[0].state, FileState::Present(_)));
+    assert!(monitor.set_targets(vec![target.clone(); 17]).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), b"before");
+    {
+        let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        file.write_all(b"after!").unwrap();
+        file.set_times(FileTimes::new().set_modified(modified))
+            .unwrap();
+    }
+    assert_eq!(path.metadata().unwrap().modified().unwrap(), modified);
+    assert_eq!(path.metadata().unwrap().len(), 6);
+    let changed = next();
+    assert!(matches!(changed[0].state, FileState::Present(_)));
+    assert_ne!(first[0].state, changed[0].state);
+    assert!(
+        notifications
+            .recv_timeout(Duration::from_millis(1200))
+            .is_err(),
+        "Unchanged source kept waking the UI"
+    );
+    std::fs::remove_file(&path).unwrap();
+    assert_eq!(next()[0].state, FileState::Unavailable);
+    std::fs::write(&path, b"restored").unwrap();
+    assert!(matches!(next()[0].state, FileState::Present(_)));
+    let mut newer = target;
+    newer.generation = 2;
+    monitor.set_targets(vec![newer]).unwrap();
+    assert_eq!(next()[0].target.generation, 2);
+    monitor.set_targets(Vec::new()).unwrap();
+    assert!(next().is_empty());
+    std::fs::write(&path, b"unobserved").unwrap();
+    assert!(
+        notifications
+            .recv_timeout(Duration::from_millis(1200))
+            .is_err(),
+        "Inactive observer did not sleep"
+    );
+    drop(monitor);
 }

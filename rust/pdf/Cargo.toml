@@ -7,8 +7,11 @@ publish.workspace = true
 license.workspace = true
 [dependencies]
 yamantaka-domain.workspace = true
+yamantaka-windows.workspace = true
 crossbeam-channel.workspace = true
 pdfium-render.workspace = true
 sha2.workspace = true
 [lints]
 workspace = true
+[dev-dependencies]
+tempfile.workspace = true

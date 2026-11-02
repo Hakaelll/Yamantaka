@@ -101,6 +101,8 @@ impl CoverImageCache for CoverCache {
         let canonical = path.canonicalize().map_err(storage)?;
         let mut file = File::open(&canonical).map_err(storage)?;
         let before = file.metadata().map_err(storage)?;
+        let physical = yamantaka_windows::source_stamp::Stamp::from_file(&file)
+            .ok_or_else(|| Failure::Storage("Cover source attributes could not be read".into()))?;
         let modified = before
             .modified()
             .map_err(storage)?
@@ -112,6 +114,7 @@ impl CoverImageCache for CoverCache {
         hash.update(before.len().to_le_bytes());
         hash.update(modified.as_nanos().to_le_bytes());
         hash.update(page.to_le_bytes());
+        hash.update(physical.token());
         // Match the bounded source fingerprint convention without allocating a PDF copy.
         let mut remaining = 64 * 1024;
         let mut buffer = [0u8; 4096];
@@ -126,7 +129,11 @@ impl CoverImageCache for CoverCache {
             remaining -= read;
         }
         let after = file.metadata().map_err(storage)?;
-        if before.len() != after.len() || before.modified().ok() != after.modified().ok() {
+        if before.len() != after.len()
+            || before.modified().ok() != after.modified().ok()
+            || yamantaka_windows::source_stamp::Stamp::from_file(&file).as_ref() != Some(&physical)
+            || yamantaka_windows::source_stamp::Stamp::read(&canonical).as_ref() != Some(&physical)
+        {
             return Err(Failure::Invalid(
                 "PDF changed during cache validation".into(),
             ));

@@ -2384,6 +2384,7 @@ impl App for YamantakaApp {
         self.update_library_selection_preview();
         self.update_removal_preview();
         self.update_cover_batch_preview(&ctx);
+        self.update_cover_source_preview(&ctx);
         self.update_bulk_organization_preview();
         self.update_tag_preview();
         self.update_collection_preview();

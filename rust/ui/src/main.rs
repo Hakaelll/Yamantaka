@@ -173,7 +173,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             || capture.is_some()
                 && args.iter().any(|arg| {
                     arg.to_str().is_some_and(|value| {
-                        value.starts_with("--bulk-remove=")
+                        value == "--cover-source-change"
+                            || value.starts_with("--bulk-remove=")
                             || value.starts_with("--backup-export=")
                             || value == "--rollback-preview"
                             || value == "--rollback-apply"
@@ -324,6 +325,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     "UPDATE documents SET fingerprint='{fingerprint}' WHERE id='demo-0'"
                 ))?;
             }
+        }
+        if capture.is_some() && args.iter().any(|arg| arg == "--cover-source-change") {
+            std::fs::create_dir_all(&store)?;
+            let path = store.join("cover-source-change.pdf");
+            std::fs::copy(
+                crate::qa_ui_root().join("../../build/rust-fixtures/covers/cover-0.pdf"),
+                &path,
+            )?;
+            let path = path.canonicalize()?;
+            let modified =
+                chrono::DateTime::<chrono::Utc>::from(path.metadata()?.modified()?).to_rfc3339();
+            let encoded = path.to_string_lossy().replace('\'', "''");
+            db.execute_batch(&format!("UPDATE documents SET path='{encoded}',normalized_path='{encoded}',title_override='Retained title',author_override='Retained author',is_favorite=1 WHERE id='demo-0'; INSERT INTO document_covers(document_id,source_page_index,small_thumbnail_path,large_thumbnail_path,generated_at,source_modified_at,confidence,selection_mode,algorithm_version,crop_mode,page_aspect_ratio) VALUES('demo-0',1,'','','synthetic-choice','{modified}',1,'manual',1,'contain',0.75);"))?;
         }
         if args.iter().any(|arg| arg == "--reference-chooser") {
             let path = fixture.to_string_lossy().replace('\'', "''");
@@ -1345,6 +1359,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--reset-library-filters") {
                     app.preview_reset_library_filters();
+                }
+                if args.iter().any(|arg| arg == "--cover-source-change") {
+                    app.preview_cover_source_change(
+                        store.join("cover-source-change.pdf").canonicalize()?,
+                        crate::qa_ui_root()
+                            .join("../../build/rust-fixtures/covers/cover-1.pdf")
+                            .canonicalize()?,
+                        args.iter().any(|arg| arg == "--cover-source-expect-stale"),
+                    );
                 }
                 if let Some(mode) = args
                     .iter()

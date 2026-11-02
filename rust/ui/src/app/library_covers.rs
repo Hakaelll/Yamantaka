@@ -1,4 +1,6 @@
 mod preview;
+mod source;
+mod source_preview;
 use super::*;
 use yamantaka_application::cover_source::CoverSource;
 
@@ -11,6 +13,12 @@ pub(super) struct LibraryCovers {
     paused: std::collections::HashSet<String>,
     capacity_preview: u8,
     blocked_before_release: usize,
+    source_preview: Option<source_preview::Preview>,
+    source_verified: Option<serde_json::Value>,
+    monitor: Option<yamantaka_windows::source_monitor::Monitor>,
+    monitor_attempted: bool,
+    monitor_dirty: bool,
+    source_invalidations: usize,
 }
 
 struct CoverSlot {
@@ -24,6 +32,28 @@ struct CoverSlot {
     source_page: Option<u32>,
     refresh_requested: bool,
     deferred: Option<(Arc<yamantaka_domain::RenderedPage>, u64)>,
+    monitor_generation: u64,
+    observed: Option<yamantaka_windows::source_monitor::FileState>,
+    validation_pending: bool,
+}
+impl CoverSlot {
+    fn new(document: &Document, generation: u64) -> Self {
+        Self {
+            path: document.path.clone(),
+            fingerprint: document.fingerprint.clone(),
+            page_count: document.page_count,
+            generation,
+            cancel: Cancellation::default(),
+            image: None,
+            finished: false,
+            source_page: None,
+            refresh_requested: true,
+            deferred: None,
+            monitor_generation: generation,
+            observed: None,
+            validation_pending: false,
+        }
+    }
 }
 impl LibraryCovers {
     pub(super) fn clear(&mut self) {
@@ -31,6 +61,9 @@ impl LibraryCovers {
             slot.cancel.cancel();
         }
         self.slots.clear();
+        self.monitor = None;
+        self.monitor_attempted = false;
+        self.monitor_dirty = true;
     }
     pub(super) fn pause(&mut self, ids: &[String]) {
         for id in ids {
@@ -54,6 +87,7 @@ impl LibraryCovers {
     }
     pub(super) fn slots_ready(&self) -> bool {
         self.preview.is_none()
+            && self.source_preview.is_none()
             && self
                 .slots
                 .values()
@@ -96,6 +130,7 @@ impl YamantakaApp {
             keep
         });
         if cancelled {
+            self.library_covers.monitor_dirty = true;
             self.runtime.wake();
         }
         let epoch = self.governor.capacity_epoch();
@@ -115,6 +150,19 @@ impl YamantakaApp {
                 upload_cover(ctx, slot, id, page, epoch, image);
             }
         }
+        for document in &requested {
+            if !document.missing
+                && !self.library_covers.slots.contains_key(&document.id)
+                && let Some(generation) = self.library_covers.generation.checked_add(1)
+            {
+                self.library_covers.generation = generation;
+                self.library_covers
+                    .slots
+                    .insert(document.id.clone(), CoverSlot::new(document, generation));
+                self.library_covers.monitor_dirty = true;
+            }
+        }
+        self.observe_library_sources(ctx);
         for document in requested {
             if document.missing
                 || self.library_covers.paused.contains(&document.id)
@@ -122,7 +170,13 @@ impl YamantakaApp {
                     .library_covers
                     .slots
                     .get(&document.id)
-                    .is_some_and(|slot| !slot.refresh_requested)
+                    .is_none_or(|slot| {
+                        !slot.refresh_requested
+                            || !matches!(
+                                slot.observed,
+                                Some(yamantaka_windows::source_monitor::FileState::Present(_))
+                            )
+                    })
             {
                 continue;
             }
@@ -144,22 +198,6 @@ impl YamantakaApp {
                         slot.finished = false;
                         slot.refresh_requested = false;
                         slot.deferred = None;
-                    } else {
-                        self.library_covers.slots.insert(
-                            document.id,
-                            CoverSlot {
-                                path: document.path,
-                                fingerprint: document.fingerprint,
-                                page_count: document.page_count,
-                                generation,
-                                cancel,
-                                image: None,
-                                finished: false,
-                                source_page: None,
-                                refresh_requested: false,
-                                deferred: None,
-                            },
-                        );
                     }
                 }
                 Err(yamantaka_domain::Failure::QueueFull) => {
@@ -200,6 +238,11 @@ impl YamantakaApp {
         }
         slot.finished = true;
         let Ok(page) = result else {
+            if slot.validation_pending {
+                slot.image = None;
+                slot.validation_pending = false;
+                ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(id)));
+            }
             return;
         };
         if page.key.document_id != id || page.key.generation != slot.generation {
@@ -208,9 +251,10 @@ impl YamantakaApp {
         let image =
             render_updates::upload_image(ctx, &mut self.presenter, &mut self.managed_pages, &page);
         upload_cover(ctx, slot, id, page, self.governor.capacity_epoch(), image);
+        slot.validation_pending = false;
     }
     pub(super) fn cover_summary(&self) -> serde_json::Value {
-        serde_json::json!({"resident": self.library_covers.slots.len(),"bulkRegeneration": self.library_covers.verified,"paused": self.library_covers.paused.len(),"deferredUploads":self.library_covers.slots.values().filter(|slot|slot.deferred.is_some()).count(),
+        serde_json::json!({"resident": self.library_covers.slots.len(),"sourceInvalidations":self.library_covers.source_invalidations,"sourceChange":self.library_covers.source_verified,"bulkRegeneration": self.library_covers.verified,"paused": self.library_covers.paused.len(),"deferredUploads":self.library_covers.slots.values().filter(|slot|slot.deferred.is_some()).count(),
             "blockedBeforeRelease":self.library_covers.blocked_before_release,"capacityPreview":self.library_covers.capacity_preview,"capacityRevision":self.runtime.pdf_capacity_revision(),
             "ready":self.library_covers.slots.values().filter(|slot| slot.image.is_some()).count(),
             "pending":self.library_covers.slots.values().filter(|slot| !slot.finished).count(),
@@ -224,7 +268,8 @@ impl YamantakaApp {
         aspect: f64,
         image: PageImage,
     ) {
-        if let Some(old) = self.library_covers.slots.remove(&document.id) {
+        let old = self.library_covers.slots.remove(&document.id);
+        if let Some(old) = &old {
             old.cancel.cancel();
             self.runtime.wake();
         }
@@ -246,24 +291,33 @@ impl YamantakaApp {
             )
         });
         self.library_covers.generation = self.library_covers.generation.saturating_add(1);
-        self.library_covers.slots.insert(
-            document.id.clone(),
-            CoverSlot {
-                path: document.path.clone(),
-                fingerprint: document.fingerprint.clone(),
-                page_count: document.page_count,
-                generation: self.library_covers.generation,
-                cancel: Cancellation::default(),
-                image: Some(image),
-                finished: true,
-                source_page: Some(page),
-                refresh_requested: false,
-                deferred: None,
-            },
-        );
+        let mut slot = CoverSlot::new(document, self.library_covers.generation);
+        self.library_covers.monitor_dirty = true;
+        slot.image = Some(image);
+        slot.source_page = Some(page);
+        slot.finished = true;
+        slot.refresh_requested = false;
+        if let Some(old) = old
+            && old.path == document.path
+            && old.fingerprint == document.fingerprint
+            && old.page_count == document.page_count
+        {
+            slot.monitor_generation = old.monitor_generation;
+            slot.observed = old.observed;
+        }
+        if matches!(
+            slot.observed,
+            Some(yamantaka_windows::source_monitor::FileState::Unavailable)
+        ) {
+            slot.image = None;
+            slot.source_page = None;
+            ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(&document.id)));
+        }
+        self.library_covers.slots.insert(document.id.clone(), slot);
     }
     pub(super) fn invalidate_library_cover(&mut self, ctx: &egui::Context, id: &str) {
         if let Some(slot) = self.library_covers.slots.remove(id) {
+            self.library_covers.monitor_dirty = true;
             slot.cancel.cancel();
             self.runtime.wake();
         }

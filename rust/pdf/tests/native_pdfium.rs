@@ -232,6 +232,61 @@ fn pdf_covers_are_bounded_cancellable_and_preserve_active_readers_and_originals(
     engine.close("reader".into()).unwrap();
     engine.close("second".into()).unwrap();
     assert_eq!(hash(&path), before);
+    verify_preserved_source_stamp(&engine);
+}
+
+fn verify_preserved_source_stamp(engine: &PdfWorker) {
+    use std::{
+        fs::FileTimes,
+        io::{Seek, SeekFrom, Write},
+    };
+    let temporary = tempfile::tempdir().unwrap();
+    let path = temporary.path().join("source-version.pdf");
+    let mut bytes = fs::read(fixture("5000-pages.pdf")).unwrap();
+    assert!(bytes.len() > 65_536);
+    bytes.extend_from_slice(b"\n% source version A\n");
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .unwrap();
+    output.write_all(&bytes).unwrap();
+    drop(output);
+    let modified = path.metadata().unwrap().modified().unwrap();
+    engine
+        .open(
+            "source-version".into(),
+            path.clone(),
+            None,
+            Cancellation::default(),
+        )
+        .unwrap();
+    engine
+        .set_visible_documents(&["source-version".into()])
+        .unwrap();
+    let mut output = fs::OpenOptions::new().write(true).open(&path).unwrap();
+    output.seek(SeekFrom::End(-2)).unwrap();
+    output.write_all(b"B").unwrap();
+    output
+        .set_times(FileTimes::new().set_modified(modified))
+        .unwrap();
+    drop(output);
+    assert_eq!(path.metadata().unwrap().modified().unwrap(), modified);
+    assert!(matches!(
+        engine
+            .try_cover(
+                "source-version".into(),
+                path.clone(),
+                0,
+                40,
+                Cancellation::default()
+            )
+            .unwrap()
+            .wait(),
+        Err(Failure::Invalid(_))
+    ));
+    engine.close("source-version".into()).unwrap();
+    fs::remove_file(path).unwrap();
 }
 
 #[test]

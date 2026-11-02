@@ -4438,7 +4438,9 @@ dependencies = [
  "crossbeam-channel",
  "pdfium-render",
  "sha2",
+ "tempfile",
  "yamantaka-domain",
+ "yamantaka-windows",
 ]
 
 [[package]]
@@ -4454,6 +4456,7 @@ dependencies = [
  "uuid",
  "yamantaka-domain",
  "yamantaka-pdf",
+ "yamantaka-windows",
 ]
 
 [[package]]

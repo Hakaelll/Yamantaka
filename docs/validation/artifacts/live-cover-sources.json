@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "case": "after",
+      "exit": 0,
+      "readyImages": 10,
+      "sourceInvalidations": 1,
+      "sourceChange": {
+        "fileReplaced": true,
+        "originalModifiedTimeRestored": true,
+        "newImage": true,
+        "staleImageObserved": false,
+        "manualPagePreserved": true
+      },
+      "bulkRegeneration": null
+    },
+    {
+      "case": "bulk-pressure",
+      "exit": 0,
+      "readyImages": 10,
+      "sourceInvalidations": 0,
+      "sourceChange": null,
+      "bulkRegeneration": {
+        "review": false,
+        "targets": [
+          "demo-0",
+          "demo-1",
+          "demo-2"
+        ],
+        "manualPageBefore": 1,
+        "automaticPageAfter": 0,
+        "newImages": true,
+        "pressureRecovery": true
+      }
+    },
+    {
+      "case": "manual-picker",
+      "exit": 0,
+      "readyImages": 10,
+      "sourceInvalidations": 0,
+      "sourceChange": null,
+      "bulkRegeneration": null
+    }
+  ],
+  "originalFixturesUnchanged": true,
+  "manualDecisionAndMetadataPreserved": true,
+  "baseline": {
+    "fileReplaced": true,
+    "originalModifiedTimeRestored": true,
+    "newImage": false,
+    "staleImageObserved": true,
+    "manualPagePreserved": true
+  },
+  "existingTestsExtended": 3,
+  "newStandaloneTests": 0,
+  "workspaceClippyAllTargetsWarningsDenied": true,
+  "nativeDebugBuildPassed": true,
+  "cacheCollisionReproducedAndFixed": true,
+  "fileObservationBound": 16,
+  "repaintOnlyOnObservationChanges": true,
+  "bookGeometryAndPhysicsUnmodified": true,
+  "executableSha256": "7bbd1fda59757e17b8ad3d22b55b00e1fc81bfdd551dd16b808ea949f59f898c",
+  "dependencyVersionsAndChecksumsUnchanged": true
+}

@@ -21,6 +21,7 @@ pub(crate) struct SourceStamp {
     size: u64,
     modified: SystemTime,
     head: [u8; 32],
+    physical: yamantaka_windows::source_stamp::Stamp,
 }
 
 impl SourceStamp {
@@ -37,6 +38,8 @@ impl SourceStamp {
         let canonical = path.canonicalize().map_err(source_error)?;
         let mut file = File::open(&canonical).map_err(source_error)?;
         let before = file.metadata().map_err(source_error)?;
+        let physical =
+            yamantaka_windows::source_stamp::Stamp::from_file(&file).ok_or_else(source_changed)?;
         if !before.is_file() {
             return Err(Failure::Invalid("PDF source is not a regular file".into()));
         }
@@ -58,7 +61,10 @@ impl SourceStamp {
         let current = std::fs::metadata(&canonical).map_err(source_error)?;
         if [after, current].iter().any(|metadata| {
             metadata.len() != before.len() || metadata.modified().ok() != Some(modified)
-        }) {
+        }) || yamantaka_windows::source_stamp::Stamp::from_file(&file).as_ref()
+            != Some(&physical)
+            || yamantaka_windows::source_stamp::Stamp::read(&canonical).as_ref() != Some(&physical)
+        {
             return Err(source_changed());
         }
         cancel.check()?;
@@ -67,6 +73,7 @@ impl SourceStamp {
             size: before.len(),
             modified,
             head: hash.finalize().into(),
+            physical,
         })
     }
 

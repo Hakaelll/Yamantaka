@@ -17,6 +17,7 @@ fn cleanup_preserves_sources_and_unknown_files_without_blocking_native_covers() 
         temp.path().join("covers"),
         1024 * 1024 * 16,
     ));
+    verify_preserved_timestamp_identity(&cache, temp.path());
     let absent = cache
         .maintain(CoverCacheOperation::Inspect, &cancel)
         .unwrap();
@@ -133,5 +134,31 @@ fn cleanup_preserves_sources_and_unknown_files_without_blocking_native_covers() 
             .unwrap()
             .files,
         1
+    );
+}
+
+fn verify_preserved_timestamp_identity(cache: &CoverCache, directory: &Path) {
+    use std::{
+        fs::FileTimes,
+        io::{Seek, SeekFrom},
+    };
+    let path = directory.join("same-date.pdf");
+    fs::write(&path, vec![b'a'; 65_540]).unwrap();
+    let modified = path.metadata().unwrap().modified().unwrap();
+    let cancel = Cancellation::default();
+    let before = cache.identity(&path, 0, &cancel).unwrap();
+    {
+        let mut file = fs::OpenOptions::new().write(true).open(&path).unwrap();
+        file.seek(SeekFrom::Start(65_536)).unwrap();
+        file.write_all(b"edit").unwrap();
+        file.set_times(FileTimes::new().set_modified(modified))
+            .unwrap();
+    }
+    assert_eq!(path.metadata().unwrap().modified().unwrap(), modified);
+    assert_eq!(path.metadata().unwrap().len(), 65_540);
+    assert_ne!(
+        before,
+        cache.identity(&path, 0, &cancel).unwrap(),
+        "A changed PDF reused its previous pixel-cache identity"
     );
 }
