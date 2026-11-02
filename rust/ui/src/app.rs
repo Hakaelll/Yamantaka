@@ -254,6 +254,7 @@ pub struct YamantakaApp {
     governor: MemoryGovernor,
     bulk_organization_preview: Option<bulk_picker::OrganizationPreview>,
     bulk_organization_verified: Option<serde_json::Value>,
+    selection_admission_verified: Option<serde_json::Value>,
     bulk_picker: Option<bulk_picker::BulkPicker>,
     library_selection: library_selection::SelectionState,
     query_cancel: Cancellation,
@@ -499,6 +500,7 @@ impl YamantakaApp {
             governor,
             bulk_organization_preview: None,
             bulk_organization_verified: None,
+            selection_admission_verified: None,
             bulk_picker: None,
             library_selection: Default::default(),
             grouping,
@@ -2733,7 +2735,8 @@ impl App for YamantakaApp {
                         "readerRenderEvents":self.capture_render_events,
                         "linkKeyboardActivated":self.reader.links.preview == links::LinkPreview::Complete,
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
-                        "memoryScope":"Tracked PDF buffers and page/thumbnail/PDF-cover GPU payloads, wgpu staging and Glow image copies. Live text, UI/font textures and opaque driver allocations are not covered."});
+                        "memoryScope":"Tracked PDF buffers, extracted-text geometry and selected-text payloads, page/thumbnail/PDF-cover GPU payloads, wgpu staging and Glow image copies. egui text layout, UI/font textures and opaque driver allocations are not covered."});
+                    record["selectionAdmission"]=self.selection_admission_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["bulkOrganization"]=self.bulk_organization_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["bulkTargetPicker"]=self.bulk_picker_summary();
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();

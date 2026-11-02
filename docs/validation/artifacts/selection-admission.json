@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "isolatedAdmission": {
+    "synthetic": true,
+    "selectedPages": 100000,
+    "failedRangeBackgroundRequests": 0,
+    "visiblePageStillAdmitted": true,
+    "retryResumesBackgroundRequests": true,
+    "unrelatedFailureDoesNotBlockSelection": true,
+    "twoPendingRequestsStopAdmission": true
+  },
+  "normalPdfSelectionReady": true,
+  "ownedTextLeasePresent": true
+}

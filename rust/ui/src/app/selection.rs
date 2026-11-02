@@ -1,4 +1,5 @@
 use super::*;
+mod admission_preview;
 mod comparison_preview;
 mod keyboard;
 mod view;
@@ -95,7 +96,12 @@ impl SelectionState {
         let available =
             2usize.saturating_sub(self.pages.values().filter(|state| state.pending()).count());
         let mut pages = Vec::with_capacity(available);
-        let selected = self.range();
+        let selected = self.range().filter(|range| {
+            !self
+                .pages
+                .range(range.start().page()..=range.end().page())
+                .any(|(_, state)| state.error().is_some())
+        });
         let needed = visible.iter().copied().chain(
             selected
                 .into_iter()

@@ -24,3 +24,7 @@ The [capture manifest](../screenshots/rust-revision-groups/capture-manifest.json
 ## Remaining acceptance
 
 Group rename, deletion, and membership editing are not part of this flow. Additional evidence is needed for the physical chooser and creation form, opening an edition from its row, full restart, rapid group/context changes, close during an accepted write, externally changing groups, multi-page group lists and inherited groups exceeding 80 members, memory pressure, physical DPI, and Narrator. Automation rules, journals, undo, full performance comparison, and Release packaging remain pending. This checkpoint does not establish complete advanced-organization parity or rewrite acceptance.
+
+## Flutter scope clarification, 2026-11-02
+
+The connected Flutter revision-group dialog (`lib/features/relations/presentation/document_relations_dialog.dart`) creates a group from the current book and one chosen edition. Its repository (`lib/storage/repositories/document_relation_repository.dart`) creates groups, reads them and changes the current edition. It does not expose group renaming, deletion or membership editing. The native create/current workflow therefore matches those connected operations; those additional CRUD features are product limitations rather than missing implemented Flutter functionality. Physical interaction and performance acceptance remain separate requirements.

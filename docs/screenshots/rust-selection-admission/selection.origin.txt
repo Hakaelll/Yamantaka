@@ -1,0 +1,5 @@
+Native synthetic reader with keyboard selection.
+The large-range failure check is isolated from this two-page PDF.
+PNG pixels unchanged; synthetic provenance text added.
+Native PNG SHA-256: 6b6551b04188c08568af8bc0ec452a7baa157b98fdd9032fa7a352b0f1e0a868
+Published PNG SHA-256: b6115ac348ce4db6af0f3103d910ac670a96f714263ab2f4b2eb66da68ec9529

@@ -1702,6 +1702,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         args.iter().any(|arg| arg == "--annotation-multi"),
                     );
                 }
+                if args.iter().any(|arg| arg == "--selection-admission-check") {
+                    app.preview_selection_admission();
+                }
                 if args.iter().any(|arg| arg == "--selection") {
                     app.preview_selection(args.iter().any(|value| value == "--selection-keyboard"));
                 }

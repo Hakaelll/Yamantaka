@@ -408,6 +408,7 @@ $cases = @(
     @{ name='selection-keyboard-dark'; args=@('--reader','--selection','--selection-keyboard') },
     @{ name='selection-keyboard-rotated'; args=@('--reader','--selection','--selection-keyboard','--rotation=90') },
     @{ name='selection-keyboard-small-200'; args=@('--reader','--selection','--selection-keyboard','--size=640x480','--text-scale=2') },
+    @{ name='selection-admission'; args=@('--reader','--selection','--selection-keyboard','--selection-admission-check','--es','--reduce-motion') },
     @{ name='selection-dark'; args=@('--reader','--selection') },
     @{ name='selection-light-es'; args=@('--reader','--selection','--light','--es') },
     @{ name='selection-rotated'; args=@('--reader','--selection','--rotation=90') },
@@ -850,6 +851,12 @@ foreach ($case in $cases) {
             if (-not $controls.relations.editingLocation) {throw 'The inline location editor did not open.'}
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar edición','Guardar ubicación')
         } elseif ($controls.relations.editingLocation) {throw 'The finished editor was left open.'}
+    }
+    if ($case.name -eq 'selection-admission') {
+        $admission=$controls.selectionAdmission
+        if (-not $admission.synthetic -or $admission.selectedPages -ne 100000 -or $admission.failedRangeBackgroundRequests -ne 0 -or -not $admission.visiblePageStillAdmitted -or -not $admission.retryResumesBackgroundRequests -or -not $admission.unrelatedFailureDoesNotBlockSelection -or -not $admission.twoPendingRequestsStopAdmission) {throw 'Selection failure admission check failed.'}
+        if ($controls.trackedMemory.text -le 0 -or -not $controls.textSelection.enabled -or $controls.textSelection.readyPages -le 0) {throw 'The normal native selection did not retain governed text.'}
+        if ($controls.textSelection.start[0] -ne 0 -or $controls.textSelection.start[1] -ne 0 -or $controls.textSelection.end[0] -ne 0 -or $controls.textSelection.end[1] -ne 1) {throw 'The native keyboard selection lost its expected character range.'}
     }
     if ($case.name -like 'import-rule-*') {
         $result=$controls.ruleSimulation

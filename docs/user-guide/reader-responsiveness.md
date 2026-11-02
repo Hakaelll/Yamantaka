@@ -15,3 +15,9 @@ With the default wgpu compositor, a page can retain a small whole-page preview w
 The crop uses the current rotation and physical scale, with a two-pixel sampling margin. Each pane divides its crop allowance among visible pages. The previous crop stays in its page-relative position while a replacement arrives. An optional crop failure falls back to the whole-page pipeline without a reader error. Safe mode and the alternate Glow compositor keep the whole-page pipeline.
 
 [Region refinement validation](../validation/rust-page-region-2026-10-31.md) records the exercised native cases. Rapid panning, device recovery and paired performance acceptance remain pending.
+
+## Text selection failures
+
+If a required text page fails while extending a selection, Yamantaka pauses new background requests for the remainder of that selection. Visible pages can still request their text. The existing **Retry selection** action clears failed text entries and allows requests to continue. Selecting a smaller passage or ending the selection releases text that is no longer needed. An unrelated visible-page failure does not pause a different selected range.
+
+This affects text extraction, not PDF page rendering or the original files. The [selection admission checkpoint](../validation/rust-selection-failure-admission-2026-11-02.md) records the exercised cases. egui text layout, font textures and opaque driver allocations are not included in the tracked PDF-buffer totals.
