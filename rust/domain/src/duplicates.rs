@@ -1,3 +1,4 @@
+pub mod merge;
 use crate::{
     Cancellation, Result,
     memory::{ByteLease, MemoryGovernor},

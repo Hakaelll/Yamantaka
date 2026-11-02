@@ -27,3 +27,7 @@ así nunca se publica un resultado que siga apuntando al registro retirado.
 La transacción empieza solo después de que el prebackup haya terminado. Si la
 transacción falla, se hace rollback; el backup permite recuperar el estado
 anterior incluso si el fallo ocurre después del commit local.
+
+## Native Rust checkpoint
+
+The [Rust consolidation store](../validation/rust-duplicate-consolidation-storage-2026-11-02.md) now uses freshly verified full SHA-256 proofs, a dependent-record revision, a pre-merge v9 backup and one SQL transaction. It preserves native preferences, manual covers, annotation provenance and incomplete historical sessions. Native discovery remains read-only until confirmation, live-editor/session retirement, continuity reconciliation and undo are connected. The historical Flutter partial-fingerprint classifier above does not authorize native exact-duplicate merges.

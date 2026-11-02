@@ -1,3 +1,4 @@
+pub mod merge_sources;
 use crate::file_digest::HashedFile;
 use crossbeam_channel::{Receiver, Select, TryRecvError, bounded};
 use std::{
@@ -186,3 +187,7 @@ impl Drop for Job {
 #[cfg(test)]
 #[path = "duplicates/verification_test.rs"]
 pub(crate) mod verification_test;
+
+#[cfg(test)]
+#[path = "duplicates/merge_verification.rs"]
+pub(crate) mod merge_verification;

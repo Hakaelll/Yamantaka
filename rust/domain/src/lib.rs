@@ -291,6 +291,12 @@ pub trait LibraryRepository {
     ) -> Result<String> {
         Err(Failure::Unsupported("Library tag changes".into()))
     }
+    fn duplicate_merge_store(
+        &self,
+        _preferences: serde_json::Value,
+    ) -> Result<duplicates::merge::Factory> {
+        Err(Failure::Unsupported("Duplicate consolidation".into()))
+    }
     fn duplicate_reader(&self) -> Result<duplicates::ReaderFactory> {
         Err(Failure::Unsupported("Library duplicate discovery".into()))
     }

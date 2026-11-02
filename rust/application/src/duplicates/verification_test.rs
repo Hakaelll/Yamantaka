@@ -1,7 +1,7 @@
 use super::*;
 use yamantaka_domain::LibraryRepository;
 use yamantaka_storage::Database;
-fn run(db: &Database, governor: &MemoryGovernor) -> Arc<Report> {
+pub(super) fn run(db: &Database, governor: &MemoryGovernor) -> Arc<Report> {
     let mut job = Job::start(
         Request {
             governor: governor.clone(),
@@ -87,4 +87,5 @@ pub(crate) fn verify(db: &Database, governor: &MemoryGovernor) {
     db.execute_batch("DELETE FROM documents WHERE id LIKE 'duplicate-page-%'")
         .unwrap();
     assert_eq!(governor.usage().total, 0);
+    super::merge_verification::verify(db, governor);
 }

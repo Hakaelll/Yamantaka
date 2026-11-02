@@ -469,6 +469,12 @@ impl LibraryRepository for Database {
     ) -> Result<yamantaka_domain::automation::execution::JournalPage> {
         self.rule_journals(offset, governor, cancel)
     }
+    fn duplicate_merge_store(
+        &self,
+        preferences: serde_json::Value,
+    ) -> Result<yamantaka_domain::duplicates::merge::Factory> {
+        crate::duplicates::merge::factory(self, preferences)
+    }
     fn duplicate_reader(&self) -> Result<yamantaka_domain::duplicates::ReaderFactory> {
         crate::duplicates::factory(self)
     }
