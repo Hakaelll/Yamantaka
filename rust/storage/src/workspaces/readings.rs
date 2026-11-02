@@ -30,7 +30,7 @@ pub(super) fn load(
     cancel.check()?;
     let db = &database.connection;
     let workspace = verify(db, expected)?;
-    let view = db.query_row("SELECT query_json,collection_id,grouping,sort_mode,density,focus_mode FROM workspaces WHERE id=?",[&expected.id],|row|Ok((row.get::<_,String>(0)?,row.get::<_,Option<String>>(1)?,row.get::<_,String>(2)?,row.get::<_,String>(3)?,row.get::<_,String>(4)?,row.get::<_,bool>(5)?))).map_err(storage)?;
+    let view = db.query_row("SELECT query_json,collection_id,grouping,sort_mode,density,focus_mode,panel_width,visible_columns_json FROM workspaces WHERE id=?",[&expected.id],|row|Ok((row.get::<_,String>(0)?,row.get::<_,Option<String>>(1)?,row.get::<_,String>(2)?,row.get::<_,String>(3)?,row.get::<_,String>(4)?,row.get::<_,bool>(5)?,row.get::<_,f64>(6)?,row.get::<_,String>(7)?))).map_err(storage)?;
     let mut view = WorkspaceView {
         query: serde_json::from_str(&view.0).map_err(storage)?,
         collection_id: view.1,
@@ -38,6 +38,8 @@ pub(super) fn load(
         sort: serde_json::from_value(serde_json::Value::String(view.3)).map_err(storage)?,
         density: serde_json::from_value(serde_json::Value::String(view.4)).map_err(storage)?,
         focus: view.5,
+        panel_width: view.6,
+        visible_columns: serde_json::from_str(&view.7).map_err(storage)?,
     };
     view.validate()?;
     if workspace.readings > 12 {

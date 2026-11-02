@@ -47,6 +47,11 @@ impl YamantakaApp {
         saved: &yamantaka_domain::workspaces::WorkspaceReadings,
     ) {
         assert_eq!(saved.workspace.name, "Reference copy");
+        assert_eq!(saved.view.panel_width, 360.0);
+        assert_eq!(
+            saved.view.visible_columns,
+            ["document", "status", "future-column"]
+        );
         assert!(saved.workspace.is_default);
         assert_eq!(saved.tabs.tabs().len(), 3);
         let first = &saved.tabs.tabs()[0];
@@ -85,6 +90,10 @@ impl YamantakaApp {
         };
         match step {
             1 => {
+                self.reader_panel_width = 360.0;
+                self.library_columns = ["document", "status", "future-column"]
+                    .map(str::to_owned)
+                    .into();
                 self.query = "Architecture".into();
                 self.list = true;
                 self.reader_focus = true;
@@ -157,6 +166,8 @@ impl YamantakaApp {
             }
             7 => {
                 assert_eq!(self.workspaces.total, 1);
+                self.reader_panel_width = 220.0;
+                self.library_columns = yamantaka_domain::workspaces::default_columns();
                 self.query.clear();
                 self.list = false;
                 self.grouping.reset();
@@ -173,6 +184,11 @@ impl YamantakaApp {
                 })
                 && !self.reader.reader_preferences_loading =>
             {
+                assert_eq!(self.reader_panel_width, 360.0);
+                assert_eq!(
+                    self.library_columns,
+                    ["document", "status", "future-column"]
+                );
                 assert_eq!(self.query, "Architecture");
                 assert!(self.list && self.reader_focus && self.workspaces.binding.is_some());
                 assert!(self.grouping.mode == super::super::library_grouping::Grouping::Author);
@@ -283,6 +299,10 @@ impl YamantakaApp {
                     &self.tabs.model.clone().into(),
                 )
                 .unwrap();
+                self.reader_focus = false;
+                self.reader.panel = true;
+                self.reader.reader_panel_tab = outline::ReaderPanelTab::Bookmarks;
+                self.workspaces.open = false;
                 self.workspaces.preview = 0;
             }
             _ => {}

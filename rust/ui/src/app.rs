@@ -28,6 +28,7 @@ mod goals;
 mod history;
 mod legacy_import;
 mod library_check;
+mod library_columns;
 mod library_covers;
 mod library_grouping;
 mod library_grouping_grid;
@@ -204,6 +205,9 @@ pub struct YamantakaApp {
     modified_only: bool,
     list: bool,
     library_density: yamantaka_domain::workspaces::WorkspaceDensity,
+    library_columns: Vec<String>,
+    reader_panel_width: f32,
+    reader_panel_restore: bool,
     reader_chrome_hidden: bool,
     command_palette_preview: command_palette::PalettePreview,
     command_palette: command_palette::PaletteState,
@@ -428,7 +432,6 @@ impl YamantakaApp {
             relations: Default::default(),
             automation: Default::default(),
             runtime,
-            preferences,
             sessions: Default::default(),
             store,
             dark,
@@ -452,6 +455,20 @@ impl YamantakaApp {
             modified_only,
             list,
             library_density,
+            library_columns: preferences
+                .get("libraryColumns")
+                .cloned()
+                .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+                .filter(|columns| yamantaka_domain::workspaces::validate_columns(columns).is_ok())
+                .unwrap_or_else(yamantaka_domain::workspaces::default_columns),
+            reader_panel_width: preferences
+                .get("readerPanelWidth")
+                .and_then(serde_json::Value::as_f64)
+                .filter(|width| width.is_finite())
+                .unwrap_or(300.0)
+                .clamp(220.0, 500.0) as f32,
+            reader_panel_restore: true,
+            preferences,
             shortcut_bindings,
             shortcut_error: None,
             reader_chrome_hidden: false,
@@ -597,6 +614,11 @@ impl YamantakaApp {
             return;
         }
         let state = [
+            ("libraryColumns", serde_json::json!(self.library_columns)),
+            (
+                "readerPanelWidth",
+                serde_json::json!(self.reader_panel_width),
+            ),
             (
                 "libraryDensity",
                 serde_json::Value::from(
@@ -2743,6 +2765,7 @@ impl App for YamantakaApp {
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();
                     record["librarySelection"]=self.library_selection.summary();
                     record["libraryGrouping"]=self.grouping_summary();
+                    record["workspaceLayout"]=serde_json::json!({"columns":self.library_columns,"panelWidth":self.reader_panel_width,"panelRestorePending":self.reader_panel_restore,"panelActualWidth":egui::containers::panel::PanelState::load(&ctx,egui::Id::new("reader-panel")).map(|state|state.size().x)});
                     record["libraryFiltersActive"]=self.library_has_filters().into();
                     record["libraryQueryLoaded"]=self.library_loaded.into();
                     record["smartView"]=self.smart_view.map(|view|view.key()).into();

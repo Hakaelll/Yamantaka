@@ -28,6 +28,8 @@ pub struct WorkspaceView {
     pub sort: LibrarySort,
     pub density: WorkspaceDensity,
     pub focus: bool,
+    pub panel_width: f64,
+    pub visible_columns: Vec<String>,
 }
 impl Default for WorkspaceView {
     fn default() -> Self {
@@ -38,6 +40,8 @@ impl Default for WorkspaceView {
             sort: Default::default(),
             density: Default::default(),
             focus: false,
+            panel_width: 320.0,
+            visible_columns: default_columns(),
         }
     }
 }
@@ -90,6 +94,12 @@ impl WorkspaceView {
     }
     pub fn validate(&self) -> Result<()> {
         self.parsed_query()?;
+        validate_columns(&self.visible_columns)?;
+        if !self.panel_width.is_finite() || !(220.0..=500.0).contains(&self.panel_width) {
+            return Err(Failure::Invalid(
+                "Saved panel width is out of range; stored data is preserved".into(),
+            ));
+        }
         if self
             .collection_id
             .as_ref()
@@ -105,4 +115,19 @@ impl WorkspaceView {
         }
         Ok(())
     }
+}
+
+/// Native defaults preserve the established list layout.
+pub fn default_columns() -> Vec<String> {
+    ["document", "author", "status", "progress", "pages"]
+        .map(str::to_owned)
+        .into()
+}
+pub fn validate_columns(columns: &[String]) -> Result<()> {
+    if columns.len() > 12 || columns.iter().any(|key| key.is_empty() || key.len() > 128) {
+        return Err(Failure::Invalid(
+            "Saved list columns exceed supported limits; stored data is preserved".into(),
+        ));
+    }
+    Ok(())
 }

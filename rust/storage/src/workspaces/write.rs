@@ -302,6 +302,6 @@ fn view(db: &Connection, id: &str, view: &WorkspaceView) -> Result<()> {
     let grouping = serde_json::to_value(view.grouping).map_err(storage)?;
     let sort = serde_json::to_value(view.sort).map_err(storage)?;
     let density = serde_json::to_value(view.density).map_err(storage)?;
-    db.execute("UPDATE workspaces SET query_json=?,collection_id=?,grouping=?,sort_mode=?,density=?,focus_mode=? WHERE id=?",params![serde_json::to_string(&query).map_err(storage)?,view.collection_id,grouping.as_str().unwrap(),sort.as_str().unwrap(),density.as_str().unwrap(),view.focus,id]).map_err(storage)?;
+    db.execute("UPDATE workspaces SET query_json=?,collection_id=?,grouping=?,sort_mode=?,density=?,focus_mode=?,panel_width=?,visible_columns_json=? WHERE id=?",params![serde_json::to_string(&query).map_err(storage)?,view.collection_id,grouping.as_str().unwrap(),sort.as_str().unwrap(),density.as_str().unwrap(),view.focus,view.panel_width,serde_json::to_string(&view.visible_columns).map_err(storage)?,id]).map_err(storage)?;
     Ok(())
 }

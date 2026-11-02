@@ -15,6 +15,8 @@ pub fn preserved_split_references(document: &str) {
     let cancel = Cancellation::default();
     let source = database.workspaces(0, &cancel).unwrap().entries.remove(0);
     let legacy = database.workspace(&(&source).into(), &cancel).unwrap();
+    assert_eq!(legacy.view.panel_width, 360.0);
+    assert_eq!(legacy.view.visible_columns, ["document", "author"]);
     let comparison = legacy.view.parsed_query().unwrap().comparison.unwrap();
     assert_eq!(comparison.layout, ComparisonLayout::Stacked);
     assert_eq!(comparison.document, "original");
@@ -121,6 +123,8 @@ pub fn preserved_split_references(document: &str) {
     let mut view = current_readings.view;
     view.query = serde_json::json!({"text":"Appendix","list":true});
     view.focus = false;
+    view.panel_width = 420.0;
+    view.visible_columns = vec!["document".into(), "progress".into(), "future-column".into()];
     let updated = database
         .change_workspace(
             &WorkspaceChange::Replace {
@@ -143,6 +147,19 @@ pub fn preserved_split_references(document: &str) {
     assert_eq!(snapshot.view.parsed_query().unwrap().text, "Appendix");
     assert!(snapshot.view.parsed_query().unwrap().list);
     assert!(!snapshot.view.focus);
+    assert_eq!(snapshot.view.panel_width, 420.0);
+    assert_eq!(
+        snapshot.view.visible_columns,
+        ["document", "progress", "future-column"]
+    );
+    for width in [f64::NAN, 0.0, 501.0] {
+        let mut invalid = snapshot.view.clone();
+        invalid.panel_width = width;
+        assert!(invalid.validate().is_err());
+    }
+    let mut invalid = snapshot.view.clone();
+    invalid.visible_columns = vec!["x".into(); 13];
+    assert!(invalid.validate().is_err());
     let focused = database
         .change_workspace(
             &WorkspaceChange::Focus {

@@ -47,7 +47,23 @@ impl YamantakaApp {
                         .show(ui, |ui| self.reader_panel_content(ui, info, p));
                 });
         } else {
-            navigator_panel(ui, |ui| self.reader_panel_content(ui, info, p));
+            if self.reader_panel_restore {
+                ui.ctx().data_mut(|data| {
+                    data.remove::<egui::containers::panel::PanelState>(egui::Id::new(
+                        "reader-panel",
+                    ))
+                });
+                self.reader_panel_restore = false;
+            }
+            let width = navigator_panel(ui, self.reader_panel_width, |ui| {
+                self.reader_panel_content(ui, info, p)
+            });
+            if (self.reader_panel_width - width).abs() > 0.5
+                && !ui.input(|input| input.pointer.primary_down())
+            {
+                self.reader_panel_width = width;
+                self.persist_library_state();
+            }
         }
     }
 
@@ -168,9 +184,9 @@ impl YamantakaApp {
     }
 }
 
-fn navigator_panel(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui)) {
+fn navigator_panel(ui: &mut egui::Ui, width: f32, contents: impl FnOnce(&mut egui::Ui)) -> f32 {
     egui::Panel::left("reader-panel")
-        .default_size(300.0)
+        .default_size(width)
         .size_range(220.0..=500.0)
         .resizable(true)
         .show(ui, |ui| {
@@ -179,7 +195,10 @@ fn navigator_panel(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui)) {
                 .id_salt("reader-navigator")
                 .auto_shrink([false, false])
                 .show(ui, contents);
-        });
+        })
+        .response
+        .rect
+        .width()
 }
 
 impl YamantakaApp {

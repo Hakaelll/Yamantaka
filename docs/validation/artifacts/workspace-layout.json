@@ -1,0 +1,65 @@
+{
+  "cases": [
+    {
+      "case": "list-minimal",
+      "layout": {
+        "columns": [
+          "document",
+          "status"
+        ],
+        "panelWidth": 300.0,
+        "panelRestorePending": true,
+        "panelActualWidth": null
+      }
+    },
+    {
+      "case": "list-small-es",
+      "layout": {
+        "columns": [
+          "document",
+          "status"
+        ],
+        "panelWidth": 300.0,
+        "panelRestorePending": true,
+        "panelActualWidth": null
+      }
+    },
+    {
+      "case": "panel-420",
+      "layout": {
+        "columns": [
+          "document",
+          "author",
+          "status",
+          "progress",
+          "pages"
+        ],
+        "panelWidth": 420.0,
+        "panelRestorePending": false,
+        "panelActualWidth": 420.0
+      }
+    },
+    {
+      "case": "workspaces-final",
+      "layout": {
+        "columns": [
+          "document",
+          "status",
+          "future-column"
+        ],
+        "panelWidth": 360.0,
+        "panelRestorePending": false,
+        "panelActualWidth": 360.0
+      }
+    }
+  ],
+  "storedLayoutVerifiedReadOnly": true,
+  "unknownColumnPreserved": true,
+  "existingTestsExtended": 1,
+  "newStandaloneTests": 0,
+  "compatibilityTestPassed": true,
+  "nativeDebugBuildPassed": true,
+  "workspaceClippyAllTargetsWarningsDenied": true,
+  "noAddedDependencies": true,
+  "executableSha256": "c4bc75042a073de83ae55203fcca93dd7dd43ae3d234c3f6a32f0b06959a08da"
+}

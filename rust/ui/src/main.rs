@@ -1531,6 +1531,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     args.iter().any(|arg| arg == "--details"),
                     args.iter().any(|arg| arg == "--text-panel"),
                 );
+                app.preview_workspace_layout(
+                    args.iter().any(|arg| arg == "--list-minimal-columns"),
+                    args.iter().any(|arg| arg == "--wide-reader-panel"),
+                );
+
                 if args
                     .iter()
                     .any(|arg| arg == "--compare-pdf" || arg == "--compare-different")

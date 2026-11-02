@@ -23,7 +23,11 @@ impl YamantakaApp {
         if wide {
             let (header, _) = ui.allocate_exact_size(egui::vec2(width, 36.0), Sense::hover());
             if ui.is_rect_visible(header) {
-                let columns = Columns::new(header);
+                let columns = Columns::new(
+                    header,
+                    self.library_column("progress") || self.library_column("status"),
+                    self.library_column("pages"),
+                );
                 line_label(
                     ui,
                     "heading-title",
@@ -33,24 +37,28 @@ impl YamantakaApp {
                     p.secondary,
                     false,
                 );
-                line_label(
-                    ui,
-                    "heading-progress",
-                    columns.progress,
-                    self.tr("Lectura", "Reading"),
-                    12.0,
-                    p.secondary,
-                    false,
-                );
-                line_label(
-                    ui,
-                    "heading-pages",
-                    columns.pages,
-                    self.tr("Páginas", "Pages"),
-                    12.0,
-                    p.secondary,
-                    false,
-                );
+                if self.library_column("progress") || self.library_column("status") {
+                    line_label(
+                        ui,
+                        "heading-progress",
+                        columns.progress,
+                        self.tr("Lectura", "Reading"),
+                        12.0,
+                        p.secondary,
+                        false,
+                    );
+                }
+                if self.library_column("pages") {
+                    line_label(
+                        ui,
+                        "heading-pages",
+                        columns.pages,
+                        self.tr("Páginas", "Pages"),
+                        12.0,
+                        p.secondary,
+                        false,
+                    );
+                }
                 line_label(
                     ui,
                     "heading-actions",
@@ -80,7 +88,15 @@ impl YamantakaApp {
         wide: bool,
         p: Palette,
     ) {
-        let height = if wide { 92.0 } else { 184.0 };
+        let summary_y = 64.0
+            + if self.library_column("author") {
+                30.0
+            } else {
+                0.0
+            };
+        let has_summary = self.library_column("progress") || self.library_column("pages");
+        let footer_y = summary_y + if has_summary { 42.0 } else { 12.0 };
+        let height = if wide { 92.0 } else { footer_y + 48.0 };
         let (row, _) = ui.allocate_exact_size(egui::vec2(width, height), Sense::hover());
         // No hidden book meshes, texture work, animation IDs or text galleys.
         if !ui.is_rect_visible(row) && self.library_selection.focus.as_deref() != Some(&document.id)
@@ -196,7 +212,11 @@ impl YamantakaApp {
             .hline(row.x_range(), row.bottom(), Stroke::new(1.0, p.line));
 
         if wide {
-            let columns = Columns::new(row);
+            let columns = Columns::new(
+                row,
+                self.library_column("progress") || self.library_column("status"),
+                self.library_column("pages"),
+            );
             let cover_rect =
                 Rect::from_min_size(row.min + egui::vec2(8.0, 5.0), egui::vec2(54.0, 82.0));
             let mut cover_ui = bounded_child(ui, "miniature", cover_rect);
@@ -221,15 +241,17 @@ impl YamantakaApp {
                 p.ink,
                 true,
             );
-            line_label(
-                ui,
-                "author",
-                at_y(columns.title, row.top() + 44.0, 20.0),
-                &author,
-                13.0,
-                p.secondary,
-                false,
-            );
+            if self.library_column("author") {
+                line_label(
+                    ui,
+                    "author",
+                    at_y(columns.title, row.top() + 44.0, 20.0),
+                    &author,
+                    13.0,
+                    p.secondary,
+                    false,
+                );
+            }
             if document.missing {
                 line_label(
                     ui,
@@ -241,42 +263,57 @@ impl YamantakaApp {
                     false,
                 );
             }
-            line_label(
-                ui,
-                "progress-label",
-                at_y(columns.progress, row.top() + 16.0, 22.0),
-                &format!("{percent} {}", self.tr("leído", "read")),
-                14.0,
-                p.ink,
-                false,
-            );
-            progress_track(
-                ui,
-                Rect::from_min_size(
-                    egui::pos2(columns.progress.left(), row.top() + 46.0),
-                    egui::vec2(columns.progress.width() - 16.0, 3.0),
-                ),
-                progress,
-                p,
-            );
-            line_label(
-                ui,
-                "position",
-                at_y(columns.progress, row.top() + 58.0, 18.0),
-                &metadata,
-                12.0,
-                p.secondary,
-                false,
-            );
-            line_label(
-                ui,
-                "pages",
-                at_y(columns.pages, row.top() + 30.0, 24.0),
-                &document.page_count.to_string(),
-                16.0,
-                p.ink,
-                false,
-            );
+            if self.library_column("progress") {
+                line_label(
+                    ui,
+                    "progress-label",
+                    at_y(columns.progress, row.top() + 16.0, 22.0),
+                    &format!("{percent} {}", self.tr("leído", "read")),
+                    14.0,
+                    p.ink,
+                    false,
+                );
+                progress_track(
+                    ui,
+                    Rect::from_min_size(
+                        egui::pos2(columns.progress.left(), row.top() + 46.0),
+                        egui::vec2(columns.progress.width() - 16.0, 3.0),
+                    ),
+                    progress,
+                    p,
+                );
+            }
+            if self.library_column("status") {
+                line_label(
+                    ui,
+                    "position",
+                    at_y(
+                        columns.progress,
+                        row.top()
+                            + if self.library_column("progress") {
+                                58.0
+                            } else {
+                                30.0
+                            },
+                        22.0,
+                    ),
+                    &metadata,
+                    12.0,
+                    p.secondary,
+                    false,
+                );
+            }
+            if self.library_column("pages") {
+                line_label(
+                    ui,
+                    "pages",
+                    at_y(columns.pages, row.top() + 30.0, 24.0),
+                    &document.page_count.to_string(),
+                    16.0,
+                    p.ink,
+                    false,
+                );
+            }
             self.list_actions(
                 ui,
                 document,
@@ -287,60 +324,73 @@ impl YamantakaApp {
             let body = row.shrink2(egui::vec2(12.0, 0.0));
             let title = at_y(body, row.top() + 14.0, 44.0);
             two_line_title(ui, title, document.display_title(), p.ink);
-            line_label(
-                ui,
-                "author",
-                at_y(body, row.top() + 64.0, 20.0),
-                &author,
-                13.0,
-                p.secondary,
-                false,
-            );
-            let summary = format!(
-                "{percent} {} · {} {}",
-                self.tr("leído", "read"),
-                document.page_count,
-                self.tr("páginas", "pages")
-            );
-            line_label(
-                ui,
-                "summary",
-                at_y(body, row.top() + 94.0, 22.0),
-                &summary,
-                13.0,
-                p.ink,
-                false,
-            );
-            progress_track(
-                ui,
-                Rect::from_min_size(
-                    egui::pos2(body.left(), row.top() + 122.0),
-                    egui::vec2(body.width(), 3.0),
-                ),
-                progress,
-                p,
-            );
+            if self.library_column("author") {
+                line_label(
+                    ui,
+                    "author",
+                    at_y(body, row.top() + 64.0, 20.0),
+                    &author,
+                    13.0,
+                    p.secondary,
+                    false,
+                );
+            }
+            let mut summary = Vec::new();
+            if self.library_column("progress") {
+                summary.push(format!("{percent} {}", self.tr("leído", "read")));
+            }
+            if self.library_column("pages") {
+                summary.push(format!(
+                    "{} {}",
+                    document.page_count,
+                    self.tr("páginas", "pages")
+                ));
+            }
+            if !summary.is_empty() {
+                line_label(
+                    ui,
+                    "summary",
+                    at_y(body, row.top() + summary_y, 22.0),
+                    &summary.join(" · "),
+                    13.0,
+                    p.ink,
+                    false,
+                );
+            }
+            if self.library_column("progress") {
+                progress_track(
+                    ui,
+                    Rect::from_min_size(
+                        egui::pos2(body.left(), row.top() + summary_y + 28.0),
+                        egui::vec2(body.width(), 3.0),
+                    ),
+                    progress,
+                    p,
+                );
+            }
             let action_rect = Rect::from_min_size(
-                egui::pos2(body.right() - ACTIONS, row.top() + 136.0),
+                egui::pos2(body.right() - ACTIONS, row.top() + footer_y),
                 egui::vec2(ACTIONS, 40.0),
             );
             let status_rect = Rect::from_min_max(
-                egui::pos2(body.left(), row.top() + 146.0),
-                egui::pos2(action_rect.left() - 8.0, row.top() + 166.0),
+                egui::pos2(body.left(), row.top() + footer_y + 10.0),
+                egui::pos2(action_rect.left() - 8.0, row.top() + footer_y + 30.0),
             );
-            line_label(
-                ui,
-                "position",
-                status_rect,
-                &metadata,
-                12.0,
-                if document.missing {
-                    p.accent
-                } else {
-                    p.secondary
-                },
-                false,
-            );
+            if self.library_column("status") || document.missing {
+                line_label(
+                    ui,
+                    "position",
+                    status_rect,
+                    &metadata,
+                    12.0,
+                    if document.missing {
+                        p.accent
+                    } else {
+                        p.secondary
+                    },
+                    false,
+                );
+            }
             self.list_actions(ui, document, action_rect, p);
         }
         self.library_book_response(ui, &response, document);
@@ -445,22 +495,29 @@ struct Columns {
     actions: Rect,
 }
 impl Columns {
-    fn new(rect: Rect) -> Self {
+    fn new(rect: Rect, show_progress: bool, show_pages: bool) -> Self {
         let actions = Rect::from_min_max(
             egui::pos2(rect.right() - ACTIONS - 12.0, rect.top()),
             egui::pos2(rect.right() - 12.0, rect.bottom()),
         );
-        let pages = Rect::from_min_max(
-            egui::pos2(actions.left() - 104.0, rect.top()),
-            egui::pos2(actions.left() - 24.0, rect.bottom()),
+        let mut right = actions.left() - 24.0;
+        let pages = Rect::from_min_size(
+            egui::pos2(right - if show_pages { 80.0 } else { 0.0 }, rect.top()),
+            egui::vec2(if show_pages { 80.0 } else { 0.0 }, rect.height()),
         );
-        let progress = Rect::from_min_max(
-            egui::pos2(pages.left() - 180.0, rect.top()),
-            egui::pos2(pages.left() - 24.0, rect.bottom()),
+        if show_pages {
+            right = pages.left() - 24.0;
+        }
+        let progress = Rect::from_min_size(
+            egui::pos2(right - if show_progress { 156.0 } else { 0.0 }, rect.top()),
+            egui::vec2(if show_progress { 156.0 } else { 0.0 }, rect.height()),
         );
+        if show_progress {
+            right = progress.left() - 24.0;
+        }
         let title = Rect::from_min_max(
-            egui::pos2(rect.left() + 72.0, rect.top()),
-            egui::pos2(progress.left() - 24.0, rect.bottom()),
+            rect.min + egui::vec2(72.0, 0.0),
+            egui::pos2(right, rect.bottom()),
         );
         Self {
             title,

@@ -187,6 +187,7 @@ impl YamantakaApp {
     }
     pub(super) fn library_grouping_options(&mut self, ui: &mut egui::Ui, p: Palette) {
         self.workspace_density_options(ui, p);
+        self.library_column_options(ui, p);
         ui.label(
             egui::RichText::new(self.tr("Agrupar por", "Group by"))
                 .color(p.secondary)

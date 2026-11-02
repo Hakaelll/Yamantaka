@@ -39,12 +39,15 @@ impl YamantakaApp {
             sort: self.sort,
             density: self.library_density,
             focus: self.reader_focus,
+            panel_width: f64::from(self.reader_panel_width),
+            visible_columns: self.library_columns.clone(),
         }
     }
     pub(super) fn apply_workspace_view(
         &mut self,
         view: &WorkspaceView,
     ) -> yamantaka_domain::Result<()> {
+        view.validate()?;
         let query = view.parsed_query()?;
         self.query = query.text;
         self.favorites = query.favorites_only;
@@ -93,6 +96,9 @@ impl YamantakaApp {
         self.sort = view.sort;
         self.library_density = view.density;
         self.reader_focus = view.focus;
+        self.reader_panel_width = view.panel_width as f32;
+        self.reader_panel_restore = true;
+        self.library_columns = view.visible_columns.clone();
         self.offset = 0;
         self.check_collection_filter();
         self.check_tag_filters();
