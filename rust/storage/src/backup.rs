@@ -10,6 +10,8 @@ use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs, io::Read, path::Path};
 use yamantaka_domain::{Cancellation, Failure, Result};
 
+mod extensions;
+
 type Contracts = BTreeMap<String, BTreeMap<String, Vec<String>>>;
 pub const MAX_BACKUP_BYTES: u64 = 128 * 1024 * 1024;
 pub const TABLE_ORDER: [&str; 23] = [
@@ -36,6 +38,25 @@ pub const TABLE_ORDER: [&str; 23] = [
     "operation_journal",
     "duplicate_merge_history",
     "app_metadata",
+];
+
+pub fn exported_tables() -> impl Iterator<Item = &'static str> {
+    TABLE_ORDER
+        .into_iter()
+        .chain(std::iter::once("document_covers"))
+}
+const COVER_COLUMNS: [&str; 11] = [
+    "document_id",
+    "source_page_index",
+    "small_thumbnail_path",
+    "large_thumbnail_path",
+    "generated_at",
+    "source_modified_at",
+    "confidence",
+    "selection_mode",
+    "algorithm_version",
+    "crop_mode",
+    "page_aspect_ratio",
 ];
 
 fn contracts() -> Contracts {
@@ -113,6 +134,12 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
     {
         return Err(Failure::Invalid("Invalid backup envelope".into()));
     }
+    if (payload["tables"].get("document_covers").is_some()
+        || payload.get("rustPreferences").is_some())
+        && payload.get("manifest").is_none()
+    {
+        return Err(Failure::Invalid("Missing optional backup manifest".into()));
+    }
     if let Some(manifest) = payload.get("manifest") {
         if manifest["format"] != payload["format"]
             || manifest["version"] != payload["version"]
@@ -124,15 +151,33 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
         let categories = manifest["categories"]
             .as_array()
             .ok_or_else(|| Failure::Invalid("Invalid manifest categories".into()))?;
+        for name in ["document_covers", "rustPreferences"] {
+            let present = if name == "document_covers" {
+                payload["tables"].get(name).is_some()
+            } else {
+                payload.get(name).is_some()
+            };
+            let count = categories.iter().filter(|c| c["name"] == name).count();
+            if present && count != 1 || !present && count != 0 {
+                return Err(Failure::Invalid(
+                    "Missing or duplicate optional backup category".into(),
+                ));
+            }
+        }
         for category in categories {
             let name = category["name"]
                 .as_str()
                 .ok_or_else(|| Failure::Invalid("Invalid category name".into()))?;
             let rows = if name == "settings" {
                 json!([payload["settings"]])
+            } else if name == "rustPreferences" {
+                json!([payload["rustPreferences"]])
             } else {
                 payload["tables"][name].clone()
             };
+            if name == "document_covers" && !rows.is_array() {
+                return Err(Failure::Invalid("Missing cover backup rows".into()));
+            }
             if let Some(count) = rows.as_array().map(Vec::len)
                 && (category["rows"].as_u64() != Some(count as u64)
                     || category["sha256"].as_str() != Some(hash_json(&rows)?.as_str()))
@@ -141,9 +186,12 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
             }
         }
     }
+    let preferences = extensions::preferences(&payload)?;
     let tables = payload["tables"]
         .as_object_mut()
         .ok_or_else(|| Failure::Invalid("Invalid backup tables".into()))?;
+    // Optional Rust category: older JSON backups have no saved cover decisions.
+    tables.entry("document_covers").or_insert_with(|| json!([]));
     // These are exactly the absent-table adapters in Flutter v9.
     for table in [
         "document_notes",
@@ -179,7 +227,7 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
     let mut counts = BTreeMap::new();
     let mut database = Database::in_memory_at(11)?;
     let tx = database.connection.transaction().map_err(storage)?;
-    for table in TABLE_ORDER {
+    for table in exported_tables() {
         cancel.check()?;
         let rows = tables
             .get(table)
@@ -187,7 +235,11 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
             .filter(|rows| rows.len() <= 100000)
             .ok_or_else(|| Failure::Invalid(format!("Invalid backup table: {table}")))?;
         counts.insert(table.into(), rows.len());
-        let mut columns = current[table].clone();
+        let mut columns = if table == "document_covers" {
+            COVER_COLUMNS.iter().map(|s| (*s).to_owned()).collect()
+        } else {
+            current[table].clone()
+        };
         // Flutter's historical JSON contract omits these existing schema-v11 fields.
         if table == "documents" {
             columns.extend(["is_modified".into(), "last_validated_at".into()]);
@@ -203,7 +255,11 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
             let map = row
                 .as_object()
                 .ok_or_else(|| Failure::Invalid(format!("Invalid row: {table}")))?;
-            if required[table].iter().any(|c| !map.contains_key(c))
+            if required
+                .get(table)
+                .unwrap_or(&columns)
+                .iter()
+                .any(|c| !map.contains_key(c))
                 || map
                     .values()
                     .any(|v| !(v.is_null() || v.is_number() || v.is_string()))
@@ -215,11 +271,18 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
             let values: Vec<_> = columns
                 .iter()
                 .map(|column| {
-                    let value = map
-                        .get(column)
-                        .filter(|v| !v.is_null())
-                        .cloned()
-                        .unwrap_or_else(|| default_value(table, column));
+                    let value = if table == "document_covers"
+                        && matches!(
+                            column.as_str(),
+                            "small_thumbnail_path" | "large_thumbnail_path"
+                        ) {
+                        Value::String(String::new())
+                    } else {
+                        map.get(column)
+                            .filter(|v| !v.is_null())
+                            .cloned()
+                            .unwrap_or_else(|| default_value(table, column))
+                    };
                     match value {
                         Value::String(s) => SqlValue::Text(s),
                         Value::Number(n) if n.is_i64() => SqlValue::Integer(n.as_i64().unwrap()),
@@ -235,10 +298,6 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
     }
     validate(&tx)?;
     tx.commit().map_err(storage)?;
-    let preferences = Preferences {
-        legacy: serde_json::from_value(payload["settings"].clone()).map_err(storage)?,
-        ..Default::default()
-    };
     Ok(RestorePreview {
         database,
         preferences,

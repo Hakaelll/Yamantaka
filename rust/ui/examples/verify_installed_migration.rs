@@ -64,6 +64,11 @@ fn verify(root: &Path) -> Result<Value> {
     let export = root.join("export-v9.json");
     db.export_backup(&export, &preferences, &cancel)?;
     let restored = backup::preview(&export, &cancel)?;
+    require(
+        serde_json::to_value(&restored.preferences).map_err(file_error)?
+            == serde_json::to_value(&preferences).map_err(file_error)?,
+        "Backup preference namespaces changed on round trip",
+    )?;
     let second = root.join("round-trip-v9.json");
     restored
         .database
@@ -77,7 +82,7 @@ fn verify(root: &Path) -> Result<Value> {
         payload["settings"] == round_trip["settings"],
         "Backup settings changed on round trip",
     )?;
-    for table in backup::TABLE_ORDER {
+    for table in backup::exported_tables() {
         require(
             payload["tables"][table] == round_trip["tables"][table],
             "Backup records changed on round trip",
@@ -98,7 +103,7 @@ fn verify(root: &Path) -> Result<Value> {
     )?;
     migration::verify_capture(&destination, &cancel)?;
     Ok(
-        json!({"version":1,"source":"installed Flutter store","sourceSchema":receipt.source_schema,"targetSchema":receipt.target_schema,"reviewedCopyVerified":true,"repeatedCaptureIdempotent":true,"allBackupTablesRoundTrip":true,"backupSettingsRoundTrip":true,"originalDatabaseUnchanged":true,"originalPreferencesUnchanged":true,"nativeClosedChecksUsed":true,"activated":false,"privacy":"Only status and schema versions are public; raw copies, records, hashes and preferences remain local."}),
+        json!({"version":1,"source":"installed Flutter store","sourceSchema":receipt.source_schema,"targetSchema":receipt.target_schema,"reviewedCopyVerified":true,"repeatedCaptureIdempotent":true,"allBackupTablesRoundTrip":true,"exportedTableCount":backup::exported_tables().count(),"preferenceNamespacesRoundTrip":true,"backupSettingsRoundTrip":true,"originalDatabaseUnchanged":true,"originalPreferencesUnchanged":true,"nativeClosedChecksUsed":true,"activated":false,"privacy":"Only status and schema versions are public; raw copies, records, hashes and preferences remain local."}),
     )
 }
 fn main() -> ExitCode {

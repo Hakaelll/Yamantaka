@@ -6,6 +6,8 @@ use yamantaka_storage::{
     backup::{TABLE_ORDER, install_preview, preview, preview_payload},
     preferences::Preferences,
 };
+#[path = "support/backup_extensions.rs"]
+mod backup_extensions;
 #[path = "support/restore_review.rs"]
 mod restore_review;
 #[path = "support/rollback.rs"]
@@ -37,6 +39,7 @@ fn all_nine_formats_restore_and_v9_exports_with_hashes() {
 #[test]
 fn every_backup_contract_restores_populated_relations_and_round_trips_all_columns() {
     let root = tempfile::tempdir().unwrap();
+    backup_extensions::verify(root.path());
     let current: Value =
         serde_json::from_str(include_str!("fixtures/populated-backup-v9.json")).unwrap();
     let contracts: Value =

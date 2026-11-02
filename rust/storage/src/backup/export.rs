@@ -1,4 +1,4 @@
-use super::{MAX_BACKUP_BYTES, TABLE_ORDER, hash_json};
+use super::{MAX_BACKUP_BYTES, TABLE_ORDER, exported_tables, hash_json};
 use crate::{Database, database::storage, preferences::Preferences};
 use rusqlite::types::ValueRef;
 use serde::Serialize;
@@ -81,6 +81,11 @@ impl Database {
         mut progress: impl FnMut(BackupProgress),
     ) -> Result<()> {
         cancel.check()?;
+        if preferences.version != 1 {
+            return Err(Failure::Invalid(
+                "Unsupported backup preferences version".into(),
+            ));
+        }
         let parent = path
             .parent()
             .ok_or_else(|| Failure::Invalid("A parent directory is required".into()))?;
@@ -99,8 +104,8 @@ impl Database {
             output.raw(b"{\"format\":\"yamantaka-local-backup\",\"version\":9,\"exportedAt\":")?;
             output.json(&exported)?;
             output.raw(b",\"containsPdfFiles\":false,\"tables\":{")?;
-            let mut categories = Vec::with_capacity(TABLE_ORDER.len() + 1);
-            for (index, table) in TABLE_ORDER.into_iter().enumerate() {
+            let mut categories = Vec::with_capacity(TABLE_ORDER.len() + 3);
+            for (index, table) in exported_tables().enumerate() {
                 cancel.check()?;
                 if index > 0 {
                     output.raw(b",")?;
@@ -110,7 +115,14 @@ impl Database {
                 output.hash = Some(Sha256::new());
                 output.raw(b"[")?;
                 let mut statement = tx
-                    .prepare(&format!("SELECT * FROM {table}"))
+                    .prepare(&format!(
+                        "SELECT * FROM {table}{}",
+                        if table == "document_covers" {
+                            " WHERE selection_mode='manual'"
+                        } else {
+                            ""
+                        }
+                    ))
                     .map_err(storage)?;
                 let names: Vec<_> = statement
                     .column_names()
@@ -126,17 +138,25 @@ impl Database {
                     }
                     let mut values = Map::new();
                     for (index, name) in names.iter().enumerate() {
-                        let value = match row.get_ref(index).map_err(storage)? {
-                            ValueRef::Null => Value::Null,
-                            ValueRef::Integer(value) => json!(value),
-                            ValueRef::Real(value) => json!(value),
-                            ValueRef::Text(value) => {
-                                json!(std::str::from_utf8(value).map_err(storage)?)
-                            }
-                            ValueRef::Blob(_) => {
-                                return Err(Failure::Invalid(
-                                    "Unexpected blob in legacy backup table".into(),
-                                ));
+                        let value = if table == "document_covers"
+                            && matches!(
+                                name.as_str(),
+                                "small_thumbnail_path" | "large_thumbnail_path"
+                            ) {
+                            Value::String(String::new())
+                        } else {
+                            match row.get_ref(index).map_err(storage)? {
+                                ValueRef::Null => Value::Null,
+                                ValueRef::Integer(value) => json!(value),
+                                ValueRef::Real(value) => json!(value),
+                                ValueRef::Text(value) => {
+                                    json!(std::str::from_utf8(value).map_err(storage)?)
+                                }
+                                ValueRef::Blob(_) => {
+                                    return Err(Failure::Invalid(
+                                        "Unexpected blob in legacy backup table".into(),
+                                    ));
+                                }
                             }
                         };
                         values.insert(name.clone(), value);
@@ -159,6 +179,9 @@ impl Database {
             output.json(&settings)?;
             categories
                 .push(json!({"name":"settings","rows":1,"sha256":hash_json(&json!([settings]))?}));
+            output.raw(b",\"rustPreferences\":")?;
+            output.json(preferences)?;
+            categories.push(json!({"name":"rustPreferences","rows":1,"sha256":hash_json(&json!([preferences]))?}));
             output.raw(b",\"manifest\":")?;
             output.json(&json!({"format":"yamantaka-local-backup","version":9,"schemaVersion":11,"exportedAt":exported,"containsPdfFiles":false,"categories":categories}))?;
             output.raw(b"}\n")?;
