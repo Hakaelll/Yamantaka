@@ -2,12 +2,15 @@
 //! nonblocking with respect to PDFium. Reserve one native document slot before
 //! stepping; use `set_slot_available(false)` to yield its native handle before
 //! another reader or importer takes that slot.
-use crossbeam_channel::{Select, TryRecvError};
+use crate::background_password::{Challenge, Purpose};
+use crossbeam_channel::{Receiver, Select, Sender, TryRecvError};
 use std::collections::VecDeque;
+use std::path::PathBuf;
 use yamantaka_domain::{
-    Cancellation, Failure, LibraryRepository, PdfInfo, Result,
+    Cancellation, Failure, LibraryRepository, PdfInfo, PdfPassword, Result,
     pdf_ticket::{AsyncPdfEngine, PdfTicket},
     search::{IndexAccess, IndexSession, IndexStats, SearchRepository},
+    source_revision::SourceRevision,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,10 +63,17 @@ pub enum IndexCommand {
 struct Active {
     session: IndexSession,
     native_id: String,
+    path: PathBuf,
+    attempted: bool,
+    yielded: bool,
+    info: Option<PdfInfo>,
+    source: Option<SourceRevision>,
     cancel: Cancellation,
 }
 enum Pending {
     Open(PdfTicket<PdfInfo>),
+    Source(PdfTicket<SourceRevision>),
+    Password(Receiver<PdfPassword>),
     Text(u32, PdfTicket<String>),
     Close(PdfTicket<()>),
 }
@@ -78,6 +88,7 @@ struct Run {
 /// retained. Progress is a coalesced snapshot; it never creates an event queue.
 #[derive(Default)]
 pub struct SearchIndexController {
+    passwords: Option<(Sender<Challenge>, Sender<()>)>,
     released_native: u64,
     progress: IndexProgress,
     dirty: bool,
@@ -88,6 +99,41 @@ pub struct SearchIndexController {
     run: Option<Run>,
 }
 impl SearchIndexController {
+    pub fn with_passwords(mut self, prompts: Sender<Challenge>, wake: Sender<()>) -> Self {
+        self.passwords = Some((prompts, wake));
+        self
+    }
+    fn open<E: AsyncPdfEngine>(&mut self, engine: &E, password: Option<PdfPassword>) -> Result<()> {
+        let run = self.run.as_mut().unwrap();
+        let active = run.active.as_mut().unwrap();
+        active.attempted = password.is_some();
+        run.pending = Some(Pending::Open(engine.try_open(
+            active.native_id.clone(),
+            active.path.clone(),
+            password,
+            yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background,
+            active.cancel.clone(),
+        )?));
+        Ok(())
+    }
+    fn password(&mut self) -> Result<()> {
+        let (prompts, wake) = self.passwords.as_ref().ok_or(Failure::PasswordRequired)?;
+        let run = self.run.as_mut().unwrap();
+        let active = run.active.as_ref().unwrap();
+        let (challenge, receive) = Challenge::channel(
+            Purpose::Index,
+            active.path.clone(),
+            active.attempted,
+            active.cancel.clone(),
+            wake.clone(),
+        );
+        prompts
+            .try_send(challenge)
+            .map_err(|_| Failure::QueueFull)?;
+        run.pending = Some(Pending::Password(receive));
+        self.dirty = true;
+        Ok(())
+    }
     pub fn released_native_revision(&self) -> u64 {
         self.released_native
     }
@@ -109,7 +155,8 @@ impl SearchIndexController {
             return;
         }
         self.slot_paused = !available;
-        if !available && let Some(active) = self.run.as_ref().and_then(|run| run.active.as_ref()) {
+        if !available && let Some(active) = self.run.as_mut().and_then(|run| run.active.as_mut()) {
+            active.yielded = true;
             active.cancel.cancel();
         }
         if self.run.is_some() {
@@ -237,6 +284,12 @@ impl SearchIndexController {
                 Pending::Open(t) => {
                     select.recv(t.readiness());
                 }
+                Pending::Source(t) => {
+                    select.recv(t.readiness());
+                }
+                Pending::Password(r) => {
+                    select.recv(r);
+                }
                 Pending::Text(_, t) => {
                     select.recv(t.readiness());
                 }
@@ -249,6 +302,14 @@ impl SearchIndexController {
     pub fn needs_step(&self) -> bool {
         self.run.as_ref().is_some_and(|run| match &run.pending {
             Some(Pending::Open(t)) => t.is_ready(),
+            Some(Pending::Source(t)) => t.is_ready(),
+            Some(Pending::Password(r)) => {
+                self.native_cancelled() || !r.is_empty() || {
+                    let mut select = Select::new();
+                    select.recv(r);
+                    select.try_ready().is_ok()
+                }
+            }
             Some(Pending::Text(_, t)) => t.is_ready(),
             Some(Pending::Close(t)) => t.is_ready(),
             None => {
@@ -336,7 +397,12 @@ impl SearchIndexController {
                     match result {
                         Ok(info) => {
                             let active = self.run.as_ref().unwrap().active.as_ref().unwrap();
-                            if info.pages.len() != active.session.page_count as usize {
+                            if info.pages.len() != active.session.page_count as usize
+                                || active
+                                    .info
+                                    .as_ref()
+                                    .is_some_and(|prior| prior.pages[..] != info.pages[..])
+                            {
                                 self.record_failure(
                                     repository,
                                     &Failure::Invalid(
@@ -344,8 +410,70 @@ impl SearchIndexController {
                                     ),
                                 )?;
                                 self.close(engine)?;
+                            } else {
+                                let run = self.run.as_mut().unwrap();
+                                let active = run.active.as_mut().unwrap();
+                                active.info = Some(info);
+                                run.pending = Some(Pending::Source(engine.try_source_revision(
+                                    active.native_id.clone(),
+                                    active.cancel.clone(),
+                                )?));
                             }
                         }
+                        Err(Failure::PasswordRequired) if self.passwords.is_some() => {
+                            self.password()?
+                        }
+                        Err(Failure::NativeDocumentUnavailable) => self.open(engine, None)?,
+                        Err(error) => {
+                            self.record_failure(repository, &error)?;
+                            self.close(engine)?;
+                        }
+                    }
+                }
+                Pending::Password(receive) => {
+                    if self.native_cancelled() {
+                        let run = self.run.as_ref().unwrap();
+                        if !run.active.as_ref().unwrap().yielded {
+                            run.cancel.cancel();
+                        }
+                        self.close(engine)?;
+                    } else {
+                        match receive.try_recv() {
+                            Ok(password) => self.open(engine, Some(password))?,
+                            Err(_) => {
+                                self.cancel();
+                                self.close(engine)?;
+                            }
+                        }
+                    }
+                }
+                Pending::Source(ticket) => {
+                    let result = ticket_result(&ticket);
+                    if self.native_cancelled() {
+                        self.close(engine)?;
+                        return Ok(true);
+                    }
+                    match result {
+                        Ok(source) => {
+                            let active = self.run.as_mut().unwrap().active.as_mut().unwrap();
+                            if yamantaka_domain::source_revision::legacy_fingerprint(
+                                source.size,
+                                source.head_sha256,
+                            ) != active.session.fingerprint
+                                || active.source.as_ref().is_some_and(|prior| prior != &source)
+                            {
+                                self.record_failure(
+                                    repository,
+                                    &Failure::Invalid(
+                                        "Indexed PDF source changed; check the file first".into(),
+                                    ),
+                                )?;
+                                self.close(engine)?;
+                            } else {
+                                active.source = Some(source);
+                            }
+                        }
+                        Err(Failure::NativeDocumentUnavailable) => self.open(engine, None)?,
                         Err(error) => {
                             self.record_failure(repository, &error)?;
                             self.close(engine)?;
@@ -376,6 +504,7 @@ impl SearchIndexController {
                                 self.dirty = true;
                             }
                         }
+                        Err(Failure::NativeDocumentUnavailable) => self.open(engine, None)?,
                         Err(error) => {
                             self.record_failure(repository, &error)?;
                             self.close(engine)?;
@@ -432,6 +561,7 @@ impl SearchIndexController {
                 let page = active.session.cursor;
                 match engine.try_text(active.native_id.clone(), page, active.cancel.clone()) {
                     Ok(ticket) => run.pending = Some(Pending::Text(page, ticket)),
+                    Err(Failure::NativeDocumentUnavailable) => self.open(engine, None)?,
                     Err(error) => {
                         self.record_failure(repository, &error)?;
                         self.close(engine)?;
@@ -472,6 +602,11 @@ impl SearchIndexController {
         run.active = Some(Active {
             session,
             native_id: native_id.clone(),
+            path: document.path.clone(),
+            attempted: false,
+            yielded: false,
+            info: None,
+            source: None,
             cancel: native_cancel.clone(),
         });
         match engine.try_open(

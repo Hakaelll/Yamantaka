@@ -260,6 +260,7 @@ pub struct YamantakaApp {
     importing: operations::BackgroundImport,
     cover_rebuild: cover_rebuild::State,
     cover_rebuild_preview: bool,
+    protected_index_preview: bool,
     inspector_actions_preview: bool,
     preview_tools_menu: bool,
     activation: Receiver<Vec<PathBuf>>,
@@ -504,6 +505,7 @@ impl YamantakaApp {
             importing: Default::default(),
             cover_rebuild: Default::default(),
             cover_rebuild_preview: false,
+            protected_index_preview: false,
             inspector_actions_preview: false,
             preview_tools_menu: false,
             activation,
@@ -2602,6 +2604,7 @@ impl App for YamantakaApp {
                     && (!self.importing.busy() || self.import_password_waiting_capture())
                     && self.import_password_capture_ready()
                     && self.cover_rebuild_capture_ready()
+                    && self.protected_index_capture_ready()
                     && self.importing.recovery_ready()
                     && self.opening.ready()
                     && self.tabs.ready()

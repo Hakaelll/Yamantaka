@@ -9,6 +9,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='index-protected-prompt'; args=@('--index-protected','--es','--light','--size=640x480','--text-scale=2') },
+    @{ name='index-protected-prompt-wide'; args=@('--index-protected') },
     @{ name='cover-rebuild-details'; args=@('--cover-rebuild-menu','--details','--es','--light','--pdf-covers') },
     @{ name='cover-rebuild-protected-prompt'; args=@('--cover-rebuild','--pdf-covers','--details','--es','--light','--size=640x480','--text-scale=2') },
     @{ name='import-password-prompt'; args=@('--import-protected','--es') },
@@ -512,6 +514,15 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'index-protected-prompt*') {
+        $labels = if ($case.name -eq 'index-protected-prompt') { @('Indexar PDF','Cancelar') } else { @('Index PDF','Cancel indexing') }
+        foreach ($label in $labels) {
+            $actions = @($controls.controls | Where-Object { $_.label -eq $label -and $_.enabled })
+            if ($actions.Count -ne 1) { throw "Missing indexing password action: $label" }
+            $action = $actions[0]
+            if ($action.rect[0] -lt $action.clip[0] -or $action.rect[1] -lt $action.clip[1] -or $action.rect[2] -gt $action.clip[2]+1 -or $action.rect[3] -gt $action.clip[3]+1 -or $action.rect[3] -gt $controls.viewport[3]-12) { throw 'Index password action is clipped.' }
+        }
+    }
     if ($case.name -eq 'cover-rebuild-details') {
         $actions = @($controls.controls | Where-Object { $_.label -eq 'Regenerar portada' -and $_.enabled })
         if ($actions.Count -ne 1) { throw 'Regenerate cover is missing from inspector actions.' }

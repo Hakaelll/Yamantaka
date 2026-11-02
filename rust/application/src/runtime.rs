@@ -1086,7 +1086,7 @@ impl Runtime {
                 let mut library_check:Option<(LibraryCheckJob,Permit)> = None;
                 let mut relocation: Option<(RelocationJob,Permit)> = None;
                 let mut file_check: Option<(FileCheckJob,Permit)> = None;
-                let mut indexer = SearchIndexController::default();
+                let mut indexer = SearchIndexController::default().with_passwords(password_requests.clone(), password_wake.clone());
                 let mut index_cleanup: Option<PdfTicket<()>> = None;
                 let mut deferred: VecDeque<Command> = VecDeque::new();
                 // Only readers accepted by the UI are committed visible owners.

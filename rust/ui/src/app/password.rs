@@ -76,11 +76,13 @@ impl PasswordChallenge {
                 Purpose::Import => ("Add PDF", "Cancel import"),
                 Purpose::Metadata => ("Reanalyse", "Cancel analysis"),
                 Purpose::Cover => ("Rebuild cover", "Cancel rebuild"),
+                Purpose::Index => ("Index PDF", "Cancel indexing"),
             },
             (PasswordTarget::Background(request), false) => match request.purpose() {
                 Purpose::Import => ("Añadir PDF", "Cancelar importación"),
                 Purpose::Metadata => ("Reanalizar", "Cancelar análisis"),
                 Purpose::Cover => ("Regenerar portada", "Cancelar regeneración"),
+                Purpose::Index => ("Indexar PDF", "Cancelar indexación"),
             },
             (_, true) => ("Open PDF", "Cancel"),
             (_, false) => ("Abrir PDF", "Cancelar"),
@@ -98,6 +100,22 @@ impl PasswordChallenge {
 }
 
 impl YamantakaApp {
+    pub fn preview_protected_index(&mut self) {
+        if self.demo && self.capture.is_some() {
+            use yamantaka_application::search_index::IndexCommand;
+            self.protected_index_preview = true;
+            self.send(Action::Index(IndexCommand::Enable(true)));
+            self.send(Action::Index(IndexCommand::Start { rebuild: false }));
+        }
+    }
+    pub(super) fn protected_index_capture_ready(&self) -> bool {
+        !self.protected_index_preview
+            || self.password.as_ref().is_some_and(|p| {
+                p.background_purpose()
+                    == Some(yamantaka_application::background_password::Purpose::Index)
+            })
+    }
+
     pub(super) fn dismiss_password_challenge(&mut self) {
         if let Some(challenge) = self.password.take()
             && let Some(document) = challenge.reference_document()
@@ -175,6 +193,8 @@ impl YamantakaApp {
         }
         let p = Palette::new(self.dark);
         let compact = ctx.content_rect().height() < 420.0;
+        let index_unlock = challenge.background_purpose()
+            == Some(yamantaka_application::background_password::Purpose::Index);
         let gap = if compact { 4.0 } else { 12.0 };
         let field_id = egui::Id::new("ephemeral-pdf-password");
         let mut submit = false;
@@ -216,8 +236,14 @@ impl YamantakaApp {
                 } else {
                     title.wrap()
                 });
+                if compact && index_unlock {
+                    ui.add_space(4.0);
+                    ui.label(RichText::new(self.tr("El índice guarda texto sin cifrar.", "The index stores unencrypted text.")).size(12.0).color(p.secondary));
+                }
                 let header_height = ui.cursor().top() - header_start;
-                let footer_height = if ui.available_width() < 360.0 {
+                let footer_height = if compact && index_unlock {
+                    56.0
+                } else if ui.available_width() < 360.0 {
                     104.0
                 } else {
                     56.0
@@ -232,6 +258,7 @@ impl YamantakaApp {
                             .max(44.0),
                     )
                     .show(ui, |ui| {
+                        if !compact || !index_unlock {
                         ui.add_space(gap);
                         ui.label(
                             RichText::new(if challenge.rejected {
@@ -248,6 +275,14 @@ impl YamantakaApp {
                             .size(if compact { 13.0 } else { 16.0 })
                             .color(p.secondary),
                         );
+                        }
+                        if index_unlock && !compact {
+                            ui.add_space(gap);
+                            ui.label(RichText::new(self.tr(
+                                "Al indexar, el texto extraído se guarda sin cifrar en este dispositivo. Puedes borrar el índice desde Búsqueda local.",
+                                "Indexing stores extracted text unencrypted on this device. You can erase the index from Local search.",
+                            )).color(p.secondary));
+                        }
                         ui.add_space(gap);
                         let label = self.tr("Contraseña del PDF", "PDF password");
                         if !compact {
@@ -305,7 +340,8 @@ impl YamantakaApp {
                     {
                         submit = true;
                     }
-                    if theme::navigation(ui, challenge.labels(self.english).1, false, p).clicked() {
+                    let cancel_label = if compact && index_unlock { self.tr("Cancelar", "Cancel") } else { challenge.labels(self.english).1 };
+                    if theme::navigation(ui, cancel_label, false, p).clicked() {
                         cancel = true;
                     }
                 });

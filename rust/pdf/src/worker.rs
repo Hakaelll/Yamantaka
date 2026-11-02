@@ -1268,7 +1268,7 @@ fn run(
                     let document = documents
                         .get(&id)
                         .map(|loaded| &loaded.document)
-                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
+                        .ok_or(Failure::NativeDocumentUnavailable)?;
                     let page = document
                         .pages()
                         .get(

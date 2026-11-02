@@ -18,6 +18,8 @@ mod cover_rebuild;
 mod engine;
 #[path = "import_resumption_runtime/password.rs"]
 mod password;
+#[path = "import_resumption_runtime/protected_index.rs"]
+mod protected_index;
 use engine::{Engine, open_reader, open_readers, requested, visible, wait};
 
 #[derive(Clone, Copy, PartialEq, Eq)]

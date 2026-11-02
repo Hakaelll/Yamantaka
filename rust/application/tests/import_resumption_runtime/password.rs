@@ -123,6 +123,7 @@ pub(super) fn verify_protected_import() {
                 uninterrupted_evidence = Some(metadata_evidence(&dbpath, &source));
                 verify_cover_cache(&db, &source, &root, cache.clone());
                 super::cover_rebuild::verify(&dbpath, &source, &root, cache.clone());
+                super::protected_index::verify(&dbpath, &source, &root);
                 assert!(
                     documents
                         .iter()
