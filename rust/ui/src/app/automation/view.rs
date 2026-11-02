@@ -102,7 +102,7 @@ impl YamantakaApp {
                         let count=batch.len();
                         if count>0 {
                             ui.label(format!("{}: {count}",tr("Documentos del último lote disponibles para simular", "Documents from the last batch available for simulation")));
-                            if theme::navigation(ui,tr("Olvidar lote", "Forget batch"),false,p).clicked() {self.importing.last_batch=None;}
+                            if theme::navigation(ui,tr("Olvidar lote", "Forget batch"),false,p).clicked() {self.request_import_rule_context(true);}
                         }
                     }
                     self.rule_execution_view(ui,p);

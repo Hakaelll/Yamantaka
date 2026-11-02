@@ -533,6 +533,7 @@ impl YamantakaApp {
         app.check_tag_filters();
         app.check_collection_filter();
         app.refresh();
+        app.request_import_rule_context(false);
         app.send(Action::PendingImports);
         app.begin_reader_continuity();
         if app.search.enabled {
@@ -1812,6 +1813,22 @@ impl App for YamantakaApp {
                     self.reader.accept_text(&id, page, &cancel, Err(error));
                 }
                 Update::Text(..) => {}
+                Update::ImportRuleContext(cancel, result) => {
+                    if self
+                        .importing
+                        .context_pending
+                        .as_ref()
+                        .is_some_and(|pending| pending.same_request(&cancel))
+                    {
+                        self.importing.context_pending = None;
+                        if !cancel.is_cancelled() {
+                            match result {
+                                Ok(batch) => self.importing.last_batch = batch,
+                                Err(error) => self.error = Some(error.to_string()),
+                            }
+                        }
+                    }
+                }
                 Update::Imported(_, cancel, batch) => {
                     if !self.importing.finish(&cancel) {
                         continue;
@@ -2573,6 +2590,7 @@ impl App for YamantakaApp {
                     && self.reference_notes_preview.ready()
                     && self.annotation_export.ready()
                     && self.duplicates.ready()
+                    && self.importing.context_pending.is_none()
                     && self.file_comparison.ready()
                     && self.bulk_organization_preview.is_none()
                     && self.bulk_picker.as_ref().is_none_or(|picker|picker.ready())

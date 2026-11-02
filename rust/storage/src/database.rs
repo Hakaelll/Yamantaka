@@ -472,6 +472,20 @@ impl LibraryRepository for Database {
     fn canonical_document_id(&self, id: &str) -> Result<Option<String>> {
         crate::duplicates::aliases::resolve(self, id)
     }
+    fn save_import_rule_context(
+        &mut self,
+        batch: Option<&yamantaka_domain::automation::imported::ImportedDocuments>,
+        governor: Option<&yamantaka_domain::memory::MemoryGovernor>,
+    ) -> Result<()> {
+        self.write_import_rule_context(batch, governor)
+    }
+    fn import_rule_context(
+        &self,
+        governor: &yamantaka_domain::memory::MemoryGovernor,
+    ) -> Result<Option<std::sync::Arc<yamantaka_domain::automation::imported::ImportedDocuments>>>
+    {
+        self.read_import_rule_context(governor)
+    }
     fn duplicate_merge_store(
         &self,
         preferences: serde_json::Value,

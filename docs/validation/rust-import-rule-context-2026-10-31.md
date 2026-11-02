@@ -35,3 +35,7 @@ Execution deliberately clears the completed simulation; its verifier checks the 
 ## Remaining acceptance
 
 Import context is not persisted across app restarts and does not reconstruct the original full batch after a resumed job. This feature provides a current-session workflow with explicit simulation and confirmation. It does not establish unattended rule execution, complete historical import-rule recovery, physical pointer/keyboard/Narrator acceptance, whole-library performance targets, or release packaging. No Computer Use or personal PDF publication was performed.
+
+## Persistence follow-up
+
+[Durable completed-import context](rust-import-context-restart-2026-11-02.md) records later journal persistence and native restart evidence. Earlier session-only limitations above describe this checkpoint. Reconstructing the complete original scope of a resumed import remains separate work.

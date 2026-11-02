@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Default)]
 pub(super) struct BackgroundImport {
+    pub(super) context_pending: Option<Cancellation>,
     pub(super) last_batch: Option<Arc<yamantaka_domain::automation::imported::ImportedDocuments>>,
     pending: Option<Cancellation>,
     catalogue_revision: u64,
@@ -42,6 +43,9 @@ impl BackgroundImport {
     }
 
     pub(super) fn begin(&mut self) -> Cancellation {
+        if let Some(cancel) = self.context_pending.take() {
+            cancel.cancel();
+        }
         self.last_batch = None;
         self.cancel();
         let token = Cancellation::default();
@@ -82,6 +86,20 @@ impl Drop for BackgroundImport {
 }
 
 impl YamantakaApp {
+    pub(in crate::app) fn request_import_rule_context(&mut self, clear: bool) {
+        if let Some(cancel) = self.importing.context_pending.take() {
+            cancel.cancel();
+        }
+        let cancel = Cancellation::default();
+        match self.runtime.submit(Action::ImportRuleContext {
+            clear,
+            cancel: cancel.clone(),
+        }) {
+            Ok(()) => self.importing.context_pending = Some(cancel),
+            Err(error) => self.error = Some(error.to_string()),
+        }
+    }
+
     pub(super) fn poll_import_progress(&mut self, ctx: &egui::Context) {
         if self.runtime.import_revision() == self.importing.catalogue_revision {
             return;

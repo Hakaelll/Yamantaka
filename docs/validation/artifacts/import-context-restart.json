@@ -1,0 +1,40 @@
+{
+  "synthetic": true,
+  "catalogueRecords": 13,
+  "importedRecords": 3,
+  "durableJournalMatchesBatch": true,
+  "separateNativeProcessRestoredExactScope": true,
+  "ruleActionsAutomaticallyExecuted": false,
+  "executableSha256": "7bab1dec676d28ee5e8c0b0f124a923cb0fe4533ec7461511fdef335729893df",
+  "sources": [
+    {
+      "path": "rust/storage/src/import_rule_context.rs",
+      "sha256": "daa63f66c2567bf968a1dd0d8cc88d140721bb6bbd02c0a051f01c4cab1e093d"
+    },
+    {
+      "path": "rust/application/src/runtime.rs",
+      "sha256": "f09d8db9cc7bc8414771da791670718bbdcbb0e753e7308241e5ae639e435f54"
+    },
+    {
+      "path": "rust/domain/src/lib.rs",
+      "sha256": "d65ed19d1a56d2c574169c3b91222730d36d206018af63c5cc98f99dd3a5fe5c"
+    },
+    {
+      "path": "rust/storage/src/database.rs",
+      "sha256": "5382e74d53afd3fe81228bf732ebd36920c2409c6f17593c9dd761e9c57ac67f"
+    },
+    {
+      "path": "rust/ui/src/app.rs",
+      "sha256": "ad10973eb169fe9a2864929cb20814080c56985aa35cd43b5ba0ab606c83b399"
+    },
+    {
+      "path": "rust/ui/src/app/operations.rs",
+      "sha256": "f4066ea3bb90ea3bf3d02597c51214639dd553e05740eb43fa58d67cf9f10cdd"
+    },
+    {
+      "path": "rust/ui/src/app/automation/view.rs",
+      "sha256": "91820bbbc6c032f57692fc073d714468274aaa5ecbeeead2886f830d33ed1ad9"
+    }
+  ],
+  "cargoLockSha256": "dd227d69ff7508a8adbbf5b94bb8d1191615e18d6f5df8d4c4834b5fedcd03d8"
+}

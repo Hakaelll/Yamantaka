@@ -1,0 +1,8 @@
+Native synthetic imported-document rule capture.
+Case: restarted
+The restarted case uses a separate process and no new import.
+Only generated synthetic documents are shown.
+PNG pixel data unchanged; synthetic provenance text added.
+Executable SHA-256: 7bab1dec676d28ee5e8c0b0f124a923cb0fe4533ec7461511fdef335729893df
+Native PNG SHA-256: 9cee4ea43013b7606daf13bc993e1b28871f17f4e0a06f8928b0a3d45edde1e7
+Published PNG SHA-256: 507855c1fb3c21d3bd0bef66d41fdc2aa67f8f2802237bead377501308b73b5a

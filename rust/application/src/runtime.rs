@@ -53,6 +53,10 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    ImportRuleContext {
+        clear: bool,
+        cancel: Cancellation,
+    },
     MergeDuplicates(Box<crate::duplicates::merge_job::MergeRequest>),
     DiscoverDuplicates(Box<crate::duplicates::Request>),
     RebuildCover(Box<crate::cover_rebuild::Request>),
@@ -184,6 +188,10 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    ImportRuleContext(
+        Cancellation,
+        Result<Option<Arc<yamantaka_domain::automation::imported::ImportedDocuments>>>,
+    ),
     DuplicateMerge(Box<crate::duplicates::merge_job::MergeReply>),
     Duplicates(Box<crate::duplicates::Reply>),
     CoverRebuilt(Box<crate::cover_rebuild::Reply>),
@@ -903,6 +911,11 @@ fn start_import(
             };
             Ok((job, folder, paths))
         });
+    let prepared = prepared.and_then(|value| {
+        repository
+            .save_import_rule_context(None, None)
+            .map(|()| value)
+    });
     match prepared {
         Ok((job, folder, paths)) => advance_import(
             engine,
@@ -1023,6 +1036,15 @@ fn advance_import<E: AsyncPdfEngine>(
     } else {
         if let Some(job) = &state.job
             && let Err(error) = repository.remove_import(job)
+        {
+            import_failed(events, notify, error, state);
+            return;
+        }
+        if state.reanalysis.is_none()
+            && let Err(error) = repository.save_import_rule_context(
+                state.imported.as_ref(),
+                engine.memory_governor().as_ref(),
+            )
         {
             import_failed(events, notify, error, state);
             return;
@@ -1794,6 +1816,10 @@ impl Runtime {
                                         Ok(document)=>advance_import(&engine,&mut repository,ImportState{unlocked:false,cover:None,password_attempted:false,imported:None,source:None,job:None,folder:None,paths:vec![document.path.clone()].into(),count:0,cancel,permit,reanalysis:Some(Box::new((*expected,document)))},&mut pending,&events,&notify),
                                         Err(error)=>emit(&events,&notify,Update::Metadata(Box::new(crate::metadata_review::MetadataReply{document:expected.document,writing:true,cancel,result:Err(error)})),permit),
                                     }
+                                }
+                                Action::ImportRuleContext {clear,cancel} => {
+                                    let result=cancel.check().and_then(|()|if clear {repository.save_import_rule_context(None,None).map(|()|None)} else {engine.memory_governor().ok_or(Failure::MemoryBudget).and_then(|governor|repository.import_rule_context(&governor))});
+                                    emit(&events,&notify,Update::ImportRuleContext(cancel,result),permit);
                                 }
                                 Action::PendingImports => emit(&events,&notify,Update::PendingImports(repository.pending_imports()),permit),
                                 Action::DiscardImport(id) => {

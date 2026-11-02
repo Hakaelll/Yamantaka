@@ -533,3 +533,7 @@ y DPI físicos 100/150/175/200 % siguen pendientes y no se infieren de widgets.
 ## Current corporate branding
 
 The owner replaced the historical emblem on 2026-11-02. Earlier geometry-preservation reports above describe their original checkpoints. Current assets are generated from `assets/branding/yamantaka-logo.svg` with `python tool/generate_brand_assets.py`. Run `tool/verify_brand_assets.ps1` to compare every generated icon with that source. `tool/recolor_brand_assets.py` is a compatibility entry point for the generator. It no longer recolors the previous emblem. Windows acceptance also checks the embedded executable icon and the live native header.
+
+## Durable completed-import rule context
+
+Run `python tool/verify_import_rule_restart.py <native-executable>` after building the Windows debug executable. The verifier imports a synthetic batch, validates its journal, and starts another native process to verify the same simulation scope without reimporting. Output, captures and local logs remain under `build/verification/import-context-restart`. The retained application verification also covers context persistence, forgetting, malformed records and future compatibility. See [the checkpoint](docs/validation/rust-import-context-restart-2026-11-02.md) for scope and limitations.

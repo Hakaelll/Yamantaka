@@ -16,6 +16,7 @@ pub mod identity;
 mod import_document;
 mod import_metadata;
 mod import_recovery;
+mod import_rule_context;
 mod library_grouping;
 mod library_removal;
 pub mod local_export;

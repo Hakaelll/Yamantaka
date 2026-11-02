@@ -300,6 +300,19 @@ pub trait LibraryRepository {
     ) -> Result<duplicates::merge::Factory> {
         Err(Failure::Unsupported("Duplicate consolidation".into()))
     }
+    fn save_import_rule_context(
+        &mut self,
+        _batch: Option<&automation::imported::ImportedDocuments>,
+        _governor: Option<&memory::MemoryGovernor>,
+    ) -> Result<()> {
+        Err(Failure::Unsupported("Durable import rule context".into()))
+    }
+    fn import_rule_context(
+        &self,
+        _governor: &memory::MemoryGovernor,
+    ) -> Result<Option<std::sync::Arc<automation::imported::ImportedDocuments>>> {
+        Ok(None)
+    }
     fn duplicate_reader(&self) -> Result<duplicates::ReaderFactory> {
         Err(Failure::Unsupported("Library duplicate discovery".into()))
     }

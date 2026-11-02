@@ -166,6 +166,27 @@ pub(crate) fn verify(root: &Path, governor: &MemoryGovernor) {
         for id in ["book-2", "book-0", "book-2", "missing"] {
             batch.insert(id, governor).unwrap();
         }
+        db.save_import_rule_context(Some(&batch), Some(governor))
+            .unwrap();
+        let reopened = Database::open_read_only(&db.file_path().unwrap()).unwrap();
+        let recovered = reopened.import_rule_context(governor).unwrap().unwrap();
+        assert_eq!(
+            recovered.ids().collect::<Vec<_>>(),
+            vec!["book-0", "book-2", "missing"]
+        );
+        sql.execute("UPDATE operation_journal SET compatibility_hash='future-import-context' WHERE id='rust-import-rule-context-v1'",[]).unwrap();
+        db.save_import_rule_context(None, None).unwrap();
+        assert!(
+            db.save_import_rule_context(Some(&batch), Some(governor))
+                .is_err()
+        );
+        let retained:String=sql.query_row("SELECT compatibility_hash FROM operation_journal WHERE id='rust-import-rule-context-v1'",[],|row|row.get(0)).unwrap();
+        assert_eq!(retained, "future-import-context");
+        sql.execute("UPDATE operation_journal SET compatibility_hash='rust-import-context-v1',summary_json='{}' WHERE id='rust-import-rule-context-v1'",[]).unwrap();
+        assert!(db.import_rule_context(governor).is_err());
+        db.save_import_rule_context(None, None).unwrap();
+        assert!(db.import_rule_context(governor).unwrap().is_none());
+        drop(recovered);
         let batch = Arc::new(batch);
         let mut request = SimulationRequest::new(rule, governor.clone());
         request.imported = Some(batch.clone());
