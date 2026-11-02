@@ -18,6 +18,8 @@ pub(crate) fn load_cached(
     governor: &MemoryGovernor,
 ) -> Result<Option<Arc<RenderedPage>>> {
     cancel.check()?;
+    let physical = yamantaka_windows::source_stamp::Stamp::read(source.path)
+        .ok_or(Failure::CoverSourceChanged)?;
     let request = yamantaka_domain::cover_cache::CoverCacheRequest {
         identity,
         document: &source.id,
@@ -28,7 +30,7 @@ pub(crate) fn load_cached(
         Ok(Some(image))
             if cache.identity(source.path, source.page, cancel).ok() == Some(identity) =>
         {
-            Some(image)
+            Some(bind_source(image, source.path, &physical)?)
         }
         Err(Failure::MemoryBudget) => return Err(Failure::MemoryBudget),
         _ => None,
@@ -46,6 +48,8 @@ pub(crate) fn render<'a>(
     cache: Option<&dyn yamantaka_domain::cover_cache::CoverImageCache>,
 ) -> Result<Arc<RenderedPage>> {
     cancel.check()?;
+    let physical = yamantaka_windows::source_stamp::Stamp::read(source.path)
+        .ok_or(Failure::CoverSourceChanged)?;
     // An already-open handle can represent an older file revision. Cache only
     // temporary opens, whose source identity is checked before and after render.
     let cache = cache.filter(|_| existing.is_none());
@@ -118,5 +122,16 @@ pub(crate) fn render<'a>(
         let _ = cache.save(identity, &image, cancel);
     }
     cancel.check()?;
-    Ok(image)
+    bind_source(image, source.path, &physical)
+}
+
+fn bind_source(
+    image: Arc<RenderedPage>,
+    path: &Path,
+    physical: &yamantaka_windows::source_stamp::Stamp,
+) -> Result<Arc<RenderedPage>> {
+    if yamantaka_windows::source_stamp::Stamp::read(path).as_ref() != Some(physical) {
+        return Err(Failure::CoverSourceChanged);
+    }
+    Ok(Arc::new(image.at_source_version(physical.version())))
 }

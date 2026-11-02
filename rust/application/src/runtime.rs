@@ -1128,6 +1128,7 @@ impl Runtime {
                 let mut library_check:Option<(LibraryCheckJob,Permit)> = None;
                 let mut relocation: Option<(RelocationJob,Permit)> = None;
                 let mut file_check: Option<(FileCheckJob,Permit)> = None;
+                let mut manual_cover: Option<(crate::manual_cover::ManualCoverJob,Permit)> = None;
                 let mut indexer = SearchIndexController::default().with_passwords(password_requests.clone(), password_wake.clone());
                 let mut index_cleanup: Option<PdfTicket<()>> = None;
                 let mut deferred: VecDeque<Command> = VecDeque::new();
@@ -1722,7 +1723,14 @@ impl Runtime {
                                     let result = cancel.check().and_then(|_| repository.cover_source_page(&id)).and_then(|page| { cancel.check()?; Ok(page) });
                                     emit(&events,&notify,Update::CoverSourcePage(id,result,cancel),permit);
                                 }
-                                Action::SaveManualCover(request) => emit(&events,&notify,Update::ManualCover(request.execute(&mut repository)),permit),
+                                Action::SaveManualCover(request) => {
+                                    let document=request.choice.document().to_owned(); let cancel=request.cancel.clone();
+                                    let result=if manual_cover.is_some() {Err(Failure::QueueFull)} else {crate::manual_cover::ManualCoverJob::start(*request)};
+                                    match result {
+                                        Ok(job)=>manual_cover=Some((job,permit)),
+                                        Err(error)=>emit(&events,&notify,Update::ManualCover(crate::manual_cover::ManualCoverReply{document,result:Err(error),cancel}),permit),
+                                    }
+                                },
                                 Action::PreviewCover(source,page,generation,cancel) => covers.push((CoverJob::preview(source,page,generation,cancel),permit)),
                                 Action::Cover(source,generation,cancel) => {
                                     match repository.automatic_restore_allowed(source.id(),&cancel) {
@@ -1899,6 +1907,10 @@ impl Runtime {
                     if let Some(reply)=cache_maintenance.as_mut().and_then(|(job,_)|job.poll()) {
                         let (_,permit)=cache_maintenance.take().unwrap();
                         emit(&events,&notify,Update::CoverCacheMaintained(Box::new(reply)),permit);
+                    }
+                    if let Some(reply)=manual_cover.as_mut().and_then(|(job,_)|job.poll(&mut repository)) {
+                        let (_,permit)=manual_cover.take().unwrap();
+                        emit(&events,&notify,Update::ManualCover(reply),permit);
                     }
                     if let Some(reply)=file_check.as_mut().and_then(|(job,_)|job.poll(&mut repository)) {
                         let (_,permit)=file_check.take().unwrap();
@@ -2298,6 +2310,7 @@ impl Runtime {
                     if let Some((job,_)) = &duplicates { job.register(&mut select); }
                     if let Some((job,_)) = &comparison { job.register(&mut select); }
                     if let Some((job,_)) = &file_check {job.register(&mut select);}
+                    if let Some((job,_)) = &manual_cover {job.register(&mut select);}
                     if let Some((job,_)) = &relocation {job.register(&mut select);}
                     if let Some((job,_)) = &library_check {job.register(&mut select);}
                     if let Some((job,_)) = &cover_regeneration {job.register(&mut select);}
@@ -2331,6 +2344,7 @@ impl Runtime {
                 drop(duplicates);
                 drop(comparison);
                 drop(file_check);
+                drop(manual_cover);
                 drop(relocation);
                 drop(library_check);
                 drop(cover_regeneration);

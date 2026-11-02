@@ -148,4 +148,22 @@ fn verify_visible_source_monitor(root: &std::path::Path) {
         "Inactive observer did not sleep"
     );
     drop(monitor);
+    use yamantaka_windows::source_stamp::{Lease, Stamp};
+    let version = Stamp::read(&path).unwrap().version();
+    let lease = Lease::acquire(&path, version).unwrap();
+    assert!(std::fs::OpenOptions::new().write(true).open(&path).is_err());
+    assert!(std::fs::remove_file(&path).is_err());
+    lease.verify().unwrap();
+    drop(lease);
+    let modified = path.metadata().unwrap().modified().unwrap();
+    {
+        let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        file.write_all(b"new version").unwrap();
+        file.set_times(FileTimes::new().set_modified(modified))
+            .unwrap();
+    }
+    assert!(matches!(
+        Lease::acquire(&path, version),
+        Err(yamantaka_domain::Failure::CoverSourceChanged)
+    ));
 }

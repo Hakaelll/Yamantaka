@@ -18,6 +18,7 @@ pub(super) struct CoverPicker {
     pub(super) image: Option<PageImage>,
     pub(super) image_page: Option<u32>,
     pub(super) aspect: Option<f64>,
+    pub(super) source_version: Option<yamantaka_domain::source_revision::PhysicalSourceVersion>,
     pub(super) error: Option<Failure>,
 }
 impl Drop for CoverPicker {
@@ -45,6 +46,7 @@ impl CoverPicker {
             && self.saving.is_none()
             && self.image_page == Some(self.page)
             && self.aspect.is_some()
+            && self.source_version.is_some()
             && self.error.is_none()
     }
     pub(super) fn capture_ready(&self) -> bool {
@@ -86,6 +88,7 @@ impl YamantakaApp {
             image: None,
             image_page: None,
             aspect: None,
+            source_version: None,
             error: result.err(),
         });
         self.runtime.wake();
@@ -102,6 +105,7 @@ impl YamantakaApp {
             token.cancel();
         }
         picker.error = None;
+        picker.source_version = None;
         picker.save_failed = false;
         picker.restore_failed = false;
         picker.restore_committed = false;
@@ -194,6 +198,7 @@ impl YamantakaApp {
                 picker.image = Some(texture);
                 picker.image_page = Some(picker.page);
                 picker.aspect = Some(f64::from(page.width) / f64::from(page.height));
+                picker.source_version = page.source_version();
                 picker.error = None;
             }
             Err(error) => picker.error = Some(error),
@@ -220,6 +225,7 @@ impl YamantakaApp {
             .runtime
             .submit(Action::SaveManualCover(Box::new(ManualCoverRequest {
                 choice,
+                source_version: picker.source_version.unwrap(),
                 cancel: cancel.clone(),
             }))) {
             Ok(()) => picker.saving = Some(cancel),
@@ -251,15 +257,20 @@ impl YamantakaApp {
                 }
             }
             Err(error) => {
+                if matches!(error, Failure::CoverSourceChanged) {
+                    picker.source_version = None;
+                    picker.save_failed = false;
+                } else {
+                    picker.save_failed = true;
+                }
                 picker.error = Some(error);
-                picker.save_failed = true;
             }
         }
     }
     pub(super) fn cover_picker_summary(&self) -> serde_json::Value {
         match &self.cover_picker {
             Some(picker) => {
-                serde_json::json!({"open":true,"document":picker.document.id,"page":picker.page,"previewPage":picker.image_page,"ready":picker.ready(),"saving":picker.saving.is_some(),"error":picker.error.is_some()})
+                serde_json::json!({"open":true,"document":picker.document.id,"page":picker.page,"previewPage":picker.image_page,"ready":picker.ready(),"sourceBound":picker.source_version.is_some(),"sourceChanged":matches!(picker.error,Some(Failure::CoverSourceChanged)),"saving":picker.saving.is_some(),"error":picker.error.is_some()})
             }
             None => serde_json::json!({"open":false}),
         }

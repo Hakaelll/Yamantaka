@@ -20,6 +20,9 @@ pub struct Stamp {
     times: [i64; 3],
 }
 impl Stamp {
+    pub fn version(&self) -> yamantaka_domain::source_revision::PhysicalSourceVersion {
+        yamantaka_domain::source_revision::PhysicalSourceVersion::from_digest(self.token())
+    }
     pub fn read(path: &Path) -> Option<Self> {
         // Attribute-only access does not lock the PDF against editing or deletion.
         let file = OpenOptions::new()
@@ -71,5 +74,39 @@ impl Stamp {
             hash.update(time.to_le_bytes());
         }
         hash.finalize().into()
+    }
+}
+
+/// A short read lease held through a source-bound database write.
+pub struct Lease {
+    file: std::fs::File,
+    path: std::path::PathBuf,
+    version: yamantaka_domain::source_revision::PhysicalSourceVersion,
+}
+impl Lease {
+    pub fn acquire(
+        path: &Path,
+        version: yamantaka_domain::source_revision::PhysicalSourceVersion,
+    ) -> yamantaka_domain::Result<Self> {
+        let file = OpenOptions::new()
+            .read(true)
+            .share_mode(FILE_SHARE_READ.0)
+            .open(path)
+            .map_err(|_| yamantaka_domain::Failure::CoverSourceChanged)?;
+        let lease = Self {
+            file,
+            path: path.to_owned(),
+            version,
+        };
+        lease.verify()?;
+        Ok(lease)
+    }
+    pub fn verify(&self) -> yamantaka_domain::Result<()> {
+        if Stamp::from_file(&self.file).map(|stamp| stamp.version()) != Some(self.version)
+            || Stamp::read(&self.path).map(|stamp| stamp.version()) != Some(self.version)
+        {
+            return Err(yamantaka_domain::Failure::CoverSourceChanged);
+        }
+        Ok(())
     }
 }

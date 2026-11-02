@@ -1,10 +1,20 @@
 use super::*;
+mod source_change;
 
 #[derive(Default)]
 pub(super) struct CoverPickerDemo {
     pub(super) action: Option<&'static str>,
     stage: u8,
     pub(super) saved: bool,
+    source_worker: Option<std::thread::JoinHandle<std::io::Result<()>>>,
+    source_rejected: bool,
+}
+impl Drop for CoverPickerDemo {
+    fn drop(&mut self) {
+        if let Some(worker) = self.source_worker.take() {
+            let _ = worker.join();
+        }
+    }
 }
 impl YamantakaApp {
     pub fn preview_cover_editor(&mut self, action: &'static str) {
@@ -16,6 +26,10 @@ impl YamantakaApp {
         let Some(action) = self.cover_picker_demo.action else {
             return;
         };
+        if action.ends_with("-source") {
+            self.advance_cover_picker_source_change(action);
+            return;
+        }
         match self.cover_picker_demo.stage {
             0 => {
                 if let Some(document) = self.documents.first().cloned() {
@@ -75,6 +89,6 @@ impl YamantakaApp {
         self.cover_picker_demo.action.is_none() || self.cover_picker_demo.stage == 4
     }
     pub(super) fn cover_picker_demo_summary(&self) -> serde_json::Value {
-        serde_json::json!({"action":self.cover_picker_demo.action,"complete":self.cover_picker_demo.stage==4,"saved":self.cover_picker_demo.saved})
+        serde_json::json!({"action":self.cover_picker_demo.action,"complete":self.cover_picker_demo.stage==4,"saved":self.cover_picker_demo.saved,"sourceRejected":self.cover_picker_demo.source_rejected})
     }
 }

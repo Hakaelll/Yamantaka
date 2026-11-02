@@ -4416,6 +4416,7 @@ dependencies = [
  "yamantaka-domain",
  "yamantaka-pdf",
  "yamantaka-storage",
+ "yamantaka-windows",
 ]
 
 [[package]]

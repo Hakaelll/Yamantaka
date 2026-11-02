@@ -1,5 +1,14 @@
 use std::{path::PathBuf, time::SystemTime};
 
+/// Runtime comparison token for the physical file that produced a preview.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PhysicalSourceVersion([u8; 32]);
+impl PhysicalSourceVersion {
+    pub fn from_digest(digest: [u8; 32]) -> Self {
+        Self(digest)
+    }
+}
+
 /// Bounded source identity captured by the native document owner, not a full-file digest.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceRevision {

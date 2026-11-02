@@ -1,0 +1,106 @@
+{
+  "cases": [
+    {
+      "case": "before",
+      "native": {
+        "action": "stale-source",
+        "complete": true,
+        "saved": true,
+        "sourceRejected": false
+      },
+      "picker": {
+        "open": false
+      },
+      "savedPage": 1,
+      "savedMode": "manual"
+    },
+    {
+      "case": "rejected",
+      "native": {
+        "action": "changed-source",
+        "complete": true,
+        "saved": false,
+        "sourceRejected": true
+      },
+      "picker": {
+        "open": true,
+        "document": "demo-0",
+        "page": 1,
+        "previewPage": 1,
+        "ready": false,
+        "sourceBound": false,
+        "sourceChanged": true,
+        "saving": false,
+        "error": true
+      },
+      "savedPage": 0,
+      "savedMode": "manual",
+      "previousDecisionPreserved": true
+    },
+    {
+      "case": "refreshed",
+      "native": {
+        "action": "refreshed-source",
+        "complete": true,
+        "saved": true,
+        "sourceRejected": true
+      },
+      "picker": {
+        "open": false
+      },
+      "savedPage": 1,
+      "savedMode": "manual"
+    },
+    {
+      "case": "rejected-small-es",
+      "native": {
+        "action": "changed-source",
+        "complete": true,
+        "saved": false,
+        "sourceRejected": true
+      },
+      "picker": {
+        "open": true,
+        "document": "demo-0",
+        "page": 1,
+        "previewPage": 1,
+        "ready": false,
+        "sourceBound": false,
+        "sourceChanged": true,
+        "saving": false,
+        "error": true
+      },
+      "savedPage": 0,
+      "savedMode": "manual",
+      "previousDecisionPreserved": true
+    },
+    {
+      "case": "failed-sql",
+      "native": {
+        "action": "failed-save",
+        "complete": true,
+        "saved": false,
+        "sourceRejected": false
+      },
+      "picker": {
+        "open": true,
+        "document": "demo-0",
+        "page": 1,
+        "previewPage": 1,
+        "ready": false,
+        "sourceBound": true,
+        "sourceChanged": false,
+        "saving": false,
+        "error": true
+      }
+    }
+  ],
+  "existingTestsExtended": 1,
+  "newStandaloneTests": 0,
+  "retainedWindowsTestPassed": true,
+  "nativeDebugBuildPassed": true,
+  "workspaceClippyAllTargetsWarningsDenied": true,
+  "runtimeTokenNotPersisted": true,
+  "sourceLeaseHeldThroughDatabaseSave": true,
+  "executableSha256": "8c61337a2092351878d0b84cbfb10463140c58392c645c0a76951f9093d41239"
+}

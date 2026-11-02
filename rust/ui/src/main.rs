@@ -173,7 +173,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             || capture.is_some()
                 && args.iter().any(|arg| {
                     arg.to_str().is_some_and(|value| {
-                        value == "--cover-source-change"
+                        value == "--cover-picker-source-change"
+                            || value == "--cover-source-change"
                             || value.starts_with("--bulk-remove=")
                             || value.starts_with("--backup-export=")
                             || value == "--rollback-preview"
@@ -339,6 +340,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let encoded = path.to_string_lossy().replace('\'', "''");
             db.execute_batch(&format!("UPDATE documents SET path='{encoded}',normalized_path='{encoded}',title_override='Retained title',author_override='Retained author',is_favorite=1 WHERE id='demo-0'; INSERT INTO document_covers(document_id,source_page_index,small_thumbnail_path,large_thumbnail_path,generated_at,source_modified_at,confidence,selection_mode,algorithm_version,crop_mode,page_aspect_ratio) VALUES('demo-0',1,'','','synthetic-choice','{modified}',1,'manual',1,'contain',0.75);"))?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--cover-picker-source-change") {
+            std::fs::create_dir_all(&store)?;
+            let path = store.join("picker-source-change.pdf");
+            std::fs::copy(
+                crate::qa_ui_root().join("../../build/rust-fixtures/covers/cover-0.pdf"),
+                &path,
+            )?;
+            let encoded = path
+                .canonicalize()?
+                .to_string_lossy()
+                .replace(char::from(39), "''");
+            db.execute_batch(&format!("UPDATE documents SET path='{encoded}',normalized_path='{encoded}',title_override='Retained title',author_override='Retained author' WHERE id='demo-0'; INSERT INTO document_covers(document_id,source_page_index,small_thumbnail_path,large_thumbnail_path,generated_at,source_modified_at,confidence,selection_mode,algorithm_version,crop_mode,page_aspect_ratio) VALUES('demo-0',0,'','','previous-choice','2026-10-08',1,'manual',1,'contain',0.75);"))?;
+        }
+
         if args.iter().any(|arg| arg == "--reference-chooser") {
             let path = fixture.to_string_lossy().replace('\'', "''");
             for index in 0..100 {
@@ -1318,6 +1333,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     app.preview_cover_editor("failed-restore");
                 }
+                if args.iter().any(|arg| arg == "--cover-picker-source-change") {
+                    app.preview_cover_editor(
+                        if args.iter().any(|arg| arg == "--cover-picker-expect-stale") {
+                            "stale-source"
+                        } else if args
+                            .iter()
+                            .any(|arg| arg == "--cover-picker-refresh-source")
+                        {
+                            "refreshed-source"
+                        } else {
+                            "changed-source"
+                        },
+                    );
+                }
+
                 if args.iter().any(|arg| arg == "--cover-picker-save") {
                     app.preview_cover_editor("save");
                 }

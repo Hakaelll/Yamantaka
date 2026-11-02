@@ -67,6 +67,8 @@ pub const MAX_RENDER_DIMENSION: u32 = 16_384;
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Failure {
+    #[error("The cover PDF changed or could not be verified; refresh its preview")]
+    CoverSourceChanged,
     #[error(
         "The annotation changed. Reload it before saving another edit; your draft is retained."
     )]
@@ -650,6 +652,7 @@ pub struct RenderedPage {
     pub width: u32,
     pub height: u32,
     pixels: Arc<memory::TrackedBytes>,
+    source_version: Option<source_revision::PhysicalSourceVersion>,
 }
 impl RenderedPage {
     pub fn from_pixels(key: RenderKey, pixels: memory::TrackedBytes) -> Result<Self> {
@@ -665,6 +668,7 @@ impl RenderedPage {
             height,
             key,
             pixels: Arc::new(pixels),
+            source_version: None,
         })
     }
     pub fn pixels(&self) -> &[u8] {
@@ -678,7 +682,16 @@ impl RenderedPage {
             width: self.width,
             height: self.height,
             pixels: self.pixels.clone(),
+            source_version: self.source_version,
         }
+    }
+    pub fn source_version(&self) -> Option<source_revision::PhysicalSourceVersion> {
+        self.source_version
+    }
+    pub fn at_source_version(&self, version: source_revision::PhysicalSourceVersion) -> Self {
+        let mut frame = self.at_generation(self.key.generation);
+        frame.source_version = Some(version);
+        frame
     }
 }
 #[derive(Debug, Clone)]

@@ -320,7 +320,10 @@ impl YamantakaApp {
             );
         }
         if let Some(error) = &picker.error {
-            let message = if matches!(error, yamantaka_domain::Failure::PasswordRequired) {
+            let message = if matches!(error, yamantaka_domain::Failure::CoverSourceChanged) {
+                self.tr("El PDF ha cambiado o no está disponible. Actualiza la vista previa antes de guardar.",
+                    "The PDF changed or is unavailable. Refresh the preview before saving.")
+            } else if matches!(error, yamantaka_domain::Failure::PasswordRequired) {
                 self.tr(
                     "Abre y desbloquea el PDF en el lector antes de elegir su portada.",
                     "Open and unlock the PDF in the reader before choosing its cover.",
@@ -334,8 +337,12 @@ impl YamantakaApp {
                 )
             };
             ui.label(message);
-            actions.retry |=
-                theme::control(ui, self.tr("Reintentar", "Retry"), None, false, false, p).clicked();
+            let retry_label = if matches!(error, yamantaka_domain::Failure::CoverSourceChanged) {
+                self.tr("Actualizar vista previa", "Refresh preview")
+            } else {
+                self.tr("Reintentar", "Retry")
+            };
+            actions.retry |= theme::control(ui, retry_label, None, false, false, p).clicked();
         }
         if !compact {
             ui.add_space(14.0);
