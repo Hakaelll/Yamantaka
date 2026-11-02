@@ -148,7 +148,13 @@ pub fn verify(db: &mut Database) {
     assert_eq!(db.query(&filtered).unwrap()[0].id, "d");
 
     let mut session = db
-        .begin_index("d", false, IndexAccess::Enabled, &cancel)
+        .begin_index(
+            &db.file_snapshot("d").unwrap(),
+            [17; 32],
+            false,
+            IndexAccess::Enabled,
+            &cancel,
+        )
         .unwrap();
     for page in 0..session.page_count {
         db.index_page(
@@ -347,7 +353,13 @@ pub fn verify(db: &mut Database) {
 fn verify_edits(db: &mut Database) {
     let cancel = Cancellation::default();
     let mut session = db
-        .begin_index("d", false, IndexAccess::Enabled, &cancel)
+        .begin_index(
+            &db.file_snapshot("d").unwrap(),
+            [17; 32],
+            false,
+            IndexAccess::Enabled,
+            &cancel,
+        )
         .unwrap();
     for page in 0..session.page_count {
         db.index_page(

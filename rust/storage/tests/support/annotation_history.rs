@@ -101,9 +101,9 @@ pub fn verify(document: &str) {
     drop(page);
     db.execute_batch("ALTER TABLE annotations ADD COLUMN inherited_blob BLOB; UPDATE annotations SET inherited_blob=X'001122FF',rects_json='[ {\"left\":0.1,\"top\":0.2,\"right\":0.4,\"bottom\":0.3} ]',origin_document_id='inherited';").unwrap();
     let expected = revision(&db, &governor);
-    db.execute_batch("SAVEPOINT title_revision; UPDATE documents SET title_override='Changed catalogue title' WHERE id='original';").unwrap();
+    db.execute_batch("CREATE TEMP TABLE annotation_title_fixture AS SELECT title_override FROM documents WHERE id='original'; UPDATE documents SET title_override='Changed catalogue title' WHERE id='original';").unwrap();
     assert_eq!(revision(&db, &governor), expected);
-    db.execute_batch("ROLLBACK TO title_revision; RELEASE title_revision;")
+    db.execute_batch("UPDATE documents SET title_override=(SELECT title_override FROM annotation_title_fixture) WHERE id='original'; DROP TABLE annotation_title_fixture;")
         .unwrap();
     let edit = || AnnotationChange::Edit {
         id: &id,

@@ -38,7 +38,8 @@ fn verify_session(db: &Connection, session: &IndexSession) -> Result<()> {
     let (fingerprint, pages) = document_identity(db, &session.document_id)?;
     let current = state(db, &session.document_id)?
         .ok_or_else(|| Failure::Invalid("Index session no longer exists".into()))?;
-    if fingerprint != session.fingerprint
+    if crate::file_check::read_file(db, &session.document_id)? != session.file
+        || fingerprint != session.fingerprint
         || pages != session.page_count
         || current.fingerprint != session.fingerprint
         || current.status != IndexStatus::Indexing
@@ -241,14 +242,25 @@ impl SearchRepository for Database {
     }
     fn begin_index(
         &mut self,
-        id: &str,
+        expected: &yamantaka_domain::file_check::FileSnapshot,
+        digest: [u8; 32],
         resume: bool,
         access: IndexAccess,
         cancel: &Cancellation,
     ) -> Result<IndexSession> {
         enabled(access)?;
         cancel.check()?;
+        let id = expected.document.as_str();
         let tx = self.connection.transaction().map_err(storage)?;
+        let file = crate::file_check::read_file(&tx, id)?;
+        if file != expected.file
+            || file.missing
+            || expected.digest.is_some_and(|prior| prior != digest)
+        {
+            return Err(Failure::Invalid(
+                "Indexed file source changed; check the file first".into(),
+            ));
+        }
         let (fingerprint, page_count) = document_identity(&tx, id)?;
         if page_count > 10_000_000 {
             return Err(Failure::Invalid("Page count exceeds index limits".into()));
@@ -262,10 +274,18 @@ impl SearchRepository for Database {
                 "Document is excluded from indexing".into(),
             ));
         }
+        let proven = if let Some(old) = &old {
+            crate::file_check::cache(&tx, &self.file_checks, |cache| {
+                cache.query_row("SELECT EXISTS(SELECT 1 FROM index_sources WHERE document_id=? AND source_key=? AND digest=? AND revision=?)",params![id,crate::file_check::source_key(&file).as_slice(),digest.as_slice(),old.updated_at],|r|r.get::<_,bool>(0)).map_err(storage)
+            })?
+        } else {
+            false
+        };
         let cursor = old
             .as_ref()
             .filter(|s| {
                 resume
+                    && proven
                     && s.status == IndexStatus::Indexing
                     && s.fingerprint == fingerprint
                     && s.indexed_pages <= page_count
@@ -273,6 +293,7 @@ impl SearchRepository for Database {
             .map_or(0, |s| s.indexed_pages);
         let can_resume = old.as_ref().is_some_and(|s| {
             resume
+                && proven
                 && s.status == IndexStatus::Indexing
                 && s.fingerprint == fingerprint
                 && s.indexed_pages <= page_count
@@ -286,13 +307,18 @@ impl SearchRepository for Database {
         tx.execute("INSERT INTO search_index_state(document_id,fingerprint,status,indexed_pages,updated_at,error_code) VALUES(?,?,'indexing',?,?,NULL) ON CONFLICT(document_id) DO UPDATE SET fingerprint=excluded.fingerprint,status='indexing',indexed_pages=excluded.indexed_pages,updated_at=excluded.updated_at,error_code=NULL", params![id,fingerprint,cursor,next]).map_err(storage)?;
         cancel.check()?;
         tx.commit().map_err(storage)?;
-        Ok(IndexSession {
+        let session = IndexSession {
+            file,
+            digest,
             document_id: id.into(),
             fingerprint,
             page_count,
             cursor,
             revision: next,
-        })
+        };
+        // Save proof after the main commit: an interrupted cache write forces a restart.
+        self.save_index_source(&session)?;
+        Ok(session)
     }
     fn index_page(
         &mut self,
@@ -334,7 +360,7 @@ impl SearchRepository for Database {
         tx.commit().map_err(storage)?;
         session.cursor = cursor;
         session.revision = next;
-        Ok(())
+        self.save_index_source(session)
     }
     fn finish_index(
         &mut self,
@@ -451,11 +477,23 @@ impl SearchRepository for Database {
         )
         .map_err(storage)?;
         cancel.check()?;
-        tx.commit().map_err(storage)
+        tx.commit().map_err(storage)?;
+        crate::file_check::cache(&self.connection, &self.file_checks, |cache| {
+            cache
+                .execute("DELETE FROM index_sources", [])
+                .map_err(storage)?;
+            Ok(())
+        })
     }
 }
 
 impl Database {
+    fn save_index_source(&self, session: &IndexSession) -> Result<()> {
+        crate::file_check::cache(&self.connection, &self.file_checks, |cache| {
+            cache.execute("INSERT INTO index_sources VALUES(?1,?2,?3,?4) ON CONFLICT(document_id) DO UPDATE SET source_key=excluded.source_key,digest=excluded.digest,revision=excluded.revision",params![session.document_id,crate::file_check::source_key(&session.file).as_slice(),session.digest.as_slice(),session.revision]).map_err(storage)?;
+            Ok(())
+        })
+    }
     /// Failure codes are short machine labels; never persist native errors,
     /// paths, extracted text, or passwords in index diagnostics.
     pub fn fail_index(

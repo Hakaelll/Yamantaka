@@ -10,7 +10,7 @@ use yamantaka_domain::{
 fn cache_error(_: impl std::fmt::Display) -> Failure {
     Failure::Storage("File verification cache could not be read or saved".into())
 }
-fn cache<T>(
+pub(crate) fn cache<T>(
     main: &Connection,
     cached: &RefCell<Option<Connection>>,
     operation: impl FnOnce(&mut Connection) -> Result<T>,
@@ -31,7 +31,7 @@ fn cache<T>(
         let version: u32 = connection
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .map_err(cache_error)?;
-        if version > 1 {
+        if version > 2 {
             return Err(Failure::Invalid(
                 "Unsupported file verification cache version; file preserved".into(),
             ));
@@ -56,11 +56,16 @@ fn cache<T>(
             transaction.execute_batch("CREATE TABLE file_hashes(document_id TEXT NOT NULL,source_key BLOB NOT NULL CHECK(length(source_key)=32),digest BLOB NOT NULL CHECK(length(digest)=32),PRIMARY KEY(document_id,source_key)) WITHOUT ROWID; PRAGMA user_version=1;").map_err(cache_error)?;
             transaction.commit().map_err(cache_error)?;
         }
+        if version < 2 {
+            let transaction = connection.transaction().map_err(cache_error)?;
+            transaction.execute_batch("CREATE TABLE index_sources(document_id TEXT PRIMARY KEY,source_key BLOB NOT NULL CHECK(length(source_key)=32),digest BLOB NOT NULL CHECK(length(digest)=32),revision TEXT NOT NULL) WITHOUT ROWID; PRAGMA user_version=2;").map_err(cache_error)?;
+            transaction.commit().map_err(cache_error)?;
+        }
         *cached = Some(connection);
     }
     operation(cached.as_mut().unwrap())
 }
-fn source_key(file: &CataloguedFile) -> [u8; 32] {
+pub(crate) fn source_key(file: &CataloguedFile) -> [u8; 32] {
     Sha256::digest(
         serde_json::json!([
             file.path,
@@ -74,7 +79,7 @@ fn source_key(file: &CataloguedFile) -> [u8; 32] {
     )
     .into()
 }
-fn read_file(connection: &Connection, document: &str) -> Result<CataloguedFile> {
+pub(crate) fn read_file(connection: &Connection, document: &str) -> Result<CataloguedFile> {
     let encoded:Option<Option<String>>=connection.query_row("SELECT CASE WHEN length(CAST(record AS BLOB))<=262144 THEN record END FROM (SELECT json_object('path',path,'fingerprint',fingerprint,'pages',page_count,'size',file_size,'modified',file_modified_at,'missing',is_missing) AS record FROM documents WHERE id=?)",[document],|row|row.get(0)).optional().map_err(storage)?;
     let encoded = encoded
         .ok_or_else(|| Failure::Invalid("File document no longer exists".into()))?
@@ -300,6 +305,9 @@ pub(crate) fn remove_import_reference(database: &Database, id: &str) -> Result<(
     if let Some(cached) = cached.as_mut() {
         cached
             .execute("DELETE FROM file_hashes WHERE document_id=?", [id])
+            .map_err(cache_error)?;
+        cached
+            .execute("DELETE FROM index_sources WHERE document_id=?", [id])
             .map_err(cache_error)?;
     }
     Ok(())

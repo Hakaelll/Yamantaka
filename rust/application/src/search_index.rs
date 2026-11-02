@@ -2,6 +2,7 @@
 //! nonblocking with respect to PDFium. Reserve one native document slot before
 //! stepping; use `set_slot_available(false)` to yield its native handle before
 //! another reader or importer takes that slot.
+mod source;
 use crate::background_password::{Challenge, Purpose};
 use crossbeam_channel::{Receiver, Select, Sender, TryRecvError};
 use std::collections::VecDeque;
@@ -62,6 +63,7 @@ pub enum IndexCommand {
 }
 struct Active {
     session: IndexSession,
+    guard: std::sync::Arc<crate::file_digest::HashedFile>,
     native_id: String,
     path: PathBuf,
     attempted: bool,
@@ -71,6 +73,8 @@ struct Active {
     cancel: Cancellation,
 }
 enum Pending {
+    Hash(Box<source::Hashing>),
+    Verified(Box<source::Verified>),
     Open(PdfTicket<PdfInfo>),
     Source(PdfTicket<SourceRevision>),
     Password(Receiver<PdfPassword>),
@@ -281,6 +285,8 @@ impl SearchIndexController {
     pub fn register_readiness<'a>(&'a self, select: &mut Select<'a>) {
         if let Some(pending) = self.run.as_ref().and_then(|r| r.pending.as_ref()) {
             match pending {
+                Pending::Hash(job) => job.job.register(select),
+                Pending::Verified(_) => {}
                 Pending::Open(t) => {
                     select.recv(t.readiness());
                 }
@@ -301,6 +307,8 @@ impl SearchIndexController {
     }
     pub fn needs_step(&self) -> bool {
         self.run.as_ref().is_some_and(|run| match &run.pending {
+            Some(Pending::Hash(job)) => job.job.ready(),
+            Some(Pending::Verified(_)) => run.cancel.is_cancelled() || !self.paused(),
             Some(Pending::Open(t)) => t.is_ready(),
             Some(Pending::Source(t)) => t.is_ready(),
             Some(Pending::Password(r)) => {
@@ -388,6 +396,8 @@ impl SearchIndexController {
         let pending = self.run.as_mut().and_then(|r| r.pending.take());
         if let Some(pending) = pending {
             match pending {
+                Pending::Hash(job) => self.finish_hash(*job, repository)?,
+                Pending::Verified(source) => self.admit_source(*source, repository, engine)?,
                 Pending::Open(ticket) => {
                     let result = ticket_result(&ticket);
                     if self.native_cancelled() {
@@ -456,10 +466,11 @@ impl SearchIndexController {
                     match result {
                         Ok(source) => {
                             let active = self.run.as_mut().unwrap().active.as_mut().unwrap();
-                            if yamantaka_domain::source_revision::legacy_fingerprint(
-                                source.size,
-                                source.head_sha256,
-                            ) != active.session.fingerprint
+                            if active.guard.reference(&source).is_err()
+                                || yamantaka_domain::source_revision::legacy_fingerprint(
+                                    source.size,
+                                    source.head_sha256,
+                                ) != active.session.fingerprint
                                 || active.source.as_ref().is_some_and(|prior| prior != &source)
                             {
                                 self.record_failure(
@@ -490,13 +501,15 @@ impl SearchIndexController {
                         Ok(text) => {
                             let run = self.run.as_mut().unwrap();
                             let active = run.active.as_mut().unwrap();
-                            if let Err(error) = repository.index_page(
-                                &mut active.session,
-                                page,
-                                &text,
-                                IndexAccess::Enabled,
-                                &run.cancel,
-                            ) {
+                            if let Err(error) = active.guard.verify().and_then(|_| {
+                                repository.index_page(
+                                    &mut active.session,
+                                    page,
+                                    &text,
+                                    IndexAccess::Enabled,
+                                    &run.cancel,
+                                )
+                            }) {
                                 self.record_failure(repository, &error)?;
                                 self.close(engine)?;
                             } else {
@@ -553,6 +566,7 @@ impl SearchIndexController {
             let run = self.run.as_mut().unwrap();
             let active = run.active.as_mut().unwrap();
             if active.session.cursor == active.session.page_count {
+                active.guard.verify()?;
                 repository.finish_index(&mut active.session, IndexAccess::Enabled, &run.cancel)?;
                 self.progress.completed_documents += 1;
                 self.dirty = true;
@@ -592,36 +606,7 @@ impl SearchIndexController {
         if document.missing || !repository.needs_index(&id)? {
             return Ok(true);
         }
-        let native_id = crate::temporary_document::reserve(repository, "index")?;
-        let session = repository.begin_index(&id, true, IndexAccess::Enabled, &run.cancel)?;
-        self.progress.current_document = Some(id);
-        self.progress.current_page = session.cursor;
-        self.progress.total_pages = session.page_count;
-        self.dirty = true;
-        let native_cancel = Cancellation::default();
-        run.active = Some(Active {
-            session,
-            native_id: native_id.clone(),
-            path: document.path.clone(),
-            attempted: false,
-            yielded: false,
-            info: None,
-            source: None,
-            cancel: native_cancel.clone(),
-        });
-        match engine.try_open(
-            native_id,
-            document.path,
-            None,
-            yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background,
-            native_cancel,
-        ) {
-            Ok(ticket) => run.pending = Some(Pending::Open(ticket)),
-            Err(error) => {
-                self.record_failure(repository, &error)?;
-                self.close(engine)?;
-            }
-        }
+        self.prepare_source(repository, engine, &id)?;
         Ok(true)
     }
     /// Shutdown cancels pending work and returns a close ticket to join with
@@ -642,11 +627,17 @@ impl SearchIndexController {
             return Ok(None);
         };
         if let Some(Pending::Close(ticket)) = run.pending.take() {
-            return Ok(Some(ticket));
+            return Ok(Some(match run.active.take() {
+                Some(active) => ticket.retain(active.guard),
+                None => ticket,
+            }));
         }
-        run.pending.take();
         run.active
-            .map(|active| engine.try_close(active.native_id))
+            .map(|active| {
+                engine
+                    .try_close(active.native_id)
+                    .map(|ticket| ticket.retain(active.guard))
+            })
             .transpose()
     }
     /// Stop a failed run without retrying a failing repository or admission in

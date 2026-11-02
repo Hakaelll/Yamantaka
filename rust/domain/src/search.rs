@@ -120,6 +120,8 @@ pub struct IndexState {
 /// already committed page is allowed without advancing the cursor again.
 #[derive(Debug, Clone)]
 pub struct IndexSession {
+    pub file: crate::source_revision::CataloguedFile,
+    pub digest: [u8; 32],
     pub document_id: String,
     pub fingerprint: String,
     pub page_count: u32,
@@ -147,7 +149,8 @@ pub trait SearchRepository {
     fn search(&self, query: &SearchQuery, cancel: &Cancellation) -> Result<Vec<SearchResult>>;
     fn begin_index(
         &mut self,
-        document_id: &str,
+        expected: &crate::file_check::FileSnapshot,
+        digest: [u8; 32],
         resume: bool,
         access: IndexAccess,
         cancel: &Cancellation,

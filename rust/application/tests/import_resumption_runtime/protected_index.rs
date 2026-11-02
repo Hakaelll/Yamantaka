@@ -1,3 +1,5 @@
+#[path = "protected_index/provenance.rs"]
+mod provenance;
 use super::*;
 use std::{path::Path, time::Instant};
 use yamantaka_application::{
@@ -10,6 +12,8 @@ use yamantaka_domain::{
 };
 
 pub(super) fn verify(path: &Path, source: &Path, root: &Path) {
+    provenance::verify();
+    provenance::verify_tail_change(source, root);
     let mut db = Database::open(path).unwrap();
     let documents = db.query(&LibraryQuery::default()).unwrap();
     let document = documents.iter().find(|d| d.path == source).unwrap();
@@ -17,7 +21,7 @@ pub(super) fn verify(path: &Path, source: &Path, root: &Path) {
         db.exclude_from_index(&other.id, true, &Cancellation::default())
             .unwrap();
     }
-    for mode in ["cancel", "reopen", "yield"] {
+    for mode in ["cancel", "shutdown", "reopen", "yield"] {
         db.clear_index(&Cancellation::default()).unwrap();
         let worker = PdfWorker::start(
             &root.join("build/native/pdfium-7881/bin/pdfium.dll"),
@@ -46,6 +50,33 @@ pub(super) fn verify(path: &Path, source: &Path, root: &Path) {
             if let Ok(prompt) = receive.try_recv() {
                 assert!(prompt.purpose() == Purpose::Index);
                 prompt_count += 1;
+                assert!(
+                    std::fs::OpenOptions::new()
+                        .write(true)
+                        .open(source)
+                        .is_err(),
+                    "Indexing must deny source writes while waiting for credentials"
+                );
+                if mode == "shutdown" {
+                    let close = controller.shutdown(&worker).unwrap().unwrap();
+                    assert!(prompt.cancelled());
+                    let ready = Instant::now() + Duration::from_secs(10);
+                    while !close.is_ready() {
+                        assert!(Instant::now() < ready, "Index close did not complete");
+                        std::thread::sleep(Duration::from_millis(1));
+                    }
+                    assert!(
+                        std::fs::OpenOptions::new()
+                            .write(true)
+                            .open(source)
+                            .is_err(),
+                        "The shutdown ticket must retain the source guard"
+                    );
+                    close.wait().unwrap();
+                    assert!(std::fs::OpenOptions::new().write(true).open(source).is_ok());
+                    drop(prompt);
+                    break;
+                }
                 if mode == "cancel" {
                     drop(prompt);
                 } else if prompt_count == 1 {

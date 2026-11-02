@@ -1,5 +1,7 @@
 # Protected PDF full-text indexing
 
+Follow-up: [guarded full-source indexing](rust-search-source-integrity-2026-11-02.md) adds full hashes, source read guards and durable cursor proofs. The evidence and remaining work below describe the earlier unlock checkpoint.
+
 ## Connected behavior
 
 The existing opt-in index controller now uses the application's bounded, one-shot password broker with an indexing purpose. It pauses on a protected open, reports an incorrect credential through the same masked dialog, and submits the owned zeroizing password for that native opening only. The controller does not retain a reusable credential.
