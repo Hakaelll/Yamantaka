@@ -10,6 +10,7 @@ pub mod cover_revision;
 pub mod cover_selection;
 pub mod cover_snapshot;
 pub mod diagnostics;
+pub mod duplicates;
 pub mod external_uri;
 pub mod file_check;
 pub mod front_matter;
@@ -289,6 +290,9 @@ pub trait LibraryRepository {
         _cancel: &Cancellation,
     ) -> Result<String> {
         Err(Failure::Unsupported("Library tag changes".into()))
+    }
+    fn duplicate_reader(&self) -> Result<duplicates::ReaderFactory> {
+        Err(Failure::Unsupported("Library duplicate discovery".into()))
     }
     fn automation_reader(&self) -> Result<automation::simulation::RuleScanFactory> {
         Err(Failure::Unsupported("Independent rule simulation".into()))

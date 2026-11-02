@@ -9,6 +9,11 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='duplicates-groups'; args=@('--duplicates') },
+    @{ name='duplicates-members'; args=@('--duplicates','--duplicates-members','--es') },
+    @{ name='duplicates-small'; args=@('--duplicates','--duplicates-members','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
+    @{ name='duplicates-empty'; args=@('--duplicates','--duplicates-empty','--light') },
+    @{ name='duplicates-tools'; args=@('--tools-menu','--es') },
     @{ name='rollback-review'; args=@('--rollback-preview','--es') },
     @{ name='rollback-review-small'; args=@('--rollback-preview','--es','--light','--size=640x480','--text-scale=2') },
     @{ name='index-protected-prompt'; args=@('--index-protected','--es','--light','--size=640x480','--text-scale=2') },
@@ -516,6 +521,16 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -in @('duplicates-groups','duplicates-members','duplicates-small','duplicates-empty')) {
+        $expectedGroups = if ($case.name -eq 'duplicates-empty') { 0 } else { 1 }
+        $expectedMatches = if ($case.name -eq 'duplicates-empty') { 0 } else { 2 }
+        $expectedChecked = if ($case.name -eq 'duplicates-empty') { 2 } else { 3 }
+        if ($controls.duplicates.pending -or $controls.duplicates.failed -or $controls.duplicates.groups -ne $expectedGroups -or $controls.duplicates.matched -ne $expectedMatches -or $controls.duplicates.checked -ne $expectedChecked -or $controls.duplicates.unverified -ne 0) { throw 'Duplicate discovery did not produce the expected full-content groups.' }
+        if ($case.name -in @('duplicates-members','duplicates-small') -and -not $controls.duplicates.detail) { throw 'Duplicate group details were not displayed.' }
+        $labels = if ($case.args -contains '--es') { @('Volver a la biblioteca','Buscar copias') } else { @('Back to library','Find copies') }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
+    }
+
     if ($case.name -like 'index-protected-prompt*') {
         $labels = if ($case.name -eq 'index-protected-prompt') { @('Indexar PDF','Cancelar') } else { @('Index PDF','Cancel indexing') }
         foreach ($label in $labels) {

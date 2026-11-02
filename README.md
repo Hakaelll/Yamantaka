@@ -195,6 +195,8 @@ The demo uses synthetic documents and does not open the personal library. Intera
 
 ## Data and migration
 
+**Tools → Identical copies** finds groups with matching complete SHA-256 hashes and lets you review and open each copy. Searches run in the background and can be cancelled. Consolidation remains under implementation. See [the identical-copy guide](docs/user-guide/identical-copies.md).
+
 Open **Settings → Storage → Export JSON backup** to save the current library data and settings as a v9 JSON file. Choose a destination outside the Rust data folder. Export runs in the background and can be cancelled; a failed or cancelled operation preserves an existing destination. PDFs are not included. The saved result offers **Show in folder**. Native v9 exports also preserve manual cover-page choices and both preference namespaces through optional, hashed categories. Cover thumbnails are regenerated. Older clients may ignore these extensions; see [backup state preservation](docs/validation/rust-backup-state-2026-11-02.md). See [backup export verification](docs/validation/rust-backup-ui-2026-10-21.md) for its checked behavior and limits.
 
 To restore, choose **Settings → Storage → Restore JSON backup**, review the version and record counts, then choose **Restore and close**. Yamantaka prepares the data in the background, closes its readers, and installs the backup. It retains the previous library in a safety directory and shows that location on completion. Reopen Yamantaka to use the restored library. A changed backup requires another review. Use **Previous library** to return to a retained safety folder; see [the rollback guide](docs/user-guide/previous-library.md). Ambiguous interrupted operations remain preserved for explicit recovery.

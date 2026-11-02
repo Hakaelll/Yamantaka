@@ -150,6 +150,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             || value == "--restore-apply"
                             || value == "--workspaces"
                     }) || arg == "--rule-simulation"
+                        || arg == "--duplicates"
                         || arg == "--export-json"
                         || arg == "--reference-export-json"
                         || arg == "--reference-export-md"
@@ -506,7 +507,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 db.execute_batch("WITH RECURSIVE n(x) AS (SELECT 0 UNION ALL SELECT x+1 FROM n WHERE x<79) INSERT INTO automation_rules(id,name,enabled,trigger_json,actions_json,created_at,updated_at) SELECT printf('paged-rule-%03d',x),printf('Study rule %03d',x),1,'{\"kind\":\"extension\",\"value\":\".pdf\"}','[{\"kind\":\"addTag\",\"value\":\"Study\"}]','2026-10-31T00:00:00Z','2026-10-31T00:00:00Z' FROM n;")?;
             }
         }
-        if capture.is_some() && args.iter().any(|arg| arg == "--rule-simulation") {
+        if capture.is_some()
+            && args
+                .iter()
+                .any(|arg| arg == "--rule-simulation" || arg == "--duplicates")
+        {
             rule_simulation_fixture::seed(&db, &store, &fixture, &args)?;
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--revision-groups") {
@@ -1483,6 +1488,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             0
                         },
                     );
+                } else if args.iter().any(|arg| arg == "--duplicates") {
+                    app.preview_duplicates(args.iter().any(|arg| arg == "--duplicates-members"));
                 } else if args.iter().any(|arg| arg == "--rule-simulation") {
                     app.preview_rule_simulation(
                         if args.iter().any(|arg| arg == "--rule-import-context") {

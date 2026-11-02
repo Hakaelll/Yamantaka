@@ -10,6 +10,7 @@ mod cover_selection;
 mod cover_snapshot;
 pub mod database;
 pub mod diagnostics;
+mod duplicates;
 mod file_check;
 pub mod identity;
 mod import_document;

@@ -235,6 +235,17 @@ impl YamantakaApp {
                         self.show_workspaces();
                         ui.close();
                     }
+                    if theme::navigation(
+                        ui,
+                        self.tr("Copias idénticas", "Identical copies"),
+                        matches!(self.surface, Surface::Duplicates),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_surface(Surface::Duplicates);
+                        ui.close();
+                    }
                     self.library_check_menu(ui, p);
                     self.operation_actions(ui, p);
                     if theme::navigation(

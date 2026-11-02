@@ -19,6 +19,7 @@ mod cover_rebuild;
 mod cover_restore;
 mod details;
 mod diagnostics;
+mod duplicates;
 mod file_check;
 mod file_comparison;
 mod find;
@@ -99,6 +100,7 @@ use yamantaka_storage::preferences::Preferences;
 use yamantaka_windows::{ActivationWatch, Instance};
 
 enum Surface {
+    Duplicates,
     Search,
     Notes,
     History,
@@ -219,6 +221,7 @@ pub struct YamantakaApp {
     outline_preview_target: Option<usize>,
     annotation_export: annotations::export::ExportState,
     file_comparison: file_comparison::ComparisonState,
+    duplicates: duplicates::State,
     file_check: file_check::CheckState,
     cache_maintenance: cache_maintenance::CacheState,
     legacy_import: legacy_import::ImportState,
@@ -472,6 +475,7 @@ impl YamantakaApp {
             metadata_preview: None,
             annotation_export: Default::default(),
             file_comparison: Default::default(),
+            duplicates: Default::default(),
             file_check: Default::default(),
             cache_maintenance: Default::default(),
             legacy_import: Default::default(),
@@ -769,6 +773,9 @@ impl YamantakaApp {
             self.reference = None;
             self.tabs.leave_destination();
             self.reader.restoration.clear();
+        }
+        if matches!(self.surface, Surface::Duplicates) {
+            self.duplicates.cancel();
         }
         if matches!(self.surface, Surface::Automation) {
             self.automation.leave();
@@ -1486,6 +1493,7 @@ impl App for YamantakaApp {
                     self.file_check.accept(*reply);
                     self.refresh();
                 }
+                Update::Duplicates(reply) => self.duplicates.accept(*reply),
                 Update::FileComparison(reply) => self.file_comparison.accept(*reply),
                 Update::AnnotationExport(reply) => self.annotation_export.accept(reply),
                 Update::AnnotationMarks(reply) => {
@@ -2466,6 +2474,7 @@ impl App for YamantakaApp {
                         Surface::Collections => self.collections_view(ui),
                         Surface::Relations => self.relations_view(ui),
                         Surface::Automation => self.automation_rules_view(ui),
+                        Surface::Duplicates => self.duplicates_view(ui),
                         Surface::Tags => self.tags_view(ui),
                         Surface::Search => self.global_search(ui),
                         Surface::Notes => self.global_notes_panel(ui),
@@ -2558,6 +2567,7 @@ impl App for YamantakaApp {
                     && self.reference_marks_preview.ready()
                     && self.reference_notes_preview.ready()
                     && self.annotation_export.ready()
+                    && self.duplicates.ready()
                     && self.file_comparison.ready()
                     && self.bulk_organization_preview.is_none()
                     && self.bulk_picker.as_ref().is_none_or(|picker|picker.ready())
@@ -2776,6 +2786,7 @@ impl App for YamantakaApp {
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
+                    record["duplicates"]=self.duplicates.summary();
                     record["libraryCheck"]=self.library_check.summary();
                     let bytes=serde_json::to_vec_pretty(&record).map_err(|error|image::ImageError::IoError(std::io::Error::other(error)))?;
                     std::fs::write(path.with_extension("controls.json"),bytes).map_err(image::ImageError::IoError)
@@ -2837,6 +2848,7 @@ impl App for YamantakaApp {
             self.graphics_recovery.checkpoint_failed();
             eprintln!("{error}");
         }
+        self.duplicates.cancel();
         self.library_check.cancel();
         self.relocation.cancel();
         self.library_selection.cancel();

@@ -1,0 +1,7 @@
+Origin: native synthetic Yamantaka Rust screenshot.
+Case: duplicates-empty
+Arguments: --demo --duplicates --duplicates-empty --light
+Executable SHA-256: F7A25C1ABE521EC4C432BB21D50E0FB5CA5493F7D652B1FB9B1DDC2AA58081A0
+Original PNG SHA-256: 21443890a4cfdee599912c25c63b30fb874bb71a5e8517da6fe60aae998f6444
+Published PNG SHA-256: 741f5e5f39b8c59981942b5f4179fe96d99b713cb3492153bd08c5d77850e4cc
+Only text provenance metadata was added; native pixel data is unchanged.

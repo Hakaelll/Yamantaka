@@ -469,6 +469,9 @@ impl LibraryRepository for Database {
     ) -> Result<yamantaka_domain::automation::execution::JournalPage> {
         self.rule_journals(offset, governor, cancel)
     }
+    fn duplicate_reader(&self) -> Result<yamantaka_domain::duplicates::ReaderFactory> {
+        crate::duplicates::factory(self)
+    }
     fn automation_reader(
         &self,
     ) -> Result<yamantaka_domain::automation::simulation::RuleScanFactory> {

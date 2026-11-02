@@ -187,6 +187,7 @@ pub(crate) fn verify(root: &Path, governor: &MemoryGovernor) {
         drop((plan, result, reader, batch));
         assert_eq!(governor.usage().total, 0);
     }
+    crate::duplicates::verification_test::verify(&db, governor);
     crate::automation_plan::verification_test::verify(&db, &sql, governor, &originals);
     let rule = saved(&mut db, governor, TriggerKind::Extension, Some(".pdf"));
     let reader = db.automation_reader().unwrap()().unwrap();

@@ -53,6 +53,7 @@ use yamantaka_domain::{
 };
 
 pub enum Action {
+    DiscoverDuplicates(Box<crate::duplicates::Request>),
     RebuildCover(Box<crate::cover_rebuild::Request>),
     FlushChanges(Sender<Result<()>>),
     Quarantine(Box<crate::quarantine::Request>),
@@ -182,6 +183,7 @@ pub enum WriteKind {
     ReaderPreferences,
 }
 pub enum Update {
+    Duplicates(Box<crate::duplicates::Reply>),
     CoverRebuilt(Box<crate::cover_rebuild::Reply>),
     Quarantine(crate::quarantine::Reply),
     /// Some contains the committed protection set; None means a stale request.
@@ -1078,6 +1080,7 @@ impl Runtime {
                 let mut rule_simulation: Option<(SimulationJob, Permit)> = None;
                 let mut rule_plan: Option<(PlanJob, Permit)> = None;
                 let mut rule_execution: Option<(ExecutionJob, Permit)> = None;
+                let mut duplicates: Option<(crate::duplicates::Job, Permit)> = None;
                 let mut comparison: Option<(ComparisonJob, Permit)> = None;
                 let mut cache_maintenance: Option<(CacheMaintenanceJob, Permit)> = None;
                 let mut cover_regeneration:Option<(crate::cover_regeneration::RegenerationJob,Permit)>=None;
@@ -1285,6 +1288,15 @@ impl Runtime {
                                     match result {
                                         Ok(job)=>file_check=Some((job,permit)),
                                         Err(error)=>emit(&events,&notify,Update::FileChecked(Box::new(FileCheckReply{document,result:Err(error),cancel})),permit),
+                                    }
+                                }
+                                Action::DiscoverDuplicates(request) => {
+                                    let cancel = request.cancel.clone();
+                                    let result = if duplicates.is_some() { Err(Failure::QueueFull) }
+                                        else { repository.duplicate_reader().and_then(|reader| crate::duplicates::Job::start(*request, reader)) };
+                                    match result {
+                                        Ok(job) => duplicates = Some((job, permit)),
+                                        Err(error) => emit(&events, &notify, Update::Duplicates(Box::new(crate::duplicates::Reply {cancel, result: Err(error)})), permit),
                                     }
                                 }
                                 Action::CompareFiles(request) => {
@@ -1838,6 +1850,10 @@ impl Runtime {
                         let (_,permit)=file_check.take().unwrap();
                         emit(&events,&notify,Update::FileChecked(Box::new(reply)),permit);
                     }
+                    if let Some(reply) = duplicates.as_mut().and_then(|(job,_)|job.poll()) {
+                        let (_,permit) = duplicates.take().unwrap();
+                        emit(&events,&notify,Update::Duplicates(Box::new(reply)),permit);
+                    }
                     if let Some(reply) = comparison.as_mut().and_then(|(job,_)|job.poll(&repository)) {
                         let (_,permit) = comparison.take().unwrap();
                         emit(&events,&notify,Update::FileComparison(Box::new(reply)),permit);
@@ -2215,6 +2231,7 @@ impl Runtime {
                         job.register(&mut select);
                     }
                     if let Some((job,_)) = &cache_maintenance { job.register(&mut select); }
+                    if let Some((job,_)) = &duplicates { job.register(&mut select); }
                     if let Some((job,_)) = &comparison { job.register(&mut select); }
                     if let Some((job,_)) = &file_check {job.register(&mut select);}
                     if let Some((job,_)) = &relocation {job.register(&mut select);}
@@ -2246,6 +2263,7 @@ impl Runtime {
                 drop(rule_execution);
                 drop(export); // Cancel and join file work before releasing the actor.
                 drop(cache_maintenance);
+                drop(duplicates);
                 drop(comparison);
                 drop(file_check);
                 drop(relocation);
