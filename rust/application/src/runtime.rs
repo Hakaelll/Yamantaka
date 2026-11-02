@@ -964,8 +964,22 @@ fn advance_import<E: AsyncPdfEngine>(
         state.cover = None;
         state.password_attempted = false;
         if let Some(job) = &state.job {
-            match repository.import_already_committed(job, &path) {
-                Ok(true) => {
+            match repository.import_checkpoint(job, &path) {
+                Ok(Some(checkpoint)) => {
+                    use yamantaka_domain::import_recovery::CheckpointOrigin;
+                    match checkpoint.origin {
+                        CheckpointOrigin::Imported => {
+                            if let Some(batch) = &mut state.imported
+                                && engine.memory_governor().is_none_or(|governor| {
+                                    batch.insert(&checkpoint.document, &governor).is_err()
+                                })
+                            {
+                                state.imported = None;
+                            }
+                        }
+                        CheckpointOrigin::Registered => {}
+                        CheckpointOrigin::Unknown => state.imported = None,
+                    }
                     state.count += 1;
                     skipped += 1;
                     if skipped == 64 && !state.paths.is_empty() {
@@ -978,7 +992,7 @@ fn advance_import<E: AsyncPdfEngine>(
                     }
                     continue;
                 }
-                Ok(false) => {}
+                Ok(None) => {}
                 Err(error) => {
                     import_failed(events, notify, error, state);
                     return;
@@ -989,7 +1003,7 @@ fn advance_import<E: AsyncPdfEngine>(
             match repository.registered_import_path(&path) {
                 Ok(Some(id)) => {
                     if let Some(job) = &state.job
-                        && let Err(error) = repository.checkpoint_import(job, &path, &id)
+                        && let Err(error) = repository.checkpoint_import(job, &path, &id, false)
                     {
                         import_failed(events, notify, error, state);
                         return;
@@ -1034,17 +1048,17 @@ fn advance_import<E: AsyncPdfEngine>(
             pending.push(Pending::ImportFolder(folder, state));
         }
     } else {
-        if let Some(job) = &state.job
-            && let Err(error) = repository.remove_import(job)
-        {
-            import_failed(events, notify, error, state);
-            return;
-        }
         if state.reanalysis.is_none()
             && let Err(error) = repository.save_import_rule_context(
                 state.imported.as_ref(),
                 engine.memory_governor().as_ref(),
             )
+        {
+            import_failed(events, notify, error, state);
+            return;
+        }
+        if let Some(job) = &state.job
+            && let Err(error) = repository.remove_import(job)
         {
             import_failed(events, notify, error, state);
             return;
@@ -2145,13 +2159,17 @@ impl Runtime {
                                     state.cancel.check()?;
                                     let guard=state.source.take().ok_or_else(||Failure::Invalid("Import content guard is missing".into()))?;
                                     let reference=guard.reference(&document.source)?;
-                                    let id=repository.import(&document,&reference,&state.cancel)?;
+                                    let id=repository.import(&document,&reference,&state.cancel,state.job.as_deref())?;
                                     if let Some(cover)=state.cover.take() {let _=crate::import_cover::persist(&mut repository,&id,&document,cover);}
-                                    if let Some(job)=&state.job {repository.checkpoint_import(job,&document.path,&id)?;}
-                                    Ok(id)
+                                    let imported=if let Some(job)=&state.job {
+                                        let imported=repository.import_checkpoint(job,&document.path)?.is_some_and(|checkpoint|checkpoint.document==id && checkpoint.origin==yamantaka_domain::import_recovery::CheckpointOrigin::Imported);
+                                        repository.checkpoint_import(job,&document.path,&id,imported)?;
+                                        imported
+                                    } else {true};
+                                    Ok((id,imported))
                                 }) {
-                                    Ok(id) => {
-                                        if let Some(batch)=&mut state.imported
+                                    Ok((id,imported)) => {
+                                        if imported && let Some(batch)=&mut state.imported
                                             && engine.memory_governor().is_none_or(|governor|batch.insert(&id,&governor).is_err()) {state.imported=None;}
                                         state.count+=1;
                                         import_progress.fetch_add(1,Ordering::Release);

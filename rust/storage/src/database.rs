@@ -666,11 +666,21 @@ impl LibraryRepository for Database {
     fn resume_import(&self, id: &str) -> Result<yamantaka_domain::import_recovery::ImportSource> {
         crate::import_recovery::resume(self, id)
     }
-    fn import_already_committed(&self, job: &str, path: &Path) -> Result<bool> {
+    fn import_checkpoint(
+        &self,
+        job: &str,
+        path: &Path,
+    ) -> Result<Option<yamantaka_domain::import_recovery::ImportCheckpoint>> {
         crate::import_recovery::committed(self, job, path)
     }
-    fn checkpoint_import(&mut self, job: &str, path: &Path, document: &str) -> Result<()> {
-        crate::import_recovery::checkpoint(self, job, path, document)
+    fn checkpoint_import(
+        &mut self,
+        job: &str,
+        path: &Path,
+        document: &str,
+        newly_imported: bool,
+    ) -> Result<()> {
+        crate::import_recovery::checkpoint(self, job, path, document, newly_imported)
     }
     fn remove_import(&mut self, id: &str) -> Result<()> {
         crate::import_recovery::remove(self, id)
@@ -783,8 +793,9 @@ impl LibraryRepository for Database {
         document: &NewDocument,
         reference: &yamantaka_domain::source_revision::FullSourceHash,
         cancel: &yamantaka_domain::Cancellation,
+        import_job: Option<&str>,
     ) -> Result<String> {
-        crate::import_document::save(self, document, reference, cancel)
+        crate::import_document::save(self, document, reference, cancel, import_job)
     }
     fn library_memberships(
         &self,

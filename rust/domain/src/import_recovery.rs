@@ -69,3 +69,14 @@ pub struct PendingImport {
     pub label: String,
     pub completed: u64,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckpointOrigin {
+    Imported,
+    Registered,
+    Unknown,
+}
+pub struct ImportCheckpoint {
+    pub document: String,
+    pub origin: CheckpointOrigin,
+}

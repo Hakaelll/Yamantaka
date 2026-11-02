@@ -13,5 +13,5 @@ pub fn save(database: &mut Database, document: &NewDocument) -> Result<String> {
         source: document.source.clone(),
         digest,
     };
-    database.import(document, &reference, &cancel)
+    database.import(document, &reference, &cancel, None)
 }

@@ -39,3 +39,7 @@ Import context is not persisted across app restarts and does not reconstruct the
 ## Persistence follow-up
 
 [Durable completed-import context](rust-import-context-restart-2026-11-02.md) records later journal persistence and native restart evidence. Earlier session-only limitations above describe this checkpoint. Reconstructing the complete original scope of a resumed import remains separate work.
+
+## Resumed-scope follow-up
+
+[Resumed import context](rust-resumed-import-context-2026-11-02.md) later connects known prior checkpoint members and atomic main-commit ownership proofs. Older scope statements above describe their original checkpoints; unknown legacy provenance is preserved without inventing a partial rule scope.

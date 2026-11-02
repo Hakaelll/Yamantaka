@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "catalogueRecords": 11,
+  "contextRecords": 2,
+  "priorCheckpointMemberRetained": true,
+  "newMemberRetained": true,
+  "unrelatedCatalogueRecordsExcluded": true,
+  "recoveryJobsFinished": true,
+  "recoverySchemaVersion": 2,
+  "mainSchemaVersion": 11
+}

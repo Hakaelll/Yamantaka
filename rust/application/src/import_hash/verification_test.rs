@@ -68,13 +68,13 @@ pub(crate) fn verify(root: &Path) {
     let mut bad_reference = reference.clone();
     bad_reference.source.size += 1;
     assert!(matches!(
-        db.import(&document, &bad_reference, &cancel),
+        db.import(&document, &bad_reference, &cancel, None),
         Err(Failure::Invalid(_))
     ));
     // This deferred failure occurs at main commit, after the auxiliary digest write.
     db.execute_batch("CREATE TABLE commit_fault(document_id TEXT REFERENCES documents(id) DEFERRABLE INITIALLY DEFERRED); CREATE TRIGGER reject_commit AFTER INSERT ON documents BEGIN INSERT INTO commit_fault VALUES('absent-document'); END;").unwrap();
     assert!(matches!(
-        db.import(&document, &reference, &cancel),
+        db.import(&document, &reference, &cancel, None),
         Err(Failure::Storage(_))
     ));
     assert_eq!(db.count(&Default::default()).unwrap(), 0);
@@ -91,13 +91,35 @@ pub(crate) fn verify(root: &Path) {
     drop(cache);
     db.execute_batch("DROP TRIGGER reject_commit; DROP TABLE commit_fault;")
         .unwrap();
-    let id = db.import(&document, &reference, &cancel).unwrap();
+    let job = db
+        .queue_import(
+            &yamantaka_domain::import_recovery::ImportSource::Files(vec![path.clone()])
+                .absolute()
+                .unwrap(),
+        )
+        .unwrap()
+        .unwrap();
+    let id = db
+        .import(&document, &reference, &cancel, Some(&job))
+        .unwrap();
+    let committed = db.import_checkpoint(&job, &path).unwrap().unwrap();
+    assert_eq!(committed.document, id);
+    assert_eq!(
+        committed.origin,
+        yamantaka_domain::import_recovery::CheckpointOrigin::Imported
+    );
+    assert!(
+        db.import_checkpoint("another-job", &path)
+            .unwrap()
+            .is_none()
+    );
+    db.remove_import(&job).unwrap();
     assert_eq!(
         db.file_snapshot(&id).unwrap().digest,
         Some(reference.digest)
     );
     db.execute_batch(&format!("UPDATE documents SET title_override='My retained title',is_favorite=1,last_page_index=1 WHERE id='{id}'")).unwrap();
-    assert_eq!(db.import(&document, &reference, &cancel).unwrap(), id);
+    assert_eq!(db.import(&document, &reference, &cancel, None).unwrap(), id);
     assert_eq!(db.registered_import_path(&path).unwrap(), Some(id.clone()));
     let plain = path
         .to_string_lossy()
@@ -144,7 +166,7 @@ pub(crate) fn verify(root: &Path) {
     let before = full_sha256(&future_cache, &cancel).unwrap();
     let mut future = Database::open(&future).unwrap();
     assert!(matches!(
-        future.import(&document, &reference, &cancel),
+        future.import(&document, &reference, &cancel, None),
         Err(Failure::Invalid(_))
     ));
     assert_eq!(future.count(&Default::default()).unwrap(), 0);

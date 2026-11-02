@@ -1,0 +1,6 @@
+Native synthetic resumed-import capture.
+One prior checkpoint member and one newly committed member.
+Only generated synthetic catalogue data is shown.
+PNG pixel data unchanged; synthetic provenance text added.
+Native PNG SHA-256: 082102d34d11b041c95b8fa01827d6e8a95cdb9fbfaaf9d06bcbc248fb0d8c34
+Published PNG SHA-256: 18c006d4eccc157b21230fc9e58b44822e3803cdfd2b40f85f267f5cab2ec8f4

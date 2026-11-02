@@ -8,9 +8,10 @@ pub(crate) fn save(
     document: &NewDocument,
     reference: &FullSourceHash,
     cancel: &Cancellation,
+    import_job: Option<&str>,
 ) -> Result<String> {
     let id = uuid::Uuid::new_v4().to_string();
-    let result = insert(database, &id, document, reference, cancel);
+    let result = insert(database, &id, document, reference, cancel, import_job);
     if result.is_err() && matches!(database.get(&id), Ok(None)) {
         // An absent main row cannot own this new UUID's derived reference.
         let _ = crate::file_check::remove_import_reference(database, &id);
@@ -23,6 +24,7 @@ fn insert(
     document: &NewDocument,
     reference: &FullSourceHash,
     cancel: &Cancellation,
+    import_job: Option<&str>,
 ) -> Result<String> {
     cancel.check()?;
     if reference.source != document.source {
@@ -69,6 +71,13 @@ fn insert(
         document,
         &reference.digest,
     )?;
+    if let Some(job) = import_job {
+        if job.is_empty() || job.len() > 128 {
+            return Err(Failure::Invalid("Invalid import job identity".into()));
+        }
+        let receipt = serde_json::json!({"version":1,"job":job,"document":id,"path":crate::import_recovery::key(&path),"fingerprint":fingerprint,"pages":document.info.pages.len()});
+        transaction.execute("INSERT INTO operation_journal(id,operation_kind,status,summary_json,total_items,completed_items,started_at,updated_at,phase,resume_capability,compatibility_hash) VALUES(?1,'rustImportMember.v1','completed',?2,1,1,?3,?3,'completed','none','rust-import-member-v1')",params![format!("rust-import-member-{id}"),receipt.to_string(),now]).map_err(storage)?;
+    }
     cancel.check()?;
     transaction.commit().map_err(storage)?;
     Ok(id.to_owned())

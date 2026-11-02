@@ -52,7 +52,8 @@ pub(super) fn verify(root: &Path, paths: &[PathBuf]) {
     assert!(db.file_snapshot(&first.id).unwrap().digest.is_some());
 
     let job = db.queue_import(&source).unwrap().unwrap();
-    db.checkpoint_import(&job, &paths[0], &first.id).unwrap();
+    db.checkpoint_import(&job, &paths[0], &first.id, true)
+        .unwrap();
     assert_eq!(db.pending_imports().unwrap()[0].completed, 1);
     assert_eq!(db.schema_version().unwrap(), 11);
     drop(db);
@@ -88,6 +89,45 @@ pub(super) fn verify(root: &Path, paths: &[PathBuf]) {
     assert!(ids.contains(&first.id));
     assert!(jobs(&resumed).is_empty());
     drop(resumed);
+    let check = Database::open(&database).unwrap();
+    let governor = yamantaka_domain::memory::MemoryGovernor::new(Default::default());
+    let batch = check.import_rule_context(&governor).unwrap().unwrap();
+    assert_eq!(
+        batch.ids().collect::<Vec<_>>(),
+        ids.iter()
+            .map(String::as_str)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>()
+    );
+    drop((batch, check));
+    assert_eq!(governor.usage().total, 0);
+    // A resumed batch includes known imported members, excluding registered paths.
+    let mut mixed_db = Database::open(&database).unwrap();
+    let mixed = mixed_db.queue_import(&source).unwrap().unwrap();
+    let second = mixed_db
+        .query(&LibraryQuery::default())
+        .unwrap()
+        .into_iter()
+        .find(|doc| doc.path == paths[1].canonicalize().unwrap())
+        .unwrap();
+    mixed_db
+        .checkpoint_import(&mixed, &paths[0], &first.id, false)
+        .unwrap();
+    mixed_db
+        .checkpoint_import(&mixed, &paths[1], &second.id, true)
+        .unwrap();
+    drop(mixed_db);
+    let mixed_runtime = runtime(root, &database);
+    mixed_runtime
+        .submit(Action::ResumeImport(mixed, Cancellation::default()))
+        .unwrap();
+    assert_eq!(folder_result(&mixed_runtime).unwrap(), 3);
+    drop(mixed_runtime);
+    let mixed_db = Database::open(&database).unwrap();
+    let batch = mixed_db.import_rule_context(&governor).unwrap().unwrap();
+    assert_eq!(batch.ids().collect::<Vec<_>>(), vec![second.id.as_str()]);
+    drop((batch, mixed_db));
     // Simulate interruption after a main-db commit but before the recovery checkpoint.
     let mut db = Database::open(&database).unwrap();
     db.execute_batch(&format!("UPDATE documents SET title_override='Keep my title',is_favorite=1,last_page_index=1 WHERE id='{}'",first.id)).unwrap();
@@ -114,7 +154,7 @@ pub(super) fn verify(root: &Path, paths: &[PathBuf]) {
     assert!(saved.favorite);
     assert_eq!(saved.last_page_index, 1);
     let discard = db.queue_import(&source).unwrap().unwrap();
-    db.checkpoint_import(&discard, &paths[0], &first.id)
+    db.checkpoint_import(&discard, &paths[0], &first.id, true)
         .unwrap();
     drop(db);
     let discard_runtime = runtime(root, &database);
@@ -150,9 +190,44 @@ pub(super) fn verify(root: &Path, paths: &[PathBuf]) {
     let mut sidecar = database.as_os_str().to_owned();
     sidecar.push(".imports.sqlite3");
     let sidecar = PathBuf::from(sidecar);
+    let mut legacy_db = Database::open(&database).unwrap();
+    let legacy = legacy_db.queue_import(&source).unwrap().unwrap();
+    legacy_db
+        .checkpoint_import(&legacy, &paths[0], &first.id, true)
+        .unwrap();
+    drop(legacy_db);
     {
         let connection = rusqlite::Connection::open(&sidecar).unwrap();
-        connection.pragma_update(None, "user_version", 2).unwrap();
+        connection
+            .execute_batch(
+                "ALTER TABLE import_completed DROP COLUMN newly_imported; PRAGMA user_version=1;",
+            )
+            .unwrap();
+    }
+    let migrated = Database::open(&database).unwrap();
+    assert_eq!(
+        migrated
+            .import_checkpoint(&legacy, &paths[0])
+            .unwrap()
+            .unwrap()
+            .origin,
+        yamantaka_domain::import_recovery::CheckpointOrigin::Unknown
+    );
+    assert_eq!(migrated.schema_version().unwrap(), 11);
+    drop(migrated);
+    let legacy_runtime = runtime(root, &database);
+    legacy_runtime
+        .submit(Action::ResumeImport(legacy, Cancellation::default()))
+        .unwrap();
+    assert_eq!(folder_result(&legacy_runtime).unwrap(), 3);
+    assert_eq!(documents(&legacy_runtime), ids);
+    drop(legacy_runtime);
+    let migrated = Database::open(&database).unwrap();
+    assert!(migrated.import_rule_context(&governor).unwrap().is_none());
+    drop(migrated);
+    {
+        let connection = rusqlite::Connection::open(&sidecar).unwrap();
+        connection.pragma_update(None, "user_version", 3).unwrap();
     }
     let before = full_sha256(&sidecar, &Cancellation::default()).unwrap();
     let db = Database::open(&database).unwrap();

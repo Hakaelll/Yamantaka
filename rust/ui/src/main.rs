@@ -421,7 +421,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             ])
             .absolute()?;
             let job = db.queue_import(&source)?.unwrap();
-            db.checkpoint_import(&job, &first.path, &first.id)?;
+            db.checkpoint_import(&job, &first.path, &first.id, true)?;
             drop(db);
             db = Database::open(&store.join("export-preview.sqlite3"))?;
         }

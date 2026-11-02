@@ -19,3 +19,7 @@ Published images contain only generated PDFs and synthetic records. PNG provenan
 ## Remaining acceptance
 
 A resumed import still collects records committed during that resumed run, not its earlier checkpointed records. Persisting the completed context does not reconstruct that full original import scope. Mid-write process termination, physical Forget-batch interaction, Narrator/DPI and large-context performance remain pending. The existing atomic SQLite statement protects context publication, but this checkpoint does not claim whole-rewrite or Release acceptance.
+
+## Resumed-scope follow-up
+
+[Resumed import context](rust-resumed-import-context-2026-11-02.md) later connects known prior checkpoint members and atomic main-commit ownership proofs. Older scope statements above describe their original checkpoints; unknown legacy provenance is preserved without inventing a partial rule scope.

@@ -31,7 +31,7 @@ fn store<T>(
         let version: u32 = connection
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .map_err(error)?;
-        if version > 1 {
+        if version > 2 {
             return Err(Failure::Invalid(
                 "Unsupported import recovery version; store preserved".into(),
             ));
@@ -56,11 +56,16 @@ fn store<T>(
             transaction.execute_batch("CREATE TABLE import_jobs(id TEXT PRIMARY KEY,source TEXT NOT NULL,label TEXT NOT NULL,created_at TEXT NOT NULL); CREATE TABLE import_completed(job_id TEXT NOT NULL REFERENCES import_jobs(id) ON DELETE CASCADE,path TEXT NOT NULL,document_id TEXT NOT NULL,fingerprint TEXT NOT NULL,pages INTEGER NOT NULL,PRIMARY KEY(job_id,path)); PRAGMA user_version=1;").map_err(error)?;
             transaction.commit().map_err(error)?;
         }
+        if version <= 1 {
+            let transaction = connection.transaction().map_err(error)?;
+            transaction.execute_batch("ALTER TABLE import_completed ADD COLUMN newly_imported INTEGER CHECK(newly_imported IS NULL OR newly_imported IN (0,1)); PRAGMA user_version=2;").map_err(error)?;
+            transaction.commit().map_err(error)?;
+        }
         *cached = Some(connection);
     }
     operation(cached.as_mut().unwrap())
 }
-fn key(path: &Path) -> String {
+pub(crate) fn key(path: &Path) -> String {
     let value = path.to_string_lossy().replace('/', "\\").to_lowercase();
     if let Some(rest) = value.strip_prefix("\\\\?\\unc\\") {
         format!("\\\\{rest}")
@@ -150,22 +155,47 @@ pub(crate) fn resume(database: &Database, id: &str) -> Result<ImportSource> {
         Ok(source)
     })
 }
-pub(crate) fn committed(database: &Database, job: &str, path: &Path) -> Result<bool> {
+pub(crate) fn committed(
+    database: &Database,
+    job: &str,
+    path: &Path,
+) -> Result<Option<yamantaka_domain::import_recovery::ImportCheckpoint>> {
     store(database, |store| {
-        let row = store.query_row("SELECT CASE WHEN length(CAST(document_id AS BLOB))<=1024 THEN document_id END,CASE WHEN length(CAST(fingerprint AS BLOB))<=256 THEN fingerprint END,pages FROM import_completed WHERE job_id=?1 AND path=?2",params![job,key(path)],|row|Ok((row.get::<_,Option<String>>(0)?,row.get::<_,Option<String>>(1)?,row.get::<_,u32>(2)?))).optional().map_err(error)?;
-        let Some((id, fingerprint, pages)) = row else {
-            return Ok(false);
+        let row = store.query_row("SELECT CASE WHEN length(CAST(document_id AS BLOB))<=1024 THEN document_id END,CASE WHEN length(CAST(fingerprint AS BLOB))<=256 THEN fingerprint END,pages,newly_imported FROM import_completed WHERE job_id=?1 AND path=?2",params![job,key(path)],|row|Ok((row.get::<_,Option<String>>(0)?,row.get::<_,Option<String>>(1)?,row.get::<_,u32>(2)?,row.get::<_,Option<bool>>(3)?))).optional().map_err(error)?;
+        let Some((id, fingerprint, pages, imported)) = row else {
+            let Some(id) = database.registered_import_path(path)? else {
+                return Ok(None);
+            };
+            let Some(document) = database.get(&id)? else {
+                return Ok(None);
+            };
+            let owned:bool=database.connection.query_row("SELECT EXISTS(SELECT 1 FROM operation_journal WHERE id=?1 AND operation_kind='rustImportMember.v1' AND compatibility_hash='rust-import-member-v1' AND status='completed' AND json_extract(CASE WHEN json_valid(summary_json) THEN summary_json ELSE '{}' END,'$.version')=1 AND json_extract(summary_json,'$.job')=?2 AND json_extract(summary_json,'$.document')=?3 AND json_extract(summary_json,'$.path')=?4 AND json_extract(summary_json,'$.fingerprint')=?5 AND json_extract(summary_json,'$.pages')=?6)",params![format!("rust-import-member-{id}"),job,id,key(path),document.fingerprint,document.page_count],|row|row.get(0)).map_err(error)?;
+            return Ok(
+                owned.then_some(yamantaka_domain::import_recovery::ImportCheckpoint {
+                    document: id,
+                    origin: yamantaka_domain::import_recovery::CheckpointOrigin::Imported,
+                }),
+            );
         };
         let (Some(id), Some(fingerprint)) = (id, fingerprint) else {
             return Err(Failure::Invalid(
                 "Import recovery checkpoint exceeds supported bounds; store preserved".into(),
             ));
         };
-        Ok(database.get(&id)?.is_some_and(|document| {
+        let valid = database.get(&id)?.is_some_and(|document| {
             !document.missing
                 && key(&document.path) == key(path)
                 && document.fingerprint == fingerprint
                 && document.page_count == pages
+        });
+        use yamantaka_domain::import_recovery::{CheckpointOrigin, ImportCheckpoint};
+        Ok(valid.then_some(ImportCheckpoint {
+            document: id,
+            origin: match imported {
+                Some(true) => CheckpointOrigin::Imported,
+                Some(false) => CheckpointOrigin::Registered,
+                None => CheckpointOrigin::Unknown,
+            },
         }))
     })
 }
@@ -174,6 +204,7 @@ pub(crate) fn checkpoint(
     job: &str,
     path: &Path,
     document: &str,
+    newly_imported: bool,
 ) -> Result<()> {
     let document = database
         .get(document)?
@@ -188,7 +219,7 @@ pub(crate) fn checkpoint(
         ));
     }
     store(database, |store| {
-        store.execute("INSERT INTO import_completed VALUES(?1,?2,?3,?4,?5) ON CONFLICT(job_id,path) DO UPDATE SET document_id=excluded.document_id,fingerprint=excluded.fingerprint,pages=excluded.pages",params![job,key(path),document.id,document.fingerprint,document.page_count]).map_err(error)?;
+        store.execute("INSERT INTO import_completed(job_id,path,document_id,fingerprint,pages,newly_imported) VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(job_id,path) DO UPDATE SET document_id=excluded.document_id,fingerprint=excluded.fingerprint,pages=excluded.pages,newly_imported=excluded.newly_imported",params![job,key(path),document.id,document.fingerprint,document.page_count,newly_imported]).map_err(error)?;
         Ok(())
     })
 }

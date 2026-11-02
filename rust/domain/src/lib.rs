@@ -445,14 +445,19 @@ pub trait LibraryRepository {
     fn resume_import(&self, _id: &str) -> Result<import_recovery::ImportSource> {
         Err(Failure::Unsupported("Import recovery".into()))
     }
-    fn import_already_committed(&self, _job: &str, _path: &std::path::Path) -> Result<bool> {
-        Ok(false)
+    fn import_checkpoint(
+        &self,
+        _job: &str,
+        _path: &std::path::Path,
+    ) -> Result<Option<import_recovery::ImportCheckpoint>> {
+        Ok(None)
     }
     fn checkpoint_import(
         &mut self,
         _job: &str,
         _path: &std::path::Path,
         _document: &str,
+        _newly_imported: bool,
     ) -> Result<()> {
         Ok(())
     }
@@ -551,6 +556,7 @@ pub trait LibraryRepository {
         document: &NewDocument,
         reference: &source_revision::FullSourceHash,
         cancel: &Cancellation,
+        import_job: Option<&str>,
     ) -> Result<String>;
 }
 pub struct NewDocument {
