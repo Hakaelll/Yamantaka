@@ -157,7 +157,29 @@ The default compositor uses DirectX 12. If wgpu cannot initialize, Yamantaka tri
 
 [Graphics recovery](docs/user-guide/graphics-recovery.md) covers startup fallback, checked restart after a reported runtime GPU fault, alternate-compositor behavior and remaining physical device-loss acceptance.
 
-A finished Release bundle must include `pdfium.dll` beside the executable. Do not copy only the executable out of a bundle. The final bundle, hashes, SBOM, notices and installation instructions will be added after the parity and validation gates pass.
+A Windows bundle includes `pdfium.dll` beside the executable. Extract the complete ZIP; keep both files together.
+
+### Build a local Release review bundle
+
+This builds an optimized native candidate for review while the rewrite's acceptance work continues. It does not publish a GitHub Release. In addition to the development tools above, the packaging scripts need Python 3.11 or newer with Pillow.
+
+```powershell
+./tool/fetch_rust_pdfium.ps1
+python ./tool/fetch_rust_licenses.py
+./tool/package_rust_windows.ps1 -Portable -OutputDirectory build/release/native-review
+```
+
+The fetch steps download pinned dependencies and upstream license texts. Packaging then uses Cargo's locked, offline dependency resolution, a static Microsoft C runtime and remapped build paths. Restore Cargo dependencies before packaging on a fresh machine. Choose a new output directory for each candidate; existing output is preserved.
+
+The output contains the application folder, ZIP, SHA-256 sums, file manifest, CycloneDX inventory, third-party notices and packaging reports. The executable carries its Windows icon and version resources. Signing remains unverified. A portable bundle uses its own `rust-data` and `rust-cache` folders beside the executable and requires a writable extracted location.
+
+Recheck an existing candidate with:
+
+```powershell
+./tool/package_rust_windows.ps1 -VerifyOnly -OutputDirectory build/release/native-review
+```
+
+Read the [bundle instructions](docs/release/RUST-WINDOWS-BUNDLE.txt) and [acceptance matrix](docs/architecture/rust-rewrite-parity.md) before relying on the candidate. Packaging checks do not establish complete feature parity, physical accessibility or performance acceptance. The final replacement Release remains gated on that work.
 
 ### Development storage
 
@@ -375,4 +397,4 @@ This guard checks exact Git blobs and synthetic capture metadata for recognized 
 - [Memory plan and implemented boundaries](docs/architecture/rust-live-memory-plan.md)
 - [Contribution guide](CONTRIBUTING.md)
 
-Third-party software and font notices remain with their respective components. The final Release bundle must include a complete license inventory and SBOM. No finished Rust release or distribution-signing status is claimed by this README.
+Yamantaka project code is licensed under the [MIT License](LICENSE). Third-party software and fonts retain their respective licenses and notices. The final Release bundle must include a complete license inventory and SBOM. No finished Rust release or distribution-signing status is claimed by this README.

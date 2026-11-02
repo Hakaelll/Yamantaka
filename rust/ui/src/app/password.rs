@@ -391,8 +391,7 @@ impl YamantakaApp {
         if self.demo && self.capture.is_some() {
             self.import_password_preview = Some(ImportPreview { mode, attempts: 0 });
             self.import(vec![
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../build/rust-fixtures/protected.pdf"),
+                crate::qa_ui_root().join("../../build/rust-fixtures/protected.pdf"),
             ]);
         }
     }

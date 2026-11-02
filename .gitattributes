@@ -4,3 +4,7 @@ docs/validation/*.json -text whitespace=trailing-space,space-before-tab,cr-at-eo
 
 # Preserve verified upstream source and local patch hashes across checkouts.
 third_party/pdfium-render/** -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,cr-at-eol
+
+# The icon generator verifies the exact SVG and generated manifest bytes.
+assets/branding/*.svg text eol=lf
+assets/branding/manifest.json text eol=lf

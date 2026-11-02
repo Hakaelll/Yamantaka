@@ -24,6 +24,33 @@ use yamantaka_pdf::{MemoryLimits, PdfWorker};
 use yamantaka_storage::{Database, preferences::Preferences};
 use yamantaka_windows::{Activation, AppPaths, Instance};
 
+/// Development fixtures are explicit at runtime in distributable binaries.
+pub(crate) fn qa_ui_root() -> PathBuf {
+    let args: Vec<_> = std::env::args_os().collect();
+    if args.iter().any(|arg| arg == "--demo")
+        && args.iter().any(|arg| {
+            arg.to_str()
+                .is_some_and(|arg| arg.starts_with("--capture="))
+        })
+        && let Some(root) = std::env::var_os("YAMANTAKA_QA_UI_ROOT")
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute())
+    {
+        return root;
+    }
+    #[cfg(debug_assertions)]
+    {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(|path| path.join("qa/rust/ui")))
+            .unwrap_or_else(|| PathBuf::from("qa/rust/ui"))
+    }
+}
+
 fn main() -> std::process::ExitCode {
     match run() {
         Ok(()) => std::process::ExitCode::SUCCESS,
@@ -126,7 +153,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             store,
         )
     } else if demo {
-        let mut store = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/demo-store");
+        let mut store = crate::qa_ui_root().join("../../build/demo-store");
         // Captures have their own instance identity so QA does not forward to
         // or interfere with a demonstration window the user is reviewing.
         if capture.is_some() {
@@ -183,7 +210,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             Database::in_memory_at(11)?
         };
-        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        let fixture = crate::qa_ui_root()
             .join(if args.iter().any(|arg| arg == "--metadata-reanalyze") {
                 if args.iter().any(|arg| arg == "--metadata-evidence-later") {
                     "../../build/rust-fixtures/front-matter-evidence-later.pdf"
@@ -229,25 +256,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         for (index, (title, author)) in names.iter().enumerate() {
             let automatic_first = index == 0 && args.iter().any(|arg| arg == "--automatic-cover");
             let cover_fixture = if automatic_first {
-                Some(
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("../../build/rust-fixtures/automatic-cover.pdf"),
-                )
+                Some(crate::qa_ui_root().join("../../build/rust-fixtures/automatic-cover.pdf"))
             } else {
                 args.iter().any(|arg| arg == "--pdf-covers").then(|| {
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!(
+                    crate::qa_ui_root().join(format!(
                         "../../build/rust-fixtures/covers/cover-{index}.pdf"
                     ))
                 })
             };
-            let reference_protected =
-                (index == 1 && args.iter().any(|arg| arg == "--reference-protected")).then(|| {
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("../../build/rust-fixtures/protected.pdf")
-                });
+            let reference_protected = (index == 1
+                && args.iter().any(|arg| arg == "--reference-protected"))
+            .then(|| crate::qa_ui_root().join("../../build/rust-fixtures/protected.pdf"));
             let reference_links = (index == 1 && args.iter().any(|arg| arg == "--reference-links"))
                 .then(|| {
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+                    crate::qa_ui_root().join(
                         if args.iter().any(|arg| arg == "--reference-link-external") {
                             "../../build/rust-fixtures/external-links.pdf"
                         } else {
@@ -255,16 +277,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         },
                     )
                 });
-            let reference_outline =
-                (index == 1 && args.iter().any(|arg| arg == "--reference-outline")).then(|| {
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("../../build/rust-fixtures/outline.pdf")
-                });
-            let reference_text =
-                (index == 1 && args.iter().any(|arg| arg == "--reference-text-empty")).then(|| {
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                        .join("../../build/rust-fixtures/scanned.pdf")
-                });
+            let reference_outline = (index == 1
+                && args.iter().any(|arg| arg == "--reference-outline"))
+            .then(|| crate::qa_ui_root().join("../../build/rust-fixtures/outline.pdf"));
+            let reference_text = (index == 1
+                && args.iter().any(|arg| arg == "--reference-text-empty"))
+            .then(|| crate::qa_ui_root().join("../../build/rust-fixtures/scanned.pdf"));
             let document_path = reference_protected
                 .as_ref()
                 .or(reference_text.as_ref())
@@ -412,7 +430,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         if capture.is_some() && args.iter().any(|arg| arg == "--import-recovery") {
             let first = db.get("demo-0")?.unwrap();
-            let second = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            let second = crate::qa_ui_root()
                 .join("../../build/rust-fixtures/front-matter-wrapped-title.pdf")
                 .canonicalize()?;
             let source = yamantaka_domain::import_recovery::ImportSource::Files(vec![
@@ -816,8 +834,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let library = if bundled.exists() || !cfg!(debug_assertions) {
         bundled
     } else {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../build/native/pdfium-7881/bin/pdfium.dll")
+        crate::qa_ui_root().join("../../build/native/pdfium-7881/bin/pdfium.dll")
     };
     // The 72 MiB page category includes CPU pages, the replacement texture and
     // its staging buffer. Keep the CPU cache a bounded subset of that ledger.
@@ -852,8 +869,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     if demo && capture.is_some() && args.iter().any(|arg| arg == "--cache-maintenance") {
-        let fixture =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build/rust-fixtures/textual.pdf");
+        let fixture = crate::qa_ui_root().join("../../build/rust-fixtures/textual.pdf");
         let cover = engine
             .try_cover(
                 "cache-fixture".into(),
@@ -1052,8 +1068,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             let notify = cc.egui_ctx.clone();
             if demo && args.iter().any(|arg| arg == "--cover-capacity-retry") {
-                let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../build/rust-fixtures/textual.pdf");
+                let source = crate::qa_ui_root().join("../../build/rust-fixtures/textual.pdf");
                 for id in ["capacity-reader-a", "capacity-reader-b"] {
                     engine.open(
                         id.into(),
@@ -1925,8 +1940,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 });
             }
             if demo && args.iter().any(|arg| arg == "--folder-import") {
-                let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../build/rust-fixtures/folder-import");
+                let root = crate::qa_ui_root().join("../../build/rust-fixtures/folder-import");
                 std::fs::create_dir_all(root.join("nested/empty"))?;
                 for (source, target) in [
                     ("textual", "first.pdf"),
@@ -1934,8 +1948,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     ("front-matter-wrapped-title", "nested/third.pdf"),
                 ] {
                     std::fs::copy(
-                        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                            .join(format!("../../build/rust-fixtures/{source}.pdf")),
+                        crate::qa_ui_root().join(format!("../../build/rust-fixtures/{source}.pdf")),
                         root.join(target),
                     )?;
                 }

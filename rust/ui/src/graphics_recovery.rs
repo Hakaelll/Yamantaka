@@ -128,7 +128,7 @@ pub(super) fn demo_store(args: &[OsString]) -> Result<Option<std::path::PathBuf>
         return Ok(None);
     };
     let store = std::path::Path::new(path).canonicalize()?;
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    let root = crate::qa_ui_root()
         .join("../../build/demo-store/captures")
         .canonicalize()?;
     if store == root || !store.starts_with(root) {

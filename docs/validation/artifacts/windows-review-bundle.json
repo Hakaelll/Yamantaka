@@ -1,0 +1,108 @@
+{
+  "applicationLicense": "MIT",
+  "archiveMatchesBundle": true,
+  "archiveSha256": "8abc0d7f62eef21730f86bdba329deb9096003006d7bc8e9bcf8bddf74059651",
+  "binaries": {
+    "pdfium.dll": {
+      "imports": [
+        "advapi32.dll",
+        "gdi32.dll",
+        "kernel32.dll",
+        "user32.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 3
+    },
+    "yamantaka.exe": {
+      "imports": [
+        "advapi32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "bcryptprimitives.dll",
+        "combase.dll",
+        "dwmapi.dll",
+        "dxgi.dll",
+        "gdi32.dll",
+        "imm32.dll",
+        "kernel32.dll",
+        "ntdll.dll",
+        "ole32.dll",
+        "oleaut32.dll",
+        "opengl32.dll",
+        "setupapi.dll",
+        "shell32.dll",
+        "uiautomationcore.dll",
+        "user32.dll",
+        "uxtheme.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 2
+    }
+  },
+  "components": 238,
+  "files": 457,
+  "machineProfilePathsAbsent": true,
+  "pdfiumHashPinned": true,
+  "status": "review-candidate-not-final-release",
+  "verified": true,
+  "version": "0.16.0-alpha.1",
+  "nativeSmoke": {
+    "packageSmoke": [
+      {
+        "case": "reader-wgpu",
+        "exitCode": 0,
+        "synthetic": true,
+        "pagePresenter": "native-wgpu",
+        "renderInstalled": true
+      },
+      {
+        "case": "reader-opengl",
+        "exitCode": 0,
+        "synthetic": true,
+        "pagePresenter": "egui-glow",
+        "renderInstalled": true
+      },
+      {
+        "case": "library-covers",
+        "exitCode": 0,
+        "synthetic": true,
+        "pagePresenter": "native-wgpu",
+        "renderInstalled": false
+      }
+    ],
+    "extractedZipUsed": true,
+    "sourcePdfsUnchanged": true,
+    "sourcePdfCount": 11,
+    "archiveSha256": "b7aad50aa6edd07ed2d3542de493a0aaafa4c74b03a010d69695fffed05f4e6b"
+  },
+  "negativeChecks": {
+    "changedBundleFileRejected": true,
+    "originalBundleRestoredAndVerified": true,
+    "adjacentDllRequired": true,
+    "missingDllExitCode": 1
+  },
+  "normalPortableStartup": {
+    "normalLaunch": true,
+    "title": "Yamantaka",
+    "responding": true,
+    "portableMarkerPresent": true,
+    "independentDatabaseCreated": true,
+    "qaFixtureOverrideAbsent": true
+  },
+  "officialSchemaCheck": {
+    "officialCycloneDx15Schema": true,
+    "valid": true
+  },
+  "repeatedArchive": {
+    "identicalArchiveBytes": true,
+    "sha256": "8abc0d7f62eef21730f86bdba329deb9096003006d7bc8e9bcf8bddf74059651",
+    "currentWorkflow": true
+  },
+  "nativeSmokeRuntimeBytesMatchCurrentBundle": true,
+  "libraryPdfCoversReady": 10,
+  "archiveBytes": 15880534,
+  "applicationBytes": 29010432,
+  "baseSourceCommit": "9eedcbb5bda133c8380e41339931cf74e3b2c62d",
+  "nativeSmokeBundleInventoryMatchesCurrent": true,
+  "workspaceClippyAllTargetsWarningsDenied": true,
+  "workspaceFormattingPassed": true
+}

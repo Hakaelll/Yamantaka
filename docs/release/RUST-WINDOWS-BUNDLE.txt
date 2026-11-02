@@ -1,0 +1,30 @@
+Yamantaka for Windows x64 - native Rust review candidate
+
+This bundle is a review candidate while rewrite parity and acceptance work
+continue. It is not the final replacement release for the Flutter application.
+Authenticode signing has not been verified for this candidate.
+
+Requirements: Windows 10 or Windows 11, x64, with working graphics drivers.
+Extract the complete ZIP, then start yamantaka/yamantaka.exe. Keep pdfium.dll
+beside the executable. Flutter, Dart and a Rust installation are not required.
+
+Normal use is local: no account or telemetry is required. Original PDF files
+are not modified. The Rust application keeps its own library and preferences,
+separate from Flutter. Keep the Flutter installation as a recovery copy and
+close it before importing its library. Review migration results before relying
+on the native library.
+
+Installed mode stores native state in the user's roaming/local application
+data under io.yamantaka.rust/Yamantaka. A bundle containing the marker
+.yamantaka-rust-portable uses rust-data and rust-cache beside the executable.
+Portable mode requires a writable extracted directory. Do not copy an active
+SQLite database manually; use the application's backup and import workflows.
+
+LICENSE contains the MIT terms for Yamantaka project code. Third-party code
+and fonts retain their own terms. See THIRD-PARTY-NOTICES.txt, licenses/ and
+SBOM.cdx.json. Cargo.lock records the pinned Rust dependency resolution.
+
+package-manifest.json lists every bundled file and its SHA-256. The ZIP and
+manifest checksums are in SHA256SUMS.txt. verification.json records packaging
+checks performed by the repository tooling; it does not establish full product
+acceptance, physical accessibility or performance targets.

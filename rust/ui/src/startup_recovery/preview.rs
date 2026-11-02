@@ -52,7 +52,7 @@ pub fn run(
     args: &[OsString],
     capture: PathBuf,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let root = crate::qa_ui_root()
         .join("../../build/demo-store/captures")
         .join(format!("startup-{}", uuid::Uuid::new_v4()));
     let store = root.join("active");
