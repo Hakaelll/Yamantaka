@@ -1,4 +1,12 @@
-# NEXT_TODOS — hoja de ruta integral de Yamantaka
+# Historical Flutter backlog
+
+This document records the earlier Flutter iterations. It is retained as historical
+context, not the active Rust roadmap. Use [ROADMAP.md](ROADMAP.md) and the
+[Rust acceptance matrix](docs/architecture/rust-rewrite-parity.md) for current work.
+Historical checked items, platform plans, and test counts do not establish native
+Rust completion.
+
+## Earlier Yamantaka roadmap
 
 Actualizado: 2026-09-09.
 
