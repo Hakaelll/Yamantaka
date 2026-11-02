@@ -187,7 +187,11 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
             .filter(|rows| rows.len() <= 100000)
             .ok_or_else(|| Failure::Invalid(format!("Invalid backup table: {table}")))?;
         counts.insert(table.into(), rows.len());
-        let columns = &current[table];
+        let mut columns = current[table].clone();
+        // Flutter's historical JSON contract omits these existing schema-v11 fields.
+        if table == "documents" {
+            columns.extend(["is_modified".into(), "last_validated_at".into()]);
+        }
         let sql = format!(
             "INSERT INTO {table} ({}) VALUES ({})",
             columns.join(","),
@@ -245,7 +249,8 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
 
 fn default_value(table: &str, column: &str) -> Value {
     match (table, column) {
-        ("documents", "is_favorite" | "restore_blocked") | ("workspaces", "focus_mode") => json!(0),
+        ("documents", "is_favorite" | "restore_blocked" | "is_modified")
+        | ("workspaces", "focus_mode") => json!(0),
         ("annotations", "review_state") | ("workspace_tabs", "queue_status") => json!("pending"),
         ("workspaces", "query_json") => json!("{}"),
         ("workspaces", "grouping") | ("operation_journal", "resume_capability") => json!("none"),

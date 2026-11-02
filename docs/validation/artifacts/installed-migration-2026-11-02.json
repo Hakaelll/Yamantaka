@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "containsPrivateLibraryData": false,
+  "executableSha256": "6FE835A62AA28C109A9FB430CFCAE9E225F2EA0C74314C1DCF83770EEBB92838",
+  "migration": {
+    "version": 1,
+    "source": "installed Flutter store",
+    "sourceSchema": 11,
+    "targetSchema": 11,
+    "reviewedCopyVerified": true,
+    "repeatedCaptureIdempotent": true,
+    "allBackupTablesRoundTrip": true,
+    "backupSettingsRoundTrip": true,
+    "originalDatabaseUnchanged": true,
+    "originalPreferencesUnchanged": true,
+    "nativeClosedChecksUsed": true,
+    "activated": false,
+    "privacy": "Only status and schema versions are public; raw copies, records, hashes and preferences remain local."
+  },
+  "startup": {
+    "version": 1,
+    "synthetic": false,
+    "privatePortableStartupVerified": true,
+    "libraryQueryLoaded": true,
+    "libraryCountMatchesCopy": true,
+    "startupClean": true,
+    "originalFlutterFilesUnchanged": true,
+    "availableOriginalPdfsUnchanged": null,
+    "presentPdfsWereChecked": false,
+    "installedRustSelectionUnchanged": true
+  },
+  "scope": "One installed v11 library; no raw paths, records, file hashes, settings or private screenshots are published. Referenced PDF originals were unavailable."
+}

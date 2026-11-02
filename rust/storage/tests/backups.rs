@@ -56,7 +56,14 @@ fn every_backup_contract_restores_populated_relations_and_round_trips_all_column
                 });
             }
         }
-        let restored = preview_payload(historic.clone(), &Cancellation::default()).unwrap();
+        let mut input = historic.clone();
+        if version == 9 {
+            for row in input["tables"]["documents"].as_array_mut().unwrap() {
+                row["is_modified"] = json!(1);
+                row["last_validated_at"] = json!("2026-11-02T00:00:00Z");
+            }
+        }
+        let restored = preview_payload(input, &Cancellation::default()).unwrap();
         restored.database.integrity().unwrap();
         assert_eq!(restored.counts["documents"], 2);
         for table in TABLE_ORDER {
@@ -72,6 +79,17 @@ fn every_backup_contract_restores_populated_relations_and_round_trips_all_column
         preview(&export, &Cancellation::default()).unwrap();
         let exported: Value = serde_json::from_slice(&fs::read(export).unwrap()).unwrap();
         assert_eq!(exported["settings"], historic["settings"]);
+        for row in exported["tables"]["documents"].as_array().unwrap() {
+            assert_eq!(row["is_modified"], json!(if version == 9 { 1 } else { 0 }));
+            assert_eq!(
+                row["last_validated_at"],
+                if version == 9 {
+                    json!("2026-11-02T00:00:00Z")
+                } else {
+                    Value::Null
+                }
+            );
+        }
         for table in TABLE_ORDER {
             let mut actual = exported["tables"][table].clone();
             for row in actual.as_array_mut().unwrap() {

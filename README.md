@@ -213,6 +213,8 @@ The rewrite must preserve identifiers, relationships, progress, annotations, man
 | SQLite capture | WAL-coherent backup; never just copy an open main database file |
 | Exact duplicate detection | Full SHA-256 verification; inherited partial fingerprints alone are insufficient |
 
+An [installed-library migration check](docs/validation/rust-installed-migration-2026-11-02.md) now verifies a private v11 copy, unchanged source files and exact v9 category/settings round trips. Optional document validation fields are preserved during reimport.
+
 Compatibility tests cover populated historical schemas and backup contracts. The native import assistant now reviews and creates an independent copy, then lets you choose it for the next launch. Complete recovery and acceptance with real Flutter installations remain pending.
 
 To import a Flutter library in the development build:
