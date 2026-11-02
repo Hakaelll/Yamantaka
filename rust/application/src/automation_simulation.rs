@@ -104,17 +104,7 @@ fn candidate(
     )))
 }
 fn observed(entry: &ScanEntry, file: &HashedFile) -> bool {
-    use chrono::TimeZone;
-    let expected = chrono::DateTime::parse_from_rfc3339(&entry.modified)
-        .ok()
-        .map(|date| date.with_timezone(&chrono::Utc))
-        .or_else(|| {
-            chrono::NaiveDateTime::parse_from_str(&entry.modified, "%Y-%m-%dT%H:%M:%S%.f")
-                .ok()
-                .and_then(|date| chrono::Local.from_local_datetime(&date).single())
-                .map(|date| date.with_timezone(&chrono::Utc))
-        });
-    expected == Some(chrono::DateTime::<chrono::Utc>::from(file.modified()))
+    file.modified_matches(&entry.modified) == Some(true)
         && file.size() == entry.size
         && file.fingerprint() == entry.fingerprint
 }

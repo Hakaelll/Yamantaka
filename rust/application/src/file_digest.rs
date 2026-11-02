@@ -115,6 +115,24 @@ impl HashedFile {
     pub(crate) fn modified(&self) -> SystemTime {
         self.modified
     }
+    pub(crate) fn modified_matches(&self, stored: &str) -> Option<bool> {
+        use chrono::TimeZone;
+        let expected = chrono::DateTime::parse_from_rfc3339(stored)
+            .ok()
+            .map(|date| date.with_timezone(&chrono::Utc))
+            .or_else(|| {
+                chrono::NaiveDateTime::parse_from_str(stored, "%Y-%m-%dT%H:%M:%S%.f")
+                    .ok()
+                    .and_then(|date| chrono::Local.from_local_datetime(&date).single())
+                    .map(|date| date.with_timezone(&chrono::Utc))
+            });
+        // Flutter timestamps can lose the filesystem's sub-microsecond precision.
+        expected.map(|date| {
+            date.signed_duration_since(chrono::DateTime::<chrono::Utc>::from(self.modified))
+                .num_nanoseconds()
+                .is_some_and(|delta| delta.unsigned_abs() <= 999)
+        })
+    }
     pub(crate) fn fingerprint(&self) -> String {
         legacy_fingerprint(self.size, self.head)
     }

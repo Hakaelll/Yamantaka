@@ -61,9 +61,37 @@ pub(crate) fn verify(root: &Path, governor: &MemoryGovernor) {
         let path = root.join(format!("simulation-{index}.pdf"));
         fs::write(&path, &bytes).unwrap();
         let path = path.canonicalize().unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(std::time::UNIX_EPOCH + Duration::new(1_730_000_000, 123_456_700))
+            .unwrap();
         let stamp =
             chrono::DateTime::<chrono::Utc>::from(path.metadata().unwrap().modified().unwrap())
-                .to_rfc3339();
+                .to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
+        let native =
+            chrono::DateTime::<chrono::Utc>::from(path.metadata().unwrap().modified().unwrap());
+        let mut buffer = [0; 65536];
+        let hashed = HashedFile::read(&path, &mut buffer, &Cancellation::default()).unwrap();
+        assert_eq!(hashed.modified_matches(&stamp), Some(true));
+        assert_eq!(hashed.modified_matches(&native.to_rfc3339()), Some(true));
+        assert_eq!(
+            hashed.modified_matches(
+                &native
+                    .with_timezone(&chrono::Local)
+                    .naive_local()
+                    .format("%Y-%m-%dT%H:%M:%S%.6f")
+                    .to_string()
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            hashed.modified_matches(&(native + chrono::Duration::microseconds(1)).to_rfc3339()),
+            Some(false)
+        );
+        assert_eq!(hashed.modified_matches("invalid timestamp"), None);
+        drop(hashed);
         let fingerprint = identity::legacy_fingerprint(&path).unwrap();
         sql.execute("INSERT INTO documents(id,path,normalized_path,file_name,title,author,author_override,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint,is_missing) VALUES(?1,?2,?3,?4,?5,'Inherited',?6,2,70000,?7,?7,?7,?8,0)", params![format!("book-{index}"),path.to_string_lossy(),if index==2 {"c:/study-other/c.pdf".to_owned()}else{format!("c:/study/book-{index}.pdf")},format!("book-{index}.PDF"),format!("Book {index}"),if index==0 {Some("ÁUTOR")}else{None},stamp,fingerprint]).unwrap();
         originals.push((path, bytes.clone()));

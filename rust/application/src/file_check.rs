@@ -82,30 +82,10 @@ impl Observation {
             {
                 return Ok(FileCheckResult::Changed);
             }
-            use chrono::TimeZone;
-            let expected = chrono::DateTime::parse_from_rfc3339(&snapshot.file.modified)
-                .ok()
-                .map(|date| date.with_timezone(&chrono::Utc))
-                .or_else(|| {
-                    chrono::NaiveDateTime::parse_from_str(
-                        &snapshot.file.modified,
-                        "%Y-%m-%dT%H:%M:%S%.f",
-                    )
-                    .ok()
-                    .and_then(|date| chrono::Local.from_local_datetime(&date).single())
-                    .map(|date| date.with_timezone(&chrono::Utc))
-                });
-            let Some(expected) = expected else {
-                return Ok(FileCheckResult::Unverifiable);
-            };
-            let modified: chrono::DateTime<chrono::Utc> = file.modified().into();
-            // Dart's filesystem timestamps may have only microsecond precision.
-            if expected
-                .signed_duration_since(modified)
-                .num_nanoseconds()
-                .is_none_or(|delta| delta.unsigned_abs() > 999)
-            {
-                return Ok(FileCheckResult::Changed);
+            match file.modified_matches(&snapshot.file.modified) {
+                None => return Ok(FileCheckResult::Unverifiable),
+                Some(false) => return Ok(FileCheckResult::Changed),
+                Some(true) => {}
             }
         }
         Ok(FileCheckResult::Available {
