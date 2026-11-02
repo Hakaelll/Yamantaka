@@ -66,9 +66,29 @@ pub fn seed(
         db.execute_batch("DELETE FROM documents WHERE id NOT IN ('demo-0','demo-1','demo-2'); UPDATE automation_rules SET trigger_json='{\"kind\":\"exactDuplicate\",\"value\":null}' WHERE id='legacy-rule';")?;
         let mut bytes = std::fs::read(fixture)?;
         bytes.resize(70000, b' ');
+        // Restore acceptance keeps original PDFs outside the replaceable library store.
+        let source_store = if args
+            .iter()
+            .any(|arg| arg == "--duplicates-merge-history-apply")
+        {
+            let path = store
+                .parent()
+                .ok_or("Synthetic store parent unavailable")?
+                .join(format!(
+                    "inputs-{}",
+                    store
+                        .file_name()
+                        .ok_or("Synthetic store identity unavailable")?
+                        .to_string_lossy()
+                ));
+            std::fs::create_dir_all(&path)?;
+            path
+        } else {
+            store.to_owned()
+        };
         for index in 0..3 {
             *bytes.last_mut().unwrap() = if index == 2 { b'B' } else { b'A' };
-            let path = store.join(format!("duplicate-{index}.pdf"));
+            let path = source_store.join(format!("duplicate-{index}.pdf"));
             std::fs::write(&path, &bytes)?;
             let path = path.canonicalize()?;
             let fingerprint = identity::legacy_fingerprint(&path)?;

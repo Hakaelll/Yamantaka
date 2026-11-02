@@ -287,7 +287,7 @@ impl YamantakaApp {
                 self.duplicates.merge.preview = None;
             }
         } else if phase == 3 && self.duplicates.merge.pending.is_none() {
-            if mode == 6
+            if mode >= 6
                 && let Some(receipt) = self
                     .duplicates
                     .merge
@@ -297,6 +297,9 @@ impl YamantakaApp {
                     .map(|entry| entry.receipt.clone())
             {
                 self.review_duplicate_undo(ctx, receipt.backup, receipt.backup_sha256);
+                if mode == 7 {
+                    self.preview_apply_duplicate_restore();
+                }
             }
             self.duplicates.merge.preview = None;
         }

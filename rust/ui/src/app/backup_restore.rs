@@ -128,6 +128,11 @@ impl YamantakaApp {
             ctx.send_viewport_cmd(ViewportCommand::Close);
         }
     }
+    pub(in crate::app) fn preview_apply_duplicate_restore(&mut self) {
+        if self.demo && self.capture.is_some() && self.backup_restore.busy() {
+            self.backup_restore.preview = Some(true);
+        }
+    }
     pub(in crate::app) fn review_duplicate_undo(
         &mut self,
         ctx: &egui::Context,

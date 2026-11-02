@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "installed": true,
+  "restoredBooks": 3,
+  "safetyBooks": 2,
+  "snapshotTablesEqual": true,
+  "foreignKeysValid": true,
+  "backupHashPreserved": true,
+  "originalDuplicatePdfHashesUnchanged": true,
+  "separateNativeProcessReopened": true,
+  "executableSha256": "4c7083443cfca03145300c57f5517279c566ff82ef619cb5c36401f635d117dd"
+}

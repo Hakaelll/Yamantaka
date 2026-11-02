@@ -1,0 +1,5 @@
+Native synthetic library after backup installation and separate native process restart.
+Only generated synthetic PDFs are used.
+PNG pixels unchanged; synthetic provenance text added.
+Native PNG SHA-256: c79400f3b9a5314711a9380f8e8c850a904bf89cc5f1f1ada7bbb53bb5df0d04
+Published PNG SHA-256: 9941542e5cff6957f61f21449c6f94485ddadb8409c5d0281597bc4720f7872c

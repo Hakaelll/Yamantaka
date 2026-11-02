@@ -29,3 +29,7 @@ The Undo capture verifies review of the three-record backup, not installation th
 ## Durable-history follow-up
 
 [Consolidation history](rust-duplicate-history-2026-11-02.md) connects later paged native history and hash-checked backup review. The evidence above describes its original session-only checkpoint.
+
+## Installation and restart follow-up
+
+[Native backup installation](rust-duplicate-restore-2026-11-02.md) now records the later actual restore handover, table comparison, PDF hashes and separate native process restart. Earlier scope and remaining physical interaction requirements above retain their original meaning.

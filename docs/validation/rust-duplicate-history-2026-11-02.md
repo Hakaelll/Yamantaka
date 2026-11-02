@@ -13,3 +13,7 @@ Executed: focused retained application test, workspace Clippy across all targets
 [History list](../screenshots/rust-duplicate-history/duplicates-merge-history.png) · [Backup review](../screenshots/rust-duplicate-history/duplicates-merge-history-undo.png)
 
 The manifest records native image bytes; published PNGs add synthetic provenance without changing pixels, with both hashes in origin files. Full process restart interaction, physical keyboard/Narrator/DPI acceptance, large history performance and native restore installation remain pending. Restoring any entry replaces the entire library with that snapshot, including later library edits; the interface states this consequence before confirmation.
+
+## Installation and restart follow-up
+
+[Native backup installation](rust-duplicate-restore-2026-11-02.md) now records the later actual restore handover, table comparison, PDF hashes and separate native process restart. Earlier scope and remaining physical interaction requirements above retain their original meaning.

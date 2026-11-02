@@ -117,7 +117,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     let (database, mut prefs, store) = if let Some(store) = demo_resume {
         (
-            Database::open(&store.join("export-preview.sqlite3"))?,
+            Database::open(&store.join(if store.join("yamantaka.sqlite3").is_file() {
+                "yamantaka.sqlite3"
+            } else {
+                "export-preview.sqlite3"
+            }))?,
             Preferences::load(&store.join("preferences.json"))?,
             store,
         )
@@ -997,13 +1001,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let app_instance = instance.clone();
     let restore_handover: app::RestoreHandover = Default::default();
     let ui_restore_handover = restore_handover.clone();
+    let consolidation_restore = demo
+        && args
+            .iter()
+            .any(|arg| arg == "--duplicates-merge-history-apply");
     let rollback_smoke = demo && args.iter().any(|arg| arg == "--rollback-apply");
     let restore_smoke = if demo {
         capture
             .as_ref()
             .filter(|_| {
-                args.iter()
-                    .any(|arg| arg == "--restore-apply" || arg == "--rollback-apply")
+                args.iter().any(|arg| {
+                    arg == "--restore-apply"
+                        || arg == "--rollback-apply"
+                        || arg == "--duplicates-merge-history-apply"
+                })
             })
             .map(|path| path.with_extension("restore-result.json"))
     } else {
@@ -1493,6 +1504,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         app.preview_duplicate_merge(
                             if args
                                 .iter()
+                                .any(|arg| arg == "--duplicates-merge-history-apply")
+                            {
+                                7
+                            } else if args
+                                .iter()
                                 .any(|arg| arg == "--duplicates-merge-history-undo")
                             {
                                 6
@@ -1957,10 +1973,27 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             let database = Database::open_read_only(&commit.store.join("yamantaka.sqlite3"))?;
             let books = database.count(&yamantaka_domain::LibraryQuery::default())?;
+            let safety_books = if consolidation_restore {
+                assert_eq!(books, 3);
+                let previous = Database::open_read_only(&safety.join("export-preview.sqlite3"))?;
+                let count = previous.count(&yamantaka_domain::LibraryQuery::default())?;
+                assert_eq!(count, 2);
+                assert!(database.get("demo-1")?.is_some());
+                assert!(previous.get("demo-1")?.is_none());
+                Some(count)
+            } else {
+                None
+            };
+            if consolidation_restore {
+                std::fs::write(
+                    result.with_extension("location.json"),
+                    serde_json::to_vec(&serde_json::json!({"store":commit.store,"safety":safety}))?,
+                )?;
+            }
             std::fs::write(
                 result,
                 serde_json::to_vec(
-                    &serde_json::json!({"synthetic":true,"installed":true,"books":books,"safetyExists":safety.is_dir()}),
+                    &serde_json::json!({"synthetic":true,"installed":true,"books":books,"safetyExists":safety.is_dir(),"safetyBooks":safety_books,"consolidationRestore":consolidation_restore}),
                 )?,
             )?;
         } else if !demo {
