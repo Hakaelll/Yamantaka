@@ -145,7 +145,7 @@ components:
 
 A personal collection supplies the identity. Matte book volumes, visible paper edges and family-specific jacket lettering make books recognizable, while graphite surfaces, ivory text and functional violet keep the interface calm and precise. Light mode changes the room to warm paper without changing the collection's authored colors.
 
-Beauty comes from physical coherence and clear hierarchy: connected book geometry, lettering attached to the cover plane, stable catalogue titles, and restrained native controls. Segoe UI Variable is the explicitly required Windows interface face. Locally bundled Source Serif 4 Display accompanies document titles and three jacket families. The corporate geometric open-volume mark in `assets/branding/yamantaka-logo.svg` is the canonical brand asset, following the owner's 2026-11-02 request to replace the previous emblem.
+Beauty comes from physical coherence and clear hierarchy: connected book geometry, lettering attached to the cover plane, stable catalogue titles, and restrained native controls. Segoe UI Variable is the explicitly required Windows interface face. Locally bundled Source Serif 4 Display accompanies document titles and three jacket families. The abstract black page-fold mark in `assets/branding/yamantaka-logo.svg` is the canonical brand asset, following the owner's 2026-11-02 request to replace the previous emblem.
 
 **Key Characteristics:**
 

@@ -17,7 +17,7 @@ def master(opaque=False):
     if svg.attrib.get("viewBox") != "0 0 512 512":
         raise ValueError("The brand source must use its canonical 512-unit canvas")
     scale = 4
-    result = Image.new("RGBA", (2048, 2048), "#6748A7" if opaque else (0, 0, 0, 0))
+    result = Image.new("RGBA", (2048, 2048), "#F2EFE8" if opaque else (0, 0, 0, 0))
     draw = ImageDraw.Draw(result)
     for node in svg:
         kind = node.tag.rsplit("}", 1)[-1]
@@ -62,9 +62,9 @@ def generated():
     for path in ["windows/runner/resources/app_icon.ico", "web/favicon.ico"]:
         output[path] = ico.getvalue()
     manifest = {
-        "version": 1, "identity": "corporate-open-volume-v1", "source": SOURCE.relative_to(ROOT).as_posix(),
+        "version": 1, "identity": "abstract-page-folds-v2", "source": SOURCE.relative_to(ROOT).as_posix(),
         "sourceSha256": hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
-        "background": "#6748A7", "foreground": "#FFFFFF", "icoSizes": list(ICO_SIZES),
+        "background": "#F2EFE8", "foreground": "#101112", "icoSizes": list(ICO_SIZES),
         "files": [{"path": path, "sha256": hashlib.sha256(data).hexdigest()} for path, data in sorted(output.items())],
     }
     output["assets/branding/manifest.json"] = (json.dumps(manifest, indent=2) + "\n").encode()

@@ -1,0 +1,7 @@
+Native synthetic library capture, light theme. Not an AI-generated image.
+Arguments: --demo --capture=<workspace-output> --light
+Only the isolated synthetic study collection and generated PDF acceptance fixture are shown.
+Logical viewport: [0.0, 0.0, 1440.0, 960.0]; pixels per logical point: 1.25.
+PNG pixel data unchanged; synthetic provenance text added.
+Executable SHA-256: cc9da7d9dc0862d1cefdd36ff59a55c21a380bfc00479ab98dd3c509a363a364
+Native PNG SHA-256: 643fad5ec5db396fcf69f6af000a1c897037e4ebe1c879750f01c4a346135823

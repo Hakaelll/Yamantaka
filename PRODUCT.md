@@ -39,7 +39,7 @@ and encrypted backups are proposals/contracts, not established complete features
 ## Brand Commitments
 
 Keep Yamantaka's name. The owner requested a corporate logo replacement on
-2026-11-02; use the canonical geometric open-volume mark in `assets/branding/yamantaka-logo.svg`.
+2026-11-02; use the canonical abstract black page-fold mark in `assets/branding/yamantaka-logo.svg`.
 This replaces the earlier logo-geometry preservation requirement. The user asks
 for a substantial visual replacement and an interface whose beauty and professional
 finish are striking. Dark neutrals and functional violet; warm paper and ivory in
