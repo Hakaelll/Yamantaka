@@ -132,6 +132,11 @@ $cases = @(
     @{ name='revision-groups-legacy'; args=@('--revision-groups','--es') },
     @{ name='revision-groups-created'; args=@('--revision-groups','--revision-create','--light') },
     @{ name='revision-groups-current-small-200'; args=@('--revision-groups','--revision-current','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
+    @{ name='relation-edit-form'; args=@('--relations','--relation-edit','--es','--light') },
+    @{ name='relation-edit-small'; args=@('--relations','--relation-edit','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
+    @{ name='relation-edit-applied'; args=@('--relations','--relation-edit-apply') },
+    @{ name='relation-edit-backlink'; args=@('--relations','--relation-edit-backlink','--es') },
+    @{ name='relation-edit-cancelled'; args=@('--relations','--relation-edit-cancel') },
     @{ name='relations-locations'; args=@('--relations','--relation-locations','--es','--light') },
     @{ name='relations-locations-small-200'; args=@('--relations','--relation-locations','--es','--light','--reduce-motion','--size=640x480','--text-scale=2') },
     @{ name='relations-location-open'; args=@('--relations','--relation-locations','--relation-location-open') },
@@ -834,6 +839,17 @@ foreach ($case in $cases) {
         } elseif ($controls.ruleReview.failed -or $controls.ruleReview.documents -ne 10 -or $controls.ruleReview.actions -ne 7) {throw 'The reviewed document or action count is incorrect.'}
         $visible=if ($case.name -eq 'rule-review-missing-workspace') {@('Review actions')} else {@('Cerrar revisión')}
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $visible
+    }
+    if ($case.name -like 'relation-edit-*') {
+        if ($controls.relations.pending -or $controls.relations.writing -or $controls.relations.failed -or $controls.relations.phase -ne 10) {throw 'Relation editing did not settle.'}
+        $related=@($controls.relations.entries | Where-Object {$_.kind -eq 'related'})[0]
+        $expectedSource=if($case.name -eq 'relation-edit-applied'){'1'}else{'0'}
+        $expectedTarget=if($case.name -eq 'relation-edit-backlink'){'0'}else{'1'}
+        if ($related.sourceAnchor -ne $expectedSource -or $related.targetAnchor -ne $expectedTarget) {throw 'Editing changed the wrong relation endpoint.'}
+        if ($case.name -in @('relation-edit-form','relation-edit-small')) {
+            if (-not $controls.relations.editingLocation) {throw 'The inline location editor did not open.'}
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Cancelar edición','Guardar ubicación')
+        } elseif ($controls.relations.editingLocation) {throw 'The finished editor was left open.'}
     }
     if ($case.name -like 'import-rule-*') {
         $result=$controls.ruleSimulation

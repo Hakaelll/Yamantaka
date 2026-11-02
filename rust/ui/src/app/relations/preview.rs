@@ -92,7 +92,32 @@ impl YamantakaApp {
                         .clone();
                     assert_eq!(entry.destination, RelationDestination::Page(1));
                     assert_eq!(entry.relation.source_anchor_id.as_deref(), Some("0"));
-                    if self.relations.preview_locations == 2 {
+                    if self.relations.preview_locations >= 3 {
+                        match self.relations.preview_locations {
+                            3 => {
+                                self.edit_relation_location(entry.relation.clone(), "demo-0");
+                                self.relations.editing.as_mut().unwrap().replace = true;
+                                self.relations.preview = 10;
+                            }
+                            4 => {
+                                self.change_relation(RelationChange::UpdateLocation {
+                                    document: "demo-0".into(),
+                                    expected: entry.relation.clone(),
+                                    page: Some(1),
+                                });
+                                self.relations.preview = 12;
+                            }
+                            5 => {
+                                self.load_relation_context("demo-1".into());
+                                self.relations.preview = 13;
+                            }
+                            _ => {
+                                self.edit_relation_location(entry.relation.clone(), "demo-0");
+                                self.relations.editing = None;
+                                self.relations.preview = 10;
+                            }
+                        }
+                    } else if self.relations.preview_locations == 2 {
                         self.open_relation(&entry);
                         self.relations.preview = 11;
                     } else {
@@ -143,6 +168,40 @@ impl YamantakaApp {
                         .iter()
                         .any(|entry| entry.relation.kind == RelationKind::Replaces)
                 );
+                self.relations.preview = 10;
+            }
+            12 => {
+                let entry = page
+                    .entries
+                    .iter()
+                    .find(|entry| entry.relation.kind == RelationKind::Related)
+                    .unwrap();
+                assert_eq!(entry.relation.source_anchor_id.as_deref(), Some("1"));
+                assert_eq!(entry.relation.target_anchor_id.as_deref(), Some("1"));
+                self.relations.preview = 10;
+            }
+            13 => {
+                let entry = page
+                    .entries
+                    .iter()
+                    .find(|entry| entry.relation.kind == RelationKind::Related)
+                    .unwrap();
+                assert!(entry.backlink);
+                self.change_relation(RelationChange::UpdateLocation {
+                    document: "demo-1".into(),
+                    expected: entry.relation.clone(),
+                    page: Some(0),
+                });
+                self.relations.preview = 14;
+            }
+            14 => {
+                let entry = page
+                    .entries
+                    .iter()
+                    .find(|entry| entry.relation.kind == RelationKind::Related)
+                    .unwrap();
+                assert_eq!(entry.relation.source_anchor_id.as_deref(), Some("0"));
+                assert_eq!(entry.relation.target_anchor_id.as_deref(), Some("0"));
                 self.relations.preview = 10;
             }
             _ => {}

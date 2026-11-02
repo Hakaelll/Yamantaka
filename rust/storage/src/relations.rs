@@ -163,6 +163,57 @@ impl Database {
                 };
                 (id, source.clone())
             }
+            RelationChange::UpdateLocation {
+                document,
+                expected,
+                page,
+            } => {
+                exists(&tx, document)?;
+                let current = tx
+                    .query_row(
+                        &format!("SELECT {FIELDS} FROM document_relations r WHERE r.id=?"),
+                        [&expected.id],
+                        record,
+                    )
+                    .optional()
+                    .map_err(storage)?;
+                if current.as_ref() != Some(expected)
+                    || (document != &expected.source && document != &expected.target)
+                {
+                    return Err(Failure::Invalid(
+                        "Relation changed; refresh before editing its location".into(),
+                    ));
+                }
+                if let Some(page) = page {
+                    let count: i64 = tx
+                        .query_row(
+                            "SELECT page_count FROM documents WHERE id=?",
+                            [document],
+                            |row| row.get(0),
+                        )
+                        .map_err(storage)?;
+                    if i64::from(*page) >= count {
+                        return Err(Failure::Invalid(
+                            "Relation page is outside this document".into(),
+                        ));
+                    }
+                }
+                let sql = if document == &expected.source {
+                    "UPDATE document_relations SET source_anchor_kind=?1,source_anchor_id=?2 WHERE id=?3"
+                } else {
+                    "UPDATE document_relations SET target_anchor_kind=?1,target_anchor_id=?2 WHERE id=?3"
+                };
+                tx.execute(
+                    sql,
+                    params![
+                        page.map(|_| "page"),
+                        page.map(|value| value.to_string()),
+                        expected.id
+                    ],
+                )
+                .map_err(storage)?;
+                (expected.id.clone(), expected.source.clone())
+            }
             RelationChange::Remove { document, expected } => {
                 exists(&tx, document)?;
                 let current = tx

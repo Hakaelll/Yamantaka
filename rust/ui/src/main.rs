@@ -1596,7 +1596,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--relations") {
                     app.preview_relations(
                         args.iter().any(|arg| arg == "--relations-review"),
-                        if args.iter().any(|arg| arg == "--relation-location-open") {
+                        if args.iter().any(|arg| arg == "--relation-edit-backlink") {
+                            5
+                        } else if args.iter().any(|arg| arg == "--relation-edit-apply") {
+                            4
+                        } else if args.iter().any(|arg| arg == "--relation-edit-cancel") {
+                            6
+                        } else if args.iter().any(|arg| arg == "--relation-edit") {
+                            3
+                        } else if args.iter().any(|arg| arg == "--relation-location-open") {
                             2
                         } else if args.iter().any(|arg| arg == "--relation-locations") {
                             1

@@ -67,6 +67,11 @@ pub struct RelationPage {
 }
 #[derive(Clone, Debug)]
 pub enum RelationChange {
+    UpdateLocation {
+        document: String,
+        expected: Relation,
+        page: Option<u32>,
+    },
     Create {
         source: String,
         target: String,

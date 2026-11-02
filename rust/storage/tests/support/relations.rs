@@ -215,4 +215,74 @@ fn verify_locations(db: &mut Database) {
         page(db, "original").entries[0].destination,
         RelationDestination::Document
     );
+    let before = page(db, "original").entries[0].relation.clone();
+    db.change_relation(
+        &RelationChange::UpdateLocation {
+            document: "original".into(),
+            expected: before.clone(),
+            page: Some(0),
+        },
+        IndexAccess::Enabled,
+        &cancel,
+    )
+    .unwrap();
+    let edited = page(db, "target").entries[0].relation.clone();
+    assert_eq!(edited.id, before.id);
+    assert_eq!(edited.created_at, before.created_at);
+    assert_eq!(edited.source_anchor_id.as_deref(), Some("0"));
+    assert_eq!(edited.target_anchor_kind, before.target_anchor_kind);
+    assert!(
+        db.change_relation(
+            &RelationChange::UpdateLocation {
+                document: "target".into(),
+                expected: before,
+                page: Some(0)
+            },
+            IndexAccess::Enabled,
+            &cancel
+        )
+        .is_err()
+    );
+    assert!(
+        db.change_relation(
+            &RelationChange::UpdateLocation {
+                document: "target".into(),
+                expected: edited.clone(),
+                page: Some(u32::MAX)
+            },
+            IndexAccess::Enabled,
+            &cancel
+        )
+        .is_err()
+    );
+    db.change_relation(
+        &RelationChange::UpdateLocation {
+            document: "target".into(),
+            expected: edited.clone(),
+            page: Some(1),
+        },
+        IndexAccess::Enabled,
+        &cancel,
+    )
+    .unwrap();
+    let updated = page(db, "original").entries[0].relation.clone();
+    assert_eq!(
+        page(db, "original").entries[0].destination,
+        RelationDestination::Page(1)
+    );
+    assert_eq!(updated.source_anchor_id, edited.source_anchor_id);
+    db.change_relation(
+        &RelationChange::UpdateLocation {
+            document: "target".into(),
+            expected: updated,
+            page: None,
+        },
+        IndexAccess::Enabled,
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(
+        page(db, "original").entries[0].destination,
+        RelationDestination::Document
+    );
 }

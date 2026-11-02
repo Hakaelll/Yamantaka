@@ -1,5 +1,6 @@
 use super::*;
 use yamantaka_domain::relations::*;
+mod location_edit;
 mod preview;
 mod revisions;
 mod view;
@@ -26,6 +27,7 @@ pub(super) struct RelationState {
     target_page: Option<u32>,
     preview_locations: u8,
     removing: Option<Relation>,
+    editing: Option<location_edit::Editor>,
     pub(super) error: Option<String>,
     saved: bool,
     preview: u8,
@@ -44,6 +46,7 @@ impl RelationState {
             cancel.cancel();
         }
         self.page = None;
+        self.editing = None;
         self.chooser = Default::default();
     }
     pub(super) fn ready(&self) -> bool {
@@ -54,7 +57,7 @@ impl RelationState {
             && (self.preview == 0 || self.preview == 10)
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"document":self.context.as_ref().map(|doc|&doc.id),"pending":self.pending.is_some(),"writing":self.writing.is_some(),"saved":self.saved,"failed":self.error.is_some(),"phase":self.preview,"offset":self.offset,"total":self.page.as_ref().map(|page|page.total),"confirmRemove":self.removing.is_some(),"entries":self.page.as_ref().map(|page|page.entries.iter().map(|entry|serde_json::json!({"id":entry.relation.id,"other":entry.other_document,"kind":entry.relation.kind.stored(),"backlink":entry.backlink,"sourceAnchor":entry.relation.source_anchor_id,"targetAnchor":entry.relation.target_anchor_id,"page":match entry.destination {RelationDestination::Page(page)=>Some(page),_=>None}})).collect::<Vec<_>>())})
+        serde_json::json!({"document":self.context.as_ref().map(|doc|&doc.id),"pending":self.pending.is_some(),"writing":self.writing.is_some(),"saved":self.saved,"failed":self.error.is_some(),"phase":self.preview,"offset":self.offset,"total":self.page.as_ref().map(|page|page.total),"confirmRemove":self.removing.is_some(),"editingLocation":self.editing.is_some(),"entries":self.page.as_ref().map(|page|page.entries.iter().map(|entry|serde_json::json!({"id":entry.relation.id,"other":entry.other_document,"kind":entry.relation.kind.stored(),"backlink":entry.backlink,"sourceAnchor":entry.relation.source_anchor_id,"targetAnchor":entry.relation.target_anchor_id,"page":match entry.destination {RelationDestination::Page(page)=>Some(page),_=>None}})).collect::<Vec<_>>())})
     }
 }
 impl Drop for RelationState {
@@ -227,6 +230,7 @@ impl YamantakaApp {
         match result {
             Ok(_) => {
                 self.relations.saved = true;
+                self.relations.editing = None;
                 self.relations.removing = None;
                 self.relations.target = None;
                 if matches!(self.surface, Surface::Relations) {

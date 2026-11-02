@@ -15,7 +15,13 @@ Select a connection type. To point to specific pages, expand **Link pages (optio
 | Source of | The current document is a source for the destination | Source |
 | Attachment of | The current document accompanies the destination | Has attachment |
 
-Repeating the same source, destination, type, and page locations reuses the existing connection. An explicit page proposal that differs from an existing connection is rejected; review and remove that link before creating its replacement. Creating a whole-document link never clears inherited anchors. Opposite directions remain distinct. Incoming labels describe the original connection without creating an inverse row.
+Repeating the same source, destination, type, and page locations reuses the existing connection. An explicit page proposal that differs from an existing connection is rejected; use **Edit location** on the saved connection to change its page. Creating a whole-document link never clears inherited anchors. Opposite directions remain distinct. Incoming labels describe the original connection without creating an inverse row.
+
+## Edit a saved location
+
+Choose **Edit location** on a connection. The inline editor names the current book and shows its saved location. Enable **Replace the saved location**, then choose the displayed PDF page number, or turn off **Page** to link the whole document. **Save location** updates that end of the existing connection; **Cancel edit** leaves it unchanged.
+
+The other end, relation type, identity and creation date remain intact. A bookmark, annotation or unsupported saved anchor is preserved until you explicitly replace that end. To edit the other book's end, choose **View connections** and edit it from that book's manager. If the connection changed after the editor opened, use **Reload** and reopen the editor before saving again.
 
 ## Follow and remove connections
 
@@ -37,8 +43,8 @@ A group that changed since it was loaded must be reloaded before another current
 
 ## Compatibility and current limits
 
-The manager reads the existing v11 relation rows, including incoming links and saved source or destination anchors. New connections can link whole documents or explicit pages. Existing links cannot be edited in place, and new bookmark/annotation anchors are not exposed by this form. Saved-rule automation is documented separately in the [saved-rule guide](saved-rules.md). The revision manager creates groups and changes their current edition; group renaming, removal, and membership editing are not provided by this flow.
+The manager reads the existing v11 relation rows, including incoming links and saved source or destination anchors. New connections can link whole documents or explicit pages. Existing links can update either end from its document manager; new bookmark/annotation anchors are not exposed by this form. Saved-rule automation is documented separately in the [saved-rule guide](saved-rules.md). The revision manager creates groups and changes their current edition; group renaming, removal, and membership editing are not provided by this flow.
 
-When global indexing is enabled, creating or removing a connection updates the source document's relation search entries in the same transaction. Excluded documents remain excluded. With indexing disabled, creating a connection does not opt an unindexed document into search.
+When global indexing is enabled, creating, editing or removing a connection updates the source document's relation search entries in the same transaction. Excluded documents remain excluded. With indexing disabled, creating a connection does not opt an unindexed document into search.
 
 See the [page-location checkpoint](../validation/rust-relation-locations-2026-10-31.md), [connections checkpoint](../validation/rust-document-connections-2026-10-31.md) and [revision-group checkpoint](../validation/rust-revision-groups-2026-10-31.md) for the executed evidence and remaining acceptance work.

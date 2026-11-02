@@ -153,6 +153,7 @@ impl YamantakaApp {
                     let mut open = None;
                     let mut view = None;
                     let mut remove = None;
+                    let mut update_location=None;
                     if let Some(page) = self.relations.page.clone() {
                         if page.total == 0 {
                             ui.label(tr("Sin relaciones todavía. Elige otro documento para crear la primera.", "No connections yet. Choose another document to create the first."));
@@ -172,10 +173,12 @@ impl YamantakaApp {
                                     if theme::navigation(ui, tr("Ver relaciones", "View connections"), false, p).clicked() {
                                         view = Some(entry.other_document.clone());
                                     }
+                                    if ui.add_enabled_ui(!busy,|ui|theme::navigation(ui,tr("Editar ubicación","Edit location"),false,p)).inner.clicked(){self.edit_relation_location(entry.relation.clone(),&context.id);}
                                     if ui.add_enabled_ui(!busy, |ui| theme::navigation(ui, tr("Quitar relación", "Remove connection"), false, p)).inner.clicked() {
                                         self.relations.removing = Some(entry.relation.clone());
                                     }
                                 });
+                                if let Some(change)=self.relation_location_editor(ui,&entry.relation,&context,p){update_location=Some(change);}
                                 if entry.destination == RelationDestination::Unavailable {
                                     ui.label(RichText::new(tr("La ubicación guardada ya no está disponible. Puedes abrir el documento.", "The saved location is unavailable. You can open the document.")).color(p.secondary));
                                 }
@@ -211,6 +214,7 @@ impl YamantakaApp {
                             }
                         });
                     }
+                    if let Some(change)=update_location {self.change_relation(change);}
                     if let Some(expected) = remove {
                         self.change_relation(RelationChange::Remove { document: context.id.clone(), expected });
                     }
@@ -225,7 +229,7 @@ impl YamantakaApp {
     }
 }
 
-fn page_choice(ui: &mut egui::Ui, label: &str, page: &mut Option<u32>, count: u32) {
+pub(super) fn page_choice(ui: &mut egui::Ui, label: &str, page: &mut Option<u32>, count: u32) {
     ui.horizontal_wrapped(|ui| {
         let mut enabled = page.is_some();
         let checkbox = ui.add_enabled(count > 0, egui::Checkbox::new(&mut enabled, label));

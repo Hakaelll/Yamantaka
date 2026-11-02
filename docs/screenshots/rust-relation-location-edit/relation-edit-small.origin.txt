@@ -1,0 +1,7 @@
+Native synthetic relation manager capture.
+Case: relation-edit-small
+Only generated synthetic catalogue records are shown.
+PNG pixels unchanged; synthetic provenance text added.
+Executable SHA-256: b23debb12f15badd76b091f3e6538c10edec348af7088b329576fa8c703efd09
+Native PNG SHA-256: 6450f5d78e5c135a44d92e92cd6dcda6d2f47d9ebfaa91d3c31b1c871072e28f
+Published PNG SHA-256: 4f0ccf584d20d1d6aadacd5df2fc0a6e00932ffd36fe8177077452cf635dba00

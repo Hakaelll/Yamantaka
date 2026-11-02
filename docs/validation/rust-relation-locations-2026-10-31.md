@@ -31,3 +31,7 @@ The normal form, final small form, and rendered destination were visually inspec
 ## Remaining acceptance
 
 The form creates page anchors, not new bookmark/annotation anchors, and does not edit existing links in place. Existing unsupported anchors remain preserved. Resolution uses the list snapshot; a source or anchor changed after loading requires refresh, and reader opening retains its normal missing-file and page-clamping behavior. Physical pointer/keyboard, Narrator, monitor DPI and whole-library performance acceptance remain pending. No Computer Use, personal library publication, broad suite, or release packaging was performed for this checkpoint.
+
+## Editing follow-up
+
+[Existing relation-location editing](rust-relation-location-edit-2026-11-02.md) now connects in-place updates from either endpoint, with explicit replacement and frozen-record checks. The earlier creation-only scope above retains its checkpoint meaning.
