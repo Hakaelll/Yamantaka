@@ -2,6 +2,7 @@ use super::*;
 
 pub(super) struct ReaderSurface {
     pub prefetch: page_prefetch::State,
+    pub empty_paints: u64,
     pub regions_enabled: bool,
     pub scale: f32,
     pub pages: HashMap<u32, ReaderPage>,
@@ -17,6 +18,7 @@ impl Default for ReaderSurface {
     fn default() -> Self {
         Self {
             prefetch: Default::default(),
+            empty_paints: 0,
             regions_enabled: false,
             scale: 1.0,
             pages: HashMap::new(),
@@ -81,11 +83,11 @@ impl ReaderSurface {
             plan: Default::default(),
             refinement: Default::default(),
         });
-        if let Some(image) = prepared {
+        if let Some((image_key, image)) = prepared {
             slot.cancel.cancel();
             slot.requested = None;
             slot.image = Some(image);
-            slot.image_key = Some(render_plan::preview_key(key));
+            slot.image_key = Some(image_key);
         }
         let base = if region.is_some() && !slot.refinement.blocked() {
             render_plan::preview_key(key)
@@ -154,6 +156,7 @@ impl ReaderSurface {
                 preferences.page_rotation,
             ));
         } else {
+            self.empty_paints += 1;
             ui.painter().rect_filled(paper, 1, Color32::WHITE);
         }
         slot.refinement.paint(

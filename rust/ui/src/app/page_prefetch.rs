@@ -79,6 +79,16 @@ impl View<'_> {
         keys
     }
 }
+fn same_page(a: &RenderKey, b: &RenderKey) -> bool {
+    a.document_id == b.document_id && a.page == b.page && a.region.is_none() && b.region.is_none()
+}
+fn same_raster(a: &RenderKey, b: &RenderKey) -> bool {
+    same_page(a, b)
+        && a.physical_width == b.physical_width
+        && a.physical_height == b.physical_height
+        && a.rotation == b.rotation
+}
+
 enum Phase {
     Planned,
     Pending,
@@ -89,7 +99,7 @@ struct Slot {
     key: RenderKey,
     cancel: Cancellation,
     phase: Phase,
-    image: Option<PageImage>,
+    image: Option<(RenderKey, PageImage)>,
 }
 #[derive(Default)]
 pub(super) struct State {
@@ -118,24 +128,38 @@ impl State {
         self.was_ready = false;
     }
     pub fn cancel_pending(&mut self) {
-        self.slots.retain(|slot| {
+        self.slots.retain_mut(|slot| {
             slot.cancel.cancel();
-            matches!(slot.phase, Phase::Ready)
+            if let Some((key, _)) = &slot.image {
+                slot.cancel = Cancellation::default();
+                slot.phase = if same_raster(key, &slot.key) {
+                    Phase::Ready
+                } else {
+                    Phase::Planned
+                };
+                true
+            } else {
+                matches!(slot.phase, Phase::Ready)
+            }
         });
         self.since = None;
         self.was_ready = false;
     }
-    pub fn take(&mut self, key: &RenderKey) -> Option<PageImage> {
+    pub fn take(&mut self, target: &RenderKey) -> Option<(RenderKey, PageImage)> {
         let index = self.slots.iter().position(|slot| {
-            let mut cached = slot.key.clone();
-            cached.generation = key.generation;
-            cached == *key && slot.image.is_some()
+            slot.image
+                .as_ref()
+                .is_some_and(|(key, _)| same_page(key, target))
         })?;
+        let slot = self.slots.remove(index);
+        slot.cancel.cancel();
+        let (mut key, image) = slot.image.unwrap();
         self.last_promotion = Some(
-            serde_json::json!({"page":key.page,"preparedGeneration":self.slots[index].key.generation,"generation":key.generation,"texture":format!("{:?}",self.slots[index].image.as_ref().unwrap().id())}),
+            serde_json::json!({"page":key.page,"preparedGeneration":key.generation,"generation":target.generation,"texture":format!("{:?}",image.id()),"preparedPixels":[key.physical_width,key.physical_height],"targetPixels":[target.physical_width,target.physical_height],"preparedRotation":key.rotation,"targetRotation":target.rotation,"geometryMatched":same_raster(&key,target)}),
         );
         self.promotions += 1;
-        self.slots.remove(index).image
+        key.generation = target.generation;
+        Some((key, image))
     }
     pub fn plan(
         &mut self,
@@ -150,16 +174,41 @@ impl State {
         }
         let keys = view.keys(generation);
         if !self.slots.iter().map(|slot| &slot.key).eq(keys.iter()) {
-            self.clear();
+            let mut previous = std::mem::take(&mut self.slots);
             self.slots = keys
                 .into_iter()
-                .map(|key| Slot {
-                    key,
-                    cancel: Cancellation::default(),
-                    phase: Phase::Planned,
-                    image: None,
+                .map(|key| {
+                    if let Some(index) = previous.iter().position(|slot| slot.key == key) {
+                        return previous.remove(index);
+                    }
+                    let image = previous
+                        .iter_mut()
+                        .find(|slot| {
+                            slot.image
+                                .as_ref()
+                                .is_some_and(|(cached, _)| same_page(cached, &key))
+                        })
+                        .and_then(|slot| slot.image.take());
+                    let phase = if image
+                        .as_ref()
+                        .is_some_and(|(cached, _)| same_raster(cached, &key))
+                    {
+                        Phase::Ready
+                    } else {
+                        Phase::Planned
+                    };
+                    Slot {
+                        key,
+                        cancel: Cancellation::default(),
+                        phase,
+                        image,
+                    }
                 })
                 .collect();
+            for slot in previous {
+                slot.cancel.cancel();
+            }
+            self.was_ready = false;
             self.since = Some(Instant::now());
         }
         if self.slots.is_empty() {
@@ -221,7 +270,10 @@ impl State {
             && page.key == *key
             && let Some(presenter) = presenter
         {
-            slot.image = presenter.upload(page).ok().map(PageImage::Native);
+            // Keep an earlier usable preview if optional replacement admission fails.
+            if let Ok(image) = presenter.upload(page) {
+                slot.image = Some((page.key.clone(), PageImage::Native(image)));
+            }
         }
         slot.phase = if result.is_ok() {
             Phase::Ready
@@ -246,6 +298,14 @@ impl Drop for State {
 }
 
 impl YamantakaApp {
+    pub fn preview_nearby_rotation(&mut self, expect_miss: bool, pause: bool) {
+        if self.demo && self.capture.is_some() {
+            self.nearby_rotation_preview = true;
+            self.nearby_expect_miss = expect_miss;
+            self.nearby_rotation_pause = pause;
+            self.preview_nearby_turn();
+        }
+    }
     pub fn preview_nearby_turn(&mut self) {
         if self.demo {
             self.nearby_turn_preview = 1;
@@ -265,11 +325,74 @@ impl YamantakaApp {
                     .as_ref()
                     .is_none_or(|reference| ready(&reference.pane.viewport.prefetch, 0)) =>
             {
+                self.nearby_blank_before = [
+                    self.reader.viewport.empty_paints,
+                    self.reference
+                        .as_ref()
+                        .map_or(0, |reference| reference.pane.viewport.empty_paints),
+                ];
+                if self.nearby_rotation_preview {
+                    let mut preferences = self.reader.reader_preferences.clone().unwrap();
+                    preferences.page_rotation =
+                        yamantaka_domain::reader_preferences::PageRotation::Deg90;
+                    self.apply_reader_preferences(preferences);
+                    let direction = self.reading_direction();
+                    if let Some(reference) = &mut self.reference {
+                        reference
+                            .pane
+                            .reader_preferences
+                            .as_mut()
+                            .unwrap()
+                            .page_rotation =
+                            yamantaka_domain::reader_preferences::PageRotation::Deg90;
+                        reference.pane.viewport.generation += 1;
+                        reference.pane.viewport.reset_requests();
+                        reference.pane.rebuild_layout(direction).unwrap();
+                    }
+                }
+                if self.nearby_rotation_pause {
+                    self.nearby_turn_preview = 4;
+                    return;
+                }
                 self.navigate(1);
                 if let Some(reference) = &mut self.reference {
                     reference.set_page(0);
                 }
                 self.nearby_turn_preview = 2;
+            }
+            4 => {
+                let retained = |state: &State, page| {
+                    state.slots.iter().any(|slot| {
+                        slot.key.page == page
+                            && slot.key.rotation == 90
+                            && slot
+                                .image
+                                .as_ref()
+                                .is_some_and(|(key, _)| key.rotation == 0)
+                    })
+                };
+                assert!(retained(&self.reader.viewport.prefetch, 1));
+                if let Some(reference) = &self.reference {
+                    assert!(retained(&reference.pane.viewport.prefetch, 0));
+                }
+                self.navigate(1);
+                if let Some(reference) = &mut self.reference {
+                    reference.set_page(0);
+                }
+                self.nearby_turn_preview = 2;
+            }
+            2 if self.nearby_expect_miss
+                && !self.reader.loading
+                && self
+                    .reader
+                    .viewport
+                    .pages
+                    .get(&1)
+                    .is_some_and(|slot| slot.image.is_some()) =>
+            {
+                assert_eq!(self.reader.viewport.prefetch.promotions, 0);
+                assert!(self.reader.viewport.empty_paints > self.nearby_blank_before[0]);
+                self.nearby_turn_preview = 3;
             }
             2 if self.reader.viewport.prefetch.promotions > 0
                 && self
@@ -277,6 +400,18 @@ impl YamantakaApp {
                     .as_ref()
                     .is_none_or(|reference| reference.pane.viewport.prefetch.promotions > 0) =>
             {
+                if self.nearby_rotation_preview {
+                    assert_eq!(
+                        self.reader.viewport.empty_paints,
+                        self.nearby_blank_before[0]
+                    );
+                    if let Some(reference) = &self.reference {
+                        assert_eq!(
+                            reference.pane.viewport.empty_paints,
+                            self.nearby_blank_before[1]
+                        );
+                    }
+                }
                 self.nearby_turn_preview = 3;
             }
             _ => {}

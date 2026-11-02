@@ -1858,6 +1858,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             if demo && reader && !graphics_recovery::continuity_resume() {
                 app.preview_reader();
+                if args.iter().any(|arg| arg == "--nearby-rotation-turn") {
+                    app.preview_nearby_rotation(
+                        args.iter().any(|arg| arg == "--nearby-expect-miss"),
+                        args.iter().any(|arg| arg == "--nearby-rotation-pause"),
+                    );
+                }
                 if args.iter().any(|arg| arg == "--nearby-turn") {
                     app.preview_nearby_turn();
                 }

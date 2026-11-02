@@ -279,6 +279,10 @@ pub struct YamantakaApp {
     capture_ready_since: Option<Instant>,
     capture_render_events: Vec<serde_json::Value>,
     nearby_turn_preview: u8,
+    nearby_rotation_preview: bool,
+    nearby_expect_miss: bool,
+    nearby_rotation_pause: bool,
+    nearby_blank_before: [u64; 2],
     preview_reader: bool,
     logo: Option<TextureHandle>,
     preview_tilt: Option<egui::Vec2>,
@@ -542,6 +546,10 @@ impl YamantakaApp {
             preview_device_loss: None,
             device_loss_configured: false,
             nearby_turn_preview: 0,
+            nearby_rotation_preview: false,
+            nearby_expect_miss: false,
+            nearby_rotation_pause: false,
+            nearby_blank_before: [0; 2],
             preview_reader: false,
             logo: None,
             preview_tilt: None,
@@ -2788,6 +2796,7 @@ impl App for YamantakaApp {
                     record["safeStartup"] = self.safe_summary();
                     record["quarantine"] = self.quarantine.summary();
                     record["nearbyTurnPreview"] = self.nearby_turn_preview.into();
+                    record["nearbyRotationTurn"]=serde_json::json!({"enabled":self.nearby_rotation_preview,"primaryEmptyPaints":self.reader.viewport.empty_paints.saturating_sub(self.nearby_blank_before[0]),"referenceEmptyPaints":self.reference.as_ref().map(|reference|reference.pane.viewport.empty_paints.saturating_sub(self.nearby_blank_before[1]))});
                     record["graphicsStartupFallback"] = crate::graphics_recovery::is_fallback().into();
                     record["readerContinuity"] = self.continuity_summary();
                     record["continuityStoreToken"] = if self.demo {self.store.file_name().and_then(|name|name.to_str()).into()} else {serde_json::Value::Null};

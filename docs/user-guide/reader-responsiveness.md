@@ -1,6 +1,6 @@
 # Nearby page previews
 
-While you read, Yamantaka can prepare up to two nearby page previews per panel. It waits until visible pages and region refinement are ready, then schedules lower-priority native work. With the default wgpu compositor, completed previews can also retain GPU textures. Navigating to a matching page transfers that texture into the visible page slot. This preparation has no progress message or extra page panel.
+While you read, Yamantaka can prepare up to two nearby page previews per panel. It waits until visible pages and region refinement are ready, then schedules lower-priority native work. With the default wgpu compositor, completed previews can also retain GPU textures. Navigating to the prepared page transfers that texture into the visible page slot. A rotation or viewport-size change can reuse the earlier texture while the current geometry refines. The image retains its original raster dimensions and rotation, so it is not mistaken for the finished replacement. [Geometry-change verification](../validation/rust-nearby-geometry-2026-11-03.md) records the native two-pane sequences. This preparation has no progress message or extra page panel.
 
 The same preview sizing is used for visible-page previews and preparation. When a completed cached raster matches a later request, its immutable pixels can be reused across navigation changes. Pages still refine for the current zoom when opened. Reopening or replacing the native document changes its cache identity.
 

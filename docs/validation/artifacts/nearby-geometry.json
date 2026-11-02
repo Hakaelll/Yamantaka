@@ -1,0 +1,167 @@
+{
+  "cases": [
+    {
+      "case": "before",
+      "compositor": "native-wgpu",
+      "emptyPagePaints": {
+        "enabled": true,
+        "primaryEmptyPaints": 3,
+        "referenceEmptyPaints": 4
+      },
+      "primaryPromotion": null,
+      "referencePromotion": null,
+      "trackedPageBytes": 29881620
+    },
+    {
+      "case": "after",
+      "compositor": "native-wgpu",
+      "emptyPagePaints": {
+        "enabled": true,
+        "primaryEmptyPaints": 0,
+        "referenceEmptyPaints": 0
+      },
+      "primaryPromotion": {
+        "page": 1,
+        "preparedGeneration": 2,
+        "generation": 4,
+        "texture": "User(4)",
+        "preparedPixels": [
+          768,
+          575
+        ],
+        "targetPixels": [
+          575,
+          768
+        ],
+        "preparedRotation": 0,
+        "targetRotation": 90,
+        "geometryMatched": false
+      },
+      "referencePromotion": {
+        "page": 0,
+        "preparedGeneration": 1,
+        "generation": 3,
+        "texture": "User(5)",
+        "preparedPixels": [
+          576,
+          768
+        ],
+        "targetPixels": [
+          768,
+          575
+        ],
+        "preparedRotation": 0,
+        "targetRotation": 90,
+        "geometryMatched": false
+      },
+      "trackedPageBytes": 28115220
+    },
+    {
+      "case": "after-replan",
+      "compositor": "native-wgpu",
+      "emptyPagePaints": {
+        "enabled": true,
+        "primaryEmptyPaints": 0,
+        "referenceEmptyPaints": 0
+      },
+      "primaryPromotion": {
+        "page": 1,
+        "preparedGeneration": 2,
+        "generation": 4,
+        "texture": "User(4)",
+        "preparedPixels": [
+          768,
+          575
+        ],
+        "targetPixels": [
+          575,
+          768
+        ],
+        "preparedRotation": 0,
+        "targetRotation": 90,
+        "geometryMatched": false
+      },
+      "referencePromotion": {
+        "page": 0,
+        "preparedGeneration": 1,
+        "generation": 3,
+        "texture": "User(5)",
+        "preparedPixels": [
+          576,
+          768
+        ],
+        "targetPixels": [
+          768,
+          575
+        ],
+        "preparedRotation": 0,
+        "targetRotation": 90,
+        "geometryMatched": false
+      },
+      "trackedPageBytes": 28115220
+    },
+    {
+      "case": "ordinary",
+      "compositor": "native-wgpu",
+      "emptyPagePaints": {
+        "enabled": false,
+        "primaryEmptyPaints": 0,
+        "referenceEmptyPaints": 0
+      },
+      "primaryPromotion": {
+        "page": 1,
+        "preparedGeneration": 2,
+        "generation": 3,
+        "texture": "User(4)",
+        "preparedPixels": [
+          768,
+          575
+        ],
+        "targetPixels": [
+          768,
+          575
+        ],
+        "preparedRotation": 0,
+        "targetRotation": 0,
+        "geometryMatched": true
+      },
+      "referencePromotion": {
+        "page": 0,
+        "preparedGeneration": 1,
+        "generation": 2,
+        "texture": "User(5)",
+        "preparedPixels": [
+          576,
+          768
+        ],
+        "targetPixels": [
+          576,
+          768
+        ],
+        "preparedRotation": 0,
+        "targetRotation": 0,
+        "geometryMatched": true
+      },
+      "trackedPageBytes": 21836400
+    },
+    {
+      "case": "glow",
+      "compositor": "egui-glow",
+      "emptyPagePaints": {
+        "enabled": false,
+        "primaryEmptyPaints": 3,
+        "referenceEmptyPaints": null
+      },
+      "primaryPromotion": null,
+      "referencePromotion": null,
+      "trackedPageBytes": 10043216
+    }
+  ],
+  "syntheticInputsUnchanged": 39,
+  "newStandaloneTests": 0,
+  "existingNativeSelfCheckExtended": true,
+  "nativeDebugBuildPassed": true,
+  "workspaceClippyAllTargetsWarningsDenied": true,
+  "dependenciesUnchanged": true,
+  "executableSha256": "e9d87ab8acd5f27dd25e3653cb668ea10bd1282973bf3ef6977a9eb106be5995"
+}
