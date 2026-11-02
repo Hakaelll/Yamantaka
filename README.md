@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/branding/yamantaka-logo-purple.png" alt="Yamantaka" width="80" />
+  <img src="assets/branding/yamantaka-logo.svg" alt="Yamantaka" width="80" />
 </p>
 
 # Yamantaka

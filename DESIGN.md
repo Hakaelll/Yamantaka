@@ -145,7 +145,7 @@ components:
 
 A personal collection supplies the identity. Matte book volumes, visible paper edges and family-specific jacket lettering make books recognizable, while graphite surfaces, ivory text and functional violet keep the interface calm and precise. Light mode changes the room to warm paper without changing the collection's authored colors.
 
-Beauty comes from physical coherence and clear hierarchy: connected book geometry, lettering attached to the cover plane, stable catalogue titles, and restrained native controls. Segoe UI Variable is the explicitly required Windows interface face. Locally bundled Source Serif 4 Display accompanies document titles and three jacket families. The exact existing Yamantaka logo remains the brand asset.
+Beauty comes from physical coherence and clear hierarchy: connected book geometry, lettering attached to the cover plane, stable catalogue titles, and restrained native controls. Segoe UI Variable is the explicitly required Windows interface face. Locally bundled Source Serif 4 Display accompanies document titles and three jacket families. The corporate geometric open-volume mark in `assets/branding/yamantaka-logo.svg` is the canonical brand asset, following the owner's 2026-11-02 request to replace the previous emblem.
 
 **Key Characteristics:**
 
@@ -355,8 +355,8 @@ not a rounded UI card. Book selection and focus use the cover-state radius.
 Custom controls have no ordinary boundary stroke. Selection uses raised fill plus
 a 1.5-point violet underline; focus uses a distinct 2-point inset violet outline.
 Native fields retain visible borders. Book selection uses a 1.5-point outline and
-5-point dot; keyboard focus outlines the full allocation at 2 points. The exact
-logo appears at 24×24 with a 12-point clipping radius; its geometry is unchanged.
+5-point dot; keyboard focus outlines the full allocation at 2 points. The corporate
+logo appears at 24×24 with a 5-point clipping radius, preserving its rounded-square silhouette.
 
 ## Components
 
@@ -444,7 +444,7 @@ bounded to the actual book rectangle rather than its whole catalogue cell.
 - **Do** keep jacket lettering, artwork and edges attached to the same cover geometry.
 - **Do** preserve readable catalogue titles and semantic labels for vector actions.
 - **Do** distinguish selection, keyboard focus and pointer motion.
-- **Do** preserve the existing logo geometry and the local font fallback order.
+- **Do** use the canonical corporate geometric open-volume mark and preserve the local font fallback order.
 - **Do** adapt to logical width after text zoom, keeping constrained layouts scrollable.
 - **Do** record executed evidence and acceptance scope before claiming a section complete.
 
@@ -530,3 +530,9 @@ Concentration mode removes the reader toolbar and navigator without changing the
 Workspace deletion exposes one temporary Undo deletion action in the manager, available until a later deletion or application exit. Restoring it leaves the current reader in place. Startup recovery stays silent when a saved workspace matches; conflicts preserve the readings and explain that the workspace was not linked. No startup wizard, progress bar or permanent recovery strip is added.
 
 Compact library composition follows width rather than the remaining scroll height. Compact jackets retain a 180-point target, while regular jackets keep their 228-point cap. Reserved projection space protects the lifting cover; miniature lift stays restrained. Below the full filter-row width, filters move to the existing temporary-menu pattern with an explicit active reset. At the smallest enlarged-text size, search and view choices use labelled popups and the page shares a single scroll area, so the header can leave room for a complete book row.
+
+## Corporate identity
+
+The owner requested a replacement mark on 2026-11-02. After rejecting a monogram, the owner requested a geometric symbol tied directly to the application. Two white page planes form an open volume, a clear central gap marks its binding, and a separate lower page layer evokes a personal collection. The symbol represents reading, study and a library without using a letterform. It sits on a solid `#6748A7` tile with a 104-unit radius on a 512-unit canvas. The mark uses no gradients, ornamental rays, lettering assets or external fonts. Its simple silhouette remains legible at native Windows icon sizes.
+
+`assets/branding/yamantaka-logo.svg` owns the geometry. Run `tool/generate_brand_assets.py` to rebuild PNG and multi-size ICO variants, then `tool/verify_brand_assets.ps1` to check them. The Rust executable embeds the Windows icon resource as well as setting its live window icon. Historical Flutter launcher assets use the same mark; this does not reactivate mobile or web targets. The previous emblem remains recoverable in Git.

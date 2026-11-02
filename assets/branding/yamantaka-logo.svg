@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">Yamantaka</title>
+  <desc id="description">A geometric open volume with layered pages and a central binding, on a violet tile.</desc>
+  <rect width="512" height="512" rx="104" fill="#6748A7"/>
+  <polygon points="112,124 244,174 244,350 112,300" fill="#FFFFFF"/>
+  <polygon points="268,174 400,124 400,300 268,350" fill="#FFFFFF"/>
+  <polygon points="112,328 244,378 268,378 400,328 400,354 268,404 244,404 112,354" fill="#FFFFFF"/>
+</svg>

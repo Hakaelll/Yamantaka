@@ -59,6 +59,14 @@ class PublicCheckpointTests(unittest.TestCase):
             self.assertIn("non-public/generated/private data path", checkpoint.audit_blob(name, b"{}"))
         self.assertIn("unexpected binary", checkpoint.audit_blob("document.bin", b"\xff\x00"))
         self.assertIn("unverified font binary", checkpoint.audit_blob(checkpoint.FONT_PATH, b"unknown font"))
+        launcher = "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png"
+        self.assertNotIn("email in file", checkpoint.text_findings(launcher))
+        self.assertIn("email in file", checkpoint.text_findings(launcher + " reader" + "@" + "example.org"))
+        root = Path(__file__).resolve().parents[2]
+        for name in checkpoint.BRAND_ASSET_HASHES:
+            self.assertEqual(checkpoint.audit_blob(name, (root / name).read_bytes()), set())
+            self.assertIn("unverified corporate brand binary", checkpoint.audit_blob(name, b"unapproved replacement"))
+
 
 
 if __name__ == "__main__":

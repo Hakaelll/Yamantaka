@@ -156,9 +156,11 @@ icono. La búsqueda global divide lista y preview solo en expanded; la lista
 continúa siendo la fuente de selección.
 
 El estado inicial de Biblioteca usa el asset raster
-`assets/branding/yamantaka-logo-purple.png`. Su geometría procede exactamente de
-la marca anterior: una sustitución de croma por coordenada conserva luminancia,
-alfa y tamaño y se replica en PNG e ICO. La marca no se convierte en fondo,
+`assets/branding/yamantaka-logo-purple.png`, generado desde el SVG canónico
+`assets/branding/yamantaka-logo.svg`. La marca corporativa representa un libro
+abierto mediante dos planos geométricos y una capa inferior de páginas sobre
+violeta. Sustituye al emblema anterior por petición del propietario del
+2026-11-02; DESIGN.md conserva la dirección canónica. No se convierte en fondo,
 textura ni decoración persistente.
 
 ## Instrumentación compacta 0.9

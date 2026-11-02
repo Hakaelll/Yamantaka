@@ -529,3 +529,7 @@ La captura WGC nativa de este host devuelve frames obsoletos en Biblioteca y
 blanco en lector, aunque UI Automation expone una única jerarquía correcta. Esas
 imágenes no se aprueban. Narrator, varios monitores, en-US, alto contraste real
 y DPI físicos 100/150/175/200 % siguen pendientes y no se infieren de widgets.
+
+## Current corporate branding
+
+The owner replaced the historical emblem on 2026-11-02. Earlier geometry-preservation reports above describe their original checkpoints. Current assets are generated from `assets/branding/yamantaka-logo.svg` with `python tool/generate_brand_assets.py`. Run `tool/verify_brand_assets.ps1` to compare every generated icon with that source. `tool/recolor_brand_assets.py` is a compatibility entry point for the generator. It no longer recolors the previous emblem. Windows acceptance also checks the embedded executable icon and the live native header.

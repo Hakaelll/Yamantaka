@@ -1,0 +1,5 @@
+Native synthetic library capture, light theme, reduced motion.
+Only a synthetic study collection is shown.
+PNG pixel data unchanged; synthetic provenance text added.
+Native PNG SHA-256: 0587eb7629ad92c3dfe11dcf5816fddd3a6eb3fc3f885e0ba6ecf2f011bed577
+Published PNG SHA-256: ce47277e00b42e9655335f3c586b4fac03d3f52b9c80e11e05a2cd4f8fc8c7e8

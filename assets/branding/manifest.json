@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "identity": "corporate-open-volume-v1",
+  "source": "assets/branding/yamantaka-logo.svg",
+  "sourceSha256": "88c20b1be6663bd2a0bba212e975d3eb4d6f6f1c7f90d61096c70634ecf91a08",
+  "background": "#6748A7",
+  "foreground": "#FFFFFF",
+  "icoSizes": [
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    96,
+    128,
+    256
+  ],
+  "files": [
+    {
+      "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+      "sha256": "ab8d686a93175ea4432a3a1d9b0456010e0b7051ba8f8b5128a42903bf6c11a0"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+      "sha256": "9e4aae94ab91a650057148ed86bc8aa73912815539fa0bda7a165bc383f74c3b"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+      "sha256": "f2fb078835296ff560bb01b5559c15be46055112ec8be80a826af0fed3d8d087"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+      "sha256": "3d360083ef9cdf3859b813c5da90db5938e2713429b92334466e58d2cd41b9f7"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+      "sha256": "5392ad7c2fc20e9f5589cb183602ad3f708025620bf6fd892c90b9a3c5dbf283"
+    },
+    {
+      "path": "assets/branding/yamantaka-logo-purple.png",
+      "sha256": "26f8bb346276be029b9e54c0fc901e5f13bd7752387281bcb27cfc3cd176a107"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png",
+      "sha256": "70e74667bc443a37f48c397dbccdd8f1f5eb2b13c85e885ab67229b36c636e79"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png",
+      "sha256": "7fdc5eb5182123868dfde4b71c23b55b665698346b6d1de4669b586682f83003"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png",
+      "sha256": "35fcafd0f1ef0302e65e0d65426be0da7877374df3aea069451721a114f15c85"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@3x.png",
+      "sha256": "b7120590caaf0bbe7bbf758a689ad14e8112db6dbe5aa4805c4e3231afc6f27c"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png",
+      "sha256": "dea22f9dafd0c6ad215ecafbb72f70e4c290de735ffb2252be0ca77baf6792d7"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png",
+      "sha256": "8553768231b7b3efe181ea12b544c9b1c3f2388b857809812dccdaaf27af2c2c"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@3x.png",
+      "sha256": "56933fa952bdaac5a00f4af6e7d31cdba11a8aaa82564bd6aad94cc9c43bbdd6"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@1x.png",
+      "sha256": "35fcafd0f1ef0302e65e0d65426be0da7877374df3aea069451721a114f15c85"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@2x.png",
+      "sha256": "3c27c42058a9bad8475204969bcd0152f4ccd166a5c9e6090d0f749f99cd064b"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@3x.png",
+      "sha256": "023512f2a29d7ab096b24b9b7e7d53b591d74280813078a68a878e7b9700059c"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png",
+      "sha256": "023512f2a29d7ab096b24b9b7e7d53b591d74280813078a68a878e7b9700059c"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@3x.png",
+      "sha256": "04a0c2287fed2ffb7e9a1b8d49a1cba171d307bbfe5694b8d487fcbd13aa0bd1"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png",
+      "sha256": "e23b818b078202ec8c73ac33e3f0b82fae786fce0b58c574326c69f4b691b342"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png",
+      "sha256": "59799d2c88d1c095724fc4f3783fbe330c8758375f55e1e979424074310e0e01"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png",
+      "sha256": "1cca607345810e8ee45600a0cc55f632f388eb8d8e5016cc3d3180c506e5b64a"
+    },
+    {
+      "path": "web/favicon.ico",
+      "sha256": "6e14442b93a8dc08f6e30e6242773c0e4116187227e660cf13cc8704d4321e31"
+    },
+    {
+      "path": "web/favicon.png",
+      "sha256": "5392ad7c2fc20e9f5589cb183602ad3f708025620bf6fd892c90b9a3c5dbf283"
+    },
+    {
+      "path": "web/icons/Icon-192.png",
+      "sha256": "5392ad7c2fc20e9f5589cb183602ad3f708025620bf6fd892c90b9a3c5dbf283"
+    },
+    {
+      "path": "web/icons/Icon-512.png",
+      "sha256": "26f8bb346276be029b9e54c0fc901e5f13bd7752387281bcb27cfc3cd176a107"
+    },
+    {
+      "path": "web/icons/Icon-maskable-192.png",
+      "sha256": "c48fa4bfedab3bac9467fdd2aad9471e01a5848a24da2198ee481f5ef0fdaebb"
+    },
+    {
+      "path": "web/icons/Icon-maskable-512.png",
+      "sha256": "1d80d40c638a05939f38efa292517a50b37012f4525c2f39ddd3984aa99d4a7d"
+    },
+    {
+      "path": "windows/runner/resources/app_icon.ico",
+      "sha256": "6e14442b93a8dc08f6e30e6242773c0e4116187227e660cf13cc8704d4321e31"
+    }
+  ]
+}

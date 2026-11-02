@@ -989,7 +989,7 @@ impl YamantakaApp {
                         ui.add(
                             egui::Image::new(logo)
                                 .fit_to_exact_size(egui::vec2(24.0, 24.0))
-                                .corner_radius(12),
+                                .corner_radius(5),
                         );
                     }
                     if !compact && !narrow {
