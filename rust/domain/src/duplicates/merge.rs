@@ -129,6 +129,7 @@ impl Plan {
         }
     }
 }
+#[derive(Clone)]
 pub struct Receipt {
     pub history: String,
     pub kept: String,
@@ -141,7 +142,24 @@ pub trait Guard: Send {
     fn verify(&self) -> Result<()>;
 }
 pub type VerifySources<'a> = dyn FnMut(&Selection) -> Result<Box<dyn Guard>> + 'a;
+pub struct HistoryEntry {
+    pub title: String,
+    pub receipt: Receipt,
+    pub created_at: String,
+}
+pub struct HistoryPage {
+    pub entries: Vec<HistoryEntry>,
+    pub offset: usize,
+    pub _lease: ByteLease,
+}
 pub trait Store: Send {
+    fn history(
+        &self,
+        offset: usize,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<HistoryPage>;
+
     fn prepare(
         &self,
         selection: Selection,

@@ -1,0 +1,6 @@
+Native synthetic history capture.
+Case: duplicates-merge-history
+Session receipt discarded; durable native history loaded.
+PNG pixel data unchanged; synthetic provenance added.
+Native PNG SHA-256: 3c6dac85e6617f6bd3b262c3b75a6c6945c4e1702af9edc9c1dfee5b4d36b0b9
+Published PNG SHA-256: a8274d746a2def6782b51e0999b2adc201883211b7a2cf3d8c7d4c68c0503126

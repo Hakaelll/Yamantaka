@@ -1491,7 +1491,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 } else if args.iter().any(|arg| arg == "--duplicates") {
                     if args.iter().any(|arg| arg == "--duplicates-merge") {
                         app.preview_duplicate_merge(
-                            if args.iter().any(|arg| arg == "--duplicates-merge-undo") {
+                            if args
+                                .iter()
+                                .any(|arg| arg == "--duplicates-merge-history-undo")
+                            {
+                                6
+                            } else if args.iter().any(|arg| arg == "--duplicates-merge-history") {
+                                5
+                            } else if args.iter().any(|arg| arg == "--duplicates-merge-undo") {
                                 4
                             } else if args.iter().any(|arg| arg == "--duplicates-merge-cancel") {
                                 3

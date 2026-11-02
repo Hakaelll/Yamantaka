@@ -68,6 +68,84 @@ fn fields(db: &Connection, id: &str) -> Result<[Option<String>; 3]> {
     Ok(fields)
 }
 impl Store for MergeStore {
+    fn history(
+        &self,
+        offset: usize,
+        governor: &MemoryGovernor,
+        cancel: &Cancellation,
+    ) -> Result<HistoryPage> {
+        if offset > 100000 {
+            return Err(invalid(
+                "Consolidation history offset exceeds supported bounds",
+            ));
+        }
+        cancel.check()?;
+        let lease = governor
+            .try_reserve_one(Cost::new(
+                MemoryCategory::Other,
+                MemoryRepresentation::Cpu,
+                8 * 1024 * 1024,
+            ))
+            .map_err(|_| Failure::MemoryBudget)?;
+        let mut statement = self.database.connection.prepare(r#"
+            SELECT h.id,h.kept_document_id,h.incoming_document_id,h.backup_path,h.created_at,
+                json_extract(j.undo_json,'$.sha256'),
+                COALESCE((SELECT COALESCE(d.title_override,d.title,d.source_title,d.file_name) FROM documents d WHERE d.id=h.kept_document_id),'')
+            FROM duplicate_merge_history h JOIN operation_journal j ON j.id=h.id
+            WHERE h.status='completed' AND j.status='completed'
+                AND j.operation_kind='rustDuplicateMerge.v1' AND j.compatibility_hash='rust-duplicate-merge-v1'
+                AND json_valid(j.summary_json) AND json_valid(j.undo_json)
+                AND json_extract(j.summary_json,'$.version')=1 AND json_extract(j.undo_json,'$.version')=1
+                AND json_extract(j.summary_json,'$.keptDocument')=h.kept_document_id
+                AND json_extract(j.summary_json,'$.incomingDocument')=h.incoming_document_id
+                AND json_extract(j.undo_json,'$.backupPath')=h.backup_path
+                AND json_extract(j.undo_json,'$.sha256')=json_extract(j.summary_json,'$.backupSha256')
+            ORDER BY h.created_at DESC,h.id DESC LIMIT 80 OFFSET ?1
+        "#).map_err(storage)?;
+        let mut rows = statement.query([offset as i64]).map_err(storage)?;
+        let mut entries = Vec::new();
+        while let Some(row) = rows.next().map_err(storage)? {
+            cancel.check()?;
+            let mut fields = Vec::with_capacity(6);
+            for index in 0..6 {
+                let value = row
+                    .get_ref(index)
+                    .map_err(storage)?
+                    .as_str()
+                    .map_err(storage)?;
+                if value.len() > 16384 {
+                    return Err(invalid(
+                        "Consolidation history field exceeds supported bounds",
+                    ));
+                }
+                fields.push(value.to_owned());
+            }
+            if fields[5].len() != 64 || !fields[5].bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err(invalid("Invalid consolidation backup digest"));
+            }
+            let title = row.get_ref(6).map_err(storage)?.as_str().map_err(storage)?;
+            if title.len() > 4096 {
+                return Err(invalid("Consolidation title exceeds supported bounds"));
+            }
+            entries.push(HistoryEntry {
+                title: title.into(),
+                receipt: Receipt {
+                    history: fields[0].clone(),
+                    kept: fields[1].clone(),
+                    incoming: fields[2].clone(),
+                    backup: PathBuf::from(&fields[3]),
+                    backup_sha256: fields[5].clone(),
+                },
+                created_at: fields[4].clone(),
+            });
+        }
+        Ok(HistoryPage {
+            entries,
+            offset,
+            _lease: lease,
+        })
+    }
+
     fn prepare(
         &self,
         selection: Selection,

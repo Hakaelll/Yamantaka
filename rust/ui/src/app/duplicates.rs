@@ -142,6 +142,7 @@ impl YamantakaApp {
                     });
                     ui.label(RichText::new(self.tr("Deshacer restaura toda la biblioteca anterior y reemplaza los cambios posteriores.","Undo restores the whole previous library and replaces later changes.")).size(13.0).color(p.secondary));
                 }
+                self.duplicate_history_view(ui);
                 let Some(report) = self.duplicates.report.clone() else { return; };
                 ui.add_space(12.0);
                 ui.label(RichText::new(format!("{} {} · {} {}", report.groups.len(), if report.groups.len() == 1 {self.tr("grupo", "group")} else {self.tr("grupos", "groups")}, report.progress.checked, self.tr("candidatos comprobados", "candidates checked"))).color(p.secondary));

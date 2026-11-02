@@ -16,4 +16,6 @@ Yamantaka rechecks the records and complete source hashes, creates a backup, the
 
 After completion, **Undo consolidation** opens a hash-checked review of the backup. This restores the **entire library** to its state before consolidation, including any later library edits. Review the counts before choosing **Restore and close**. The current library is retained in a safety folder.
 
-The immediate Undo action is available in the current application session. Its backup and journal remain on disk after restart, but a dedicated consolidation-history browser is still pending. Do not treat Undo as a selective reversal of one record.
+The immediate Undo action is available in the current application session. After restarting, open **Tools → Identical copies → Consolidation history**. The history reads compatible completed native consolidation receipts from disk, in pages of up to 80 entries. Choose **Review backup** beside a date to validate and review that backup before restoring it. Missing or modified backups cannot pass the recorded hash check.
+
+**Previous**, **Next** and **Hide history** control the history list. Historical Flutter merge records without a compatible native hash receipt do not appear here. Do not treat either Undo or history restore as a selective reversal of one record.

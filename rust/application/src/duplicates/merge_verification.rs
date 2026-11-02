@@ -147,6 +147,28 @@ pub(crate) fn verify(source: &Database, governor: &MemoryGovernor) {
             super::merge_sources::freeze(selection, governor, &cancel)
         })
         .unwrap();
+    let reopened = Database::open(&path)
+        .unwrap()
+        .duplicate_merge_store(
+            serde_json::to_value(yamantaka_storage::preferences::Preferences::default()).unwrap(),
+        )
+        .unwrap()()
+    .unwrap();
+    let history = reopened.history(0, governor, &cancel).unwrap();
+    assert_eq!(history.entries.len(), 1);
+    assert_eq!(history.entries[0].receipt.history, receipt.history);
+    assert_eq!(
+        history.entries[0].receipt.backup_sha256,
+        receipt.backup_sha256
+    );
+    assert!(
+        reopened
+            .history(1, governor, &cancel)
+            .unwrap()
+            .entries
+            .is_empty()
+    );
+    drop(history);
     assert_eq!(receipt.kept, "book-0");
     assert_eq!(receipt.incoming, "book-1");
     assert_eq!(

@@ -25,3 +25,7 @@ The native manifest describes original capture bytes. Published PNGs add synthet
 ## Remaining acceptance
 
 The Undo capture verifies review of the three-record backup, not installation through the native confirmation button. Dedicated durable merge-history browsing after restart, native forced termination during merge, physical keyboard/Narrator/DPI interaction and large-library performance acceptance remain pending. The cancelled capture dismisses review before application; it does not prove mid-transaction cancellation. Storage failure and cancellation checks have narrower scope than native interaction acceptance. No final rewrite or Release acceptance is claimed.
+
+## Durable-history follow-up
+
+[Consolidation history](rust-duplicate-history-2026-11-02.md) connects later paged native history and hash-checked backup review. The evidence above describes its original session-only checkpoint.

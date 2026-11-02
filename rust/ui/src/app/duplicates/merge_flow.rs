@@ -7,6 +7,8 @@ use yamantaka_domain::{
 #[derive(Default)]
 pub(super) struct MergeState {
     pub(super) pending: Option<(Cancellation, bool)>,
+    pub(super) history: Option<yamantaka_domain::duplicates::merge::HistoryPage>,
+    pub(super) history_loading: bool,
     pub(super) plan: Option<Arc<Plan>>,
     pub(super) choices: Choices,
     pub(super) notice: Option<String>,
@@ -22,7 +24,7 @@ impl MergeState {
         self.pending.as_ref().is_some_and(|(_, writing)| *writing)
     }
     pub(super) fn open(&self) -> bool {
-        self.plan.is_some() || self.pending.is_some()
+        self.plan.is_some() || (self.pending.is_some() && !self.history_loading)
     }
     pub(super) fn ready(&self) -> bool {
         self.pending.is_none() && self.preview.is_none()
@@ -37,7 +39,7 @@ impl MergeState {
         }
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"pending":self.pending.is_some(),"writing":self.writing(),"reviewed":self.plan.is_some(),"merged":self.receipt.is_some(),"titleIncoming":self.choices.title==yamantaka_domain::duplicates::merge::Choice::Incoming,"notice":self.notice})
+        serde_json::json!({"pending":self.pending.is_some(),"writing":self.writing(),"reviewed":self.plan.is_some(),"merged":self.receipt.is_some(),"titleIncoming":self.choices.title==yamantaka_domain::duplicates::merge::Choice::Incoming,"notice":self.notice,"historyCount":self.history.as_ref().map(|page|page.entries.len()),"historyLoading":self.history_loading})
     }
 }
 impl YamantakaApp {
@@ -121,6 +123,7 @@ impl YamantakaApp {
     }
     fn submit_duplicate_merge(&mut self, command: Command) -> Result<()> {
         let writing = matches!(command, Command::Apply { .. });
+        let history_loading = matches!(command, Command::History { .. });
         let cancel = Cancellation::default();
         let preferences = serde_json::to_value(&self.preferences)
             .map_err(|_| Failure::Invalid("Preferences could not be prepared".into()))?;
@@ -132,6 +135,7 @@ impl YamantakaApp {
                 cancel: cancel.clone(),
             })))?;
         self.duplicates.merge.pending = Some((cancel, writing));
+        self.duplicates.merge.history_loading = history_loading;
         self.duplicates.merge.dismiss_after = false;
         self.duplicates.merge.notice = None;
         self.duplicates.merge.focus_cancel = true;
@@ -175,7 +179,9 @@ impl YamantakaApp {
             return;
         }
         self.duplicates.merge.pending = None;
+        self.duplicates.merge.history_loading = false;
         match reply.result {
+            Ok(Outcome::History(page)) => { if !reply.cancel.is_cancelled() {self.duplicates.merge.history=Some(page);} }
             Ok(Outcome::Reviewed(plan)) if !reply.cancel.is_cancelled()=>{self.duplicates.merge.plan=Some(plan);self.duplicates.merge.choices=Choices::default();}
             Ok(Outcome::Reviewed(_))=>{self.duplicates.merge.plan=None;}
             Ok(Outcome::Merged(receipt))=>{
@@ -273,7 +279,115 @@ impl YamantakaApp {
             if mode == 4 && self.duplicates.merge.receipt.is_some() {
                 self.undo_duplicate_merge(ctx);
             }
+            if mode >= 5 {
+                self.duplicates.merge.receipt = None;
+                self.load_duplicate_history(0);
+                self.duplicates.merge.preview = Some((mode, 3));
+            } else {
+                self.duplicates.merge.preview = None;
+            }
+        } else if phase == 3 && self.duplicates.merge.pending.is_none() {
+            if mode == 6
+                && let Some(receipt) = self
+                    .duplicates
+                    .merge
+                    .history
+                    .as_ref()
+                    .and_then(|page| page.entries.first())
+                    .map(|entry| entry.receipt.clone())
+            {
+                self.review_duplicate_undo(ctx, receipt.backup, receipt.backup_sha256);
+            }
             self.duplicates.merge.preview = None;
+        }
+    }
+    pub(in crate::app) fn load_duplicate_history(&mut self, offset: usize) {
+        if self.duplicates.merge.pending.is_none()
+            && let Err(error) = self.submit_duplicate_merge(Command::History { offset })
+        {
+            self.error = Some(error.to_string());
+        }
+    }
+    pub(in crate::app) fn duplicate_history_view(&mut self, ui: &mut egui::Ui) {
+        let p = Palette::new(self.dark);
+        if theme::navigation(
+            ui,
+            self.tr("Historial de consolidaciones", "Consolidation history"),
+            false,
+            p,
+        )
+        .clicked()
+        {
+            self.load_duplicate_history(0);
+        }
+        if self.duplicates.merge.history_loading {
+            ui.label(self.tr("Consultando historial…", "Reading history…"));
+        }
+        let Some(page) = self.duplicates.merge.history.take() else {
+            return;
+        };
+        let mut undo = None;
+        let mut next = None;
+        ui.add_space(8.0);
+        ui.label(RichText::new(self.tr("Restaurar recupera toda la biblioteca de esa fecha y reemplaza los cambios posteriores.","Restoring recovers the whole library from that date and replaces later changes.")).size(13.0).color(p.secondary));
+        if page.entries.is_empty() {
+            ui.label(self.tr(
+                "No hay consolidaciones en esta página.",
+                "No consolidations on this page.",
+            ));
+        }
+        for entry in &page.entries {
+            ui.horizontal_wrapped(|ui| {
+                let date = chrono::DateTime::parse_from_rfc3339(&entry.created_at)
+                    .map(|value| {
+                        value
+                            .with_timezone(&chrono::Local)
+                            .format(if self.english {
+                                "%Y-%m-%d %H:%M"
+                            } else {
+                                "%d/%m/%Y %H:%M"
+                            })
+                            .to_string()
+                    })
+                    .unwrap_or_else(|_| self.tr("Fecha no disponible", "Date unavailable").into());
+                ui.label(if entry.title.is_empty() {
+                    self.tr("Registro consolidado", "Consolidated record")
+                } else {
+                    &entry.title
+                });
+                ui.label(RichText::new(date).color(p.secondary));
+                if theme::navigation(ui, self.tr("Revisar backup", "Review backup"), false, p)
+                    .clicked()
+                {
+                    undo = Some(entry.receipt.clone());
+                }
+            });
+        }
+        ui.horizontal_wrapped(|ui| {
+            if page.offset > 0
+                && theme::navigation(ui, self.tr("Anterior", "Previous"), false, p).clicked()
+            {
+                next = Some(page.offset.saturating_sub(80));
+            }
+            if page.entries.len() == 80
+                && theme::navigation(ui, self.tr("Siguiente", "Next"), false, p).clicked()
+            {
+                next = Some(page.offset + 80);
+            }
+            if theme::navigation(ui, self.tr("Ocultar historial", "Hide history"), false, p)
+                .clicked()
+            {
+                next = Some(usize::MAX);
+            }
+        });
+        if next != Some(usize::MAX) {
+            self.duplicates.merge.history = Some(page);
+        }
+        if let Some(offset) = next.filter(|offset| *offset != usize::MAX) {
+            self.load_duplicate_history(offset);
+        }
+        if let Some(receipt) = undo {
+            self.review_duplicate_undo(ui.ctx(), receipt.backup, receipt.backup_sha256);
         }
     }
     pub(in crate::app) fn undo_duplicate_merge(&mut self, ctx: &egui::Context) {

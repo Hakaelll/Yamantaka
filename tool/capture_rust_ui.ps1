@@ -11,6 +11,8 @@ $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
     @{ name='corporate-brand-dark'; args=@('--pdf-covers','--es','--reduce-motion') },
     @{ name='corporate-brand-light'; args=@('--pdf-covers','--light','--reduce-motion') },
+    @{ name='duplicates-merge-history'; args=@('--duplicates','--duplicates-merge','--duplicates-merge-history','--es') },
+    @{ name='duplicates-merge-history-undo'; args=@('--duplicates','--duplicates-merge','--duplicates-merge-history-undo','--light') },
     @{ name='duplicates-merge-review'; args=@('--duplicates','--duplicates-merge') },
     @{ name='duplicates-merge-small'; args=@('--duplicates','--duplicates-merge','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
     @{ name='duplicates-merge-completed'; args=@('--duplicates','--duplicates-merge','--duplicates-merge-apply','--es') },
@@ -530,8 +532,9 @@ foreach ($case in $cases) {
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($case.name -like 'duplicates-merge-*') {
         if ($controls.duplicates.merge.pending -or $controls.duplicates.merge.writing) { throw 'Duplicate consolidation did not settle.' }
-        $completed = $case.name -in @('duplicates-merge-completed','duplicates-merge-undo')
-        if ([bool]$controls.duplicates.merge.merged -ne $completed) { throw 'Unexpected consolidation write result.' }
+        $history = $case.name -in @('duplicates-merge-history','duplicates-merge-history-undo')
+        $completed = $history -or $case.name -in @('duplicates-merge-completed','duplicates-merge-undo')
+        if ([bool]$controls.duplicates.merge.merged -ne ($completed -and -not $history)) { throw 'Unexpected consolidation write result.' }
         $expectedBooks = if ($completed) {2} else {3}
         if ($controls.libraryDocumentCount -ne $expectedBooks) { throw 'Consolidation changed the wrong catalogue records.' }
         if ($case.name -in @('duplicates-merge-review','duplicates-merge-small')) {
@@ -540,7 +543,8 @@ foreach ($case in $cases) {
             & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
         }
         if ($completed -and (-not $controls.duplicates.merge.titleIncoming -or $controls.duplicates.groups -ne 0)) { throw 'The chosen metadata or refreshed duplicate groups were lost.' }
-        if ($case.name -eq 'duplicates-merge-undo' -and (-not $controls.restore.reviewed -or $controls.restore.books -ne 3 -or $controls.restore.queued)) { throw 'Undo did not review the verified pre-merge library.' }
+        if ($history -and ($controls.duplicates.merge.historyCount -ne 1 -or $controls.duplicates.merge.historyLoading)) { throw 'Durable consolidation history did not load.' }
+        if ($case.name -in @('duplicates-merge-undo','duplicates-merge-history-undo') -and (-not $controls.restore.reviewed -or $controls.restore.books -ne 3 -or $controls.restore.queued)) { throw 'Undo did not review the verified pre-merge library.' }
     }
     if ($case.name -in @('duplicates-groups','duplicates-members','duplicates-small','duplicates-empty')) {
         $expectedGroups = if ($case.name -eq 'duplicates-empty') { 0 } else { 1 }

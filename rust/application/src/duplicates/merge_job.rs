@@ -1,10 +1,11 @@
 use super::*;
 use std::collections::VecDeque;
 use yamantaka_domain::{
-    duplicates::merge::{Choices, Factory, Plan, Receipt, Selection},
+    duplicates::merge::{Choices, Factory, HistoryPage, Plan, Receipt, Selection},
     pdf_ticket::{AsyncPdfEngine, PdfTicket},
 };
 pub enum Command {
+    History { offset: usize },
     Review(Box<Selection>),
     Apply { plan: Arc<Plan>, choices: Choices },
 }
@@ -15,6 +16,7 @@ pub struct MergeRequest {
     pub cancel: Cancellation,
 }
 pub enum Outcome {
+    History(HistoryPage),
     Reviewed(Arc<Plan>),
     Merged(Receipt),
 }
@@ -26,12 +28,13 @@ impl MergeRequest {
     pub fn writing(&self) -> bool {
         matches!(self.command, Command::Apply { .. })
     }
-    pub fn documents(&self) -> [&str; 2] {
+    pub fn documents(&self) -> Vec<&str> {
         let selection = match &self.command {
+            Command::History { .. } => return Vec::new(),
             Command::Review(selection) => selection,
             Command::Apply { plan, .. } => &plan.selection,
         };
-        [&selection.kept.document, &selection.incoming.document]
+        vec![&selection.kept.document, &selection.incoming.document]
     }
 }
 struct Worker {
@@ -48,6 +51,9 @@ impl Worker {
             .name("yamantaka-duplicate-merge".into())
             .spawn(move || {
                 let result = factory().and_then(|mut store| match request.command {
+                    Command::History { offset } => store
+                        .history(offset, &request.governor, &request.cancel)
+                        .map(Outcome::History),
                     Command::Review(selection) => store
                         .prepare(*selection, &request.governor, &request.cancel)
                         .map(Outcome::Reviewed),
@@ -118,7 +124,7 @@ impl MergeJob {
         request.cancel.check()?;
         let writing = request.writing();
         let closes = if writing {
-            request.documents().map(str::to_owned).into()
+            request.documents().into_iter().map(str::to_owned).collect()
         } else {
             VecDeque::new()
         };
