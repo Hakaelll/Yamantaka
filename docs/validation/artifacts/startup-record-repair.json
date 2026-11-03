@@ -1,0 +1,71 @@
+{
+  "synthetic": true,
+  "executableSha256": "7ca8dd45168351054d5278edf4d4de997f98447cfaabb7c8af1aab5d2fad4c9a",
+  "storage": {
+    "synthetic": true,
+    "unicodeParent": true,
+    "writeAndDeleteLease": true,
+    "existingDestinationPreserved": true,
+    "staleReviewRejected": true,
+    "cancelledApplyPreserved": true,
+    "originalRecordPreserved": true,
+    "repeatedApplyRejected": true,
+    "validRecordPreserved": true,
+    "retentionGapRecovered": true,
+    "nextStartupNormal": true,
+    "libraryAndPreferencesUnchanged": true
+  },
+  "cases": {
+    "review": {
+      "startupMode": "stateUnavailable",
+      "repair": {
+        "reviewed": true,
+        "repaired": false,
+        "error": false,
+        "verified": true
+      },
+      "captureSha256": "f65ac8878f5cb4dc0d2e5042611009a72e67f9dda3a7f69523c28f40de1c1f43"
+    },
+    "apply": {
+      "startupMode": "stateUnavailable",
+      "repair": {
+        "reviewed": false,
+        "repaired": true,
+        "error": false,
+        "verified": true
+      },
+      "captureSha256": "319ffb074ae29b31907be8638d1691f6740f6e5b0fd750fbb66b14f5fb492829"
+    },
+    "stale": {
+      "startupMode": "stateUnavailable",
+      "repair": {
+        "reviewed": false,
+        "repaired": false,
+        "error": true,
+        "verified": true
+      },
+      "captureSha256": "1346a1d5384adc10060891bee4756580d4fbebd891a1787d1ac1053fa41a0b85"
+    },
+    "cancel": {
+      "startupMode": "stateUnavailable",
+      "repair": {
+        "reviewed": false,
+        "repaired": false,
+        "error": false,
+        "verified": true
+      },
+      "captureSha256": "a44cc42575a96ff0222353ba4a7f4110a1eec85b0b6a253371597a7c0071f346"
+    }
+  },
+  "checks": {
+    "format": true,
+    "workspaceClippyAllTargetsDenyWarnings": true,
+    "visibleActionsNormal": true,
+    "visibleContinueCompact200": true
+  },
+  "limits": [
+    "No physical Narrator or keyboard certification",
+    "Retention gap reconstructed, not a process-kill test",
+    "Ambiguous restore journals remain pending"
+  ]
+}

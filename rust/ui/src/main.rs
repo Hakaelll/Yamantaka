@@ -9,7 +9,9 @@ mod managed_pages;
 mod page_presenter;
 mod restore_worker;
 mod rule_simulation_fixture;
+mod startup_record_probe;
 mod startup_recovery;
+mod startup_repair_worker;
 mod text_layout_probe;
 mod theme;
 mod window_state;
@@ -93,6 +95,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .find_map(|arg| arg.strip_prefix("--verify-text-layout="))
     {
         text_layout_probe::verify(std::path::Path::new(path))?;
+        return Ok(());
+    }
+    if let Some(path) = args
+        .iter()
+        .filter_map(|arg| arg.to_str())
+        .find_map(|arg| arg.strip_prefix("--verify-startup-record-repair="))
+    {
+        startup_record_probe::verify(std::path::Path::new(path))?;
         return Ok(());
     }
     let demo = args.iter().any(|arg| arg == "--demo");
@@ -2066,6 +2076,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             if demo && args.iter().any(|arg| arg == "--search-exclusions") {
                 app.preview_search_exclusions();
+            }
+            if demo {
+                for mode in ["review", "apply", "stale", "cancel"] {
+                    if args.iter().any(|arg| {
+                        arg.to_str() == Some(format!("--startup-record-repair={mode}").as_str())
+                    }) {
+                        app.preview_startup_record_repair(mode, &cc.egui_ctx);
+                    }
+                }
             }
             if demo && args.iter().any(|arg| arg == "--library-check") {
                 app.preview_library_check(

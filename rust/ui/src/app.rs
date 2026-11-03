@@ -67,6 +67,7 @@ mod sessions;
 mod settings;
 mod shortcuts;
 mod smart_views;
+mod startup_repair;
 mod tabs;
 mod tags;
 mod text;
@@ -137,6 +138,7 @@ pub struct YamantakaApp {
     window_state: Option<crate::window_state::State>,
     startup_mode: yamantaka_domain::startup::StartupMode,
     safe_notice: bool,
+    startup_repair: startup_repair::State,
     quarantine: quarantine::QuarantineState,
     shortcut_bindings: shortcuts::bindings::Bindings,
     shortcut_error: Option<String>,
@@ -384,6 +386,7 @@ impl YamantakaApp {
         let mut app = Self {
             startup_mode,
             safe_notice: startup_mode.is_safe(),
+            startup_repair: Default::default(),
             window_state: None,
             quarantine: Default::default(),
             reader: Default::default(),
@@ -2235,6 +2238,7 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
+        self.poll_startup_record_repair(&ctx);
         let shortcut_modal = self.duplicates.merge_open()
             || self.command_palette.open
             || self.close_review.open()
@@ -2632,6 +2636,7 @@ impl App for YamantakaApp {
                     && !self.preview_reference
                     && self.tabs.ready()
                     && self.reading_queue.ready()
+                    && self.startup_record_repair_ready()
                     && self.search_exclusions_ready()
                     && self.workspaces.ready()
                     && match self.preview_password_target {
@@ -2753,6 +2758,7 @@ impl App for YamantakaApp {
                     record["diagnostics"]=self.diagnostics.summary();
                     record["startupMode"] = serde_json::to_value(self.startup_mode).unwrap();
                     record["safeStartup"] = self.safe_summary();
+                    record["startupRecordRepair"] = self.startup_record_repair_summary();
                     record["quarantine"] = self.quarantine.summary();
                     record["nearbyTurnPreview"] = self.nearby_turn_preview.into();
                     record["nearbyRotationTurn"]=serde_json::json!({"enabled":self.nearby_rotation_preview,"primaryEmptyPaints":self.reader.viewport.empty_paints.saturating_sub(self.nearby_blank_before[0]),"referenceEmptyPaints":self.reference.as_ref().map(|reference|reference.pane.viewport.empty_paints.saturating_sub(self.nearby_blank_before[1]))});

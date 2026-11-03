@@ -9,7 +9,7 @@ license.workspace = true
 yamantaka-domain.workspace = true
 serde_json.workspace = true
 rfd.workspace = true
-windows.workspace = true
+windows = { workspace = true, features = ["Wdk_Storage_FileSystem", "Win32_System_IO"] }
 sha2.workspace = true
 raw-window-handle.workspace = true
 [dev-dependencies]
