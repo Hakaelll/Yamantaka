@@ -11,6 +11,9 @@ impl ReferenceView {
         self.followed_position = None;
     }
     pub(in crate::app) fn snapshot(&self, primary: &str) -> Option<WorkspaceComparison> {
+        if self.deferred {
+            return None;
+        }
         let (document, _) = self.pane.active.as_ref()?;
         let position = self.pane.navigation.as_ref()?.position();
         let prefs = self.pane.reader_preferences.as_ref()?;

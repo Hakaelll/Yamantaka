@@ -1349,7 +1349,11 @@ impl YamantakaApp {
             self.toggle_reference(ui.ctx());
         }
         self.prepare_reference_mount(ui);
-        if self.reference.is_some() {
+        if self
+            .reference
+            .as_mut()
+            .is_some_and(|reference| !reference.deferred)
+        {
             self.comparison_viewport(ui, &document, p);
         } else {
             self.reader_viewport(ui, &document, p);

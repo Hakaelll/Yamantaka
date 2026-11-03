@@ -1,0 +1,91 @@
+{
+  "executableSha256": "8206e90e6891b566ac88754bc4395c1ae61cd664019e73d9a667e1a82f9d54c6",
+  "cases": [
+    {
+      "case": "workspaces",
+      "opening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 0,
+        "primaryPlan": null,
+        "primaryFirstFrame": null,
+        "primaryStagedPages": [],
+        "provisionalPaints": 0
+      },
+      "workspaceLayout": {
+        "columns": [
+          "document",
+          "status",
+          "future-column"
+        ],
+        "panelWidth": 360.0,
+        "panelRestorePending": false,
+        "panelActualWidth": 360.0
+      }
+    },
+    {
+      "case": "normal",
+      "opening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 0,
+        "primaryPlan": {
+          "viewport": [
+            716.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "zoom": 1.0425,
+          "visiblePages": [
+            0
+          ]
+        },
+        "primaryFirstFrame": {
+          "viewport": [
+            716.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "zoom": 1.0425,
+          "visiblePages": [
+            0
+          ],
+          "missingPages": []
+        },
+        "primaryStagedPages": [],
+        "provisionalPaints": 0
+      },
+      "workspaceLayout": {
+        "columns": [
+          "document",
+          "author",
+          "status",
+          "progress",
+          "pages"
+        ],
+        "panelWidth": 300.0,
+        "panelRestorePending": true,
+        "panelActualWidth": null
+      }
+    }
+  ],
+  "debugBuildPassed": true,
+  "workspaceClippyPassed": true,
+  "originalPdfHashesUnchanged": 39,
+  "automaticPrimaryFramePreparationComplete": false,
+  "physicalPresentationAcceptance": false
+}

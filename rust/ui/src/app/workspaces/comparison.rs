@@ -103,7 +103,10 @@ impl YamantakaApp {
                 return;
             }
             match reference::ReferenceView::new(&self.reader, self.reading_direction()) {
-                Ok(reference) => self.reference = Some(reference),
+                Ok(mut reference) => {
+                    reference.deferred = true;
+                    self.reference = Some(reference);
+                }
                 Err(error) => {
                     self.finish_workspace_comparison(restore.origin, Some(error.to_string()));
                     return;
@@ -127,7 +130,10 @@ impl YamantakaApp {
             .ok_or_else(|| {
                 yamantaka_domain::Failure::Invalid("Reference restoration was cancelled".into())
             })
-            .and_then(|reference| reference.restore(&restore.saved, direction));
+            .and_then(|reference| {
+                reference.restore(&restore.saved, direction)?;
+                reference.release_deferred()
+            });
         self.finish_workspace_comparison(
             restore.origin,
             result.err().map(|error| error.to_string()),
@@ -140,6 +146,13 @@ impl YamantakaApp {
             if error.is_some() {
                 self.close_reference_preserving_continuity();
             }
+        } else if error.is_some()
+            && self
+                .reference
+                .as_ref()
+                .is_some_and(|reference| reference.deferred)
+        {
+            self.close_reference_preserving_continuity();
         }
         let actual = self.capture_comparison();
         if origin == Origin::Workspace

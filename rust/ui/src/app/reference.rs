@@ -25,6 +25,8 @@ struct ReferenceTools<'a> {
     export: &'a mut annotations::export::ExportState,
 }
 pub(super) struct ReferenceView {
+    pub(in crate::app) deferred: bool,
+    provisional_paints: u64,
     opening_probe: Option<preparation::Probe>,
     retry_open: Option<preparation::OpenRequest>,
     admission: Admission,
@@ -87,7 +89,31 @@ impl ReferenceView {
         self.error = None;
     }
     pub(in crate::app) fn opening_summary(&self) -> Option<serde_json::Value> {
-        self.opening_probe.as_ref().map(preparation::Probe::summary)
+        self.opening_probe.as_ref().map(|probe| {
+            let mut summary = probe.summary();
+            summary["provisionalPaints"] = self.provisional_paints.into();
+            summary
+        })
+    }
+    pub(in crate::app) fn release_deferred(&mut self) -> yamantaka_domain::Result<()> {
+        if self.deferred
+            && !self.busy()
+            && self
+                .pane
+                .viewport
+                .pages
+                .get(&self.pane.page)
+                .is_some_and(|slot| slot.image.is_some())
+        {
+            self.deferred = false;
+        }
+        if self.deferred {
+            Err(yamantaka_domain::Failure::Invalid(
+                "The saved reference image is not ready".into(),
+            ))
+        } else {
+            Ok(())
+        }
     }
     pub(in crate::app) fn new(
         source: &reader_pane::ReaderPane,
@@ -117,6 +143,8 @@ impl ReferenceView {
         pane.navigation_changed();
         pane.rebuild_layout(direction)?;
         Ok(Self {
+            deferred: false,
+            provisional_paints: 0,
             opening_probe: None,
             retry_open: None,
             admission: Admission::Ready,
@@ -363,6 +391,9 @@ impl ReferenceView {
         english: bool,
         p: Palette,
     ) {
+        if self.deferred {
+            self.provisional_paints += 1;
+        }
         if self.pane.reader_destination.is_some() {
             let size = ui.available_size();
             let previous_zoom = self.pane.viewport.scale;
