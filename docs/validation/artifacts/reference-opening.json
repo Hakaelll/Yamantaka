@@ -1,0 +1,166 @@
+{
+  "cases": [
+    {
+      "case": "before",
+      "executableSha256": "9b929cdbcc2b4c2461a03ff1486bc4cf9ed550a47ab5d1f4eaf07675f65ba07d",
+      "compositor": "native-wgpu",
+      "opening": {
+        "adoptedWithoutImage": true,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": true,
+        "emptyPaints": 6
+      },
+      "admission": {
+        "demoStage": 3,
+        "nativeCloses": 0,
+        "passwordAttempts": 0
+      },
+      "cancelledBeforeAdoption": false,
+      "trackedPageBytes": 24482708
+    },
+    {
+      "case": "normal",
+      "executableSha256": "3cd78a02a7f8cc099406ce7f34de077bb67306e9f34e7e02411445d84a12d458",
+      "compositor": "native-wgpu",
+      "opening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 0
+      },
+      "admission": {
+        "demoStage": 3,
+        "nativeCloses": 0,
+        "passwordAttempts": 0
+      },
+      "cancelledBeforeAdoption": false,
+      "trackedPageBytes": 22493920
+    },
+    {
+      "case": "failure-glow",
+      "executableSha256": "3cd78a02a7f8cc099406ce7f34de077bb67306e9f34e7e02411445d84a12d458",
+      "compositor": "glow",
+      "opening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 1,
+        "retainedOnFailure": true,
+        "queueRetries": 0
+      },
+      "admission": {
+        "demoStage": 3,
+        "nativeCloses": 0,
+        "passwordAttempts": 0
+      },
+      "cancelledBeforeAdoption": false,
+      "trackedPageBytes": 20952980
+    },
+    {
+      "case": "cancel",
+      "executableSha256": "3cd78a02a7f8cc099406ce7f34de077bb67306e9f34e7e02411445d84a12d458",
+      "compositor": "native-wgpu",
+      "opening": null,
+      "admission": {
+        "demoStage": 5,
+        "nativeCloses": 0,
+        "passwordAttempts": 0
+      },
+      "cancelledBeforeAdoption": true,
+      "trackedPageBytes": 13582160
+    },
+    {
+      "case": "pressure",
+      "executableSha256": "3cd78a02a7f8cc099406ce7f34de077bb67306e9f34e7e02411445d84a12d458",
+      "compositor": "native-wgpu",
+      "opening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 1
+      },
+      "admission": {
+        "demoStage": 3,
+        "nativeCloses": 0,
+        "passwordAttempts": 0
+      },
+      "cancelledBeforeAdoption": false,
+      "trackedPageBytes": 24485780
+    },
+    {
+      "case": "workspaces",
+      "executableSha256": "3cd78a02a7f8cc099406ce7f34de077bb67306e9f34e7e02411445d84a12d458",
+      "compositor": "native-wgpu",
+      "opening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 0
+      },
+      "admission": {
+        "demoStage": 0,
+        "nativeCloses": 0,
+        "passwordAttempts": 0
+      },
+      "cancelledBeforeAdoption": false,
+      "trackedPageBytes": 36830064
+    },
+    {
+      "case": "protected",
+      "executableSha256": "3cd78a02a7f8cc099406ce7f34de077bb67306e9f34e7e02411445d84a12d458",
+      "compositor": "native-wgpu",
+      "opening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 0
+      },
+      "admission": {
+        "demoStage": 3,
+        "nativeCloses": 0,
+        "passwordAttempts": 2
+      },
+      "cancelledBeforeAdoption": false,
+      "trackedPageBytes": 22493920
+    },
+    {
+      "case": "close",
+      "executableSha256": "3cd78a02a7f8cc099406ce7f34de077bb67306e9f34e7e02411445d84a12d458",
+      "compositor": "native-wgpu",
+      "opening": null,
+      "admission": {
+        "demoStage": 5,
+        "nativeCloses": 1,
+        "passwordAttempts": 0
+      },
+      "cancelledBeforeAdoption": false,
+      "trackedPageBytes": 11812688
+    }
+  ],
+  "originalPdfHashesUnchanged": 39,
+  "settledCapturePixelIdentical": true,
+  "settledCaptureDimensions": [
+    1800,
+    1200
+  ],
+  "debugBuildPassed": true,
+  "workspaceClippyPassed": true,
+  "standaloneTestsAdded": 0,
+  "dependenciesAdded": false,
+  "initialSameDocumentComparisonPrepared": false,
+  "physicalFramePresentationAcceptance": false,
+  "sustainedQueuePressureAcceptance": false
+}

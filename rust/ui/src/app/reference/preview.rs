@@ -1,6 +1,20 @@
 use super::*;
 
 impl YamantakaApp {
+    pub fn preview_reference_opening(&mut self, cancel: bool) {
+        if self.demo && self.capture.is_some() {
+            self.reference_prepare_preview = if cancel {
+                PreparationPreview::CancelAfterSubmit
+            } else {
+                PreparationPreview::FailOnce
+            };
+        }
+    }
+    pub fn preview_reference_pressure(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.reference_prepare_preview = PreparationPreview::PressureOnce;
+        }
+    }
     pub fn preview_reference_regions(&mut self) {
         self.reference_region_preview = self.demo;
     }
@@ -239,6 +253,48 @@ impl YamantakaApp {
     pub(in crate::app) fn advance_reference_demo(&mut self) {
         if !self.demo {
             return;
+        }
+        if self.reference_prepare_preview == PreparationPreview::Closing && self.reference.is_none()
+        {
+            assert_eq!(self.reader.active.as_ref().unwrap().0.id, "demo-0");
+            assert!(
+                self.reader
+                    .viewport
+                    .pages
+                    .values()
+                    .any(|slot| slot.image.is_some())
+            );
+            assert_eq!(self.reference_native_closes, 0);
+            self.reference_prepare_preview = PreparationPreview::Complete;
+            self.reference_demo = 5;
+        }
+        if self.reference_demo == 2
+            && self.reference_prepare_preview == PreparationPreview::Retry
+            && self.reference.as_ref().is_some_and(|reference| {
+                !reference.busy()
+                    && reference
+                        .opening_probe
+                        .as_ref()
+                        .is_some_and(|probe| probe.failures == 1)
+            })
+        {
+            let reference = self.reference.as_mut().unwrap();
+            assert!(
+                reference
+                    .opening_probe
+                    .as_ref()
+                    .unwrap()
+                    .retained_on_failure
+            );
+            assert_eq!(reference.pane.active.as_ref().unwrap().0.id, "demo-0");
+            reference.retry_error();
+            let document = reference
+                .selection
+                .take()
+                .expect("A failed reference offers its document for retry");
+            assert_eq!(document.id, "demo-1");
+            self.reference_prepare_preview = PreparationPreview::Off;
+            self.open_reference(document);
         }
         if self.reference_region_preview
             && let Some(reference) = &mut self.reference

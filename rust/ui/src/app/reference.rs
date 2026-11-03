@@ -8,12 +8,14 @@ mod differences;
 mod navigator;
 mod options;
 mod password;
+mod preparation;
 mod preview;
 mod saved;
 mod sync;
 mod text_preview;
 mod toolbar;
 use admission::Admission;
+pub(super) use preparation::Preview as PreparationPreview;
 
 struct ReferenceTools<'a> {
     runtime: &'a Runtime,
@@ -21,6 +23,8 @@ struct ReferenceTools<'a> {
     export: &'a mut annotations::export::ExportState,
 }
 pub(super) struct ReferenceView {
+    opening_probe: Option<preparation::Probe>,
+    retry_open: Option<preparation::OpenRequest>,
     admission: Admission,
     close_requested: bool,
     password_attempted: bool,
@@ -65,10 +69,24 @@ impl Drop for ReferenceView {
         if let Admission::Opening { cancel, .. } = &self.admission {
             cancel.cancel();
         }
+        if let Admission::Preparing(candidate) = &self.admission {
+            candidate.cancel();
+        }
     }
 }
 
 impl ReferenceView {
+    fn retry_error(&mut self) {
+        if let Some(request) = &self.retry_open {
+            self.selection = Some(request.document.clone());
+        } else {
+            self.pane.viewport.reset_requests();
+        }
+        self.error = None;
+    }
+    pub(in crate::app) fn opening_summary(&self) -> Option<serde_json::Value> {
+        self.opening_probe.as_ref().map(preparation::Probe::summary)
+    }
     pub(in crate::app) fn new(
         source: &reader_pane::ReaderPane,
         direction: ReadingDirection,
@@ -97,6 +115,8 @@ impl ReferenceView {
         pane.navigation_changed();
         pane.rebuild_layout(direction)?;
         Ok(Self {
+            opening_probe: None,
+            retry_open: None,
             admission: Admission::Ready,
             close_requested: false,
             password_attempted: false,
@@ -250,8 +270,7 @@ impl ReferenceView {
             ui.horizontal_wrapped(|ui| {
                 ui.label(error);
                 if theme::navigation(ui, tr("Reintentar", "Retry"), false, p).clicked() {
-                    self.pane.viewport.reset_requests();
-                    self.error = None;
+                    self.retry_error();
                 }
             });
         }
@@ -538,6 +557,9 @@ impl ReferenceView {
                     .pages
                     .values()
                     .any(|slot| !slot.plan.ready(slot.image_key.as_ref()));
+            if let Some(probe) = &mut self.opening_probe {
+                probe.observe(&self.pane.viewport);
+            }
             self.pane.viewport.prefetch.plan(
                 ui.ctx(),
                 runtime,

@@ -10,6 +10,7 @@ pub(in crate::app) enum Admission {
     Password {
         document: String,
     },
+    Preparing(Box<preparation::Candidate>),
     Confirming {
         document: String,
         cancel: Cancellation,
@@ -49,6 +50,19 @@ impl YamantakaApp {
     }
 
     pub(in crate::app) fn open_reference(&mut self, document: Document) {
+        let context = self
+            .reference
+            .as_ref()
+            .and_then(|reference| reference.retry_open.as_ref())
+            .filter(|request| request.document.id == document.id)
+            .and_then(|request| request.context.clone());
+        self.open_reference_with_context(document, context);
+    }
+    pub(in crate::app) fn open_reference_with_context(
+        &mut self,
+        document: Document,
+        context: Option<yamantaka_domain::workspaces::WorkspaceComparison>,
+    ) {
         if self.opening.busy()
             || self.password.is_some()
             || self.tabs.busy()
@@ -60,6 +74,22 @@ impl YamantakaApp {
         let Some(reference) = &mut self.reference else {
             return;
         };
+        if let Some(saved) = &context {
+            if let Err(error) = saved.validate() {
+                reference.error = Some(error.to_string());
+                return;
+            }
+            if saved.document != document.id
+                || self
+                    .reader
+                    .active
+                    .as_ref()
+                    .is_none_or(|(primary, _)| primary.id != saved.primary)
+            {
+                reference.error = Some("The saved comparison belongs to another reading".into());
+                return;
+            }
+        }
         if reference.pane.annotations.editing() && !reference.pane.annotations.writing() {
             self.error = Some(
                 self.tr(
@@ -96,6 +126,10 @@ impl YamantakaApp {
             Ok(()) => {
                 reference.error = None;
                 reference.password_attempted = false;
+                reference.retry_open = Some(preparation::OpenRequest {
+                    document: document.clone(),
+                    context,
+                });
                 reference.admission = Admission::Opening {
                     document: document.id,
                     cancel,
@@ -107,6 +141,7 @@ impl YamantakaApp {
 
     pub(in crate::app) fn accept_reference_opened(
         &mut self,
+        ctx: &egui::Context,
         document: &Document,
         info: &PdfInfo,
         token: &Cancellation,
@@ -121,7 +156,7 @@ impl YamantakaApp {
         let Some((primary, _)) = &self.reader.active else {
             return false;
         };
-        let mut visible = vec![primary.id.clone()];
+        let visible = vec![primary.id.clone()];
         if !token.is_cancelled() {
             let count = u32::try_from(info.pages.len()).unwrap_or(0);
             let navigation =
@@ -153,16 +188,38 @@ impl YamantakaApp {
                     };
                     match pane.rebuild_layout(direction) {
                         Ok(()) => {
-                            reference.pane = pane;
-                            visible.push(document.id.clone());
-                            reference.follow_page = false;
-                            reference.follow_zoom = false;
-                            reference.follow_position = false;
-                            reference.followed_position = None;
-                            reference.pending_primary_page = None;
-                            reference.pending_primary_zoom = false;
-                            reference.differences.clear();
-                            reference.difference_target = None;
+                            if self.capture.is_some() {
+                                reference.opening_probe.get_or_insert_with(Default::default);
+                            }
+                            match preparation::Candidate::new(
+                                pane,
+                                token.clone(),
+                                (ctx.input(|input| input.max_texture_side) as u32).min(768),
+                                (self.governor.limits().pages / 12).clamp(4, 2 * 1024 * 1024),
+                                direction,
+                                reference
+                                    .retry_open
+                                    .as_ref()
+                                    .and_then(|request| request.context.as_ref()),
+                            ) {
+                                Ok(mut candidate) => {
+                                    if self.demo
+                                        && self.capture.is_some()
+                                        && self.reference_prepare_preview
+                                            == preparation::Preview::FailOnce
+                                    {
+                                        candidate.key.page = info.pages.len() as u32;
+                                        self.reference_prepare_preview =
+                                            preparation::Preview::Retry;
+                                    }
+                                    reference.admission = Admission::Preparing(Box::new(candidate));
+                                    return true;
+                                }
+                                Err(error) => {
+                                    reference.error = Some(error.to_string());
+                                    token.cancel();
+                                }
+                            }
                         }
                         Err(error) => {
                             reference.error = Some(error.to_string());
@@ -354,6 +411,7 @@ impl YamantakaApp {
     }
 
     pub(in crate::app) fn pump_reference(&mut self, ctx: &egui::Context) {
+        self.pump_reference_preparation(ctx);
         if let Some(reference) = &mut self.reference
             && let Admission::Confirming {
                 document,

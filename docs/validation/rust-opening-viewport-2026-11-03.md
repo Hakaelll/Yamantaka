@@ -25,4 +25,4 @@ The first enlarged-text panel attempt exposed a measurement error: an empty egui
 
 ## Remaining acceptance
 
-Rapid resize and input during preparation, broader restored-scroll/context combinations, sustained cancellation and memory pressure, reference-pane handoff, physical DPI/accessibility, and paired frame-time and latency measurements remain open. These logical paint checks do not prove uninterrupted physical frame presentation or full-rewrite readiness. The final replacement Release remains gated on the full parity matrix.
+Rapid resize and input during preparation, broader restored-scroll/context combinations, sustained cancellation and memory pressure, physical DPI/accessibility, and paired frame-time and latency measurements remain open. The subsequent [reference replacement checkpoint](rust-reference-opening-2026-11-03.md) prepares a different reference document before handoff; initial same-document comparison mounting remains pending. These logical paint checks do not prove uninterrupted physical frame presentation or full-rewrite readiness. The final replacement Release remains gated on the full parity matrix.

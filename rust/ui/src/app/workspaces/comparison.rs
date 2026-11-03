@@ -109,7 +109,7 @@ impl YamantakaApp {
                     return;
                 }
             }
-            self.open_reference(document);
+            self.open_reference_with_context(document, Some(restore.saved.clone()));
             restore.started = true;
         }
         if self

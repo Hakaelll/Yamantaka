@@ -1919,6 +1919,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| arg == "--reference-opening-pressure") {
+                        app.preview_reference_pressure();
+                    }
+                    if args.iter().any(|arg| {
+                        arg == "--reference-opening-failure" || arg == "--reference-opening-cancel"
+                    }) {
+                        app.preview_reference_opening(
+                            args.iter().any(|arg| arg == "--reference-opening-cancel"),
+                        );
+                    }
                     if args.iter().any(|arg| arg == "--reference-regions") {
                         app.preview_reference_regions();
                     }

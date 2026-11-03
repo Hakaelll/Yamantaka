@@ -43,6 +43,7 @@ impl YamantakaApp {
         {
             reference.admission = Admission::Ready;
             reference.password_attempted = false;
+            reference.retry_open = None;
         }
     }
 }

@@ -146,6 +146,7 @@ pub struct YamantakaApp {
     reference: Option<reference::ReferenceView>,
     reference_return: Option<Surface>,
     reference_demo: u8,
+    reference_prepare_preview: reference::PreparationPreview,
     reference_close_demo: bool,
     reference_swap_demo: bool,
     reference_find_demo: bool,
@@ -389,6 +390,7 @@ impl YamantakaApp {
             reference: None,
             reference_return: None,
             reference_demo: 0,
+            reference_prepare_preview: Default::default(),
             reference_close_demo: false,
             reference_swap_demo: false,
             reference_find_demo: false,
@@ -1626,21 +1628,7 @@ impl App for YamantakaApp {
                     self.accept_bookmarks(&id, &cancel, Err(error.to_string()), false);
                 }
                 Update::Opened(document, info, cancel) => {
-                    if self.accept_reference_opened(&document, &info, &cancel) {
-                        if !cancel.is_cancelled()
-                            && self.reference.as_ref().is_some_and(|reference| {
-                                reference
-                                    .pane
-                                    .active
-                                    .as_ref()
-                                    .is_some_and(|(active, _)| active.id == document.id)
-                            })
-                        {
-                            self.record_reader_health(
-                                &document,
-                                yamantaka_domain::quarantine::ReaderHealth::Opened,
-                            );
-                        }
+                    if self.accept_reference_opened(ctx, &document, &info, &cancel) {
                         continue;
                     }
                     self.begin_open_preparation(document, info, cancel);
@@ -1714,7 +1702,9 @@ impl App for YamantakaApp {
                 Update::MetadataSource(reply) => self.accept_metadata_source(reply),
                 Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
                 Update::Page(page, cancel, _, _) => {
-                    if !self.accept_open_preparation_image(ctx, &page, &cancel) {
+                    if !self.accept_open_preparation_image(ctx, &page, &cancel)
+                        && !self.accept_reference_preparation_image(ctx, &page, &cancel)
+                    {
                         self.accept_rendered_page(ctx, &page, &cancel);
                     }
                 }
@@ -1829,6 +1819,9 @@ impl App for YamantakaApp {
                 }
                 Update::Failed(error, cancel) => {
                     if self.fail_open_preparation(&error, cancel.as_ref()) {
+                        continue;
+                    }
+                    if self.fail_reference_preparation(ctx, &error, cancel.as_ref()) {
                         continue;
                     }
 
@@ -2777,6 +2770,8 @@ impl App for YamantakaApp {
                     record["storedNoteRecovery"] = self.stored_note_recovery_summary();
                     record["selectionNoteRecovery"] = self.selection_note_recovery_summary();
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
+                    record["referenceOpening"]=self.reference.as_ref().and_then(|reference|reference.opening_summary()).unwrap_or_default();
+                    record["referencePreparationPreview"]=serde_json::json!({"cancelledBeforeAdoption":self.reference_prepare_preview==reference::PreparationPreview::Complete});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();
                     record["relocation"]=self.relocation.summary();
