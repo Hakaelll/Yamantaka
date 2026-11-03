@@ -1948,6 +1948,7 @@ impl App for YamantakaApp {
                 Update::Committed(_, yamantaka_application::runtime::WriteKind::Index) => {
                     self.send(Action::IndexStatistics);
                     self.refresh_selected_index_state();
+                    self.refresh_search_exclusions();
                 }
                 Update::OpenConfirmed {
                     document,
@@ -1969,6 +1970,9 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Committed(_, _) => {}
+                Update::SearchExclusions(result, cancel) => {
+                    self.accept_search_exclusions(result, &cancel)
+                }
                 Update::Search(results, cancel) => {
                     if !cancel.is_cancelled() {
                         self.search.has_more = results.len() == 80;
@@ -2628,6 +2632,7 @@ impl App for YamantakaApp {
                     && !self.preview_reference
                     && self.tabs.ready()
                     && self.reading_queue.ready()
+                    && self.search_exclusions_ready()
                     && self.workspaces.ready()
                     && match self.preview_password_target {
                         Some("unlock") => matches!(self.surface, Surface::Reader),
@@ -2735,6 +2740,7 @@ impl App for YamantakaApp {
                     record["backup"]=self.backups.summary();
                     record["restore"]=self.backup_restore.summary();
                     record["collections"]=self.collections.summary();
+                    record["searchExclusions"]=self.search_exclusions_summary();
                     record["workspaces"]=self.workspace_capture_summary();
                     record["coverCache"]=self.cache_maintenance.summary();
                     record["referenceShortcutPhase"] = serde_json::json!(self.reference_shortcuts_preview.phase());

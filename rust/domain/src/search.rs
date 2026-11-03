@@ -137,7 +137,26 @@ pub struct IndexStats {
     pub failed: u64,
     pub rows: u64,
 }
+#[derive(Debug, Clone, Default)]
+pub struct ExclusionQuery {
+    pub text: String,
+    pub offset: usize,
+}
+#[derive(Debug, Clone)]
+pub struct ExcludedDocument {
+    pub id: String,
+    pub title: String,
+    pub author: String,
+    pub missing: bool,
+}
+#[derive(Debug, Clone, Default)]
+pub struct ExclusionPage {
+    pub entries: Vec<ExcludedDocument>,
+    pub total: u64,
+    pub offset: usize,
+}
 pub trait SearchRepository {
+    fn exclusions(&self, query: &ExclusionQuery, cancel: &Cancellation) -> Result<ExclusionPage>;
     fn index_candidates(
         &self,
         after_id: Option<&str>,

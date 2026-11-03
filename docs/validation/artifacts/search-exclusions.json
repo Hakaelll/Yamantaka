@@ -1,0 +1,64 @@
+{
+  "executableSha256": "7268945f00125e35a2b45a5f03c34c82106f0379971738ad4a3a1ce9a0eb0906",
+  "cases": [
+    {
+      "case": "final-disabled",
+      "state": {
+        "open": true,
+        "preview": 0,
+        "pending": false,
+        "total": 164,
+        "rows": 80,
+        "offset": 0,
+        "error": false
+      },
+      "persistedExcluded": 164,
+      "includedDocumentStatus": "pending",
+      "includedDocumentIndexedPages": 0,
+      "excludedFtsRows": 0,
+      "syntheticDocumentsPreserved": 165,
+      "pixelsPerPoint": 1.25
+    },
+    {
+      "case": "final-compact-light",
+      "state": {
+        "open": true,
+        "preview": 0,
+        "pending": false,
+        "total": 164,
+        "rows": 80,
+        "offset": 0,
+        "error": false
+      },
+      "persistedExcluded": 164,
+      "includedDocumentStatus": "pending",
+      "includedDocumentIndexedPages": 0,
+      "excludedFtsRows": 0,
+      "syntheticDocumentsPreserved": 165,
+      "pixelsPerPoint": 1.25
+    },
+    {
+      "case": "final-large-text",
+      "state": {
+        "open": true,
+        "preview": 0,
+        "pending": false,
+        "total": 164,
+        "rows": 80,
+        "offset": 0,
+        "error": false
+      },
+      "persistedExcluded": 164,
+      "includedDocumentStatus": "pending",
+      "includedDocumentIndexedPages": 0,
+      "excludedFtsRows": 0,
+      "syntheticDocumentsPreserved": 165,
+      "pixelsPerPoint": 2.5
+    }
+  ],
+  "originalPdfHashesUnchanged": 39,
+  "standaloneTestsAdded": 0,
+  "dependenciesAdded": false,
+  "physicalAccessibilityAcceptance": false,
+  "largeCatalogueLatencyAcceptance": false
+}

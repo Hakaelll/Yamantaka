@@ -2,7 +2,10 @@ use super::*;
 use yamantaka_application::search_index::{IndexCommand, IndexPhase};
 use yamantaka_domain::search::{IndexStats, SearchKind, SearchQuery, SearchResult};
 
+mod exclusions;
+
 pub(super) struct SearchState {
+    exclusions: exclusions::State,
     pub enabled: bool,
     text: String,
     kinds: Vec<SearchKind>,
@@ -62,6 +65,7 @@ impl SearchState {
     pub fn new(enabled: bool) -> Self {
         Self {
             enabled,
+            exclusions: Default::default(),
             text: String::new(),
             kinds: Vec::new(),
             missing: false,
@@ -327,8 +331,10 @@ impl YamantakaApp {
         self.show_surface(Surface::Search);
         self.search.focus = true;
         self.send(Action::IndexStatistics);
+        self.refresh_search_exclusions();
     }
     pub(super) fn poll_search(&mut self, ctx: &egui::Context) {
+        self.advance_search_exclusions_preview();
         let progress = self.runtime.index_progress();
         let phase = (progress.generation, progress.phase);
         if self.search.last_phase != Some(phase) {
@@ -424,6 +430,23 @@ impl YamantakaApp {
     }
     pub(super) fn global_search(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark);
+        if self.search.exclusions.open {
+            egui::ScrollArea::vertical()
+                .id_salt("exclusion-manager")
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    egui::Frame::new()
+                        .inner_margin(egui::Margin::symmetric(
+                            if ui.available_width() < 700.0 { 16 } else { 36 },
+                            16,
+                        ))
+                        .show(ui, |ui| {
+                            self.search_exclusions_view(ui, p);
+                        });
+                });
+            return;
+        }
+
         let cramped = ui.available_width() < 420.0;
         egui::ScrollArea::vertical()
             .id_salt("global-search-page")
@@ -505,6 +528,16 @@ impl YamantakaApp {
             return;
         }
         if !self.search.enabled {
+            if theme::navigation(
+                ui,
+                self.tr("Documentos excluidos", "Excluded documents"),
+                false,
+                p,
+            )
+            .clicked()
+            {
+                self.open_search_exclusions();
+            }
             ui.label(
                 RichText::new(self.tr(
                     "Busca dentro de tu biblioteca, solo en este dispositivo.",
@@ -601,6 +634,18 @@ impl YamantakaApp {
                 p,
             );
             egui::Popup::menu(&menu).show(|ui| {
+                if theme::navigation(
+                    ui,
+                    self.tr("Documentos excluidos", "Excluded documents"),
+                    false,
+                    p,
+                )
+                .clicked()
+                {
+                    self.open_search_exclusions();
+                    ui.close();
+                }
+
                 ui.add_enabled_ui(!running, |ui| {
                     if theme::navigation(
                         ui,

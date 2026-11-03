@@ -153,6 +153,54 @@ fn metadata(db: &Connection, id: &str) -> Result<()> {
     Ok(())
 }
 impl SearchRepository for Database {
+    fn exclusions(&self, query: &ExclusionQuery, cancel: &Cancellation) -> Result<ExclusionPage> {
+        cancel.check()?;
+        if query.text.chars().count() > 256 {
+            return Err(Failure::Invalid("The exclusion filter is too long".into()));
+        }
+        let tx = self.connection.unchecked_transaction().map_err(storage)?;
+        let filter = format!(
+            "FROM documents d JOIN search_index_state s ON s.document_id=d.id WHERE s.status='excluded' AND instr(lower({TITLE} || ' ' || COALESCE(d.author_override,d.author,d.source_author,'')),lower(?1))>0"
+        );
+        let total: i64 = tx
+            .query_row(
+                &format!("SELECT COUNT(*) {filter}"),
+                [query.text.trim()],
+                |r| r.get(0),
+            )
+            .map_err(storage)?;
+        let total = total as u64;
+        let offset = query
+            .offset
+            .min(((total.saturating_sub(1) / 80) * 80) as usize);
+        let entries = {
+            let mut statement = tx.prepare(&format!("SELECT d.id,{TITLE},COALESCE(d.author_override,d.author,d.source_author,''),d.is_missing {filter} ORDER BY {TITLE} COLLATE NOCASE,d.id LIMIT 80 OFFSET ?2")).map_err(storage)?;
+            let rows = statement
+                .query_map(params![query.text.trim(), offset as i64], |r| {
+                    Ok(ExcludedDocument {
+                        id: r.get(0)?,
+                        title: r.get(1)?,
+                        author: r.get(2)?,
+                        missing: r.get(3)?,
+                    })
+                })
+                .map_err(storage)?;
+            let mut entries = Vec::new();
+            for row in rows {
+                cancel.check()?;
+                entries.push(row.map_err(storage)?);
+            }
+            entries
+        };
+        cancel.check()?;
+        tx.commit().map_err(storage)?;
+        Ok(ExclusionPage {
+            entries,
+            total,
+            offset,
+        })
+    }
+
     fn index_candidates(
         &self,
         after_id: Option<&str>,

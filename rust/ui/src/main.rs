@@ -182,6 +182,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                             || value == "--restore-preview"
                             || value == "--restore-apply"
                             || value == "--workspaces"
+                            || value == "--search-exclusions"
                     }) || arg == "--rule-simulation"
                         || arg == "--duplicates"
                         || arg == "--export-json"
@@ -513,6 +514,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .is_some_and(|value| value.starts_with("--bulk-covers="))
         }) {
             db.execute_batch("INSERT INTO document_covers SELECT id,1,'','','2026-10-20','2026-10-08',1,'manual',1,'contain',0.75 FROM documents WHERE id IN ('demo-0','demo-1','demo-2');")?;
+        }
+        if args.iter().any(|arg| arg == "--search-exclusions") {
+            db.execute_batch("WITH RECURSIVE n(x) AS(VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<164) INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) SELECT printf('excluded-%03d',x),path,printf('excluded-%03d',x),'fixture.pdf',printf('Excluded catalogue %03d',x),'Lectura personal',page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint FROM n JOIN documents ON documents.id='demo-0'; INSERT INTO search_index_state(document_id,fingerprint,status,indexed_pages,updated_at) SELECT id,fingerprint,'excluded',0,'2026-11-03' FROM documents WHERE id LIKE 'excluded-%';")?;
         }
         if args.iter().any(|arg| arg == "--bulk-remove=last-page") {
             db.execute_batch("WITH RECURSIVE n(x) AS(VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<70) INSERT INTO documents(id,path,normalized_path,file_name,title,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) SELECT printf('extra-%03d',x),path,printf('extra-%03d',x),'fixture.pdf','Synthetic last-page fixture',page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint FROM n JOIN documents ON documents.id='demo-0';")?;
@@ -965,7 +969,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or(true)
     };
     if demo {
-        if args.iter().any(|arg| arg == "--search") {
+        if args
+            .iter()
+            .any(|arg| arg == "--search" || arg == "--search-exclusions-enabled")
+        {
             prefs.rust.insert("globalIndexEnabled".into(), true.into());
         }
         if args.iter().any(|arg| arg == "--reduce-motion") {
@@ -2044,6 +2051,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--search-excluded") {
                     app.preview_search_action("exclude");
                 }
+            }
+            if demo && args.iter().any(|arg| arg == "--search-exclusions") {
+                app.preview_search_exclusions();
             }
             if demo && args.iter().any(|arg| arg == "--library-check") {
                 app.preview_library_check(

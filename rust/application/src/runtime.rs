@@ -140,6 +140,11 @@ pub enum Action {
     Bookmarks(String, usize, Cancellation),
     ChangeBookmark(String, BookmarkChange, usize, Cancellation),
     GetDocument(String, Cancellation),
+    SearchExclusions(
+        yamantaka_domain::search::ExclusionQuery,
+        Option<String>,
+        Cancellation,
+    ),
     IndexState(String, Cancellation),
     Search(SearchQuery, Cancellation),
     Index(IndexCommand),
@@ -272,6 +277,10 @@ pub enum Update {
         Cancellation,
     ),
     Search(Vec<SearchResult>, Cancellation),
+    SearchExclusions(
+        Result<yamantaka_domain::search::ExclusionPage>,
+        Cancellation,
+    ),
     IndexStatistics(IndexStats),
     Library(
         Vec<Document>,
@@ -1444,6 +1453,19 @@ impl Runtime {
                                     }
                                 }
                                 Action::Quarantine(request) => emit(&events,&notify,Update::Quarantine(request.execute(&mut repository)),permit),
+                                Action::SearchExclusions(query, include, cancel) => {
+                                    let result = (|| {
+                                        cancel.check()?;
+                                        if let Some(id) = include {
+                                            if repository.index_state(&id)?.is_none_or(|state| state.status != yamantaka_domain::search::IndexStatus::Excluded) {
+                                                return Err(Failure::Invalid("The document is no longer excluded; refresh the list".into()));
+                                            }
+                                            indexer.command(IndexCommand::Exclude { document_id:id, excluded:false }, &mut repository)?;
+                                        }
+                                        repository.exclusions(&query, &cancel)
+                                    })();
+                                    emit(&events, &notify, Update::SearchExclusions(result, cancel), permit);
+                                }
                                 Action::IndexState(id, cancel) => {
                                     let result = cancel
                                         .check()
