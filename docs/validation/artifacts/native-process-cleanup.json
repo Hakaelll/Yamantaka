@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "synthetic": true,
+  "helperSha256": "e445417b0088fdc9306c423d88790897665991eba1e49ea2ec8c8c1c0dd5c766",
+  "executableSha256": "2e44a0ac1a2eb8583b238cc8d3255b3f6cefdfbeedabd32db7c6a0239607e80e",
+  "cases": [
+    {
+      "exitCode": 7,
+      "exited": true,
+      "case": "normal",
+      "timeout": false
+    },
+    {
+      "exitCode": -1,
+      "exited": true,
+      "case": "timeout",
+      "timeout": true
+    },
+    {
+      "exitCode": -1,
+      "exited": true,
+      "timeout": true,
+      "case": "native-timeout"
+    }
+  ],
+  "nativeCapture": {
+    "exitCode": 0,
+    "controlBoundsVerified": true,
+    "case": "chrome-hidden"
+  },
+  "powerShellParse": {
+    "scripts": 4,
+    "errors": 0
+  },
+  "scope": "Exact owned-child cleanup on normal exit and timeout. No process-wide termination, migration replay, forced parent termination or Release performance acceptance."
+}

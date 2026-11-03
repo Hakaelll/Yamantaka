@@ -4,6 +4,7 @@ param(
     [string]$CaptureDirectory="$PSScriptRoot/../build/rust-visual/workspace-recovery"
 )
 $ErrorActionPreference='Stop'
+. "$PSScriptRoot/wait_rust_test_process.ps1"
 $repository=(Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $executablePath=(Resolve-Path -LiteralPath $Executable).Path
 $capturePath=(Resolve-Path -LiteralPath $CaptureDirectory).Path
@@ -63,7 +64,7 @@ try {
         }
         $image=Join-Path $sandbox ($case+'.png')
         $process=Start-Process -FilePath $native -ArgumentList @(('"--capture={0}"' -f $image),'--es') -WorkingDirectory $repository -WindowStyle Hidden -RedirectStandardError (Join-Path $sandbox ($case+'.stderr.log')) -PassThru
-        if (-not $process.WaitForExit(45000)) {$process.Kill();throw "Startup timed out: $case"}
+        Wait-RustTestProcess -Process $process
         if ($process.ExitCode -ne 0) {throw "Startup failed: $case"}
         $actual=Get-Content -LiteralPath ([IO.Path]::ChangeExtension($image,'controls.json')) -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($actual.synthetic -or -not $actual.libraryQueryLoaded -or -not $actual.workspaces.startupFinished -or $actual.workspaces.bindingName -ne 'Reference copy' -or $actual.workspaces.paused -or -not $actual.workspaces.focus -or $actual.workspaces.reference -ne $actual.workspaces.bindingId -or @($actual.workspaces.queue).Count -ne 3) {throw "Incorrect workspace recovery: $case"}

@@ -4,6 +4,7 @@ param(
     [string]$CaptureDirectory = "$PSScriptRoot/../build/rust-visual/migration-ui"
 )
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/wait_rust_test_process.ps1"
 $repository = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $executablePath = (Resolve-Path -LiteralPath $Executable).Path
 $capturePath = (Resolve-Path -LiteralPath $CaptureDirectory).Path
@@ -77,7 +78,7 @@ try {
         $imagePath = Join-Path $sandbox ($case.name + '.png')
         $arguments = @(('"--capture={0}"' -f $imagePath))
         $process = Start-Process -FilePath $native -ArgumentList $arguments -WorkingDirectory $repository -WindowStyle Hidden -PassThru
-        if (-not $process.WaitForExit(45000)) { $process.Kill(); throw "Native startup timed out: $($case.name)" }
+        Wait-RustTestProcess -Process $process
         if ($process.ExitCode -ne 0) { throw "Native startup failed: $($case.name)" }
         $record = Get-Content -LiteralPath ([IO.Path]::ChangeExtension($imagePath,'controls.json')) -Raw | ConvertFrom-Json
         if ($record.synthetic -or -not $record.libraryQueryLoaded -or $record.libraryDocumentCount -ne $case.count) {

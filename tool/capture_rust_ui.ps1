@@ -4,6 +4,7 @@ param(
     [string[]]$CaseNames = @()
 )
 $ErrorActionPreference = 'Stop'
+. "$PSScriptRoot/wait_rust_test_process.ps1"
 $executablePath = (Resolve-Path -LiteralPath $Executable).Path
 $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
@@ -542,11 +543,11 @@ foreach ($case in $cases) {
     $stderrPath = Join-Path $outputPath "$($case.name).stderr.log"
     $stdoutPath = Join-Path $outputPath "$($case.name).stdout.log"
     $process = Start-Process -FilePath $executablePath -ArgumentList $arguments -WorkingDirectory $repositoryPath -WindowStyle Hidden -RedirectStandardError $stderrPath -RedirectStandardOutput $stdoutPath -PassThru
-    if (-not $process.WaitForExit(45000)) {
-        $process.Kill()
-        $process.WaitForExit()
+    try {
+        Wait-RustTestProcess -Process $process
+    } catch {
         Get-Content -LiteralPath $stderrPath -Tail 12 | Write-Output
-        throw "Capture timed out: $($case.name)"
+        throw "Capture did not complete: $($case.name). $($_.Exception.Message)"
     }
     if ($process.ExitCode -ne 0) {
         Get-Content -LiteralPath $stderrPath -Tail 12 | Write-Output
