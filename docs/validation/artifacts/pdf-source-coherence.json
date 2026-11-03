@@ -1,0 +1,127 @@
+{
+  "synthetic": true,
+  "sourceBase": "cc59e8a8f4284f0fbaf9cb4db891b3f622767617",
+  "runtimeSourcesModified": true,
+  "profile": "debug",
+  "applicationSha256": "2E44A0AC1A2EB8583B238CC8D3255B3F6CEFDFBEEDABD32DB7C6A0239607E80E",
+  "sourceProbeBeforeSha256": "5046f694cbe17d53be3bd9ca1327d3543a907668fc3ebba57049f10d917e0701",
+  "sourceProbeAfterSha256": "be15370738d7c9a82da40ec601af605eddbe5f642a03e9b8f65de0d0834500c5",
+  "before": {
+    "synthetic": true,
+    "legacyPrefixUnchanged": true,
+    "sizeAndModifiedUnchanged": true,
+    "inPlaceWriteBetweenJobsAllowed": true,
+    "cachedRenderRejected": false,
+    "cachedTextRejected": false,
+    "outlineRejected": false,
+    "textGeometryRejected": false,
+    "linksRejected": false,
+    "findRejected": false,
+    "reopenUsesNewContent": true,
+    "oldPixelsUnchanged": true,
+    "pathReplacementRejected": false
+  },
+  "after": {
+    "synthetic": true,
+    "legacyPrefixUnchanged": true,
+    "sizeAndModifiedUnchanged": true,
+    "inPlaceWriteBetweenJobsAllowed": true,
+    "cachedRenderRejected": true,
+    "cachedTextRejected": true,
+    "outlineRejected": true,
+    "textGeometryRejected": true,
+    "linksRejected": true,
+    "findRejected": true,
+    "reopenUsesNewContent": true,
+    "oldPixelsUnchanged": true,
+    "pathReplacementRejected": true,
+    "leaseBlocksWrites": true,
+    "leaseReleasesWrites": true
+  },
+  "runtimeSourceHashes": [
+    {
+      "path": "rust/domain/src/lib.rs",
+      "sha256": "20D7256E4EC75D8F36586F7B4E7E185D8BA5AD3174EE041CDA1FF3AFA97B7297"
+    },
+    {
+      "path": "rust/pdf/src/cover_detection.rs",
+      "sha256": "FBBC5B45C77A82FFF4B30E46D724A5A52DCAFE4ACEFD29DACD8AEA20A8693069"
+    },
+    {
+      "path": "rust/pdf/src/covers.rs",
+      "sha256": "4E1B64C84BA1707A1489D696978E710C3A5EC1FB043B5F089C83E3573181F3B8"
+    },
+    {
+      "path": "rust/pdf/src/source.rs",
+      "sha256": "474D6D491DFB0017CB4311603AF2DF457BE228D3FBD6A834EBE538E8BDE0E8E9"
+    },
+    {
+      "path": "rust/pdf/src/worker.rs",
+      "sha256": "55A8C907772D4749AFE95D262255B9A3EE2755D3108E9B66C2D2F0E065CC2105"
+    }
+  ],
+  "readerPixelComparisons": {
+    "chrome-revealed": true,
+    "chrome-eink-glow": true
+  },
+  "nativePdfiumTests": {
+    "passed": 9,
+    "failed": 0,
+    "existingTestsOnly": true
+  },
+  "generatedSourcePdfsUnchanged": true,
+  "generatedSourcePdfCount": 42,
+  "captures": [
+    {
+      "name": "chrome-revealed",
+      "exitCode": 0,
+      "processId": 6396,
+      "compositor": "native-wgpu",
+      "imageSha256": "C254B93A2143A6FE9BC748E2FEE95D3EADE38D8546E74FE83F93B0FE24A8D459",
+      "controlsSha256": "FBBCF6249E4CF7EAB00C8F19B7E4A3A656A6BD08C065F39020E430B51122AE8D",
+      "residentCovers": 0,
+      "idle": null,
+      "emptyPagePaints": 0
+    },
+    {
+      "name": "chrome-eink-glow",
+      "exitCode": 0,
+      "processId": 23496,
+      "compositor": "egui-glow",
+      "imageSha256": "6D36CEF14FDBC97F6837EE29B7AB368A75DCD7C980F6E2BAD5A4794FE7F4A66A",
+      "controlsSha256": "CBBC3DBBFC5E4972D9647DEE5E1915FD611D3D81229069C9EAF3FC28356A6106",
+      "residentCovers": 0,
+      "idle": null,
+      "emptyPagePaints": 0
+    },
+    {
+      "name": "idle-library-wgpu",
+      "exitCode": 0,
+      "processId": 6008,
+      "compositor": "native-wgpu",
+      "imageSha256": "AD2346BBCDAAC5B08C13467CEC83209648E29FFDDE3B2E65720AE56DAEA821A0",
+      "controlsSha256": "D4B8D4974EBC5CED17F6F362307028FA8258F01967FC85C7D37A43DCEF352F3B",
+      "residentCovers": 10,
+      "idle": {
+        "synthetic": true,
+        "positiveControl": false,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2009.1123,
+        "firstFrame": 49,
+        "lastFrame": 50,
+        "intermediateUpdates": 0,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      },
+      "emptyPagePaints": 0
+    }
+  ],
+  "scope": "Physical-source guards for native operations and caches, bound-reader opening, synthetic source mutation/reopening and native smoke; not cryptographic file immutability or full filesystem/concurrent-edit interaction acceptance",
+  "probeSourceSha256": "a9c5e5c7eddb5fcb94832a508c40f73e408ad33e8cb7ebe4128e88c687e59e67",
+  "nativeTestSourceSha256": "f58097e4289d02359758de98ac58d6c19c7a93a67e86432477df01d11e494c14",
+  "existingReportRejectedAndPreserved": true
+}

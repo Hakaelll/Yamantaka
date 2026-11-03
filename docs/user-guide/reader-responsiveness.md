@@ -41,6 +41,15 @@ The crop uses the current rotation and physical scale, with a two-pixel sampling
 
 [Region refinement validation](../validation/rust-page-region-2026-10-31.md) records the exercised native cases. Rapid panning, device recovery and paired performance acceptance remain pending.
 
+## Changes made by another application
+
+If another application changes an open PDF, new native reads can report that its
+source changed or is being edited. Return to the library and open the PDF again
+after that edit finishes. Already displayed images remain available while the
+reader rejects results from the outdated source. See the
+[source-coherence validation](../validation/rust-pdf-source-coherence-2026-11-03.md)
+for the checked scope and remaining limits.
+
 ## Text selection failures
 
 If a required text page fails while extending a selection, Yamantaka pauses new background requests for the remainder of that selection. Visible pages can still request their text. The existing **Retry selection** action clears failed text entries and allows requests to continue. Selecting a smaller passage or ending the selection releases text that is no longer needed. An unrelated visible-page failure does not pause a different selected range.

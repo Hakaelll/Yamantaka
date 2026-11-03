@@ -1,8 +1,8 @@
-use pdfium_render::prelude::PdfDocument;
+use pdfium_render::prelude::{PdfDocument, Pdfium};
 use sha2::{Digest, Sha256};
 use std::{
     fs::File,
-    io::Read,
+    io::{Read, Seek},
     path::{Path, PathBuf},
     time::SystemTime,
 };
@@ -13,6 +13,16 @@ pub(crate) struct LoadedPdf<'a> {
     pub document: PdfDocument<'a>,
     pub path: PathBuf,
     pub source: SourceStamp,
+}
+
+impl LoadedPdf<'_> {
+    pub fn with_source<T: 'static>(
+        &self,
+        operation: impl FnOnce(&PdfDocument<'_>) -> Result<T>,
+    ) -> Result<T> {
+        self.source
+            .with_source(&self.path, || operation(&self.document))
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -34,6 +44,10 @@ impl SourceStamp {
         }
     }
     pub fn read(path: &Path, cancel: &Cancellation) -> Result<Self> {
+        Self::open(path, cancel).map(|(source, _)| source)
+    }
+
+    pub fn open(path: &Path, cancel: &Cancellation) -> Result<(Self, File)> {
         cancel.check()?;
         let canonical = path.canonicalize().map_err(source_error)?;
         let mut file = File::open(&canonical).map_err(source_error)?;
@@ -68,13 +82,46 @@ impl SourceStamp {
             return Err(source_changed());
         }
         cancel.check()?;
-        Ok(Self {
+        let source = Self {
             canonical,
             size: before.len(),
             modified,
             head: hash.finalize().into(),
             physical,
-        })
+        };
+        file.rewind().map_err(source_error)?;
+        Ok((source, file))
+    }
+
+    pub fn lease(&self, path: &Path) -> Result<yamantaka_windows::source_stamp::Lease> {
+        yamantaka_windows::source_stamp::Lease::acquire(path, self.physical.version())
+            .map_err(|_| source_changed())
+    }
+
+    pub fn with_source<T: 'static>(
+        &self,
+        path: &Path,
+        operation: impl FnOnce() -> Result<T>,
+    ) -> Result<T> {
+        let lease = self.lease(path)?;
+        let result = operation();
+        lease.verify().map_err(|_| source_changed())?;
+        result
+    }
+
+    pub fn open_pdf<'a>(
+        &self,
+        pdfium: &'a Pdfium,
+        path: &Path,
+        cancel: &Cancellation,
+    ) -> Result<PdfDocument<'a>> {
+        let (source, file) = Self::open(path, cancel)?;
+        if source != *self {
+            return Err(source_changed());
+        }
+        pdfium
+            .load_pdf_from_reader(file, None)
+            .map_err(crate::worker::pdf_failure)
     }
 
     pub fn verify(&self, path: &Path, cancel: &Cancellation) -> Result<()> {
@@ -86,7 +133,7 @@ impl SourceStamp {
 }
 
 pub(crate) fn source_changed() -> Failure {
-    Failure::Invalid("PDF source changed; reopen the document before requesting its cover".into())
+    Failure::PdfSourceChanged
 }
 
 fn source_error(error: std::io::Error) -> Failure {

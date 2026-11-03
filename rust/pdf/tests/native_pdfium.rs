@@ -283,7 +283,7 @@ fn verify_preserved_source_stamp(engine: &PdfWorker) {
             )
             .unwrap()
             .wait(),
-        Err(Failure::Invalid(_))
+        Err(Failure::PdfSourceChanged)
     ));
     engine.close("source-version".into()).unwrap();
     fs::remove_file(path).unwrap();

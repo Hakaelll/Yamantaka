@@ -856,7 +856,7 @@ fn run(
                     let loaded = documents
                         .get(&id)
                         .ok_or(Failure::NativeDocumentUnavailable)?;
-                    Ok(loaded.source.snapshot())
+                    loaded.with_source(|_| Ok(loaded.source.snapshot()))
                 })();
                 reply.send(result);
             }
@@ -896,6 +896,7 @@ fn run(
                         pdfium,
                         documents.get(&id).map(|loaded| &loaded.document),
                         crate::covers::CoverSource {
+                            version: &revision,
                             id: id.clone(),
                             path: &path,
                             page: 0,
@@ -929,6 +930,7 @@ fn run(
                             pdfium,
                             loaded,
                             super::covers::CoverSource {
+                                version: &loaded.source,
                                 id,
                                 path: &path,
                                 page,
@@ -943,6 +945,7 @@ fn run(
 
                     let revision = SourceStamp::read(&path, &cancel)?;
                     let source = super::covers::CoverSource {
+                        version: &revision,
                         id: id.clone(),
                         path: &path,
                         page,
@@ -1001,7 +1004,8 @@ fn run(
                 let result = (|| {
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
-                    let source = SourceStamp::read(&path, &cancel)?;
+                    let (source, file) = SourceStamp::open(&path, &cancel)?;
+                    let _source_lease = source.lease(&path)?;
                     // Remove stale caches even when the same ID is reopened for a
                     // changed file. Close a victim before opening the next handle:
                     // the native hot-document limit also applies during opening.
@@ -1020,8 +1024,8 @@ fn run(
                         drop(handle);
                         clear_document_state(&old, &mut recency, &mut pages, &mut tiles, &mut text);
                     }
-                    let opened = pdfium.load_pdf_from_file(
-                        &path,
+                    let opened = pdfium.load_pdf_from_reader(
+                        file,
                         password.as_ref().map(yamantaka_domain::PdfPassword::expose),
                     );
                     // Release our credential immediately after the FFI call,
@@ -1088,27 +1092,27 @@ fn run(
                     let loaded = documents
                         .get(&id)
                         .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
-                    let document = &loaded.document;
-                    let count = u32::try_from(document.pages().len())
-                        .map_err(|_| Failure::Pdf("Invalid page count".into()))?;
-                    let end = next_page.saturating_add(16).min(count);
-                    while next_page < end {
-                        cancel.check()?;
-                        let page =
-                            document
+                    loaded.with_source(|document| {
+                        let count = u32::try_from(document.pages().len())
+                            .map_err(|_| Failure::Pdf("Invalid page count".into()))?;
+                        let end = next_page.saturating_add(16).min(count);
+                        while next_page < end {
+                            cancel.check()?;
+                            let page = document
                                 .pages()
                                 .get(next_page.try_into().map_err(|_| {
                                     Failure::Invalid("Page index out of range".into())
                                 })?)
                                 .map_err(pdf_failure)?;
-                        info.pages.push(super::page_geometry::read(&page)?)?;
-                        next_page += 1;
-                    }
-                    epoch_matches(&scheduler, &id, epoch)?;
-                    if next_page == count {
-                        loaded.source.verify(&loaded.path, &cancel)?;
-                    }
-                    Ok(next_page == count)
+                            info.pages.push(super::page_geometry::read(&page)?)?;
+                            next_page += 1;
+                        }
+                        epoch_matches(&scheduler, &id, epoch)?;
+                        if next_page == count {
+                            loaded.source.verify(&loaded.path, &cancel)?;
+                        }
+                        Ok(next_page == count)
+                    })
                 })();
                 match result {
                     Ok(true) => reply.send(info.pages.finish().map(|pages| PdfInfo {
@@ -1157,85 +1161,85 @@ fn run(
                 };
                 let result = (|| {
                     epoch_matches(&scheduler, &key.document_id, epoch)?;
-                    key.byte_size(
-                        limits.max_dimension,
-                        if key.region.is_some() {
-                            limits.tiles
-                        } else {
-                            limits.pages
-                        },
-                    )?;
-                    let raster_key = RasterKey::new(&key, epoch);
-                    if let Some(cached) = cache.get(&raster_key) {
-                        return Ok(if cached.key.generation == key.generation {
-                            cached
-                        } else {
-                            Arc::new(cached.at_generation(key.generation))
-                        });
-                    }
-                    let document = documents
+                    let loaded = documents
                         .get(&key.document_id)
-                        .map(|loaded| &loaded.document)
-                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
-                    let page = document
-                        .pages()
-                        .get(
-                            key.page
-                                .try_into()
-                                .map_err(|_| Failure::Invalid("Page index out of range".into()))?,
-                        )
-                        .map_err(pdf_failure)?;
-                    let rotation = match key.rotation % 360 {
-                        90 => PdfPageRenderRotation::Degrees90,
-                        180 => PdfPageRenderRotation::Degrees180,
-                        270 => PdfPageRenderRotation::Degrees270,
-                        _ => PdfPageRenderRotation::None,
-                    };
-                    let [width, height] = key.output_dimensions()?;
-                    let [x, y, _, _] = key.region.unwrap_or([0, 0, width, height]);
-                    // Keep the full device canvas scale and rotation, but translate
-                    // its origin into a tile-sized native bitmap. PDFium clips to
-                    // that bitmap: no full-page raster or post-render crop exists.
-                    // The origin path also preserves form overlays, unlike the
-                    // pdfium-render matrix/explicit-clip path, which disables them.
-                    let config = PdfRenderConfig::new()
-                        .set_fixed_size(key.physical_width as i32, key.physical_height as i32)
-                        .set_origin(-(x as i32), -(y as i32))
-                        .rotate(rotation, false)
-                        .set_reverse_byte_order(false);
-                    let bytes = key.byte_size(limits.max_dimension, usize::MAX)?;
-                    let category = if key.region.is_some() {
-                        MemoryCategory::Tiles
-                    } else {
-                        MemoryCategory::Pages
-                    };
-                    let mut buffer = loop {
-                        match TrackedBytesBuilder::try_zeroed(&governor, category, bytes) {
-                            Ok(buffer) => break buffer,
-                            Err(MemoryError::BudgetDenied { .. }) if cache.evict_oldest() => {
-                                continue;
-                            }
-                            Err(error) => return Err(memory_failure(error)),
+                        .ok_or(Failure::NativeDocumentUnavailable)?;
+                    loaded.with_source(|document| {
+                        key.byte_size(
+                            limits.max_dimension,
+                            if key.region.is_some() {
+                                limits.tiles
+                            } else {
+                                limits.pages
+                            },
+                        )?;
+                        let raster_key = RasterKey::new(&key, epoch);
+                        if let Some(cached) = cache.get(&raster_key) {
+                            return Ok(if cached.key.generation == key.generation {
+                                cached
+                            } else {
+                                Arc::new(cached.at_generation(key.generation))
+                            });
                         }
-                    };
-                    {
-                        let mut bitmap = PdfBitmap::from_bytes(
-                            width as i32,
-                            height as i32,
-                            PdfBitmapFormat::BGRA,
-                            buffer.as_mut_slice(),
-                        )
-                        .map_err(pdf_failure)?;
-                        page.render_into_bitmap_with_config(&mut bitmap, &config)
+                        let page =
+                            document
+                                .pages()
+                                .get(key.page.try_into().map_err(|_| {
+                                    Failure::Invalid("Page index out of range".into())
+                                })?)
+                                .map_err(pdf_failure)?;
+                        let rotation = match key.rotation % 360 {
+                            90 => PdfPageRenderRotation::Degrees90,
+                            180 => PdfPageRenderRotation::Degrees180,
+                            270 => PdfPageRenderRotation::Degrees270,
+                            _ => PdfPageRenderRotation::None,
+                        };
+                        let [width, height] = key.output_dimensions()?;
+                        let [x, y, _, _] = key.region.unwrap_or([0, 0, width, height]);
+                        // Keep the full device canvas scale and rotation, but translate
+                        // its origin into a tile-sized native bitmap. PDFium clips to
+                        // that bitmap: no full-page raster or post-render crop exists.
+                        // The origin path also preserves form overlays, unlike the
+                        // pdfium-render matrix/explicit-clip path, which disables them.
+                        let config = PdfRenderConfig::new()
+                            .set_fixed_size(key.physical_width as i32, key.physical_height as i32)
+                            .set_origin(-(x as i32), -(y as i32))
+                            .rotate(rotation, false)
+                            .set_reverse_byte_order(false);
+                        let bytes = key.byte_size(limits.max_dimension, usize::MAX)?;
+                        let category = if key.region.is_some() {
+                            MemoryCategory::Tiles
+                        } else {
+                            MemoryCategory::Pages
+                        };
+                        let mut buffer = loop {
+                            match TrackedBytesBuilder::try_zeroed(&governor, category, bytes) {
+                                Ok(buffer) => break buffer,
+                                Err(MemoryError::BudgetDenied { .. }) if cache.evict_oldest() => {
+                                    continue;
+                                }
+                                Err(error) => return Err(memory_failure(error)),
+                            }
+                        };
+                        {
+                            let mut bitmap = PdfBitmap::from_bytes(
+                                width as i32,
+                                height as i32,
+                                PdfBitmapFormat::BGRA,
+                                buffer.as_mut_slice(),
+                            )
                             .map_err(pdf_failure)?;
-                    } // Destroy the borrowed native bitmap before touching its bytes.
-                    for pixel in buffer.as_mut_slice().chunks_exact_mut(4) {
-                        pixel.swap(0, 2);
-                    }
-                    let rendered =
-                        Arc::new(RenderedPage::from_pixels(key.clone(), buffer.finish())?);
-                    cache.insert(raster_key, rendered.clone(), rendered.pixels().len());
-                    Ok(rendered)
+                            page.render_into_bitmap_with_config(&mut bitmap, &config)
+                                .map_err(pdf_failure)?;
+                        } // Destroy the borrowed native bitmap before touching its bytes.
+                        for pixel in buffer.as_mut_slice().chunks_exact_mut(4) {
+                            pixel.swap(0, 2);
+                        }
+                        let rendered =
+                            Arc::new(RenderedPage::from_pixels(key.clone(), buffer.finish())?);
+                        cache.insert(raster_key, rendered.clone(), rendered.pixels().len());
+                        Ok(rendered)
+                    })
                 })();
                 let active = {
                     let mut state = scheduler.lock().unwrap();
@@ -1261,30 +1265,31 @@ fn run(
                 let result = (|| {
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
-                    let key = (id.clone(), page);
-                    if let Some(cached) = text.get(&key) {
-                        return Ok(cached);
-                    }
-                    let document = documents
+                    let loaded = documents
                         .get(&id)
-                        .map(|loaded| &loaded.document)
                         .ok_or(Failure::NativeDocumentUnavailable)?;
-                    let page = document
-                        .pages()
-                        .get(
-                            page.try_into()
-                                .map_err(|_| Failure::Invalid("Page index out of range".into()))?,
-                        )
-                        .map_err(pdf_failure)?;
-                    let page_text = page.text().map_err(pdf_failure)?;
-                    if page_text.len() as usize > limits.text / 4 {
-                        return Err(Failure::Pdf("Page text exceeds memory budget".into()));
-                    }
-                    let result = page_text.all();
-                    cancel.check()?;
-                    epoch_matches(&scheduler, &id, epoch)?;
-                    text.insert(key, result.clone(), result.len());
-                    Ok(result)
+                    loaded.with_source(|document| {
+                        let key = (id.clone(), page);
+                        if let Some(cached) = text.get(&key) {
+                            return Ok(cached);
+                        }
+                        let page =
+                            document
+                                .pages()
+                                .get(page.try_into().map_err(|_| {
+                                    Failure::Invalid("Page index out of range".into())
+                                })?)
+                                .map_err(pdf_failure)?;
+                        let page_text = page.text().map_err(pdf_failure)?;
+                        if page_text.len() as usize > limits.text / 4 {
+                            return Err(Failure::Pdf("Page text exceeds memory budget".into()));
+                        }
+                        let result = page_text.all();
+                        cancel.check()?;
+                        epoch_matches(&scheduler, &id, epoch)?;
+                        text.insert(key, result.clone(), result.len());
+                        Ok(result)
+                    })
                 })();
                 reply.send(epoch_matches(&scheduler, &id, epoch).and(result));
             }
@@ -1297,13 +1302,14 @@ fn run(
                 let result = (|| {
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
-                    let document = documents
+                    let loaded = documents
                         .get(&id)
-                        .map(|loaded| &loaded.document)
-                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
-                    crate::outline::read(document, &governor, || {
-                        cancel.check()?;
-                        epoch_matches(&scheduler, &id, epoch)
+                        .ok_or(Failure::NativeDocumentUnavailable)?;
+                    loaded.with_source(|document| {
+                        crate::outline::read(document, &governor, || {
+                            cancel.check()?;
+                            epoch_matches(&scheduler, &id, epoch)
+                        })
                     })
                 })();
                 reply.send(
@@ -1324,20 +1330,21 @@ fn run(
                 let result = (|| {
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
-                    let document = documents
+                    let loaded = documents
                         .get(&id)
-                        .map(|loaded| &loaded.document)
                         .ok_or(Failure::NativeDocumentUnavailable)?;
-                    crate::text_geometry::read(
-                        document,
-                        page,
-                        purpose.character_limit(),
-                        &governor,
-                        || {
-                            cancel.check()?;
-                            epoch_matches(&scheduler, &id, epoch)
-                        },
-                    )
+                    loaded.with_source(|document| {
+                        crate::text_geometry::read(
+                            document,
+                            page,
+                            purpose.character_limit(),
+                            &governor,
+                            || {
+                                cancel.check()?;
+                                epoch_matches(&scheduler, &id, epoch)
+                            },
+                        )
+                    })
                 })();
                 reply.send(
                     cancel
@@ -1356,13 +1363,14 @@ fn run(
                 let result = (|| {
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
-                    let document = documents
+                    let loaded = documents
                         .get(&id)
-                        .map(|loaded| &loaded.document)
-                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
-                    crate::links::read(document, page, &governor, || {
-                        cancel.check()?;
-                        epoch_matches(&scheduler, &id, epoch)
+                        .ok_or(Failure::NativeDocumentUnavailable)?;
+                    loaded.with_source(|document| {
+                        crate::links::read(document, page, &governor, || {
+                            cancel.check()?;
+                            epoch_matches(&scheduler, &id, epoch)
+                        })
                     })
                 })();
                 reply.send(
@@ -1384,13 +1392,14 @@ fn run(
                 let result = (|| {
                     cancel.check()?;
                     epoch_matches(&scheduler, &id, epoch)?;
-                    let document = documents
+                    let loaded = documents
                         .get(&id)
-                        .map(|loaded| &loaded.document)
-                        .ok_or_else(|| Failure::Pdf("Document was closed or evicted".into()))?;
-                    crate::find::read(document, page, &query, offset, &governor, || {
-                        cancel.check()?;
-                        epoch_matches(&scheduler, &id, epoch)
+                        .ok_or(Failure::NativeDocumentUnavailable)?;
+                    loaded.with_source(|document| {
+                        crate::find::read(document, page, &query, offset, &governor, || {
+                            cancel.check()?;
+                            epoch_matches(&scheduler, &id, epoch)
+                        })
                     })
                 })();
                 reply.send(
