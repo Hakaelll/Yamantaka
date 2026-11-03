@@ -342,7 +342,7 @@ fn verify_cover_cache(
             .try_capture_import_cover("guarded-cover".into(), changed, Cancellation::default())
             .unwrap()
             .wait(),
-        Err(Failure::Invalid(_))
+        Err(Failure::PdfSourceChanged)
     ));
     fresh.close("guarded-cover".into()).unwrap();
     assert!(matches!(

@@ -44,9 +44,11 @@ The crop uses the current rotation and physical scale, with a two-pixel sampling
 ## Changes made by another application
 
 If another application changes an open PDF, new native reads can report that its
-source changed or is being edited. Return to the library and open the PDF again
-after that edit finishes. Already displayed images remain available while the
-reader rejects results from the outdated source. See the
+source changed or is being edited. After that edit finishes, close its open
+reading tabs, then open the PDF from the library. Close Compare first if that
+PDF is also visible there. Returning to the library alone keeps the existing
+reading open. Already displayed images remain available while the reader
+rejects results from the outdated source. See the
 [source-coherence validation](../validation/rust-pdf-source-coherence-2026-11-03.md)
 for the checked scope and remaining limits.
 

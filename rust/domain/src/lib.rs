@@ -69,6 +69,8 @@ pub const MAX_RENDER_DIMENSION: u32 = 16_384;
 pub enum Failure {
     #[error("The PDF changed or is being edited. Reopen it before continuing.")]
     PdfSourceChanged,
+    #[error("Close the existing reading before reopening this PDF.")]
+    ReaderAlreadyOpen,
     #[error("The cover PDF changed or could not be verified; refresh its preview")]
     CoverSourceChanged,
     #[error(

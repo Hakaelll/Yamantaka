@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "synthetic": true,
+  "sourceBase": "f89b869",
+  "before": {
+    "version": 1,
+    "synthetic": true,
+    "unchangedVisibleOpenRejected": false,
+    "changedVisibleOpenRejected": false,
+    "oldTextRetainedBeforeEdit": true,
+    "oldSourceReadRejectedAfterEdit": true,
+    "referenceUnaffected": true,
+    "closedReaderReopenedWithNewText": true,
+    "bothReadersClosed": true
+  },
+  "after": {
+    "version": 1,
+    "synthetic": true,
+    "unchangedVisibleOpenRejected": true,
+    "changedVisibleOpenRejected": true,
+    "oldTextRetainedBeforeEdit": true,
+    "oldSourceReadRejectedAfterEdit": true,
+    "referenceUnaffected": true,
+    "nativeEpochRetained": true,
+    "cachedRasterRetained": true,
+    "cancellationPreserved": true,
+    "ownershipRejectionExcludedFromQuarantine": true,
+    "closedReaderReopenedWithNewText": true,
+    "bothReadersClosed": true
+  },
+  "nativeCaptures": [
+    {
+      "name": "chrome-hidden",
+      "exitCode": 0,
+      "imageSha256": "34456A7F3E6951FDEB8829247F9B4A8BF4311C06ED5CFDFD76725663AD10E852",
+      "controlsSha256": "39D20AAC294A5F0B466B478349571E24BF324BC07EEF08512A8332AD1805ECB1"
+    },
+    {
+      "name": "chrome-reference",
+      "exitCode": 0,
+      "imageSha256": "0D3ADEE883203E186FD7278E06B4874677938E17550462B96360AF79B1EF84F9",
+      "controlsSha256": "4A077FA940B367E94BC6C435E4A354F58776E0898021666BBCAABED5E87F0FB3"
+    },
+    {
+      "name": "reader-reference",
+      "exitCode": 0,
+      "imageSha256": "69DAD43AE40E945A28790556F0E1F306BFD5ABCDBFDBD4BC2766CFEFD5C7834E",
+      "controlsSha256": "C788F48BF34EC8C4E4DDB507DAF035335560828C66C82A740830BF1F072B993A"
+    }
+  ],
+  "rgbaMatchesPriorCheckpoint": {
+    "chrome-hidden": true,
+    "chrome-reference": true
+  },
+  "unchangedFixturePdfs": 42,
+  "retainedApplicationTests": {
+    "passed": 8,
+    "failed": 0
+  },
+  "workspaceClippyWarningsDenied": true,
+  "workspaceFormatCheck": true,
+  "sha256": {
+    "rust/application/src/runtime.rs": "bfcd4d169d1b5f031f4872ad08469c29ea97065ee5444c2a0d45191d3621891d",
+    "rust/domain/src/lib.rs": "e00305c7fba43cacf940c836b6550d5bb1c743e9153be35daef100e2635e52f4",
+    "rust/application/examples/reader_source_handoff.rs": "9b1776b45c524c101464a1c8eeba5fcb46afcfd66928e8c6a1879321ebc2bfdd",
+    "rust/application/tests/import_resumption_runtime/password.rs": "91455218c9b72560b4443bc9c304ba3bb3f7f3d571d2202e1c481d289fb8346b",
+    "build/verification/reader-source-handoff-probe.exe": "b3d79acbd153f1a54b4bbf7f0d25f1ca5cee3192617ee46c6a4482a2ac1fc1f8",
+    "build/verification/yamantaka-reader-ownership.exe": "1bdc35cbe96dcb0233c0ae95f91f8a47fef4e6f35772f8fe3b3d9602773ca1c8"
+  },
+  "scope": "Actor admission and native close/reopen using generated fixture copies. No automatic reload, full UI close/draft interaction, physical accessibility or Release performance certification."
+}
