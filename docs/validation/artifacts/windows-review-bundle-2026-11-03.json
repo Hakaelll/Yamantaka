@@ -1,0 +1,139 @@
+{
+  "applicationLicense": "MIT",
+  "archiveMatchesBundle": true,
+  "archiveSha256": "6a796dc6de242cfeaeac7a44f467f0b8247ae1cc4093cee3e1da68d6ed5a7167",
+  "binaries": {
+    "pdfium.dll": {
+      "imports": [
+        "advapi32.dll",
+        "gdi32.dll",
+        "kernel32.dll",
+        "user32.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 3
+    },
+    "yamantaka.exe": {
+      "imports": [
+        "advapi32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "bcryptprimitives.dll",
+        "combase.dll",
+        "dwmapi.dll",
+        "dxgi.dll",
+        "gdi32.dll",
+        "imm32.dll",
+        "kernel32.dll",
+        "ntdll.dll",
+        "ole32.dll",
+        "oleaut32.dll",
+        "opengl32.dll",
+        "setupapi.dll",
+        "shell32.dll",
+        "uiautomationcore.dll",
+        "user32.dll",
+        "uxtheme.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 2
+    }
+  },
+  "components": 239,
+  "files": 462,
+  "machineProfilePathsAbsent": true,
+  "pdfiumHashPinned": true,
+  "status": "review-candidate-not-final-release",
+  "verified": true,
+  "version": "0.16.0-alpha.1",
+  "baseSourceCommit": "9822b6126a27351497bc6660e09139e6adaa7168",
+  "runtimeSourcesModified": false,
+  "archiveBytes": 16186420,
+  "applicationBytes": 29831680,
+  "applicationSha256": "ce506f9f8197a02178e984172a27e013d2d14e24095a7b41d66394aa6f14c4de",
+  "authenticodeObserved": "NotSigned",
+  "nativeSmoke": {
+    "extractedZipUsed": true,
+    "cases": [
+      {
+        "case": "reader-wgpu",
+        "exitCode": 0,
+        "pagePresenter": "native-wgpu",
+        "installedPageImages": 1,
+        "pdfCoversReady": 0
+      },
+      {
+        "case": "reader-opengl",
+        "exitCode": 0,
+        "pagePresenter": "egui-glow",
+        "installedPageImages": 1,
+        "pdfCoversReady": 0
+      },
+      {
+        "case": "library-covers",
+        "exitCode": 0,
+        "pagePresenter": "native-wgpu",
+        "installedPageImages": 0,
+        "pdfCoversReady": 10
+      }
+    ],
+    "bidirectionalEditorAndCopyPassed": true,
+    "startupRecordRepair": {
+      "synthetic": true,
+      "unicodeParent": true,
+      "writeAndDeleteLease": true,
+      "existingDestinationPreserved": true,
+      "staleReviewRejected": true,
+      "cancelledApplyPreserved": true,
+      "originalRecordPreserved": true,
+      "repeatedApplyRejected": true,
+      "validRecordPreserved": true,
+      "retentionGapRecovered": true,
+      "nextStartupNormal": true,
+      "libraryAndPreferencesUnchanged": true
+    },
+    "pendingOperationCurrentChoice": {
+      "synthetic": true,
+      "originalPreserved": true,
+      "installed": true
+    },
+    "sourcePdfsUnchanged": true,
+    "sourcePdfCount": 42
+  },
+  "normalPortableStartup": {
+    "normalPortableStartup": true,
+    "qaFixtureOverrideAbsent": true,
+    "responding": true,
+    "title": "Yamantaka",
+    "databaseCreated": true,
+    "networkObservation": {
+      "requestedSeconds": 10,
+      "samples": 2,
+      "tcpOwnedRecords": 0,
+      "udpOwnedRecords": 0,
+      "scope": "Sampled Windows TCP and UDP tables for this process only"
+    },
+    "syntheticArgumentImported": true
+  },
+  "textOverrides": {
+    "egui": "third_party/egui",
+    "epaint": "third_party/epaint",
+    "unicode-bidi": "0.3.18",
+    "sourceInventoryChecked": true,
+    "licenseFilesPresent": true
+  },
+  "officialSchemaCheck": {
+    "valid": true,
+    "offlineReferenceBundling": true,
+    "sourceSchemas": {
+      "bom-1.5.schema.json": "a00fcba23a44b72179ac1f288be4c3529b59f6e1b3719709a40685f177516b46",
+      "jsf-0.82.schema.json": "2faf5eb3651f2ae5f46091a131770d8d847bbd121139d19c85fc7051bfa58c46",
+      "spdx.schema.json": "33863a360fc4d348e183d89c1ca7aa0877f481e7eb55be2d4102a30386188a10"
+    }
+  },
+  "limits": [
+    "Local review candidate; no final replacement release",
+    "Physical Windows 10, DPI, monitors and Narrator not certified",
+    "Network observation sampled two snapshots; not an offline or packet-level proof",
+    "Complete parity and paired Flutter/Rust performance remain open"
+  ]
+}

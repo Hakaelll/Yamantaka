@@ -182,6 +182,8 @@ Recheck an existing candidate with:
 
 Read the [bundle instructions](docs/release/RUST-WINDOWS-BUNDLE.txt) and [acceptance matrix](docs/architecture/rust-rewrite-parity.md) before relying on the candidate. Packaging checks do not establish complete feature parity, physical accessibility or performance acceptance. The final replacement Release remains gated on that work.
 
+The [current candidate notes](docs/release/rust-0.16-review-08.md) describe the reading, text-layout and recovery changes, package contents and remaining acceptance work.
+
 ### Development storage
 
 Frozen verification executables accumulate independently of the application and
