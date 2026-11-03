@@ -64,6 +64,8 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Recent implementation checkpoints
 
+The review-10 distribution now also has an unpublished GitHub draft with four uploaded assets and matching server-reported digests. Its [preparation record](../validation/artifacts/github-review-10-draft-2026-11-03.json) records the draft state and target revision. Preparing this draft does not close the final Release or runtime acceptance gates.
+
 [Windows review 10](../release/rust-0.16-review-10.md) packages the committed runtime through `1659213` with a successful locked, offline optimized build. Its distribution inventory, hashes, licenses and executable resources pass packaging checks. No new application tests, captures or physical checks were run. The implementation checkpoints below therefore retain Partial acceptance.
 
 An owned visible-page or refinement failure reporting a changed PDF now blocks further page requests in that pane, retains available base images and exposes localized close/reopen guidance through the existing draft-protected close commands. Source changes are no longer discarded as ordinary optional-refinement failures. See [reader responsiveness](../user-guide/reader-responsiveness.md). No new tests or native captures were run; broader source-change interaction acceptance remains pending.

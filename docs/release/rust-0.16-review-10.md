@@ -53,6 +53,16 @@ manifest, SHA-256 sums, pinned PDFium, MIT and third-party licenses, Cargo.lock,
 instructions and a CycloneDX inventory. This checkpoint does not publish a
 GitHub Release.
 
+A GitHub draft has since been prepared under
+`v0.16.0-alpha.1-review.10`, targeting documentation checkpoint `88e6d28` with
+the same packaged runtime. It contains four uploaded assets: the ZIP,
+`SHA256SUMS.txt`, `package-manifest.json` and `SBOM.cdx.json`. GitHub's returned
+asset digests match the prepared bytes. The draft remains unpublished and
+marked as a prerelease; it does not change the pending acceptance status. The
+[draft preparation record](../validation/artifacts/github-review-10-draft-2026-11-03.json)
+captures that observation. Draft access requires a GitHub account with repository
+permission.
+
 | Item | Value |
 | --- | --- |
 | Target | Windows 10/11 x64 |

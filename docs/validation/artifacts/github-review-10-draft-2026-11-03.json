@@ -1,0 +1,43 @@
+{
+  "repository": "Hakaelll/Yamantaka",
+  "releaseId": 433297391,
+  "tag": "v0.16.0-alpha.1-review.10",
+  "targetCommit": "88e6d28059cd501c393359b184cb074e442353e2",
+  "draft": true,
+  "prerelease": true,
+  "htmlUrl": "https://github.com/Hakaelll/Yamantaka/releases/tag/untagged-509fa5deafa41874e5b2",
+  "assets": [
+    {
+      "id": 707360873,
+      "name": "yamantaka-0.16.0-alpha.1-windows-x64-portable.zip",
+      "bytes": 16352931,
+      "digest": "sha256:99da170913e2514c3d82c954e5bdd36a9ff59907624be4b4b389067b9e2a3d96",
+      "state": "uploaded"
+    },
+    {
+      "id": 707360973,
+      "name": "SHA256SUMS.txt",
+      "bytes": 206,
+      "digest": "sha256:914d76526ed8660c8f86ffa16a85cda7c3ca609e739f7dc6357cb3e368483e0c",
+      "state": "uploaded"
+    },
+    {
+      "id": 707361016,
+      "name": "package-manifest.json",
+      "bytes": 217789,
+      "digest": "sha256:91ed69b71a8c2db0444f701477a25a4b1457020c03f2336bf6d150f40cdf2d36",
+      "state": "uploaded"
+    },
+    {
+      "id": 707361049,
+      "name": "SBOM.cdx.json",
+      "bytes": 166179,
+      "digest": "sha256:55081f3806ac315b952ac9cce49bdab27df201ddaa4c8092d02c48444a2a1add",
+      "state": "uploaded"
+    }
+  ],
+  "runtimeValidation": "pending",
+  "recordScope": "draft-preparation-observation",
+  "publicationPerformed": false,
+  "newApplicationTestsRun": false
+}
