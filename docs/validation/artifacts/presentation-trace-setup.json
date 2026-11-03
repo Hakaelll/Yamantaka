@@ -1,0 +1,28 @@
+{
+  "status": "tooling-prepared-permission-required",
+  "performanceVerdict": "not-established",
+  "tool": {
+    "name": "PresentMon",
+    "version": "2.6.0",
+    "bytes": 980320,
+    "sha256": "b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af",
+    "source": "https://github.com/GameTechDev/PresentMon/releases/tag/v2.6.0"
+  },
+  "targetExecutableSha256": "ce506f9f8197a02178e984172a27e013d2d14e24095a7b41d66394aa6f14c4de",
+  "executed": {
+    "scriptParsingPassed": true,
+    "officialAssetHashMatched": true,
+    "cachedVerificationPassed": true,
+    "captureExitCode": 6,
+    "captureStatus": "capture-failed",
+    "capturedFrameRows": 0,
+    "exactProcessPathMismatchRejected": true,
+    "existingEvidencePreserved": true
+  },
+  "limits": [
+    "Windows ETW permissions denied collection",
+    "No valid presentation frames collected",
+    "UAC authorization pending",
+    "No paired performance or 16.7 ms acceptance established"
+  ]
+}
