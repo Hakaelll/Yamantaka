@@ -23,4 +23,4 @@ The [status artifact](artifacts/reference-opening.json) records the executable h
 
 ## Remaining acceptance
 
-Creating the initial comparison of two pages from the same document still mounts a pane before its image is prepared. This checkpoint covers replacement with a different document, including the saved comparison target; it does not close that initial-mount gap. Broader cancellation and real pressure stress, physical DPI/accessibility, paired performance measurements, and the full replacement Release gates remain pending.
+At this checkpoint, creating the initial comparison of two pages from the same document still mounted a pane before its image was prepared. The subsequent [manual comparison checkpoint](rust-reference-mount-2026-11-03.md) prepares both panes before the manual split appears. Automatic saved-comparison construction, broader cancellation and real pressure stress, physical DPI/accessibility, paired performance measurements, and the full replacement Release gates remain pending.

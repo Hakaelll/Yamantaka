@@ -190,12 +190,14 @@ impl YamantakaApp {
         }
     }
     pub(super) fn replace_reader_state(&mut self, preferences: Cancellation) {
+        self.reference_mount = None;
         self.reference = None;
         self.reader.prepare_replacement(preferences);
         self.dismiss_password_challenge();
         self.password_attempted = false;
     }
     pub(super) fn cancel_reader_opening(&mut self) {
+        self.reference_mount = None;
         self.tabs.cancel();
         self.opening.cancel();
         self.reader.restoration.clear();

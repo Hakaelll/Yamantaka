@@ -14,7 +14,9 @@ When you open another document in the primary reader, the current reading stays 
 
 Native checks cover continuous opening, a 5,000-page PDF, opening from the library, enlarged text with a navigator, and failed facing-page preparation with retry. [Initial viewport verification](../validation/rust-opening-viewport-2026-11-03.md) records matching planned and painted views. Rapid resizing and broader performance acceptance remain pending. [Facing opening verification](../validation/rust-opening-spreads-2026-11-03.md) and [opening verification](../validation/rust-first-raster-opening-2026-11-03.md) record earlier checkpoints.
 
-Changing the reference to another document also keeps the previous pane until its replacement has a page image. If that preparation fails, Retry reopens the failed document. Saved comparisons prepare their saved reference page before the switch. [Reference replacement verification](../validation/rust-reference-opening-2026-11-03.md) covers native failure, cancellation, retry, password, and workspace sequences. Preparing the initial same-document comparison before it appears remains pending.
+Compare keeps the main reading visible while it prepares the reference and any additional primary pages exposed by splitting the view. Toggling Compare again cancels that preparation. [Initial comparison verification](../validation/rust-reference-mount-2026-11-03.md) covers single-page, continuous, rotated, and enlarged-text cases. Initial presentation during automatic restoration of saved comparisons remains pending.
+
+Changing the reference to another document also keeps the previous pane until its replacement has a page image. If that preparation fails, Retry reopens the failed document. Saved comparisons prepare their saved reference page before the replacement. [Reference replacement verification](../validation/rust-reference-opening-2026-11-03.md) covers native failure, cancellation, retry, password, and workspace sequences.
 
 ## High zoom
 

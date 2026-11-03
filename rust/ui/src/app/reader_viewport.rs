@@ -167,6 +167,9 @@ impl YamantakaApp {
                 }
             }
             self.opening.observe_frame(&document.id, &frame, &self.reader.viewport);
+            if let Some(reference)=&mut self.reference {
+                reference.observe_primary_mount(&frame,&self.reader.viewport);
+            }
             self.reader.loading = !self.reader.viewport.retry
                 && self.reader.viewport.pages
                     .values()

@@ -1919,6 +1919,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--reference") {
                     app.preview_reference();
+                    if args.iter().any(|arg| {
+                        arg == "--reference-mount-failure"
+                            || arg == "--reference-mount-cancel"
+                            || arg == "--reference-mount-pressure"
+                    }) {
+                        app.preview_reference_mount(
+                            args.iter().any(|arg| arg == "--reference-mount-cancel"),
+                            args.iter().any(|arg| arg == "--reference-mount-pressure"),
+                        );
+                    }
                     if args.iter().any(|arg| arg == "--reference-opening-pressure") {
                         app.preview_reference_pressure();
                     }

@@ -28,6 +28,33 @@ pub(super) enum Progress {
     Waiting(Instant),
     Submitted,
 }
+pub(super) fn submit(
+    runtime: &Runtime,
+    ctx: &egui::Context,
+    key: &RenderKey,
+    cancel: &Cancellation,
+    progress: &mut Progress,
+) -> yamantaka_domain::Result<()> {
+    if let Progress::Waiting(at) = progress {
+        if let Some(delay) = at.checked_duration_since(Instant::now()) {
+            ctx.request_repaint_after(delay);
+            return Ok(());
+        }
+        match runtime.submit(Action::Render(
+            key.clone(),
+            yamantaka_domain::Priority::Visible,
+            cancel.clone(),
+        )) {
+            Ok(()) => *progress = Progress::Submitted,
+            Err(Failure::QueueFull) => {
+                *progress = Progress::Waiting(Instant::now() + Duration::from_millis(100));
+                ctx.request_repaint_after(Duration::from_millis(100));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
 impl Candidate {
     pub(super) fn new(
         mut pane: reader_pane::ReaderPane,
@@ -86,6 +113,21 @@ impl Candidate {
         self.render.cancel();
         self.open.cancel();
     }
+    pub(super) fn ready(mut self, image: PageImage) -> (reader_pane::ReaderPane, Cancellation) {
+        self.render.cancel();
+        self.pane.viewport.pages.insert(
+            self.key.page,
+            ReaderPage {
+                requested: None,
+                cancel: Cancellation::default(),
+                image: Some(image),
+                image_key: Some(self.key),
+                plan: Default::default(),
+                refinement: Default::default(),
+            },
+        );
+        (self.pane, self.open)
+    }
 }
 
 #[derive(Default)]
@@ -97,6 +139,9 @@ pub(super) struct Probe {
     pub failures: u32,
     pub retained_on_failure: bool,
     pub queue_retries: u32,
+    pub primary_plan: Option<serde_json::Value>,
+    pub primary_first: Option<serde_json::Value>,
+    pub primary_staged: Vec<u32>,
 }
 impl Probe {
     pub(super) fn adopted(&mut self, pane: &reader_pane::ReaderPane) {
@@ -117,7 +162,7 @@ impl Probe {
         self.empty_paints = surface.empty_paints;
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"adoptedWithoutImage":self.adopted_without_image,"firstPaintSeen":self.first_paint_seen,"firstPaintEmpty":self.first_paint_empty,"emptyPaints":self.empty_paints,"failures":self.failures,"retainedOnFailure":self.retained_on_failure,"queueRetries":self.queue_retries})
+        serde_json::json!({"adoptedWithoutImage":self.adopted_without_image,"firstPaintSeen":self.first_paint_seen,"firstPaintEmpty":self.first_paint_empty,"emptyPaints":self.empty_paints,"failures":self.failures,"retainedOnFailure":self.retained_on_failure,"queueRetries":self.queue_retries,"primaryPlan":self.primary_plan,"primaryFirstFrame":self.primary_first,"primaryStagedPages":self.primary_staged})
     }
 }
 
@@ -166,27 +211,15 @@ impl YamantakaApp {
             reference.reject_preparation(&primary.id, &Failure::Cancelled);
             return;
         }
-        if let Progress::Waiting(at) = candidate.progress {
-            if let Some(delay) = at.checked_duration_since(Instant::now()) {
-                ctx.request_repaint_after(delay);
-                return;
-            }
-            match self.runtime.submit(Action::Render(
-                candidate.key.clone(),
-                yamantaka_domain::Priority::Visible,
-                candidate.render.clone(),
-            )) {
-                Ok(()) => candidate.progress = Progress::Submitted,
-                Err(Failure::QueueFull) => {
-                    candidate.progress =
-                        Progress::Waiting(Instant::now() + Duration::from_millis(100));
-                    ctx.request_repaint_after(Duration::from_millis(100));
-                }
-                Err(error) => {
-                    reference.reject_preparation(&primary.id, &error);
-                    return;
-                }
-            }
+        if let Err(error) = submit(
+            &self.runtime,
+            ctx,
+            &candidate.key,
+            &candidate.render,
+            &mut candidate.progress,
+        ) {
+            reference.reject_preparation(&primary.id, &error);
+            return;
         }
         if matches!(candidate.progress, Progress::Submitted)
             && self.reference_prepare_preview == Preview::PressureOnce
@@ -279,23 +312,11 @@ impl YamantakaApp {
         else {
             unreachable!()
         };
-        let mut candidate = *candidate;
-        candidate.render.cancel();
-        candidate.pane.viewport.pages.insert(
-            page.key.page,
-            ReaderPage {
-                requested: None,
-                cancel: Cancellation::default(),
-                image: Some(image),
-                image_key: Some(page.key.clone()),
-                plan: Default::default(),
-                refinement: Default::default(),
-            },
-        );
+        let (pane, open) = candidate.ready(image);
         if let Some(probe) = &mut reference.opening_probe {
-            probe.adopted(&candidate.pane);
+            probe.adopted(&pane);
         }
-        reference.pane = candidate.pane;
+        reference.pane = pane;
         reference.retry_open = None;
         reference.follow_page = false;
         reference.follow_zoom = false;
@@ -307,7 +328,7 @@ impl YamantakaApp {
         reference.difference_target = None;
         reference.admission = Admission::Confirming {
             document: page.key.document_id.clone(),
-            cancel: candidate.open,
+            cancel: open,
             visible: vec![primary.id.clone(), page.key.document_id.clone()],
             submitted: false,
             blocked: false,

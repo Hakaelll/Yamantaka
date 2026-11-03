@@ -144,6 +144,8 @@ pub struct YamantakaApp {
     reading_focus: shortcuts::ReadingFocus,
     reference_shortcuts_preview: shortcuts::ShortcutPreview,
     reference: Option<reference::ReferenceView>,
+    reference_mount: Option<reference::Mount>,
+    reference_mount_preview: reference::PreparationPreview,
     reference_return: Option<Surface>,
     reference_demo: u8,
     reference_prepare_preview: reference::PreparationPreview,
@@ -388,6 +390,8 @@ impl YamantakaApp {
             reading_focus: Default::default(),
             reference_shortcuts_preview: Default::default(),
             reference: None,
+            reference_mount: None,
+            reference_mount_preview: Default::default(),
             reference_return: None,
             reference_demo: 0,
             reference_prepare_preview: Default::default(),
@@ -1336,10 +1340,15 @@ impl YamantakaApp {
         if self.reader.panel && !self.reader_focus && ui.ctx().content_rect().width() < 620.0 {
             return;
         }
-        if self.preview_reference && self.reader.reader_preferences.is_some() {
+        if self.preview_reference
+            && self.reader.reader_preferences.is_some()
+            && self.open_confirmation.is_none()
+            && !self.opening.busy()
+        {
             self.preview_reference = false;
-            self.toggle_reference();
+            self.toggle_reference(ui.ctx());
         }
+        self.prepare_reference_mount(ui);
         if self.reference.is_some() {
             self.comparison_viewport(ui, &document, p);
         } else {
@@ -1703,6 +1712,7 @@ impl App for YamantakaApp {
                 Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
                 Update::Page(page, cancel, _, _) => {
                     if !self.accept_open_preparation_image(ctx, &page, &cancel)
+                        && !self.accept_reference_mount_image(ctx, &page, &cancel)
                         && !self.accept_reference_preparation_image(ctx, &page, &cancel)
                     {
                         self.accept_rendered_page(ctx, &page, &cancel);
@@ -1822,6 +1832,9 @@ impl App for YamantakaApp {
                         continue;
                     }
                     if self.fail_reference_preparation(ctx, &error, cancel.as_ref()) {
+                        continue;
+                    }
+                    if self.fail_reference_mount(ctx, &error, cancel.as_ref()) {
                         continue;
                     }
 
@@ -2601,6 +2614,8 @@ impl App for YamantakaApp {
                     && self.protected_index_capture_ready()
                     && self.importing.recovery_ready()
                     && self.opening.ready()
+                    && self.reference_mount.is_none()
+                    && !self.preview_reference
                     && self.tabs.ready()
                     && self.reading_queue.ready()
                     && self.workspaces.ready()
@@ -2771,6 +2786,7 @@ impl App for YamantakaApp {
                     record["selectionNoteRecovery"] = self.selection_note_recovery_summary();
                     record["referenceAdmission"]=serde_json::json!({"demoStage":self.reference_demo,"nativeCloses":self.reference_native_closes,"passwordAttempts":self.reference_password_attempts});
                     record["referenceOpening"]=self.reference.as_ref().and_then(|reference|reference.opening_summary()).unwrap_or_default();
+                    record["referenceMount"]=self.reference_mount_summary();
                     record["referencePreparationPreview"]=serde_json::json!({"cancelledBeforeAdoption":self.reference_prepare_preview==reference::PreparationPreview::Complete});
                     record["referenceChooser"]=self.reference.as_ref().map(|reference|serde_json::json!({"demoStage":self.reference_chooser_demo,"pagedRows":self.reference_chooser_paged,"offset":reference.chooser.offset,"count":reference.chooser.total,"rows":reference.chooser.entries.len(),"outsideVisible":reference.chooser.entries.first().is_some_and(|entry|!self.documents.iter().any(|doc|doc.id==entry.id))})).unwrap_or_default();
                     record["fileCheck"]=self.file_check.summary();
@@ -2857,6 +2873,7 @@ impl App for YamantakaApp {
         self.reader.selection.clear();
         self.reader.find = Default::default();
         self.reference = None;
+        self.reference_mount = None;
         self.reader.viewport.clear();
         self.query_cancel.cancel();
         self.reader.reader_preferences_cancel.cancel();

@@ -321,6 +321,7 @@ impl YamantakaApp {
         self.close_reference_preserving_continuity()
     }
     pub(in crate::app) fn close_reference_preserving_continuity(&mut self) -> bool {
+        self.reference_mount = None;
         let Some(reference) = &mut self.reference else {
             return true;
         };

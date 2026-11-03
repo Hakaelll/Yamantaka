@@ -153,14 +153,14 @@ impl YamantakaApp {
                 theme::navigation(
                     ui,
                     self.tr("Comparar páginas", "Compare pages"),
-                    self.reference.is_some(),
+                    self.reference.is_some() || self.reference_mount.is_some(),
                     p,
                 )
             })
             .inner
             .clicked()
         {
-            self.toggle_reference();
+            self.toggle_reference(ui.ctx());
             ui.close();
         }
         if theme::navigation(

@@ -5,6 +5,7 @@ use yamantaka_domain::{PageLayout, reader::ReaderMode};
 mod admission;
 mod bookmark_preview;
 mod differences;
+mod mount;
 mod navigator;
 mod options;
 mod password;
@@ -15,6 +16,7 @@ mod sync;
 mod text_preview;
 mod toolbar;
 use admission::Admission;
+pub(super) use mount::Mount;
 pub(super) use preparation::Preview as PreparationPreview;
 
 struct ReferenceTools<'a> {
@@ -591,16 +593,37 @@ impl YamantakaApp {
     pub fn preview_reference(&mut self) {
         self.preview_reference = self.demo;
     }
-    pub(super) fn toggle_reference(&mut self) {
+    pub(super) fn toggle_reference(&mut self, ctx: &egui::Context) {
+        if self.reference_mount.take().is_some() {
+            return;
+        }
         self.reader.viewport.scroll_anchor = true;
         if self.reference.is_some() {
             self.request_reference_close();
             return;
         }
-        match ReferenceView::new(&self.reader, self.reading_direction()) {
-            Ok(reference) => {
-                self.discard_retained_comparison();
-                self.reference = Some(reference);
+        if self.opening.busy()
+            || self.tabs.busy()
+            || self.reader.reader_preferences_loading
+            || self.open_confirmation.is_some()
+        {
+            return;
+        }
+        match Mount::new(
+            &self.reader,
+            self.reading_direction(),
+            ctx,
+            self.governor.limits().pages,
+            self.capture.is_some(),
+        ) {
+            Ok(mut mount) => {
+                if self.reference_mount_preview == PreparationPreview::FailOnce {
+                    mount.inject_failure();
+                    self.reference_mount_preview = PreparationPreview::Off;
+                }
+                self.cancel_continuity_comparison_restore();
+                self.finish_continuity_comparison(false);
+                self.reference_mount = Some(mount);
             }
             Err(error) => self.error = Some(error.to_string()),
         }
@@ -627,11 +650,8 @@ impl YamantakaApp {
             reference.pane.navigation_changed();
         }
         let rect = ui.available_rect_before_wrap();
-        let stacked = match reference.layout {
-            ComparisonLayout::Automatic => rect.width() < 960.0,
-            ComparisonLayout::SideBySide => false,
-            ComparisonLayout::Stacked => true,
-        };
+        let geometry = comparison_rects(rect, reference.layout, reference.ratio, reference.swapped);
+        let stacked = geometry.stacked;
         if reference.size != rect.size() || reference.stacked != stacked {
             reference.size = rect.size();
             reference.stacked = stacked;
@@ -640,32 +660,7 @@ impl YamantakaApp {
             reference.pane.viewport.scroll_anchor = true;
         }
         let extent = if stacked { rect.height() } else { rect.width() };
-        let leading_ratio = if reference.swapped {
-            1.0 - reference.ratio
-        } else {
-            reference.ratio
-        };
-        let split = extent * leading_ratio;
-        let mut first = rect;
-        let mut second = rect;
-        if stacked {
-            first.max.y = rect.top() + split - 4.0;
-            second.min.y = first.bottom() + 8.0;
-        } else {
-            first.max.x = rect.left() + split - 4.0;
-            second.min.x = first.right() + 8.0;
-        }
-        let divider = if stacked {
-            egui::Rect::from_min_max(
-                egui::pos2(rect.left(), first.bottom()),
-                egui::pos2(rect.right(), second.top()),
-            )
-        } else {
-            egui::Rect::from_min_max(
-                egui::pos2(first.right(), rect.top()),
-                egui::pos2(second.left(), rect.bottom()),
-            )
-        };
+        let divider = geometry.divider;
         let drag = ui.interact(
             divider,
             ui.id().with("reference-divider"),
@@ -701,11 +696,8 @@ impl YamantakaApp {
             },
             egui::Stroke::new(1.0, p.line),
         );
-        let (primary_rect, reference_rect) = if reference.swapped {
-            (second, first)
-        } else {
-            (first, second)
-        };
+        let primary_rect = geometry.primary;
+        let reference_rect = geometry.reference;
         ui.scope_builder(
             egui::UiBuilder::new()
                 .max_rect(primary_rect)
@@ -811,5 +803,57 @@ impl YamantakaApp {
         if let Some(document) = selected {
             self.open_reference(document);
         }
+    }
+}
+
+struct ComparisonRects {
+    primary: egui::Rect,
+    reference: egui::Rect,
+    divider: egui::Rect,
+    stacked: bool,
+}
+fn comparison_rects(
+    rect: egui::Rect,
+    layout: ComparisonLayout,
+    ratio: f32,
+    swapped: bool,
+) -> ComparisonRects {
+    let stacked = match layout {
+        ComparisonLayout::Automatic => rect.width() < 960.0,
+        ComparisonLayout::SideBySide => false,
+        ComparisonLayout::Stacked => true,
+    };
+    let extent = if stacked { rect.height() } else { rect.width() };
+    let split = extent * if swapped { 1.0 - ratio } else { ratio };
+    let mut first = rect;
+    let mut second = rect;
+    if stacked {
+        first.max.y = rect.top() + split - 4.0;
+        second.min.y = first.bottom() + 8.0;
+    } else {
+        first.max.x = rect.left() + split - 4.0;
+        second.min.x = first.right() + 8.0;
+    }
+    let divider = if stacked {
+        egui::Rect::from_min_max(
+            egui::pos2(rect.left(), first.bottom()),
+            egui::pos2(rect.right(), second.top()),
+        )
+    } else {
+        egui::Rect::from_min_max(
+            egui::pos2(first.right(), rect.top()),
+            egui::pos2(second.left(), rect.bottom()),
+        )
+    };
+    let (primary, reference) = if swapped {
+        (second, first)
+    } else {
+        (first, second)
+    };
+    ComparisonRects {
+        primary,
+        reference,
+        divider,
+        stacked,
     }
 }
