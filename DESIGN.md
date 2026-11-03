@@ -307,6 +307,12 @@ uses 2-point gaps and 4 points of separation above the document. Reading options
 contains zoom, fit, open readings, history and saved A/B positions. Its optional page-text panel defaults to 280 and ranges
 from 180 to 500. PDF page appearance comes from the actual document texture.
 
+The Accessibility category includes Standard and Electronic ink reader profiles.
+Electronic ink gives both reading panes a white canvas, light controls, single-page
+navigation and flat pages without animated scrolling. It preserves each document's
+saved layout, book mode and environment for returning to Standard. It does not
+change the gallery's composition or physical cover behavior.
+
 **The Stable Collection Rule.** Inspection opens below the library; preserve gallery width rather than shifting its columns sideways.
 
 The Tools menu includes Import folder and the existing Cancel import action.

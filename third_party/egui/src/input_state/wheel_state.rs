@@ -195,6 +195,15 @@ impl WheelState {
         self.status != Status::Static
     }
 
+    pub(super) fn finish_smoothing(&mut self) -> Vec2 {
+        let remaining = std::mem::take(&mut self.unprocessed_wheel_delta);
+        if self.status == Status::Smoothing {
+            self.status = Status::Static;
+            self.modifiers = Default::default();
+        }
+        remaining
+    }
+
     pub fn ui(&self, ui: &mut crate::Ui) {
         let Self {
             status,

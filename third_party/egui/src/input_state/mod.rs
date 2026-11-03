@@ -551,6 +551,19 @@ impl InputState {
         self.smooth_scroll_delta
     }
 
+    /// Apply the rest of a discrete wheel event in this update, without a smoothing tail.
+    /// Call before consuming scrolling or zooming. Trackpad events keep their OS phases.
+    pub fn finish_scroll_smoothing(&mut self) {
+        let zoom = self.wheel.modifiers.matches_any(self.options.zoom_modifier);
+        let remaining = self.wheel.finish_smoothing();
+        if zoom {
+            self.zoom_factor_delta *=
+                (self.options.scroll_zoom_speed * (remaining.x + remaining.y)).exp();
+        } else {
+            self.smooth_scroll_delta += remaining;
+        }
+    }
+
     /// Uniform zoom scale factor this frame (e.g. from ctrl-scroll or pinch gesture).
     /// * `zoom = 1`: no change
     /// * `zoom < 1`: pinch together

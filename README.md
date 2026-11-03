@@ -228,6 +228,8 @@ The launcher manages only frozen workspace executables started with both `--demo
 
 The demo uses synthetic documents and does not open the personal library. Interactive desktop previews and selected capture scenarios use isolated file-backed stores; other demo modes use an in-memory database. It currently depends on the repository's generated fixtures and is a development tool.
 
+The [reader profile guide](docs/user-guide/reader-profiles.md) explains the optional electronic-ink presentation and how to return to your saved document settings.
+
 ## Data and migration
 
 **Tools → Identical copies** finds groups with matching complete SHA-256 hashes and lets you review and open each copy. Searches run in the background and can be cancelled. Reviewed consolidation now combines library records with explicit metadata choices and a pre-merge backup. Original PDFs remain unchanged. Immediate Undo reviews a whole-library restore, rather than selectively reversing one record. See [the identical-copy guide](docs/user-guide/identical-copies.md).

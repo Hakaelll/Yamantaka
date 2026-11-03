@@ -164,6 +164,7 @@ impl YamantakaApp {
             match navigation {
                 Ok(navigation) => {
                     let mut pane = reader_pane::ReaderPane::default();
+                    pane.visual_profile = self.reader.visual_profile;
                     pane.page = navigation.position().page();
                     pane.reader_panel_tab = reference.pane.reader_panel_tab;
                     pane.navigation = Some(navigation);

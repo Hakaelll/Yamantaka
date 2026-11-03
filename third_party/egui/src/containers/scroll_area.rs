@@ -361,6 +361,7 @@ pub struct ScrollArea {
 
     /// If false, `scroll_to_*` functions will not be animated
     animated: bool,
+    kinetic_scrolling: bool,
 }
 
 impl ScrollArea {
@@ -409,6 +410,7 @@ impl ScrollArea {
             content_margin: None,
             stick_to_end: Vec2b::FALSE,
             animated: true,
+            kinetic_scrolling: true,
         }
     }
 
@@ -616,6 +618,12 @@ impl ScrollArea {
         self
     }
 
+    /// Whether dragging may continue scrolling after release. Default: `true`.
+    pub fn kinetic_scrolling(mut self, enabled: bool) -> Self {
+        self.kinetic_scrolling = enabled;
+        self
+    }
+
     /// Is any scrolling enabled?
     pub(crate) fn is_any_scroll_enabled(&self) -> bool {
         self.direction_enabled[0] || self.direction_enabled[1]
@@ -726,6 +734,7 @@ impl ScrollArea {
             content_margin: _, // Used elsewhere
             stick_to_end,
             animated,
+            kinetic_scrolling,
         } = self;
 
         let ctx = ui.ctx().clone();
@@ -854,9 +863,13 @@ impl ScrollArea {
                 }
             } else {
                 // Apply the cursor velocity to the scroll area when the user releases the drag.
-                if content_response_option
-                    .as_ref()
-                    .is_some_and(|response| response.drag_stopped())
+                if !kinetic_scrolling {
+                    state.vel = Vec2::ZERO;
+                }
+                if kinetic_scrolling
+                    && content_response_option
+                        .as_ref()
+                        .is_some_and(|response| response.drag_stopped())
                 {
                     state.vel =
                         direction_enabled.to_vec2() * ui.input(|input| input.pointer.velocity());

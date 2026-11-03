@@ -137,6 +137,7 @@ impl ReferenceView {
         preferences.zoom_mode = ZoomMode::FitPage;
         preferences.scroll_offset = 0.0;
         let mut pane = reader_pane::ReaderPane::default();
+        pane.visual_profile = source.visual_profile;
         pane.active = Some(active);
         pane.reader_panel_tab = outline::ReaderPanelTab::Outline;
         pane.navigation = Some(navigation);
@@ -437,7 +438,7 @@ impl ReferenceView {
         let (Some((document, _)), Some(layout), Some(preferences), Some(navigation)) = (
             &self.pane.active,
             self.pane.viewport.layout.clone(),
-            self.pane.reader_preferences.clone(),
+            self.pane.effective_preferences(),
             &self.pane.navigation,
         ) else {
             return;
@@ -450,9 +451,17 @@ impl ReferenceView {
         ui.painter().rect_filled(
             ui.available_rect_before_wrap(),
             0,
-            YamantakaApp::reading_paper(preferences.reading_theme),
+            if self.pane.visual_profile == reader_profile::VisualProfile::ElectronicInk {
+                Color32::WHITE
+            } else {
+                YamantakaApp::reading_paper(preferences.reading_theme)
+            },
         );
         let mut scroll = egui::ScrollArea::both()
+            .animated(self.pane.visual_profile != reader_profile::VisualProfile::ElectronicInk)
+            .kinetic_scrolling(
+                self.pane.visual_profile != reader_profile::VisualProfile::ElectronicInk,
+            )
             .id_salt("reference-pages")
             .max_height(size.y.max(1.0))
             .min_scrolled_height(0.0)
@@ -464,7 +473,13 @@ impl ReferenceView {
                 preferences.zoom_mode,
                 f64::from(self.pane.zoom),
             ) {
-                let y = self.pane.restoration.scroll.take().unwrap_or(y);
+                let restored = self.pane.restoration.scroll.take();
+                let y = if self.pane.visual_profile == reader_profile::VisualProfile::ElectronicInk
+                {
+                    y
+                } else {
+                    restored.unwrap_or(y)
+                };
                 scroll = scroll.scroll_offset(egui::vec2(x as f32, y as f32));
             }
             self.pane.viewport.scroll_anchor = false;

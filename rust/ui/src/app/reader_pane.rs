@@ -1,6 +1,7 @@
 use super::*;
 
 pub(super) struct ReaderPane {
+    pub visual_profile: reader_profile::VisualProfile,
     pub restoration: restoration::RestorationState,
     pub viewport: reader_surface::ReaderSurface,
     pub active: Option<(Document, Arc<PdfInfo>)>,
@@ -31,6 +32,7 @@ pub(super) struct ReaderPane {
 impl Default for ReaderPane {
     fn default() -> Self {
         Self {
+            visual_profile: Default::default(),
             restoration: Default::default(),
             viewport: Default::default(),
             active: None,
@@ -113,20 +115,23 @@ impl ReaderPane {
     }
 
     pub fn rebuild_layout(&mut self, direction: ReadingDirection) -> yamantaka_domain::Result<()> {
-        let (Some((_, info)), Some(preferences)) = (&self.active, &self.reader_preferences) else {
+        let (Some((_, info)), Some(preferences)) = (&self.active, self.effective_preferences())
+        else {
             return Ok(());
         };
         match ReaderLayout::new(
             info.pages.iter().map(|page| page.size()),
-            preferences,
+            &preferences,
             direction,
             24.0,
         ) {
             Ok(layout) => {
                 if let Some(navigation) = &mut self.navigation {
-                    navigation.apply_preferences(preferences, direction);
+                    navigation.apply_preferences(&preferences, direction);
                 }
                 self.viewport.layout = Some(Arc::new(layout));
+                self.viewport.flat_pages =
+                    self.visual_profile == reader_profile::VisualProfile::ElectronicInk;
                 self.viewport.scroll_anchor = true;
                 Ok(())
             }

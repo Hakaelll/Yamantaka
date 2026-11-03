@@ -29,6 +29,10 @@ impl YamantakaApp {
                 panel = tab.panel().is_some();
                 restored_scroll = Some(effective.scroll_offset);
             }
+            effective = self.reader.visual_profile.effective(&effective);
+            if self.reader.visual_profile == reader_profile::VisualProfile::ElectronicInk {
+                restored_scroll = None;
+            }
             if candidate
                 .geometry
                 .as_ref()

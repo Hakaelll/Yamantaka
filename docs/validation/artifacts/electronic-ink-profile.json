@@ -1,0 +1,355 @@
+{
+  "synthetic": true,
+  "sourceBase": "eec442a9e730dd1a6bbefa850ca6598fe9222bc5",
+  "runtimeSourcesModified": true,
+  "profile": "debug",
+  "executableSha256": "797F910B11BC4D3EED1BDD4F16E6C3BA60911D320DA88ADFA2834CEC712CB481",
+  "sources": [
+    {
+      "path": "rust/ui/src/app.rs",
+      "sha256": "D2D54A3F4994586C388715B054363D926E52301286194048FB11B6453D750EAD"
+    },
+    {
+      "path": "rust/ui/src/app/opening/layout.rs",
+      "sha256": "65BB065F55C7C10423A7ACA263AE6C818EC9B23BA09F46984366BEA73D127252"
+    },
+    {
+      "path": "rust/ui/src/app/reader_options.rs",
+      "sha256": "55F2245DC79F6F78AA292A5D86B255F65CFFB09BB283D50726A82E3417B3941E"
+    },
+    {
+      "path": "rust/ui/src/app/reader_pane.rs",
+      "sha256": "101D8EA3EC993412D91C01E58BEEBE27A4ECAFA281636FA0F44F9C1C544595BC"
+    },
+    {
+      "path": "rust/ui/src/app/reader_profile.rs",
+      "sha256": "0B283DA06943C260BF7B1DEC41130EC02BCCD005730AD455D96154A1C7C2BCF0"
+    },
+    {
+      "path": "rust/ui/src/app/reader_surface.rs",
+      "sha256": "E05B3827232E9EA7CAA2E27A5B4895AB2339A5008EFB3DEBF6D9934553700CF5"
+    },
+    {
+      "path": "rust/ui/src/app/reader_viewport.rs",
+      "sha256": "E364B5CEC5A2E747AF8AB42CB4929A09576A7A1E76F0FB2ED6B5890CADE79652"
+    },
+    {
+      "path": "rust/ui/src/app/reference.rs",
+      "sha256": "62BF6BB64018A1976A83FAE8D4CB07F2FD0993503113D2E9B2A62416F970241B"
+    },
+    {
+      "path": "rust/ui/src/app/reference/admission.rs",
+      "sha256": "17FAB6CDCD7C5C587F6A939E42955639EE9F6D747F1A8D624E732E992EA9E2CD"
+    },
+    {
+      "path": "rust/ui/src/app/settings.rs",
+      "sha256": "DF94479B0C7BB47644130296534987136FEB745B52271D439DC4F147C05811B8"
+    },
+    {
+      "path": "rust/ui/src/main.rs",
+      "sha256": "EE4B6ABDCD96E9D59C38E1C0217071A8F5B0E5CC040DE55381FA359AAC4757FF"
+    },
+    {
+      "path": "rust/ui/src/profile_input_probe.rs",
+      "sha256": "55A4A3801C260784566038452355F07BAB5B7BEC72E94575B190080723738AF2"
+    },
+    {
+      "path": "third_party/egui/src/containers/scroll_area.rs",
+      "sha256": "44a8d03ab3a57fbd9986510904449101bc765d982067faa85ba3ea42067c75f5"
+    },
+    {
+      "path": "third_party/egui/src/input_state/mod.rs",
+      "sha256": "4799e9cbc4a66c4281c86b4c95271227dd124534aad57a25d6223627958b2c87"
+    },
+    {
+      "path": "third_party/egui/src/input_state/wheel_state.rs",
+      "sha256": "1453acc7520b951c8939571a4a8ca1d1eefdc6006169a2f13b9e62a67cbecc53"
+    }
+  ],
+  "baselineExecutableSha256": "5A14C3829F0BC7E975BE59F07F35423A719BAFA53CD213FACCD27577BBDA2499",
+  "standardPixelsMatchBaseline": {
+    "eink-standard-reader": true,
+    "eink-return-standard": true
+  },
+  "generatedSourcePdfsUnchanged": true,
+  "generatedSourcePdfCount": 42,
+  "preferenceSaveReloadAndReturnAssertions": true,
+  "captureProcessesTerminal": true,
+  "cases": [
+    {
+      "name": "eink-standard-reader",
+      "exitCode": 0,
+      "processId": 22800,
+      "compositor": "native-wgpu",
+      "profile": {
+        "profile": "standard",
+        "storedLayout": "continuous",
+        "storedMode": "document",
+        "storedTheme": "ivory",
+        "effectiveLayout": "continuous",
+        "effectiveMode": "document",
+        "effectiveTheme": "ivory",
+        "navigationLayout": "Continuous",
+        "flatPages": false
+      },
+      "reference": null,
+      "returnStage": 0,
+      "emptyPagePaints": 0,
+      "imageSha256": "2542B8DFC163AD208B86B9915BE943AD72D21B2A85B31769E8629CD77C7C10EB",
+      "controlsSha256": "926F3EF73E00ED93408BA6BFC3861AB8A4A97AECC79B49CE0CF4AF3DEACE53ED",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25
+    },
+    {
+      "name": "eink-continuous-reader",
+      "exitCode": 0,
+      "processId": 8912,
+      "compositor": "native-wgpu",
+      "profile": {
+        "profile": "electronicInk",
+        "storedLayout": "continuous",
+        "storedMode": "document",
+        "storedTheme": "ivory",
+        "effectiveLayout": "single",
+        "effectiveMode": "document",
+        "effectiveTheme": "light",
+        "navigationLayout": "Single",
+        "flatPages": true
+      },
+      "reference": null,
+      "returnStage": 0,
+      "emptyPagePaints": 0,
+      "imageSha256": "9CEEE55B4DE181139BF1C515F55176776419F1C4FBBABB23CD41434E91CD5187",
+      "controlsSha256": "DC4CDA9FBE733A7241251D068280E169789AA61610743D81A0C811F95D016EEC",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25
+    },
+    {
+      "name": "eink-book-reader",
+      "exitCode": 0,
+      "processId": 24208,
+      "compositor": "native-wgpu",
+      "profile": {
+        "profile": "electronicInk",
+        "storedLayout": "facing",
+        "storedMode": "book",
+        "storedTheme": "ivory",
+        "effectiveLayout": "single",
+        "effectiveMode": "document",
+        "effectiveTheme": "light",
+        "navigationLayout": "Single",
+        "flatPages": true
+      },
+      "reference": null,
+      "returnStage": 0,
+      "emptyPagePaints": 0,
+      "imageSha256": "9CEEE55B4DE181139BF1C515F55176776419F1C4FBBABB23CD41434E91CD5187",
+      "controlsSha256": "79732F3299786BF0E73BC9ABC039F1DFD1E119B3CA3D22D36D9069066D0ED1B5",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25
+    },
+    {
+      "name": "eink-reference",
+      "exitCode": 0,
+      "processId": 22388,
+      "compositor": "native-wgpu",
+      "profile": {
+        "profile": "electronicInk",
+        "storedLayout": "single",
+        "storedMode": "document",
+        "storedTheme": "ivory",
+        "effectiveLayout": "single",
+        "effectiveMode": "document",
+        "effectiveTheme": "light",
+        "navigationLayout": "Single",
+        "flatPages": true
+      },
+      "reference": {
+        "profile": "electronicInk",
+        "storedLayout": "single",
+        "storedMode": "document",
+        "storedTheme": "ivory",
+        "effectiveLayout": "single",
+        "effectiveMode": "document",
+        "effectiveTheme": "light",
+        "navigationLayout": "Single",
+        "flatPages": true
+      },
+      "returnStage": 0,
+      "emptyPagePaints": 0,
+      "imageSha256": "B161916C87BEEA778C13A3FCAF9ED37DAB4CD650EFCF0C0049109CF113E9C400",
+      "controlsSha256": "3D70BF90BE4962D0327F2A4F4224F80AFCDF97CEC1FB6DC46415992F8881F477",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25
+    },
+    {
+      "name": "eink-glow",
+      "exitCode": 0,
+      "processId": 9312,
+      "compositor": "egui-glow",
+      "profile": {
+        "profile": "electronicInk",
+        "storedLayout": "continuous",
+        "storedMode": "document",
+        "storedTheme": "ivory",
+        "effectiveLayout": "single",
+        "effectiveMode": "document",
+        "effectiveTheme": "light",
+        "navigationLayout": "Single",
+        "flatPages": true
+      },
+      "reference": null,
+      "returnStage": 0,
+      "emptyPagePaints": 0,
+      "imageSha256": "94D3069CA72BCA9674CF8B917B10BD0BC0300F60AD43F8162BDDEEC8DC253573",
+      "controlsSha256": "6459EE14B50C4C9CBDFCEDC781F4162BD2623CA8D29C03BE792560495BB96AA5",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25
+    },
+    {
+      "name": "eink-return-standard",
+      "exitCode": 0,
+      "processId": 23192,
+      "compositor": "native-wgpu",
+      "profile": {
+        "profile": "standard",
+        "storedLayout": "continuous",
+        "storedMode": "document",
+        "storedTheme": "ivory",
+        "effectiveLayout": "continuous",
+        "effectiveMode": "document",
+        "effectiveTheme": "ivory",
+        "navigationLayout": "Continuous",
+        "flatPages": false
+      },
+      "reference": null,
+      "returnStage": 2,
+      "emptyPagePaints": 0,
+      "imageSha256": "2542B8DFC163AD208B86B9915BE943AD72D21B2A85B31769E8629CD77C7C10EB",
+      "controlsSha256": "2EA876CD54E588818BBF5D1C0612FF59C400736D9134408B8C3E1514F8AC841A",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25
+    },
+    {
+      "name": "eink-settings-small",
+      "exitCode": 0,
+      "processId": 21148,
+      "compositor": "native-wgpu",
+      "profile": {
+        "profile": "electronicInk",
+        "storedLayout": null,
+        "storedMode": null,
+        "storedTheme": null,
+        "effectiveLayout": null,
+        "effectiveMode": null,
+        "effectiveTheme": null,
+        "navigationLayout": null,
+        "flatPages": false
+      },
+      "reference": null,
+      "returnStage": 0,
+      "emptyPagePaints": 0,
+      "imageSha256": "B632C3187AE0B09DB5C4D3BFE5EFA8EBC4EA8999CC8CD4C407876A7CC753F601",
+      "controlsSha256": "50C21AB694C7648725D0EE25EF56FFB6E67E3A69BEC091C00621A127EAF85CB2",
+      "viewport": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "pixelsPerPoint": 2.5
+    }
+  ],
+  "scope": "Native synthetic profile presentation, canonical navigation, saved-setting preservation and compact control bounds; no physical display or full interaction/performance certification",
+  "inputProbe": {
+    "exitCode": 0,
+    "sha256": "27f800c56ecf8f6cf690d5dff3aa600b1524d15825447b0b8ebbcb8ad7c8f204",
+    "result": {
+      "synthetic": true,
+      "standardWheel": [
+        [
+          0.0,
+          -12.748315811157227,
+          1.0
+        ],
+        [
+          0.0,
+          -8.68532657623291,
+          1.0
+        ],
+        [
+          0.0,
+          -5.9172444343566895,
+          1.0
+        ]
+      ],
+      "immediateWheel": [
+        [
+          0.0,
+          -40.0,
+          1.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "shiftWheelImmediate": true,
+      "controlZoomImmediate": true,
+      "standardDragOffsets": [
+        0.0,
+        0.0,
+        0.0,
+        50.0,
+        100.0,
+        133.05555725097656,
+        165.83334350585938
+      ],
+      "nonKineticDragOffsets": [
+        0.0,
+        0.0,
+        0.0,
+        50.0,
+        100.0,
+        100.0,
+        100.0
+      ]
+    }
+  }
+}

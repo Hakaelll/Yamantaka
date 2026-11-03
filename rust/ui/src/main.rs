@@ -8,6 +8,7 @@ mod idle_probe;
 mod legacy_import_worker;
 mod managed_pages;
 mod page_presenter;
+mod profile_input_probe;
 mod restore_worker;
 mod rule_simulation_fixture;
 mod selection_repair_probe;
@@ -92,6 +93,13 @@ fn main() -> std::process::ExitCode {
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.iter().any(|arg| arg == "--demo") {
+        if let Some(path) = args
+            .iter()
+            .filter_map(|arg| arg.to_str())
+            .find_map(|arg| arg.strip_prefix("--verify-reader-profile-input="))
+        {
+            return profile_input_probe::verify(std::path::Path::new(path));
+        }
         if let Some(path) = args
             .iter()
             .filter_map(|a| a.to_str())
@@ -1057,6 +1065,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if args.iter().any(|arg| arg == "--reduce-motion") {
             prefs.rust.insert("reduceMotion".into(), true.into());
         }
+        if args.iter().any(|arg| arg == "--electronic-ink") {
+            prefs
+                .rust
+                .insert("visualProfile".into(), "electronicInk".into());
+        }
         if let Some(scale) = args
             .iter()
             .find_map(|arg| {
@@ -1275,6 +1288,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.idle_probe = Some(idle_probe::Probe::new(
                     args.iter().any(|arg| arg == "--idle-positive-control"),
                 ));
+            }
+            if args.iter().any(|arg| arg == "--eink-return-standard") {
+                app.preview_profile_return();
             }
             if preview_device_fault && let Some(state) = &cc.wgpu_render_state {
                 app.preview_graphics_loss(state.device.clone());
@@ -1617,6 +1633,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--privacy") {
                     app.preview_privacy(&cc.egui_ctx);
+                }
+                if args.iter().any(|arg| arg == "--accessibility") {
+                    app.preview_accessibility(&cc.egui_ctx);
                 }
                 if args.iter().any(|arg| arg == "--quarantine") {
                     app.preview_quarantine(

@@ -24,6 +24,9 @@ impl YamantakaApp {
     }
 
     pub(super) fn reader_canvas(&self, palette: Palette) -> Color32 {
+        if self.electronic_ink() {
+            return Color32::WHITE;
+        }
         self.reader
             .reader_preferences
             .as_ref()

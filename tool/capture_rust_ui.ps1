@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='eink-standard-reader'; args=@('--reader','--continuous') },
+    @{ name='eink-continuous-reader'; args=@('--reader','--continuous','--electronic-ink') },
+    @{ name='eink-book-reader'; args=@('--reader','--facing','--book-mode','--electronic-ink','--es') },
+    @{ name='eink-reference'; args=@('--reader','--reference','--reference-book','--electronic-ink') },
+    @{ name='eink-glow'; args=@('--reader','--continuous','--electronic-ink','--software') },
+    @{ name='eink-return-standard'; args=@('--reader','--continuous','--electronic-ink','--eink-return-standard') },
+    @{ name='eink-settings-small'; args=@('--settings','--accessibility','--electronic-ink','--size=640x480','--text-scale=2') },
     @{ name='idle-library-wgpu'; args=@('--pdf-covers','--verify-idle') },
     @{ name='idle-reader-wgpu'; args=@('--reader','--verify-idle') },
     @{ name='idle-control-wgpu'; args=@('--pdf-covers','--verify-idle','--idle-positive-control') },
@@ -1272,6 +1279,25 @@ foreach ($case in $cases) {
             $visibleLabels = if ($case.args -contains '--es') { @('Ver libros','Acciones de colección') } else { @('View books','Collection actions') }
         }
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $visibleLabels
+    }
+    if ($case.args -contains '--eink-return-standard') {
+        $profile=$controls.readerVisualProfile
+        if ($controls.readerVisualProfileReturn -ne 2 -or $profile.profile -ne 'standard' -or $profile.storedLayout -ne 'continuous' -or $profile.effectiveLayout -ne 'continuous' -or $profile.navigationLayout -ne 'Continuous' -or $profile.flatPages) { throw 'Leaving electronic ink did not restore saved document settings.' }
+    } elseif ($case.args -contains '--electronic-ink') {
+        $profile=$controls.readerVisualProfile
+        if ($profile.profile -ne 'electronicInk') { throw 'Electronic-ink setting was not loaded.' }
+        if ($case.args -contains '--reader') {
+            if ($profile.effectiveLayout -ne 'single' -or $profile.effectiveMode -ne 'document' -or $profile.effectiveTheme -ne 'light' -or $profile.navigationLayout -ne 'Single' -or -not $profile.flatPages) { throw 'Electronic ink did not use canonical single-page navigation and flat light pages.' }
+            if ($case.args -contains '--continuous' -and $profile.storedLayout -ne 'continuous') { throw 'Electronic ink replaced saved document layout.' }
+            if ($case.args -contains '--book-mode' -and ($profile.storedMode -ne 'book' -or $profile.storedLayout -ne 'facing')) { throw 'Electronic ink replaced saved book preferences.' }
+        }
+        if ($case.args -contains '--reference') {
+            $reference=$controls.referenceVisualProfile
+            if ($reference.profile -ne 'electronicInk' -or $reference.navigationLayout -ne 'Single' -or -not $reference.flatPages) { throw 'Comparison did not inherit electronic ink.' }
+        }
+        if ($case.name -eq 'eink-settings-small') {
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Electronic ink')
+        }
     }
     if ($case.args -contains '--verify-idle') {
         $idle = $controls.idleObservation

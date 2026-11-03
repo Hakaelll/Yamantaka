@@ -43,7 +43,7 @@ impl YamantakaApp {
         self.apply_reader_destination(viewport_size);
         let (Some(layout), Some(preferences), Some(navigation)) = (
             self.reader.viewport.layout.clone(),
-            self.reader.reader_preferences.clone(),
+            self.reader.effective_preferences(),
             self.reader.navigation.as_ref(),
         ) else {
             ui.painter()
@@ -54,6 +54,8 @@ impl YamantakaApp {
         ui.painter()
             .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
         let mut scrolling = egui::ScrollArea::both()
+            .animated(!self.reduced_motion && !self.electronic_ink())
+            .kinetic_scrolling(!self.electronic_ink())
             .id_salt(("pdf-viewport", &document.id))
             .max_height(viewport.y.max(1.0))
             .min_scrolled_height(0.0)
@@ -66,7 +68,12 @@ impl YamantakaApp {
                 f64::from(self.reader.zoom),
             ) {
                 Ok([x, y]) => {
-                    let y = self.reader.restoration.scroll.take().unwrap_or(y);
+                    let restored = self.reader.restoration.scroll.take();
+                    let y = if self.electronic_ink() {
+                        y
+                    } else {
+                        restored.unwrap_or(y)
+                    };
                     scrolling = scrolling.scroll_offset(egui::vec2(x as f32, y as f32));
                 }
                 Err(error) => {

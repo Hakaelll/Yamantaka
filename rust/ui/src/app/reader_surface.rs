@@ -1,6 +1,7 @@
 use super::*;
 
 pub(super) struct ReaderSurface {
+    pub flat_pages: bool,
     pub prefetch: page_prefetch::State,
     pub empty_paints: u64,
     pub paint_count: u64,
@@ -18,6 +19,7 @@ pub(super) struct ReaderSurface {
 impl Default for ReaderSurface {
     fn default() -> Self {
         Self {
+            flat_pages: false,
             prefetch: Default::default(),
             empty_paints: 0,
             paint_count: 0,
@@ -133,10 +135,12 @@ impl ReaderSurface {
         response.widget_info(|| {
             egui::WidgetInfo::labeled(egui::WidgetType::Image, ui.is_enabled(), &label)
         });
-        if !matches!(
-            preferences.reading_theme,
-            ReaderTheme::Dark | ReaderTheme::Black
-        ) {
+        if !self.flat_pages
+            && !matches!(
+                preferences.reading_theme,
+                ReaderTheme::Dark | ReaderTheme::Black
+            )
+        {
             ui.painter().add(
                 egui::epaint::Shadow {
                     offset: [0, 3],

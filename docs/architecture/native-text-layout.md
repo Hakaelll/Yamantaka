@@ -19,6 +19,8 @@ Both crates retain their original MIT and Apache license texts. Their normalized
 
 The Windows packaging inventory hashes the patched Rust sources, manifests and license files. The public-checkpoint guard permits the publisher's email only in the two exact upstream MIT license blobs, preserving attribution without accepting arbitrary personal data.
 
+The egui override also provides opt-in immediate wheel completion and a kinetic-scroll switch for the [electronic-ink reader profile](../user-guide/reader-profiles.md). Default wheel smoothing and drag inertia remain enabled. These input additions are local Yamantaka changes, with native positive-control evidence in the profile validation report.
+
 Replace these patches when a stable compatible upstream version passes the same native cursor, copying, mixed-script, wrapping and Latin rendering checks. Do not remove logical character mapping or replace it with reordered stored strings.
 
 The [native validation record](../validation/rust-bidirectional-text-2026-11-03.md) defines the executed scope. Full Unicode conformance, IME interaction, physical Narrator and wider script/font coverage remain separate acceptance work.

@@ -51,6 +51,7 @@ mod reader_controls;
 mod reader_destination;
 mod reader_options;
 mod reader_pane;
+mod reader_profile;
 mod reader_surface;
 mod reader_viewport;
 mod reading_queue;
@@ -295,6 +296,7 @@ pub struct YamantakaApp {
     preview_list_focus: bool,
     preview_reader_options: bool,
     reader_options_section: usize,
+    reader_profile_preview: u8,
 }
 impl YamantakaApp {
     #[allow(clippy::too_many_arguments)]
@@ -384,13 +386,15 @@ impl YamantakaApp {
             .unwrap_or(false);
         let shortcut_bindings =
             shortcuts::bindings::Bindings::load(preferences.get("shortcutOverrides"));
+        let mut reader = reader_pane::ReaderPane::default();
+        reader.visual_profile = reader_profile::VisualProfile::load(&preferences);
         let mut app = Self {
             startup_mode,
             safe_notice: startup_mode.is_safe(),
             startup_repair: Default::default(),
             window_state: None,
             quarantine: Default::default(),
-            reader: Default::default(),
+            reader,
             reading_focus: Default::default(),
             reference_shortcuts_preview: Default::default(),
             reference: None,
@@ -567,6 +571,7 @@ impl YamantakaApp {
             preview_list_focus: false,
             preview_reader_options: false,
             reader_options_section: 0,
+            reader_profile_preview: 0,
         };
         app.check_tag_filters();
         app.check_collection_filter();
@@ -1318,7 +1323,15 @@ impl YamantakaApp {
         }
     }
     fn reader(&mut self, ui: &mut egui::Ui) {
-        let p = Palette::new(self.dark);
+        let p = Palette::new(self.dark && !self.electronic_ink());
+        if self.electronic_ink() {
+            ui.painter()
+                .rect_filled(ui.available_rect_before_wrap(), 0, Color32::WHITE);
+            *ui.visuals_mut() = egui::Visuals::light();
+            ui.visuals_mut().override_text_color = Some(p.ink);
+            ui.visuals_mut().dark_mode = false;
+            ui.style_mut().animation_time = 0.0;
+        }
         let Some((document, info)) = self.reader.active.clone() else {
             ui.label(self.tr(
                 "Elige un documento en la biblioteca.",
@@ -1364,6 +1377,7 @@ impl YamantakaApp {
         } else {
             self.reader_viewport(ui, &document, p);
         }
+        self.advance_profile_return();
         self.cache_reading_context();
     }
 }
@@ -2176,6 +2190,9 @@ impl App for YamantakaApp {
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut Frame) {
+        if self.electronic_ink() && matches!(self.surface, Surface::Reader) {
+            ui.ctx().input_mut(|input| input.finish_scroll_smoothing());
+        }
         if self.graphics_recovery.faulted() {
             return;
         }
@@ -2545,6 +2562,7 @@ impl App for YamantakaApp {
                     && self.preview_device_loss.is_none()
                     && matches!(self.nearby_turn_preview, 0 | 3)
                     && self.reader.viewport.refinements_settled()
+                    && self.reader_profile_preview != 1
                     && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.refinements_settled())
                     && self.reader.viewport.prefetch.settled()
                     && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.prefetch.settled())
@@ -2743,6 +2761,9 @@ impl App for YamantakaApp {
                         "memoryScope":"Tracked PDF buffers, extracted-text geometry and selected-text payloads, page/thumbnail/PDF-cover GPU payloads, wgpu staging and Glow image copies. egui text layout, UI/font textures and opaque driver allocations are not covered."});
                     record["selectionAdmission"]=self.selection_admission_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["idleObservation"] = self.idle_probe.as_ref().map(|probe|probe.summary()).unwrap_or_default();
+                    record["readerVisualProfile"] = self.reader.profile_summary();
+                    record["readerVisualProfileReturn"] = self.reader_profile_preview.into();
+                    record["referenceVisualProfile"] = self.reference.as_ref().map(|reference|reference.pane.profile_summary()).unwrap_or_default();
                     record["bulkOrganization"]=self.bulk_organization_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["bulkTargetPicker"]=self.bulk_picker_summary();
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();

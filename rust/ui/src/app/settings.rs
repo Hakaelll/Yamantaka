@@ -3,6 +3,15 @@ use super::*;
 const CATEGORY_KEY: &str = "settings-category";
 
 impl YamantakaApp {
+    pub fn preview_accessibility(&mut self, ctx: &egui::Context) {
+        if self.demo && self.capture.is_some() {
+            ctx.data_mut(|data| {
+                data.insert_temp(egui::Id::new(CATEGORY_KEY), 1_usize);
+                data.insert_temp(egui::Id::new("preview-reader-profile-settings"), true);
+            });
+            self.show_surface(Surface::Settings);
+        }
+    }
     pub(super) fn preview_storage(&mut self, ctx: &egui::Context) {
         ctx.data_mut(|data| data.insert_temp(egui::Id::new(CATEGORY_KEY), 4_usize));
         self.show_surface(Surface::Settings);
@@ -306,6 +315,7 @@ impl YamantakaApp {
                     "Mantiene los libros y las transiciones quietos, con la selección y el foco visibles.",
                     "Keeps books and transitions still, with selection and focus visible.",
                 ), p);
+                changed |= self.reader_profile_settings(ui, p);
             }
             2 => {
                 if !cramped {
