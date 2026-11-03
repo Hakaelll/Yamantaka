@@ -2,6 +2,8 @@
 
 The primary reader now prepares its saved preferences and a bounded preview of the requested opening page before replacing the current reading. Previously native open completion retired the earlier page surface before either result arrived. A native baseline reproduced adoption without an image and two empty-page paint calls during a synthetic reading switch.
 
+The original capture-only probe could complete before the new viewport painted. Its counts below are historical and do not prove completed-frame coverage. The [corrected post-paint check](rust-opening-spreads-2026-11-03.md) reconfirmed the single-page result, exposed the missing facing companion, and records its subsequent fix.
+
 ## Preparation and ownership
 
 One candidate belongs to the exact pending open request. Preferences use the existing repository actor; preview rendering uses the existing serialized PDF worker at visible priority. Its whole-page raster is at most 768 pixels per side and uses a share of the existing page-memory budget, capped at 2 MiB. No new worker, disk cache, or persistent format is introduced.

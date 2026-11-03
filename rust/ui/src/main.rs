@@ -340,6 +340,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let encoded = path.to_string_lossy().replace('\'', "''");
             db.execute_batch(&format!("UPDATE documents SET path='{encoded}',normalized_path='{encoded}',title_override='Retained title',author_override='Retained author',is_favorite=1 WHERE id='demo-0'; INSERT INTO document_covers(document_id,source_page_index,small_thumbnail_path,large_thumbnail_path,generated_at,source_modified_at,confidence,selection_mode,algorithm_version,crop_mode,page_aspect_ratio) VALUES('demo-0',1,'','','synthetic-choice','{modified}',1,'manual',1,'contain',0.75);"))?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--opening-spread") {
+            let mut preferences =
+                yamantaka_domain::reader_preferences::ReaderPreferences::new("demo-1");
+            preferences.view_mode = yamantaka_domain::reader_preferences::ReaderMode::Book;
+            preferences.page_layout = yamantaka_domain::PageLayout::Spread;
+            preferences.cover_policy = yamantaka_domain::reader_preferences::CoverPolicy::NoCover;
+            preferences.initial_side = yamantaka_domain::reader_preferences::InitialSide::Left;
+            db.save_reader_preferences("demo-1", &preferences)?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--opening-distinct-pdf") {
             let path = crate::qa_ui_root()
                 .join("../../build/rust-fixtures/covers/cover-1.pdf")
@@ -773,7 +782,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 &yamantaka_domain::Cancellation::default(),
             )?;
         }
-        (db, Preferences::default(), store)
+        let mut demo_preferences = Preferences::default();
+        if capture.is_some() && args.iter().any(|arg| arg == "--opening-rtl") {
+            demo_preferences
+                .rust
+                .insert("readingDirection".into(), serde_json::json!("rightToLeft"));
+        }
+        (db, demo_preferences, store)
     } else {
         let active_store = yamantaka_storage::managed_imports::recover_and_select(&paths.store)?;
         std::fs::create_dir_all(&active_store)?;

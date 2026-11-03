@@ -14,6 +14,9 @@ impl YamantakaApp {
         let mut model = DocumentTabs::default();
         for (index, document) in self.documents.iter().take(3).enumerate() {
             let mut preferences = ReaderPreferences::new(&document.id);
+            if index == 2 {
+                preferences.view_mode = yamantaka_domain::reader_preferences::ReaderMode::Book;
+            }
             preferences.zoom_mode = ZoomMode::Custom;
             preferences.zoom_level = 1.25;
             preferences.reading_theme = ReaderTheme::Sepia;
@@ -185,6 +188,14 @@ impl YamantakaApp {
                 && !self.reader.reader_preferences_loading =>
             {
                 assert_eq!(self.reader_panel_width, 360.0);
+                assert_eq!(
+                    self.reader.reader_preferences.as_ref().unwrap().view_mode,
+                    yamantaka_domain::reader_preferences::ReaderMode::Book
+                );
+                assert_eq!(
+                    self.opening.summary()["firstRaster"]["preparedPages"],
+                    serde_json::json!([0, 1])
+                );
                 assert_eq!(
                     self.library_columns,
                     ["document", "status", "future-column"]

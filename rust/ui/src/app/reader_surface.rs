@@ -3,6 +3,7 @@ use super::*;
 pub(super) struct ReaderSurface {
     pub prefetch: page_prefetch::State,
     pub empty_paints: u64,
+    pub paint_count: u64,
     pub regions_enabled: bool,
     pub scale: f32,
     pub pages: HashMap<u32, ReaderPage>,
@@ -19,6 +20,7 @@ impl Default for ReaderSurface {
         Self {
             prefetch: Default::default(),
             empty_paints: 0,
+            paint_count: 0,
             regions_enabled: false,
             scale: 1.0,
             pages: HashMap::new(),
@@ -47,6 +49,7 @@ impl ReaderSurface {
         runtime: &Runtime,
         paint: PagePaint<'_>,
     ) -> yamantaka_domain::Result<Option<RenderKey>> {
+        self.paint_count += 1;
         let PagePaint {
             key,
             paper,

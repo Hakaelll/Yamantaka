@@ -9,8 +9,7 @@ impl YamantakaApp {
             cancel,
             preferences,
             context,
-            mut key,
-            image,
+            previews,
         } = prepared;
         let editing =
             self.reader.annotations.editing() && self.opening.matches(&document.id, &cancel);
@@ -99,18 +98,24 @@ impl YamantakaApp {
                 .arm(id, self.reader.reader_preferences_cancel.clone(), context);
         }
         self.load_reader_preferences(preferences);
-        key.generation = self.reader.viewport.generation;
-        self.reader.viewport.pages.insert(
-            key.page,
-            ReaderPage {
-                requested: None,
-                cancel: Cancellation::default(),
-                image: Some(image),
-                image_key: Some(key),
-                plan: Default::default(),
-                refinement: Default::default(),
-            },
-        );
+        self.opening
+            .first_raster_probe
+            .begin_adoption(self.reader.viewport.paint_count);
+        for (mut key, image) in previews {
+            self.opening.first_raster_probe.record_prepared(key.page);
+            key.generation = self.reader.viewport.generation;
+            self.reader.viewport.pages.insert(
+                key.page,
+                ReaderPage {
+                    requested: None,
+                    cancel: Cancellation::default(),
+                    image: Some(image),
+                    image_key: Some(key),
+                    plan: Default::default(),
+                    refinement: Default::default(),
+                },
+            );
+        }
         if reveal_reader {
             self.show_surface(Surface::Reader);
         }

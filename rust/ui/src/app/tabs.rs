@@ -66,6 +66,22 @@ impl TabState {
             })
             .map(|p| p.target.clone())
     }
+    pub(super) fn opening_preferences(
+        &self,
+        document: &str,
+        token: &Cancellation,
+    ) -> Option<ReaderPreferences> {
+        self.pending
+            .as_ref()
+            .filter(|pending| {
+                pending.target.document() == document
+                    && pending
+                        .opening
+                        .as_ref()
+                        .is_some_and(|opening| opening.same_request(token))
+            })
+            .map(|pending| pending.target.preferences().clone())
+    }
     pub(super) fn bind_open(&mut self, token: Cancellation) {
         if let Some(pending) = &mut self.pending {
             pending.opening = Some(token);

@@ -1643,7 +1643,7 @@ impl App for YamantakaApp {
                         }
                         continue;
                     }
-                    self.begin_open_preparation(ctx, document, info, cancel);
+                    self.begin_open_preparation(document, info, cancel);
                 }
                 Update::DocumentMatches(id, batch, cancel) => {
                     if let Some(reference) = self

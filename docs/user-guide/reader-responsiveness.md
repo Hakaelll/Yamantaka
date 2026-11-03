@@ -10,9 +10,9 @@ This is one part of reader responsiveness. Complex native rasters, pages outside
 
 ## Opening a reading
 
-When you open another document in the primary reader, the current reading stays available while its replacement obtains preferences and a preview of the requested page. The switch occurs after that preview can be displayed. If preparation fails, the current reading is retained so you can try opening the other document again. Original PDFs remain unchanged.
+When you open another document in the primary reader, the current reading stays available while its replacement obtains preferences and a preview of the requested page. In a facing view, both pages of the opening spread are prepared before the switch. Cover pairing and reading direction follow the saved reading context. If preparation fails, the current reading is retained so you can try opening the other document again. Original PDFs remain unchanged.
 
-This preparation covers the requested opening page. Complete facing-page, continuous-layout, and reference-replacement acceptance remains pending. [Opening verification](../validation/rust-first-raster-opening-2026-11-03.md) records the exercised cases.
+Single-page and facing openings have native checks, including a failed companion and retry. Continuous opening still prepares only its requested page; complete initial-viewport and reference-replacement acceptance remain pending. [Facing opening verification](../validation/rust-opening-spreads-2026-11-03.md) records the corrected post-paint evidence. [Opening verification](../validation/rust-first-raster-opening-2026-11-03.md) records the exercised cases.
 
 ## High zoom
 

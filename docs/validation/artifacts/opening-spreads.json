@@ -1,0 +1,175 @@
+{
+  "cases": [
+    {
+      "case": "single-probe-corrected",
+      "executableSha256": "71afc3e01d6a976de19b3bc1c80f7cbc8431139c8ca439c82ee887c4c80036a0",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0
+        ],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 16837368
+    },
+    {
+      "case": "spread-before-corrected",
+      "executableSha256": "71afc3e01d6a976de19b3bc1c80f7cbc8431139c8ca439c82ee887c4c80036a0",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0
+        ],
+        "emptyPagePaints": 7
+      },
+      "trackedPageBytes": 20115880
+    },
+    {
+      "case": "spread-after",
+      "executableSha256": "c6ffc939ffbb725139983777dcc7726f6a2600ae41ef420e6004fe29f4c3b6e4",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0,
+          1
+        ],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 18671440
+    },
+    {
+      "case": "rtl-small",
+      "executableSha256": "6dc5533e9e9803cdd292e4bae087d652625bd25204d2e44238e2653ad692615d",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0,
+          1
+        ],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 5239596
+    },
+    {
+      "case": "failure-glow-final",
+      "executableSha256": "6dc5533e9e9803cdd292e4bae087d652625bd25204d2e44238e2653ad692615d",
+      "compositor": "egui-glow",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": true,
+        "targetPage": 1,
+        "preparedPages": [
+          1,
+          0
+        ],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 19927112
+    },
+    {
+      "case": "workspace-book",
+      "executableSha256": "6dc5533e9e9803cdd292e4bae087d652625bd25204d2e44238e2653ad692615d",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 0,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0,
+          1
+        ],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 36830064
+    },
+    {
+      "case": "rotation",
+      "executableSha256": "6dc5533e9e9803cdd292e4bae087d652625bd25204d2e44238e2653ad692615d",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 0,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0
+        ],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 26348820
+    },
+    {
+      "case": "region-rotation",
+      "executableSha256": "6dc5533e9e9803cdd292e4bae087d652625bd25204d2e44238e2653ad692615d",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 0,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0
+        ],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 34666080
+    },
+    {
+      "case": "region-before",
+      "executableSha256": "71afc3e01d6a976de19b3bc1c80f7cbc8431139c8ca439c82ee887c4c80036a0",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 0,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 8847360
+    },
+    {
+      "case": "region-after",
+      "executableSha256": "6dc5533e9e9803cdd292e4bae087d652625bd25204d2e44238e2653ad692615d",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 0,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0
+        ],
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 7077888
+    }
+  ],
+  "postAdoptionPaintRevisionRequired": true,
+  "rotatedCropFinalPixelsIdentical": true,
+  "rotatedIntermediateWholePageRequestRemoved": true,
+  "generatedPdfsUnchanged": 39,
+  "nativeDebugBuildPassed": true,
+  "workspaceClippyAllTargetsWarningsDenied": true,
+  "newStandaloneRustTests": 0,
+  "dependenciesAdded": false,
+  "continuousOpeningFrameComplete": false
+}

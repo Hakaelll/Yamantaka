@@ -8,11 +8,20 @@ pub(super) struct Probe {
     expect_failure: bool,
     failure_seen: bool,
     target_page: u32,
+    prepared_pages: Vec<u32>,
+    adoption_paints: u64,
     adopted_without_image: bool,
     empty_before: u64,
     empty_after: u64,
 }
 impl Probe {
+    pub(super) fn begin_adoption(&mut self, paints: u64) {
+        self.prepared_pages.clear();
+        self.adoption_paints = paints;
+    }
+    pub(super) fn record_prepared(&mut self, page: u32) {
+        self.prepared_pages.push(page);
+    }
     pub(super) fn inject_failure(&mut self, document: &str) -> bool {
         if self.stage == 2 && document == "demo-1" {
             std::mem::take(&mut self.fail_once)
@@ -24,7 +33,7 @@ impl Probe {
         matches!(self.stage, 0 | 3)
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"stage":self.stage,"adoptedWithoutImage":self.adopted_without_image,"failureSeen":self.failure_seen,"targetPage":self.target_page,"emptyPagePaints":self.empty_after.saturating_sub(self.empty_before)})
+        serde_json::json!({"stage":self.stage,"adoptedWithoutImage":self.adopted_without_image,"failureSeen":self.failure_seen,"targetPage":self.target_page,"preparedPages":self.prepared_pages,"emptyPagePaints":self.empty_after.saturating_sub(self.empty_before)})
     }
 }
 impl YamantakaApp {
@@ -83,13 +92,17 @@ impl YamantakaApp {
                 let probe = &mut self.opening.first_raster_probe;
                 probe.adopted_without_image |= !image;
                 if image
+                    && self.reader.viewport.paint_count > probe.adoption_paints
                     && !self.reader.loading
                     && self.reader.reader_preferences.is_some()
                     && !self.opening.busy()
                 {
                     let probe = &mut self.opening.first_raster_probe;
                     probe.empty_after = self.reader.viewport.empty_paints;
-                    assert_eq!(probe.adopted_without_image, probe.expect_empty);
+                    assert_eq!(
+                        probe.adopted_without_image || probe.empty_after > probe.empty_before,
+                        probe.expect_empty
+                    );
                     if !probe.expect_empty {
                         assert_eq!(probe.empty_before, probe.empty_after);
                     }

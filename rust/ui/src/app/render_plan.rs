@@ -17,7 +17,7 @@ impl RenderPlan {
     pub(super) fn ready(&self, image: Option<&RenderKey>) -> bool {
         self.target
             .as_ref()
-            .is_some_and(|(key, _)| image == Some(key))
+            .is_some_and(|(key, _)| image.is_some_and(|image| matches_display(image, key)))
     }
 
     pub(super) fn next(
@@ -34,7 +34,7 @@ impl RenderPlan {
             request: None,
             wake_after: None,
         };
-        if image == Some(target) || requested == Some(target) {
+        if image.is_some_and(|image| matches_display(image, target)) || requested == Some(target) {
             return decision;
         }
         if image.is_none() {
@@ -88,4 +88,24 @@ pub(super) fn preview_key(target: &RenderKey) -> RenderKey {
         .max(1) as u32;
     }
     preview
+}
+
+fn matches_display(image: &RenderKey, target: &RenderKey) -> bool {
+    if image == target {
+        return true;
+    }
+    if image.document_id != target.document_id
+        || image.page != target.page
+        || image.generation != target.generation
+        || image.region.is_some()
+        || target.region.is_some()
+    {
+        return false;
+    }
+    let [width, height] = if image.rotation % 180 == target.rotation % 180 {
+        [image.physical_width, image.physical_height]
+    } else {
+        [image.physical_height, image.physical_width]
+    };
+    width == target.physical_width && height == target.physical_height
 }
