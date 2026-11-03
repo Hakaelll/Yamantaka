@@ -10,6 +10,7 @@ mod page_presenter;
 mod restore_worker;
 mod rule_simulation_fixture;
 mod startup_recovery;
+mod text_layout_probe;
 mod theme;
 mod window_state;
 use eframe::egui;
@@ -86,6 +87,14 @@ fn main() -> std::process::ExitCode {
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if let Some(path) = args
+        .iter()
+        .filter_map(|arg| arg.to_str())
+        .find_map(|arg| arg.strip_prefix("--verify-text-layout="))
+    {
+        text_layout_probe::verify(std::path::Path::new(path))?;
+        return Ok(());
+    }
     let demo = args.iter().any(|arg| arg == "--demo");
     let settings = args.iter().any(|arg| arg == "--settings");
     let protected = args.iter().any(|arg| arg == "--protected");
@@ -514,6 +523,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .is_some_and(|value| value.starts_with("--bulk-covers="))
         }) {
             db.execute_batch("INSERT INTO document_covers SELECT id,1,'','','2026-10-20','2026-10-08',1,'manual',1,'contain',0.75 FROM documents WHERE id IN ('demo-0','demo-1','demo-2');")?;
+        }
+        if args.iter().any(|arg| arg == "--bidi-demo") {
+            db.execute_batch("UPDATE documents SET title='عدد 123 مرحبا',author='مكتبة شخصية' WHERE id='demo-0'; UPDATE documents SET title='שלום 42 עולם',author='ספרייה אישית' WHERE id='demo-1'; UPDATE documents SET title='Hello שלום world',author='Reading · دراسة' WHERE id='demo-2'; UPDATE documents SET title='Crème brûlée · Ångström',author='Estudio personal' WHERE id='demo-3';")?;
         }
         if args.iter().any(|arg| arg == "--search-exclusions") {
             db.execute_batch("WITH RECURSIVE n(x) AS(VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<164) INSERT INTO documents(id,path,normalized_path,file_name,title,author,page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint) SELECT printf('excluded-%03d',x),path,printf('excluded-%03d',x),'fixture.pdf',printf('Excluded catalogue %03d',x),'Lectura personal',page_count,file_size,file_modified_at,added_at,last_opened_at,fingerprint FROM n JOIN documents ON documents.id='demo-0'; INSERT INTO search_index_state(document_id,fingerprint,status,indexed_pages,updated_at) SELECT id,fingerprint,'excluded',0,'2026-11-03' FROM documents WHERE id LIKE 'excluded-%';")?;

@@ -104,6 +104,7 @@ pub fn install(ctx: &egui::Context, dark: bool) {
 }
 pub fn load_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
+    let mut primary_path = "";
     for path in [
         "C:/Windows/Fonts/SegUIVar.ttf",
         "C:/Windows/Fonts/segoeui.ttf",
@@ -118,7 +119,26 @@ pub fn load_fonts(ctx: &egui::Context) {
                 .get_mut(&FontFamily::Proportional)
                 .unwrap()
                 .insert(0, "Yamantaka UI".into());
+            primary_path = path;
             break;
+        }
+    }
+    for (name, path) in [
+        (
+            "Yamantaka Arabic and Hebrew",
+            "C:/Windows/Fonts/segoeui.ttf",
+        ),
+        ("Yamantaka Symbols", "C:/Windows/Fonts/seguisym.ttf"),
+    ] {
+        if path != primary_path
+            && let Ok(bytes) = std::fs::read(path)
+        {
+            fonts
+                .font_data
+                .insert(name.into(), egui::FontData::from_owned(bytes).into());
+            for family in fonts.families.values_mut() {
+                family.push(name.into());
+            }
         }
     }
     let jacket = if let Ok(bytes) = std::fs::read("C:/Windows/Fonts/segoeuib.ttf") {

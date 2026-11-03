@@ -1,7 +1,7 @@
 [workspace]
 members = ["rust/domain", "rust/application", "rust/storage", "rust/pdf", "rust/windows", "rust/ui"]
 resolver = "2"
-exclude = ["third_party/pdfium-render"]
+exclude = ["third_party/pdfium-render", "third_party/egui", "third_party/epaint"]
 
 [workspace.package]
 version = "0.16.0-alpha.1"
@@ -46,4 +46,6 @@ unsafe_op_in_unsafe_fn = "deny"
 all = "warn"
 
 [patch.crates-io]
+egui = { path = "third_party/egui" }
+epaint = { path = "third_party/epaint" }
 pdfium-render = { path = "third_party/pdfium-render" }

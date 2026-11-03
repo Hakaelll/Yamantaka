@@ -1,0 +1,391 @@
+{
+  "executableSha256": "1b2c6416d59150316f78dbcb0465d02e16c314a8b134f47e3f497ef4ee391951",
+  "originalEguiVersion": "0.36.2",
+  "patchedEguiVersion": "0.36.2",
+  "unicodeBidiVersion": "0.3.18",
+  "baseline": {
+    "samples": [
+      {
+        "text": "שלום 42 עולם",
+        "characters": 12,
+        "glyphs": 18,
+        "endCursor": 18
+      },
+      {
+        "text": "Hello שלום world",
+        "characters": 16,
+        "glyphs": 19,
+        "endCursor": 19
+      },
+      {
+        "text": "abc אבג def",
+        "characters": 11,
+        "glyphs": 13,
+        "endCursor": 13
+      },
+      {
+        "text": "عدد 123 مرحبا",
+        "characters": 13,
+        "glyphs": 19,
+        "endCursor": 19
+      }
+    ],
+    "editorResult": "عدد 123 مرحباx"
+  },
+  "patched": {
+    "samples": [
+      {
+        "text": "Hello, world! fi ffi 123 (x) - ok\tdone",
+        "glyphs": [
+          [
+            "H",
+            0.0,
+            18.458984375
+          ],
+          [
+            "e",
+            18.0,
+            13.5966796875
+          ],
+          [
+            "l",
+            32.0,
+            6.296875
+          ],
+          [
+            "l",
+            38.0,
+            6.296875
+          ],
+          [
+            "o",
+            44.0,
+            15.234375
+          ],
+          [
+            ",",
+            60.0,
+            5.63671875
+          ],
+          [
+            " ",
+            65.0,
+            7.1220703125
+          ],
+          [
+            "w",
+            72.0,
+            18.7890625
+          ],
+          [
+            "o",
+            91.0,
+            15.234375
+          ],
+          [
+            "r",
+            106.0,
+            9.0390625
+          ],
+          [
+            "l",
+            115.0,
+            6.296875
+          ],
+          [
+            "d",
+            122.0,
+            15.310546875
+          ],
+          [
+            "!",
+            137.0,
+            7.388671875
+          ],
+          [
+            " ",
+            144.0,
+            7.1220703125
+          ],
+          [
+            "f",
+            151.0,
+            8.1376953125
+          ],
+          [
+            "i",
+            160.0,
+            6.296875
+          ],
+          [
+            " ",
+            166.0,
+            7.1220703125
+          ],
+          [
+            "f",
+            173.0,
+            8.1376953125
+          ],
+          [
+            "f",
+            181.0,
+            8.1376953125
+          ],
+          [
+            "i",
+            189.0,
+            6.296875
+          ],
+          [
+            " ",
+            196.0,
+            7.1220703125
+          ],
+          [
+            "1",
+            203.0,
+            9.8515625
+          ],
+          [
+            "2",
+            213.0,
+            14.015625
+          ],
+          [
+            "3",
+            227.0,
+            14.015625
+          ],
+          [
+            " ",
+            241.0,
+            7.1220703125
+          ],
+          [
+            "(",
+            248.0,
+            7.845703125
+          ],
+          [
+            "x",
+            256.0,
+            11.93359375
+          ],
+          [
+            ")",
+            267.0,
+            7.845703125
+          ],
+          [
+            " ",
+            275.0,
+            7.1220703125
+          ],
+          [
+            "-",
+            282.0,
+            10.3974609375
+          ],
+          [
+            " ",
+            293.0,
+            7.1220703125
+          ],
+          [
+            "o",
+            300.0,
+            15.234375
+          ],
+          [
+            "k",
+            315.0,
+            12.923828125
+          ],
+          [
+            "\t",
+            328.0,
+            28.48828125
+          ],
+          [
+            "d",
+            357.0,
+            15.310546875
+          ],
+          [
+            "o",
+            372.0,
+            15.234375
+          ],
+          [
+            "n",
+            387.0,
+            14.7138671875
+          ],
+          [
+            "e",
+            402.0,
+            13.5966796875
+          ]
+        ],
+        "size": [
+          415.84375,
+          35.0
+        ]
+      },
+      {
+        "text": "Ångström",
+        "characters": 10,
+        "glyphs": 10
+      },
+      {
+        "text": "ǻ fi ffi",
+        "characters": 8,
+        "glyphs": 8
+      },
+      {
+        "text": "مرحباَ",
+        "characters": 6,
+        "glyphs": 6
+      },
+      {
+        "text": "שלום 42 עולם",
+        "characters": 12,
+        "glyphs": 12,
+        "visualOrder": [
+          11,
+          10,
+          9,
+          8,
+          7,
+          5,
+          6,
+          4,
+          3,
+          2,
+          1,
+          0
+        ],
+        "hitTesting": true
+      },
+      {
+        "text": "Hello שלום world",
+        "characters": 16,
+        "glyphs": 16,
+        "visualOrder": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          9,
+          8,
+          7,
+          6,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ],
+        "hitTesting": true
+      },
+      {
+        "text": "abc אבג def",
+        "characters": 11,
+        "glyphs": 11,
+        "visualOrder": [
+          0,
+          1,
+          2,
+          3,
+          6,
+          5,
+          4,
+          7,
+          8,
+          9,
+          10
+        ],
+        "hitTesting": true
+      },
+      {
+        "text": "عدد 123 مرحبا",
+        "characters": 13,
+        "glyphs": 13,
+        "visualOrder": [
+          12,
+          11,
+          10,
+          9,
+          8,
+          7,
+          4,
+          5,
+          6,
+          3,
+          2,
+          1,
+          0
+        ],
+        "hitTesting": true
+      },
+      {
+        "mixedArabicHebrewPreservesArabicJoining": true
+      },
+      {
+        "wrappedText": "abc אבג   xyz",
+        "trailingWhitespaceUsesParagraphDirection": true
+      },
+      {
+        "wrappedText": "אבג abc   xyz",
+        "trailingWhitespaceUsesParagraphDirection": true
+      }
+    ],
+    "editorAfterLeftThreeAndInsert": "عدد 123 مرxحبا",
+    "copyPreservesLogicalOrder": true
+  },
+  "latinGlyphMetricsIdentical": true,
+  "latinGalleryRgbaBytesIdentical": true,
+  "captures": [
+    {
+      "case": "final-latin",
+      "presenter": "native-wgpu",
+      "size": [
+        1920,
+        1200
+      ]
+    },
+    {
+      "case": "final-dark",
+      "presenter": "native-wgpu",
+      "size": [
+        1920,
+        1200
+      ]
+    },
+    {
+      "case": "final-light",
+      "presenter": "native-wgpu",
+      "size": [
+        1280,
+        1200
+      ]
+    },
+    {
+      "case": "final-glow",
+      "presenter": "egui-glow",
+      "size": [
+        1280,
+        1200
+      ]
+    }
+  ],
+  "originalPdfHashesUnchanged": 39,
+  "applicationUnitTestsAdded": 0,
+  "physicalAccessibilityAcceptance": false,
+  "fullUnicodeConformance": false,
+  "performanceAcceptance": false
+}

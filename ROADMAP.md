@@ -20,8 +20,9 @@ fault acceptance without modifying the original Flutter installation or PDFs.
 
 The library, 3D covers, reader, annotation tools, search, workspaces, comparison,
 organization, and recovery flows are connected in varying scopes. Finish the
-remaining behavior and interaction acceptance recorded in the matrix. Unicode
-bidirectional composition still requires a complete shaping solution and evidence.
+remaining behavior and interaction acceptance recorded in the matrix. Native
+bidirectional composition is connected through pinned text patches. Complete wider
+script, IME and accessibility acceptance.
 
 Keep reading controls compact, preserve book-cover physics, and reuse the approved
 visual system in [DESIGN.md](DESIGN.md). Refine actual rendered states, including

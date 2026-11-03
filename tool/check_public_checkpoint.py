@@ -148,6 +148,9 @@ def audit_blob(name, data):
         findings.add("unexpected binary")
         return findings
     findings.update(text_findings(text))
+    # Preserve the publisher's copyright attribution in these exact public licenses.
+    if name in {"third_party/egui/LICENSE-MIT", "third_party/epaint/LICENSE-MIT"} and hashlib.sha256(data).hexdigest() == "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c":
+        findings.discard("email in file")
     if path.suffix.lower() == ".json":
         try:
             for value in json_strings(json.loads(text)):

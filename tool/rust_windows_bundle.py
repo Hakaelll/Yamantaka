@@ -78,6 +78,10 @@ def json_file(path, value):
 def source_inputs():
     paths = set((ROOT / "rust").rglob("*.rs")) | set((ROOT / "rust").rglob("Cargo.toml"))
     paths.update((ROOT / "third_party/pdfium-render").rglob("*.rs"))
+    for crate in ["egui", "epaint"]:
+        source = ROOT / "third_party" / crate
+        paths.update(source.rglob("*.rs"))
+        paths.update(path for path in source.iterdir() if path.is_file() and path.name in {"Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "YAMANTAKA-PATCH.md"})
     paths.update(ROOT / name for name in [
         "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".gitattributes", "LICENSE",
         "third_party/pdfium-render/Cargo.toml", "windows/runner/resources/app_icon.ico",
@@ -171,6 +175,8 @@ def package(output, portable, cargo):
             component.setdefault("properties",[]).append({"name": "yamantaka:license-status", "value": "not-declared"})
         components.append(component)
         source = Path(item["manifest_path"]).parent
+        if source.is_relative_to(ROOT / "third_party"):
+            component.setdefault("properties", []).append({"name": "yamantaka:source-override", "value": source.relative_to(ROOT).as_posix()})
         workspace = source.is_relative_to(ROOT / "rust")
         candidates = set()
         if not workspace:
@@ -238,7 +244,7 @@ def package(output, portable, cargo):
     json_file(bundle / "SBOM.cdx.json", {"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1, "metadata": {"component": application, "properties": [{"name": "yamantaka:target", "value": TARGET}, {"name": "yamantaka:status", "value": "review-candidate-not-final-release"}]}, "components": [item for item in components if item != application], "dependencies": dependencies})
     require(source_inputs() == sources, "Inputs changed during packaging; rebuild the candidate")
     files = [{"path": path.relative_to(bundle).as_posix(), "sha256": digest(path), "bytes": path.stat().st_size} for path in sorted(bundle.rglob("*")) if path.is_file()]
-    runtime_changes = command(["git", "status", "--porcelain=v1", "--untracked-files=normal", "--", "rust", "third_party/pdfium-render", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "assets/branding", "assets/fonts", "windows/runner/resources/app_icon.ico"])
+    runtime_changes = command(["git", "status", "--porcelain=v1", "--untracked-files=normal", "--", "rust", "third_party/pdfium-render", "third_party/egui", "third_party/epaint", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "assets/branding", "assets/fonts", "windows/runner/resources/app_icon.ico"])
     json_file(output / "package-manifest.json", {"format": "yamantaka-rust-windows-package-v1", "version": version, "target": TARGET, "status": "review-candidate-not-final-release", "portable": portable, "applicationLicense": "MIT", "cargoLockSha256": digest(ROOT / "Cargo.lock"), "baseSourceCommit": command(["git", "rev-parse", "HEAD"]).strip(), "runtimeSourcesModified": bool(runtime_changes.strip()), "sources":sources, "authenticode":"not-verified", "files": files})
     archive = output / ("yamantaka-" + version + "-windows-x64" + ("-portable" if portable else "") + ".zip")
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zipped:
