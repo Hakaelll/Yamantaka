@@ -12,8 +12,9 @@ use windows::{
     Win32::{
         Foundation::HANDLE,
         Storage::FileSystem::{
-            DELETE, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
-            FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ, FILE_SHARE_READ, FILE_SHARE_WRITE,
+            DELETE, FILE_ATTRIBUTE_REPARSE_POINT, FILE_DISPOSITION_INFO,
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ,
+            FILE_SHARE_READ, FILE_SHARE_WRITE, FileDispositionInfo, SetFileInformationByHandle,
         },
         System::IO::IO_STATUS_BLOCK,
     },
@@ -55,6 +56,19 @@ impl RetainedFile {
     }
     pub fn file(&self) -> &File {
         &self.file
+    }
+    pub fn remove(self) -> io::Result<()> {
+        let info = FILE_DISPOSITION_INFO { DeleteFile: true };
+        // Mark only the held file for deletion; dropping its handle completes removal.
+        unsafe {
+            SetFileInformationByHandle(
+                HANDLE(self.file.as_raw_handle()),
+                FileDispositionInfo,
+                (&info as *const FILE_DISPOSITION_INFO).cast(),
+                std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
+            )
+            .map_err(io::Error::other)
+        }
     }
     pub fn retain_as(&self, name: &OsStr) -> io::Result<()> {
         let wide: Vec<_> = name.encode_wide().collect();

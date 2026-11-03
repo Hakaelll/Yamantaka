@@ -14,6 +14,16 @@ If automatic recovery cannot confirm an interrupted library operation, the recov
 
 Leaving this window without confirmation does not resolve the operation. A changed library or journal requires another review. Validation reads independent database and WAL copies; it does not create SQLite sidecars in the original folders. A complete, valid WAL is included in the reviewed counts. Damaged, truncated or stale WAL frames stop this review rather than silently presenting an older main-file view. Retain those files for separate recovery.
 
-This path requires an existing current folder and exactly one pending operation record no larger than 64 KiB. Multiple pending operations, missing folders, unsupported historical schemas and damaged imported-store selection records still need separate recovery. The independent Flutter import supports historical databases. For an unavailable startup marker, see [safe startup and record recovery](safe-startup.md). Without a usable recovery source, exit and retain the files.
+This path requires an existing current folder and exactly one pending operation record no larger than 64 KiB. Multiple pending operations, missing folders and unsupported historical schemas still need separate recovery. The independent Flutter import supports historical databases. For an unavailable startup marker, see [safe startup and record recovery](safe-startup.md). Without a usable recovery source, exit and retain the files.
 
 See the [interrupted-operation checkpoint](../validation/rust-pending-operation-recovery-2026-11-03.md) for the exercised preservation and WAL cases.
+
+## Recover the saved library selection
+
+If the saved selection is damaged, unsupported or points to an unavailable imported store, the recovery window offers **Review original** and **Imported library…**. The original library is the initial native store. Imported libraries are independent captures; Flutter's source files remain separate.
+
+Choose a valid library and review its book, annotation and bookmark counts. **Confirm and close** preserves the old selection record as `yamantaka-selection-preserved-<identity>.json`, then activates the chosen library. Reopen Yamantaka afterwards. This changes the selection record; it does not merge, move or rewrite either library. Leaving without confirmation preserves the current selection and library files.
+
+If confirmation is interrupted, the next startup resumes the recorded choice before opening a library. Keep the pending recovery files until this completes. A changed candidate or selector requires another review. Reviewing the original library does not scan unrelated imported stores.
+
+Candidates need valid native schema-v11 data and preferences; an imported candidate also needs its existing capture/restore receipt. Missing candidates, insufficient folder permissions, a selector larger than 64 KiB or a damaged recovery intent require separate recovery. Historical Flutter databases continue through the independent import workflow. See the [selection-recovery checkpoint](../validation/rust-library-selection-recovery-2026-11-03.md).

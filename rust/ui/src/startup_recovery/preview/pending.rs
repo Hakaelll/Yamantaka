@@ -108,9 +108,8 @@ pub(super) fn run(args: &[OsString], capture: PathBuf) -> Result<(), Box<dyn std
     let previous = files(&old)?;
     let blocked = managed_imports::recover_and_select(&store).unwrap_err();
     assert!(blocked.to_string().contains("requires explicit recovery"));
-    assert_eq!(
-        managed_imports::pending_operation_store(&store)?,
-        Some(store.clone())
+    assert!(
+        matches!(managed_imports::recovery_target(&store)?,Some(managed_imports::RecoveryTarget::PendingOperation(path)) if path==store)
     );
     let token = Cancellation::default();
     let wal = store.join("yamantaka.sqlite3-wal");
@@ -154,6 +153,7 @@ pub(super) fn run(args: &[OsString], capture: PathBuf) -> Result<(), Box<dyn std
         install: mode != "cancel",
     };
     let verification = super::Verification {
+        selection: None,
         capture,
         backup: PathBuf::new(),
         original: Vec::new(),

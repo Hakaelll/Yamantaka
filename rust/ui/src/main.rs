@@ -9,6 +9,7 @@ mod managed_pages;
 mod page_presenter;
 mod restore_worker;
 mod rule_simulation_fixture;
+mod selection_repair_probe;
 mod startup_record_probe;
 mod startup_recovery;
 mod startup_repair_worker;
@@ -89,6 +90,27 @@ fn main() -> std::process::ExitCode {
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.iter().any(|arg| arg == "--demo") {
+        if let Some(path) = args
+            .iter()
+            .filter_map(|a| a.to_str())
+            .find_map(|a| a.strip_prefix("--verify-selection-repair="))
+        {
+            return selection_repair_probe::verify(std::path::Path::new(path));
+        }
+        if let Some(root) = args
+            .iter()
+            .filter_map(|a| a.to_str())
+            .find_map(|a| a.strip_prefix("--selection-repair-kill-root="))
+        {
+            let phase = args
+                .iter()
+                .filter_map(|a| a.to_str())
+                .find_map(|a| a.strip_prefix("--selection-repair-kill-phase="))
+                .ok_or("Missing synthetic kill phase")?;
+            return selection_repair_probe::child(std::path::Path::new(root), phase);
+        }
+    }
     if let Some(path) = args
         .iter()
         .filter_map(|arg| arg.to_str())
@@ -132,7 +154,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if demo
         && args.iter().any(|arg| {
             arg.to_str().is_some_and(|s| {
-                s.starts_with("--startup-recovery=") || s.starts_with("--interrupted-recovery=")
+                s.starts_with("--startup-recovery=")
+                    || s.starts_with("--interrupted-recovery=")
+                    || s.starts_with("--selection-recovery=")
             })
         })
     {
@@ -838,12 +862,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             match yamantaka_storage::managed_imports::recover_and_select(&paths.store) {
                 Ok(store) => store,
                 Err(error) => {
-                    if let Some(store) =
-                        yamantaka_storage::managed_imports::pending_operation_store(&paths.store)?
+                    if let Some(target) =
+                        yamantaka_storage::managed_imports::recovery_target(&paths.store)?
                     {
+                        use yamantaka_storage::managed_imports::RecoveryTarget;
+                        let (store, stage) = match target {
+                            RecoveryTarget::PendingOperation(store) => {
+                                (store, startup_recovery::FailedStage::InterruptedOperation)
+                            }
+                            RecoveryTarget::LibrarySelection(store) => {
+                                (store, startup_recovery::FailedStage::LibrarySelection)
+                            }
+                        };
                         startup_recovery::run(
                             store,
-                            startup_recovery::FailedStage::InterruptedOperation,
+                            stage,
                             args.iter().any(|arg| arg == "--en"),
                             args.iter().any(|arg| arg == "--software"),
                             None,

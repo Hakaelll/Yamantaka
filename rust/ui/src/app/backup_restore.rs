@@ -45,6 +45,7 @@ impl RestoreState {
             Command::Prepare(r) => r.rollback(),
             Command::Review(_) | Command::ReviewExpected { .. } => false,
             Command::ReviewPending { previous, .. } => previous.is_some(),
+            Command::ReviewSelection { .. } => false,
         };
         self.error = None;
         self.open = true;

@@ -12,6 +12,7 @@ pub enum Review {
     Json(RestoreReview),
     Rollback(RollbackReview),
     Pending(Box<backup::pending::Review>),
+    Selection(Box<yamantaka_storage::managed_imports::repair::Review>),
 }
 impl Review {
     pub fn source(&self) -> &Path {
@@ -19,6 +20,7 @@ impl Review {
             Self::Json(r) => r.source(),
             Self::Rollback(r) => r.source(),
             Self::Pending(r) => r.source(),
+            Self::Selection(r) => r.source(),
         }
     }
     pub fn counts(&self) -> &BTreeMap<String, usize> {
@@ -26,12 +28,15 @@ impl Review {
             Self::Json(r) => r.counts(),
             Self::Rollback(r) => r.counts(),
             Self::Pending(r) => r.counts(),
+            Self::Selection(r) => r.counts(),
         }
     }
     pub fn version(&self) -> u64 {
         match self {
             Self::Json(r) => r.version(),
-            Self::Rollback(_) | Self::Pending(_) => yamantaka_domain::SCHEMA_VERSION.into(),
+            Self::Rollback(_) | Self::Pending(_) | Self::Selection(_) => {
+                yamantaka_domain::SCHEMA_VERSION.into()
+            }
         }
     }
     pub fn rollback(&self) -> bool {
@@ -42,6 +47,7 @@ pub enum Prepared {
     Json(Box<RestorePreview>),
     Rollback(RollbackReview),
     Pending(backup::pending::Review),
+    Selection(Box<yamantaka_storage::managed_imports::repair::Review>),
 }
 impl Prepared {
     pub fn install(self, active: &Path, cancel: &Cancellation) -> Result<PathBuf> {
@@ -49,6 +55,9 @@ impl Prepared {
             Self::Json(p) => backup::install_preview(*p, active, cancel),
             Self::Rollback(r) => backup::install_rollback(&r, active, cancel),
             Self::Pending(r) => backup::pending::resolve(&r, active, cancel),
+            Self::Selection(r) => {
+                yamantaka_storage::managed_imports::repair::apply(&r, active, cancel)
+            }
         }
     }
 }
@@ -65,6 +74,10 @@ pub enum Command {
     ReviewPending {
         active: PathBuf,
         previous: Option<PathBuf>,
+    },
+    ReviewSelection {
+        root: PathBuf,
+        source: Option<PathBuf>,
     },
     Prepare(Review),
 }
@@ -108,6 +121,16 @@ impl Job {
                             .map(Review::Pending)
                             .map(Outcome::Reviewed)
                     }
+                    Command::ReviewSelection { root, source } => {
+                        yamantaka_storage::managed_imports::repair::review(
+                            &root,
+                            source.as_deref(),
+                            &token,
+                        )
+                        .map(Box::new)
+                        .map(Review::Selection)
+                        .map(Outcome::Reviewed)
+                    }
                     Command::Prepare(Review::Json(review)) => {
                         backup::prepare_reviewed(&review, &token)
                             .map(|p| Prepared::Json(Box::new(p)))
@@ -120,6 +143,10 @@ impl Job {
                     Command::Prepare(Review::Pending(review)) => {
                         backup::pending::verify(&review, &token)
                             .map(|_| Outcome::Prepared(Box::new(Prepared::Pending(*review))))
+                    }
+                    Command::Prepare(Review::Selection(review)) => {
+                        yamantaka_storage::managed_imports::repair::verify(&review, &token)
+                            .map(|_| Outcome::Prepared(Box::new(Prepared::Selection(review))))
                     }
                 };
                 let _ = sender.send(result);

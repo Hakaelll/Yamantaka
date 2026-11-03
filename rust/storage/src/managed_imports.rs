@@ -10,6 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use yamantaka_domain::{Cancellation, Failure, Result};
+pub mod repair;
 
 #[derive(Serialize, Deserialize)]
 struct Selection {
@@ -113,6 +114,11 @@ fn checked_store(root: &Path, id: &str) -> Result<PathBuf> {
     Ok(store)
 }
 fn save_selection(root: &Path, import: Option<String>) -> Result<()> {
+    if repair::pending(root)? {
+        return Err(Failure::Invalid(
+            "Complete pending library-selection recovery first".into(),
+        ));
+    }
     ordinary(root, true)?;
     let path = root.join("selected-library.json");
     if present(&path)? {
@@ -121,6 +127,11 @@ fn save_selection(root: &Path, import: Option<String>) -> Result<()> {
     atomic_json(&path, &Selection { version: 1, import })
 }
 fn selected(root: &Path) -> Result<Option<String>> {
+    if repair::pending(root)? {
+        return Err(Failure::Invalid(
+            "Complete pending library-selection recovery first".into(),
+        ));
+    }
     let path = root.join("selected-library.json");
     if !present(&path)? {
         return Ok(None);
@@ -128,7 +139,7 @@ fn selected(root: &Path) -> Result<Option<String>> {
     ordinary(root, true)?;
     ordinary(&path, false)?;
     let selection: Selection =
-        serde_json::from_slice(&fs::read(path).map_err(storage)?).map_err(storage)?;
+        serde_json::from_slice(&repair::read_record(&path)?).map_err(storage)?;
     if selection.version != 1 {
         return Err(Failure::Invalid(
             "Unsupported library selection version".into(),
@@ -144,22 +155,36 @@ pub fn active_store(root: &Path) -> Result<PathBuf> {
 }
 /// Resolve managed selection only after interrupted directory swaps have recovered.
 pub fn recover_and_select(root: &Path) -> Result<PathBuf> {
+    repair::recover(root)?;
     crate::backup::recover_interrupted_restore(root)?;
     if let Some(id) = selected(root)? {
         crate::backup::recover_interrupted_restore(&store_path(root, &id)?)?;
     }
     active_store(root)
 }
-/// Locate a blocked operation without opening or switching a library.
-pub fn pending_operation_store(root: &Path) -> Result<Option<PathBuf>> {
-    if crate::backup::pending::present_for(root)? {
-        return Ok(Some(root.to_owned()));
+pub enum RecoveryTarget {
+    PendingOperation(PathBuf),
+    LibrarySelection(PathBuf),
+}
+/// Locate blocked startup state without opening or switching a library.
+pub fn recovery_target(root: &Path) -> Result<Option<RecoveryTarget>> {
+    if repair::pending(root)? {
+        return Ok(Some(RecoveryTarget::LibrarySelection(root.to_owned())));
     }
-    if let Some(id) = selected(root)? {
-        let store = store_path(root, &id)?;
+    if crate::backup::pending::present_for(root)? {
+        return Ok(Some(RecoveryTarget::PendingOperation(root.to_owned())));
+    }
+    if let Ok(Some(id)) = selected(root) {
+        let store = match store_path(root, &id) {
+            Ok(store) => store,
+            Err(_) => return Ok(Some(RecoveryTarget::LibrarySelection(root.to_owned()))),
+        };
         if crate::backup::pending::present_for(&store)? {
-            return Ok(Some(store));
+            return Ok(Some(RecoveryTarget::PendingOperation(store)));
         }
+    }
+    if present(&root.join("selected-library.json"))? && active_store(root).is_err() {
+        return Ok(Some(RecoveryTarget::LibrarySelection(root.to_owned())));
     }
     Ok(None)
 }

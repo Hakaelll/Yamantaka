@@ -339,3 +339,6 @@ mod wal;
 pub use rollback::{
     RollbackReview, install_rollback, install_rollback_progress, review_rollback, verify_rollback,
 };
+pub(crate) use rollback::{
+    original_selection_tree, tree as store_tree, validate_source as inspect_store,
+};

@@ -53,6 +53,7 @@ struct Tree {
     entries: usize,
     names: usize,
     bytes: u64,
+    omit_managed_imports: bool,
 }
 fn invalid(message: &str) -> Failure {
     Failure::Invalid(message.into())
@@ -81,15 +82,30 @@ pub(super) fn journal_path(active: &Path) -> Result<PathBuf> {
         .ok_or_else(|| invalid("Invalid rollback store"))?;
     Ok(active.with_file_name(format!(".{name}.rollback-journal.json")))
 }
-pub(super) fn tree(path: &Path, cancel: &Cancellation) -> Result<(String, u64)> {
+pub(crate) fn tree(path: &Path, cancel: &Cancellation) -> Result<(String, u64)> {
+    tree_scope(path, cancel, false)
+}
+pub(crate) fn original_selection_tree(path: &Path, cancel: &Cancellation) -> Result<(String, u64)> {
+    tree_scope(path, cancel, true)
+}
+fn tree_scope(
+    path: &Path,
+    cancel: &Cancellation,
+    omit_managed_imports: bool,
+) -> Result<(String, u64)> {
     ordinary(path, true)?;
     let mut state = Tree {
         hash: Sha256::new(),
         entries: 0,
         names: 0,
         bytes: 0,
+        omit_managed_imports,
     };
-    state.hash.update(b"yamantaka-rollback-tree-v1");
+    state.hash.update(if omit_managed_imports {
+        b"yamantaka-selection-original-tree-v1".as_slice()
+    } else {
+        b"yamantaka-rollback-tree-v1".as_slice()
+    });
     visit(path, path, 0, &mut state, cancel)?;
     Ok((format!("{:x}", state.hash.finalize()), state.bytes))
 }
@@ -108,6 +124,9 @@ fn visit(
     for child in fs::read_dir(path).map_err(storage)? {
         cancel.check()?;
         let child = child.map_err(storage)?;
+        if depth == 0 && state.omit_managed_imports && child.file_name() == "imports" {
+            continue;
+        }
         state.entries += 1;
         state.names = state
             .names
@@ -158,7 +177,7 @@ fn visit(
     }
     Ok(())
 }
-pub(super) fn validate_source(
+pub(crate) fn validate_source(
     source: &Path,
     cancel: &Cancellation,
 ) -> Result<BTreeMap<String, usize>> {

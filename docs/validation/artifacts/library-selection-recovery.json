@@ -1,0 +1,78 @@
+{
+  "synthetic": true,
+  "executableSha256": "dc2c22500d7dbc621d8991653ce715b718162c8a2761fcb47a92c75aec7bde88",
+  "storage": {
+    "synthetic": true,
+    "staleRecordRejected": true,
+    "staleLibraryRejected": true,
+    "earlyCancellationPreserved": true,
+    "foreignLibraryRejected": true,
+    "oversizedRecordPreserved": true,
+    "originalRecordPreserved": true,
+    "libraryHashesUnchanged": true,
+    "importedChoiceRestored": true,
+    "processKillsRecovered": [
+      "IntentSaved",
+      "PointerPreserved",
+      "Installed"
+    ],
+    "pendingIntentPreventsDefaultSelection": true,
+    "idempotentRecovery": true
+  },
+  "nativeCases": {
+    "original": {
+      "result": {
+        "synthetic": true,
+        "originalPreserved": true,
+        "installed": true
+      },
+      "imageSha256": "126c105437ebe2de9a79337a6306520b4dbaa0267c11c0776d7ec3877a025450"
+    },
+    "imported": {
+      "result": {
+        "synthetic": true,
+        "originalPreserved": true,
+        "installed": true
+      },
+      "imageSha256": "80a3f41661e7f514b4b6ff5a3e958923f946627193643d304d37f908fdf4d38b"
+    },
+    "cancel": {
+      "result": {
+        "synthetic": true,
+        "originalPreserved": true,
+        "installed": false
+      },
+      "imageSha256": "4ad74dbde895ed3b05d2ffc922eb972382b5b6b2579a16b2650865e316ea50c9"
+    },
+    "json-regression": {
+      "result": {
+        "synthetic": true,
+        "originalPreserved": true,
+        "installed": false
+      },
+      "imageSha256": "f2de66b8645999a3911a0b2637c951ff2cc7644c5530a872e69e96354eefecf3"
+    },
+    "pending-regression": {
+      "result": {
+        "synthetic": true,
+        "originalPreserved": true,
+        "installed": true
+      },
+      "imageSha256": "507208c9600f649aced25484667e667697123a233b4f414b070e2dfbc4c8165d"
+    }
+  },
+  "checks": {
+    "workspaceClippyAllTargetsDenyWarnings": true,
+    "format": true,
+    "normalAndCompactControlsVisible": true,
+    "unselectedImportDoesNotInvalidateOriginalReview": true,
+    "existingJsonAndPendingRecoveryPixelsUnchanged": true
+  },
+  "limits": [
+    "Physical picker, keyboard, Narrator and hardware DPI remain pending",
+    "No power-loss or concurrent-writer certification",
+    "Missing selectors without intents retain initial-store behavior",
+    "Invalid intents, missing candidates and combined failures require separate recovery",
+    "No final replacement Release certification"
+  ]
+}

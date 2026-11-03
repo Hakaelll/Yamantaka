@@ -3,6 +3,7 @@ use super::*;
 use std::{ffi::OsString, time::Duration};
 use yamantaka_domain::{LibraryQuery, LibraryRepository};
 mod pending;
+mod selection;
 
 #[derive(Clone)]
 pub struct Verification {
@@ -15,6 +16,7 @@ pub struct Verification {
     captured: bool,
     scale: f32,
     pending: Option<pending::Verification>,
+    selection: Option<selection::Verification>,
 }
 impl Verification {
     pub fn verify_installed(
@@ -22,6 +24,10 @@ impl Verification {
         store: &Path,
         safety: &Path,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        if let Some(selection) = &self.selection {
+            selection.verify(store, Some(safety))?;
+            return self.result(true);
+        }
         if let Some(pending) = &self.pending {
             pending.verify(store, Some(safety))?;
             return self.result(true);
@@ -37,6 +43,10 @@ impl Verification {
         &self,
         store: &Path,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        if let Some(selection) = &self.selection {
+            selection.verify(store, None)?;
+            return self.result(false);
+        }
         if let Some(pending) = &self.pending {
             pending.verify(store, None)?;
             return self.result(false);
@@ -62,6 +72,12 @@ pub fn run(
     args: &[OsString],
     capture: PathBuf,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    if args.iter().any(|arg| {
+        arg.to_str()
+            .is_some_and(|s| s.starts_with("--selection-recovery="))
+    }) {
+        return selection::run(args, capture);
+    }
     if args.iter().any(|arg| {
         arg.to_str()
             .is_some_and(|s| s.starts_with("--interrupted-recovery="))
@@ -110,6 +126,7 @@ pub fn run(
         },
     )?;
     let verification = Verification {
+        selection: None,
         pending: None,
         capture,
         backup,
@@ -137,7 +154,12 @@ impl Recovery {
     pub(super) fn start_preview(&mut self, ctx: &egui::Context) {
         if let Some(preview) = &self.verification {
             ctx.set_zoom_factor(preview.scale);
-            let command = if let Some(pending) = &preview.pending {
+            let command = if let Some(selection) = &preview.selection {
+                Command::ReviewSelection {
+                    root: self.store.clone(),
+                    source: selection.source.clone(),
+                }
+            } else if let Some(pending) = &preview.pending {
                 Command::ReviewPending {
                     active: self.store.clone(),
                     previous: pending.previous.clone(),
@@ -171,7 +193,10 @@ impl Recovery {
         if !self.failed {
             assert_eq!(
                 self.review.as_ref().unwrap().counts()["documents"],
-                preview.pending.as_ref().map_or(2, |p| p.books)
+                preview.selection.as_ref().map_or_else(
+                    || preview.pending.as_ref().map_or(2, |p| p.books),
+                    |s| s.books
+                )
             );
         }
         if !preview.requested {
