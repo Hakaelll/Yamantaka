@@ -38,6 +38,7 @@ separates the exercised backend from the later presentation change.
 
 Raw scenarios stay local under `build/verification/multiple-pending-records-final`.
 These runs simulate persisted archival boundaries; they do not certify power-loss
-durability. This flow requires an existing current directory and ordinary record
-files. Missing current directories, non-file records, physical accessibility and
-full rewrite acceptance remain open.
+durability. The recorded scenarios cover an existing current directory and ordinary record
+files. [Missing-directory recovery](../architecture/rust-missing-current-recovery.md)
+was implemented afterward and has separate pending acceptance. Non-file records,
+physical accessibility and full rewrite acceptance remain open.

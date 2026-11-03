@@ -15,7 +15,7 @@ use yamantaka_windows::{retained_file::RetainedFile, source_stamp::Stamp};
 #[derive(Clone)]
 pub struct Review {
     active: PathBuf,
-    active_sha: String,
+    active_sha: Option<String>,
     records: Vec<Record>,
     previous: Option<super::RollbackReview>,
     counts: BTreeMap<String, usize>,
@@ -37,6 +37,9 @@ impl Review {
     }
     pub fn previous(&self) -> bool {
         self.previous.is_some()
+    }
+    pub fn current_missing(&self) -> bool {
+        self.active_sha.is_none()
     }
 }
 fn invalid() -> Failure {
@@ -83,8 +86,7 @@ fn digest(file: &RetainedFile, cancel: &Cancellation) -> Result<[u8; 32]> {
 }
 pub fn review(active: &Path, previous: Option<&Path>, cancel: &Cancellation) -> Result<Review> {
     cancel.check()?;
-    ordinary(active, true)?;
-    let active = active.canonicalize().map_err(storage)?;
+    let active = rollback::active_path(active)?;
     ordinary(active.parent().ok_or_else(invalid)?, true)?;
     let paths = records(&active)?;
     if paths.is_empty() {
@@ -103,16 +105,16 @@ pub fn review(active: &Path, previous: Option<&Path>, cancel: &Cancellation) -> 
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    let active_sha = rollback::tree(&active, cancel)?.0;
+    let active_sha = active_snapshot(&active, cancel)?;
     let previous = previous
-        .map(|source| rollback::review_rollback(&active, source, cancel))
+        .map(|source| rollback::review_for_recovery(&active, source, cancel))
         .transpose()?;
     let counts = if let Some(previous) = &previous {
         previous.counts().clone()
     } else {
         rollback::validate_source(&active, cancel)?
     };
-    if rollback::tree(&active, cancel)?.0 != active_sha {
+    if active_snapshot(&active, cancel)? != active_sha {
         return Err(Failure::BackupSourceChanged);
     }
     Ok(Review {
@@ -123,6 +125,13 @@ pub fn review(active: &Path, previous: Option<&Path>, cancel: &Cancellation) -> 
         counts,
     })
 }
+fn active_snapshot(active: &Path, cancel: &Cancellation) -> Result<Option<String>> {
+    if !present(active)? {
+        return Ok(None);
+    }
+    ordinary(active, true)?;
+    Ok(Some(rollback::tree(active, cancel)?.0))
+}
 pub fn verify(review: &Review, cancel: &Cancellation) -> Result<()> {
     cancel.check()?;
     if records(&review.active)?
@@ -131,7 +140,7 @@ pub fn verify(review: &Review, cancel: &Cancellation) -> Result<()> {
             .iter()
             .map(|r| r.path.clone())
             .collect::<Vec<_>>()
-        || rollback::tree(&review.active, cancel)?.0 != review.active_sha
+        || active_snapshot(&review.active, cancel)? != review.active_sha
     {
         return Err(invalid());
     }
@@ -153,7 +162,7 @@ fn check_record(record: &Record, lease: &RetainedFile, cancel: &Cancellation) ->
     Ok(())
 }
 pub fn resolve(review: &Review, active: &Path, cancel: &Cancellation) -> Result<PathBuf> {
-    if active.canonicalize().map_err(storage)? != review.active {
+    if rollback::active_path(active)? != review.active {
         return Err(invalid());
     }
     verify(review, cancel)?;

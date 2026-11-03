@@ -42,6 +42,9 @@ impl Review {
     pub fn rollback(&self) -> bool {
         matches!(self, Self::Rollback(_)) || matches!(self, Self::Pending(r) if r.previous())
     }
+    pub fn current_missing(&self) -> bool {
+        matches!(self,Self::Pending(review) if review.current_missing())
+    }
 }
 pub enum Prepared {
     Json(Box<RestorePreview>),

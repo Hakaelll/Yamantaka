@@ -20,6 +20,7 @@ use yamantaka_domain::{Cancellation, Failure, Result};
 #[derive(Debug, Clone)]
 pub struct RollbackReview {
     active: PathBuf,
+    original_existed: bool,
     source: PathBuf,
     sha256: String,
     counts: BTreeMap<String, usize>,
@@ -47,6 +48,8 @@ struct Journal {
     source: PathBuf,
     safety: PathBuf,
     sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    original_existed: Option<bool>,
 }
 struct Tree {
     hash: Sha256,
@@ -58,7 +61,7 @@ struct Tree {
 fn invalid(message: &str) -> Failure {
     Failure::Invalid(message.into())
 }
-fn active_path(active: &Path) -> Result<PathBuf> {
+pub(super) fn active_path(active: &Path) -> Result<PathBuf> {
     let parent = active
         .parent()
         .ok_or_else(|| invalid("Missing rollback parent"))?;
@@ -233,6 +236,19 @@ pub fn review_rollback(
     cancel.check()?;
     let active = active_path(active)?;
     ordinary(&active, true)?;
+    review_for_recovery(&active, source, cancel)
+}
+pub(super) fn review_for_recovery(
+    active: &Path,
+    source: &Path,
+    cancel: &Cancellation,
+) -> Result<RollbackReview> {
+    cancel.check()?;
+    let active = active_path(active)?;
+    let original_existed = present(&active)?;
+    if original_existed {
+        ordinary(&active, true)?;
+    }
     ordinary(source, true)?;
     let source = source.canonicalize().map_err(storage)?;
     if source == active || source.parent() != active.parent() || !safety_name(&source) {
@@ -247,6 +263,7 @@ pub fn review_rollback(
     }
     Ok(RollbackReview {
         active,
+        original_existed,
         source,
         sha256,
         counts,
@@ -277,7 +294,12 @@ pub fn install_rollback_progress(
     if active != review.active {
         return Err(invalid("Rollback belongs to a different library"));
     }
-    ordinary(&active, true)?;
+    if present(&active)? != review.original_existed {
+        return Err(Failure::BackupSourceChanged);
+    }
+    if review.original_existed {
+        ordinary(&active, true)?;
+    }
     verify_rollback(review, cancel)?;
     let journal = journal_path(&active)?;
     if super::pending::present_for(&active)? {
@@ -290,11 +312,16 @@ pub fn install_rollback_progress(
         .unwrap()
         .join(format!("pre-restore-{}", uuid::Uuid::new_v4()));
     let record = Journal {
-        version: 1,
+        version: if review.original_existed { 1 } else { 2 },
         active: active.clone(),
         source: review.source.clone(),
         safety: safety.clone(),
         sha256: review.sha256.clone(),
+        original_existed: if review.original_existed {
+            None
+        } else {
+            Some(false)
+        },
     };
     progress(RestoreProgress::Installing);
     cancel.check()?;
@@ -308,17 +335,21 @@ pub fn install_rollback_progress(
         fs::remove_file(&journal).map_err(storage)?;
         return Err(error);
     }
-    if let Err(error) = fs::rename(&active, &safety) {
-        fs::remove_file(&journal).map_err(storage)?;
-        return Err(storage(error));
+    if review.original_existed {
+        if let Err(error) = fs::rename(&active, &safety) {
+            fs::remove_file(&journal).map_err(storage)?;
+            return Err(storage(error));
+        }
+        progress(RestoreProgress::OriginalSaved);
     }
-    progress(RestoreProgress::OriginalSaved);
     if present(&active)? {
         return Err(Failure::DestinationOccupied);
     }
     if let Err(error) = fs::rename(&review.source, &active) {
-        fs::rename(&safety, &active).map_err(storage)?;
-        fs::remove_file(&journal).map_err(storage)?;
+        if review.original_existed {
+            fs::rename(&safety, &active).map_err(storage)?;
+            fs::remove_file(&journal).map_err(storage)?;
+        }
         return Err(storage(error));
     }
     progress(RestoreProgress::Installed);
@@ -327,12 +358,18 @@ pub fn install_rollback_progress(
             return Err(Failure::BackupSourceChanged);
         }
         fs::rename(&active, &review.source).map_err(storage)?;
-        fs::rename(&safety, &active).map_err(storage)?;
-        fs::remove_file(&journal).map_err(storage)?;
+        if review.original_existed {
+            fs::rename(&safety, &active).map_err(storage)?;
+            fs::remove_file(&journal).map_err(storage)?;
+        }
         return Err(Failure::BackupSourceChanged);
     }
     fs::remove_file(journal).map_err(storage)?;
-    Ok(safety)
+    Ok(if review.original_existed {
+        safety
+    } else {
+        active
+    })
 }
 pub(super) fn recover(active: &Path) -> Result<bool> {
     let active = active_path(active)?;
@@ -348,8 +385,10 @@ pub(super) fn recover(active: &Path) -> Result<bool> {
         return Err(invalid("Rollback journal exceeds its limit"));
     }
     let record: Journal = serde_json::from_slice(&bytes).map_err(storage)?;
-    if record.version != 1
-        || record.active != active
+    if !matches!(
+        (record.version, record.original_existed),
+        (1, None) | (2, Some(false))
+    ) || record.active != active
         || record.source == record.safety
         || record.source == active
         || record.safety == active
@@ -379,14 +418,40 @@ pub(super) fn recover(active: &Path) -> Result<bool> {
             resolved.push(canonical);
         }
     }
-    match exists.as_slice() {
-        [false, true, true] => fs::rename(&record.safety, &active).map_err(storage)?,
-        [true, false, true] if tree(&active, &Cancellation::default())?.0 == record.sha256 => {}
-        [true, true, false] => {}
-        _ => {
-            return Err(invalid(
-                "Rollback is ambiguous; all library folders were preserved",
-            ));
+    if record.original_existed == Some(false) {
+        match exists.as_slice() {
+            [false, true, false] => {
+                if tree(&record.source, &Cancellation::default())?.0 != record.sha256 {
+                    return Err(Failure::BackupSourceChanged);
+                }
+                validate_source(&record.source, &Cancellation::default())?;
+                if present(&active)? {
+                    return Err(Failure::DestinationOccupied);
+                }
+                fs::rename(&record.source, &active).map_err(storage)?;
+                if tree(&active, &Cancellation::default())?.0 != record.sha256 {
+                    return Err(Failure::BackupSourceChanged);
+                }
+            }
+            [true, false, false] if tree(&active, &Cancellation::default())?.0 == record.sha256 => {
+                validate_source(&active, &Cancellation::default())?;
+            }
+            _ => {
+                return Err(invalid(
+                    "Rollback is ambiguous; all library folders were preserved",
+                ));
+            }
+        }
+    } else {
+        match exists.as_slice() {
+            [false, true, true] => fs::rename(&record.safety, &active).map_err(storage)?,
+            [true, false, true] if tree(&active, &Cancellation::default())?.0 == record.sha256 => {}
+            [true, true, false] => {}
+            _ => {
+                return Err(invalid(
+                    "Rollback is ambiguous; all library folders were preserved",
+                ));
+            }
         }
     }
     fs::remove_file(path).map_err(storage)?;

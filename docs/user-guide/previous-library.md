@@ -2,7 +2,7 @@
 
 Open **Settings → Storage → Previous library**. The folder picker opens beside the active Rust library. Select one of Yamantaka's `pre-restore-…` safety folders, review its filename and record counts, then choose **Return and close**. **Cancel** leaves both libraries unchanged.
 
-Close other instances using the selected copy before confirming. A copy with pending SQLite WAL data is rejected, so that uncheckpointed data cannot be silently ignored. Do not delete WAL files to bypass this check.
+Close other instances using the selected copy before confirming. Review includes complete, valid SQLite WAL data through independent temporary copies. Incomplete or damaged WAL data is rejected. Keep the database and its sidecars together.
 
 The entire selected folder becomes the active library. Its former safety-folder path disappears. Your current library moves into a new `pre-restore-…` folder, preserving its database, preferences, sessions, journals, auxiliary files and unknown resources. PDF contents are unchanged. Reopen Yamantaka when the operation finishes.
 
@@ -27,3 +27,17 @@ a previous copy retains the whole current library as a safety folder. If record
 preservation is interrupted, startup asks for review again before replaying any
 remaining record. See [multiple-record recovery](../validation/rust-multiple-pending-records-2026-11-03.md)
 for implementation scope and remaining acceptance.
+
+## The active folder is missing
+
+If startup recovery cannot find the active folder, choose **Previous copy** and
+select a valid `pre-restore-…` folder beside its expected location. The summary
+identifies the selected library and shows **Current missing**. Review the counts,
+then choose **Confirm and close**.
+
+The previous folder becomes the active library. Recovery creates no empty
+placeholder during review and refuses to replace a destination that appeared
+after that review. No current folder exists to retain as a safety copy. If the
+installation is interrupted, its recorded source and missing-folder state allow
+startup to resume the move. Ambiguous or changed folders remain preserved for
+another explicit review.
