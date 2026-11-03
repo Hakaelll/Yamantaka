@@ -340,6 +340,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let encoded = path.to_string_lossy().replace('\'', "''");
             db.execute_batch(&format!("UPDATE documents SET path='{encoded}',normalized_path='{encoded}',title_override='Retained title',author_override='Retained author',is_favorite=1 WHERE id='demo-0'; INSERT INTO document_covers(document_id,source_page_index,small_thumbnail_path,large_thumbnail_path,generated_at,source_modified_at,confidence,selection_mode,algorithm_version,crop_mode,page_aspect_ratio) VALUES('demo-0',1,'','','synthetic-choice','{modified}',1,'manual',1,'contain',0.75);"))?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--opening-distinct-pdf") {
+            let path = crate::qa_ui_root()
+                .join("../../build/rust-fixtures/covers/cover-1.pdf")
+                .canonicalize()?
+                .to_string_lossy()
+                .replace(char::from(39), "''");
+            db.execute_batch(&format!(
+                "UPDATE documents SET path='{path}',normalized_path='{path}' WHERE id='demo-1'"
+            ))?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--cover-picker-source-change") {
             std::fs::create_dir_all(&store)?;
             let path = store.join("picker-source-change.pdf");
@@ -1862,6 +1872,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_nearby_rotation(
                         args.iter().any(|arg| arg == "--nearby-expect-miss"),
                         args.iter().any(|arg| arg == "--nearby-rotation-pause"),
+                    );
+                }
+                if args.iter().any(|arg| arg == "--first-raster-opening") {
+                    app.preview_first_raster(
+                        args.iter().any(|arg| arg == "--opening-expect-empty"),
+                        args.iter().any(|arg| arg == "--first-raster-failure"),
+                        args.iter().any(|arg| arg == "--opening-page-two"),
                     );
                 }
                 if args.iter().any(|arg| arg == "--nearby-turn") {

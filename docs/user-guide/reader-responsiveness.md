@@ -8,6 +8,12 @@ Changing the reading context cancels its old preparation requests. Memory or que
 
 This is one part of reader responsiveness. Complex native rasters, pages outside the prepared range and device recovery remain relevant to page-turn latency. The [CPU cache checkpoint](../validation/rust-page-prefetch-2026-10-31.md) and [GPU preview checkpoint](../validation/rust-nearby-presentation-2026-10-31.md) record the exercised cases and remaining performance acceptance.
 
+## Opening a reading
+
+When you open another document in the primary reader, the current reading stays available while its replacement obtains preferences and a preview of the requested page. The switch occurs after that preview can be displayed. If preparation fails, the current reading is retained so you can try opening the other document again. Original PDFs remain unchanged.
+
+This preparation covers the requested opening page. Complete facing-page, continuous-layout, and reference-replacement acceptance remains pending. [Opening verification](../validation/rust-first-raster-opening-2026-11-03.md) records the exercised cases.
+
 ## High zoom
 
 With the default wgpu compositor, a page can retain a small whole-page preview while PDFium refines the visible region. Refinement waits for 150 milliseconds of stable region geometry and for the preview to finish. This delay is a scheduling policy, not a measured response time.

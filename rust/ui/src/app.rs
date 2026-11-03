@@ -1643,99 +1643,7 @@ impl App for YamantakaApp {
                         }
                         continue;
                     }
-                    let editing = self.reader.annotations.editing()
-                        && self.opening.matches(&document.id, &cancel);
-                    if editing {
-                        self.error = Some(
-                            self.tr(
-                                "Termina o cancela la nota antes de cambiar de lectura.",
-                                "Finish or cancel the note before switching readings.",
-                            )
-                            .into(),
-                        );
-                    }
-                    if cancel.is_cancelled()
-                        || !self.opening.matches(&document.id, &cancel)
-                        || editing
-                    {
-                        if self.opening.fail(&document.id, &cancel, false) {
-                            self.reader.loading = false;
-                            self.tabs.fail(&document.id, &cancel);
-                            self.reader.restoration.clear();
-                        }
-                        cancel.cancel();
-                        self.open_confirmation = Some((document.id.clone(), cancel));
-                        continue;
-                    }
-                    let (target_page, reveal_reader) = self.open_intent.finish_open(&document.id);
-                    let page = target_page
-                        .unwrap_or(document.last_page_index)
-                        .min(info.pages.len().saturating_sub(1) as u32);
-                    let count = u32::try_from(info.pages.len()).unwrap_or(0);
-                    let navigation = match self
-                        .open_intent
-                        .take_navigation(&document.id)
-                        .filter(|nav| nav.page_count() == count)
-                        .map(|mut nav| {
-                            nav.go_to_page(page);
-                            nav
-                        })
-                        .map(Ok)
-                        .unwrap_or_else(|| ReaderNavigation::new(count, page))
-                    {
-                        Ok(navigation) => navigation,
-                        Err(error) => {
-                            self.error = Some(error.to_string());
-                            self.opening.fail(&document.id, &cancel, false);
-                            self.tabs.fail(&document.id, &cancel);
-                            self.reader.restoration.clear();
-                            cancel.cancel();
-                            self.open_confirmation = Some((document.id.clone(), cancel));
-                            self.reader.loading = false;
-                            continue;
-                        }
-                    };
-                    if let Err(error) = self.finish_reading_session() {
-                        self.error = Some(error.to_string());
-                        self.opening.fail(&document.id, &cancel, false);
-                        self.tabs.fail(&document.id, &cancel);
-                        self.reader.restoration.clear();
-                        cancel.cancel();
-                        self.open_confirmation = Some((document.id.clone(), cancel));
-                        self.reader.loading = false;
-                        continue;
-                    }
-                    let Some(preferences_cancel) = self.opening.accept(&document.id, &cancel)
-                    else {
-                        cancel.cancel();
-                        self.open_confirmation = Some((document.id.clone(), cancel));
-                        continue;
-                    };
-                    self.record_reader_health(
-                        &document,
-                        yamantaka_domain::quarantine::ReaderHealth::Opened,
-                    );
-                    self.sync_tab_context();
-                    self.tabs
-                        .accept_open(&document.id, &cancel, preferences_cancel.clone());
-                    self.forget_failed_retirement(&document.id);
-                    self.replace_reader_state(preferences_cancel);
-                    self.reader.page = page;
-                    self.reader.navigation = Some(navigation);
-                    self.open_confirmation = Some((document.id.clone(), cancel));
-                    if target_page.is_some() {
-                        self.send(Action::Navigate(document.id.clone(), self.reader.page));
-                    }
-                    self.reader.active = Some((*document, Arc::new(info)));
-                    let id = self.reader.active.as_ref().unwrap().0.id.clone();
-                    self.send(Action::LoadReaderPreferences(
-                        id,
-                        self.reader.reader_preferences_cancel.clone(),
-                    ));
-                    if reveal_reader {
-                        self.show_surface(Surface::Reader);
-                    }
-                    self.reader.loading = false;
+                    self.begin_open_preparation(ctx, document, info, cancel);
                 }
                 Update::DocumentMatches(id, batch, cancel) => {
                     if let Some(reference) = self
@@ -1805,7 +1713,11 @@ impl App for YamantakaApp {
                 }
                 Update::MetadataSource(reply) => self.accept_metadata_source(reply),
                 Update::ManualCover(reply) => self.accept_manual_cover(ctx, reply),
-                Update::Page(page, cancel, _, _) => self.accept_rendered_page(ctx, &page, &cancel),
+                Update::Page(page, cancel, _, _) => {
+                    if !self.accept_open_preparation_image(ctx, &page, &cancel) {
+                        self.accept_rendered_page(ctx, &page, &cancel);
+                    }
+                }
                 Update::Prefetched(key, result, cancel) => {
                     if !self.reader.viewport.prefetch.accept(
                         &key,
@@ -1916,6 +1828,10 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::Failed(error, cancel) => {
+                    if self.fail_open_preparation(&error, cancel.as_ref()) {
+                        continue;
+                    }
+
                     if let Some(token) = &cancel
                         && (self.reader.viewport.fail_refinement(token)
                             || self.reference.as_mut().is_some_and(|reference| {
@@ -2128,11 +2044,7 @@ impl App for YamantakaApp {
                                         self.open_intent.set_page(id.clone(), page);
                                     }
                                     if let Some(context) = target.context {
-                                        self.reader.restoration.arm(
-                                            id,
-                                            self.opening.preferences().unwrap(),
-                                            context,
-                                        );
+                                        self.opening.arm_context(context);
                                     }
                                 }
                             }
@@ -2142,6 +2054,10 @@ impl App for YamantakaApp {
                     }
                 }
                 Update::ReaderPreferences(id, preferences, cancel) => {
+                    if self.accept_open_preparation_preferences(&id, preferences.clone(), &cancel) {
+                        continue;
+                    }
+
                     if cancel.is_cancelled()
                         || !cancel.same_request(&self.reader.reader_preferences_cancel)
                         || !self
@@ -2187,9 +2103,11 @@ impl App for YamantakaApp {
                 Update::Workspace(reply) => self.accept_workspace(reply),
             }
         }
+        self.pump_open_preparation(ctx);
         self.advance_cover_picker_preview();
         self.advance_metadata_preview();
         self.advance_replacement_preview();
+        self.advance_first_raster_probe();
         self.advance_tab_preview();
         self.advance_queue_preview();
         self.pump_workspace_startup(ctx);

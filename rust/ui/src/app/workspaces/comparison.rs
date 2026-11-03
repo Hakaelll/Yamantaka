@@ -70,7 +70,11 @@ impl YamantakaApp {
         let Some(mut restore) = self.workspaces.comparison_restore.take() else {
             return;
         };
-        if self.tabs.busy() || self.opening.busy() || self.reader.reader_preferences_loading {
+        if self.tabs.busy()
+            || self.opening.busy()
+            || self.open_confirmation.is_some()
+            || self.reader.reader_preferences_loading
+        {
             self.workspaces.comparison_restore = Some(restore);
             return;
         }

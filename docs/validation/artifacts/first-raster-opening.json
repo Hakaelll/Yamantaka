@@ -1,0 +1,146 @@
+{
+  "cases": [
+    {
+      "case": "before",
+      "compositor": "native-wgpu",
+      "opening": {
+        "pending": null,
+        "password": false,
+        "replacementPreview": "Off",
+        "firstRaster": {
+          "stage": 3,
+          "adoptedWithoutImage": true,
+          "emptyPagePaints": 2
+        }
+      },
+      "trackedPageBytes": 13576016
+    },
+    {
+      "case": "after-final",
+      "compositor": "native-wgpu",
+      "opening": {
+        "pending": null,
+        "password": false,
+        "replacementPreview": "Off",
+        "firstRaster": {
+          "stage": 3,
+          "adoptedWithoutImage": false,
+          "failureSeen": false,
+          "targetPage": 0,
+          "emptyPagePaints": 0
+        }
+      },
+      "trackedPageBytes": 13582160
+    },
+    {
+      "case": "failure-retry-final",
+      "compositor": "native-wgpu",
+      "opening": {
+        "pending": null,
+        "password": false,
+        "replacementPreview": "Off",
+        "firstRaster": {
+          "stage": 3,
+          "adoptedWithoutImage": false,
+          "failureSeen": true,
+          "targetPage": 1,
+          "emptyPagePaints": 0
+        }
+      },
+      "trackedPageBytes": 18658784
+    },
+    {
+      "case": "glow-page-two",
+      "compositor": "egui-glow",
+      "opening": {
+        "pending": null,
+        "password": false,
+        "replacementPreview": "Off",
+        "firstRaster": {
+          "stage": 3,
+          "adoptedWithoutImage": false,
+          "failureSeen": false,
+          "targetPage": 1,
+          "emptyPagePaints": 0
+        }
+      },
+      "trackedPageBytes": 16892384
+    },
+    {
+      "case": "distinct-pdf-retry",
+      "compositor": "native-wgpu",
+      "opening": {
+        "pending": null,
+        "password": false,
+        "replacementPreview": "Off",
+        "firstRaster": {
+          "stage": 3,
+          "adoptedWithoutImage": false,
+          "failureSeen": true,
+          "targetPage": 1,
+          "emptyPagePaints": 0
+        }
+      },
+      "trackedPageBytes": 12753488
+    },
+    {
+      "case": "failed-native-open",
+      "compositor": "native-wgpu",
+      "opening": {
+        "pending": null,
+        "password": false,
+        "replacementPreview": "Complete",
+        "firstRaster": {
+          "stage": 0,
+          "adoptedWithoutImage": false,
+          "failureSeen": false,
+          "targetPage": 0,
+          "emptyPagePaints": 0
+        }
+      },
+      "trackedPageBytes": 25436672
+    },
+    {
+      "case": "protected",
+      "compositor": "native-wgpu",
+      "opening": {
+        "pending": null,
+        "password": false,
+        "replacementPreview": "Off",
+        "firstRaster": {
+          "stage": 0,
+          "adoptedWithoutImage": false,
+          "failureSeen": false,
+          "targetPage": 0,
+          "emptyPagePaints": 0
+        }
+      },
+      "trackedPageBytes": 11812688
+    },
+    {
+      "case": "workspaces-fixed",
+      "compositor": "native-wgpu",
+      "opening": {
+        "pending": null,
+        "password": false,
+        "replacementPreview": "Off",
+        "firstRaster": {
+          "stage": 0,
+          "adoptedWithoutImage": false,
+          "failureSeen": false,
+          "targetPage": 0,
+          "emptyPagePaints": 0
+        }
+      },
+      "trackedPageBytes": 33034016
+    }
+  ],
+  "syntheticInputsUnchanged": 39,
+  "newStandaloneRustTests": 0,
+  "nativeCaptureSelfCheckAdded": true,
+  "nativeDebugBuildPassed": true,
+  "workspaceClippyAllTargetsWarningsDenied": true,
+  "noDependenciesAdded": true,
+  "newPersistentFormats": false,
+  "executableSha256": "5b3deb97afe674c5e024a41442ddde435835336e52e63834fdbad9a373c16adf"
+}

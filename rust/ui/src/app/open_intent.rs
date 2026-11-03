@@ -90,6 +90,12 @@ impl OpenIntent {
         self.reveal_reader
     }
 
+    pub fn pending_page(&self, id: &str) -> Option<u32> {
+        self.pending_page
+            .as_ref()
+            .filter(|(target, _)| target == id)
+            .map(|(_, page)| *page)
+    }
     pub fn finish_open(&mut self, id: &str) -> (Option<u32>, bool) {
         let page = if self
             .pending_page

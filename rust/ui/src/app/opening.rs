@@ -1,15 +1,21 @@
 use super::*;
+mod adoption;
+mod preparation;
+mod preview;
 
 struct PendingOpening {
     document: String,
     open: Cancellation,
     preferences: Cancellation,
     password: bool,
+    candidate: Option<preparation::Candidate>,
+    context: Option<yamantaka_domain::reading_sessions::restoration::ReaderSessionRestoration>,
 }
 #[derive(Default)]
 pub(super) struct ReaderOpening {
     pending: Option<PendingOpening>,
     preview: ReplacementPreview,
+    first_raster_probe: preview::Probe,
 }
 #[derive(Default, Debug, PartialEq, Eq)]
 enum ReplacementPreview {
@@ -23,13 +29,14 @@ enum ReplacementPreview {
 impl ReaderOpening {
     pub(super) fn ready(&self) -> bool {
         !self.busy()
+            && self.first_raster_probe.ready()
             && matches!(
                 self.preview,
                 ReplacementPreview::Off | ReplacementPreview::Complete
             )
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"pending":self.pending.as_ref().map(|pending|pending.document.as_str()),"password":self.pending.as_ref().is_some_and(|pending|pending.password),"replacementPreview":format!("{:?}",self.preview)})
+        serde_json::json!({"pending":self.pending.as_ref().map(|pending|pending.document.as_str()),"password":self.pending.as_ref().is_some_and(|pending|pending.password),"replacementPreview":format!("{:?}",self.preview),"firstRaster":self.first_raster_probe.summary()})
     }
     pub(super) fn begin(&mut self, document: String) -> Cancellation {
         let open = Cancellation::default();
@@ -43,6 +50,8 @@ impl ReaderOpening {
             open,
             preferences: Cancellation::default(),
             password: false,
+            candidate: None,
+            context: None,
         });
     }
     pub(super) fn matches(&self, document: &str, open: &Cancellation) -> bool {
@@ -58,16 +67,24 @@ impl ReaderOpening {
     pub(super) fn token(&self) -> Option<Cancellation> {
         self.pending.as_ref().map(|pending| pending.open.clone())
     }
-    pub(super) fn preferences(&self) -> Option<Cancellation> {
-        self.pending
-            .as_ref()
-            .map(|pending| pending.preferences.clone())
+    pub(super) fn arm_context(
+        &mut self,
+        context: yamantaka_domain::reading_sessions::restoration::ReaderSessionRestoration,
+    ) {
+        if let Some(pending) = &mut self.pending {
+            pending.context = Some(context);
+        }
     }
     pub(super) fn accept(&mut self, document: &str, open: &Cancellation) -> Option<Cancellation> {
         if open.is_cancelled() || !self.matches(document, open) {
             return None;
         }
-        self.pending.take().map(|pending| pending.preferences)
+        self.pending.take().map(|pending| {
+            if let Some(candidate) = pending.candidate {
+                candidate.cancel();
+            }
+            pending.preferences
+        })
     }
     pub(super) fn fail(&mut self, document: &str, open: &Cancellation, password: bool) -> bool {
         if !self.matches(document, open) {
@@ -96,6 +113,9 @@ impl ReaderOpening {
         if let Some(pending) = self.pending.take() {
             pending.open.cancel();
             pending.preferences.cancel();
+            if let Some(candidate) = pending.candidate {
+                candidate.cancel();
+            }
         }
     }
 }
