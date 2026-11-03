@@ -2,17 +2,19 @@ use super::*;
 use yamantaka_domain::reading_sessions::restoration::ReaderSessionRestoration;
 use yamantaka_domain::{Failure, RenderedPage};
 
-enum Step<T> {
+pub(super) enum Step<T> {
     Waiting,
     Submitted,
     Ready(T),
 }
 pub(super) struct Candidate {
-    document: Box<Document>,
-    info: PdfInfo,
-    page: u32,
-    preferences: Step<ReaderPreferences>,
+    pub document: Box<Document>,
+    pub info: PdfInfo,
+    pub page: u32,
+    pub preferences: Step<ReaderPreferences>,
     previews: Option<Vec<Preview>>,
+    planned_pages: Vec<u32>,
+    pub geometry: Option<(ReaderPreferences, ReadingDirection, Arc<ReaderLayout>)>,
 }
 impl Candidate {
     pub(super) fn cancel(&self) {
@@ -57,17 +59,12 @@ impl YamantakaApp {
             page,
             preferences: Step::Waiting,
             previews: None,
+            planned_pages: Vec::new(),
+            geometry: None,
         });
     }
 
     pub(in crate::app) fn pump_open_preparation(&mut self, ctx: &egui::Context) {
-        let direction = self.reading_direction();
-        let tab_preferences = self.opening.pending.as_ref().and_then(|pending| {
-            self.tabs
-                .opening_preferences(&pending.document, &pending.open)
-        });
-        let cap = (ctx.input(|input| input.max_texture_side) as u32).min(768);
-        let bytes = (self.governor.limits().pages / 6).clamp(4, 2 * 1024 * 1024);
         let Some(pending) = self.opening.pending.as_mut() else {
             return;
         };
@@ -85,26 +82,6 @@ impl YamantakaApp {
                     pending.preferences.clone(),
                 ))?;
                 candidate.preferences = Step::Submitted;
-            }
-            if candidate.previews.is_none()
-                && let Step::Ready(preferences) = &candidate.preferences
-            {
-                let mut effective = preferences.clone();
-                if let Some(context) = &pending.context {
-                    effective = context.apply(&effective)?;
-                }
-                if let Some(tab) = &tab_preferences {
-                    effective = tab.clone();
-                }
-                let mut previews = plan(candidate, &effective, direction, cap, bytes)?;
-                if self
-                    .opening
-                    .first_raster_probe
-                    .inject_failure(&pending.document)
-                {
-                    previews.last_mut().unwrap().key.page = candidate.info.pages.len() as u32;
-                }
-                candidate.previews = Some(previews);
             }
             for preview in candidate.previews.iter_mut().flatten() {
                 if matches!(preview.image, Step::Waiting) {
@@ -240,7 +217,7 @@ impl YamantakaApp {
         }
         owns
     }
-    fn reject_open_preparation(&mut self, error: Failure) {
+    pub(super) fn reject_open_preparation(&mut self, error: Failure) {
         let Some(pending) = self.opening.pending.as_ref() else {
             return;
         };
@@ -264,27 +241,10 @@ struct Preview {
 }
 fn plan(
     candidate: &Candidate,
-    preferences: &ReaderPreferences,
-    direction: ReadingDirection,
+    pages: Vec<u32>,
     cap: u32,
     bytes: usize,
 ) -> yamantaka_domain::Result<Vec<Preview>> {
-    let mut pages = vec![candidate.page];
-    if preferences.effective_layout() == yamantaka_domain::PageLayout::Spread {
-        let spread = yamantaka_domain::reader::Spread::for_preferences(
-            candidate.info.pages.len() as u32,
-            candidate.page,
-            preferences,
-            direction,
-        )
-        .ok_or_else(|| Failure::Invalid("The opening spread is outside the PDF".into()))?;
-        for page in [spread.left, spread.right].into_iter().flatten() {
-            if !pages.contains(&page) {
-                pages.push(page);
-            }
-        }
-    }
-    // shortcut: continuous opening still stages its target page; use the actual first viewport frame to extend it.
     let per_page = bytes / pages.len();
     if per_page < 4 {
         return Err(Failure::MemoryBudget);
@@ -314,4 +274,29 @@ fn plan(
             })
         })
         .collect()
+}
+
+impl Candidate {
+    pub(super) fn plan_pages(
+        &mut self,
+        pages: Vec<u32>,
+        cap: u32,
+        bytes: usize,
+    ) -> yamantaka_domain::Result<()> {
+        if self.previews.is_none() || self.planned_pages != pages {
+            self.cancel();
+            self.previews = Some(plan(self, pages.clone(), cap, bytes)?);
+            self.planned_pages = pages;
+        }
+        Ok(())
+    }
+    pub(super) fn inject_failure(&mut self) {
+        if let Some(preview) = self
+            .previews
+            .as_mut()
+            .and_then(|previews| previews.last_mut())
+        {
+            preview.key.page = self.info.pages.len() as u32;
+        }
+    }
 }

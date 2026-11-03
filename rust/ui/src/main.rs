@@ -349,6 +349,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             preferences.initial_side = yamantaka_domain::reader_preferences::InitialSide::Left;
             db.save_reader_preferences("demo-1", &preferences)?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--opening-continuous") {
+            let mut preferences =
+                yamantaka_domain::reader_preferences::ReaderPreferences::new("demo-1");
+            preferences.page_layout = yamantaka_domain::PageLayout::Continuous;
+            preferences.zoom_mode = yamantaka_domain::reader_preferences::ZoomMode::Custom;
+            preferences.zoom_level = 0.2;
+            if args.iter().any(|arg| arg == "--opening-zoom-high") {
+                preferences.zoom_level = 1.75;
+            }
+            if args.iter().any(|arg| arg == "--opening-fit-width") {
+                preferences.zoom_mode = ZoomMode::FitWidth;
+            }
+            if args.iter().any(|arg| arg == "--opening-rotated") {
+                preferences.page_rotation = PageRotation::Deg90;
+            }
+            db.save_reader_preferences("demo-1", &preferences)?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--opening-distinct-pdf") {
             let path = crate::qa_ui_root()
                 .join("../../build/rust-fixtures/covers/cover-1.pdf")
@@ -1894,6 +1911,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         args.iter().any(|arg| arg == "--opening-expect-empty"),
                         args.iter().any(|arg| arg == "--first-raster-failure"),
                         args.iter().any(|arg| arg == "--opening-page-two"),
+                        args.iter().any(|arg| arg == "--opening-from-library"),
                     );
                 }
                 if args.iter().any(|arg| arg == "--nearby-turn") {

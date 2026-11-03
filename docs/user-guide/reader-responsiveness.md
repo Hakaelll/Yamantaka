@@ -10,9 +10,9 @@ This is one part of reader responsiveness. Complex native rasters, pages outside
 
 ## Opening a reading
 
-When you open another document in the primary reader, the current reading stays available while its replacement obtains preferences and a preview of the requested page. In a facing view, both pages of the opening spread are prepared before the switch. Cover pairing and reading direction follow the saved reading context. If preparation fails, the current reading is retained so you can try opening the other document again. Original PDFs remain unchanged.
+When you open another document in the primary reader, the current reading stays available while its replacement obtains preferences and previews of the pages visible in the first view. This includes continuous and facing layouts. Zoom, rotation, panel space, cover pairing, reading direction, and restored scroll follow the saved reading context. If the navigator drawer hides the PDF, a preview of the target page is kept. If preparation fails, the current reading is retained so you can try opening the other document again. Original PDFs remain unchanged.
 
-Single-page and facing openings have native checks, including a failed companion and retry. Continuous opening still prepares only its requested page; complete initial-viewport and reference-replacement acceptance remain pending. [Facing opening verification](../validation/rust-opening-spreads-2026-11-03.md) records the corrected post-paint evidence. [Opening verification](../validation/rust-first-raster-opening-2026-11-03.md) records the exercised cases.
+Native checks cover continuous opening, a 5,000-page PDF, opening from the library, enlarged text with a navigator, and failed facing-page preparation with retry. [Initial viewport verification](../validation/rust-opening-viewport-2026-11-03.md) records matching planned and painted views. Reference replacement, rapid resizing and broader performance acceptance remain pending. [Facing opening verification](../validation/rust-opening-spreads-2026-11-03.md) and [opening verification](../validation/rust-first-raster-opening-2026-11-03.md) record earlier checkpoints.
 
 ## High zoom
 

@@ -50,94 +50,89 @@ impl YamantakaApp {
         page_count: u32,
         p: Palette,
     ) {
-        egui::Frame::new()
-            .inner_margin(egui::Margin::symmetric(8, 2))
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing.x = 2.0;
-                ui.horizontal(|ui| {
-                    if theme::icon_button(
+        toolbar_frame(ui, |ui| {
+            if theme::icon_button(
+                ui,
+                if self.metadata_return_available() {
+                    self.tr("Volver a los metadatos", "Back to metadata")
+                } else {
+                    self.tr("Biblioteca", "Library")
+                },
+                theme::Icon::Book,
+                p,
+            )
+            .clicked()
+            {
+                self.show_surface(Surface::Library);
+                self.refresh();
+            }
+            if ui
+                .add_enabled_ui(self.reader.page > 0, |ui| {
+                    theme::icon_button(
                         ui,
-                        if self.metadata_return_available() {
-                            self.tr("Volver a los metadatos", "Back to metadata")
-                        } else {
-                            self.tr("Biblioteca", "Library")
-                        },
-                        theme::Icon::Book,
+                        self.tr("Página anterior", "Previous page"),
+                        theme::Icon::Left,
                         p,
                     )
-                    .clicked()
-                    {
-                        self.show_surface(Surface::Library);
-                        self.refresh();
-                    }
-                    if ui
-                        .add_enabled_ui(self.reader.page > 0, |ui| {
-                            theme::icon_button(
-                                ui,
-                                self.tr("Página anterior", "Previous page"),
-                                theme::Icon::Left,
-                                p,
-                            )
-                        })
-                        .inner
-                        .clicked()
-                    {
-                        self.step_reader(false);
-                    }
-                    let mut shown = self.reader.page + 1;
-                    let response = ui.add_sized(
-                        [64.0, 40.0],
-                        egui::DragValue::new(&mut shown)
-                            .range(1..=page_count)
-                            .suffix(format!(" / {page_count}")),
-                    );
-                    response.widget_info(|| {
-                        egui::WidgetInfo::labeled(
-                            egui::WidgetType::DragValue,
-                            ui.is_enabled(),
-                            self.tr("Página", "Page"),
-                        )
-                    });
-                    if response.changed() {
-                        self.navigate(shown.saturating_sub(1));
-                    }
-                    if ui
-                        .add_enabled_ui(self.reader.page + 1 < page_count, |ui| {
-                            theme::icon_button(
-                                ui,
-                                self.tr("Página siguiente", "Next page"),
-                                theme::Icon::Right,
-                                p,
-                            )
-                        })
-                        .inner
-                        .clicked()
-                    {
-                        self.step_reader(true);
-                    }
-                    ui.add_space((ui.available_width() - 82.0).max(0.0));
-                    let options = theme::icon_button(
-                        ui,
-                        self.tr("Opciones de lectura", "Reading options"),
-                        theme::Icon::Settings,
-                        p,
-                    );
-                    self.reader_options_popup(&options)
-                        .show(|ui| self.reader_options_menu(ui, p));
-
-                    if theme::icon_toggle(
-                        ui,
-                        self.tr("Navegador de lectura", "Reading navigator"),
-                        theme::Icon::Panel,
-                        self.reader.panel,
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.toggle_reader_panel();
-                    }
-                });
+                })
+                .inner
+                .clicked()
+            {
+                self.step_reader(false);
+            }
+            let mut shown = self.reader.page + 1;
+            let response = ui.add_sized(
+                [64.0, 40.0],
+                egui::DragValue::new(&mut shown)
+                    .range(1..=page_count)
+                    .suffix(format!(" / {page_count}")),
+            );
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(
+                    egui::WidgetType::DragValue,
+                    ui.is_enabled(),
+                    self.tr("Página", "Page"),
+                )
             });
+            if response.changed() {
+                self.navigate(shown.saturating_sub(1));
+            }
+            if ui
+                .add_enabled_ui(self.reader.page + 1 < page_count, |ui| {
+                    theme::icon_button(
+                        ui,
+                        self.tr("Página siguiente", "Next page"),
+                        theme::Icon::Right,
+                        p,
+                    )
+                })
+                .inner
+                .clicked()
+            {
+                self.step_reader(true);
+            }
+            ui.add_space((ui.available_width() - 82.0).max(0.0));
+            let options = theme::icon_button(
+                ui,
+                self.tr("Opciones de lectura", "Reading options"),
+                theme::Icon::Settings,
+                p,
+            );
+            self.reader_options_popup(&options)
+                .show(|ui| self.reader_options_menu(ui, p));
+
+            if theme::icon_toggle(
+                ui,
+                self.tr("Navegador de lectura", "Reading navigator"),
+                theme::Icon::Panel,
+                self.reader.panel,
+                p,
+            )
+            .clicked()
+            {
+                self.toggle_reader_panel();
+            }
+        });
     }
     pub(super) fn set_reader_zoom(&mut self, zoom: f32) {
         if let Some(mut preferences) = self.reader.reader_preferences.clone() {
@@ -150,4 +145,16 @@ impl YamantakaApp {
         self.reader.viewport.generation += 1;
         self.reset_render_request();
     }
+}
+
+pub(super) fn toolbar_frame(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui)) {
+    egui::Frame::new()
+        .inner_margin(egui::Margin::symmetric(8, 2))
+        .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            ui.horizontal(|ui| {
+                ui.set_min_height(40.0);
+                contents(ui);
+            });
+        });
 }

@@ -185,20 +185,35 @@ impl YamantakaApp {
 }
 
 fn navigator_panel(ui: &mut egui::Ui, width: f32, contents: impl FnOnce(&mut egui::Ui)) -> f32 {
-    egui::Panel::left("reader-panel")
-        .default_size(width)
-        .size_range(220.0..=500.0)
-        .resizable(true)
-        .show(ui, |ui| {
-            ui.add_space(14.0);
-            egui::ScrollArea::both()
-                .id_salt("reader-navigator")
-                .auto_shrink([false, false])
-                .show(ui, contents);
-        })
+    navigator_frame("reader-panel", width)
+        .show(ui, |ui| navigator_content(ui, contents))
         .response
         .rect
         .width()
+}
+
+pub(super) fn navigator_content(ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui)) {
+    let rect = ui.available_rect_before_wrap();
+    ui.set_min_width(rect.width());
+    // Long or enlarged controls scroll inside the chosen panel width.
+    let mut content = ui.new_child(
+        egui::UiBuilder::new()
+            .id_salt("navigator-content")
+            .max_rect(rect),
+    );
+    content.set_clip_rect(rect.intersect(ui.clip_rect()));
+    content.add_space(14.0);
+    egui::ScrollArea::both()
+        .id_salt("reader-navigator")
+        .auto_shrink([false, false])
+        .show(&mut content, contents);
+}
+
+pub(super) fn navigator_frame(id: &'static str, width: f32) -> egui::Panel {
+    egui::Panel::left(id)
+        .default_size(width)
+        .size_range(220.0..=500.0)
+        .resizable(true)
 }
 
 impl YamantakaApp {

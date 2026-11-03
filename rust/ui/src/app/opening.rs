@@ -1,5 +1,6 @@
 use super::*;
 mod adoption;
+mod layout;
 mod preparation;
 mod preview;
 
@@ -27,6 +28,15 @@ enum ReplacementPreview {
     Complete,
 }
 impl ReaderOpening {
+    pub(super) fn observe_frame(
+        &mut self,
+        document: &str,
+        frame: &yamantaka_domain::reader_layout::ReaderFrame,
+        surface: &reader_surface::ReaderSurface,
+    ) {
+        self.first_raster_probe
+            .observe_frame(document, frame, surface);
+    }
     pub(super) fn ready(&self) -> bool {
         !self.busy()
             && self.first_raster_probe.ready()

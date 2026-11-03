@@ -21,4 +21,4 @@ With that correction, the previous single-page sequence still recorded zero empt
 
 The [status artifact](artifacts/opening-spreads.json) records the outcomes and executable hashes. Local images remain under `build/verification/opening-visible-pages`.
 
-Continuous opening still prepares only its requested page. Planning the actual initial continuous viewport, visible-only scheduling for cropped spreads, reference-pane replacement, broader cancellation/pressure stress, physical input/accessibility, and paired performance acceptance remain pending. This checkpoint does not establish whole-rewrite or final-release readiness.
+At this checkpoint, continuous opening still prepared only its requested page. The subsequent [initial viewport checkpoint](rust-opening-viewport-2026-11-03.md) replaces target-page and whole-spread planning with the canonical visible frame, including continuous opening. Reference-pane replacement, broader cancellation/pressure stress, physical input/accessibility, and paired performance acceptance remain pending. This checkpoint does not establish whole-rewrite or final-release readiness.

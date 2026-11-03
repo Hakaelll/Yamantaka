@@ -2103,7 +2103,6 @@ impl App for YamantakaApp {
                 Update::Workspace(reply) => self.accept_workspace(reply),
             }
         }
-        self.pump_open_preparation(ctx);
         self.advance_cover_picker_preview();
         self.advance_metadata_preview();
         self.advance_replacement_preview();
@@ -2354,9 +2353,11 @@ impl App for YamantakaApp {
         }
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
             egui::Frame::new().fill(p.canvas).show(ui, |ui| {
+                let before_toolbar = ui.available_rect_before_wrap().top();
                 if !matches!(self.surface, Surface::Reader) {
                     self.toolbar(ui);
                 }
+                let toolbar_extent = ui.available_rect_before_wrap().top() - before_toolbar;
                 if let Some(error) = self.error.clone() {
                     egui::Frame::new()
                         .fill(p.raised)
@@ -2422,6 +2423,22 @@ impl App for YamantakaApp {
                                 .color(p.secondary),
                         );
                     });
+                }
+                let mut opening_rect = ui.available_rect_before_wrap();
+                opening_rect.min.y -= toolbar_extent;
+                self.measure_opening_view(ui, opening_rect);
+                if self.opening.busy() && ui.ctx().current_pass_index() == 0 {
+                    let previous = self.reader.reader_preferences_cancel.clone();
+                    self.pump_open_preparation(ui.ctx());
+                    if !previous.same_request(&self.reader.reader_preferences_cancel) {
+                        ui.ctx()
+                            .request_discard("Opening adoption updates the reader composition");
+                        if ui.ctx().will_discard() {
+                            return;
+                        }
+                    }
+                } else if self.opening.busy() {
+                    ui.ctx().request_repaint();
                 }
                 if matches!(self.surface, Surface::Library)
                     && self.inspector

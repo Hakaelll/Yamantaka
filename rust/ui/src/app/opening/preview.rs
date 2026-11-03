@@ -10,6 +10,9 @@ pub(super) struct Probe {
     target_page: u32,
     prepared_pages: Vec<u32>,
     adoption_paints: u64,
+    first_frame: Option<serde_json::Value>,
+    planned_frame: Option<serde_json::Value>,
+    from_library: bool,
     adopted_without_image: bool,
     empty_before: u64,
     empty_after: u64,
@@ -18,9 +21,45 @@ impl Probe {
     pub(super) fn begin_adoption(&mut self, paints: u64) {
         self.prepared_pages.clear();
         self.adoption_paints = paints;
+        self.first_frame = None;
     }
     pub(super) fn record_prepared(&mut self, page: u32) {
         self.prepared_pages.push(page);
+    }
+    pub(super) fn record_plan(
+        &mut self,
+        document: &str,
+        frame: &yamantaka_domain::reader_layout::ReaderFrame,
+    ) {
+        if self.stage == 2 && document == "demo-1" {
+            self.planned_frame = Some(
+                serde_json::json!({"viewport":frame.viewport,"scroll":frame.scroll,"zoom":frame.zoom,"visiblePages":frame.pages.iter().map(|page|page.page).collect::<Vec<_>>() }),
+            );
+        }
+    }
+    pub(in crate::app) fn observe_frame(
+        &mut self,
+        document: &str,
+        frame: &yamantaka_domain::reader_layout::ReaderFrame,
+        surface: &reader_surface::ReaderSurface,
+    ) {
+        if self.stage != 2 || document != "demo-1" || self.first_frame.is_some() {
+            return;
+        }
+        self.first_frame = Some(serde_json::json!({
+            "viewport":frame.viewport,"scroll":frame.scroll,"zoom":frame.zoom,
+            "visiblePages":frame.pages.iter().map(|page|page.page).collect::<Vec<_>>(),
+            "missingPages":frame.pages.iter().filter(|page|surface.pages.get(&page.page).is_none_or(|slot|slot.image.is_none())).map(|page|page.page).collect::<Vec<_>>(),
+        }));
+        if let Some(planned) = &self.planned_frame {
+            let observed = self.first_frame.as_ref().unwrap();
+            for key in ["viewport", "scroll", "zoom", "visiblePages"] {
+                assert_eq!(
+                    planned[key], observed[key],
+                    "Opening geometry differs at {key}"
+                );
+            }
+        }
     }
     pub(super) fn inject_failure(&mut self, document: &str) -> bool {
         if self.stage == 2 && document == "demo-1" {
@@ -33,11 +72,17 @@ impl Probe {
         matches!(self.stage, 0 | 3)
     }
     pub(super) fn summary(&self) -> serde_json::Value {
-        serde_json::json!({"stage":self.stage,"adoptedWithoutImage":self.adopted_without_image,"failureSeen":self.failure_seen,"targetPage":self.target_page,"preparedPages":self.prepared_pages,"emptyPagePaints":self.empty_after.saturating_sub(self.empty_before)})
+        serde_json::json!({"stage":self.stage,"adoptedWithoutImage":self.adopted_without_image,"failureSeen":self.failure_seen,"targetPage":self.target_page,"preparedPages":self.prepared_pages,"plannedFrame":self.planned_frame,"firstFrame":self.first_frame,"emptyPagePaints":self.empty_after.saturating_sub(self.empty_before)})
     }
 }
 impl YamantakaApp {
-    pub fn preview_first_raster(&mut self, expect_empty: bool, fail_once: bool, page_two: bool) {
+    pub fn preview_first_raster(
+        &mut self,
+        expect_empty: bool,
+        fail_once: bool,
+        page_two: bool,
+        from_library: bool,
+    ) {
         if self.demo && self.capture.is_some() {
             self.opening.first_raster_probe = Probe {
                 stage: 1,
@@ -45,6 +90,7 @@ impl YamantakaApp {
                 fail_once,
                 expect_failure: fail_once,
                 target_page: u32::from(page_two),
+                from_library,
                 ..Default::default()
             };
         }
@@ -64,6 +110,10 @@ impl YamantakaApp {
             {
                 let document = self.documents.get(1).cloned().unwrap();
                 self.opening.first_raster_probe.empty_before = self.reader.viewport.empty_paints;
+                if self.opening.first_raster_probe.from_library {
+                    self.show_surface(Surface::Library);
+                    self.inspector = true;
+                }
                 assert!(self.open(document));
                 self.open_intent
                     .set_page("demo-1".into(), self.opening.first_raster_probe.target_page);

@@ -1,0 +1,319 @@
+{
+  "cases": [
+    {
+      "case": "before",
+      "executableSha256": "98b29ccd0cb2249c506fab0e4537121d518603c1c1ec425addedbdaa4037817a",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0
+        ],
+        "firstFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "zoom": 0.20000000298023224,
+          "visiblePages": [
+            0,
+            1
+          ],
+          "missingPages": [
+            1
+          ]
+        },
+        "emptyPagePaints": 1
+      },
+      "trackedPageBytes": 4018944
+    },
+    {
+      "case": "continuous",
+      "executableSha256": "6e603a675ecf24175dcac45818a0731c4235b36c22155869aed1f28c793e9cf5",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0,
+          1
+        ],
+        "plannedFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "zoom": 0.20000000298023224,
+          "visiblePages": [
+            0,
+            1
+          ]
+        },
+        "firstFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "zoom": 0.20000000298023224,
+          "visiblePages": [
+            0,
+            1
+          ],
+          "missingPages": []
+        },
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 7599184
+    },
+    {
+      "case": "library-rotated",
+      "executableSha256": "6e603a675ecf24175dcac45818a0731c4235b36c22155869aed1f28c793e9cf5",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 1,
+        "preparedPages": [
+          1
+        ],
+        "plannedFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            12.0,
+            1116.0
+          ],
+          "zoom": 1.75,
+          "visiblePages": [
+            1
+          ]
+        },
+        "firstFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            12.0,
+            1116.0
+          ],
+          "zoom": 1.75,
+          "visiblePages": [
+            1
+          ],
+          "missingPages": []
+        },
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 25445888
+    },
+    {
+      "case": "panel-enlarged",
+      "executableSha256": "6e603a675ecf24175dcac45818a0731c4235b36c22155869aed1f28c793e9cf5",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0
+        ],
+        "plannedFrame": {
+          "viewport": [
+            468.0,
+            402.0
+          ],
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "zoom": 0.6733333333333333,
+          "visiblePages": [
+            0
+          ]
+        },
+        "firstFrame": {
+          "viewport": [
+            468.0,
+            402.0
+          ],
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "zoom": 0.6733333333333333,
+          "visiblePages": [
+            0
+          ],
+          "missingPages": []
+        },
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 20300588
+    },
+    {
+      "case": "spread-glow-failure",
+      "executableSha256": "6e603a675ecf24175dcac45818a0731c4235b36c22155869aed1f28c793e9cf5",
+      "compositor": "glow",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": true,
+        "targetPage": 1,
+        "preparedPages": [
+          0,
+          1
+        ],
+        "plannedFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "zoom": 1.4892857142857143,
+          "visiblePages": [
+            0,
+            1
+          ]
+        },
+        "firstFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "zoom": 1.4892857142857143,
+          "visiblePages": [
+            0,
+            1
+          ],
+          "missingPages": []
+        },
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 19927112
+    },
+    {
+      "case": "workspaces",
+      "executableSha256": "6e603a675ecf24175dcac45818a0731c4235b36c22155869aed1f28c793e9cf5",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 0,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0,
+          1
+        ],
+        "plannedFrame": null,
+        "firstFrame": null,
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 36830064
+    },
+    {
+      "case": "continuous-5000",
+      "executableSha256": "6e603a675ecf24175dcac45818a0731c4235b36c22155869aed1f28c793e9cf5",
+      "compositor": "native-wgpu",
+      "opening": {
+        "stage": 3,
+        "adoptedWithoutImage": false,
+        "failureSeen": false,
+        "targetPage": 0,
+        "preparedPages": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "plannedFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "zoom": 0.20000000298023224,
+          "visiblePages": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "firstFrame": {
+          "viewport": [
+            1440.0,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "zoom": 0.20000000298023224,
+          "visiblePages": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "missingPages": []
+        },
+        "emptyPagePaints": 0
+      },
+      "trackedPageBytes": 9281656
+    }
+  ],
+  "workspaceScenarioPassed": true,
+  "originalPdfHashesUnchanged": 39,
+  "settledCapturePixelIdentical": true,
+  "settledCaptureDimensions": [
+    1800,
+    1200
+  ],
+  "debugBuildPassed": true,
+  "workspaceClippyPassed": true,
+  "standaloneTestsAdded": 0,
+  "dependenciesAdded": false,
+  "referenceFirstFrameAcceptance": false,
+  "physicalFramePresentationAcceptance": false
+}
