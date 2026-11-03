@@ -1709,15 +1709,15 @@ impl Runtime {
                                     emit(&events, &notify, Update::OpenConfirmed { document: id, cancel, result }, permit);
                                 }
                                 Action::Open(document, password, cancel) => {
+                                    let fresh=if removal.as_ref().is_some_and(|(job,_)|job.contains(&document.id)) {Err(Failure::Invalid("Document removal is in progress".into()))}
+                                        else {CoverSource::capture(&document).read(&repository,&cancel)};
+                                    let document=match fresh {Ok(document)=>document,Err(error)=>{emit(&events,&notify,Update::OpenFailed(Box::new(document),error,cancel),permit);continue;}};
                                     // A visible pane still owns this native handle and its geometry.
                                     if visible.contains(&document.id) {
                                         let error = cancel.check().err().unwrap_or(Failure::ReaderAlreadyOpen);
                                         emit(&events, &notify, Update::OpenFailed(Box::new(document), error, cancel), permit);
                                         continue;
                                     }
-                                    let fresh=if removal.as_ref().is_some_and(|(job,_)|job.contains(&document.id)) {Err(Failure::Invalid("Document removal is in progress".into()))}
-                                        else {CoverSource::capture(&document).read(&repository,&cancel)};
-                                    let document=match fresh {Ok(document)=>document,Err(error)=>{emit(&events,&notify,Update::OpenFailed(Box::new(document),error,cancel),permit);continue;}};
                                     let mut protected = visible.clone();
                                     if !protected.contains(&document.id) { protected.push(document.id.clone()); }
                                     let revision = open_revision.checked_add(1);

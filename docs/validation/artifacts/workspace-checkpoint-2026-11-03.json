@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sourceBase": "296c632",
+  "command": "cargo test --locked --offline --workspace -- --test-threads=1",
+  "workspaceTemporaryDirectory": true,
+  "results": {
+    "passed": 56,
+    "failed": 0,
+    "ignored": 0
+  },
+  "testResultGroups": 20,
+  "logSha256": "65ec5ea1aac2bcfac127a1c8f537e1cac7bc4d9d5d06e1d50a6fdd64b614d30b",
+  "runtimeSha256": "d0240efd81acee8be35aeae5b2154f8c8ee08eee0f72c4329a75b2cafa232eb9",
+  "cargoLockSha256": "d346e2355677b0de010bea37bbfd651405eeaa10598be83384fb0763a9ed5fa9",
+  "allTargetClippyWarningsDenied": true,
+  "workspaceFormatCheck": true,
+  "nativeOwnershipProbe": {
+    "version": 1,
+    "synthetic": true,
+    "unchangedVisibleOpenRejected": true,
+    "changedVisibleOpenRejected": true,
+    "oldTextRetainedBeforeEdit": true,
+    "oldSourceReadRejectedAfterEdit": true,
+    "referenceUnaffected": true,
+    "nativeEpochRetained": true,
+    "cachedRasterRetained": true,
+    "cancellationPreserved": true,
+    "ownershipRejectionExcludedFromQuarantine": true,
+    "closedReaderReopenedWithNewText": true,
+    "bothReadersClosed": true
+  },
+  "newRustTestFunctions": 0,
+  "correction": "Validate removal and fresh catalogue state before rejecting native replacement of a visible reader.",
+  "scope": "The complete retained workspace suite and the synthetic two-reader ownership probe. Comparative performance, physical accessibility and final replacement-release acceptance remain open."
+}

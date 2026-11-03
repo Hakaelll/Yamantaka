@@ -7,7 +7,7 @@ requests, but cannot identify which pane originated a later request for the same
 document ID.
 
 The application actor now rejects that replacement with `ReaderAlreadyOpen`
-before repository preparation or native admission. Cancellation retains its
+after catalogue/removal validation and before native admission. Cancellation retains its
 `Cancelled` result. Closing the reading releases its owner and permits a fresh
 open. Selecting a document's existing tab still reuses that reading. To load an
 external edit, close Compare if it displays that PDF, close the PDF's reading
@@ -45,3 +45,17 @@ captures stay local under `build/verification/reader-ownership`.
 This checkpoint verifies actor admission and native close/reopen behavior. It
 does not add automatic reload, certify every UI close/draft interaction or replace
 the remaining physical accessibility, filesystem and Release performance gates.
+
+## Complete retained workspace check
+
+A subsequent workspace run exposed an admission-order regression: reopening a
+visible document during removal returned `ReaderAlreadyOpen` before the existing
+removal rejection. Catalogue and removal validation now run first. The visible
+owner remains protected before any native opening request.
+
+The corrected locked, offline workspace run passed all 56 retained tests, with
+zero failures or ignored tests. Workspace formatting, all-target Clippy with
+warnings denied and the native two-reader ownership probe also passed. No Rust
+test functions were added. The [workspace artifact](artifacts/workspace-checkpoint-2026-11-03.json)
+records the source and raw-log hashes. These checks do not establish comparative
+performance, physical accessibility or final replacement-release readiness.

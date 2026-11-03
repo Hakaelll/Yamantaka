@@ -8,7 +8,7 @@ is insufficient to satisfy the supplied specification.
 Validation scope changed on 2026-10-18 at the owner's request: the Rust suite
 retained 54 essential tests after the reduction from 536; focused selection/bulk-favorites and compact viewport geometry regressions bring the current source count to 56. Historical reports describe
 their original checkpoints, including tests subsequently removed. This reduction
-does not upgrade any acceptance status. See
+does not upgrade any acceptance status. The [current complete workspace run](../validation/artifacts/workspace-checkpoint-2026-11-03.json) passes all 56 retained tests after correcting visible-reader/removal admission order. See
 `../validation/rust-reading-refinement-2026-10-18.md` for retained coverage,
 multi-line title extraction, hidden reading controls, and current limitations.
 
