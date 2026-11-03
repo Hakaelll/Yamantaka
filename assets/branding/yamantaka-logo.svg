@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
   <title id="title">Yamantaka</title>
-  <desc id="description">Two offset black page folds form an abstract reading mark on a warm paper tile.</desc>
+  <desc id="description">Two angular black leaves frame an open reading space on a warm paper tile.</desc>
   <rect width="512" height="512" rx="104" fill="#F2EFE8"/>
-  <polygon points="104,152 248,104 248,256 176,280 176,352 104,376" fill="#101112"/>
-  <polygon points="264,160 408,112 408,360 264,408 264,336 336,312 336,208 264,232" fill="#101112"/>
+  <polygon points="104,176 244,112 244,176 168,212 168,300 244,336 244,400 104,336" fill="#101112"/>
+  <polygon points="268,112 408,176 408,336 268,400 268,336 344,300 344,212 268,176" fill="#101112"/>
 </svg>

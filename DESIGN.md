@@ -145,7 +145,7 @@ components:
 
 A personal collection supplies the identity. Matte book volumes, visible paper edges and family-specific jacket lettering make books recognizable, while graphite surfaces, ivory text and functional violet keep the interface calm and precise. Light mode changes the room to warm paper without changing the collection's authored colors.
 
-Beauty comes from physical coherence and clear hierarchy: connected book geometry, lettering attached to the cover plane, stable catalogue titles, and restrained native controls. Segoe UI Variable is the explicitly required Windows interface face. Locally bundled Source Serif 4 Display accompanies document titles and three jacket families. The abstract black page-fold mark in `assets/branding/yamantaka-logo.svg` is the canonical brand asset, following the owner's 2026-11-02 request to replace the previous emblem.
+Beauty comes from physical coherence and clear hierarchy: connected book geometry, lettering attached to the cover plane, stable catalogue titles, and restrained native controls. Segoe UI Variable is the explicitly required Windows interface face. Locally bundled Source Serif 4 Display accompanies document titles and three jacket families. The abstract black open-folio mark in `assets/branding/yamantaka-logo.svg` is the canonical brand asset, following the owner's 2026-11-02 request to replace the previous emblem.
 
 **Key Characteristics:**
 
@@ -533,7 +533,7 @@ Compact library composition follows width rather than the remaining scroll heigh
 
 ## Corporate identity
 
-The owner requested a replacement mark on 2026-11-02 and then asked for a more abstract black symbol. Two offset page folds form the current geometric mark, suggesting pages and a binding without using a letterform. The `#101112` geometry sits on a warm paper `#F2EFE8` tile with a 104-unit radius on a 512-unit canvas. The tile keeps the black mark visible against both light and dark Windows surfaces. The mark uses no gradients, lettering assets or external fonts. Functional violet remains an interface accent rather than the logo color.
+The owner requested a replacement mark on 2026-11-02 and then asked for a more abstract black symbol. Two angular leaves frame an open reading space in the current geometric mark. Its symmetrical silhouette suggests an open folio in perspective without using a letterform. The `#101112` geometry sits on a warm paper `#F2EFE8` tile with a 104-unit radius on a 512-unit canvas. The tile keeps the black mark visible against both light and dark Windows surfaces. The mark uses no gradients, lettering assets or external fonts. Functional violet remains an interface accent rather than the logo color.
 
 `assets/branding/yamantaka-logo.svg` owns the geometry. Run `tool/generate_brand_assets.py` to rebuild PNG and multi-size ICO variants, then `tool/verify_brand_assets.ps1` to check them. The Rust executable embeds the Windows icon resource as well as setting its live window icon. Historical Flutter launcher assets use the same mark; this does not reactivate mobile or web targets. The previous emblem remains recoverable in Git.
 

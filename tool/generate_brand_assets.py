@@ -62,7 +62,7 @@ def generated():
     for path in ["windows/runner/resources/app_icon.ico", "web/favicon.ico"]:
         output[path] = ico.getvalue()
     manifest = {
-        "version": 1, "identity": "abstract-page-folds-v2", "source": SOURCE.relative_to(ROOT).as_posix(),
+        "version": 1, "identity": "open-folio-v3", "source": SOURCE.relative_to(ROOT).as_posix(),
         "sourceSha256": hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
         "background": "#F2EFE8", "foreground": "#101112", "icoSizes": list(ICO_SIZES),
         "files": [{"path": path, "sha256": hashlib.sha256(data).hexdigest()} for path, data in sorted(output.items())],
