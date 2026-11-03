@@ -43,7 +43,7 @@ The target is **Windows 10/11 x64**. A native review bundle includes the executa
 
 The default compositor uses DirectX 12 through wgpu. If initialization fails, the application attempts the alternate OpenGL compositor once in a fresh process. You can also start with `--opengl`; see [graphics recovery](docs/user-guide/graphics-recovery.md).
 
-The [review 09 notes](docs/release/rust-0.16-review-09.md) record the current local candidate, source revision, checks and archive hash.
+The [review 10 notes](docs/release/rust-0.16-review-10.md) describe the latest local candidate and its packaging scope. Application checks recorded for [review 09](docs/release/rust-0.16-review-09.md) apply to that earlier revision; review 10 has no new runtime acceptance.
 
 Portable builds include `.yamantaka-rust-portable` and keep independent `rust-data` and `rust-cache` folders beside the executable. Extract a review build separately from your Flutter installation.
 
