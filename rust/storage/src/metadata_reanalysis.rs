@@ -1,8 +1,10 @@
 use crate::{Database, database::storage};
 use rusqlite::{TransactionBehavior, params};
 use yamantaka_domain::{
-    Cancellation, Document, Failure, NewDocument, Result, front_matter::ImportAnalysis,
-    metadata_review::MetadataReview, search::IndexAccess,
+    Cancellation, Document, Failure, NewDocument, Result,
+    front_matter::{EvidenceKind, ImportAnalysis, MetadataDecision},
+    metadata_review::MetadataReview,
+    search::IndexAccess,
 };
 
 pub(crate) fn save(
@@ -67,7 +69,12 @@ pub(crate) fn save(
     }
     let file_name = canonical.file_name().unwrap_or_default().to_string_lossy();
     let (title, author) = crate::import_metadata::effective(analyzed, &file_name);
-    for (baseline, analyzed) in [
+    let replace_filename = before.automatic_title.as_deref().is_some_and(|value| {
+        yamantaka_domain::import_metadata::is_filename_title(value, &file_name)
+    }) && matches!(&analyzed.analysis, ImportAnalysis::Complete(evidence)
+        if matches!(&evidence.title, MetadataDecision::Autofill(candidate)
+            if matches!(candidate.evidence, EvidenceKind::TitleWithByline | EvidenceKind::RepeatedTitleWithByline)));
+    for (baseline, analyzed, replace_filename) in [
         (
             yamantaka_domain::import_metadata::catalogue_title(
                 before.automatic_title.as_deref(),
@@ -75,14 +82,17 @@ pub(crate) fn save(
                 &file_name,
             ),
             &title,
+            replace_filename,
         ),
         (
             yamantaka_domain::import_metadata::author(before.automatic_author.as_deref()),
             &author,
+            false,
         ),
     ] {
         if let yamantaka_domain::import_metadata::MetadataValue::Accepted(value) = baseline
             && analyzed.as_deref() != Some(value.as_str())
+            && !replace_filename
         {
             return Err(Failure::Invalid(
                 "Analysis does not preserve the accepted catalogue metadata".into(),

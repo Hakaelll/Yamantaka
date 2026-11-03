@@ -7,6 +7,15 @@ pub enum MetadataValue {
     Rejected,
 }
 
+/// Filename metadata remains usable as a fallback, but is not strong title evidence.
+pub fn is_filename_title(value: &str, file_name: &str) -> bool {
+    let value = key(value);
+    let stem = file_name
+        .rsplit_once('.')
+        .map_or(file_name, |(stem, _)| stem);
+    !value.is_empty() && (value == key(file_name) || value == key(stem))
+}
+
 pub fn title(value: Option<&str>, file_name: &str) -> MetadataValue {
     let cleaned = clean(value);
     let MetadataValue::Accepted(text) = &cleaned else {

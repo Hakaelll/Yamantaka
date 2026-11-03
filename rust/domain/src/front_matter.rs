@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub const MAX_FRONT_MATTER_PAGES: u32 = 6;
-pub const ENRICHMENT_ALGORITHM_VERSION: u32 = 3;
+pub const ENRICHMENT_ALGORITHM_VERSION: u32 = 4;
 
 pub enum ImportAnalysis {
     NotRequested,
@@ -76,6 +76,7 @@ pub struct EnrichmentEvidence {
 
 pub struct FrontMatter {
     title: MetadataValue,
+    title_from_filename: bool,
     author: MetadataValue,
     title_match: Option<u32>,
     author_match: Option<u32>,
@@ -105,8 +106,12 @@ impl FrontMatter {
                 16 * 1024,
             ))
             .map_err(|_| Failure::MemoryBudget)?;
+        let title = import_metadata::title(title, file_name);
+        let title_from_filename = matches!(&title, MetadataValue::Accepted(value)
+            if import_metadata::is_filename_title(value, file_name));
         Ok(Self {
-            title: import_metadata::title(title, file_name),
+            title,
+            title_from_filename,
             author: import_metadata::author(author),
             title_match: None,
             author_match: None,
@@ -238,8 +243,13 @@ impl FrontMatter {
             candidate
         });
         Ok(EnrichmentEvidence {
-            title: decision(self.title, self.title_match, title),
-            author: decision(self.author, self.author_match, self.candidate_author),
+            title: decision(
+                self.title,
+                self.title_match,
+                title,
+                self.title_from_filename,
+            ),
+            author: decision(self.author, self.author_match, self.candidate_author, false),
             has_text: self.has_text,
             _lease: self.lease,
         })
@@ -250,6 +260,7 @@ fn decision(
     current: MetadataValue,
     matching_page: Option<u32>,
     candidate: Option<MetadataCandidate>,
+    replace_filename: bool,
 ) -> MetadataDecision {
     let matching_page = matching_page.or_else(|| {
         candidate
@@ -260,6 +271,13 @@ fn decision(
     let candidate = match candidate {
         Some(candidate) if candidate.evidence == EvidenceKind::ConflictingBylines => {
             return MetadataDecision::Review { current, candidate };
+        }
+        Some(candidate)
+            if replace_filename
+                && automatic_evidence(candidate.evidence)
+                && !matches_value(&current, &candidate.value) =>
+        {
+            return MetadataDecision::Autofill(candidate);
         }
         candidate => candidate,
     };
@@ -274,18 +292,20 @@ fn decision(
     let Some(candidate) = candidate else {
         return MetadataDecision::Unchanged(current);
     };
-    if matches!(current, MetadataValue::Accepted(_))
-        || !matches!(
-            candidate.evidence,
-            EvidenceKind::ExplicitByline
-                | EvidenceKind::TitleWithByline
-                | EvidenceKind::RepeatedTitleWithByline
-        )
-    {
+    if matches!(current, MetadataValue::Accepted(_)) || !automatic_evidence(candidate.evidence) {
         MetadataDecision::Review { current, candidate }
     } else {
         MetadataDecision::Autofill(candidate)
     }
+}
+
+fn automatic_evidence(evidence: EvidenceKind) -> bool {
+    matches!(
+        evidence,
+        EvidenceKind::ExplicitByline
+            | EvidenceKind::TitleWithByline
+            | EvidenceKind::RepeatedTitleWithByline
+    )
 }
 
 fn normalized(text: &str) -> String {

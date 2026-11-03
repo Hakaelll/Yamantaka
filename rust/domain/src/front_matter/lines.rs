@@ -223,6 +223,11 @@ pub(super) fn analyze(
         &mut line_count,
     );
     cancel.check()?;
+    lines.sort_by(|left, right| {
+        left.layout.min()[1]
+            .total_cmp(&right.layout.min()[1])
+            .then_with(|| left.layout.min()[0].total_cmp(&right.layout.min()[0]))
+    });
     Ok(PageAnalysis {
         lines,
         front_matter: line_count <= 24,

@@ -64,6 +64,8 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Excluded claims
 
+Front-matter analyzer version four now orders lines by page geometry and treats filename-equivalent embedded titles as replaceable only with the existing automatic title evidence. The same exception reaches guarded catalogue reanalysis while retaining manual overrides and protection of other accepted metadata. See [book metadata](../user-guide/book-metadata.md). No new tests, compilation or native PDF runs were executed for this update; metadata acceptance remains Partial.
+
 Reduced motion now reaches the reference viewport explicitly and disables drag inertia in both readers. Application input consumes the remaining discrete-wheel smoothing delta, and native state transitions use zero animation time. The pinned egui scroll container also finishes an outstanding scroll target when animation is disabled. No new tests, compilation or rendered checks were run for this implementation; physical motion and input acceptance remain pending.
 
 Saved comparison context now also carries the reference reading mode, page layout, cover pairing, initial side and control-hiding preference. The Flutter split adapter supplies the same fields, and default-session continuity supports version seven. See [reference reading context](rust-comparison-reading-context.md). This is an implementation checkpoint without newly executed tests, compilation or rendered acceptance; the workspace and continuity rows remain Partial.
