@@ -4,9 +4,10 @@ use yamantaka_domain::{
     reader_tabs::{DocumentTabs, QueueEntry, QueueStatus, ReaderTab},
 };
 impl YamantakaApp {
-    pub fn preview_workspaces(&mut self) {
+    pub fn preview_workspaces(&mut self, continuous: bool) {
         if self.demo && self.capture.is_some() {
             self.workspaces.preview = 1;
+            self.workspaces.continuous_preview = continuous;
             self.tabs.continuity.overridden = true;
         }
     }
@@ -22,6 +23,12 @@ impl YamantakaApp {
             preferences.reading_theme = ReaderTheme::Sepia;
             preferences.page_rotation = PageRotation::Deg90;
             preferences.horizontal_margin = 48.0;
+            if index == 2 && self.workspaces.continuous_preview {
+                preferences.view_mode = yamantaka_domain::reader_preferences::ReaderMode::Document;
+                preferences.page_layout = yamantaka_domain::PageLayout::Continuous;
+                preferences.zoom_mode = ZoomMode::FitWidth;
+                preferences.page_rotation = PageRotation::Deg0;
+            }
             let queue = if index == 0 {
                 QueueEntry::new(
                     QueueStatus::Blocked,
@@ -109,7 +116,11 @@ impl YamantakaApp {
                     bidirectional: false,
                     swapped: false,
                     differences: Default::default(),
-                    layout: yamantaka_domain::workspaces::ComparisonLayout::Stacked,
+                    layout: if self.workspaces.continuous_preview {
+                        yamantaka_domain::workspaces::ComparisonLayout::SideBySide
+                    } else {
+                        yamantaka_domain::workspaces::ComparisonLayout::Stacked
+                    },
                     scroll_offset: Some(80.0),
                     primary: self.documents[2].id.clone(),
                     document: self.documents[1].id.clone(),
@@ -183,18 +194,29 @@ impl YamantakaApp {
                 && self.tabs.ready()
                 && self.workspaces.comparison_restore.is_none()
                 && self.reference.as_ref().is_some_and(|reference| {
-                    !reference.busy() && !reference.pane.loading && reference.stacked
+                    !reference.deferred
+                        && !reference.busy()
+                        && !reference.pane.loading
+                        && reference.stacked != self.workspaces.continuous_preview
                 })
                 && !self.reader.reader_preferences_loading =>
             {
                 assert_eq!(self.reader_panel_width, 360.0);
                 assert_eq!(
                     self.reader.reader_preferences.as_ref().unwrap().view_mode,
-                    yamantaka_domain::reader_preferences::ReaderMode::Book
+                    if self.workspaces.continuous_preview {
+                        yamantaka_domain::reader_preferences::ReaderMode::Document
+                    } else {
+                        yamantaka_domain::reader_preferences::ReaderMode::Book
+                    }
                 );
                 assert_eq!(
                     self.opening.summary()["firstRaster"]["preparedPages"],
-                    serde_json::json!([0, 1])
+                    if self.workspaces.continuous_preview {
+                        serde_json::json!([0])
+                    } else {
+                        serde_json::json!([0, 1])
+                    }
                 );
                 assert_eq!(
                     self.library_columns,
@@ -212,7 +234,11 @@ impl YamantakaApp {
                 assert_eq!(comparison.ratio, 0.6);
                 assert_eq!(
                     comparison.layout,
-                    yamantaka_domain::workspaces::ComparisonLayout::Stacked
+                    if self.workspaces.continuous_preview {
+                        yamantaka_domain::workspaces::ComparisonLayout::SideBySide
+                    } else {
+                        yamantaka_domain::workspaces::ComparisonLayout::Stacked
+                    }
                 );
                 let reference = self.reference.as_mut().unwrap();
                 reference.follow_zoom = true;
@@ -234,7 +260,11 @@ impl YamantakaApp {
                         .as_ref()
                         .unwrap()
                         .page_rotation,
-                    PageRotation::Deg90
+                    if self.workspaces.continuous_preview {
+                        PageRotation::Deg0
+                    } else {
+                        PageRotation::Deg90
+                    }
                 );
                 self.workspaces.preview = 9;
                 self.show_workspaces();

@@ -1290,7 +1290,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     app.preview_reading_queue();
                 }
                 if args.iter().any(|arg| arg == "--workspaces") {
-                    app.preview_workspaces();
+                    app.preview_workspaces(args.iter().any(|arg| arg == "--workspaces-continuous"));
                 }
                 if args
                     .iter()

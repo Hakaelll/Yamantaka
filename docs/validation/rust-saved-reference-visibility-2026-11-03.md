@@ -6,4 +6,4 @@ The native workspace scenario passed its existing saved-page, rotation, zoom, ra
 
 The [status artifact](artifacts/saved-reference-visibility.json) records selected results and the executable hash. Captures remain local under `build/verification/saved-reference`.
 
-This closes the provisional reference display gap in the exercised restoration. Automatic preparation of newly exposed primary pages before the split remains pending; the manual path already stages those pages. Broader automatic restoration failures, cancellation, physical accessibility, and performance acceptance are also pending. These checks do not prove whole-comparison frame continuity or replacement Release readiness.
+This closes the provisional reference display gap in the exercised restoration. The subsequent [restored-primary checkpoint](rust-restored-primary-2026-11-03.md) adds automatic preparation of newly exposed primary pages before the split. Broader automatic restoration failures, cancellation, physical accessibility, and performance acceptance remain pending. These checks do not prove whole-comparison frame continuity or replacement Release readiness.

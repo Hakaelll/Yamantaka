@@ -1349,6 +1349,7 @@ impl YamantakaApp {
             self.toggle_reference(ui.ctx());
         }
         self.prepare_reference_mount(ui);
+        self.prepare_saved_primary(ui);
         if self
             .reference
             .as_mut()
@@ -1717,6 +1718,7 @@ impl App for YamantakaApp {
                 Update::Page(page, cancel, _, _) => {
                     if !self.accept_open_preparation_image(ctx, &page, &cancel)
                         && !self.accept_reference_mount_image(ctx, &page, &cancel)
+                        && !self.accept_saved_primary_image(ctx, &page, &cancel)
                         && !self.accept_reference_preparation_image(ctx, &page, &cancel)
                     {
                         self.accept_rendered_page(ctx, &page, &cancel);
@@ -1839,6 +1841,9 @@ impl App for YamantakaApp {
                         continue;
                     }
                     if self.fail_reference_mount(ctx, &error, cancel.as_ref()) {
+                        continue;
+                    }
+                    if self.fail_saved_primary(ctx, &error, cancel.as_ref()) {
                         continue;
                     }
 
@@ -2619,6 +2624,7 @@ impl App for YamantakaApp {
                     && self.importing.recovery_ready()
                     && self.opening.ready()
                     && self.reference_mount.is_none()
+                    && self.reference.as_ref().is_none_or(|reference|!reference.deferred)
                     && !self.preview_reference
                     && self.tabs.ready()
                     && self.reading_queue.ready()

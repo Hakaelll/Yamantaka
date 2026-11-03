@@ -8,6 +8,18 @@ struct Page {
     progress: Progress,
     image: Option<PageImage>,
 }
+pub(super) struct PrimaryStage {
+    source: Cancellation,
+    pages: std::collections::BTreeMap<u32, Page>,
+}
+impl PrimaryStage {
+    pub(super) fn new(source: Cancellation) -> Self {
+        Self {
+            source,
+            pages: Default::default(),
+        }
+    }
+}
 impl Drop for Page {
     fn drop(&mut self) {
         self.cancel.cancel();
@@ -144,6 +156,147 @@ impl ReferenceView {
 }
 
 impl YamantakaApp {
+    pub(in crate::app) fn prepare_saved_primary(&mut self, ui: &mut egui::Ui) {
+        let Some(reference) = &mut self.reference else {
+            return;
+        };
+        if reference.busy() || reference.close_requested {
+            return;
+        }
+        let Some(stage) = &mut reference.primary_stage else {
+            return;
+        };
+        if stage.source.is_cancelled()
+            || !stage
+                .source
+                .same_request(&self.reader.reader_preferences_cancel)
+        {
+            self.close_reference_preserving_continuity();
+            return;
+        }
+        if self.reader.reader_destination.is_some() {
+            return;
+        }
+        let geometry = comparison_rects(
+            ui.available_rect_before_wrap(),
+            reference.layout,
+            reference.ratio,
+            reference.swapped,
+        );
+        let frame = match plan_primary(
+            &self.reader,
+            &mut stage.pages,
+            geometry.primary,
+            &self.runtime,
+            ui,
+            self.governor.limits().pages,
+        ) {
+            Ok(frame) => frame,
+            Err(error) => {
+                self.error = Some(error.to_string());
+                self.close_reference_preserving_continuity();
+                return;
+            }
+        };
+        if stage.pages.values().any(|page| page.image.is_none()) {
+            return;
+        }
+        if let Some(probe) = &mut reference.opening_probe {
+            probe.primary_plan = Some(frame_summary(&frame));
+            probe.primary_staged = stage.pages.keys().copied().collect();
+        }
+        for (page, slot) in &mut stage.pages {
+            let mut key = slot.key.clone();
+            key.generation = self.reader.viewport.generation;
+            if let Some(previous) = self.reader.viewport.pages.insert(
+                *page,
+                ReaderPage {
+                    requested: None,
+                    cancel: Cancellation::default(),
+                    image: slot.image.take(),
+                    image_key: Some(key),
+                    plan: Default::default(),
+                    refinement: Default::default(),
+                },
+            ) {
+                previous.cancel.cancel();
+            }
+        }
+        self.reader.restoration.scroll = Some(frame.scroll[1]);
+        self.reader.viewport.scroll_anchor = true;
+        reference.primary_stage = None;
+        reference.deferred = false;
+    }
+    pub(in crate::app) fn accept_saved_primary_image(
+        &mut self,
+        ctx: &egui::Context,
+        page: &RenderedPage,
+        token: &Cancellation,
+    ) -> bool {
+        let Some(stage) = self
+            .reference
+            .as_mut()
+            .and_then(|reference| reference.primary_stage.as_mut())
+        else {
+            return false;
+        };
+        let Some(slot) = stage
+            .pages
+            .get_mut(&page.key.page)
+            .filter(|slot| slot.cancel.same_request(token))
+        else {
+            return false;
+        };
+        if token.is_cancelled()
+            || stage.source.is_cancelled()
+            || slot.key != page.key
+            || !matches!(slot.progress, Progress::Submitted)
+        {
+            return true;
+        }
+        match render_updates::upload_image(ctx, &mut self.presenter, &mut self.managed_pages, page)
+        {
+            Ok(image) => slot.image = Some(image),
+            Err(error) => {
+                self.error = Some(error.to_string());
+                self.close_reference_preserving_continuity();
+            }
+        }
+        true
+    }
+    pub(in crate::app) fn fail_saved_primary(
+        &mut self,
+        ctx: &egui::Context,
+        error: &Failure,
+        token: Option<&Cancellation>,
+    ) -> bool {
+        let Some(stage) = self
+            .reference
+            .as_mut()
+            .and_then(|reference| reference.primary_stage.as_mut())
+        else {
+            return false;
+        };
+        let Some(slot) = stage
+            .pages
+            .values_mut()
+            .find(|slot| token.is_some_and(|token| slot.cancel.same_request(token)))
+        else {
+            return false;
+        };
+        if matches!(error, Failure::QueueFull) && !stage.source.is_cancelled() {
+            slot.cancel.cancel();
+            slot.cancel = Cancellation::default();
+            slot.progress = Progress::Waiting(Instant::now() + Duration::from_millis(100));
+            ctx.request_repaint_after(Duration::from_millis(100));
+        } else {
+            if !matches!(error, Failure::Cancelled) {
+                self.error = Some(error.to_string());
+            }
+            self.close_reference_preserving_continuity();
+        }
+        true
+    }
     pub fn preview_reference_mount(&mut self, cancel: bool, pressure: bool) {
         if self.demo && self.capture.is_some() {
             self.reference_mount_preview = if pressure {
@@ -174,95 +327,20 @@ impl YamantakaApp {
             return;
         }
         let result = (|| {
-            let layout = self.reader.viewport.layout.as_ref().ok_or_else(|| {
-                Failure::Invalid("The primary reader layout is unavailable".into())
-            })?;
-            let preferences = self.reader.reader_preferences.as_ref().ok_or_else(|| {
-                Failure::Invalid("The primary reader preferences are unavailable".into())
-            })?;
-            let navigation = self.reader.navigation.as_ref().ok_or_else(|| {
-                Failure::Invalid("The primary reader position is unavailable".into())
-            })?;
-            let (document, info) = self.reader.active.as_ref().unwrap();
             let geometry = comparison_rects(
                 ui.available_rect_before_wrap(),
                 mount.view.layout,
                 mount.view.ratio,
                 mount.view.swapped,
             );
-            let size = geometry.primary.size();
-            let viewport = [f64::from(size.x.max(1.0)), f64::from(size.y.max(1.0))];
-            let anchor = navigation.position();
-            let zoom = f64::from(self.reader.zoom);
-            let [x, y] = layout.scroll_for_anchor(viewport, anchor, preferences.zoom_mode, zoom)?;
-            let y = self.reader.restoration.scroll.unwrap_or(y);
-            let frame = layout.frame(
-                viewport,
-                anchor,
-                preferences.zoom_mode,
-                zoom,
-                [f64::from(x as f32), f64::from(y as f32)],
-                0.0,
+            let frame = plan_primary(
+                &self.reader,
+                &mut mount.pages,
+                geometry.primary,
+                &self.runtime,
+                ui,
+                self.governor.limits().pages,
             )?;
-            let mut missing: Vec<_> = frame
-                .pages
-                .iter()
-                .filter(|page| {
-                    self.reader
-                        .viewport
-                        .pages
-                        .get(&page.page)
-                        .is_none_or(|slot| slot.image.is_none())
-                })
-                .map(|page| page.page)
-                .collect();
-            missing.sort_unstable();
-            missing.dedup();
-            if mount.pages.keys().copied().ne(missing.iter().copied()) {
-                mount.pages.clear();
-                let budget = (self.governor.limits().pages / 12).clamp(4, 1024 * 1024)
-                    / missing.len().max(1);
-                if budget < 4 {
-                    return Err(Failure::MemoryBudget);
-                }
-                let cap = (ui.input(|input| input.max_texture_side) as u32).min(768);
-                for page in missing {
-                    let size = info
-                        .pages
-                        .get(page as usize)
-                        .ok_or_else(|| {
-                            Failure::Invalid("A comparison page is outside the PDF".into())
-                        })?
-                        .size();
-                    let pixels = preview_dimensions(egui::vec2(size[0], size[1]), 1.0, cap, budget);
-                    mount.pages.insert(
-                        page,
-                        Page {
-                            key: RenderKey {
-                                document_id: document.id.clone(),
-                                page,
-                                region: None,
-                                physical_width: pixels[0],
-                                physical_height: pixels[1],
-                                rotation: 0,
-                                generation: 0,
-                            },
-                            cancel: Cancellation::default(),
-                            progress: Progress::Waiting(Instant::now()),
-                            image: None,
-                        },
-                    );
-                }
-            }
-            for page in mount.pages.values_mut().filter(|page| page.image.is_none()) {
-                preparation::submit(
-                    &self.runtime,
-                    ui.ctx(),
-                    &page.key,
-                    &page.cancel,
-                    &mut page.progress,
-                )?;
-            }
             if let Admission::Preparing(candidate) = &mut mount.view.admission {
                 preparation::submit(
                     &self.runtime,
@@ -411,4 +489,99 @@ impl YamantakaApp {
         }
         true
     }
+}
+
+fn plan_primary(
+    reader: &reader_pane::ReaderPane,
+    pages: &mut std::collections::BTreeMap<u32, Page>,
+    rect: egui::Rect,
+    runtime: &Runtime,
+    ui: &mut egui::Ui,
+    bytes: usize,
+) -> yamantaka_domain::Result<ReaderFrame> {
+    let layout = reader
+        .viewport
+        .layout
+        .as_ref()
+        .ok_or_else(|| Failure::Invalid("The primary reader layout is unavailable".into()))?;
+    let preferences = reader
+        .reader_preferences
+        .as_ref()
+        .ok_or_else(|| Failure::Invalid("The primary reader preferences are unavailable".into()))?;
+    let navigation = reader
+        .navigation
+        .as_ref()
+        .ok_or_else(|| Failure::Invalid("The primary reader position is unavailable".into()))?;
+    let (document, info) = reader.active.as_ref().unwrap();
+    let size = rect.size();
+    let viewport = [f64::from(size.x.max(1.0)), f64::from(size.y.max(1.0))];
+    let anchor = navigation.position();
+    let zoom = f64::from(reader.zoom);
+    let [x, y] = layout.scroll_for_anchor(viewport, anchor, preferences.zoom_mode, zoom)?;
+    let y = reader.restoration.scroll.unwrap_or(y);
+    let frame = layout.frame(
+        viewport,
+        anchor,
+        preferences.zoom_mode,
+        zoom,
+        [f64::from(x as f32), f64::from(y as f32)],
+        0.0,
+    )?;
+    let mut missing: Vec<_> = frame
+        .pages
+        .iter()
+        .filter(|page| {
+            reader
+                .viewport
+                .pages
+                .get(&page.page)
+                .is_none_or(|slot| slot.image.is_none())
+        })
+        .map(|page| page.page)
+        .collect();
+    missing.sort_unstable();
+    missing.dedup();
+    if pages.keys().copied().ne(missing.iter().copied()) {
+        pages.clear();
+        let budget = (bytes / 12).clamp(4, 1024 * 1024) / missing.len().max(1);
+        if budget < 4 {
+            return Err(Failure::MemoryBudget);
+        }
+        let cap = (ui.input(|input| input.max_texture_side) as u32).min(768);
+        for page in missing {
+            let size = info
+                .pages
+                .get(page as usize)
+                .ok_or_else(|| Failure::Invalid("A comparison page is outside the PDF".into()))?
+                .size();
+            let pixels = preview_dimensions(egui::vec2(size[0], size[1]), 1.0, cap, budget);
+            pages.insert(
+                page,
+                Page {
+                    key: RenderKey {
+                        document_id: document.id.clone(),
+                        page,
+                        region: None,
+                        physical_width: pixels[0],
+                        physical_height: pixels[1],
+                        rotation: 0,
+                        generation: 0,
+                    },
+                    cancel: Cancellation::default(),
+                    progress: Progress::Waiting(Instant::now()),
+                    image: None,
+                },
+            );
+        }
+    }
+    for page in pages.values_mut().filter(|page| page.image.is_none()) {
+        preparation::submit(
+            runtime,
+            ui.ctx(),
+            &page.key,
+            &page.cancel,
+            &mut page.progress,
+        )?;
+    }
+    Ok(frame)
 }

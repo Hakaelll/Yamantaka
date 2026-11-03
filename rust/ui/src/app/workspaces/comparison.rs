@@ -124,6 +124,7 @@ impl YamantakaApp {
             return;
         }
         let direction = self.reading_direction();
+        let source = self.reader.reader_preferences_cancel.clone();
         let result = self
             .reference
             .as_mut()
@@ -132,7 +133,7 @@ impl YamantakaApp {
             })
             .and_then(|reference| {
                 reference.restore(&restore.saved, direction)?;
-                reference.release_deferred()
+                reference.release_deferred(source)
             });
         self.finish_workspace_comparison(
             restore.origin,

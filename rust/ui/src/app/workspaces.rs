@@ -37,6 +37,7 @@ pub(super) struct WorkspaceState {
     focus_close: bool,
     focus_cancel: bool,
     preview: u8,
+    continuous_preview: bool,
     startup: startup::Startup,
     startup_view: Option<yamantaka_domain::workspaces::WorkspaceView>,
     undo: Option<yamantaka_domain::workspaces::WorkspaceUndo>,

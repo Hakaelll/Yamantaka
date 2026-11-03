@@ -26,6 +26,7 @@ struct ReferenceTools<'a> {
 }
 pub(super) struct ReferenceView {
     pub(in crate::app) deferred: bool,
+    primary_stage: Option<mount::PrimaryStage>,
     provisional_paints: u64,
     opening_probe: Option<preparation::Probe>,
     retry_open: Option<preparation::OpenRequest>,
@@ -95,7 +96,10 @@ impl ReferenceView {
             summary
         })
     }
-    pub(in crate::app) fn release_deferred(&mut self) -> yamantaka_domain::Result<()> {
+    pub(in crate::app) fn release_deferred(
+        &mut self,
+        source: Cancellation,
+    ) -> yamantaka_domain::Result<()> {
         if self.deferred
             && !self.busy()
             && self
@@ -105,9 +109,9 @@ impl ReferenceView {
                 .get(&self.pane.page)
                 .is_some_and(|slot| slot.image.is_some())
         {
-            self.deferred = false;
+            self.primary_stage = Some(mount::PrimaryStage::new(source));
         }
-        if self.deferred {
+        if self.deferred && self.primary_stage.is_none() {
             Err(yamantaka_domain::Failure::Invalid(
                 "The saved reference image is not ready".into(),
             ))
@@ -144,6 +148,7 @@ impl ReferenceView {
         pane.rebuild_layout(direction)?;
         Ok(Self {
             deferred: false,
+            primary_stage: None,
             provisional_paints: 0,
             opening_probe: None,
             retry_open: None,
