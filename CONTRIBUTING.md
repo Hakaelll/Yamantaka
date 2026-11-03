@@ -64,6 +64,8 @@ The launcher replaces managed synthetic previews and leaves ordinary application
 
 Capture processes are awaited and cleaned up before another case starts. [Native close checks](docs/validation/rust-native-close-2026-11-03.md) record the tested limits. Review old frozen executables with `tool/prune_rust_checkpoints.ps1`; use `-Apply` only for its reviewed candidates. Its scope excludes source, PDFs, libraries and compiler dependencies.
 
+Checkpoint cleanup queries Windows process paths through CIM, including applications outside the current shell job. It stops without removing files if process paths cannot be inspected, and retains the two newest frozen executables plus every executable currently in use.
+
 ## Keep checkpoints public-safe
 
 Never commit personal PDFs, library databases, credentials, raw document diagnostics or machine-specific paths. Publish only generated demonstration captures with their provenance. Do not log passwords or add accounts, telemetry or network calls to normal library use.

@@ -12,11 +12,9 @@ foreach ($ancestor in @($repository, (Join-Path $repository 'build'), $directory
 $tracked = @(git -C $repository ls-files -- build/verification)
 if ($LASTEXITCODE -ne 0 -or $tracked.Count -gt 0) { throw 'Refusing to prune a tracked or unverifiable directory.' }
 $running = @()
-foreach ($process in @(Get-Process -Name 'yamantaka*' -ErrorAction SilentlyContinue)) {
-    $process.Refresh()
-    if ($process.HasExited) { continue }
-    if (-not $process.Path) { throw 'A running Yamantaka path could not be inspected; no files removed.' }
-    $running += $process.Path
+foreach ($process in @(Get-CimInstance -ClassName Win32_Process -Filter "Name LIKE 'yamantaka%.exe'" -ErrorAction Stop)) {
+    if (-not $process.ExecutablePath) { throw 'A running Yamantaka path could not be inspected; no files removed.' }
+    $running += [IO.Path]::GetFullPath($process.ExecutablePath)
 }
 $files = @(Get-ChildItem -LiteralPath $directory -File | Where-Object {
     $_.Name -match '^yamantaka-[a-z0-9-]+\.exe$' -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint)
