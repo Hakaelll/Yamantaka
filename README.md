@@ -211,10 +211,18 @@ python ./tool/create_rust_metadata_fixtures.py
 ./target/debug/yamantaka-rust.exe --demo
 ./target/debug/yamantaka-rust.exe --demo --light
 ./target/debug/yamantaka-rust.exe --demo --reader
-./target/debug/yamantaka-rust.exe --demo --demo-window
 ```
 
-`--demo-window` opens an independent synthetic preview while an existing demo remains open.
+For an interactive preview, use the launcher below. It closes earlier managed test previews before opening one new window. Captures exit after their check; the visual-capture runner also terminates its own process on timeout.
+
+```powershell
+New-Item -ItemType Directory -Force build/verification | Out-Null
+$preview = 'build/verification/yamantaka-preview-' + [guid]::NewGuid().ToString('N') + '.exe'
+Copy-Item target/debug/yamantaka-rust.exe $preview
+./tool/open_rust_preview.ps1 -Executable $preview
+```
+
+The launcher manages only frozen workspace executables started with both `--demo` and `--demo-window`. It requests a normal close first and removes a surviving test process before opening its replacement. It keeps normal application instances outside this preview workflow intact.
 
 The demo uses synthetic documents and does not open the personal library. Interactive desktop previews and selected capture scenarios use isolated file-backed stores; other demo modes use an in-memory database. It currently depends on the repository's generated fixtures and is a development tool.
 
