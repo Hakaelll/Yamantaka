@@ -318,8 +318,15 @@ impl YamantakaApp {
     }
 
     pub(in crate::app) fn request_reference_close(&mut self) -> bool {
-        self.discard_retained_comparison();
-        self.close_reference_preserving_continuity()
+        let closed = self.close_reference_preserving_continuity();
+        if self
+            .reference
+            .as_ref()
+            .is_none_or(|reference| reference.close_requested)
+        {
+            self.discard_retained_comparison();
+        }
+        closed
     }
     pub(in crate::app) fn close_reference_preserving_continuity(&mut self) -> bool {
         self.reference_mount = None;

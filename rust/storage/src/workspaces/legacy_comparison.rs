@@ -50,14 +50,16 @@ pub(super) fn decode(
     let comparison = WorkspaceComparison {
         reading: Some(prefs.into()),
         layout,
-        scroll_offset: Some(prefs.scroll_offset),
+        scroll_offset: secondary.point().is_none().then_some(prefs.scroll_offset),
         bidirectional: true,
         swapped: false,
         differences: Default::default(),
         primary: primary.document().into(),
         document: secondary.document().into(),
         page: secondary.page(),
-        point: prefs.page_rotation.unrotate_point([0.5, 0.0]),
+        point: secondary
+            .point()
+            .unwrap_or_else(|| prefs.page_rotation.unrotate_point([0.5, 0.0])),
         zoom_mode: prefs.zoom_mode.persisted_name().into(),
         zoom: prefs.zoom_level,
         theme: prefs.reading_theme.persisted_name().into(),

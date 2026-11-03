@@ -8,6 +8,8 @@ Newly saved main readings also retain the position within the page, including ho
 
 If the reference PDF is missing, the main reading still opens. Yamantaka retains the reference configuration and unfinished work for later recovery. Closing a reference explicitly discards its comparison configuration. Removing a document from the library also removes its recovery context.
 
+If an unfinished note prevents the reference from closing, its comparison recovery configuration is retained. It is discarded once the close request is accepted, including while native closure finishes asynchronously. This correction has not undergone a new runtime check.
+
 New page notes, new annotations on selected text and edits to existing annotations persist locally as drafts. Selected passages are checked against fresh PDF text and geometry before their editor returns. If the passage no longer matches, the draft stays separate. Matching annotation revisions reopen in the editor without saving. If an annotation changed or is unavailable, its recovered edit stays separate. **Copy draft** includes the complete draft even when the panel shows a shortened preview. **Retry recovery** checks the source again. **Discard draft** abandons that recovered edit without changing the annotation in the library.
 
 If an annotation changes while you are editing it, Save is blocked and your text stays in the editor. Reloading the list does not make an older editor current. Preserve any text you need before cancelling and reopening the annotation.
