@@ -200,16 +200,53 @@ impl ReferenceView {
         english: bool,
         p: Palette,
         primary: &reader_pane::ReaderPane,
-        hide_controls: bool,
+        mut policy: reader_chrome::Policy,
     ) -> bool {
-        let runtime = tools.runtime;
-        let governor = tools.governor;
-        let tr = |es, en| if english { en } else { es };
-        if hide_controls && !self.busy() {
-            self.viewport(ui, runtime, governor, english, p);
-            return false;
-        }
+        policy.blocked |= self.busy() || self.pane.panel || self.error.is_some();
+        policy.manual_hidden &= !self.busy();
+        let mut state = std::mem::take(&mut self.pane.chrome);
+        state.bind(
+            self.pane
+                .active
+                .as_ref()
+                .map_or("reference-pending", |(document, _)| document.id.as_str()),
+        );
         let mut close = false;
+        if let Some(layer) = state.show(
+            ui,
+            "reference-reading-controls",
+            policy,
+            if english {
+                "Show reference controls"
+            } else {
+                "Mostrar controles de referencia"
+            },
+            p,
+            |ui| {
+                let result = self.overlay_controls(ui, tools, english, p, primary);
+                close = result.0;
+                result.1
+            },
+        ) {
+            self.input_layers.insert(layer);
+        }
+        self.pane.chrome = state;
+        self.viewport(ui, tools.runtime, tools.governor, english, p);
+        close
+    }
+
+    fn overlay_controls(
+        &mut self,
+        ui: &mut egui::Ui,
+        tools: &mut ReferenceTools<'_>,
+        english: bool,
+        p: Palette,
+        primary: &reader_pane::ReaderPane,
+    ) -> (bool, Option<egui::Id>) {
+        let runtime = tools.runtime;
+        let tr = |es, en| if english { en } else { es };
+        let mut close = false;
+        let mut first = None;
         let can_choose = self.pane.active.as_ref().map(|(doc, _)| &doc.id)
             == primary.active.as_ref().map(|(doc, _)| &doc.id);
         let notes_blocked = primary.annotations.writing();
@@ -245,8 +282,7 @@ impl ReferenceView {
                 close = theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
                     .clicked();
             });
-            self.viewport(ui, runtime, governor, english, p);
-            return close;
+            return (close, None);
         }
         let count = self
             .pane
@@ -254,7 +290,7 @@ impl ReferenceView {
             .as_ref()
             .map_or(1, ReaderNavigation::page_count);
         ui.horizontal_wrapped(|ui| {
-            self.navigator(ui, tools, notes_blocked, english, p);
+            first = Some(self.navigator(ui, tools, notes_blocked, english, p));
             let page_label = ui.label(
                 RichText::new(tr("Referencia", "Reference"))
                     .color(p.secondary)
@@ -323,8 +359,7 @@ impl ReferenceView {
                 }
             });
         }
-        self.viewport(ui, runtime, governor, english, p);
-        close
+        (close, first)
     }
 
     pub fn fail_render(&mut self, token: &Cancellation, error: &yamantaka_domain::Failure) -> bool {
@@ -457,6 +492,7 @@ impl ReferenceView {
                 YamantakaApp::reading_paper(preferences.reading_theme)
             },
         );
+        ui.spacing_mut().scroll.fade.strength = 0.0;
         let mut scroll = egui::ScrollArea::both()
             .animated(self.pane.visual_profile != reader_profile::VisualProfile::ElectronicInk)
             .kinetic_scrolling(
@@ -502,6 +538,9 @@ impl ReferenceView {
                 }
             };
             self.pane.viewport.scale = frame.zoom as f32;
+            self.pane
+                .chrome
+                .record_frame(ui.ctx(), &frame, self.pane.viewport.generation);
             if !self.busy() && !self.close_requested {
                 let pages: Vec<u32> = frame.pages.iter().map(|page| page.page).collect();
                 self.pane
@@ -785,7 +824,15 @@ impl YamantakaApp {
                         self.english,
                         p,
                         &self.reader,
-                        self.reader_chrome_hidden,
+                        reader_chrome::Policy {
+                            auto_hide: reference
+                                .pane
+                                .reader_preferences
+                                .as_ref()
+                                .is_some_and(|prefs| prefs.controls_auto_hide),
+                            blocked: self.reader_chrome_blocked,
+                            manual_hidden: self.reader_chrome_hidden,
+                        },
                     );
                     selected = reference.selection.take();
                     difference = reference.difference_target.take();

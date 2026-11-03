@@ -35,6 +35,8 @@ impl YamantakaApp {
     }
 
     pub(super) fn reader_viewport(&mut self, ui: &mut egui::Ui, document: &Document, p: Palette) {
+        self.reader_overlay_controls(ui, document, p);
+        ui.spacing_mut().scroll.fade.strength = 0.0;
         let viewport = ui.available_size();
         let viewport_size = [
             f64::from(viewport.x.max(1.0)),
@@ -105,6 +107,7 @@ impl YamantakaApp {
                 }
             };
             self.reader.viewport.scale = frame.zoom as f32;
+            self.reader.chrome.record_frame(ui.ctx(),&frame,self.reader.viewport.generation);
             ui.set_min_size(egui::vec2(
                 frame.content_size[0] as f32,
                 frame.content_size[1] as f32,

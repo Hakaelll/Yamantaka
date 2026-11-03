@@ -300,12 +300,20 @@ layouts wrap category controls horizontally; cramped layouts below 420 use one
 category menu. Theme choices sit beside each other from 460 available points,
 otherwise stack. All four categories remain reachable.
 
-The reader uses one quiet, unfilled row with 8×2 insets at every width: Library,
-previous page, a 64×40 page/total field, next page, Reading options and the reading
-navigator. Options and navigator align to the right when space permits. The row
-uses 2-point gaps and 4 points of separation above the document. Reading options
-contains zoom, fit, open readings, history and saved A/B positions. Its optional page-text panel defaults to 280 and ranges
-from 180 to 500. PDF page appearance comes from the actual document texture.
+Reader controls float above each reading pane in a neutral surface with an
+8-point corner radius, a fine border and a maximum width of 360 points. The primary
+row keeps its 8×2 insets, 2-point gaps and 64×40 page field. Narrow panes keep Library,
+the page field, Reading options and the navigator; Previous and Next remain in
+Reading options. The compact full-panel navigator retains an ordinary toolbar
+because that state does not display a PDF.
+
+Controls disappear after three seconds without interaction, or two in fullscreen.
+They retain a small focusable reveal button and return at the pane's upper edge.
+Menus, keyboard focus, dragging and open navigators protect active controls.
+Visibility changes never reserve space or change PDF geometry. The document's
+auto-hide preference can keep them visible. Manual hiding and immersive mode retain
+their explicit exit controls. PDF scroll areas have no edge fades over document
+pixels. The optional page-text panel defaults to 280 and ranges from 180 to 500.
 
 The Accessibility category includes Standard and Electronic ink reader profiles.
 Electronic ink gives both reading panes a white canvas, light controls, single-page

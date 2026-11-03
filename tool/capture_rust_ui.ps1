@@ -9,6 +9,13 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='chrome-hidden'; args=@('--reader','--continuous','--chrome=hidden') },
+    @{ name='chrome-revealed'; args=@('--reader','--continuous','--chrome=revealed') },
+    @{ name='chrome-pinned'; args=@('--reader','--continuous','--chrome=pinned') },
+    @{ name='chrome-menu-held'; args=@('--reader','--reader-options','--chrome=held') },
+    @{ name='chrome-compact'; args=@('--reader','--size=640x480','--text-scale=2','--chrome=revealed','--es') },
+    @{ name='chrome-reference'; args=@('--reader','--reference','--reference-book','--chrome=revealed') },
+    @{ name='chrome-eink-glow'; args=@('--reader','--continuous','--electronic-ink','--software','--chrome=hidden') },
     @{ name='eink-standard-reader'; args=@('--reader','--continuous') },
     @{ name='eink-continuous-reader'; args=@('--reader','--continuous','--electronic-ink') },
     @{ name='eink-book-reader'; args=@('--reader','--facing','--book-mode','--electronic-ink','--es') },
@@ -1279,6 +1286,17 @@ foreach ($case in $cases) {
             $visibleLabels = if ($case.args -contains '--es') { @('Ver libros','Acciones de colección') } else { @('View books','Collection actions') }
         }
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $visibleLabels
+    }
+    if ($case.args -like '--chrome=*') {
+        $transition=$controls.readerChromeTransition
+        if (-not $transition.geometryUnchanged -or -not $transition.expectedVisibilityMet -or $controls.readerOpening.firstRaster.emptyPagePaints -ne 0) { throw 'Reading controls changed page geometry, visibility or first-page continuity.' }
+        $labels=switch ($case.name) {
+            'chrome-hidden' { @('Show reading controls') }
+            'chrome-compact' { @('Biblioteca','Opciones de lectura','Navegador de lectura') }
+            'chrome-menu-held' { @('Automatically hide controls','Previous page','Next page') }
+            default { @() }
+        }
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $labels
     }
     if ($case.args -contains '--eink-return-standard') {
         $profile=$controls.readerVisualProfile

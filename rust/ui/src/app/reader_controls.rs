@@ -40,6 +40,10 @@ impl YamantakaApp {
                         {
                             self.reader_focus = false;
                             self.reader_chrome_hidden = false;
+                            self.reader.chrome.reveal();
+                            if let Some(reference) = &mut self.reference {
+                                reference.pane.chrome.reveal();
+                            }
                         }
                     });
             });
@@ -49,9 +53,11 @@ impl YamantakaApp {
         ui: &mut egui::Ui,
         page_count: u32,
         p: Palette,
-    ) {
+    ) -> Option<egui::Id> {
+        let mut first = None;
+        let narrow = ui.available_width() < 320.0;
         toolbar_frame(ui, |ui| {
-            if theme::icon_button(
+            let library = theme::icon_button(
                 ui,
                 if self.metadata_return_available() {
                     self.tr("Volver a los metadatos", "Back to metadata")
@@ -60,23 +66,24 @@ impl YamantakaApp {
                 },
                 theme::Icon::Book,
                 p,
-            )
-            .clicked()
-            {
+            );
+            first = Some(library.id);
+            if library.clicked() {
                 self.show_surface(Surface::Library);
                 self.refresh();
             }
-            if ui
-                .add_enabled_ui(self.reader.page > 0, |ui| {
-                    theme::icon_button(
-                        ui,
-                        self.tr("Página anterior", "Previous page"),
-                        theme::Icon::Left,
-                        p,
-                    )
-                })
-                .inner
-                .clicked()
+            if !narrow
+                && ui
+                    .add_enabled_ui(self.reader.page > 0, |ui| {
+                        theme::icon_button(
+                            ui,
+                            self.tr("Página anterior", "Previous page"),
+                            theme::Icon::Left,
+                            p,
+                        )
+                    })
+                    .inner
+                    .clicked()
             {
                 self.step_reader(false);
             }
@@ -97,17 +104,18 @@ impl YamantakaApp {
             if response.changed() {
                 self.navigate(shown.saturating_sub(1));
             }
-            if ui
-                .add_enabled_ui(self.reader.page + 1 < page_count, |ui| {
-                    theme::icon_button(
-                        ui,
-                        self.tr("Página siguiente", "Next page"),
-                        theme::Icon::Right,
-                        p,
-                    )
-                })
-                .inner
-                .clicked()
+            if !narrow
+                && ui
+                    .add_enabled_ui(self.reader.page + 1 < page_count, |ui| {
+                        theme::icon_button(
+                            ui,
+                            self.tr("Página siguiente", "Next page"),
+                            theme::Icon::Right,
+                            p,
+                        )
+                    })
+                    .inner
+                    .clicked()
             {
                 self.step_reader(true);
             }
@@ -133,6 +141,7 @@ impl YamantakaApp {
                 self.toggle_reader_panel();
             }
         });
+        first
     }
     pub(super) fn set_reader_zoom(&mut self, zoom: f32) {
         if let Some(mut preferences) = self.reader.reader_preferences.clone() {

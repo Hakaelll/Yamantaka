@@ -17,7 +17,7 @@ impl YamantakaApp {
             .gap(8.0)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
         if self.preview_reader_options {
-            popup.open(true)
+            popup.open_memory(egui::SetOpenCommand::Bool(true))
         } else {
             popup
         }
@@ -97,13 +97,29 @@ impl YamantakaApp {
             self.error = Some("Reader zoom cannot be represented".into());
             return;
         }
+        let chrome_only = self
+            .reader
+            .reader_preferences
+            .as_ref()
+            .is_some_and(|saved| {
+                let mut previous = saved.clone();
+                previous.updated_at = None;
+                previous.controls_auto_hide = preferences.controls_auto_hide;
+                previous == preferences
+            });
         self.reader.zoom = zoom;
-        self.reader.viewport.generation += 1;
-        self.reader.viewport.cancel.cancel();
-        self.reader.viewport.cancel = Cancellation::default();
-        self.reset_render_request();
+        if !chrome_only {
+            self.reader.viewport.generation += 1;
+            self.reader.viewport.cancel.cancel();
+            self.reader.viewport.cancel = Cancellation::default();
+            self.reset_render_request();
+        }
         self.reader.reader_preferences = Some(preferences.clone());
-        self.rebuild_reader_layout();
+        if !chrome_only {
+            self.rebuild_reader_layout();
+        } else {
+            self.reader.chrome.reveal();
+        }
         if !self.demo {
             self.send(Action::SaveReaderPreferences(
                 preferences.document_id.clone(),
@@ -218,6 +234,20 @@ impl YamantakaApp {
             return;
         }
         if self.reader_options_section == 0 {
+            let label = self.tr(
+                "Ocultar controles automáticamente",
+                "Automatically hide controls",
+            );
+            let response = ui.checkbox(&mut preferences.controls_auto_hide, label);
+            theme::record_control_bounds(ui, label, response.rect);
+            ui.horizontal(|ui| {
+                if theme::navigation(ui, self.tr("Anterior", "Previous page"), false, p).clicked() {
+                    self.step_reader(false);
+                }
+                if theme::navigation(ui, self.tr("Siguiente", "Next page"), false, p).clicked() {
+                    self.step_reader(true);
+                }
+            });
             ui.label(
                 RichText::new(self.tr("Ajuste", "Page fit"))
                     .size(13.0)

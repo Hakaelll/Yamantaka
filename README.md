@@ -84,7 +84,7 @@ No account is required. Documents and library data stay on your computer. The pr
 
 *Native Windows capture of an isolated synthetic study collection. The capture demonstrates the current gallery; it is not a photograph of a personal library or proof of complete feature parity.*
 
-The library no longer reserves a full-width Continue reading strip. Resume sits beside the filters, or in the utility row on short windows. The reader uses a single quiet control row; zoom, fit and open readings remain in Reading options. See [the compact chrome checkpoint](docs/validation/rust-quiet-chrome-2026-10-18.md).
+The library no longer reserves a full-width Continue reading strip. Resume sits beside the filters, or in the utility row on short windows. Reader controls float above each pane and hide after a pause without moving the PDF. Use the upper edge or the keyboard-accessible reveal button to recover them. Reading options can keep controls visible. See the [reader guide](docs/user-guide/reader-responsiveness.md) and [native visibility checks](docs/validation/rust-reader-auto-hide-2026-11-03.md).
 
 To import a folder, choose **Tools → Import folder…**. Yamantaka scans its subfolders in the background and feeds PDFs into the existing metadata and cover import flow. **Tools → Cancel import** stops remaining work. Already imported books stay saved. Folder links are excluded, and importing the same paths again preserves their document identities. See [folder import verification](docs/validation/rust-folder-import-2026-10-18.md).
 

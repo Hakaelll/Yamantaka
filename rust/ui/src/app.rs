@@ -47,6 +47,7 @@ mod page_prefetch;
 mod page_refinement;
 mod password;
 mod quarantine;
+pub(crate) mod reader_chrome;
 mod reader_controls;
 mod reader_destination;
 mod reader_options;
@@ -215,6 +216,8 @@ pub struct YamantakaApp {
     reader_panel_width: f32,
     reader_panel_restore: bool,
     reader_chrome_hidden: bool,
+    reader_chrome_blocked: bool,
+    chrome_capture: Option<reader_chrome::Capture>,
     command_palette_preview: command_palette::PalettePreview,
     command_palette: command_palette::PaletteState,
     page_jump: Option<shortcuts::reader_commands::PageJump>,
@@ -490,6 +493,8 @@ impl YamantakaApp {
             shortcut_bindings,
             shortcut_error: None,
             reader_chrome_hidden: false,
+            reader_chrome_blocked: false,
+            chrome_capture: None,
             command_palette_preview: Default::default(),
             command_palette: Default::default(),
             page_jump: None,
@@ -793,6 +798,9 @@ impl YamantakaApp {
         }
     }
     fn show_surface(&mut self, surface: Surface) {
+        if matches!(surface, Surface::Reader) && !matches!(self.surface, Surface::Reader) {
+            self.reader.chrome.reveal();
+        }
         if !matches!(surface, Surface::Reader) && !self.request_reference_close() {
             self.reference_return = Some(surface);
             return;
@@ -1325,6 +1333,8 @@ impl YamantakaApp {
     fn reader(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark && !self.electronic_ink());
         if self.electronic_ink() {
+            ui.ctx()
+                .data_mut(|data| data.insert_temp(egui::Id::new("yamantaka-reduced-motion"), true));
             ui.painter()
                 .rect_filled(ui.available_rect_before_wrap(), 0, Color32::WHITE);
             *ui.visuals_mut() = egui::Visuals::light();
@@ -1345,11 +1355,13 @@ impl YamantakaApp {
             self.reader.text.clear();
             self.reader.thumbnails.clear();
         }
-        if self.reader_chrome_hidden {
-            self.reader_focus_exit(ui, p);
-        } else {
-            self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
-            ui.add_space(4.0);
+        if self.reader.panel && !self.reader_focus && ui.ctx().content_rect().width() < 620.0 {
+            if self.reader_chrome_hidden {
+                self.reader_focus_exit(ui, p);
+            } else {
+                self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
+                ui.add_space(4.0);
+            }
         }
         self.selection_toolbar(ui, p);
         if !self.reader_focus {
@@ -2276,6 +2288,7 @@ impl App for YamantakaApp {
             || self.reading_queue.open
             || self.workspaces.open
             || self.workspaces.close_after;
+        self.reader_chrome_blocked = shortcut_modal;
         self.reading_focus.observe(
             &ctx,
             shortcut_modal,
@@ -2563,6 +2576,8 @@ impl App for YamantakaApp {
                     && matches!(self.nearby_turn_preview, 0 | 3)
                     && self.reader.viewport.refinements_settled()
                     && self.reader_profile_preview != 1
+                    && (self.idle_probe.is_none() || !matches!(self.surface,Surface::Reader) || self.reader_chrome_hidden ||
+                        (self.reader.panel || self.reader.chrome.settled()) && self.reference.as_ref().is_none_or(|reference|reference.pane.chrome.settled()))
                     && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.refinements_settled())
                     && self.reader.viewport.prefetch.settled()
                     && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.prefetch.settled())
@@ -2681,6 +2696,18 @@ impl App for YamantakaApp {
                                     && self.reader.viewport.pages
                                         .values()
                                         .all(|page| page.image.is_some())));
+                let ready = if let Some(capture) = &mut self.chrome_capture {
+                    capture.advance(
+                        &ctx,
+                        ready,
+                        &mut self.reader.chrome,
+                        self.reference
+                            .as_mut()
+                            .map(|reference| &mut reference.pane.chrome),
+                    )
+                } else {
+                    ready
+                };
                 if ready {
                     self.capture_ready_since.get_or_insert_with(Instant::now);
                 } else {
@@ -2763,6 +2790,9 @@ impl App for YamantakaApp {
                     record["idleObservation"] = self.idle_probe.as_ref().map(|probe|probe.summary()).unwrap_or_default();
                     record["readerVisualProfile"] = self.reader.profile_summary();
                     record["readerVisualProfileReturn"] = self.reader_profile_preview.into();
+                    record["readerAutoHide"] = self.reader.chrome.summary();
+                    record["readerChromeTransition"] = self.chrome_capture.as_ref().map(|capture|capture.summary()).unwrap_or_default();
+                    record["referenceAutoHide"] = self.reference.as_ref().map(|reference|reference.pane.chrome.summary()).unwrap_or_default();
                     record["referenceVisualProfile"] = self.reference.as_ref().map(|reference|reference.pane.profile_summary()).unwrap_or_default();
                     record["bulkOrganization"]=self.bulk_organization_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["bulkTargetPicker"]=self.bulk_picker_summary();

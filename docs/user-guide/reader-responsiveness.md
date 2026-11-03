@@ -1,4 +1,6 @@
-# Nearby page previews
+# Reader responsiveness
+
+## Nearby page previews
 
 While you read, Yamantaka can prepare up to two nearby page previews per panel. It waits until visible pages and region refinement are ready, then schedules lower-priority native work. With the default wgpu compositor, completed previews can also retain GPU textures. Navigating to the prepared page transfers that texture into the visible page slot. A rotation or viewport-size change can reuse the earlier texture while the current geometry refines. The image retains its original raster dimensions and rotation, so it is not mistaken for the finished replacement. [Geometry-change verification](../validation/rust-nearby-geometry-2026-11-03.md) records the native two-pane sequences. This preparation has no progress message or extra page panel.
 
@@ -7,6 +9,19 @@ The same preview sizing is used for visible-page previews and preparation. When 
 Changing the reading context cancels its old preparation requests. Memory or queue pressure can skip optional work without showing a reading error. A failed optional GPU upload leaves the CPU cache available; Glow uses that CPU-only preparation. Preparation stops outside the reader and in [safe mode](safe-startup.md). Page previews use the in-memory cache; the cover-image disk cache remains a separate setting.
 
 This is one part of reader responsiveness. Complex native rasters, pages outside the prepared range and device recovery remain relevant to page-turn latency. The [CPU cache checkpoint](../validation/rust-page-prefetch-2026-10-31.md) and [GPU preview checkpoint](../validation/rust-nearby-presentation-2026-10-31.md) record the exercised cases and remaining performance acceptance.
+
+## Reading controls
+
+The controls float over each reading pane and hide after a short pause. Move the
+pointer to the pane's upper edge, or activate **Show reading controls** with the
+keyboard, to bring them back. They stay available while a control has focus or a
+menu is open. Showing and hiding them keeps the PDF's position and zoom unchanged.
+
+In **Reading options → Reading**, turn off **Automatically hide controls** to keep
+them visible. The choice belongs to the document's reading preferences. Previous
+and Next also remain in that menu when a narrow pane omits their toolbar buttons.
+See [native control validation](../validation/rust-reader-auto-hide-2026-11-03.md)
+for the executed checks and remaining limits.
 
 ## Opening a reading
 

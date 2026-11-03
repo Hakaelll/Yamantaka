@@ -10,7 +10,7 @@ impl ReferenceView {
         notes_blocked: bool,
         english: bool,
         p: Palette,
-    ) {
+    ) -> egui::Id {
         let runtime = tools.runtime;
         let governor = tools.governor;
         let tr = |es, en| if english { en } else { es };
@@ -270,6 +270,7 @@ impl ReferenceView {
             self.stop_navigator_requests();
         }
         self.pane.panel = shown.is_some();
+        button.id
     }
 
     pub(in crate::app) fn stop_navigator_requests(&mut self) {

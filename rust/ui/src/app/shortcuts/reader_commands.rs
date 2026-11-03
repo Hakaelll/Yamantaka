@@ -11,6 +11,10 @@ impl YamantakaApp {
     pub(in crate::app) fn toggle_immersive_reader(&mut self, ctx: &egui::Context) {
         self.reader_focus = !self.reader_focus;
         self.reader_chrome_hidden = self.reader_focus;
+        self.reader.chrome.reveal();
+        if let Some(reference) = &mut self.reference {
+            reference.pane.chrome.reveal();
+        }
         egui::Popup::close_all(ctx);
         if self.reader_focus {
             self.reader.panel = false;
@@ -46,9 +50,11 @@ impl YamantakaApp {
             return true;
         }
         if command == Shortcut::ToggleChrome {
-            self.reader_chrome_hidden = !self.reader_chrome_hidden;
+            self.reader_chrome_hidden = !self.reader.chrome.hidden() && !self.reader_chrome_hidden;
+            self.reader.chrome.reveal();
             egui::Popup::close_all(ctx);
             if let Some(reference) = &mut self.reference {
+                reference.pane.chrome.reveal();
                 reference.stop_navigator_requests();
                 reference.pane.panel = false;
             }

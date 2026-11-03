@@ -96,6 +96,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(path) = args
             .iter()
             .filter_map(|arg| arg.to_str())
+            .find_map(|arg| arg.strip_prefix("--verify-reader-chrome="))
+        {
+            return app::reader_chrome::verify(std::path::Path::new(path));
+        }
+        if let Some(path) = args
+            .iter()
+            .filter_map(|arg| arg.to_str())
             .find_map(|arg| arg.strip_prefix("--verify-reader-profile-input="))
         {
             return profile_input_probe::verify(std::path::Path::new(path));
@@ -833,6 +840,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if args.iter().any(|arg| arg == "--continuous") {
             reading.page_layout = PageLayout::Continuous;
         }
+        if args.iter().any(|arg| arg == "--chrome=pinned") {
+            reading.controls_auto_hide = false;
+        }
         if args.iter().any(|arg| arg == "--book-mode") {
             reading.view_mode = ReaderMode::Book;
         }
@@ -1284,6 +1294,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 startup_mode,
             );
             app.graphics_recovery = app_graphics.clone();
+            if let Some(mode) = args
+                .iter()
+                .filter_map(|arg| arg.to_str())
+                .find_map(|arg| arg.strip_prefix("--chrome="))
+            {
+                app.preview_reader_chrome(mode)?;
+            }
             if idle_probe {
                 app.idle_probe = Some(idle_probe::Probe::new(
                     args.iter().any(|arg| arg == "--idle-positive-control"),

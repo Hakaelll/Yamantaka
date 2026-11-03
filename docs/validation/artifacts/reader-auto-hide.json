@@ -1,0 +1,1192 @@
+{
+  "synthetic": true,
+  "sourceBase": "5c8019ef977ef5d1e648a59bdf1da7386754175a",
+  "runtimeSourcesModified": true,
+  "profile": "debug",
+  "executableSha256": "39371538DE9AAE83EDB397D6480A05B7C02C50AAE4AA7A5B9C4D982D7A9E5218",
+  "sources": [
+    {
+      "path": "rust/ui/src/app.rs",
+      "sha256": "4CBE4121CDF394359391C6869EDB368BC4ACEEC6CDCE693C2D6BC3EE3B865172"
+    },
+    {
+      "path": "rust/ui/src/app/opening/layout.rs",
+      "sha256": "3A31B85126D187E13C9979692A4154E7987BD2B8CB9247A36560DC0B9BBB0BF9"
+    },
+    {
+      "path": "rust/ui/src/app/reader_chrome.rs",
+      "sha256": "9E0758436AE34D5D60BBD21B03A4D32290A5C4076A46D53911344288DA9C5C01"
+    },
+    {
+      "path": "rust/ui/src/app/reader_chrome/capture.rs",
+      "sha256": "DC059448A6EAF2512974E1370919874167600A5E01DFD9A7F75346D663BCC991"
+    },
+    {
+      "path": "rust/ui/src/app/reader_chrome/probe.rs",
+      "sha256": "E5D2B443C9A343ED2880EEF1AB639ED92BF532E91E09897BCF542E53F02743C2"
+    },
+    {
+      "path": "rust/ui/src/app/reader_controls.rs",
+      "sha256": "1AA54FE690D3CE43D5E384E6079A9EA7F34C625CF0194DEAD3772B9640CD55A0"
+    },
+    {
+      "path": "rust/ui/src/app/reader_options.rs",
+      "sha256": "76BA4F9ABFA3CED318BF33BA2AB3B88D09E8E89876FF5069724EE52E3263C459"
+    },
+    {
+      "path": "rust/ui/src/app/reader_pane.rs",
+      "sha256": "23F5FAA9AD859F8B41F6CDF26DBB28DEEF84F71428B1DB02FC3073E9427C909F"
+    },
+    {
+      "path": "rust/ui/src/app/reader_viewport.rs",
+      "sha256": "D4EB82037E33C295E03A17FF93E1665BBCB8460DF7EEB348F80123ACACCA87D7"
+    },
+    {
+      "path": "rust/ui/src/app/reference.rs",
+      "sha256": "F7AA03DDD82B7EB55CC8165E7ED96CE7131D955B4C60601AD27409A7342A0265"
+    },
+    {
+      "path": "rust/ui/src/app/reference/navigator.rs",
+      "sha256": "DDB8C63CC764639E3A6CFDD1963962AFFC7AA9C698FAB61B58F2E62E2961E2AF"
+    },
+    {
+      "path": "rust/ui/src/app/shortcuts/reader_commands.rs",
+      "sha256": "FA89D3E96AE543525B7E1FC387B6C19D455FAFB315E7FDEEC0B6276B81715800"
+    },
+    {
+      "path": "rust/ui/src/main.rs",
+      "sha256": "1F3F183484089D13C203C151A46B103B89B4E36232B452FB3C6C88F6CC7A8383"
+    }
+  ],
+  "inputProbe": {
+    "exitCode": 0,
+    "sha256": "713b0c2c8fa99618a972c4760b578e92aeeb883141c07b93f4a768817df0da95",
+    "result": {
+      "synthetic": true,
+      "timeoutHides": true,
+      "keyboardReveal": true,
+      "focusRetained": true,
+      "edgeReveal": true,
+      "disabledKeepsVisible": true,
+      "blockedKeepsVisible": true,
+      "newDocumentReveals": true,
+      "overlayPreservesParentRect": true
+    }
+  },
+  "beforeReaderImageSha256": "2542b8dfc163ad208b86b9915be943ad72d21b2a85b31769e8629cd77c7c10eb",
+  "documentPixelsOutsideControlsUnchanged": {
+    "crop": [
+      0,
+      100,
+      1800,
+      1200
+    ],
+    "equal": true
+  },
+  "generatedSourcePdfsUnchanged": true,
+  "generatedSourcePdfCount": 42,
+  "cases": [
+    {
+      "name": "chrome-hidden",
+      "exitCode": 0,
+      "processId": 13692,
+      "compositor": "native-wgpu",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "primary": {
+        "autoHidden": true,
+        "settled": true,
+        "rect": [
+          700.0,
+          8.0,
+          742.0,
+          50.0
+        ],
+        "geometry": {
+          "viewport": [
+            1440.0,
+            940.0
+          ],
+          "scale": 1.115,
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              385.5,
+              24.0,
+              669.0,
+              892.0
+            ],
+            [
+              1,
+              274.0,
+              942.76,
+              892.0,
+              669.0
+            ]
+          ]
+        }
+      },
+      "reference": null,
+      "transition": {
+        "synthetic": true,
+        "geometryUnchanged": true,
+        "expectedVisibilityMet": true,
+        "elapsedMs": 3013.0377,
+        "before": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              24.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ],
+              [
+                1,
+                274.0,
+                942.76,
+                892.0,
+                669.0
+              ]
+            ]
+          },
+          "reference": null
+        },
+        "hidden": null,
+        "after": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              24.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ],
+              [
+                1,
+                274.0,
+                942.76,
+                892.0,
+                669.0
+              ]
+            ]
+          },
+          "reference": null
+        }
+      },
+      "idle": null,
+      "emptyPagePaints": 0,
+      "imageSha256": "34456A7F3E6951FDEB8829247F9B4A8BF4311C06ED5CFDFD76725663AD10E852",
+      "controlsSha256": "FBE9EF15240304A8B94A0D83DE4801596B31E81F482EA36B35B7A008998A37D7"
+    },
+    {
+      "name": "chrome-revealed",
+      "exitCode": 0,
+      "processId": 24276,
+      "compositor": "native-wgpu",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "primary": {
+        "autoHidden": false,
+        "settled": false,
+        "rect": [
+          540.0,
+          8.0,
+          900.0,
+          54.0
+        ],
+        "geometry": {
+          "viewport": [
+            1440.0,
+            940.0
+          ],
+          "scale": 1.115,
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              385.5,
+              24.0,
+              669.0,
+              892.0
+            ],
+            [
+              1,
+              274.0,
+              942.76,
+              892.0,
+              669.0
+            ]
+          ]
+        }
+      },
+      "reference": null,
+      "transition": {
+        "synthetic": true,
+        "geometryUnchanged": true,
+        "expectedVisibilityMet": true,
+        "elapsedMs": 3011.0688,
+        "before": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              24.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ],
+              [
+                1,
+                274.0,
+                942.76,
+                892.0,
+                669.0
+              ]
+            ]
+          },
+          "reference": null
+        },
+        "hidden": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              24.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ],
+              [
+                1,
+                274.0,
+                942.76,
+                892.0,
+                669.0
+              ]
+            ]
+          },
+          "reference": null
+        },
+        "after": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              24.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ],
+              [
+                1,
+                274.0,
+                942.76,
+                892.0,
+                669.0
+              ]
+            ]
+          },
+          "reference": null
+        }
+      },
+      "idle": null,
+      "emptyPagePaints": 0,
+      "imageSha256": "C254B93A2143A6FE9BC748E2FEE95D3EADE38D8546E74FE83F93B0FE24A8D459",
+      "controlsSha256": "E344D3311B95917BED69648F545B959CDA03EB0F781AD2524D4076D79319981E"
+    },
+    {
+      "name": "chrome-pinned",
+      "exitCode": 0,
+      "processId": 9188,
+      "compositor": "native-wgpu",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "primary": {
+        "autoHidden": false,
+        "settled": true,
+        "rect": [
+          540.0,
+          8.0,
+          900.0,
+          54.0
+        ],
+        "geometry": {
+          "viewport": [
+            1440.0,
+            940.0
+          ],
+          "scale": 1.115,
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              385.5,
+              24.0,
+              669.0,
+              892.0
+            ],
+            [
+              1,
+              274.0,
+              942.76,
+              892.0,
+              669.0
+            ]
+          ]
+        }
+      },
+      "reference": null,
+      "transition": {
+        "synthetic": true,
+        "geometryUnchanged": true,
+        "expectedVisibilityMet": true,
+        "elapsedMs": 3364.7017,
+        "before": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              24.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ],
+              [
+                1,
+                274.0,
+                942.76,
+                892.0,
+                669.0
+              ]
+            ]
+          },
+          "reference": null
+        },
+        "hidden": null,
+        "after": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              24.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ],
+              [
+                1,
+                274.0,
+                942.76,
+                892.0,
+                669.0
+              ]
+            ]
+          },
+          "reference": null
+        }
+      },
+      "idle": null,
+      "emptyPagePaints": 0,
+      "imageSha256": "C254B93A2143A6FE9BC748E2FEE95D3EADE38D8546E74FE83F93B0FE24A8D459",
+      "controlsSha256": "B3DB7A5AD9CC21CA67C4FA4AAB2594B3B950D5CE3F46C3C40212CDFA0D3B3D2C"
+    },
+    {
+      "name": "chrome-menu-held",
+      "exitCode": 0,
+      "processId": 9416,
+      "compositor": "native-wgpu",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "primary": {
+        "autoHidden": false,
+        "settled": true,
+        "rect": [
+          540.0,
+          8.0,
+          900.0,
+          54.0
+        ],
+        "geometry": {
+          "viewport": [
+            1440.0,
+            940.0
+          ],
+          "scale": 1.115,
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              385.5,
+              24.0,
+              669.0,
+              892.0
+            ]
+          ]
+        }
+      },
+      "reference": null,
+      "transition": {
+        "synthetic": true,
+        "geometryUnchanged": true,
+        "expectedVisibilityMet": true,
+        "elapsedMs": 3304.8868,
+        "before": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ]
+            ]
+          },
+          "reference": null
+        },
+        "hidden": null,
+        "after": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ]
+            ]
+          },
+          "reference": null
+        }
+      },
+      "idle": null,
+      "emptyPagePaints": 0,
+      "imageSha256": "A65DE8B1C7523ABDC82D0E8E4E38402D4A4AB94268EA7B631FBFC9F6DF969511",
+      "controlsSha256": "302445C87A645CF0AA19DECD7387199E2942A7307E0E31513758DD4E15D13E19"
+    },
+    {
+      "name": "chrome-compact",
+      "exitCode": 0,
+      "processId": 19272,
+      "compositor": "native-wgpu",
+      "viewport": [
+        0.0,
+        0.0,
+        320.0,
+        240.0
+      ],
+      "pixelsPerPoint": 2.5,
+      "primary": {
+        "autoHidden": false,
+        "settled": false,
+        "rect": [
+          8.0,
+          8.0,
+          312.0,
+          54.0
+        ],
+        "geometry": {
+          "viewport": [
+            320.0,
+            220.0
+          ],
+          "scale": 0.215,
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              95.5,
+              24.0,
+              129.0,
+              172.0
+            ]
+          ]
+        }
+      },
+      "reference": null,
+      "transition": {
+        "synthetic": true,
+        "geometryUnchanged": true,
+        "expectedVisibilityMet": true,
+        "elapsedMs": 2753.7091,
+        "before": {
+          "primary": {
+            "viewport": [
+              320.0,
+              220.0
+            ],
+            "scale": 0.215,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                95.5,
+                24.0,
+                129.0,
+                172.0
+              ]
+            ]
+          },
+          "reference": null
+        },
+        "hidden": {
+          "primary": {
+            "viewport": [
+              320.0,
+              220.0
+            ],
+            "scale": 0.215,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                95.5,
+                24.0,
+                129.0,
+                172.0
+              ]
+            ]
+          },
+          "reference": null
+        },
+        "after": {
+          "primary": {
+            "viewport": [
+              320.0,
+              220.0
+            ],
+            "scale": 0.215,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                95.5,
+                24.0,
+                129.0,
+                172.0
+              ]
+            ]
+          },
+          "reference": null
+        }
+      },
+      "idle": null,
+      "emptyPagePaints": 0,
+      "imageSha256": "E043A9D96D5CCCE42A8760A4A34666AF682BAE7280F3095F27FAFF7F3F167FC0",
+      "controlsSha256": "8503A27890B9261EB09A3F1F476DFD382CCAA2CBB21867699829882BFD563030"
+    },
+    {
+      "name": "chrome-reference",
+      "exitCode": 0,
+      "processId": 7532,
+      "compositor": "native-wgpu",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "primary": {
+        "autoHidden": false,
+        "settled": false,
+        "rect": [
+          178.40625,
+          8.0,
+          538.40625,
+          54.0
+        ],
+        "geometry": {
+          "viewport": [
+            716.0,
+            940.0
+          ],
+          "scale": 1.0866666666666667,
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              32.0,
+              35.333333333333314,
+              652.0,
+              869.3333333333334
+            ]
+          ]
+        }
+      },
+      "reference": {
+        "autoHidden": false,
+        "settled": false,
+        "rect": [
+          902.40625,
+          8.0,
+          1262.40625,
+          50.0
+        ],
+        "geometry": {
+          "viewport": [
+            716.0,
+            940.0
+          ],
+          "scale": 1.0866666666666667,
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "generation": 0,
+          "pages": [
+            [
+              0,
+              32.0,
+              35.333333333333314,
+              652.0,
+              869.3333333333334
+            ]
+          ]
+        }
+      },
+      "transition": {
+        "synthetic": true,
+        "geometryUnchanged": true,
+        "expectedVisibilityMet": true,
+        "elapsedMs": 2693.4485,
+        "before": {
+          "primary": {
+            "viewport": [
+              716.0,
+              940.0
+            ],
+            "scale": 1.0866666666666667,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                32.0,
+                35.333333333333314,
+                652.0,
+                869.3333333333334
+              ]
+            ]
+          },
+          "reference": {
+            "viewport": [
+              716.0,
+              940.0
+            ],
+            "scale": 1.0866666666666667,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 0,
+            "pages": [
+              [
+                0,
+                32.0,
+                35.333333333333314,
+                652.0,
+                869.3333333333334
+              ]
+            ]
+          }
+        },
+        "hidden": {
+          "primary": {
+            "viewport": [
+              716.0,
+              940.0
+            ],
+            "scale": 1.0866666666666667,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                32.0,
+                35.333333333333314,
+                652.0,
+                869.3333333333334
+              ]
+            ]
+          },
+          "reference": {
+            "viewport": [
+              716.0,
+              940.0
+            ],
+            "scale": 1.0866666666666667,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 0,
+            "pages": [
+              [
+                0,
+                32.0,
+                35.333333333333314,
+                652.0,
+                869.3333333333334
+              ]
+            ]
+          }
+        },
+        "after": {
+          "primary": {
+            "viewport": [
+              716.0,
+              940.0
+            ],
+            "scale": 1.0866666666666667,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                32.0,
+                35.333333333333314,
+                652.0,
+                869.3333333333334
+              ]
+            ]
+          },
+          "reference": {
+            "viewport": [
+              716.0,
+              940.0
+            ],
+            "scale": 1.0866666666666667,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 0,
+            "pages": [
+              [
+                0,
+                32.0,
+                35.333333333333314,
+                652.0,
+                869.3333333333334
+              ]
+            ]
+          }
+        }
+      },
+      "idle": null,
+      "emptyPagePaints": 0,
+      "imageSha256": "0D3ADEE883203E186FD7278E06B4874677938E17550462B96360AF79B1EF84F9",
+      "controlsSha256": "AA7E2F7C053DBC64A76C464F3FC5658A885A5A3502EACD04B54E8E6E245B3164"
+    },
+    {
+      "name": "chrome-eink-glow",
+      "exitCode": 0,
+      "processId": 1524,
+      "compositor": "egui-glow",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "primary": {
+        "autoHidden": true,
+        "settled": true,
+        "rect": [
+          700.0,
+          8.0,
+          742.0,
+          50.0
+        ],
+        "geometry": {
+          "viewport": [
+            1440.0,
+            940.0
+          ],
+          "scale": 1.115,
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              385.5,
+              24.0,
+              669.0,
+              892.0
+            ]
+          ]
+        }
+      },
+      "reference": null,
+      "transition": {
+        "synthetic": true,
+        "geometryUnchanged": true,
+        "expectedVisibilityMet": true,
+        "elapsedMs": 2748.9800999999998,
+        "before": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ]
+            ]
+          },
+          "reference": null
+        },
+        "hidden": null,
+        "after": {
+          "primary": {
+            "viewport": [
+              1440.0,
+              940.0
+            ],
+            "scale": 1.115,
+            "scroll": [
+              0.0,
+              0.0
+            ],
+            "generation": 2,
+            "pages": [
+              [
+                0,
+                385.5,
+                24.0,
+                669.0,
+                892.0
+              ]
+            ]
+          },
+          "reference": null
+        }
+      },
+      "idle": null,
+      "emptyPagePaints": 0,
+      "imageSha256": "6D36CEF14FDBC97F6837EE29B7AB368A75DCD7C980F6E2BAD5A4794FE7F4A66A",
+      "controlsSha256": "168F69EF21D6E1B09F63B9F52CAD163BE8113E4762432AB15DAB46A3986E74E9"
+    },
+    {
+      "name": "idle-reader-wgpu",
+      "exitCode": 0,
+      "processId": 12548,
+      "compositor": "native-wgpu",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "primary": {
+        "autoHidden": true,
+        "settled": true,
+        "rect": [
+          700.0,
+          8.0,
+          742.0,
+          50.0
+        ],
+        "geometry": {
+          "viewport": [
+            1440.0,
+            940.0
+          ],
+          "scale": 1.115,
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              385.5,
+              24.0,
+              669.0,
+              892.0
+            ]
+          ]
+        }
+      },
+      "reference": null,
+      "transition": null,
+      "idle": {
+        "synthetic": true,
+        "positiveControl": false,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2003.9316999999999,
+        "firstFrame": 81,
+        "lastFrame": 82,
+        "intermediateUpdates": 0,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      },
+      "emptyPagePaints": 0,
+      "imageSha256": "3C1D85710181E85A01118E7CAB546DB64FE351716B41D1C0824ECD3441BA3F62",
+      "controlsSha256": "6C6343A427C74C8B6245B980A1ACFF7052743798354424333DD43BA6C11E279E"
+    },
+    {
+      "name": "legacy-reader-commands",
+      "exitCode": 0,
+      "processId": 9332,
+      "compositor": "native-wgpu",
+      "viewport": [
+        0.0,
+        0.0,
+        1440.0,
+        960.0
+      ],
+      "pixelsPerPoint": 1.25,
+      "primary": {
+        "autoHidden": false,
+        "settled": true,
+        "rect": [
+          403.1875,
+          8.0,
+          763.1875,
+          54.0
+        ],
+        "geometry": {
+          "viewport": [
+            716.0,
+            940.0
+          ],
+          "scale": 1.0866666666666667,
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "generation": 2,
+          "pages": [
+            [
+              0,
+              32.0,
+              35.333333333333314,
+              652.0,
+              869.3333333333334
+            ]
+          ]
+        }
+      },
+      "reference": {
+        "autoHidden": false,
+        "settled": true,
+        "rect": [
+          976.8125,
+          8.0,
+          1336.8125,
+          50.0
+        ],
+        "geometry": {
+          "viewport": [
+            716.0,
+            940.0
+          ],
+          "scale": 0.815,
+          "scroll": [
+            0.0,
+            0.0
+          ],
+          "generation": 1,
+          "pages": [
+            [
+              1,
+              32.0,
+              225.50000000000003,
+              652.0,
+              488.99999999999994
+            ]
+          ]
+        }
+      },
+      "transition": null,
+      "idle": null,
+      "emptyPagePaints": 0,
+      "imageSha256": "AC8B9BCF75C882E7C329802C2A6CED0925CEE7C6317EB5B02E6F6EA1AC209691",
+      "controlsSha256": "248E1F039BB1230384705B344A6DF9AF7AB1F1436C111D5178C5D92BA3B1DA67"
+    }
+  ],
+  "scope": "Native synthetic reader controls, keyboard input, geometry continuity and one settled idle observation; no physical accessibility, Release performance or full-parity certification"
+}

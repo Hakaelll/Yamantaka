@@ -1,6 +1,7 @@
 use super::*;
 
 pub(super) struct ReaderPane {
+    pub chrome: reader_chrome::State,
     pub visual_profile: reader_profile::VisualProfile,
     pub restoration: restoration::RestorationState,
     pub viewport: reader_surface::ReaderSurface,
@@ -32,6 +33,7 @@ pub(super) struct ReaderPane {
 impl Default for ReaderPane {
     fn default() -> Self {
         Self {
+            chrome: Default::default(),
             visual_profile: Default::default(),
             restoration: Default::default(),
             viewport: Default::default(),

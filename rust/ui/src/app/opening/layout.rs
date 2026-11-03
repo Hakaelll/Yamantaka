@@ -54,7 +54,11 @@ impl YamantakaApp {
                     .max_rect(rect)
                     .invisible(),
             );
-            if !self.reader_chrome_hidden {
+            if panel
+                && !self.reader_focus
+                && ui.ctx().content_rect().width() < 620.0
+                && !self.reader_chrome_hidden
+            {
                 reader_controls::toolbar_frame(&mut measuring, |ui| {
                     ui.allocate_space(egui::vec2(0.0, 40.0));
                 });
