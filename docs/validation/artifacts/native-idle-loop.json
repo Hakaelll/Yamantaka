@@ -1,0 +1,174 @@
+{
+  "synthetic": true,
+  "sourceBase": "7aa2e9da14db2f2569cabb7ba82c498a340d418b",
+  "runtimeSourcesModified": true,
+  "profile": "debug",
+  "executableSha256": "5A14C3829F0BC7E975BE59F07F35423A719BAFA53CD213FACCD27577BBDA2499",
+  "sources": [
+    {
+      "path": "rust/ui/src/app.rs",
+      "sha256": "5FDD14E516A6C73EFBD134698BC57C57C9F3B46EBEAD78BA19B72A27F47088CE"
+    },
+    {
+      "path": "rust/ui/src/idle_probe.rs",
+      "sha256": "1B33A5FB28F809118E56844963851407C6854B2EFA54C5F8266FB41DF80E1693"
+    },
+    {
+      "path": "rust/ui/src/main.rs",
+      "sha256": "477785143BD64DA7ADCE016792AD4590B4F935C0C96688A6295B886A91C2FF56"
+    }
+  ],
+  "cases": [
+    {
+      "name": "idle-library-wgpu",
+      "exitCode": 0,
+      "processId": 13916,
+      "compositor": "native-wgpu",
+      "observation": {
+        "synthetic": true,
+        "positiveControl": false,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2006.5114999999998,
+        "firstFrame": 62,
+        "lastFrame": 63,
+        "intermediateUpdates": 0,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      },
+      "residentCovers": 10,
+      "emptyPagePaints": 0,
+      "imageSha256": "AD2346BBCDAAC5B08C13467CEC83209648E29FFDDE3B2E65720AE56DAEA821A0",
+      "controlsSha256": "3E420CF556F19AC3D42DD8C75F586B4BE6C0704F97953B9A127876228BCC4456"
+    },
+    {
+      "name": "idle-reader-wgpu",
+      "exitCode": 0,
+      "processId": 10308,
+      "compositor": "native-wgpu",
+      "observation": {
+        "synthetic": true,
+        "positiveControl": false,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2003.3329,
+        "firstFrame": 46,
+        "lastFrame": 47,
+        "intermediateUpdates": 0,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      },
+      "residentCovers": 0,
+      "emptyPagePaints": 0,
+      "imageSha256": "AA7D09C4B74A534165AFD202B6B7D3669F45F2DCB4A693E56351A61BD21B4E98",
+      "controlsSha256": "513AA6EC8097398E52B4BEE0F55B24D3837560D8B46A00583035CC977143551D"
+    },
+    {
+      "name": "idle-control-wgpu",
+      "exitCode": 0,
+      "processId": 21976,
+      "compositor": "native-wgpu",
+      "observation": {
+        "synthetic": true,
+        "positiveControl": true,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2013.4029,
+        "firstFrame": 55,
+        "lastFrame": 145,
+        "intermediateUpdates": 89,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      },
+      "residentCovers": 10,
+      "emptyPagePaints": 0,
+      "imageSha256": "AD2346BBCDAAC5B08C13467CEC83209648E29FFDDE3B2E65720AE56DAEA821A0",
+      "controlsSha256": "287A7E84B0936156590F91F8C9318B438DEDB671752E3FEB7E26B085198AEF89"
+    },
+    {
+      "name": "idle-library-glow",
+      "exitCode": 0,
+      "processId": 10980,
+      "compositor": "egui-glow",
+      "observation": {
+        "synthetic": true,
+        "positiveControl": false,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2006.4495,
+        "firstFrame": 58,
+        "lastFrame": 59,
+        "intermediateUpdates": 0,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      },
+      "residentCovers": 10,
+      "emptyPagePaints": 0,
+      "imageSha256": "58A0BE86D4BEE25A3748DFB246699BC4D589892220C4B5CA9DDA0DDFC53B3A29",
+      "controlsSha256": "7F7FCF3E46C04FE637E1865B7C575C49823BB593A26D8DDAAA762F485B285B3F"
+    },
+    {
+      "name": "idle-reader-glow",
+      "exitCode": 0,
+      "processId": 11632,
+      "compositor": "egui-glow",
+      "observation": {
+        "synthetic": true,
+        "positiveControl": false,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2016.143,
+        "firstFrame": 47,
+        "lastFrame": 48,
+        "intermediateUpdates": 0,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      },
+      "residentCovers": 0,
+      "emptyPagePaints": 0,
+      "imageSha256": "52951B456F4333BFF2FFBDA326BE5BBA2406D6DAB8E8BADDEF51E5254C9BB238",
+      "controlsSha256": "8A7B0CD44954672B1671CEE9563882E43B94209DBDA5E612B6993E87704601A1"
+    },
+    {
+      "name": "idle-control-glow",
+      "exitCode": 0,
+      "processId": 15608,
+      "compositor": "egui-glow",
+      "observation": {
+        "synthetic": true,
+        "positiveControl": true,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2004.709,
+        "firstFrame": 63,
+        "lastFrame": 159,
+        "intermediateUpdates": 95,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      },
+      "residentCovers": 10,
+      "emptyPagePaints": 0,
+      "imageSha256": "58A0BE86D4BEE25A3748DFB246699BC4D589892220C4B5CA9DDA0DDFC53B3A29",
+      "controlsSha256": "AB30AA8A638E3CE80E39E11A7CF14412EEE3094D5E3A5E5D9E352A064E57D1D4"
+    }
+  ],
+  "scope": "Serial native egui update-loop observations; not presentation timing or CPU/GPU/memory acceptance"
+}

@@ -282,6 +282,7 @@ pub struct YamantakaApp {
     capture: Option<PathBuf>,
     capture_requested: bool,
     capture_ready_since: Option<Instant>,
+    pub(crate) idle_probe: Option<crate::idle_probe::Probe>,
     capture_render_events: Vec<serde_json::Value>,
     nearby_turn_preview: u8,
     nearby_rotation_preview: bool,
@@ -550,6 +551,7 @@ impl YamantakaApp {
             capture,
             capture_requested: false,
             capture_ready_since: None,
+            idle_probe: None,
             capture_render_events: Vec::new(),
             graphics_recovery: Default::default(),
             preview_device_loss: None,
@@ -2666,11 +2668,20 @@ impl App for YamantakaApp {
                 } else {
                     self.capture_ready_since = None;
                 }
-                ctx.request_repaint_after(Duration::from_millis(100));
-                if self
-                    .capture_ready_since
-                    .is_some_and(|since| since.elapsed() >= Duration::from_millis(350))
+                let capture_now = if let Some(probe) = &mut self.idle_probe {
+                    probe.advance(&ctx, ready)
+                } else {
+                    self.capture_ready_since
+                        .is_some_and(|since| since.elapsed() >= Duration::from_millis(350))
+                };
+                if !self
+                    .idle_probe
+                    .as_ref()
+                    .is_some_and(|probe| probe.observing())
                 {
+                    ctx.request_repaint_after(Duration::from_millis(100));
+                }
+                if capture_now {
                     self.capture_requested = true;
                     ctx.send_viewport_cmd(ViewportCommand::Screenshot(Default::default()));
                 }
@@ -2731,6 +2742,7 @@ impl App for YamantakaApp {
                         "trackedMemory":{"total":usage.total,"pages":usage.pages,"tiles":usage.tiles,"text":usage.text,"other":usage.other,"cpu":usage.cpu,"gpu":usage.gpu,"transient":usage.transient},
                         "memoryScope":"Tracked PDF buffers, extracted-text geometry and selected-text payloads, page/thumbnail/PDF-cover GPU payloads, wgpu staging and Glow image copies. egui text layout, UI/font textures and opaque driver allocations are not covered."});
                     record["selectionAdmission"]=self.selection_admission_verified.clone().unwrap_or(serde_json::Value::Null);
+                    record["idleObservation"] = self.idle_probe.as_ref().map(|probe|probe.summary()).unwrap_or_default();
                     record["bulkOrganization"]=self.bulk_organization_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["bulkTargetPicker"]=self.bulk_picker_summary();
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();

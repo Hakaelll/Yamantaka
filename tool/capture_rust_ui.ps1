@@ -9,6 +9,12 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='idle-library-wgpu'; args=@('--pdf-covers','--verify-idle') },
+    @{ name='idle-reader-wgpu'; args=@('--reader','--verify-idle') },
+    @{ name='idle-control-wgpu'; args=@('--pdf-covers','--verify-idle','--idle-positive-control') },
+    @{ name='idle-library-glow'; args=@('--pdf-covers','--verify-idle','--software') },
+    @{ name='idle-reader-glow'; args=@('--reader','--verify-idle','--software') },
+    @{ name='idle-control-glow'; args=@('--pdf-covers','--verify-idle','--idle-positive-control','--software') },
     @{ name='corporate-brand-dark'; args=@('--pdf-covers','--es','--reduce-motion') },
     @{ name='corporate-brand-light'; args=@('--pdf-covers','--light','--reduce-motion') },
     @{ name='duplicates-merge-history'; args=@('--duplicates','--duplicates-merge','--duplicates-merge-history','--es') },
@@ -1266,6 +1272,12 @@ foreach ($case in $cases) {
             $visibleLabels = if ($case.args -contains '--es') { @('Ver libros','Acciones de colección') } else { @('View books','Collection actions') }
         }
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $visibleLabels
+    }
+    if ($case.args -contains '--verify-idle') {
+        $idle = $controls.idleObservation
+        $control = $case.args -contains '--idle-positive-control'
+        if (-not $idle.valid -or -not $idle.expectationMet -or $idle.positiveControl -ne $control -or $idle.actualObservationMs -lt 2000 -or $idle.actualObservationMs -gt 5000) { throw 'Native idle observation failed or was interrupted.' }
+        if (($control -and $idle.intermediateUpdates -lt 3) -or (-not $control -and $idle.intermediateUpdates -ne 0)) { throw 'Native idle observation counted unexpected updates.' }
     }
     $export = $null
     if ($controls.annotationExport.artifact) {

@@ -4,6 +4,7 @@ mod backup_worker;
 mod book;
 mod diagnostics_worker;
 mod graphics_recovery;
+mod idle_probe;
 mod legacy_import_worker;
 mod managed_pages;
 mod page_presenter;
@@ -150,6 +151,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|s| s.strip_prefix("--capture="))
             .map(PathBuf::from)
     });
+    let idle_probe = args.iter().any(|arg| arg == "--verify-idle");
+    if idle_probe && (!demo || capture.is_none()) {
+        return Err("Idle observation requires --demo and --capture".into());
+    }
     let executable = std::env::current_exe()?;
     if demo
         && args.iter().any(|arg| {
@@ -1266,6 +1271,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 startup_mode,
             );
             app.graphics_recovery = app_graphics.clone();
+            if idle_probe {
+                app.idle_probe = Some(idle_probe::Probe::new(
+                    args.iter().any(|arg| arg == "--idle-positive-control"),
+                ));
+            }
             if preview_device_fault && let Some(state) = &cc.wgpu_render_state {
                 app.preview_graphics_loss(state.device.clone());
                 if args.iter().any(|arg| arg == "--graphics-fail-checkpoint") {
