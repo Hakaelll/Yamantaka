@@ -916,7 +916,7 @@ impl ScrollArea {
             if let Some(scroll_target) = state.offset_target[d] {
                 state.vel[d] = 0.0;
 
-                if (state.offset[d] - scroll_target.target_offset).abs() < 1.0 {
+                if !animated || (state.offset[d] - scroll_target.target_offset).abs() < 1.0 {
                     // Arrived
                     state.offset[d] = scroll_target.target_offset;
                     state.offset_target[d] = None;

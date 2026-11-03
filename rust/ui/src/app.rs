@@ -2202,8 +2202,12 @@ impl App for YamantakaApp {
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut Frame) {
-        if self.electronic_ink() && matches!(self.surface, Surface::Reader) {
+        if self.reduced_motion || (self.electronic_ink() && matches!(self.surface, Surface::Reader))
+        {
             ui.ctx().input_mut(|input| input.finish_scroll_smoothing());
+        }
+        if self.reduced_motion {
+            ui.style_mut().animation_time = 0.0;
         }
         if self.graphics_recovery.faulted() {
             return;

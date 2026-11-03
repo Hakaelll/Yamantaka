@@ -57,7 +57,7 @@ impl YamantakaApp {
             .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
         let mut scrolling = egui::ScrollArea::both()
             .animated(!self.reduced_motion && !self.electronic_ink())
-            .kinetic_scrolling(!self.electronic_ink())
+            .kinetic_scrolling(!self.reduced_motion && !self.electronic_ink())
             .id_salt(("pdf-viewport", &document.id))
             .max_height(viewport.y.max(1.0))
             .min_scrolled_height(0.0)

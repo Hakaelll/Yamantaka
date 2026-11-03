@@ -23,6 +23,7 @@ struct ReferenceTools<'a> {
     runtime: &'a Runtime,
     governor: &'a MemoryGovernor,
     export: &'a mut annotations::export::ExportState,
+    reduced_motion: bool,
 }
 pub(super) struct ReferenceView {
     pub(in crate::app) deferred: bool,
@@ -231,7 +232,7 @@ impl ReferenceView {
             self.input_layers.insert(layer);
         }
         self.pane.chrome = state;
-        self.viewport(ui, tools.runtime, tools.governor, english, p);
+        self.viewport(ui, tools, english, p);
         close
     }
 
@@ -441,11 +442,12 @@ impl ReferenceView {
     fn viewport(
         &mut self,
         ui: &mut egui::Ui,
-        runtime: &Runtime,
-        governor: &MemoryGovernor,
+        tools: &ReferenceTools<'_>,
         english: bool,
         p: Palette,
     ) {
+        let runtime = tools.runtime;
+        let governor = tools.governor;
         if self.deferred {
             self.provisional_paints += 1;
         }
@@ -494,9 +496,13 @@ impl ReferenceView {
         );
         ui.spacing_mut().scroll.fade.strength = 0.0;
         let mut scroll = egui::ScrollArea::both()
-            .animated(self.pane.visual_profile != reader_profile::VisualProfile::ElectronicInk)
+            .animated(
+                !tools.reduced_motion
+                    && self.pane.visual_profile != reader_profile::VisualProfile::ElectronicInk,
+            )
             .kinetic_scrolling(
-                self.pane.visual_profile != reader_profile::VisualProfile::ElectronicInk,
+                !tools.reduced_motion
+                    && self.pane.visual_profile != reader_profile::VisualProfile::ElectronicInk,
             )
             .id_salt("reference-pages")
             .max_height(size.y.max(1.0))
@@ -820,6 +826,7 @@ impl YamantakaApp {
                             runtime: &self.runtime,
                             governor: &self.governor,
                             export: &mut self.annotation_export,
+                            reduced_motion: self.reduced_motion,
                         },
                         self.english,
                         p,
