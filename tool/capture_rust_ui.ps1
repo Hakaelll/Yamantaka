@@ -10,6 +10,8 @@ $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $cases = @(
+    @{ name='readme-library-dark'; args=@('--pdf-covers','--reduce-motion') },
+    @{ name='readme-library-light'; args=@('--pdf-covers','--light','--reduce-motion') },
     @{ name='chrome-hidden'; args=@('--reader','--continuous','--chrome=hidden') },
     @{ name='chrome-revealed'; args=@('--reader','--continuous','--chrome=revealed') },
     @{ name='chrome-pinned'; args=@('--reader','--continuous','--chrome=pinned') },

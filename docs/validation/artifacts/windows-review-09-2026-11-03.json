@@ -1,0 +1,502 @@
+{
+  "applicationLicense": "MIT",
+  "archiveMatchesBundle": true,
+  "archiveSha256": "48cc5e2a794e2c8a4462197474a18f7fe96e684401d7da56217f8f9a18ab6435",
+  "binaries": {
+    "pdfium.dll": {
+      "imports": [
+        "advapi32.dll",
+        "gdi32.dll",
+        "kernel32.dll",
+        "user32.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 3
+    },
+    "yamantaka.exe": {
+      "imports": [
+        "advapi32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "bcryptprimitives.dll",
+        "combase.dll",
+        "dwmapi.dll",
+        "dxgi.dll",
+        "gdi32.dll",
+        "imm32.dll",
+        "kernel32.dll",
+        "ntdll.dll",
+        "ole32.dll",
+        "oleaut32.dll",
+        "opengl32.dll",
+        "setupapi.dll",
+        "shell32.dll",
+        "uiautomationcore.dll",
+        "user32.dll",
+        "uxtheme.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 2
+    }
+  },
+  "components": 239,
+  "files": 462,
+  "machineProfilePathsAbsent": true,
+  "pdfiumHashPinned": true,
+  "status": "review-candidate-not-final-release",
+  "verified": true,
+  "version": "0.16.0-alpha.1",
+  "baseSourceCommit": "ff9b58eb7ea493a3077218a15dc362cc697d1ebe",
+  "runtimeSourcesModified": false,
+  "sourceInventoryMatches": true,
+  "archiveBytes": 16301266,
+  "applicationBytes": 30189568,
+  "applicationSha256": "5ef6b10c0d053e92e14e942c29a607030e2685e3b264bac96406fdc544931400",
+  "authenticodeObserved": "NotSigned",
+  "syntheticNativeChecks": [
+    {
+      "name": "readme-library-dark",
+      "exitCode": 0,
+      "imageSha256": "A4FEAAF76EEC3A65036E762F5D157EE67E85D6C074A270478DCC26F4CDD51623",
+      "controlsSha256": "612C1187748F54943284BA2A1D29F44B9330EFF0F8E22FF2771E70B381244556",
+      "readyPdfCovers": 10
+    },
+    {
+      "name": "readme-library-light",
+      "exitCode": 0,
+      "imageSha256": "FE2AA09AEB97091A336B359DFBC66A11BE2BD66B1F8D7A7DF7E020701372D8AF",
+      "controlsSha256": "C193FA24921E1D3AA4E7433860B6B0EDB8F948E629C67E148A5BA4BAB917DDD4",
+      "readyPdfCovers": 10
+    },
+    {
+      "name": "chrome-hidden",
+      "exitCode": 0,
+      "imageSha256": "34456A7F3E6951FDEB8829247F9B4A8BF4311C06ED5CFDFD76725663AD10E852",
+      "controlsSha256": "564D50824A08EEE0F93D899620238A7253E11F53898F7A67AE1EEF4C94472D3A"
+    },
+    {
+      "name": "chrome-eink-glow",
+      "exitCode": 0,
+      "imageSha256": "6D36CEF14FDBC97F6837EE29B7AB368A75DCD7C980F6E2BAD5A4794FE7F4A66A",
+      "controlsSha256": "A9989AB8352DB2446B0BFA54100F0247129CC9368A9029AAA54593D9FC5B3A49"
+    },
+    {
+      "name": "idle-reader-wgpu",
+      "exitCode": 0,
+      "imageSha256": "3C1D85710181E85A01118E7CAB546DB64FE351716B41D1C0824ECD3441BA3F62",
+      "controlsSha256": "C2220342402B55DA82D7B8E4860E39B5871D6F321313ED4A599ECDE9EDF3A6A3",
+      "idleObservation": {
+        "synthetic": true,
+        "positiveControl": false,
+        "warmupMs": 2000,
+        "requestedObservationMs": 2000,
+        "actualObservationMs": 2001.2026,
+        "firstFrame": 79,
+        "lastFrame": 80,
+        "intermediateUpdates": 0,
+        "inputEvents": 0,
+        "lostReadiness": false,
+        "valid": true,
+        "expectationMet": true,
+        "scope": "egui native update loop only; no GPU/CPU/energy or interaction-time acceptance"
+      }
+    }
+  ],
+  "nativeProbes": {
+    "reader-controls": {
+      "synthetic": true,
+      "timeoutHides": true,
+      "keyboardReveal": true,
+      "focusRetained": true,
+      "edgeReveal": true,
+      "disabledKeepsVisible": true,
+      "blockedKeepsVisible": true,
+      "newDocumentReveals": true,
+      "overlayPreservesParentRect": true
+    },
+    "reader-profile": {
+      "synthetic": true,
+      "standardWheel": [
+        [
+          0.0,
+          -12.748315811157227,
+          1.0
+        ],
+        [
+          0.0,
+          -8.68532657623291,
+          1.0
+        ],
+        [
+          0.0,
+          -5.9172444343566895,
+          1.0
+        ]
+      ],
+      "immediateWheel": [
+        [
+          0.0,
+          -40.0,
+          1.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "shiftWheelImmediate": true,
+      "controlZoomImmediate": true,
+      "standardDragOffsets": [
+        0.0,
+        0.0,
+        0.0,
+        50.0,
+        100.0,
+        133.05555725097656,
+        165.83334350585938
+      ],
+      "nonKineticDragOffsets": [
+        0.0,
+        0.0,
+        0.0,
+        50.0,
+        100.0,
+        100.0,
+        100.0
+      ]
+    },
+    "text-layout": {
+      "samples": [
+        {
+          "text": "Hello, world! fi ffi 123 (x) - ok\tdone",
+          "glyphs": [
+            [
+              "H",
+              0.0,
+              18.458984375
+            ],
+            [
+              "e",
+              18.0,
+              13.5966796875
+            ],
+            [
+              "l",
+              32.0,
+              6.296875
+            ],
+            [
+              "l",
+              38.0,
+              6.296875
+            ],
+            [
+              "o",
+              44.0,
+              15.234375
+            ],
+            [
+              ",",
+              60.0,
+              5.63671875
+            ],
+            [
+              " ",
+              65.0,
+              7.1220703125
+            ],
+            [
+              "w",
+              72.0,
+              18.7890625
+            ],
+            [
+              "o",
+              91.0,
+              15.234375
+            ],
+            [
+              "r",
+              106.0,
+              9.0390625
+            ],
+            [
+              "l",
+              115.0,
+              6.296875
+            ],
+            [
+              "d",
+              122.0,
+              15.310546875
+            ],
+            [
+              "!",
+              137.0,
+              7.388671875
+            ],
+            [
+              " ",
+              144.0,
+              7.1220703125
+            ],
+            [
+              "f",
+              151.0,
+              8.1376953125
+            ],
+            [
+              "i",
+              160.0,
+              6.296875
+            ],
+            [
+              " ",
+              166.0,
+              7.1220703125
+            ],
+            [
+              "f",
+              173.0,
+              8.1376953125
+            ],
+            [
+              "f",
+              181.0,
+              8.1376953125
+            ],
+            [
+              "i",
+              189.0,
+              6.296875
+            ],
+            [
+              " ",
+              196.0,
+              7.1220703125
+            ],
+            [
+              "1",
+              203.0,
+              9.8515625
+            ],
+            [
+              "2",
+              213.0,
+              14.015625
+            ],
+            [
+              "3",
+              227.0,
+              14.015625
+            ],
+            [
+              " ",
+              241.0,
+              7.1220703125
+            ],
+            [
+              "(",
+              248.0,
+              7.845703125
+            ],
+            [
+              "x",
+              256.0,
+              11.93359375
+            ],
+            [
+              ")",
+              267.0,
+              7.845703125
+            ],
+            [
+              " ",
+              275.0,
+              7.1220703125
+            ],
+            [
+              "-",
+              282.0,
+              10.3974609375
+            ],
+            [
+              " ",
+              293.0,
+              7.1220703125
+            ],
+            [
+              "o",
+              300.0,
+              15.234375
+            ],
+            [
+              "k",
+              315.0,
+              12.923828125
+            ],
+            [
+              "\t",
+              328.0,
+              28.48828125
+            ],
+            [
+              "d",
+              357.0,
+              15.310546875
+            ],
+            [
+              "o",
+              372.0,
+              15.234375
+            ],
+            [
+              "n",
+              387.0,
+              14.7138671875
+            ],
+            [
+              "e",
+              402.0,
+              13.5966796875
+            ]
+          ],
+          "size": [
+            415.84375,
+            35.0
+          ]
+        },
+        {
+          "text": "A\u030angstro\u0308m",
+          "characters": 10,
+          "glyphs": 10
+        },
+        {
+          "text": "\u01fb fi ffi",
+          "characters": 8,
+          "glyphs": 8
+        },
+        {
+          "text": "\u0645\u0631\u062d\u0628\u0627\u064e",
+          "characters": 6,
+          "glyphs": 6
+        },
+        {
+          "text": "\u05e9\u05dc\u05d5\u05dd 42 \u05e2\u05d5\u05dc\u05dd",
+          "characters": 12,
+          "glyphs": 12,
+          "visualOrder": [
+            11,
+            10,
+            9,
+            8,
+            7,
+            5,
+            6,
+            4,
+            3,
+            2,
+            1,
+            0
+          ],
+          "hitTesting": true
+        },
+        {
+          "text": "Hello \u05e9\u05dc\u05d5\u05dd world",
+          "characters": 16,
+          "glyphs": 16,
+          "visualOrder": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            9,
+            8,
+            7,
+            6,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "hitTesting": true
+        },
+        {
+          "text": "abc \u05d0\u05d1\u05d2 def",
+          "characters": 11,
+          "glyphs": 11,
+          "visualOrder": [
+            0,
+            1,
+            2,
+            3,
+            6,
+            5,
+            4,
+            7,
+            8,
+            9,
+            10
+          ],
+          "hitTesting": true
+        },
+        {
+          "text": "\u0639\u062f\u062f 123 \u0645\u0631\u062d\u0628\u0627",
+          "characters": 13,
+          "glyphs": 13,
+          "visualOrder": [
+            12,
+            11,
+            10,
+            9,
+            8,
+            7,
+            4,
+            5,
+            6,
+            3,
+            2,
+            1,
+            0
+          ],
+          "hitTesting": true
+        },
+        {
+          "mixedArabicHebrewPreservesArabicJoining": true
+        },
+        {
+          "wrappedText": "abc \u05d0\u05d1\u05d2   xyz",
+          "trailingWhitespaceUsesParagraphDirection": true
+        },
+        {
+          "wrappedText": "\u05d0\u05d1\u05d2 abc   xyz",
+          "trailingWhitespaceUsesParagraphDirection": true
+        }
+      ],
+      "editorAfterLeftThreeAndInsert": "\u0639\u062f\u062f 123 \u0645\u0631x\u062d\u0628\u0627",
+      "copyPreservesLogicalOrder": true
+    }
+  },
+  "officialSchemaCheck": {
+    "valid": true,
+    "validator": "PowerShell Test-Json",
+    "offlineReferenceBundling": true,
+    "schemaSha256": "f21873a92077437735d02e7ce9ec4da882be1b8d2e45184fb16db334d20733d9"
+  },
+  "unchangedGeneratedSourcePdfs": 42,
+  "limits": [
+    "Review candidate, not final replacement release",
+    "Physical accessibility and Windows 10 execution remain pending",
+    "Complete parity and paired Flutter/Rust performance acceptance remain pending",
+    "No interaction-time, CPU, GPU or energy verdict follows from the idle update count"
+  ]
+}
