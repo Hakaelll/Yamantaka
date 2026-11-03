@@ -48,6 +48,7 @@ pub(super) fn decode(
         })?;
     let prefs = secondary.preferences();
     let comparison = WorkspaceComparison {
+        reading: Some(prefs.into()),
         layout,
         scroll_offset: Some(prefs.scroll_offset),
         bidirectional: true,

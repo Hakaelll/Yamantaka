@@ -1,7 +1,7 @@
 use crate::reader_tabs::DocumentTabs;
 mod comparison;
 mod view;
-pub use comparison::{ComparisonLayout, WorkspaceComparison};
+pub use comparison::{ComparisonLayout, ComparisonReading, WorkspaceComparison};
 pub use view::*;
 
 #[derive(Clone, Debug)]

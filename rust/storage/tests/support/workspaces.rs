@@ -261,6 +261,7 @@ pub fn preserved_split_references(document: &str) {
         Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions)
     );
     let comparison = WorkspaceComparison {
+        reading: None,
         bidirectional: false,
         swapped: true,
         differences: std::collections::BTreeSet::from([1, 3]),

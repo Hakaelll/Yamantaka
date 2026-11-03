@@ -64,6 +64,8 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Excluded claims
 
+Saved comparison context now also carries the reference reading mode, page layout, cover pairing, initial side and control-hiding preference. The Flutter split adapter supplies the same fields, and default-session continuity supports version seven. See [reference reading context](rust-comparison-reading-context.md). This is an implementation checkpoint without newly executed tests, compilation or rendered acceptance; the workspace and continuity rows remain Partial.
+
 The current open-reading context includes a native queue with ordering, five review states, blocking reasons, next actions and continuity persistence. The [saved workspace checkpoint](../validation/rust-workspaces-2026-10-22.md) adds named readings and management through the existing v11 tables. The [context checkpoint](../validation/rust-workspace-context-2026-10-22.md) connects library-view/focus restoration and queue binding. The [recovery checkpoint](../validation/rust-workspace-recovery-2026-10-22.md) adds guarded binding across restart, default opening without an existing continuity file and deletion undo. Saved comparison restoration and panel-width/column application now have [native workspace evidence](../validation/rust-workspace-layout-2026-11-03.md); this does not establish complete workspace parity.
 
 Printing: `docs/adr/ADR-0002-printing.md` is a contract/proposal. Secondary reader

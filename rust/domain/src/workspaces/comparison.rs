@@ -13,6 +13,8 @@ pub enum ComparisonLayout {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkspaceComparison {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reading: Option<ComparisonReading>,
     #[serde(default)]
     pub layout: ComparisonLayout,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -39,9 +41,37 @@ pub struct WorkspaceComparison {
     pub follow_position: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ComparisonReading {
+    pub mode: String,
+    pub layout: String,
+    pub cover: String,
+    pub side: String,
+    pub auto_hide: bool,
+}
+impl From<&ReaderPreferences> for ComparisonReading {
+    fn from(preferences: &ReaderPreferences) -> Self {
+        Self {
+            mode: preferences.view_mode.persisted_name().into(),
+            layout: preferences.persisted_layout_name().into(),
+            cover: preferences.cover_policy.persisted_name().into(),
+            side: preferences.initial_side.persisted_name().into(),
+            auto_hide: preferences.controls_auto_hide,
+        }
+    }
+}
+
 impl WorkspaceComparison {
     pub fn preferences(&self) -> Result<ReaderPreferences> {
         let mut prefs = ReaderPreferences::new(&self.document);
+        if let Some(reading) = &self.reading {
+            prefs.view_mode = ReaderMode::from_persisted(&reading.mode)?;
+            prefs.load_layout_name(&reading.layout)?;
+            prefs.cover_policy = CoverPolicy::from_persisted(&reading.cover)?;
+            prefs.initial_side = InitialSide::from_persisted(&reading.side)?;
+            prefs.controls_auto_hide = reading.auto_hide;
+        }
         prefs.zoom_mode = ZoomMode::from_persisted(&self.zoom_mode)?;
         prefs.zoom_level = self.zoom;
         prefs.reading_theme = ReaderTheme::from_persisted(&self.theme)?;

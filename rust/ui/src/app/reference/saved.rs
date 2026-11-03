@@ -18,6 +18,7 @@ impl ReferenceView {
         let position = self.pane.navigation.as_ref()?.position();
         let prefs = self.pane.reader_preferences.as_ref()?;
         Some(WorkspaceComparison {
+            reading: Some(prefs.into()),
             bidirectional: self.bidirectional,
             swapped: self.swapped,
             differences: self.differences.clone(),

@@ -99,7 +99,7 @@ impl Snapshot {
             .with_selection_notes(self.selection_notes.clone())
     }
     fn model(&self) -> Result<DocumentTabs> {
-        if !matches!(self.version, 1..=6) {
+        if !matches!(self.version, 1..=7) {
             return Err(Failure::Invalid(
                 "Unsupported reader continuity version; original file is preserved".into(),
             ));
@@ -272,7 +272,13 @@ pub fn save(path: &Path, continuity: &ReaderContinuity) -> Result<()> {
         StoredTab::capture(tab, old)
     };
     let snapshot = Snapshot {
-        version: if !continuity.selection_notes().is_empty()
+        version: if continuity
+            .comparison()
+            .is_some_and(|saved| saved.reading.is_some())
+            || previous.as_ref().is_some_and(|old| old.version == 7)
+        {
+            7
+        } else if !continuity.selection_notes().is_empty()
             || previous.as_ref().is_some_and(|old| old.version == 6)
         {
             6

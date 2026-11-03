@@ -115,6 +115,7 @@ impl YamantakaApp {
                 let mut view = self.capture_workspace_view();
                 let mut query = view.parsed_query().unwrap();
                 query.comparison = Some(yamantaka_domain::workspaces::WorkspaceComparison {
+                    reading: None,
                     bidirectional: false,
                     swapped: false,
                     differences: Default::default(),
