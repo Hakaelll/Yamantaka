@@ -4,10 +4,11 @@ use yamantaka_domain::{
     reader_tabs::{DocumentTabs, QueueEntry, QueueStatus, ReaderTab},
 };
 impl YamantakaApp {
-    pub fn preview_workspaces(&mut self, continuous: bool) {
+    pub fn preview_workspaces(&mut self, continuous: bool, synchronized: bool) {
         if self.demo && self.capture.is_some() {
             self.workspaces.preview = 1;
             self.workspaces.continuous_preview = continuous;
+            self.workspaces.synchronized_preview = synchronized;
             self.tabs.continuity.overridden = true;
         }
     }
@@ -98,6 +99,7 @@ impl YamantakaApp {
                 .map(WorkspaceRevision::from)
                 .unwrap()
         };
+
         match step {
             1 => {
                 self.reader_panel_width = 360.0;
@@ -133,9 +135,9 @@ impl YamantakaApp {
                     horizontal_margin: 48.0,
                     vertical_margin: 24.0,
                     ratio: 0.6,
-                    follow_page: false,
-                    follow_zoom: false,
-                    follow_position: false,
+                    follow_page: self.workspaces.synchronized_preview,
+                    follow_zoom: self.workspaces.synchronized_preview,
+                    follow_position: self.workspaces.synchronized_preview,
                 });
                 view.query = serde_json::to_value(query).unwrap();
                 self.workspace_change(WorkspaceChange::Create {
@@ -228,9 +230,31 @@ impl YamantakaApp {
                 let comparison = self.capture_comparison().unwrap();
                 assert_eq!(comparison.document, "demo-1");
                 assert_eq!(comparison.primary, "demo-2");
-                assert_eq!(comparison.page, 1);
+                assert_eq!(
+                    comparison.page,
+                    if self.workspaces.synchronized_preview {
+                        self.reader.page
+                    } else {
+                        1
+                    }
+                );
+                if self.workspaces.synchronized_preview {
+                    let probe = self.reference.as_ref().unwrap().opening_summary().unwrap();
+                    assert_eq!(probe["firstPaintSeen"], true);
+                    assert_eq!(probe["firstPaintEmpty"], false);
+                    assert_eq!(probe["emptyPaints"], 0);
+                }
                 assert_eq!(comparison.rotation, 90);
-                assert!((comparison.zoom - 0.8).abs() < 0.0001);
+                assert!(
+                    (comparison.zoom
+                        - if self.workspaces.synchronized_preview {
+                            f64::from(self.reader.viewport.scale)
+                        } else {
+                            0.8
+                        })
+                    .abs()
+                        < 0.0001
+                );
                 assert_eq!(comparison.ratio, 0.6);
                 assert_eq!(
                     comparison.layout,

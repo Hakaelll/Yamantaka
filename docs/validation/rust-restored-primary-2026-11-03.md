@@ -13,4 +13,4 @@ The saved context becomes available for valid continuity and binding snapshots a
 
 The [status artifact](artifacts/restored-primary.json) records selected results and the executable hash. Local captures remain under `build/verification/restored-primary`.
 
-First-presentation acceptance for synchronized saved views, broader cancellation and pressure combinations, rapid input or resizing, physical accessibility/DPI, and paired performance measurements remains pending. These logical paint checks do not establish physical presentation latency or whole-rewrite readiness.
+The subsequent [synchronized restoration checkpoint](rust-saved-sync-2026-11-03.md) covers combined page, zoom and position following at first presentation. Broader synchronization, cancellation and pressure combinations, rapid input or resizing, physical accessibility/DPI, and paired performance measurements remain pending. These logical paint checks do not establish physical presentation latency or whole-rewrite readiness.

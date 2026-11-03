@@ -343,6 +343,20 @@ impl ReferenceView {
         true
     }
 
+    fn follow_primary_page(&mut self, page: u32) {
+        if !self.busy()
+            && !self.close_requested
+            && self.follow_page
+            && self.pending_primary_page.is_none()
+            && !self.follow_position
+            && let Some(nav) = &mut self.pane.navigation
+            && nav.position().page() != page.min(nav.page_count() - 1)
+            && nav.go_to_page(page.min(nav.page_count() - 1))
+        {
+            self.pane.navigation_changed();
+        }
+    }
+
     fn follow_primary_zoom(&mut self, scale: f32) {
         if !self.follow_zoom
             || self.pending_primary_zoom
@@ -674,17 +688,7 @@ impl YamantakaApp {
         let Some(reference) = &mut self.reference else {
             return;
         };
-        if !reference.busy()
-            && !reference.close_requested
-            && reference.follow_page
-            && reference.pending_primary_page.is_none()
-            && !reference.follow_position
-            && let Some(nav) = &mut reference.pane.navigation
-            && nav.position().page() != self.reader.page.min(nav.page_count() - 1)
-            && nav.go_to_page(self.reader.page.min(nav.page_count() - 1))
-        {
-            reference.pane.navigation_changed();
-        }
+        reference.follow_primary_page(self.reader.page);
         let rect = ui.available_rect_before_wrap();
         let geometry = comparison_rects(rect, reference.layout, reference.ratio, reference.swapped);
         let stacked = geometry.stacked;

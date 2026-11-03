@@ -9,6 +9,7 @@ struct Page {
     image: Option<PageImage>,
 }
 pub(super) struct PrimaryStage {
+    reference_pages: std::collections::BTreeMap<u32, Page>,
     source: Cancellation,
     pages: std::collections::BTreeMap<u32, Page>,
 }
@@ -16,6 +17,7 @@ impl PrimaryStage {
     pub(super) fn new(source: Cancellation) -> Self {
         Self {
             source,
+            reference_pages: Default::default(),
             pages: Default::default(),
         }
     }
@@ -198,8 +200,54 @@ impl YamantakaApp {
                 return;
             }
         };
+
         if stage.pages.values().any(|page| page.image.is_none()) {
             return;
+        }
+        reference.follow_primary_page(self.reader.page);
+        reference.follow_primary_zoom(frame.zoom as f32);
+        let position = self.reader.viewport.layout.as_ref().and_then(|layout| {
+            layout
+                .anchor_at_scroll(&frame, self.reader.navigation.as_ref()?.position())
+                .ok()
+        });
+        reference.follow_primary_position(position);
+        let stage = reference.primary_stage.as_mut().unwrap();
+        if let Err(error) = plan_primary(
+            &reference.pane,
+            &mut stage.reference_pages,
+            geometry.reference,
+            &self.runtime,
+            ui,
+            self.governor.limits().pages,
+        ) {
+            self.error = Some(error.to_string());
+            self.close_reference_preserving_continuity();
+            return;
+        }
+        if stage
+            .reference_pages
+            .values()
+            .any(|page| page.image.is_none())
+        {
+            return;
+        }
+        for (page, slot) in &mut stage.reference_pages {
+            let mut key = slot.key.clone();
+            key.generation = reference.pane.viewport.generation;
+            if let Some(previous) = reference.pane.viewport.pages.insert(
+                *page,
+                ReaderPage {
+                    requested: None,
+                    cancel: Cancellation::default(),
+                    image: slot.image.take(),
+                    image_key: Some(key),
+                    plan: Default::default(),
+                    refinement: Default::default(),
+                },
+            ) {
+                previous.cancel.cancel();
+            }
         }
         if let Some(probe) = &mut reference.opening_probe {
             probe.primary_plan = Some(frame_summary(&frame));
@@ -242,8 +290,9 @@ impl YamantakaApp {
         };
         let Some(slot) = stage
             .pages
-            .get_mut(&page.key.page)
-            .filter(|slot| slot.cancel.same_request(token))
+            .values_mut()
+            .chain(stage.reference_pages.values_mut())
+            .find(|slot| slot.cancel.same_request(token))
         else {
             return false;
         };
@@ -280,6 +329,7 @@ impl YamantakaApp {
         let Some(slot) = stage
             .pages
             .values_mut()
+            .chain(stage.reference_pages.values_mut())
             .find(|slot| token.is_some_and(|token| slot.cancel.same_request(token)))
         else {
             return false;

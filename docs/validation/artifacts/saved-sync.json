@@ -1,0 +1,184 @@
+{
+  "executableSha256": "3dbde9c3da1b7af5951547386fa7a2e17a6fbff8260772a89ffa00eb679e0c23",
+  "beforeFixNativeFirstPaintAssertionFailed": true,
+  "cases": [
+    {
+      "case": "continuous",
+      "referenceOpening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 0,
+        "primaryPlan": {
+          "viewport": [
+            610.4000244140625,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "zoom": 0.6430000305175781,
+          "visiblePages": [
+            0,
+            1
+          ]
+        },
+        "primaryFirstFrame": {
+          "viewport": [
+            610.4000244140625,
+            882.0
+          ],
+          "scroll": [
+            0.0,
+            24.0
+          ],
+          "zoom": 0.6430000305175781,
+          "visiblePages": [
+            0,
+            1
+          ],
+          "missingPages": []
+        },
+        "primaryStagedPages": [
+          1
+        ],
+        "provisionalPaints": 0
+      },
+      "referenceNavigation": {
+        "page": 0,
+        "point": [
+          0.0,
+          0.408136098366802
+        ],
+        "back": false,
+        "forward": false,
+        "entries": 1,
+        "markA": null,
+        "markB": null
+      }
+    },
+    {
+      "case": "book",
+      "referenceOpening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 0,
+        "primaryPlan": {
+          "viewport": [
+            1024.0,
+            525.2000122070312
+          ],
+          "scroll": [
+            36.0,
+            24.0
+          ],
+          "zoom": 1.25,
+          "visiblePages": [
+            0,
+            1
+          ]
+        },
+        "primaryFirstFrame": {
+          "viewport": [
+            1024.0,
+            525.2000122070312
+          ],
+          "scroll": [
+            36.0,
+            24.0
+          ],
+          "zoom": 1.25,
+          "visiblePages": [
+            0,
+            1
+          ],
+          "missingPages": []
+        },
+        "primaryStagedPages": [],
+        "provisionalPaints": 0
+      },
+      "referenceNavigation": {
+        "page": 0,
+        "point": [
+          0.0,
+          0.5
+        ],
+        "back": false,
+        "forward": false,
+        "entries": 1,
+        "markA": null,
+        "markB": null
+      }
+    },
+    {
+      "case": "independent",
+      "referenceOpening": {
+        "adoptedWithoutImage": false,
+        "firstPaintSeen": true,
+        "firstPaintEmpty": false,
+        "emptyPaints": 0,
+        "failures": 0,
+        "retainedOnFailure": false,
+        "queueRetries": 0,
+        "primaryPlan": {
+          "viewport": [
+            1024.0,
+            525.2000122070312
+          ],
+          "scroll": [
+            36.0,
+            24.0
+          ],
+          "zoom": 1.25,
+          "visiblePages": [
+            0,
+            1
+          ]
+        },
+        "primaryFirstFrame": {
+          "viewport": [
+            1024.0,
+            525.2000122070312
+          ],
+          "scroll": [
+            36.0,
+            24.0
+          ],
+          "zoom": 1.25,
+          "visiblePages": [
+            0,
+            1
+          ],
+          "missingPages": []
+        },
+        "primaryStagedPages": [],
+        "provisionalPaints": 0
+      },
+      "referenceNavigation": {
+        "page": 1,
+        "point": [
+          0.0875,
+          0.5
+        ],
+        "back": false,
+        "forward": false,
+        "entries": 1,
+        "markA": null,
+        "markB": null
+      }
+    }
+  ],
+  "originalPdfHashesUnchanged": 39,
+  "standaloneTestsAdded": 0,
+  "dependenciesAdded": false,
+  "physicalPresentationAcceptance": false,
+  "performanceAcceptance": false
+}
