@@ -1878,6 +1878,27 @@ impl App for YamantakaApp {
                         continue;
                     }
 
+                    if matches!(error, yamantaka_domain::Failure::PdfSourceChanged)
+                        && let Some(token) = &cancel
+                    {
+                        let primary = self.reader.viewport.block_changed_source(token);
+                        let reference = self.reference.as_mut().is_some_and(|reference| {
+                            let changed = reference.pane.viewport.block_changed_source(token);
+                            if changed {
+                                reference.pane.loading = false;
+                            }
+                            changed
+                        });
+                        if primary {
+                            self.reader.loading = false;
+                            self.error =
+                                Some(reader_surface::source_change_message(self.english).into());
+                        }
+                        if primary || reference {
+                            continue;
+                        }
+                    }
+
                     if let Some(token) = &cancel
                         && (self.reader.viewport.fail_refinement(token)
                             || self.reference.as_mut().is_some_and(|reference| {
@@ -2417,7 +2438,12 @@ impl App for YamantakaApp {
                     self.toolbar(ui);
                 }
                 let toolbar_extent = ui.available_rect_before_wrap().top() - before_toolbar;
-                if let Some(error) = self.error.clone() {
+                if let Some(error) = self.error.clone().or_else(|| {
+                    self.reader
+                        .viewport
+                        .source_changed
+                        .then(|| reader_surface::source_change_message(self.english).into())
+                }) {
                     egui::Frame::new()
                         .fill(p.raised)
                         .inner_margin(egui::Margin::symmetric(24, 12))
@@ -2448,7 +2474,25 @@ impl App for YamantakaApp {
                                     self.error = None;
                                     self.retry_reader_close();
                                 }
+                                if self.reader.viewport.source_changed {
+                                    let has_reference = self.reference.is_some();
+                                    let label = if has_reference {
+                                        self.tr("Cerrar comparación", "Close comparison")
+                                    } else {
+                                        self.tr("Cerrar lectura", "Close reading")
+                                    };
+                                    if theme::navigation(ui, label, false, p).clicked() {
+                                        if has_reference {
+                                            self.request_reference_close();
+                                        } else if let Some(id) =
+                                            self.tabs.model.active().map(|tab| tab.id().to_owned())
+                                        {
+                                            self.close_reader_tab(&id);
+                                        }
+                                    }
+                                }
                                 if self.reader.viewport.retry
+                                    && !self.reader.viewport.source_changed
                                     && theme::primary_icon(
                                         ui,
                                         self.tr("Reintentar página", "Retry page"),

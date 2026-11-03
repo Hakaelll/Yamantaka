@@ -39,6 +39,8 @@ With the default wgpu compositor, a page can retain a small whole-page preview w
 
 The crop uses the current rotation and physical scale, with a two-pixel sampling margin. Each pane divides its crop allowance among visible pages. The previous crop stays in its page-relative position while a replacement arrives. An optional crop failure falls back to the whole-page pipeline without a reader error. Safe mode and the alternate Glow compositor keep the whole-page pipeline.
 
+A detected source-file change is handled separately from an optional crop failure. The affected pane retains available whole-page images, cancels its pending page and refinement requests, and stops nearby preparation. Its Spanish or English notice offers closing the comparison or reading rather than retrying the same native owner. Save or cancel unfinished notes before closing, close any other reading of that PDF, then open it again. Ordinary zoom and render-request resets do not clear this source-change state. A confirmed pane replacement or closure clears it. This update has not been compiled or exercised in a new runtime check.
+
 [Region refinement validation](../validation/rust-page-region-2026-10-31.md) records the exercised native cases. Rapid panning, device recovery and paired performance acceptance remain pending.
 
 ## Changes made by another application

@@ -339,10 +339,21 @@ impl ReferenceView {
             )
             .clicked();
         });
-        if let Some(error) = self.error.clone() {
+        if let Some(error) = self.error.clone().or_else(|| {
+            self.pane
+                .viewport
+                .source_changed
+                .then(|| reader_surface::source_change_message(english).into())
+        }) {
             ui.horizontal_wrapped(|ui| {
                 ui.label(error);
-                if theme::navigation(ui, tr("Reintentar", "Retry"), false, p).clicked() {
+                if self.pane.viewport.source_changed {
+                    if theme::navigation(ui, tr("Cerrar referencia", "Close reference"), false, p)
+                        .clicked()
+                    {
+                        close = true;
+                    }
+                } else if theme::navigation(ui, tr("Reintentar", "Retry"), false, p).clicked() {
                     self.retry_error();
                 }
             });

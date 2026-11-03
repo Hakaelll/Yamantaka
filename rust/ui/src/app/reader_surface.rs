@@ -13,6 +13,7 @@ pub(super) struct ReaderSurface {
     pub generation: u64,
     pub requested: Option<RenderKey>,
     pub retry: bool,
+    pub source_changed: bool,
     pub cancel: Cancellation,
 }
 
@@ -31,6 +32,7 @@ impl Default for ReaderSurface {
             generation: 0,
             requested: None,
             retry: false,
+            source_changed: false,
             cancel: Cancellation::default(),
         }
     }
@@ -107,7 +109,7 @@ impl ReaderSurface {
         );
         let mut submitted = None;
         let mut failure = None;
-        if !self.retry {
+        if !self.retry && !self.source_changed {
             if let Some(delay) = decision.wake_after {
                 ui.ctx().request_repaint_after(delay);
             }
@@ -166,14 +168,16 @@ impl ReaderSurface {
             self.empty_paints += 1;
             ui.painter().rect_filled(paper, 1, Color32::WHITE);
         }
-        slot.refinement.paint(
-            ui,
-            runtime,
-            region,
-            paper,
-            key.rotation,
-            slot.plan.ready(slot.image_key.as_ref()),
-        );
+        if !self.source_changed {
+            slot.refinement.paint(
+                ui,
+                runtime,
+                region,
+                paper,
+                key.rotation,
+                slot.plan.ready(slot.image_key.as_ref()),
+            );
+        }
         match failure {
             Some(error) => Err(error),
             None => Ok(submitted),
@@ -210,6 +214,22 @@ impl ReaderSurface {
             .values_mut()
             .any(|slot| slot.refinement.fail(cancel))
     }
+    pub fn block_changed_source(&mut self, cancel: &Cancellation) -> bool {
+        if cancel.is_cancelled() {
+            return false;
+        }
+        let owned = self
+            .pages
+            .values()
+            .any(|slot| slot.requested.is_some() && slot.cancel.same_request(cancel))
+            || self.fail_refinement(cancel);
+        if !owned {
+            return false;
+        }
+        self.source_changed = true;
+        self.reset_requests();
+        true
+    }
     pub fn refinements_settled(&self) -> bool {
         self.pages.values().all(|slot| slot.refinement.settled())
     }
@@ -225,7 +245,7 @@ impl ReaderSurface {
     pub fn reset_requests(&mut self) {
         self.prefetch.cancel_pending();
         self.requested = None;
-        self.retry = false;
+        self.retry = self.source_changed;
         self.scroll_anchor = true;
         for page in self.pages.values_mut() {
             page.cancel.cancel();
@@ -235,6 +255,7 @@ impl ReaderSurface {
     }
 
     pub fn clear(&mut self) {
+        self.source_changed = false;
         self.prefetch.clear();
         self.cancel.cancel();
         for page in self.pages.values() {
@@ -244,6 +265,14 @@ impl ReaderSurface {
         self.layout = None;
         self.cancel = Cancellation::default();
         self.reset_requests();
+    }
+}
+
+pub(super) fn source_change_message(english: bool) -> &'static str {
+    if english {
+        "This PDF changed on disk. Close its comparison and readings, then open it again. Unsaved notes must be saved or cancelled before closing."
+    } else {
+        "Este PDF ha cambiado en disco. Cierra su comparación y sus lecturas y vuelve a abrirlo. Guarda o cancela las notas pendientes antes de cerrar."
     }
 }
 
