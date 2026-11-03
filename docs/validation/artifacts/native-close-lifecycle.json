@@ -1,0 +1,41 @@
+{
+  "synthetic": true,
+  "runtimeSourceCommit": "23dc620",
+  "executableSha256": "dc2c22500d7dbc621d8991653ce715b718162c8a2761fcb47a92c75aec7bde88",
+  "profile": "debug",
+  "scope": "Serial early-window close after library-cover, reader and protected-document launches; no input automation",
+  "cases": [
+    {
+      "case": "library-covers",
+      "windowObserved": true,
+      "closeRequested": true,
+      "exitedNormally": true,
+      "exitCode": 0,
+      "forcedCleanup": false
+    },
+    {
+      "case": "reader",
+      "windowObserved": true,
+      "closeRequested": true,
+      "exitedNormally": true,
+      "exitCode": 0,
+      "forcedCleanup": false
+    },
+    {
+      "case": "password",
+      "windowObserved": true,
+      "closeRequested": true,
+      "exitedNormally": true,
+      "exitCode": 0,
+      "forcedCleanup": false
+    }
+  ],
+  "generatedSourcePdfsUnchanged": true,
+  "generatedSourcePdfCount": 42,
+  "limits": [
+    "No modal-state or completed-page proof from the window title",
+    "No broad shutdown-race, power-loss or memory-leak certification",
+    "No interaction or presentation-time acceptance"
+  ],
+  "stderrLogsEmpty": true
+}

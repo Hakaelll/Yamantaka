@@ -224,6 +224,8 @@ Copy-Item target/debug/yamantaka-rust.exe $preview
 
 The launcher manages only frozen workspace executables started with both `--demo` and `--demo-window`. It requests a normal close first and removes a surviving test process before opening its replacement. It keeps normal application instances outside this preview workflow intact.
 
+[Serial native close checks](docs/validation/rust-native-close-2026-11-03.md) record early window-close behavior and its validation limits.
+
 The demo uses synthetic documents and does not open the personal library. Interactive desktop previews and selected capture scenarios use isolated file-backed stores; other demo modes use an in-memory database. It currently depends on the repository's generated fixtures and is a development tool.
 
 ## Data and migration
