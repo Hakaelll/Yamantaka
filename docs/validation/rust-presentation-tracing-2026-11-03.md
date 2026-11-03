@@ -25,7 +25,9 @@ The [setup artifact](artifacts/presentation-trace-setup.json) records these outc
 
 ## Next validation step
 
-A one-time UAC-authorized capture has been requested. That authorization is still required before attempting elevation. The scripts do not request it themselves. After permissions are available, establish a positive control with known rendered frames, then define equivalent Flutter/Rust workloads, separate CPU/GPU/display work and collect five interleaved passes. Quiet-process observations or startup screenshots alone cannot establish the 16.7 ms interaction target.
+The user authorized a one-time UAC capture. The original observed process had already closed, so the verified Release executable was reopened. Windows then returned cancellation from the elevation request before the capture script started. No elevated observation or frame CSV was created. The scripts do not elevate themselves or change account-group membership. Administrative collection remains pending.
+
+After permissions are available, establish a positive control with known rendered frames, then define equivalent Flutter/Rust workloads, separate CPU/GPU/display work and collect five interleaved passes. Quiet-process observations or startup screenshots alone cannot establish the 16.7 ms interaction target.
 
 From a suitable PowerShell session, use a live Yamantaka PID and its exact executable path:
 

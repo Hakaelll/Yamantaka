@@ -22,7 +22,14 @@
   "limits": [
     "Windows ETW permissions denied collection",
     "No valid presentation frames collected",
-    "UAC authorization pending",
+    "Windows elevation cancelled; administrative collection remains pending",
     "No paired performance or 16.7 ms acceptance established"
-  ]
+  ],
+  "elevationAttempt": {
+    "userAuthorized": true,
+    "verifiedReleaseReopened": true,
+    "windowsResult": "operation-cancelled",
+    "scriptStarted": false,
+    "elevatedObservationCreated": false
+  }
 }
