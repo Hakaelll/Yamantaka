@@ -6,7 +6,7 @@ use crate::{
 };
 use std::{
     collections::BTreeMap,
-    io::Read,
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 use yamantaka_domain::{Cancellation, Failure, Result};
@@ -16,11 +16,15 @@ use yamantaka_windows::{retained_file::RetainedFile, source_stamp::Stamp};
 pub struct Review {
     active: PathBuf,
     active_sha: String,
-    journal: PathBuf,
-    journal_version: yamantaka_domain::source_revision::PhysicalSourceVersion,
-    journal_sha: [u8; 32],
+    records: Vec<Record>,
     previous: Option<super::RollbackReview>,
     counts: BTreeMap<String, usize>,
+}
+#[derive(Clone)]
+struct Record {
+    path: PathBuf,
+    version: yamantaka_domain::source_revision::PhysicalSourceVersion,
+    sha: [u8; 32],
 }
 impl Review {
     pub fn source(&self) -> &Path {
@@ -40,50 +44,65 @@ fn invalid() -> Failure {
         "The pending operation changed or cannot be reviewed; all files were preserved".into(),
     )
 }
-fn record(active: &Path) -> Result<PathBuf> {
+pub(super) fn recovery_guard_path(active: &Path) -> Result<PathBuf> {
+    let name = active.file_name().ok_or_else(invalid)?.to_string_lossy();
+    Ok(active.with_file_name(format!(".{name}.recovery-review.json")))
+}
+fn records(active: &Path) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     for path in [
         restore::restore_journal_path(active)?,
         rollback::journal_path(active)?,
+        recovery_guard_path(active)?,
     ] {
         if present(&path)? {
             paths.push(path);
         }
     }
-    if paths.len() != 1 {
-        return Err(invalid());
-    }
-    Ok(paths.remove(0))
+    Ok(paths)
 }
 pub fn present_for(active: &Path) -> Result<bool> {
-    Ok(present(&restore::restore_journal_path(active)?)?
-        || present(&rollback::journal_path(active)?)?)
+    Ok(!records(active)?.is_empty())
 }
 fn digest(file: &RetainedFile, cancel: &Cancellation) -> Result<[u8; 32]> {
     use sha2::{Digest, Sha256};
     cancel.check()?;
-    let mut bytes = Vec::new();
-    file.file()
-        .take(65537)
-        .read_to_end(&mut bytes)
-        .map_err(storage)?;
-    if bytes.len() > 65536 {
-        return Err(invalid());
+    let mut input = file.file();
+    let mut hash = Sha256::new();
+    let mut buffer = [0; 8192];
+    loop {
+        cancel.check()?;
+        let read = input.read(&mut buffer).map_err(storage)?;
+        if read == 0 {
+            break;
+        }
+        hash.update(&buffer[..read]);
     }
     cancel.check()?;
-    Ok(Sha256::digest(bytes).into())
+    Ok(hash.finalize().into())
 }
 pub fn review(active: &Path, previous: Option<&Path>, cancel: &Cancellation) -> Result<Review> {
     cancel.check()?;
     ordinary(active, true)?;
     let active = active.canonicalize().map_err(storage)?;
     ordinary(active.parent().ok_or_else(invalid)?, true)?;
-    let journal = record(&active)?;
-    let lease = RetainedFile::open(&journal).map_err(|_| invalid())?;
-    let journal_version = Stamp::from_file(lease.file())
-        .ok_or_else(invalid)?
-        .version();
-    let journal_sha = digest(&lease, cancel)?;
+    let paths = records(&active)?;
+    if paths.is_empty() {
+        return Err(invalid());
+    }
+    let records = paths
+        .into_iter()
+        .map(|path| {
+            let lease = RetainedFile::open(&path).map_err(|_| invalid())?;
+            Ok(Record {
+                path,
+                version: Stamp::from_file(lease.file())
+                    .ok_or_else(invalid)?
+                    .version(),
+                sha: digest(&lease, cancel)?,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     let active_sha = rollback::tree(&active, cancel)?.0;
     let previous = previous
         .map(|source| rollback::review_rollback(&active, source, cancel))
@@ -99,16 +118,19 @@ pub fn review(active: &Path, previous: Option<&Path>, cancel: &Cancellation) -> 
     Ok(Review {
         active,
         active_sha,
-        journal,
-        journal_version,
-        journal_sha,
+        records,
         previous,
         counts,
     })
 }
 pub fn verify(review: &Review, cancel: &Cancellation) -> Result<()> {
     cancel.check()?;
-    if record(&review.active)? != review.journal
+    if records(&review.active)?
+        != review
+            .records
+            .iter()
+            .map(|r| r.path.clone())
+            .collect::<Vec<_>>()
         || rollback::tree(&review.active, cancel)?.0 != review.active_sha
     {
         return Err(invalid());
@@ -116,12 +138,15 @@ pub fn verify(review: &Review, cancel: &Cancellation) -> Result<()> {
     if let Some(previous) = &review.previous {
         super::verify_rollback(previous, cancel)?;
     }
-    let lease = RetainedFile::open(&review.journal).map_err(|_| invalid())?;
-    check_record(review, &lease, cancel)
+    for record in &review.records {
+        let lease = RetainedFile::open(&record.path).map_err(|_| invalid())?;
+        check_record(record, &lease, cancel)?;
+    }
+    Ok(())
 }
-fn check_record(review: &Review, lease: &RetainedFile, cancel: &Cancellation) -> Result<()> {
-    if Stamp::from_file(lease.file()).map(|s| s.version()) != Some(review.journal_version)
-        || digest(lease, cancel)? != review.journal_sha
+fn check_record(record: &Record, lease: &RetainedFile, cancel: &Cancellation) -> Result<()> {
+    if Stamp::from_file(lease.file()).map(|s| s.version()) != Some(record.version)
+        || digest(lease, cancel)? != record.sha
     {
         return Err(invalid());
     }
@@ -132,16 +157,59 @@ pub fn resolve(review: &Review, active: &Path, cancel: &Cancellation) -> Result<
         return Err(invalid());
     }
     verify(review, cancel)?;
-    let lease = RetainedFile::open(&review.journal).map_err(|_| invalid())?;
-    check_record(review, &lease, cancel)?;
-    let name = format!("yamantaka-recovery-preserved-{}.json", uuid::Uuid::new_v4());
+    let leases = review
+        .records
+        .iter()
+        .map(|record| {
+            let lease = RetainedFile::open(&record.path).map_err(|_| invalid())?;
+            check_record(record, &lease, cancel)?;
+            Ok((record, lease))
+        })
+        .collect::<Result<Vec<_>>>()?;
     cancel.check()?;
-    lease.retain_as(name.as_ref()).map_err(|_| invalid())?;
+    let guard = recovery_guard_path(&review.active)?;
+    let existing_guard = leases
+        .iter()
+        .find(|(record, _)| record.path == guard)
+        .map(|(_, lease)| lease);
+    let created_guard = if leases.len() > 1 && existing_guard.is_none() {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&guard)
+            .map_err(|_| invalid())?;
+        file.write_all(b"{\"version\":1,\"state\":\"preserving-operation-records\"}\n")
+            .map_err(storage)?;
+        file.sync_all().map_err(storage)?;
+        drop(file);
+        Some(RetainedFile::open(&guard).map_err(|_| invalid())?)
+    } else {
+        None
+    };
+    let parent = review.active.parent().ok_or_else(invalid)?;
+    let retain = |lease: &RetainedFile, prefix: &str| -> Result<PathBuf> {
+        let name = format!("{prefix}-{}.json", uuid::Uuid::new_v4());
+        lease.retain_as(name.as_ref()).map_err(|_| invalid())?;
+        Ok(parent.join(name))
+    };
+    let mut preserved = None;
+    for (record, lease) in &leases {
+        if record.path != guard {
+            preserved = Some(retain(lease, "yamantaka-recovery-preserved")?);
+        }
+    }
+    if let Some(lease) = existing_guard.or(created_guard.as_ref()) {
+        // Keep automatic recovery blocked until every reviewed operation is archived.
+        if records(&review.active)? != [guard] {
+            return Err(invalid());
+        }
+        preserved = Some(retain(lease, "yamantaka-recovery-barrier-preserved")?);
+    }
     // The archived operation is never deleted. A new rollback has its own journal.
     match &review.previous {
         Some(previous) => {
             super::install_rollback(previous, &review.active, &Cancellation::default())
         }
-        None => Ok(review.journal.parent().ok_or_else(invalid)?.join(name)),
+        None => preserved.ok_or_else(invalid),
     }
 }

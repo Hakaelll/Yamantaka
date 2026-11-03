@@ -40,7 +40,7 @@ pub fn install_preview_progress(
         ordinary(active, true)?;
     }
     let journal = restore_journal_path(active)?;
-    if present(&journal)? || present(&super::rollback::journal_path(active)?)? {
+    if super::pending::present_for(active)? {
         return Err(Failure::Invalid(
             "Recover the interrupted restore before starting another".into(),
         ));
@@ -74,7 +74,7 @@ pub fn install_preview_progress(
     let safety = parent.join(format!("pre-restore-{}", uuid::Uuid::new_v4()));
     progress(RestoreProgress::Installing);
     cancel.check()?;
-    if present(&journal)? || present(&safety)? {
+    if super::pending::present_for(active)? || present(&safety)? {
         return Err(Failure::Invalid(
             "Recover the interrupted restore before starting another".into(),
         ));
@@ -141,6 +141,11 @@ pub(super) fn restore_journal_path(active: &Path) -> Result<std::path::PathBuf> 
 /// Called before opening any active DB. A crash between the two renames rolls
 /// back to the complete safety store. A committed new store keeps its safety copy.
 pub fn recover_interrupted_restore(active: &Path) -> Result<bool> {
+    if present(&super::pending::recovery_guard_path(active)?)? {
+        return Err(Failure::Invalid(
+            "Interrupted library recovery requires explicit review; files preserved".into(),
+        ));
+    }
     let journal_path = restore_journal_path(active)?;
     if present(&super::rollback::journal_path(active)?)? {
         if present(&journal_path)? {

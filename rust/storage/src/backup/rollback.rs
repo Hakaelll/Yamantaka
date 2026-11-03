@@ -1,5 +1,5 @@
 //! Reviewed rollback swaps whole sibling stores; no library file is discarded.
-use super::{RestoreProgress, TABLE_ORDER, restore::restore_journal_path};
+use super::{RestoreProgress, TABLE_ORDER};
 use crate::{
     Database,
     database::storage,
@@ -280,7 +280,7 @@ pub fn install_rollback_progress(
     ordinary(&active, true)?;
     verify_rollback(review, cancel)?;
     let journal = journal_path(&active)?;
-    if present(&journal)? || present(&restore_journal_path(&active)?)? {
+    if super::pending::present_for(&active)? {
         return Err(invalid(
             "Recover the pending library operation before rollback",
         ));
@@ -298,6 +298,11 @@ pub fn install_rollback_progress(
     };
     progress(RestoreProgress::Installing);
     cancel.check()?;
+    if super::pending::present_for(&active)? {
+        return Err(invalid(
+            "Recover the pending library operation before rollback",
+        ));
+    }
     atomic_json(&journal, &record)?;
     if let Err(error) = cancel.check() {
         fs::remove_file(&journal).map_err(storage)?;

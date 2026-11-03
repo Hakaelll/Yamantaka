@@ -113,7 +113,7 @@ The workspace separates application concerns into six crates:
 | `yamantaka-windows` | Paths, activation, clipboard, Explorer and Windows integration |
 | `yamantaka` | egui/eframe interface, 3D covers and GPU page presentation |
 
-The retained workspace checkpoint passes **56 tests**, covering native rendering, migration, backup, ownership, cancellation and other core behavior. This is not full rewrite acceptance. [Contributing](CONTRIBUTING.md) explains fixture setup, isolated previews, targeted checks and the complete workspace commands.
+The retained suite contains **56 tests**, covering native rendering, migration, backup, ownership, cancellation and other core behavior. The [complete workspace checkpoint](docs/validation/artifacts/workspace-checkpoint-2026-11-03.json) records the last full run and its source scope. This is not full rewrite acceptance. [Contributing](CONTRIBUTING.md) explains fixture setup, isolated previews, targeted checks and the complete workspace commands.
 
 ## Documentation
 

@@ -198,6 +198,17 @@ impl Recovery {
                     |s| s.books
                 )
             );
+            let (summary, clip) = ctx
+                .data(|data| {
+                    data.get_temp::<(egui::Rect, egui::Rect)>(egui::Id::new(
+                        "recovery-review-summary",
+                    ))
+                })
+                .expect("The reviewed source summary must be rendered before confirmation");
+            assert!(
+                clip.expand(0.5).contains_rect(summary),
+                "The reviewed source summary is clipped: {summary:?}, clip {clip:?}"
+            );
         }
         if !preview.requested {
             preview.requested = true;
@@ -230,7 +241,8 @@ impl Recovery {
             });
             std::fs::write(preview.capture.with_extension("controls.json"), serde_json::to_vec(&serde_json::json!({
                 "synthetic":true,"captureProcessId":std::process::id(),"viewport":rect(ctx.content_rect()),"pixelsPerPoint":ctx.pixels_per_point(),
-                "controls":controls.into_iter().map(|c|serde_json::json!({"label":c.label,"rect":rect(c.rect),"clip":rect(c.clip),"enabled":c.enabled})).collect::<Vec<_>>()
+                "controls":controls.into_iter().map(|c|serde_json::json!({"label":c.label,"rect":rect(c.rect),"clip":rect(c.clip),"enabled":c.enabled})).collect::<Vec<_>>(),
+                "reviewSummary":ctx.data(|data|data.get_temp::<(egui::Rect,egui::Rect)>(egui::Id::new("recovery-review-summary"))).map(|(summary,clip)|serde_json::json!({"rect":rect(summary),"clip":rect(clip),"fullyVisible":clip.expand(0.5).contains_rect(summary)}))
             })).unwrap()).unwrap();
             preview.captured = true;
             if preview.mode != "install" {

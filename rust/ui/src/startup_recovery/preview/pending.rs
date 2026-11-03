@@ -10,8 +10,8 @@ pub(super) struct Verification {
     current: BTreeMap<String, String>,
     old_path: PathBuf,
     old: BTreeMap<String, String>,
-    journal: PathBuf,
-    bytes: Vec<u8>,
+    journals: Vec<(PathBuf, Vec<u8>)>,
+    remaining: Vec<(PathBuf, Vec<u8>)>,
     install: bool,
 }
 fn files(root: &Path) -> Result<BTreeMap<String, String>, Box<dyn std::error::Error>> {
@@ -41,9 +41,28 @@ impl Verification {
                         .starts_with("yamantaka-recovery-preserved-")
                 })
                 .collect();
-            assert_eq!(preserved.len(), 1);
-            assert_eq!(fs::read(preserved[0].path())?, self.bytes);
-            assert!(!self.journal.exists());
+            let mut actual = preserved
+                .iter()
+                .map(|entry| fs::read(entry.path()))
+                .collect::<std::io::Result<Vec<_>>>()?;
+            let mut expected = self
+                .journals
+                .iter()
+                .map(|(_, bytes)| bytes.clone())
+                .collect::<Vec<_>>();
+            actual.sort();
+            expected.sort();
+            assert_eq!(actual, expected);
+            for (path, _) in &self.journals {
+                assert!(!path.exists());
+            }
+            assert!(
+                !store
+                    .parent()
+                    .unwrap()
+                    .join(".active.recovery-review.json")
+                    .exists()
+            );
             if self.previous.is_some() {
                 assert_eq!(files(store)?, self.old);
                 assert_eq!(files(safety.unwrap())?, self.current);
@@ -56,7 +75,9 @@ impl Verification {
             assert!(safety.is_none());
             assert_eq!(files(store)?, self.current);
             assert_eq!(files(&self.old_path)?, self.old);
-            assert_eq!(fs::read(&self.journal)?, self.bytes);
+            for (path, bytes) in &self.remaining {
+                assert_eq!(&fs::read(path)?, bytes);
+            }
         }
         Ok(())
     }
@@ -67,7 +88,13 @@ pub(super) fn run(args: &[OsString], capture: PathBuf) -> Result<(), Box<dyn std
         .filter_map(|arg| arg.to_str())
         .find_map(|s| s.strip_prefix("--interrupted-recovery="))
         .unwrap();
-    assert!(["current", "previous", "cancel"].contains(&mode));
+    let action = mode.rsplit('-').next().unwrap();
+    assert!(["current", "previous", "cancel"].contains(&action));
+    let multiple = mode.starts_with("multiple-");
+    let partial = mode.starts_with("partial-");
+    let guard_only = mode.starts_with("guard-");
+    let corrupt = mode.starts_with("corrupt-");
+    assert!(mode == action || multiple || partial || guard_only || corrupt);
     let root = crate::qa_ui_root()
         .join("../../build/demo-store/captures")
         .join(format!("pending-ñ-{}", uuid::Uuid::new_v4()));
@@ -134,23 +161,93 @@ pub(super) fn run(args: &[OsString], capture: PathBuf) -> Result<(), Box<dyn std
     fs::remove_file(store.join("late-change"))?;
     let other = root.join(".active.rollback-journal.json");
     fs::write(&other, b"second synthetic operation")?;
-    assert!(backup::pending::review(&store, None, &token).is_err());
-    fs::remove_file(other)?;
+    assert!(backup::pending::verify(&reviewed, &token).is_err());
+    let both = backup::pending::review(&store, None, &token)?;
+    assert_eq!(both.counts()["documents"], 3);
+    fs::remove_file(&other)?;
+    assert!(backup::pending::verify(&both, &token).is_err());
     assert_eq!(files(&store)?, current);
     assert_eq!(files(&old)?, previous);
-    let pending = Verification {
-        previous: if mode == "previous" {
-            Some(old.clone())
+    let mut journals = vec![(journal.clone(), bytes)];
+    if multiple || partial || guard_only {
+        let opaque = vec![b'x'; 70_001];
+        fs::write(&other, &opaque)?;
+        journals.push((other.clone(), opaque));
+    }
+    let guard = root.join(".active.recovery-review.json");
+    if partial || guard_only || corrupt {
+        if partial {
+            yamantaka_windows::retained_file::RetainedFile::open(&other)?
+                .retain_as("yamantaka-recovery-preserved-synthetic-second.json".as_ref())?;
+            let automatic = serde_json::to_vec(
+                &serde_json::json!({"version":1,"active":store,"safety":root.join("pre-restore-missing"),"replacement_sha256":"synthetic"}),
+            )?;
+            fs::write(&journal, &automatic)?;
+            assert!(backup::recover_interrupted_restore(&store)?);
+            assert!(!journal.exists());
+            fs::write(&journal, &automatic)?;
+            journals[0].1 = automatic;
+        }
+        let marker = if corrupt {
+            vec![b'!'; 70_003]
         } else {
-            None
-        },
-        books: if mode == "previous" { 2 } else { 3 },
+            b"{\"version\":1,\"state\":\"preserving-operation-records\"}\n".to_vec()
+        };
+        fs::write(&guard, &marker)?;
+        if guard_only {
+            yamantaka_windows::retained_file::RetainedFile::open(&other)?
+                .retain_as("yamantaka-recovery-preserved-synthetic-second.json".as_ref())?;
+        }
+        if guard_only {
+            yamantaka_windows::retained_file::RetainedFile::open(&journal)?
+                .retain_as("yamantaka-recovery-preserved-synthetic-first.json".as_ref())?;
+        }
+        assert!(managed_imports::recover_and_select(&store).is_err());
+        assert!(
+            matches!(managed_imports::recovery_target(&store)?,Some(managed_imports::RecoveryTarget::PendingOperation(path)) if path==store)
+        );
+        if partial {
+            assert_eq!(fs::read(&journal)?, journals[0].1);
+        }
+        assert_eq!(fs::read(&guard)?, marker);
+        let previous_review = backup::review_rollback(&store, &old, &token)?;
+        assert!(backup::install_rollback(&previous_review, &store, &token).is_err());
+        let json_preview = backup::preview_payload(
+            serde_json::from_str(include_str!(
+                "../../../../storage/tests/fixtures/populated-backup-v9.json"
+            ))?,
+            &token,
+        )?;
+        assert!(backup::install_preview(json_preview, &store, &token).is_err());
+        assert_eq!(files(&store)?, current);
+        assert_eq!(files(&old)?, previous);
+    }
+    let remaining = journals
+        .iter()
+        .map(|(path, _)| path)
+        .chain(std::iter::once(&guard))
+        .filter(|path| path.exists())
+        .map(|path| Ok((path.clone(), fs::read(path)?)))
+        .collect::<std::io::Result<Vec<_>>>()?;
+    let chosen = if action == "previous" {
+        Some(old.clone())
+    } else {
+        None
+    };
+    let ready = backup::pending::review(&store, chosen.as_deref(), &token)?;
+    assert_eq!(
+        ready.counts()["documents"],
+        if chosen.is_some() { 2 } else { 3 }
+    );
+    let pending = Verification {
+        previous: chosen,
+        books: if action == "previous" { 2 } else { 3 },
         current,
         old_path: old,
         old: previous,
-        journal,
-        bytes,
-        install: mode != "cancel",
+        journals,
+        remaining,
+        install: action != "cancel",
     };
     let verification = super::Verification {
         selection: None,
@@ -158,7 +255,7 @@ pub(super) fn run(args: &[OsString], capture: PathBuf) -> Result<(), Box<dyn std
         backup: PathBuf::new(),
         original: Vec::new(),
         file: "",
-        mode: if mode == "cancel" {
+        mode: if action == "cancel" {
             "review".into()
         } else {
             "install".into()
