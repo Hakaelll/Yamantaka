@@ -131,8 +131,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let executable = std::env::current_exe()?;
     if demo
         && args.iter().any(|arg| {
-            arg.to_str()
-                .is_some_and(|s| s.starts_with("--startup-recovery="))
+            arg.to_str().is_some_and(|s| {
+                s.starts_with("--startup-recovery=") || s.starts_with("--interrupted-recovery=")
+            })
         })
     {
         return startup_recovery::preview::run(
@@ -833,7 +834,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         (db, demo_preferences, store)
     } else {
-        let active_store = yamantaka_storage::managed_imports::recover_and_select(&paths.store)?;
+        let active_store =
+            match yamantaka_storage::managed_imports::recover_and_select(&paths.store) {
+                Ok(store) => store,
+                Err(error) => {
+                    if let Some(store) =
+                        yamantaka_storage::managed_imports::pending_operation_store(&paths.store)?
+                    {
+                        startup_recovery::run(
+                            store,
+                            startup_recovery::FailedStage::InterruptedOperation,
+                            args.iter().any(|arg| arg == "--en"),
+                            args.iter().any(|arg| arg == "--software"),
+                            None,
+                        )?;
+                        return Ok(());
+                    }
+                    return Err(error.into());
+                }
+            };
         std::fs::create_dir_all(&active_store)?;
         startup = Some(yamantaka_storage::startup::StartupRun::begin(
             &active_store,

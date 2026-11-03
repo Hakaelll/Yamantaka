@@ -11,46 +11,61 @@ use yamantaka_storage::backup::{self, RestorePreview, RestoreReview, RollbackRev
 pub enum Review {
     Json(RestoreReview),
     Rollback(RollbackReview),
+    Pending(Box<backup::pending::Review>),
 }
 impl Review {
     pub fn source(&self) -> &Path {
         match self {
             Self::Json(r) => r.source(),
             Self::Rollback(r) => r.source(),
+            Self::Pending(r) => r.source(),
         }
     }
     pub fn counts(&self) -> &BTreeMap<String, usize> {
         match self {
             Self::Json(r) => r.counts(),
             Self::Rollback(r) => r.counts(),
+            Self::Pending(r) => r.counts(),
         }
     }
     pub fn version(&self) -> u64 {
         match self {
             Self::Json(r) => r.version(),
-            Self::Rollback(_) => yamantaka_domain::SCHEMA_VERSION.into(),
+            Self::Rollback(_) | Self::Pending(_) => yamantaka_domain::SCHEMA_VERSION.into(),
         }
     }
     pub fn rollback(&self) -> bool {
-        matches!(self, Self::Rollback(_))
+        matches!(self, Self::Rollback(_)) || matches!(self, Self::Pending(r) if r.previous())
     }
 }
 pub enum Prepared {
     Json(Box<RestorePreview>),
     Rollback(RollbackReview),
+    Pending(backup::pending::Review),
 }
 impl Prepared {
     pub fn install(self, active: &Path, cancel: &Cancellation) -> Result<PathBuf> {
         match self {
             Self::Json(p) => backup::install_preview(*p, active, cancel),
             Self::Rollback(r) => backup::install_rollback(&r, active, cancel),
+            Self::Pending(r) => backup::pending::resolve(&r, active, cancel),
         }
     }
 }
 pub enum Command {
     Review(PathBuf),
-    ReviewExpected { path: PathBuf, sha256: String },
-    ReviewRollback { active: PathBuf, source: PathBuf },
+    ReviewExpected {
+        path: PathBuf,
+        sha256: String,
+    },
+    ReviewRollback {
+        active: PathBuf,
+        source: PathBuf,
+    },
+    ReviewPending {
+        active: PathBuf,
+        previous: Option<PathBuf>,
+    },
     Prepare(Review),
 }
 pub enum Outcome {
@@ -87,6 +102,12 @@ impl Job {
                             .map(Review::Rollback)
                             .map(Outcome::Reviewed)
                     }
+                    Command::ReviewPending { active, previous } => {
+                        backup::pending::review(&active, previous.as_deref(), &token)
+                            .map(Box::new)
+                            .map(Review::Pending)
+                            .map(Outcome::Reviewed)
+                    }
                     Command::Prepare(Review::Json(review)) => {
                         backup::prepare_reviewed(&review, &token)
                             .map(|p| Prepared::Json(Box::new(p)))
@@ -95,6 +116,10 @@ impl Job {
                     Command::Prepare(Review::Rollback(review)) => {
                         backup::verify_rollback(&review, &token)
                             .map(|_| Outcome::Prepared(Box::new(Prepared::Rollback(review))))
+                    }
+                    Command::Prepare(Review::Pending(review)) => {
+                        backup::pending::verify(&review, &token)
+                            .map(|_| Outcome::Prepared(Box::new(Prepared::Pending(*review))))
                     }
                 };
                 let _ = sender.send(result);

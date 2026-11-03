@@ -81,7 +81,7 @@ pub(super) fn journal_path(active: &Path) -> Result<PathBuf> {
         .ok_or_else(|| invalid("Invalid rollback store"))?;
     Ok(active.with_file_name(format!(".{name}.rollback-journal.json")))
 }
-fn tree(path: &Path, cancel: &Cancellation) -> Result<(String, u64)> {
+pub(super) fn tree(path: &Path, cancel: &Cancellation) -> Result<(String, u64)> {
     ordinary(path, true)?;
     let mut state = Tree {
         hash: Sha256::new(),
@@ -158,34 +158,26 @@ fn visit(
     }
     Ok(())
 }
-fn validate_source(source: &Path, cancel: &Cancellation) -> Result<BTreeMap<String, usize>> {
+pub(super) fn validate_source(
+    source: &Path,
+    cancel: &Cancellation,
+) -> Result<BTreeMap<String, usize>> {
     for name in ["yamantaka.sqlite3", "preferences.json"] {
         ordinary(&source.join(name), false)?;
     }
     let wal = source.join("yamantaka.sqlite3-wal");
     if present(&wal)? {
         ordinary(&wal, false)?;
-        if wal.metadata().map_err(storage)?.len() != 0 {
-            return Err(invalid(
-                "Close the source library and checkpoint its pending WAL before rollback",
-            ));
-        }
     }
-    // Validate an independent main-file copy without creating SQLite sidecars in the safety store.
+    // Validate independent main/WAL copies; SQLite sidecars stay in the temporary folder.
     let temp = tempfile::tempdir().map_err(storage)?;
     let copy = temp.path().join("library.sqlite3");
-    let mut input = fs::File::open(source.join("yamantaka.sqlite3")).map_err(storage)?;
-    let mut output = fs::File::create(&copy).map_err(storage)?;
-    let mut buffer = vec![0; 65536];
-    loop {
-        cancel.check()?;
-        let n = input.read(&mut buffer).map_err(storage)?;
-        if n == 0 {
-            break;
-        }
-        output.write_all(&buffer[..n]).map_err(storage)?;
+    copy_file(&source.join("yamantaka.sqlite3"), &copy, cancel)?;
+    if present(&wal)? {
+        let copy_wal = temp.path().join("library.sqlite3-wal");
+        copy_file(&wal, &copy_wal, cancel)?;
+        super::wal::validate(&copy_wal, &copy, cancel)?;
     }
-    drop(output);
     let db = Database::open_read_only(&copy)?;
     db.integrity()?;
     Preferences::load(&source.join("preferences.json"))?;
@@ -199,6 +191,20 @@ fn validate_source(source: &Path, cancel: &Cancellation) -> Result<BTreeMap<Stri
         counts.insert(table.into(), usize::try_from(count).map_err(storage)?);
     }
     Ok(counts)
+}
+fn copy_file(source: &Path, destination: &Path, cancel: &Cancellation) -> Result<()> {
+    let mut input = fs::File::open(source).map_err(storage)?;
+    let mut output = fs::File::create(destination).map_err(storage)?;
+    let mut buffer = vec![0; 65536];
+    loop {
+        cancel.check()?;
+        let n = input.read(&mut buffer).map_err(storage)?;
+        if n == 0 {
+            break;
+        }
+        output.write_all(&buffer[..n]).map_err(storage)?;
+    }
+    Ok(())
 }
 pub fn review_rollback(
     active: &Path,

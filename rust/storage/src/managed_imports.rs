@@ -150,6 +150,19 @@ pub fn recover_and_select(root: &Path) -> Result<PathBuf> {
     }
     active_store(root)
 }
+/// Locate a blocked operation without opening or switching a library.
+pub fn pending_operation_store(root: &Path) -> Result<Option<PathBuf>> {
+    if crate::backup::pending::present_for(root)? {
+        return Ok(Some(root.to_owned()));
+    }
+    if let Some(id) = selected(root)? {
+        let store = store_path(root, &id)?;
+        if crate::backup::pending::present_for(&store)? {
+            return Ok(Some(store));
+        }
+    }
+    Ok(None)
+}
 pub fn use_original(root: &Path, cancel: &Cancellation) -> Result<()> {
     ordinary(root, true)?;
     ordinary(&root.join("yamantaka.sqlite3"), false)?;

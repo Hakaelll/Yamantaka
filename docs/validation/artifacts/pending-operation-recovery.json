@@ -1,0 +1,58 @@
+{
+  "synthetic": true,
+  "executableSha256": "d9630ad480474c91f51f8145f33918adcef35f75c9ffc68ab2bc06c8cc62ebe1",
+  "scenarios": {
+    "current": {
+      "result": {
+        "synthetic": true,
+        "originalPreserved": true,
+        "installed": true
+      },
+      "reviewedBooks": 3,
+      "imageSha256": "507208c9600f649aced25484667e667697123a233b4f414b070e2dfbc4c8165d"
+    },
+    "previous": {
+      "result": {
+        "synthetic": true,
+        "originalPreserved": true,
+        "installed": true
+      },
+      "reviewedBooks": 2,
+      "imageSha256": "93c2be26fd25bc53d3a4b14556fc6fefa761323b6431667a8f44439eae8ab473"
+    },
+    "cancel": {
+      "result": {
+        "synthetic": true,
+        "originalPreserved": true,
+        "installed": false
+      },
+      "reviewedBooks": 3,
+      "imageSha256": "507208c9600f649aced25484667e667697123a233b4f414b070e2dfbc4c8165d"
+    }
+  },
+  "assertionsExecutedBeforeEachScenario": [
+    "Ambiguous v1 restore stops automatic recovery",
+    "Native pending-store lookup finds the active store",
+    "Real committed WAL-only book included in count",
+    "Damaged WAL checksum rejected",
+    "Changed journal rejected",
+    "Cancelled resolution preserves files",
+    "Changed active tree rejected",
+    "Multiple operation records rejected"
+  ],
+  "checks": {
+    "offlineNativeBuild": true,
+    "format": true,
+    "workspaceClippyAllTargetsDenyWarnings": true,
+    "retainedRestoreRollbackTestPassed": true,
+    "regularAndCompactActionClipsPassed": true,
+    "existingJsonRecoveryRgbaUnchanged": true
+  },
+  "limits": [
+    "Synthetic data only",
+    "No physical picker, keyboard or Narrator certification",
+    "Missing folders and multiple-record resolution remain pending",
+    "WAL reset tails and truncated frames require separate recovery",
+    "No final Release certification"
+  ]
+}

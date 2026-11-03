@@ -333,7 +333,9 @@ pub use restore::{
 mod review;
 pub use review::{RestoreReview, install_reviewed, prepare_reviewed, review};
 
+pub mod pending;
 mod rollback;
+mod wal;
 pub use rollback::{
     RollbackReview, install_rollback, install_rollback_progress, review_rollback, verify_rollback,
 };
