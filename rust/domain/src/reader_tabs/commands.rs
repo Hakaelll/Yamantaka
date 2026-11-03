@@ -213,6 +213,7 @@ impl DocumentTabs {
         page: u32,
         preferences: ReaderPreferences,
         panel: Option<SessionPanel>,
+        point: Option<[f64; 2]>,
     ) -> Result<()> {
         let Some(index) = self
             .tabs
@@ -228,7 +229,8 @@ impl DocumentTabs {
             page,
             preferences,
             panel,
-        )?;
+        )?
+        .with_point(point)?;
         updated.pinned = tab.pinned;
         updated.resource = tab.resource;
         updated.queue = tab.queue.clone();
@@ -242,6 +244,7 @@ impl DocumentTabs {
         page: u32,
         preferences: ReaderPreferences,
         panel: Option<SessionPanel>,
+        point: Option<[f64; 2]>,
     ) -> Result<bool> {
         let Some(index) = self.closed.iter().position(|tab| tab.id() == id) else {
             return Ok(false);
@@ -253,7 +256,8 @@ impl DocumentTabs {
             page,
             preferences,
             panel,
-        )?;
+        )?
+        .with_point(point)?;
         updated.pinned = previous.pinned;
         updated.resource = previous.resource;
         updated.queue = previous.queue.clone();

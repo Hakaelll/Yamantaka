@@ -77,7 +77,7 @@ impl YamantakaApp {
         assert_eq!(model.next_queued().unwrap().id(), "queue-1");
         let active = model.active().unwrap();
         let preferences = active.preferences().clone();
-        model.update_active(0, preferences, None).unwrap();
+        model.update_active(0, preferences, None, None).unwrap();
         assert_eq!(
             model.active().unwrap().queue().status(),
             QueueStatus::Reviewed
@@ -86,7 +86,7 @@ impl YamantakaApp {
         let mut closed = model.clone();
         let tab = closed.close("queue-0").unwrap();
         closed
-            .refresh_closed(tab.id(), 0, tab.preferences().clone(), None)
+            .refresh_closed(tab.id(), 0, tab.preferences().clone(), None, None)
             .unwrap();
         assert_eq!(closed.closed().last().unwrap().queue(), tab.queue());
         model

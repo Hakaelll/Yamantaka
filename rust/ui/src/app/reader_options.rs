@@ -62,7 +62,7 @@ impl YamantakaApp {
     pub(super) fn load_reader_preferences(&mut self, preferences: ReaderPreferences) {
         self.reader.reader_preferences_loading = false;
         let preferences = self.restore_loaded_preferences(preferences);
-        let preferences = self.restore_tab_preferences(preferences);
+        let (preferences, point) = self.restore_tab_preferences(preferences);
         let zoom = preferences.zoom_level as f32;
         if !zoom.is_finite() || zoom <= 0.0 {
             self.error = Some("Reader zoom cannot be represented".into());
@@ -70,7 +70,9 @@ impl YamantakaApp {
         }
         self.reader.zoom = zoom;
         self.reader.viewport.scale = zoom;
-        let start = preferences.page_rotation.unrotate_point([0.5, 0.0]);
+        let start = point
+            .filter(|_| !self.electronic_ink())
+            .unwrap_or_else(|| preferences.page_rotation.unrotate_point([0.5, 0.0]));
         self.reader.reader_preferences = Some(preferences);
         self.rebuild_reader_layout();
         if let Some(navigation) = &mut self.reader.navigation {

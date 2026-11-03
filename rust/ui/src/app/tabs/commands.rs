@@ -35,11 +35,15 @@ impl YamantakaApp {
                 }
             }
         }
-        if let Err(error) =
-            self.tabs
-                .model
-                .update_active(self.reader.page, preferences.clone(), panel)
-        {
+        if let Err(error) = self.tabs.model.update_active(
+            self.reader.page,
+            preferences.clone(),
+            panel,
+            self.reader
+                .navigation
+                .as_ref()
+                .map(|navigation| navigation.position().point()),
+        ) {
             self.error = Some(error.to_string());
         }
         self.tabs.captions.insert(
@@ -155,6 +159,7 @@ impl YamantakaApp {
         );
         let mut plan = self.tabs.model.clone();
         match tab
+            .and_then(|tab| tab.with_point(current.point()))
             .and_then(|tab| tab.with_queue(current.queue().clone()))
             .and_then(|tab| plan.open(tab, true))
         {
@@ -206,18 +211,21 @@ impl YamantakaApp {
     pub(in crate::app) fn restore_tab_preferences(
         &mut self,
         preferences: ReaderPreferences,
-    ) -> ReaderPreferences {
+    ) -> (ReaderPreferences, Option<[f64; 2]>) {
         let Some(tab) = self.tabs.take_restoration(
             &preferences.document_id,
             &self.reader.reader_preferences_cancel,
         ) else {
-            return preferences;
+            return (preferences, None);
         };
         self.reader.panel = tab.panel().is_some();
         if let Some(panel) = tab.panel() {
             self.reader.reader_panel_tab = reader_panel(panel);
         }
-        self.reader.restoration.scroll = Some(tab.preferences().scroll_offset);
-        tab.preferences().clone()
+        self.reader.restoration.scroll = tab
+            .point()
+            .is_none()
+            .then_some(tab.preferences().scroll_offset);
+        (tab.preferences().clone(), tab.point())
     }
 }

@@ -17,6 +17,7 @@ impl TabState {
                     current.page(),
                     current.preferences().clone(),
                     current.panel(),
+                    current.point(),
                 );
             } else {
                 let _ = plan.refresh_closed(
@@ -24,6 +25,7 @@ impl TabState {
                     current.page(),
                     current.preferences().clone(),
                     current.panel(),
+                    current.point(),
                 );
             }
         }

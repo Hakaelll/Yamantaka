@@ -64,6 +64,8 @@ struct StoredTab {
     id: String,
     document: String,
     page: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    point: Option<[f64; 2]>,
     pinned: bool,
     panel: Option<String>,
     preferences: StoredPreferences,
@@ -99,7 +101,7 @@ impl Snapshot {
             .with_selection_notes(self.selection_notes.clone())
     }
     fn model(&self) -> Result<DocumentTabs> {
-        if !matches!(self.version, 1..=7) {
+        if !matches!(self.version, 1..=8) {
             return Err(Failure::Invalid(
                 "Unsupported reader continuity version; original file is preserved".into(),
             ));
@@ -153,6 +155,7 @@ impl StoredTab {
             }
         };
         ReaderTab::new(self.id.clone(), self.document.clone(), self.page, p, panel)?
+            .with_point(self.point)?
             .with_pinned(self.pinned)
             .with_queue(self.queue.clone())
     }
@@ -163,6 +166,7 @@ impl StoredTab {
             queue: tab.queue().clone(),
             document: tab.document().into(),
             page: tab.page(),
+            point: tab.point(),
             pinned: tab.pinned(),
             panel: tab.panel().map(|panel| {
                 match panel {
@@ -272,7 +276,15 @@ pub fn save(path: &Path, continuity: &ReaderContinuity) -> Result<()> {
         StoredTab::capture(tab, old)
     };
     let snapshot = Snapshot {
-        version: if continuity
+        version: if model
+            .tabs()
+            .iter()
+            .chain(model.closed())
+            .any(|tab| tab.point().is_some())
+            || previous.as_ref().is_some_and(|old| old.version == 8)
+        {
+            8
+        } else if continuity
             .comparison()
             .is_some_and(|saved| saved.reading.is_some())
             || previous.as_ref().is_some_and(|old| old.version == 7)

@@ -25,6 +25,7 @@ fn remap(tabs: &DocumentTabs) -> Result<DocumentTabs> {
                 tab.preferences().clone(),
                 tab.panel(),
             )?
+            .with_point(tab.point())?
             .with_pinned(tab.pinned())
             .with_queue(tab.queue().clone())?,
         );

@@ -118,6 +118,7 @@ pub fn preserved_split_references(document: &str) {
             active.page(),
             active.preferences().clone(),
             Some(yamantaka_domain::reading_sessions::restoration::SessionPanel::Positions),
+            None,
         )
         .unwrap();
     let mut view = current_readings.view;

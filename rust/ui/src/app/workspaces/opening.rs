@@ -44,6 +44,7 @@ impl YamantakaApp {
                 tab.preferences().clone(),
                 tab.panel(),
             )
+            .and_then(|mapped| mapped.with_point(tab.point()))
             .map(|mapped| mapped.with_pinned(tab.pinned()))
             .and_then(|mapped| mapped.with_queue(tab.queue().clone()));
             match mapped {

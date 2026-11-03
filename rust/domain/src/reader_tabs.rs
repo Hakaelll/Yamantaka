@@ -21,6 +21,7 @@ pub struct ReaderTab {
     id: String,
     document: String,
     page: u32,
+    point: Option<[f64; 2]>,
     preferences: ReaderPreferences,
     panel: Option<SessionPanel>,
     pinned: bool,
@@ -39,6 +40,7 @@ impl ReaderTab {
             id,
             document,
             page,
+            point: None,
             preferences,
             panel,
             pinned: false,
@@ -50,6 +52,9 @@ impl ReaderTab {
     }
     fn validate(&self) -> Result<()> {
         self.queue.validate()?;
+        if let Some(point) = self.point {
+            crate::reader::ReaderPosition::at(self.page, point)?;
+        }
         if self.id.is_empty()
             || self.document.is_empty()
             || self.preferences.document_id != self.document
@@ -76,6 +81,16 @@ impl ReaderTab {
     }
     pub fn page(&self) -> u32 {
         self.page
+    }
+    pub fn point(&self) -> Option<[f64; 2]> {
+        self.point
+    }
+    pub fn with_point(mut self, point: Option<[f64; 2]>) -> Result<Self> {
+        if let Some(point) = point {
+            crate::reader::ReaderPosition::at(self.page, point)?;
+        }
+        self.point = point;
+        Ok(self)
     }
     pub fn preferences(&self) -> &ReaderPreferences {
         &self.preferences

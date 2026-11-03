@@ -19,6 +19,7 @@ impl YamantakaApp {
             let mut effective = preferences;
             let mut panel = self.reader.panel;
             let mut restored_scroll = None;
+            let mut restored_point = None;
             if let Some(context) = &pending.context {
                 effective = context.apply(&effective)?;
                 panel = context.panel().is_some();
@@ -27,11 +28,13 @@ impl YamantakaApp {
             if let Some(tab) = self.tabs.opening_tab(&pending.document, &pending.open) {
                 effective = tab.preferences().clone();
                 panel = tab.panel().is_some();
-                restored_scroll = Some(effective.scroll_offset);
+                restored_point = tab.point();
+                restored_scroll = restored_point.is_none().then_some(effective.scroll_offset);
             }
             effective = self.reader.visual_profile.effective(&effective);
             if self.reader.visual_profile == reader_profile::VisualProfile::ElectronicInk {
                 restored_scroll = None;
+                restored_point = None;
             }
             if candidate
                 .geometry
@@ -100,7 +103,8 @@ impl YamantakaApp {
             ];
             let anchor = ReaderPosition::at(
                 candidate.page,
-                effective.page_rotation.unrotate_point([0.5, 0.0]),
+                restored_point
+                    .unwrap_or_else(|| effective.page_rotation.unrotate_point([0.5, 0.0])),
             )?;
             let zoom = f64::from(effective.zoom_level as f32);
             let [x, y] = layout.scroll_for_anchor(viewport, anchor, effective.zoom_mode, zoom)?;

@@ -64,6 +64,8 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Excluded claims
 
+Main-reader tabs now retain a normalized within-page point through default-session continuity version eight, recently closed readings, duplication and named-workspace remapping. Opening preparation and final adoption share that point, while legacy snapshots retain their vertical-offset fallback. See [reading position context](rust-tab-position-context.md). This implementation has no newly executed tests, compilation or native captures; continuity and workspace acceptance remain Partial.
+
 Front-matter analyzer version four now orders lines by page geometry and treats filename-equivalent embedded titles as replaceable only with the existing automatic title evidence. The same exception reaches guarded catalogue reanalysis while retaining manual overrides and protection of other accepted metadata. See [book metadata](../user-guide/book-metadata.md). No new tests, compilation or native PDF runs were executed for this update; metadata acceptance remains Partial.
 
 Reduced motion now reaches the reference viewport explicitly and disables drag inertia in both readers. Application input consumes the remaining discrete-wheel smoothing delta, and native state transitions use zero animation time. The pinned egui scroll container also finishes an outstanding scroll target when animation is disabled. No new tests, compilation or rendered checks were run for this implementation; physical motion and input acceptance remain pending.
