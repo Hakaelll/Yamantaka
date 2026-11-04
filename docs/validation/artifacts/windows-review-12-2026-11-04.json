@@ -1,0 +1,61 @@
+{
+  "applicationLicense": "MIT",
+  "archiveMatchesBundle": true,
+  "archiveSha256": "9fc857b6d397ca411fa82cfdfd944c115dfd64126638728014a761441325d3b4",
+  "binaries": {
+    "pdfium.dll": {
+      "imports": [
+        "advapi32.dll",
+        "gdi32.dll",
+        "kernel32.dll",
+        "user32.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 3
+    },
+    "yamantaka.exe": {
+      "imports": [
+        "advapi32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "bcryptprimitives.dll",
+        "combase.dll",
+        "dwmapi.dll",
+        "dxgi.dll",
+        "gdi32.dll",
+        "imm32.dll",
+        "kernel32.dll",
+        "ntdll.dll",
+        "ole32.dll",
+        "oleaut32.dll",
+        "opengl32.dll",
+        "setupapi.dll",
+        "shell32.dll",
+        "uiautomationcore.dll",
+        "user32.dll",
+        "uxtheme.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 2
+    }
+  },
+  "components": 239,
+  "files": 462,
+  "machineProfilePathsAbsent": true,
+  "pdfiumHashPinned": true,
+  "status": "review-candidate-not-final-release",
+  "verified": true,
+  "version": "0.16.0-alpha.1",
+  "baseSourceCommit": "5946e3c914bd15b807ec43924216b3f1abd938d9",
+  "runtimeSourcesModified": false,
+  "archiveBytes": 16382976,
+  "applicationFile": {
+    "path": "yamantaka.exe",
+    "bytes": 30374912,
+    "sha256": "e952e3705c52e9dedc0953d4ff1c5a18b5f32fe5b5886647557b60f03b6c9247"
+  },
+  "validationScope": "build-and-packaging-only",
+  "newApplicationTestsRun": false,
+  "newRuntimeCapturesRun": false,
+  "newPhysicalChecksRun": false,
+  "newComparativePerformanceRun": false
+}
