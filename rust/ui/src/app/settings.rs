@@ -351,6 +351,7 @@ impl YamantakaApp {
             4 => {
                 self.backup_settings(ui, p);
                 self.cache_maintenance_settings(ui, p);
+                self.folder_watch_settings(ui, p);
                 self.legacy_import_settings(ui, p);
             }
             _ => {

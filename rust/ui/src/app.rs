@@ -23,6 +23,7 @@ mod duplicates;
 mod file_check;
 mod file_comparison;
 mod find;
+mod folder_watch;
 mod global_notes;
 mod goals;
 mod history;
@@ -141,6 +142,7 @@ pub struct YamantakaApp {
     startup_mode: yamantaka_domain::startup::StartupMode,
     safe_notice: bool,
     startup_repair: startup_repair::State,
+    folder_watches: folder_watch::State,
     quarantine: quarantine::QuarantineState,
     shortcut_bindings: shortcuts::bindings::Bindings,
     shortcut_error: Option<String>,
@@ -395,6 +397,7 @@ impl YamantakaApp {
             startup_mode,
             safe_notice: startup_mode.is_safe(),
             startup_repair: Default::default(),
+            folder_watches: Default::default(),
             window_state: None,
             quarantine: Default::default(),
             reader,
@@ -2294,6 +2297,7 @@ impl App for YamantakaApp {
         });
         let p = Palette::new(self.dark);
         self.poll_search(&ctx);
+        self.poll_folder_watches(&ctx);
         self.poll_startup_record_repair(&ctx);
         let shortcut_modal = self.duplicates.merge_open()
             || self.command_palette.open

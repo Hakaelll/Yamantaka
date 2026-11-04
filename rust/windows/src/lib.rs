@@ -1,5 +1,6 @@
 //! Native Windows integration with a Rust-only application identity.
 pub mod annotation_export;
+pub mod folder_watch;
 pub mod retained_file;
 pub mod source_monitor;
 pub mod source_stamp;

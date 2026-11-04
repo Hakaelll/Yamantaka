@@ -124,6 +124,7 @@ The retained suite contains **56 tests**, covering native rendering, migration, 
 | Topic | Guide |
 | --- | --- |
 | Library layout and smaller windows | [Library layout](docs/user-guide/library-layout.md) |
+| Session-only folder notifications, after review 11 | [Authorized folders](docs/user-guide/authorized-folders.md) |
 | Controls, page previews and source changes | [Reader responsiveness](docs/user-guide/reader-responsiveness.md) |
 | Electronic-ink presentation | [Reader profiles](docs/user-guide/reader-profiles.md) |
 | Tabs, sessions, workspaces and comparison | [Reading continuity](docs/user-guide/reading-continuity.md) |
