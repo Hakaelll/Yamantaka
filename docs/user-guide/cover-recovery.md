@@ -23,6 +23,10 @@ waits for availability. Close an unused reading to let it continue, or choose
 **Cancel batch**. The completed source hash stays available while waiting. If
 the temporary PDF owner must be reopened, its password may be requested again.
 
+When the PDF worker's close queue is busy, the operation retains its temporary
+document and retries closing after a short pause. Cancelling still waits for
+this cleanup; it does not publish an unfinished replacement.
+
 Batch regeneration replaces selected manual covers with newly detected automatic
 choices only after its existing confirmation. The saved cover decision is checked
 again before replacement; a later manual change is preserved and that item fails.

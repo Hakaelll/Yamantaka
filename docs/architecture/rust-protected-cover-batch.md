@@ -36,6 +36,19 @@ Individual cache-repair requests keep their earlier busy-slot behavior. Cache
 pressure can still prevent an item from completing. Runtime cancellation,
 foreground-preemption and capacity-pressure acceptance remain pending.
 
+Temporary-document closure also retains its owner when native close admission
+returns `QueueFull`. It registers a 100 ms channel deadline before retrying,
+without a busy retry loop or another hash job. A queued close reply that reports
+the same transient failure takes the same path. The original operation outcome
+is retained, and cancellation does not skip this cleanup phase. Irrecoverable
+worker errors still return a failure. A successful native close is required
+before the captured cover can reach the existing save pipeline.
+
+The PDF worker's bounded reply admission now returns the typed `QueueFull`
+failure for both ordinary and control requests. Saturation is therefore distinct
+from the generic native-PDF failure class used by document-health handling.
+The reservation limits are unchanged.
+
 This is development work after published review 10. No new test cases were added.
 Existing fixture constructors and calls were adapted to the new request/context
 fields. The locked, offline native development build (`cargo build -p yamantaka`)

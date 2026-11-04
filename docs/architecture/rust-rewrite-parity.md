@@ -64,6 +64,8 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Recent implementation checkpoints
 
+Cover rebuilding now retains temporary-document cleanup across typed PDF queue saturation, using a channel deadline rather than a busy retry loop. The worker reports bounded admission as `QueueFull` instead of a generic PDF failure. Native close confirmation still precedes saving a replacement. These source changes are after review 10 and have no new runtime, fault-injection or cancellation acceptance.
+
 [Protected batch-cover regeneration](rust-protected-cover-batch.md) now connects password-required items to the existing transient unlock and cache-rebuild flow. It retains the batch's reviewed source/cover snapshots and a shared cancellation scope. Native-slot pressure now parks batch opening against its admission-capacity generation, preserving the completed hash and revalidating the frozen choice before retrying. The native development build passes; this source change follows published review 10, and runtime, retry, cancellation and capacity-pressure acceptance remain pending.
 
 The review-10 distribution was published as a [GitHub prerelease](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.16.0-alpha.1-review.10) on 2026-11-04 after the user's general confirmation that the application works correctly. Its [publication record](../validation/artifacts/github-review-10-publication-2026-11-04.json) records the four assets and source target. The earlier [draft preparation record](../validation/artifacts/github-review-10-draft-2026-11-03.json) remains historical. User functional acceptance does not supply per-DPI or comparative-performance measurements; final replacement acceptance remains open.

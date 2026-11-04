@@ -315,7 +315,7 @@ impl PdfWorker {
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
                 (count < MAX_PENDING_REQUESTS).then_some(count + 1)
             })
-            .map_err(|_| Failure::Pdf("PDF queue is full; cancel pending work or retry".into()))?;
+            .map_err(|_| Failure::QueueFull)?;
         let permit = Some(Arc::new(Permit(counter.clone())));
         let id = self.0.sequence.fetch_add(1, Ordering::Relaxed) as u64;
         let (sender, mut ticket) = PdfTicket::channel(id, epoch, cancel);

@@ -36,6 +36,7 @@ enum Work {
     Detect(PdfTicket<DetectedCover>),
     Page(PdfTicket<Arc<RenderedPage>>),
     Close(PdfTicket<()>),
+    CloseRetry(Receiver<std::time::Instant>),
 }
 enum Image {
     Detected(DetectedCover),
@@ -115,6 +116,11 @@ impl Job {
             Work::Detect(t) => t.is_ready(),
             Work::Page(t) => t.is_ready(),
             Work::Close(t) => t.is_ready(),
+            Work::CloseRetry(timer) => {
+                let mut select = Select::new();
+                select.recv(timer);
+                select.try_ready().is_ok()
+            }
             Work::Password(r) => {
                 let mut select = Select::new();
                 select.recv(r);
@@ -143,6 +149,9 @@ impl Job {
             }
             Work::Close(t) => {
                 select.recv(t.readiness());
+            }
+            Work::CloseRetry(timer) => {
+                select.recv(timer);
             }
             Work::Password(r) => {
                 select.recv(r);
@@ -174,6 +183,9 @@ impl Job {
         }
         match engine.try_close(self.id.clone()) {
             Ok(ticket) => self.pending(Work::Close(ticket)),
+            Err(Failure::QueueFull) => self.pending(Work::CloseRetry(crossbeam_channel::after(
+                std::time::Duration::from_millis(100),
+            ))),
             Err(error) => self.finish(Err(error), false),
         }
     }
@@ -241,7 +253,9 @@ impl Job {
         capacity: u64,
     ) -> Step {
         let work = self.work.take().unwrap();
-        if self.request.cancel.is_cancelled() && !matches!(work, Work::Close(_)) {
+        if self.request.cancel.is_cancelled()
+            && !matches!(work, Work::Close(_) | Work::CloseRetry(_))
+        {
             return self.close(engine, Some(Failure::Cancelled));
         }
         match work {
@@ -373,8 +387,24 @@ impl Job {
                 Err(Failure::NativeDocumentUnavailable) => self.open(engine, None, capacity),
                 Err(error) => self.close(engine, Some(error)),
             },
+            Work::CloseRetry(timer) => {
+                if matches!(
+                    timer.try_recv(),
+                    Err(crossbeam_channel::TryRecvError::Empty)
+                ) {
+                    self.pending(Work::CloseRetry(timer))
+                } else {
+                    let error = self.error.take();
+                    self.close(engine, error)
+                }
+            }
             Work::Close(ticket) => {
                 let closed = ticket.wait();
+                if matches!(&closed, Err(Failure::QueueFull)) {
+                    return self.pending(Work::CloseRetry(crossbeam_channel::after(
+                        std::time::Duration::from_millis(100),
+                    )));
+                }
                 let released = closed.is_ok();
                 self.owner = !released;
                 let result = closed.and_then(|()| {
