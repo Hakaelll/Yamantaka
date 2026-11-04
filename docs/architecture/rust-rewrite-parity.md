@@ -64,6 +64,8 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Recent implementation checkpoints
 
+[Protected batch-cover regeneration](rust-protected-cover-batch.md) now connects password-required items to the existing transient unlock and cache-rebuild flow. It retains the batch's reviewed source/cover snapshots and a shared cancellation scope. This source change follows published review 10; runtime, retry, cancellation and capacity-pressure acceptance remain pending.
+
 The review-10 distribution was published as a [GitHub prerelease](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.16.0-alpha.1-review.10) on 2026-11-04 after the user's general confirmation that the application works correctly. Its [publication record](../validation/artifacts/github-review-10-publication-2026-11-04.json) records the four assets and source target. The earlier [draft preparation record](../validation/artifacts/github-review-10-draft-2026-11-03.json) remains historical. User functional acceptance does not supply per-DPI or comparative-performance measurements; final replacement acceptance remains open.
 
 [Windows review 10](../release/rust-0.16-review-10.md) packages the committed runtime through `1659213` with a successful locked, offline optimized build. Its distribution inventory, hashes, licenses and executable resources pass packaging checks. No new application tests, captures or physical checks were run. The implementation checkpoints below therefore retain Partial acceptance.

@@ -2245,7 +2245,7 @@ impl Runtime {
                         let mut finished=false;
                         for _ in 0..2 {
                             if !job.ready(capacity) {break;}
-                            finished=job.advance(&mut repository,&engine,capacity);
+                            finished=job.advance(&mut repository,&engine,capacity,&crate::cover_regeneration::UnlockContext{passwords:&password_requests,wake:&password_wake,notify:&notify,capacity:&pdf_capacity});
                             if finished {break;}
                         }
                         let progress=job.snapshot(finished);

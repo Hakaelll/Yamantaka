@@ -73,6 +73,7 @@ pub(super) fn verify(
         runtime
             .submit(Action::RebuildCover(Box::new(Request {
                 document: document.clone(),
+                automatic: None,
                 governor,
                 cancel: cancel.clone(),
             })))

@@ -22,6 +22,7 @@ impl YamantakaApp {
         let cancel = Cancellation::default();
         match self.runtime.submit(Action::RebuildCover(Box::new(Request {
             document,
+            automatic: None,
             governor: self.governor.clone(),
             cancel: cancel.clone(),
         }))) {

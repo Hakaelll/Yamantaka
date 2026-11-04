@@ -32,7 +32,7 @@ fn advance_until(
             return;
         }
         if job.ready(capacity) {
-            let finished = job.advance(db, engine, capacity);
+            let finished = advance_once(job, db, engine, capacity);
             if done(&job.snapshot(finished)) {
                 return;
             }
@@ -43,6 +43,27 @@ fn advance_until(
             select.ready_timeout(Duration::from_secs(5)).unwrap();
         }
     }
+}
+fn advance_once(
+    job: &mut RegenerationJob,
+    db: &mut Database,
+    engine: &PdfWorker,
+    capacity: u64,
+) -> bool {
+    let (passwords, _password_replies) = crossbeam_channel::bounded(1);
+    let (wake, _wake_replies) = crossbeam_channel::bounded(1);
+    let generation = std::sync::atomic::AtomicU64::new(capacity);
+    job.advance(
+        db,
+        engine,
+        capacity,
+        &super::UnlockContext {
+            passwords: &passwords,
+            wake: &wake,
+            notify: &|| {},
+            capacity: &generation,
+        },
+    )
 }
 pub(crate) fn verify() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -105,7 +126,7 @@ pub(crate) fn verify() {
     assert_eq!(db.cover_source_page("c").unwrap(), Some(0));
     drop(job);
     let mut late = RegenerationJob::start(request(&["a"]), &db).unwrap();
-    assert!(!late.advance(&mut db, &worker, 1));
+    assert!(!advance_once(&mut late, &mut db, &worker, 1));
     manual(&mut db, "a", 0, "newer during detection");
     let newest = db.cover_snapshot("a").unwrap();
     advance_until(&mut late, &mut db, &worker, 1, |state| state.finished);
@@ -119,7 +140,7 @@ pub(crate) fn verify() {
         state.report.succeeded.len() == 1
     });
     cancel.cancel();
-    assert!(partial.advance(&mut db, &worker, 1));
+    assert!(advance_once(&mut partial, &mut db, &worker, 1));
     let report = partial.reply().result.unwrap();
     assert_eq!(report.succeeded, ["a"]);
     assert_eq!(report.remaining, ["b"]);
@@ -130,7 +151,7 @@ pub(crate) fn verify() {
     let cancel = input.cancel.clone();
     let mut stopped = RegenerationJob::start(input, &db).unwrap();
     cancel.cancel();
-    assert!(stopped.advance(&mut db, &worker, 1));
+    assert!(advance_once(&mut stopped, &mut db, &worker, 1));
     assert_eq!(stopped.reply().result.unwrap().remaining, ["a", "b"]);
     drop(stopped);
     assert_eq!(

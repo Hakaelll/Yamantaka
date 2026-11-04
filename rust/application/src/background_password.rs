@@ -8,6 +8,7 @@ pub enum Purpose {
     Import,
     Metadata,
     Cover,
+    CoverBatch,
     Index,
 }
 

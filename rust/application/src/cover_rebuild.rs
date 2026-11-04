@@ -18,6 +18,7 @@ use yamantaka_domain::{
 
 pub struct Request {
     pub document: Document,
+    pub automatic: Option<CoverSnapshot>,
     pub governor: MemoryGovernor,
     pub cancel: Cancellation,
 }
@@ -74,6 +75,13 @@ impl Job {
         let source = CoverSource::capture(&request.document);
         source.read(repository, &request.cancel)?;
         let snapshot = repository.cover_snapshot(&request.document.id)?;
+        if request
+            .automatic
+            .as_ref()
+            .is_some_and(|expected| expected != &snapshot)
+        {
+            return Err(Failure::Invalid("Cover selection changed; retry".into()));
+        }
         let cache = engine
             .cover_cache_handle()
             .ok_or_else(|| Failure::Unsupported("Cover cache is disabled".into()))?;
@@ -218,7 +226,7 @@ impl Job {
         engine: &impl AsyncPdfEngine,
         passwords: &Sender<Challenge>,
         wake: &Sender<()>,
-        notify: &impl Fn(),
+        notify: &dyn Fn(),
     ) -> Step {
         let work = self.work.take().unwrap();
         if self.request.cancel.is_cancelled() && !matches!(work, Work::Close(_)) {
@@ -242,7 +250,11 @@ impl Job {
             Work::Open(ticket) => match ticket.wait() {
                 Err(Failure::PasswordRequired) => {
                     let (challenge, receive) = Challenge::channel(
-                        Purpose::Cover,
+                        if self.request.automatic.is_some() {
+                            Purpose::CoverBatch
+                        } else {
+                            Purpose::Cover
+                        },
                         self.request.document.path.clone(),
                         self.attempted,
                         self.request.cancel.clone(),
@@ -286,7 +298,11 @@ impl Job {
                     {
                         return self.close(engine, Some(error));
                     }
-                    match self.snapshot.plan {
+                    match if self.request.automatic.is_some() {
+                        CoverPlan::Detect
+                    } else {
+                        self.snapshot.plan.clone()
+                    } {
                         CoverPlan::Render(page) => match engine.try_capture_import_cover_page(
                             self.id.clone(),
                             source,
@@ -370,16 +386,27 @@ impl Job {
                     if let Image::Detected(detected) = captured {
                         let mut image = detected.image.at_generation(0);
                         image.key.document_id = self.request.document.id.clone();
-                        crate::automatic_cover::complete(
-                            repository,
-                            self.request.document.clone(),
-                            0,
-                            DetectedCover {
-                                image: Arc::new(image),
-                                choice: detected.choice,
-                            },
-                            self.snapshot.clone(),
-                        )?;
+                        let detected = DetectedCover {
+                            image: Arc::new(image),
+                            choice: detected.choice,
+                        };
+                        if self.request.automatic.is_some() {
+                            crate::automatic_cover::restore(
+                                repository,
+                                self.request.document.clone(),
+                                0,
+                                detected,
+                                self.snapshot.clone(),
+                            )?;
+                        } else {
+                            crate::automatic_cover::complete(
+                                repository,
+                                self.request.document.clone(),
+                                0,
+                                detected,
+                                self.snapshot.clone(),
+                            )?;
+                        }
                     }
                     Ok(())
                 });
