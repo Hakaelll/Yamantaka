@@ -1,0 +1,64 @@
+{
+  "applicationLicense": "MIT",
+  "archiveMatchesBundle": true,
+  "archiveSha256": "2b60d4876a849048816d12059e770727428220cb67e8dd2e4d22fcbfc0dd61ad",
+  "binaries": {
+    "pdfium.dll": {
+      "imports": [
+        "advapi32.dll",
+        "gdi32.dll",
+        "kernel32.dll",
+        "user32.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 3
+    },
+    "yamantaka.exe": {
+      "imports": [
+        "advapi32.dll",
+        "api-ms-win-core-synch-l1-2-0.dll",
+        "bcryptprimitives.dll",
+        "combase.dll",
+        "dwmapi.dll",
+        "dxgi.dll",
+        "gdi32.dll",
+        "imm32.dll",
+        "kernel32.dll",
+        "ntdll.dll",
+        "ole32.dll",
+        "oleaut32.dll",
+        "opengl32.dll",
+        "setupapi.dll",
+        "shell32.dll",
+        "uiautomationcore.dll",
+        "user32.dll",
+        "uxtheme.dll"
+      ],
+      "machine": "AMD64",
+      "subsystem": 2
+    }
+  },
+  "components": 239,
+  "files": 462,
+  "machineProfilePathsAbsent": true,
+  "pdfiumHashPinned": true,
+  "status": "stable-release",
+  "verified": true,
+  "version": "0.16.0",
+  "baseSourceCommit": "59f8233a2ea11689062cc98b7571c1a44b9954e6",
+  "runtimeSourcesModified": false,
+  "archiveBytes": 16357329,
+  "applicationFile": {
+    "path": "yamantaka.exe",
+    "bytes": 30247424,
+    "sha256": "16b14580097ca6ac383127988aa698249d1f37329308e747e7366a17fcc9ed69"
+  },
+  "validationAuthority": "owner-final-acceptance",
+  "ownerAcceptanceRecord": "owner-final-acceptance-2026-11-04.json",
+  "newAgentApplicationTestsRun": false,
+  "newAgentPhysicalChecksRun": false,
+  "newAgentComparativeMeasurementsRun": false,
+  "runtimeImplementationMatchesAcceptedReview13": true,
+  "legacyArchiveTag": "archive/flutter-before-rust-0.16.0",
+  "cargoBuildElapsedSeconds": 861
+}

@@ -1,0 +1,47 @@
+{
+  "repository": "Hakaelll/Yamantaka",
+  "releaseId": 434316913,
+  "tag": "v0.16.0",
+  "targetCommit": "59f8233a2ea11689062cc98b7571c1a44b9954e6",
+  "draft": false,
+  "prerelease": false,
+  "htmlUrl": "https://github.com/Hakaelll/Yamantaka/releases/tag/v0.16.0",
+  "assets": [
+    {
+      "name": "yamantaka-0.16.0-windows-x64-portable.zip",
+      "bytes": 16357329,
+      "digest": "sha256:2b60d4876a849048816d12059e770727428220cb67e8dd2e4d22fcbfc0dd61ad",
+      "state": "uploaded"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 198,
+      "digest": "sha256:3cad14edc4615aa46d463ab5e12a26cf3b1f6225e90cde3767b65da9674a2daf",
+      "state": "uploaded"
+    },
+    {
+      "name": "package-manifest.json",
+      "bytes": 218517,
+      "digest": "sha256:85e05ad6fec08503e4d31fbfd1d88c4e671f741ea9fe2ea91070b917ebe60f45",
+      "state": "uploaded"
+    },
+    {
+      "name": "SBOM.cdx.json",
+      "bytes": 165871,
+      "digest": "sha256:c790d791541ca8c83c3cbcb97cc6b8745b4b9ae05810e1e78577e6f094fe832c",
+      "state": "uploaded"
+    }
+  ],
+  "ownerAcceptanceRecord": "owner-final-acceptance-2026-11-04.json",
+  "runtimeImplementationMatchesAcceptedReview13": true,
+  "newAgentApplicationTestsRun": false,
+  "newAgentPhysicalChecksRun": false,
+  "newAgentComparativeMeasurementsRun": false,
+  "legacyArchiveTag": "archive/flutter-before-rust-0.16.0",
+  "applicationLicense": "MIT",
+  "publicationPerformed": true,
+  "recordScope": "stable-release-publication",
+  "publishedAt": "2026-11-04T18:51:48Z",
+  "isLatestRelease": true,
+  "tagCommitVerified": true
+}
