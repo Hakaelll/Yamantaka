@@ -673,6 +673,11 @@ impl ReferenceView {
                     }
                 }
             }
+            if !self.busy() && !self.close_requested {
+                self.pane
+                    .selection
+                    .drag_viewport(ui, &frame, origin, layout.rotation());
+            }
             self.pane.loading = !self.pane.viewport.retry
                 && self
                     .pane

@@ -2,6 +2,7 @@ use super::*;
 mod admission_preview;
 mod comparison_preview;
 mod keyboard;
+mod pointer_scroll;
 mod view;
 pub(super) use comparison_preview::ComparisonSelectionPreview;
 use std::collections::BTreeMap;

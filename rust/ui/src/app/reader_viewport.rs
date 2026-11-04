@@ -176,6 +176,9 @@ impl YamantakaApp {
                     }
                 }
             }
+            if self.password.is_none() && !self.link_confirmation_open() {
+                self.reader.selection.drag_viewport(ui, &frame, origin, layout.rotation());
+            }
             self.opening.observe_frame(&document.id, &frame, &self.reader.viewport);
             if let Some(reference)=&mut self.reference {
                 reference.observe_primary_mount(&frame,&self.reader.viewport);
