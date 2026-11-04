@@ -21,9 +21,20 @@ a second reader or store passwords in batch intent.
 A distinct password purpose gives the same ES/EN dialog an explicit Cancel batch
 action. It cancels the shared batch token; completed items remain successful,
 while unfinished items remain in the report. A changed saved choice fails its
-item rather than replacing the user's newer decision. Native slot or cache
-pressure can still prevent a protected item from completing; cancellation and
-foreground-preemption acceptance remain pending.
+item rather than replacing the user's newer decision.
+
+Protected batch items now wait when native opening reports that the document
+slots are busy. Each open ticket retains its admission-capacity generation, so
+a release that arrives before the busy reply is consumed still permits a retry.
+The waiting state registers no repeated native request and resumes only after
+that generation changes or cancellation is requested. Before reopening, it
+rechecks the frozen source and selection while retaining the completed full hash.
+Passwords are not held across that wait; another unlock may be required.
+
+The batch progress exposes this capacity wait through its existing status.
+Individual cache-repair requests keep their earlier busy-slot behavior. Cache
+pressure can still prevent an item from completing. Runtime cancellation,
+foreground-preemption and capacity-pressure acceptance remain pending.
 
 This is development work after published review 10. No new test cases were added.
 Existing fixture constructors and calls were adapted to the new request/context

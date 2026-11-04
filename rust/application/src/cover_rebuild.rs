@@ -29,7 +29,8 @@ pub struct Reply {
 }
 enum Work {
     Hash(ImportHashJob),
-    Open(PdfTicket<PdfInfo>),
+    Open(PdfTicket<PdfInfo>, u64),
+    Waiting(u64),
     Password(Receiver<PdfPassword>),
     Source(PdfTicket<yamantaka_domain::source_revision::SourceRevision>),
     Detect(PdfTicket<DetectedCover>),
@@ -105,10 +106,11 @@ impl Job {
             error: None,
         }))
     }
-    pub fn ready(&self) -> bool {
+    pub fn ready(&self, capacity: u64) -> bool {
         match self.work.as_ref().unwrap() {
             Work::Hash(job) => job.ready(),
-            Work::Open(t) => t.is_ready(),
+            Work::Open(t, _) => t.is_ready(),
+            Work::Waiting(admitted) => self.request.cancel.is_cancelled() || capacity != *admitted,
             Work::Source(t) => t.is_ready(),
             Work::Detect(t) => t.is_ready(),
             Work::Page(t) => t.is_ready(),
@@ -120,12 +122,16 @@ impl Job {
             }
         }
     }
+    pub fn waiting(&self) -> bool {
+        matches!(self.work.as_ref(), Some(Work::Waiting(_)))
+    }
     pub fn register<'a>(&'a self, select: &mut Select<'a>) {
         match self.work.as_ref().unwrap() {
             Work::Hash(job) => job.register(select),
-            Work::Open(t) => {
+            Work::Open(t, _) => {
                 select.recv(t.readiness());
             }
+            Work::Waiting(_) => {}
             Work::Source(t) => {
                 select.recv(t.readiness());
             }
@@ -175,6 +181,7 @@ impl Job {
         mut self: Box<Self>,
         engine: &impl AsyncPdfEngine,
         password: Option<PdfPassword>,
+        capacity: u64,
     ) -> Step {
         if let Err(error) = self.request.cancel.check() {
             return self.close(engine, Some(error));
@@ -189,7 +196,11 @@ impl Job {
         ) {
             Ok(ticket) => {
                 self.owner = true;
-                self.pending(Work::Open(ticket))
+                self.pending(Work::Open(ticket, capacity))
+            }
+            Err(Failure::NativeSlotsBusy) if self.request.automatic.is_some() => {
+                self.owner = false;
+                self.pending(Work::Waiting(capacity))
             }
             Err(error) => self.close(engine, Some(error)),
         }
@@ -227,6 +238,7 @@ impl Job {
         passwords: &Sender<Challenge>,
         wake: &Sender<()>,
         notify: &dyn Fn(),
+        capacity: u64,
     ) -> Step {
         let work = self.work.take().unwrap();
         if self.request.cancel.is_cancelled() && !matches!(work, Work::Close(_)) {
@@ -237,17 +249,31 @@ impl Job {
                 Ok(guard) => {
                     self.guard = Some(guard);
                     match self.validate(repository) {
-                        Ok(()) => self.open(engine, None),
+                        Ok(()) => self.open(engine, None, capacity),
                         Err(error) => self.close(engine, Some(error)),
                     }
                 }
                 Err(error) => self.close(engine, Some(error)),
             },
             Work::Password(receive) => match receive.recv() {
-                Ok(password) => self.open(engine, Some(password)),
+                Ok(password) => self.open(engine, Some(password), capacity),
                 Err(_) => self.close(engine, Some(Failure::Cancelled)),
             },
-            Work::Open(ticket) => match ticket.wait() {
+            Work::Waiting(admitted) => {
+                if admitted == capacity {
+                    self.pending(Work::Waiting(admitted))
+                } else {
+                    match self.validate(repository) {
+                        Ok(()) => self.open(engine, None, capacity),
+                        Err(error) => self.close(engine, Some(error)),
+                    }
+                }
+            }
+            Work::Open(ticket, admitted) => match ticket.wait() {
+                Err(Failure::NativeSlotsBusy) if self.request.automatic.is_some() => {
+                    self.owner = false;
+                    self.pending(Work::Waiting(admitted))
+                }
                 Err(Failure::PasswordRequired) => {
                     let (challenge, receive) = Challenge::channel(
                         if self.request.automatic.is_some() {
@@ -268,7 +294,7 @@ impl Job {
                         Err(_) => self.close(engine, Some(Failure::QueueFull)),
                     }
                 }
-                Err(Failure::NativeDocumentUnavailable) => self.open(engine, None),
+                Err(Failure::NativeDocumentUnavailable) => self.open(engine, None, capacity),
                 Err(error) => self.close(engine, Some(error)),
                 Ok(info) if info.pages.len() != self.request.document.page_count as usize => self
                     .close(
@@ -280,13 +306,15 @@ impl Job {
                 Ok(_) => {
                     match engine.try_source_revision(self.id.clone(), self.request.cancel.clone()) {
                         Ok(ticket) => self.pending(Work::Source(ticket)),
-                        Err(Failure::NativeDocumentUnavailable) => self.open(engine, None),
+                        Err(Failure::NativeDocumentUnavailable) => {
+                            self.open(engine, None, capacity)
+                        }
                         Err(error) => self.close(engine, Some(error)),
                     }
                 }
             },
             Work::Source(ticket) => match ticket.wait() {
-                Err(Failure::NativeDocumentUnavailable) => self.open(engine, None),
+                Err(Failure::NativeDocumentUnavailable) => self.open(engine, None, capacity),
                 Err(error) => self.close(engine, Some(error)),
                 Ok(source) => {
                     if let Err(error) = self
@@ -310,7 +338,9 @@ impl Job {
                             self.request.cancel.clone(),
                         ) {
                             Ok(ticket) => self.pending(Work::Page(ticket)),
-                            Err(Failure::NativeDocumentUnavailable) => self.open(engine, None),
+                            Err(Failure::NativeDocumentUnavailable) => {
+                                self.open(engine, None, capacity)
+                            }
                             Err(error) => self.close(engine, Some(error)),
                         },
                         CoverPlan::Detect => match engine.try_capture_import_cover(
@@ -319,7 +349,9 @@ impl Job {
                             self.request.cancel.clone(),
                         ) {
                             Ok(ticket) => self.pending(Work::Detect(ticket)),
-                            Err(Failure::NativeDocumentUnavailable) => self.open(engine, None),
+                            Err(Failure::NativeDocumentUnavailable) => {
+                                self.open(engine, None, capacity)
+                            }
                             Err(error) => self.close(engine, Some(error)),
                         },
                     }
@@ -330,7 +362,7 @@ impl Job {
                     self.captured = Some(Image::Page(image));
                     self.close(engine, None)
                 }
-                Err(Failure::NativeDocumentUnavailable) => self.open(engine, None),
+                Err(Failure::NativeDocumentUnavailable) => self.open(engine, None, capacity),
                 Err(error) => self.close(engine, Some(error)),
             },
             Work::Detect(ticket) => match ticket.wait() {
@@ -338,7 +370,7 @@ impl Job {
                     self.captured = Some(Image::Detected(image));
                     self.close(engine, None)
                 }
-                Err(Failure::NativeDocumentUnavailable) => self.open(engine, None),
+                Err(Failure::NativeDocumentUnavailable) => self.open(engine, None, capacity),
                 Err(error) => self.close(engine, Some(error)),
             },
             Work::Close(ticket) => {

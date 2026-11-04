@@ -95,7 +95,7 @@ impl RegenerationJob {
             .as_ref()
             .is_none_or(|current| match &current.work {
                 Work::Ordinary(job) => job.ready(capacity),
-                Work::Unlock(job) => job.ready(),
+                Work::Unlock(job) => job.ready(capacity),
             })
     }
     pub(crate) fn register<'a>(&'a self, select: &mut Select<'a>) {
@@ -109,7 +109,10 @@ impl RegenerationJob {
     pub(crate) fn waiting(&self) -> bool {
         self.current
             .as_ref()
-            .is_some_and(|current| matches!(&current.work, Work::Ordinary(job) if job.waiting()))
+            .is_some_and(|current| match &current.work {
+                Work::Ordinary(job) => job.waiting(),
+                Work::Unlock(job) => job.waiting(),
+            })
     }
     pub(crate) fn advance(
         &mut self,
@@ -184,6 +187,7 @@ impl RegenerationJob {
                 unlock.passwords,
                 unlock.wake,
                 unlock.notify,
+                capacity,
             ) {
                 cover_rebuild::Step::Pending(job) => {
                     self.current = Some(Current {

@@ -555,7 +555,7 @@ impl Pending {
             }
         }
     }
-    fn ready(&self) -> bool {
+    fn ready(&self, capacity: u64) -> bool {
         match self {
             Self::ImportReady(_) => true,
             Self::ImportHashReady(_, _, state) => state.cancel.is_cancelled(),
@@ -577,7 +577,7 @@ impl Pending {
             Self::TextGeometry(_, _, ticket, _) => ticket.is_ready(),
             Self::ImportSource(_, _, _, ticket, _) => ticket.is_ready(),
             Self::ImportScan(scan, _) => scan.ready(),
-            Self::CoverRebuild(job, _) => job.ready(),
+            Self::CoverRebuild(job, _) => job.ready(capacity),
             Self::ImportCover(_, _, ticket, _) => ticket.is_ready(),
             Self::RejectedOpen(_, ticket, _)
             | Self::Close(_, ticket, _)
@@ -1959,12 +1959,12 @@ impl Runtime {
                     let mut next_imports = Vec::new();
                     let mut index = 0;
                     while index < pending.len() {
-                        if !pending[index].ready() {
+                        if !pending[index].ready(pdf_capacity.load(Ordering::Acquire)) {
                             index += 1;
                             continue;
                         }
                         match pending.remove(index) {
-                            Pending::CoverRebuild(job,permit)=>match job.advance(&mut repository,&engine,&password_requests,&password_wake,&notify) {
+                            Pending::CoverRebuild(job,permit)=>match job.advance(&mut repository,&engine,&password_requests,&password_wake,&notify,pdf_capacity.load(Ordering::Acquire)) {
                                 crate::cover_rebuild::Step::Pending(job)=>{pending.insert(index,Pending::CoverRebuild(job,permit));index+=1;},
                                 crate::cover_rebuild::Step::Finished(reply,released)=>{if released {pdf_capacity.fetch_add(1,Ordering::Release);}emit(&events,&notify,Update::CoverRebuilt(reply),permit);},
                             },

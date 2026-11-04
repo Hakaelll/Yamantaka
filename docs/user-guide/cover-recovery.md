@@ -18,6 +18,11 @@ rebuild flow. Choose **Regenerate cover** to continue or **Cancel batch** to sto
 the remaining covers. Completed replacements stay saved. Passwords are temporary
 and are not retained for the next document.
 
+If native document slots become busy during a protected batch item, the batch
+waits for availability. Close an unused reading to let it continue, or choose
+**Cancel batch**. The completed source hash stays available while waiting. If
+the temporary PDF owner must be reopened, its password may be requested again.
+
 Batch regeneration replaces selected manual covers with newly detected automatic
 choices only after its existing confirmation. The saved cover decision is checked
 again before replacement; a later manual change is preserved and that item fails.
