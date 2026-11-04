@@ -32,6 +32,7 @@ of pointer scrolling.
 
 Edge scrolling is included in review 12; word selection and pointer grapheme
 snapping are included in review 13. Their locked, offline development and
-optimized package builds completed successfully. No new interaction
-tests or native captures were run at the owner's request; pointer, rotation,
+optimized package builds completed successfully. The owner reported testing review
+13 without faults; the exact procedure was not supplied. No new agent-run
+interaction tests or native captures were executed. Detailed pointer, rotation,
 comparison and physical input acceptance remain pending.

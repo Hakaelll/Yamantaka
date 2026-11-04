@@ -1,8 +1,9 @@
 # Yamantaka 0.16.0-alpha.1: Windows review 13
 
-This portable development candidate packages runtime commit `4243c38`, including
-all changes from review 12. It is for user review; final replacement acceptance
-remains open. Published review 10 is unchanged.
+This Windows prerelease packages runtime commit `4243c38`, including all changes
+from review 12. On 2026-11-04, the owner confirmed testing review 13 without
+finding faults. Final replacement acceptance remains open; earlier releases are
+unchanged.
 
 ## Changes since review 12
 
@@ -39,10 +40,15 @@ current session format.
 
 ## Validation scope
 
-The development source compiles successfully. No application tests, captures,
-physical input checks or comparative performance measurements were run for these
-changes at the owner's request. Compilation does not establish interaction,
-Unicode, clipboard or accessibility acceptance.
+The development source compiles successfully. The owner reported testing review
+13 without finding faults on 2026-11-04. No specific procedure, per-DPI results,
+Narrator results or comparative measurements were supplied. This is general
+user-reported functional acceptance.
+
+No new automated application tests, captures, physical input checks or comparative
+performance measurements were run by the agent, following the owner's request.
+The user report does not establish every interaction, Unicode, clipboard or
+accessibility requirement.
 
 The remaining parity, migration, physical accessibility, visual and paired
 performance gates are recorded in the
@@ -59,12 +65,13 @@ records that scope.
 
 The local directory is `build/release/rust-0.16.0-alpha.1-review-13`.
 
-An unpublished GitHub draft uses `v0.16.0-alpha.1-review.13` and the same runtime
+The published prerelease uses `v0.16.0-alpha.1-review.13` and the same runtime
 commit. The ZIP, `SHA256SUMS.txt`, `package-manifest.json` and `SBOM.cdx.json` have
-matching local and server-reported sizes and SHA-256 digests. See the
-[draft record](../validation/artifacts/github-review-13-draft-2026-11-04.json).
-Draft access requires repository permission. This preparation did not publish
-or replace a release.
+matching prepared and server-reported sizes and SHA-256 digests. See the
+[publication record](../validation/artifacts/github-review-13-publication-2026-11-04.json).
+The earlier [draft record](../validation/artifacts/github-review-13-draft-2026-11-04.json)
+remains a historical preparation observation. This release is a prerelease,
+not the stable Flutter replacement.
 
 | Item | Value |
 | --- | --- |

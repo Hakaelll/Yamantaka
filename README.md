@@ -36,7 +36,7 @@ Metadata extraction uses PDF metadata and readable front matter. Image-only page
 
 The target is **Windows 10/11 x64**. A native review bundle includes the executable, PDFium, licenses and user instructions. Flutter, Dart and Rust are not needed to run that bundle.
 
-Download the [portable prerelease](https://github.com/Hakaelll/Yamantaka/releases/download/v0.16.0-alpha.1-review.10/yamantaka-0.16.0-alpha.1-windows-x64-portable.zip), or open its [release page](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.16.0-alpha.1-review.10) for checksums, the manifest and SBOM.
+Download the [portable prerelease](https://github.com/Hakaelll/Yamantaka/releases/download/v0.16.0-alpha.1-review.13/yamantaka-0.16.0-alpha.1-windows-x64-portable.zip), or open its [release page](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.16.0-alpha.1-review.13) for checksums, the manifest and SBOM.
 
 1. Extract the complete ZIP into a writable folder.
 2. Start `yamantaka/yamantaka.exe`. Keep `pdfium.dll` beside it.
@@ -45,9 +45,9 @@ Download the [portable prerelease](https://github.com/Hakaelll/Yamantaka/release
 
 The default compositor uses DirectX 12 through wgpu. If initialization fails, the application attempts the alternate OpenGL compositor once in a fresh process. You can also start with `--opengl`; see [graphics recovery](docs/user-guide/graphics-recovery.md).
 
-The [review 10 notes](docs/release/rust-0.16-review-10.md) describe the published prerelease, user-reported functional acceptance and remaining limits. Application checks recorded for [review 09](docs/release/rust-0.16-review-09.md) apply to that earlier revision; no new automated runtime suite was run for review 10.
+The [review 13 notes](docs/release/rust-0.16-review-13.md) describe the published prerelease, the owner's report of testing without faults and remaining limits. Application checks recorded for [review 09](docs/release/rust-0.16-review-09.md) apply to that earlier revision; no new automated runtime suite was run for review 13.
 
-The [review 13 candidate](docs/release/rust-0.16-review-13.md) packages protected-cover and metadata scheduling changes, session-only folder notifications, selection edge scrolling, visible-page search highlights and Unicode pointer selection. Its build and packaging are complete; runtime acceptance remains pending. Review 10 remains the published download.
+Review 13 includes protected-cover and metadata scheduling changes, session-only folder notifications, selection edge scrolling, visible-page search highlights and Unicode pointer selection. Its build and packaging are verified; the general user report does not replace the remaining accessibility and performance acceptance.
 
 Portable builds include `.yamantaka-rust-portable` and keep independent `rust-data` and `rust-cache` folders beside the executable. Extract a review build separately from your Flutter installation.
 
