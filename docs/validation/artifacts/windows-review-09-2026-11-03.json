@@ -498,5 +498,16 @@
     "Physical accessibility and Windows 10 execution remain pending",
     "Complete parity and paired Flutter/Rust performance acceptance remain pending",
     "No interaction-time, CPU, GPU or energy verdict follows from the idle update count"
-  ]
+  ],
+  "userFollowUp": {
+    "date": "2026-11-04",
+    "source": "user-report",
+    "review": "09",
+    "context": "two-monitor use",
+    "result": "no issues reported",
+    "procedureSpecified": false,
+    "dpiScalesSpecified": false,
+    "narratorResultSpecified": false,
+    "coversReview10": false
+  }
 }

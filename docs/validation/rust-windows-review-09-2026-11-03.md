@@ -36,3 +36,10 @@ This review does not establish full parity, physical accessibility, Windows 10
 execution, GPU/CPU/energy behavior or paired Flutter/Rust performance. The
 [acceptance matrix](../architecture/rust-rewrite-parity.md) continues to govern
 the final replacement Release.
+
+## User follow-up: 2026-11-04
+
+The user reported no issues when asked about review 09 with two monitors. This
+is a user observation for that build. The report does not specify a test
+procedure, DPI scales or Narrator results, and does not cover the later review-10
+runtime. The physical acceptance row records this limited scope.
