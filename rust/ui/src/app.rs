@@ -1707,7 +1707,20 @@ impl App for YamantakaApp {
                         self.accept_find(&id, &cancel, Err(error.to_string()));
                     }
                 }
-                Update::PageMatches(..) | Update::PageFindFailed(..) => {}
+                Update::PageMatches(id, payload, cancel) => {
+                    self.reader
+                        .find
+                        .accept_highlights(&id, payload.clone(), &cancel);
+                    if let Some(reference) = &mut self.reference {
+                        reference.pane.find.accept_highlights(&id, payload, &cancel);
+                    }
+                }
+                Update::PageFindFailed(id, error, cancel) => {
+                    self.reader.find.fail_highlights(&id, &error, &cancel);
+                    if let Some(reference) = &mut self.reference {
+                        reference.pane.find.fail_highlights(&id, &error, &cancel);
+                    }
+                }
                 Update::PageLinks(id, payload, cancel) => {
                     let page = payload.page();
                     if let Some(reference) = self

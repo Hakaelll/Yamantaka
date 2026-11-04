@@ -1,5 +1,6 @@
 use super::*;
 mod controller;
+mod highlights;
 mod reference;
 pub(super) struct FindTarget {
     pub page: u32,
@@ -37,6 +38,7 @@ pub(super) struct FindState {
     phase: FindPhase,
     focus: bool,
     preview: Option<String>,
+    highlights: highlights::Highlights,
 }
 impl Default for FindState {
     fn default() -> Self {
@@ -49,6 +51,7 @@ impl Default for FindState {
             phase: FindPhase::Idle,
             focus: false,
             preview: None,
+            highlights: Default::default(),
         }
     }
 }
@@ -68,6 +71,7 @@ impl FindState {
         self.preview = preview;
     }
     pub(super) fn stop(&mut self) {
+        self.highlights.clear();
         if let FindPhase::Running { token, .. } = &self.phase {
             token.cancel();
             self.phase = FindPhase::Stopped;
@@ -247,6 +251,7 @@ impl YamantakaApp {
             self.new_find();
         }
         ui.add_space(12.0);
+        self.reader.find.highlight_notice(ui, self.english, p);
         match &self.reader.find.phase {
             FindPhase::Idle => {
                 ui.label(

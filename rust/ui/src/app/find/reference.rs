@@ -61,6 +61,7 @@ impl ReferenceView {
         }
         let mut choose = None;
         let mut step = None;
+        self.pane.find.highlight_notice(ui, english, p);
         match &self.pane.find.phase {
             FindPhase::Idle => {
                 ui.label(tr(

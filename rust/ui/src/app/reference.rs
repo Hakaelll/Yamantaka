@@ -580,6 +580,16 @@ impl ReferenceView {
             });
             let selection_pages: Vec<u32> = frame.pages.iter().map(|page| page.page).collect();
             if !self.busy() && !self.close_requested {
+                if self.pane.panel && self.pane.reader_panel_tab == outline::ReaderPanelTab::Find {
+                    self.pane.find.request_highlights(
+                        runtime,
+                        &document.id,
+                        &selection_pages,
+                        ui.ctx(),
+                    );
+                } else {
+                    self.pane.find.clear_highlights();
+                }
                 self.pane
                     .selection
                     .request(runtime, &document.id, &selection_pages);

@@ -8,7 +8,9 @@ impl FindState {
         edge: SelectionEdge,
         wrap: bool,
     ) {
-        self.stop();
+        if let FindPhase::Running { token, .. } = &self.phase {
+            token.cancel();
+        }
         let token = request.cancellation.clone();
         let progress = request.progress.clone();
         self.document = Some(request.document_id.clone());
@@ -23,6 +25,7 @@ impl FindState {
         };
     }
     pub(in crate::app) fn start(&mut self, runtime: &Runtime, document: &Document, info: &PdfInfo) {
+        self.highlights.clear();
         let request =
             PdfFindQuery::new(&self.editor, self.match_case, self.whole_words).and_then(|query| {
                 self.query = Some(query.clone());
@@ -197,13 +200,13 @@ impl FindState {
         let FindPhase::Ready { batch, selected } = &self.phase else {
             return;
         };
-        for (index, (match_page, item)) in batch.matches().enumerate() {
-            if match_page != page {
-                continue;
-            }
+        let selected = selected.and_then(|index| batch.matches().nth(index));
+        let paint = |item: &yamantaka_domain::pdf_find::PdfMatch, active| {
             for bounds in &item.rectangles {
                 let rect = reader_viewport::page_region(paper, rotation, *bounds);
-                let active = *selected == Some(index);
+                if !rect.intersects(ui.clip_rect()) {
+                    continue;
+                }
                 ui.painter().rect_filled(
                     rect,
                     1,
@@ -217,6 +220,24 @@ impl FindState {
                         egui::StrokeKind::Inside,
                     );
                 }
+            }
+        };
+        for item in self.highlights.matches(page) {
+            paint(
+                item,
+                selected.is_some_and(|(active_page, active)| {
+                    active_page == page && active.ordinal == item.ordinal
+                }),
+            );
+        }
+        for (match_page, item) in batch.matches() {
+            if match_page == page && !self.highlights.contains(page, item.ordinal) {
+                paint(
+                    item,
+                    selected.is_some_and(|(active_page, active)| {
+                        active_page == page && active.ordinal == item.ordinal
+                    }),
+                );
             }
         }
     }
