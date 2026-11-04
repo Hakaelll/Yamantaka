@@ -64,6 +64,8 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Recent implementation checkpoints
 
+[Windows review 11](../release/rust-0.16-review-11.md) packages runtime `fd91aa3` with the later protected-cover, close-admission and metadata retry changes. The optimized build and packaging pass, with 462 files and 239 SBOM components. No application instances were launched for packaging, and the earlier user acceptance remains scoped to review 10. Review-11 runtime and final replacement acceptance remain pending.
+
 Metadata enrichment now retains its page and accumulated evidence across typed native queue saturation. Readiness registers a short channel deadline for text admission, reopening and source verification; busy native reopening also yields instead of immediately resubmitting. Cancellation, including during a native text reply, returns the cancellation outcome instead of marking extraction unavailable. Source-change rejection remains in the same coordinator. See [analysis under load](../user-guide/book-metadata.md). This post-review-10 source change has no new runtime or pressure acceptance.
 
 Cover rebuilding now retains temporary-document cleanup across typed PDF queue saturation, using a channel deadline rather than a busy retry loop. The worker reports bounded admission as `QueueFull` instead of a generic PDF failure. Native close confirmation still precedes saving a replacement. These source changes are after review 10 and have no new runtime, fault-injection or cancellation acceptance.

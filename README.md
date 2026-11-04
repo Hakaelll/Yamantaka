@@ -47,6 +47,8 @@ The default compositor uses DirectX 12 through wgpu. If initialization fails, th
 
 The [review 10 notes](docs/release/rust-0.16-review-10.md) describe the published prerelease, user-reported functional acceptance and remaining limits. Application checks recorded for [review 09](docs/release/rust-0.16-review-09.md) apply to that earlier revision; no new automated runtime suite was run for review 10.
 
+The [review 11 candidate](docs/release/rust-0.16-review-11.md) packages later protected-cover and metadata scheduling changes. Its build and packaging are complete; runtime acceptance remains pending.
+
 Portable builds include `.yamantaka-rust-portable` and keep independent `rust-data` and `rust-cache` folders beside the executable. Extract a review build separately from your Flutter installation.
 
 ## Keep your library independent
