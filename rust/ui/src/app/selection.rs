@@ -4,6 +4,7 @@ mod comparison_preview;
 mod keyboard;
 mod pointer_scroll;
 mod view;
+mod words;
 pub(super) use comparison_preview::ComparisonSelectionPreview;
 use std::collections::BTreeMap;
 pub(super) use view::SelectionPage;
@@ -415,6 +416,14 @@ fn selection_input(
     {
         *gesture = SelectionGesture::Dragging(anchor, extent);
     }
+    if response.double_clicked()
+        && let Some(point) = response.interact_pointer_pos()
+        && let Some((index, bounds)) = character_at(payload, paper, rotation, point)
+        && bounds.expand(1.0).contains(point)
+        && let Some((start, end)) = words::at(payload, index)
+    {
+        *gesture = SelectionGesture::Selected(start, end);
+    }
     response
         .on_hover_cursor(egui::CursorIcon::Text)
         .on_hover_text(label);
@@ -426,6 +435,7 @@ fn caret_at(
     rotation: PageRotation,
     point: egui::Pos2,
 ) -> Option<usize> {
+    let (index, bounds) = character_at(payload, paper, rotation, point)?;
     let rectangle = |index: usize| {
         payload
             .characters()
@@ -433,15 +443,6 @@ fn caret_at(
             .region
             .map(|region| reader_viewport::page_region(paper, rotation, region))
     };
-    let (index, bounds) = payload
-        .characters()
-        .iter()
-        .enumerate()
-        .filter_map(|(index, _)| rectangle(index).map(|bounds| (index, bounds)))
-        .min_by(|(_, a), (_, b)| {
-            a.distance_to_pos(point)
-                .total_cmp(&b.distance_to_pos(point))
-        })?;
     let center = bounds.center();
     let direction = index
         .checked_sub(1)
@@ -460,5 +461,28 @@ fn caret_at(
             PageRotation::Deg180 => egui::vec2(-1.0, 0.0),
             PageRotation::Deg270 => egui::vec2(0.0, -1.0),
         });
-    Some(index + usize::from((point - center).dot(direction) >= 0.0))
+    let forward = (point - center).dot(direction) >= 0.0;
+    let position = SelectionPosition::new(payload.page(), index + usize::from(forward)).ok()?;
+    keyboard::snap_position(payload, position, forward).map(|position| position.character())
+}
+
+fn character_at(
+    payload: &PdfPageText,
+    paper: egui::Rect,
+    rotation: PageRotation,
+    point: egui::Pos2,
+) -> Option<(usize, egui::Rect)> {
+    payload
+        .characters()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, character)| {
+            character
+                .region
+                .map(|region| (index, reader_viewport::page_region(paper, rotation, region)))
+        })
+        .min_by(|(_, a), (_, b)| {
+            a.distance_to_pos(point)
+                .total_cmp(&b.distance_to_pos(point))
+        })
 }

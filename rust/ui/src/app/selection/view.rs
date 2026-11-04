@@ -117,9 +117,9 @@ impl SelectionState {
         let id = ui.id().with(("select-pdf-text", page.document, page.page));
         self.focus_ids.insert(page.page, id);
         let label = if page.english {
-            "Select PDF text. Shift+arrows extends the selection; Ctrl+A selects the page; Ctrl+C copies the passage."
+            "Select PDF text. Double-click selects a word. Shift+arrows extends the selection; Ctrl+A selects the page; Ctrl+C copies the passage."
         } else {
-            "Seleccionar texto del PDF. Mayús+flechas amplía la selección; Ctrl+A selecciona la página; Ctrl+C copia el pasaje."
+            "Seleccionar texto del PDF. Doble clic selecciona una palabra. Mayús+flechas amplía la selección; Ctrl+A selecciona la página; Ctrl+C copia el pasaje."
         };
         selection_input(
             ui,

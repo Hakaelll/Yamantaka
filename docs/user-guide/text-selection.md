@@ -6,6 +6,13 @@ to extend the selection onto adjacent pages. Horizontal edge scrolling is also
 available when zoom makes the page wider than the viewport. Page gaps use the
 nearest visible page without resetting the start of the selection.
 
+After review 12, double-clicking a word's glyph selects its Unicode word segment.
+Punctuation and whitespace use Unicode segmentation; this is not a dictionary or
+language-specific word recognizer. Pointer carets also use the keyboard's
+grapheme boundaries so selection endpoints do not split combining accents or
+joined emoji sequences. The behavior is shared by both panes and by edge-scroll
+selection. Double-clicking a blank margin does not select a distant word.
+
 The same behavior is connected to the main reader and the reference pane in
 comparison reading. Each pane keeps its own selection. Leaving its viewport by
 more than 32 logical points stops automatic scrolling. Releasing the mouse
@@ -23,8 +30,8 @@ focused, **Shift+arrows** extends the selection, **Ctrl+A** selects that page an
 **Ctrl+C** copies the passage. Keyboard commands remain available independently
 of pointer scrolling.
 
-Edge scrolling is a source change after the review 11 candidate and is absent
-from the existing review 10 and 11 packages. The locked, offline development
-build completed successfully. No new interaction tests or native captures were
-run at the owner's request; pointer, rotation, comparison and physical input
-acceptance remain pending.
+Edge scrolling is included in review 12. Word selection and pointer grapheme
+snapping are later source changes and are not included in that package. The
+locked, offline development build completed successfully. No new interaction
+tests or native captures were run at the owner's request; pointer, rotation,
+comparison and physical input acceptance remain pending.

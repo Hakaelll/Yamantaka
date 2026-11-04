@@ -179,7 +179,7 @@ fn apply_key(
     true
 }
 
-fn snap_position(
+pub(super) fn snap_position(
     page: &PdfPageText,
     position: SelectionPosition,
     forward: bool,
