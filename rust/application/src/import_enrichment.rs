@@ -16,10 +16,16 @@ pub(crate) enum ImportStep {
 
 enum Work {
     RequestPage,
+    Retry(RetryStage, Receiver<std::time::Instant>),
     Text(PdfTicket<Arc<PdfPageText>>),
     Reopen(PdfTicket<PdfInfo>, bool),
     Password(Receiver<yamantaka_domain::PdfPassword>),
     Source(PdfTicket<SourceRevision>),
+}
+enum RetryStage {
+    Page,
+    Open,
+    Source,
 }
 
 pub(crate) struct ImportEnrichment {
@@ -33,6 +39,9 @@ pub(crate) struct ImportEnrichment {
 }
 
 fn unavailable(mut document: Box<NewDocument>, error: Failure) -> ImportStep {
+    if matches!(&error, Failure::Cancelled) {
+        return ImportStep::Failed(error);
+    }
     let reason = match error {
         Failure::MemoryBudget => AnalysisFailure::MemoryBudget,
         Failure::TextWorkLimit => AnalysisFailure::TextWorkLimit,
@@ -110,6 +119,11 @@ impl ImportEnrichment {
     pub fn ready(&self) -> bool {
         match &self.work {
             Work::RequestPage => true,
+            Work::Retry(_, timer) => {
+                let mut select = Select::new();
+                select.recv(timer);
+                self.cancel.is_cancelled() || select.try_ready().is_ok()
+            }
             Work::Text(ticket) => ticket.is_ready(),
             Work::Reopen(ticket, _) => ticket.is_ready(),
             Work::Password(receive) => {
@@ -123,6 +137,9 @@ impl ImportEnrichment {
     pub fn register<'a>(&'a self, select: &mut Select<'a>) {
         match &self.work {
             Work::RequestPage => {}
+            Work::Retry(_, timer) => {
+                select.recv(timer);
+            }
             Work::Text(ticket) => {
                 select.recv(ticket.readiness());
             }
@@ -140,6 +157,13 @@ impl ImportEnrichment {
     pub fn cancel(&self) {
         self.cancel.cancel();
     }
+    fn retry(mut self: Box<Self>, stage: RetryStage) -> ImportStep {
+        self.work = Work::Retry(
+            stage,
+            crossbeam_channel::after(std::time::Duration::from_millis(100)),
+        );
+        ImportStep::Pending(self)
+    }
     fn request_page(mut self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
         if let Err(error) = self.cancel.check() {
             return ImportStep::Failed(error);
@@ -155,11 +179,23 @@ impl ImportEnrichment {
                 ImportStep::Pending(self)
             }
             Err(Failure::NativeDocumentUnavailable) => self.reopen(engine),
+            Err(Failure::QueueFull) => self.retry(RetryStage::Page),
             Err(error) => unavailable(self.document, error),
         }
     }
     fn reopen(self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
         self.open(engine, None)
+    }
+    fn request_source(mut self: Box<Self>, engine: &impl AsyncPdfEngine) -> ImportStep {
+        match engine.try_source_revision(self.id.clone(), self.cancel.clone()) {
+            Ok(ticket) => {
+                self.work = Work::Source(ticket);
+                ImportStep::Pending(self)
+            }
+            Err(Failure::NativeDocumentUnavailable) => self.reopen(engine),
+            Err(Failure::QueueFull) => self.retry(RetryStage::Source),
+            Err(error) => ImportStep::Failed(error),
+        }
     }
     fn open(
         mut self: Box<Self>,
@@ -181,6 +217,7 @@ impl ImportEnrichment {
                 self.work = Work::Reopen(ticket, attempted);
                 ImportStep::Pending(self)
             }
+            Err(Failure::QueueFull | Failure::NativeSlotsBusy) => self.retry(RetryStage::Open),
             Err(error) => ImportStep::Failed(error),
         }
     }
@@ -196,6 +233,21 @@ impl ImportEnrichment {
         }
         match std::mem::replace(&mut self.work, Work::RequestPage) {
             Work::RequestPage => self.request_page(engine),
+            Work::Retry(stage, timer) => {
+                if matches!(
+                    timer.try_recv(),
+                    Err(crossbeam_channel::TryRecvError::Empty)
+                ) {
+                    self.work = Work::Retry(stage, timer);
+                    ImportStep::Pending(self)
+                } else {
+                    match stage {
+                        RetryStage::Page => self.request_page(engine),
+                        RetryStage::Open => self.reopen(engine),
+                        RetryStage::Source => self.request_source(engine),
+                    }
+                }
+            }
             Work::Text(ticket) => {
                 let observed = (|| {
                     let text = ticket.wait()?;
@@ -218,6 +270,7 @@ impl ImportEnrichment {
                 })();
                 match observed {
                     Err(Failure::NativeDocumentUnavailable) => return self.reopen(engine),
+                    Err(Failure::QueueFull) => return self.retry(RetryStage::Page),
                     Err(error) => return unavailable(self.document, error),
                     Ok(()) => {}
                 }
@@ -270,18 +323,13 @@ impl ImportEnrichment {
                             "Reopened metadata source has different page geometry".into(),
                         ));
                     }
-                    match engine.try_source_revision(self.id.clone(), self.cancel.clone()) {
-                        Ok(ticket) => {
-                            self.work = Work::Source(ticket);
-                            ImportStep::Pending(self)
-                        }
-                        Err(Failure::NativeDocumentUnavailable) => self.reopen(engine),
-                        Err(error) => ImportStep::Failed(error),
-                    }
+                    self.request_source(engine)
                 }
-                Err(Failure::NativeSlotsBusy | Failure::NativeDocumentUnavailable) => {
-                    self.reopen(engine)
-                }
+                Err(
+                    Failure::QueueFull
+                    | Failure::NativeSlotsBusy
+                    | Failure::NativeDocumentUnavailable,
+                ) => self.retry(RetryStage::Open),
                 Err(error) => ImportStep::Failed(error),
             },
             Work::Source(ticket) => match ticket.wait() {
@@ -290,6 +338,7 @@ impl ImportEnrichment {
                     "Metadata source changed while analysis was interrupted".into(),
                 )),
                 Err(Failure::NativeDocumentUnavailable) => self.reopen(engine),
+                Err(Failure::QueueFull) => self.retry(RetryStage::Source),
                 Err(error) => ImportStep::Failed(error),
             },
         }

@@ -8,4 +8,20 @@ For an existing book, open its title-and-author editor and request metadata rean
 
 Automatic suggestions still need usable PDF text. Image-only covers require a manual title; this feature does not add OCR or online lookups. A large logo without sufficient bibliographic support remains a proposal for review. Conflicting bylines do not authorize automatic title replacement. Original PDFs are never rewritten.
 
-This update uses analyzer version four. Earlier stored evidence retains its recorded version and can be refreshed through reanalysis. No tests, compilation or new PDF runs were performed for this update at the user's request; detection and reanalysis acceptance remain pending.
+This update uses analyzer version four. Earlier stored evidence retains its recorded version and can be refreshed through reanalysis. Version four is included in [review 10](../release/rust-0.16-review-10.md), whose build, packaging and user-reported functional acceptance are recorded separately. Wider metadata and reanalysis acceptance remains pending.
+
+## Analysis under load after review 10
+
+The development source now pauses briefly and retries when native PDF admission
+reports a full queue. It keeps the current page and earlier bibliographic evidence
+instead of abandoning extraction because of temporary queue pressure. Reopening
+and source verification use the same retry policy; native-slot contention also
+yields before another opening attempt.
+
+Cancellation remains available during the pause and is returned as cancellation,
+including when it arrives during a native text reply. It is not recorded as
+unavailable extraction. A failed source check, text work
+limit or memory limit still follows its existing error behavior. Passwords are
+not retained for a later reopening attempt. No new runtime or pressure tests were
+performed for this scheduling change, and it is not included in the published
+review-10 executable.
