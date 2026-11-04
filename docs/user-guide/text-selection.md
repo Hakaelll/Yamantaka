@@ -30,8 +30,8 @@ focused, **Shift+arrows** extends the selection, **Ctrl+A** selects that page an
 **Ctrl+C** copies the passage. Keyboard commands remain available independently
 of pointer scrolling.
 
-Edge scrolling is included in review 12. Word selection and pointer grapheme
-snapping are later source changes and are not included in that package. The
-locked, offline development build completed successfully. No new interaction
+Edge scrolling is included in review 12; word selection and pointer grapheme
+snapping are included in review 13. Their locked, offline development and
+optimized package builds completed successfully. No new interaction
 tests or native captures were run at the owner's request; pointer, rotation,
 comparison and physical input acceptance remain pending.

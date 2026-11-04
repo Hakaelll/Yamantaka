@@ -47,7 +47,7 @@ The default compositor uses DirectX 12 through wgpu. If initialization fails, th
 
 The [review 10 notes](docs/release/rust-0.16-review-10.md) describe the published prerelease, user-reported functional acceptance and remaining limits. Application checks recorded for [review 09](docs/release/rust-0.16-review-09.md) apply to that earlier revision; no new automated runtime suite was run for review 10.
 
-The [review 12 candidate](docs/release/rust-0.16-review-12.md) packages protected-cover and metadata scheduling changes, session-only folder notifications, selection edge scrolling and visible-page search highlights. Its build and packaging are complete; runtime acceptance remains pending. Review 10 remains the published download.
+The [review 13 candidate](docs/release/rust-0.16-review-13.md) packages protected-cover and metadata scheduling changes, session-only folder notifications, selection edge scrolling, visible-page search highlights and Unicode pointer selection. Its build and packaging are complete; runtime acceptance remains pending. Review 10 remains the published download.
 
 Portable builds include `.yamantaka-rust-portable` and keep independent `rust-data` and `rust-cache` folders beside the executable. Extract a review build separately from your Flutter installation.
 
@@ -125,7 +125,7 @@ The retained suite contains **56 tests**, covering native rendering, migration, 
 | --- | --- |
 | Library layout and smaller windows | [Library layout](docs/user-guide/library-layout.md) |
 | Session-only folder notifications, review 12 | [Authorized folders](docs/user-guide/authorized-folders.md) |
-| Passage selection and edge scrolling, review 12 | [Text selection](docs/user-guide/text-selection.md) |
+| Passage, word and Unicode selection, review 13 | [Text selection](docs/user-guide/text-selection.md) |
 | Visible-page PDF search highlights, review 12 | [Document search](docs/user-guide/document-search.md) |
 | Controls, page previews and source changes | [Reader responsiveness](docs/user-guide/reader-responsiveness.md) |
 | Electronic-ink presentation | [Reader profiles](docs/user-guide/reader-profiles.md) |
