@@ -50,18 +50,13 @@ remain readable; original PDFs are not rewritten.
 The local output directory is
 `build/release/rust-0.16.0-alpha.1-review-10`. It includes the ZIP, a per-file
 manifest, SHA-256 sums, pinned PDFium, MIT and third-party licenses, Cargo.lock,
-instructions and a CycloneDX inventory. This checkpoint does not publish a
-GitHub Release.
+instructions and a CycloneDX inventory. This checkpoint is distributed as a GitHub prerelease.
 
-A GitHub draft has since been prepared under
-`v0.16.0-alpha.1-review.10`, targeting documentation checkpoint `88e6d28` with
-the same packaged runtime. It contains four uploaded assets: the ZIP,
-`SHA256SUMS.txt`, `package-manifest.json` and `SBOM.cdx.json`. GitHub's returned
-asset digests match the prepared bytes. The draft remains unpublished and
-marked as a prerelease; it does not change the pending acceptance status. The
-[draft preparation record](../validation/artifacts/github-review-10-draft-2026-11-03.json)
-captures that observation. Draft access requires a GitHub account with repository
-permission.
+This review is published as a prerelease under
+`v0.16.0-alpha.1-review.10`, retaining the packaged runtime and four distribution
+assets: the ZIP, `SHA256SUMS.txt`, `package-manifest.json` and `SBOM.cdx.json`.
+The earlier [draft preparation record](../validation/artifacts/github-review-10-draft-2026-11-03.json)
+remains a historical record of the unpublished draft.
 
 | Item | Value |
 | --- | --- |
@@ -95,3 +90,18 @@ scope and do not certify the changes listed above. Functional and migration
 acceptance, DPI, Narrator, multiple monitors, Windows 10 execution and paired
 Flutter/Rust performance remain open in the
 [acceptance matrix](../architecture/rust-rewrite-parity.md).
+
+## User acceptance: 2026-11-04
+
+After opening review 10, the user confirmed that the application works correctly.
+The earlier two-monitor report remains scoped to review 09. This is user
+functional acceptance; no per-scale DPI results, separate Narrator procedure or
+comparative performance measurements were provided. No additional automated
+application tests or captures were run for publication.
+
+## Known limitations
+
+Batch automatic-cover regeneration can still report password-protected PDFs as
+failed. The individual cover-rebuild flow supports a transient unlock prompt;
+coordinated batch unlocking remains pending. This prerelease does not claim final
+replacement acceptance or the unmeasured performance targets.

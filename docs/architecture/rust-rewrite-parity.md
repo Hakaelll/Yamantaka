@@ -64,7 +64,7 @@ The local SQL primitive for library removal now atomically deletes document-owne
 
 ## Recent implementation checkpoints
 
-The review-10 distribution now also has an unpublished GitHub draft with four uploaded assets and matching server-reported digests. Its [preparation record](../validation/artifacts/github-review-10-draft-2026-11-03.json) records the draft state and target revision. Preparing this draft does not close the final Release or runtime acceptance gates.
+The review-10 distribution was published as a [GitHub prerelease](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.16.0-alpha.1-review.10) on 2026-11-04 after the user's general confirmation that the application works correctly. Its [publication record](../validation/artifacts/github-review-10-publication-2026-11-04.json) records the four assets and source target. The earlier [draft preparation record](../validation/artifacts/github-review-10-draft-2026-11-03.json) remains historical. User functional acceptance does not supply per-DPI or comparative-performance measurements; final replacement acceptance remains open.
 
 [Windows review 10](../release/rust-0.16-review-10.md) packages the committed runtime through `1659213` with a successful locked, offline optimized build. Its distribution inventory, hashes, licenses and executable resources pass packaging checks. No new application tests, captures or physical checks were run. The implementation checkpoints below therefore retain Partial acceptance.
 
