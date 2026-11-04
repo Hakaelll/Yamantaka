@@ -1,30 +1,29 @@
-Yamantaka for Windows x64 - native Rust review candidate
+Yamantaka 0.16.0 for Windows x64
 
-This bundle is a review candidate while rewrite parity and acceptance work
-continue. It is not the final replacement release for the Flutter application.
-Authenticode signing has not been verified for this candidate.
+Native Rust application for Windows 10/11 x64. Flutter, Dart and Rust are not
+required to run this distribution. Extract the complete ZIP and start
+ yamantaka/yamantaka.exe
+Keep pdfium.dll, licenses and companion files beside the executable.
 
-Requirements: Windows 10 or Windows 11, x64, with working graphics drivers.
-Extract the complete ZIP, then start yamantaka/yamantaka.exe. Keep pdfium.dll
-beside the executable. Flutter, Dart and a Rust installation are not required.
+The default compositor uses DirectX 12 through wgpu. If startup cannot initialize
+it, the application attempts the OpenGL compositor once in a fresh process.
+Use --opengl to select the alternate compositor explicitly.
 
-Normal use is local: no account or telemetry is required. Original PDF files
-are not modified. The Rust application keeps its own library and preferences,
-separate from Flutter. Keep the Flutter installation as a recovery copy and
-close it before importing its library. Review migration results before relying
-on the native library.
+Portable bundles contain .yamantaka-rust-portable and use rust-data and
+rust-cache beside the executable. Extract into a writable directory. Bundles
+without that marker use the independent io.yamantaka.rust application identity.
+Use the application's reviewed backup and import workflows to transfer a library;
+do not manually copy a database while it is open. Existing installations and
+original PDF files are not overwritten by extraction.
 
-Installed mode stores native state in the user's roaming/local application
-data under io.yamantaka.rust/Yamantaka. A bundle containing the marker
-.yamantaka-rust-portable uses rust-data and rust-cache beside the executable.
-Portable mode requires a writable extracted directory. Do not copy an active
-SQLite database manually; use the application's backup and import workflows.
+LICENSE contains the MIT terms for Yamantaka. Third-party code and fonts retain
+their own licenses in THIRD-PARTY-NOTICES.txt and licenses/. SBOM.cdx.json records
+components; Cargo.lock records the pinned dependency resolution.
 
-LICENSE contains the MIT terms for Yamantaka project code. Third-party code
-and fonts retain their own terms. See THIRD-PARTY-NOTICES.txt, licenses/ and
-SBOM.cdx.json. Cargo.lock records the pinned Rust dependency resolution.
+The accompanying package-manifest.json lists bundled files and SHA-256 hashes.
+SHA256SUMS.txt covers the archive and manifest. verification.json describes
+packaging checks. Final validation was accepted by the owner on 2026-11-04;
+packaging checks are not new runtime or numerical performance measurements.
 
-package-manifest.json lists every bundled file and its SHA-256. The ZIP and
-manifest checksums are in SHA256SUMS.txt. verification.json records packaging
-checks performed by the repository tooling; it does not establish full product
-acceptance, physical accessibility or performance targets.
+This distribution is not Authenticode-signed. Verify its published checksums
+against the release page before installing or sharing it.

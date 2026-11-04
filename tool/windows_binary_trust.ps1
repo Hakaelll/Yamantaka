@@ -33,9 +33,7 @@ function Get-YamantakaWindowsBundleLayoutState {
 
     $requiredPaths = @(
         'yamantaka.exe',
-        'flutter_windows.dll',
-        'data\app.so',
-        'data\icudtl.dat'
+        'pdfium.dll'
     )
     $missingPaths = @(
         $requiredPaths |

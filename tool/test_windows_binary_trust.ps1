@@ -35,16 +35,8 @@ try {
         $peStub
     )
     [System.IO.File]::WriteAllBytes(
-        (Join-Path $fixtureRoot 'flutter_windows.dll'),
+        (Join-Path $fixtureRoot 'pdfium.dll'),
         $peStub
-    )
-    [System.IO.File]::WriteAllBytes(
-        (Join-Path $fixtureRoot 'data/app.so'),
-        [byte[]](0x01)
-    )
-    [System.IO.File]::WriteAllBytes(
-        (Join-Path $fixtureRoot 'data/icudtl.dat'),
-        [byte[]](0x01)
     )
 
     $state = Get-YamantakaWindowsBundleExecutionState `

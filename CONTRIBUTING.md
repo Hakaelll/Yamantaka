@@ -1,6 +1,6 @@
 # Contributing to Yamantaka
 
-The active product is the native Rust Windows rewrite. Keep the Flutter checkpoint recoverable until the acceptance matrix permits replacement. Start with the [product brief](PRODUCT.md), [design system](DESIGN.md) and [acceptance matrix](docs/architecture/rust-rewrite-parity.md).
+The active product is native Rust for Windows. The owner accepted the replacement on 2026-11-04; recover Flutter from the [archived checkpoint](docs/legacy/README.md). Start with the [product brief](PRODUCT.md), [design system](DESIGN.md) and [acceptance matrix](docs/architecture/rust-rewrite-parity.md).
 
 ## Set up the native workspace
 

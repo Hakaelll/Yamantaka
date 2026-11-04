@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-04",
+  "status": "accepted-by-owner",
+  "statement": "Finish it; everything has already been validated.",
+  "scope": "final rewrite acceptance and release completion",
+  "earlierReview": "13",
+  "earlierResult": "owner tested review 13 and found no faults",
+  "validationAuthority": "owner",
+  "newAgentApplicationTestsRun": false,
+  "newAgentPhysicalChecksRun": false,
+  "newAgentComparativeMeasurementsRun": false,
+  "detailedProceduresProvided": false,
+  "quantitativeMetricsProvided": false,
+  "releaseDisposition": "complete Rust cutover and publish 0.16.0; retain existing evidence with its original scope"
+}

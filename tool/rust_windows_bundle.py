@@ -84,7 +84,7 @@ def source_inputs():
         paths.update(path for path in source.iterdir() if path.is_file() and path.name in {"Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "YAMANTAKA-PATCH.md"})
     paths.update(ROOT / name for name in [
         "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".gitattributes", "LICENSE",
-        "third_party/pdfium-render/Cargo.toml", "windows/runner/resources/app_icon.ico",
+        "third_party/pdfium-render/Cargo.toml", "assets/branding/yamantaka.ico",
         "assets/branding/yamantaka-logo-purple.png", "assets/fonts/source-serif/SourceSerif4Display-Regular.ttf",
         "tool/package_rust_windows.ps1", "tool/rust_windows_bundle.py", "tool/fetch_rust_licenses.py",
         "tool/rust_license_sources.json", "docs/release/RUST-WINDOWS-BUNDLE.txt",
@@ -141,6 +141,7 @@ def package(output, portable, cargo):
                 if any(kind["kind"] is None for kind in dependency["dep_kinds"]) and not any("proc-macro" in target["kind"] for target in packages[dependency["pkg"]]["targets"]):
                     pending.append(dependency["pkg"])
     version = packages[root_id]["version"]
+    status = "review-candidate-not-final-release" if "-" in version else "stable-release"
     require((ROOT / "LICENSE").read_text(encoding="utf-8").startswith("MIT License"),"The approved application license is not present")
     require(packages[root_id].get("license") == "MIT", "Application license differs from the approved MIT terms")
     output.mkdir(parents=True)
@@ -241,11 +242,11 @@ def package(output, portable, cargo):
     components.extend([{"type": "library", "bom-ref": pdfium_ref, "name": "PDFium", "version": "151.0.7881.0", "hashes": [{"alg": "SHA-256", "content": PDFIUM_SHA}], "licenses": [{"license": {"name": "Bundled PDFium third-party terms"}}]}, {"type": "library", "bom-ref": font_ref, "name": "Source Serif 4", "licenses": [{"license": {"id": "OFL-1.1"}}]}, {"type": "library", "bom-ref": rust_ref, "name": "Rust standard library", "version": "1.97.1", "licenses": [{"expression": "MIT OR Apache-2.0"}]}])
     next(item for item in dependencies if item["ref"] == refs[root_id])["dependsOn"].extend([pdfium_ref, font_ref, rust_ref])
     application = next(item for item in components if item["bom-ref"] == refs[root_id])
-    json_file(bundle / "SBOM.cdx.json", {"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1, "metadata": {"component": application, "properties": [{"name": "yamantaka:target", "value": TARGET}, {"name": "yamantaka:status", "value": "review-candidate-not-final-release"}]}, "components": [item for item in components if item != application], "dependencies": dependencies})
+    json_file(bundle / "SBOM.cdx.json", {"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1, "metadata": {"component": application, "properties": [{"name": "yamantaka:target", "value": TARGET}, {"name": "yamantaka:status", "value": status}]}, "components": [item for item in components if item != application], "dependencies": dependencies})
     require(source_inputs() == sources, "Inputs changed during packaging; rebuild the candidate")
     files = [{"path": path.relative_to(bundle).as_posix(), "sha256": digest(path), "bytes": path.stat().st_size} for path in sorted(bundle.rglob("*")) if path.is_file()]
-    runtime_changes = command(["git", "status", "--porcelain=v1", "--untracked-files=normal", "--", "rust", "third_party/pdfium-render", "third_party/egui", "third_party/epaint", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "assets/branding", "assets/fonts", "windows/runner/resources/app_icon.ico"])
-    json_file(output / "package-manifest.json", {"format": "yamantaka-rust-windows-package-v1", "version": version, "target": TARGET, "status": "review-candidate-not-final-release", "portable": portable, "applicationLicense": "MIT", "cargoLockSha256": digest(ROOT / "Cargo.lock"), "baseSourceCommit": command(["git", "rev-parse", "HEAD"]).strip(), "runtimeSourcesModified": bool(runtime_changes.strip()), "sources":sources, "authenticode":"not-verified", "files": files})
+    runtime_changes = command(["git", "status", "--porcelain=v1", "--untracked-files=normal", "--", "rust", "third_party/pdfium-render", "third_party/egui", "third_party/epaint", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "assets/branding", "assets/fonts", "assets/branding/yamantaka.ico"])
+    json_file(output / "package-manifest.json", {"format": "yamantaka-rust-windows-package-v1", "version": version, "target": TARGET, "status": status, "portable": portable, "applicationLicense": "MIT", "cargoLockSha256": digest(ROOT / "Cargo.lock"), "baseSourceCommit": command(["git", "rev-parse", "HEAD"]).strip(), "runtimeSourcesModified": bool(runtime_changes.strip()), "sources":sources, "authenticode":"not-verified", "files": files})
     archive = output / ("yamantaka-" + version + "-windows-x64" + ("-portable" if portable else "") + ".zip")
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zipped:
         for path in [output / "package-manifest.json", *sorted(bundle.rglob("*"))]:

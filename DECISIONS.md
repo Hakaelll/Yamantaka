@@ -1,3 +1,7 @@
+> Historical decision log. The current native architecture is documented in
+> [ARCHITECTURE.md](ARCHITECTURE.md). Flutter source references resolve in the
+> [archived checkout](docs/legacy/README.md).
+
 # Registro de decisiones
 
 ## ADR-001 — Motor PDF inicial

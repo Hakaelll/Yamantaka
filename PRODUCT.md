@@ -4,12 +4,12 @@
 
 ## Platform
 
-Windows 10/11 x64 native desktop. Windows is the only active rewrite platform.
+Windows 10/11 x64 native desktop. Windows is the only supported product platform.
 
 ## Stack
 
 Rust Cargo workspace; egui/eframe, wgpu, AccessKit, PDFium through pdfium-render,
-SQLite through rusqlite. No web frontend or Flutter in the final Rust product.
+SQLite through rusqlite. No web frontend or Flutter dependency.
 
 ## Users
 
@@ -24,8 +24,9 @@ a visibly exceptional, professional executed interface.
 ## Operating Context
 
 Local PDFs, long reading sessions, mouse and keyboard, multiple monitors and
-variable DPI. The Flutter installation remains a separate fallback during the
-rewrite; migration captures a closed installation and never synchronizes it.
+variable DPI. Existing Flutter installations remain separate migration sources and backups;
+migration captures a closed installation and never synchronizes it. The owner
+accepted the native replacement on 2026-11-04.
 
 ## Capabilities and Constraints
 
@@ -47,7 +48,7 @@ light mode; local Segoe UI Variable typography.
 
 ## Evidence on Hand
 
-Flutter commit c773acf, connected lib/features implementation, committed tests,
+Archived Flutter commit c773acf and tag archive/flutter-before-rust-0.16.0, committed tests,
 docs/screenshots/windows-reader-editorial-v015.png. The recorded 330 tests and
 performance regressions are historical evidence, not current measurements.
 

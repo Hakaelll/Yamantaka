@@ -1,3 +1,6 @@
+> Retired planning. The Flutter source and its original tools are recoverable from
+> [the archived checkpoint](docs/legacy/README.md). Owner accepted Rust 0.16.0 on 2026-11-04.
+
 # Historical Flutter backlog
 
 This document records the earlier Flutter iterations. It is retained as historical

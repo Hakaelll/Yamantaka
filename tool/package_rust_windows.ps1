@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = 'build/release/rust-0.16.0-alpha.1-review',
+    [string]$OutputDirectory = 'build/release/yamantaka-0.16.0',
     [string]$Cargo = 'cargo',
     [string]$Python = 'python',
     [switch]$Portable,
@@ -18,7 +18,7 @@ function Test-BundleResources {
     $actualVersion = (Get-Item -LiteralPath $executable).VersionInfo.ProductVersion
     $manifest = Get-Content -LiteralPath (Join-Path $output 'package-manifest.json') -Raw | ConvertFrom-Json
     if ($actualVersion -ne $manifest.version) {throw 'Executable version differs from the package manifest.'}
-    Write-Output ('Native review bundle verified: '+$manifest.version)
+    Write-Output ('Native Windows bundle verified: '+$manifest.version)
 }
 if ($VerifyOnly) {
     & $Python -X utf8 (Join-Path $PSScriptRoot 'rust_windows_bundle.py') $output --verify-only

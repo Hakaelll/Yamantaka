@@ -27,7 +27,7 @@ fn compiler() -> PathBuf {
 }
 fn main() {
     println!("cargo:rerun-if-env-changed=RC");
-    println!("cargo:rerun-if-changed=../../windows/runner/resources/app_icon.ico");
+    println!("cargo:rerun-if-changed=../../assets/branding/yamantaka.ico");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
@@ -37,7 +37,7 @@ fn main() {
         "Windows branding requires the supported MSVC target"
     );
     let icon = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("../../windows/runner/resources/app_icon.ico")
+        .join("../../assets/branding/yamantaka.ico")
         .canonicalize()
         .expect("Generate application icons before building");
     let icon = icon.to_string_lossy().replace(char::from(92), "/");

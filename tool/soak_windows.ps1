@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$ExecutablePath = 'build/windows/x64/runner/Release/yamantaka.exe',
+    [string]$ExecutablePath = 'build/release/yamantaka-0.16.0/yamantaka/yamantaka.exe',
     [string]$FixturePdf = 'build/verification/corpus/normal.pdf',
     [int]$Cycles = 30,
     [int]$SecondsPerCycle = 3,

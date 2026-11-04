@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.0 — 2026-11-04
+
+- Replace the active Flutter project with the native Rust Windows application.
+- Preserve immersive 3D covers, local PDF reading, study and organization workflows.
+- Keep SQLite v11, historical backup compatibility and independent reviewed migration.
+- Add protected cover batches, robust metadata scheduling, authorized folder notifications, visible-page search highlights and Unicode passage selection.
+- Archive Flutter before cutover and publish a complete portable Windows bundle with hashes, licenses and SBOM.
+- Record the owner's final acceptance without claiming new agent-run tests or numerical performance measurements.
+
+
 ## 0.15.0 — 2026-09-07 (acabado editorial profesional)
 
 - Unifica Biblioteca, lector y Ajustes en temas claro y oscuro compartidos,

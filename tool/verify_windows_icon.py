@@ -11,7 +11,7 @@ import struct
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executable", type=Path)
-    parser.add_argument("--icon", type=Path, default=Path(__file__).resolve().parents[1] / "windows/runner/resources/app_icon.ico")
+    parser.add_argument("--icon", type=Path, default=Path(__file__).resolve().parents[1] / "assets/branding/yamantaka.ico")
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)

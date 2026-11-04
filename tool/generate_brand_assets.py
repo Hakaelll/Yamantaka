@@ -44,14 +44,6 @@ def png_bytes(image):
 def generated():
     transparent, opaque = master(), master(True)
     targets = {"assets/branding/yamantaka-logo-purple.png": (512, False)}
-    for path in sorted((ROOT / "web").rglob("*.png")):
-        if path.name.startswith("Icon-") or path.name == "favicon.png":
-            with Image.open(path) as image:
-                targets[path.relative_to(ROOT).as_posix()] = (image.width, "maskable" in path.name)
-    for folder, pattern in [("android/app/src/main/res", "ic_launcher.png"), ("ios/Runner/Assets.xcassets/AppIcon.appiconset", "*.png")]:
-        for path in sorted((ROOT / folder).rglob(pattern)):
-            with Image.open(path) as image:
-                targets[path.relative_to(ROOT).as_posix()] = (image.width, folder.startswith("ios/"))
     output = {}
     for path, (size, solid) in targets.items():
         if size <= 0 or size > 1024:
@@ -59,8 +51,7 @@ def generated():
         output[path] = png_bytes((opaque if solid else transparent).resize((size, size), Image.Resampling.LANCZOS))
     ico = io.BytesIO()
     transparent.resize((256, 256), Image.Resampling.LANCZOS).save(ico, format="ICO", sizes=[(size, size) for size in ICO_SIZES])
-    for path in ["windows/runner/resources/app_icon.ico", "web/favicon.ico"]:
-        output[path] = ico.getvalue()
+    output["assets/branding/yamantaka.ico"] = ico.getvalue()
     manifest = {
         "version": 1, "identity": "open-folio-v3", "source": SOURCE.relative_to(ROOT).as_posix(),
         "sourceSha256": hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
@@ -85,7 +76,7 @@ def main():
         args.report.write_text(json.dumps({"status": "fail" if args.check and changed else "pass", "files": len(manifest["files"]), "mismatches": changed if args.check else [], "sourceSha256": manifest["sourceSha256"]}, indent=2) + "\n", encoding="utf-8")
     if args.check and changed:
         raise SystemExit("Brand assets differ from the canonical SVG: " + ", ".join(changed))
-    with Image.open(io.BytesIO(output["windows/runner/resources/app_icon.ico"])) as icon:
+    with Image.open(io.BytesIO(output["assets/branding/yamantaka.ico"])) as icon:
         if icon.ico.sizes() != {(size, size) for size in ICO_SIZES}:
             raise SystemExit("Windows icon frames do not match the required sizes")
     print(f"Brand assets {'verified' if args.check else 'generated'}: {len(manifest['files'])}")

@@ -54,7 +54,7 @@ BRAND_ASSET_HASHES = {
     "web/icons/Icon-512.png": "0367c684444a7a06a56e2bca826681f3db41ecfd3ccc465c35f64eb580b593e2",
     "web/icons/Icon-maskable-192.png": "a77293c630261c34f030af934b0f8b988fff0f8f8854e510f6e19c39e6a5f11a",
     "web/icons/Icon-maskable-512.png": "95460d464dd866bc5985c884adef40f81444179aae438117ddc4c410280867f5",
-    "windows/runner/resources/app_icon.ico": "f38afc05ec30ac9b44cfb8051e262e2e6916e95171dddf66de131e74ae816e81"
+    "assets/branding/yamantaka.ico": "f38afc05ec30ac9b44cfb8051e262e2e6916e95171dddf66de131e74ae816e81"
 }
 
 def text_findings(text):

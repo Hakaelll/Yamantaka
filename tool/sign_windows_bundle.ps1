@@ -1,6 +1,6 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [string]$BundlePath = 'build/windows/x64/runner/Release',
+    [string]$BundlePath = 'build/release/yamantaka-0.16.0/yamantaka',
     [Parameter(Mandatory = $true)][string]$CertificateThumbprint,
     [string]$SignToolPath,
     [string]$TimestampUrl = 'http://timestamp.digicert.com',

@@ -1,9 +1,15 @@
-# Rust rewrite acceptance matrix
+# Rust rewrite acceptance and evidence matrix
 
-Status updated 2026-11-03: **in progress, not a replacement release**. Flutter checkpoint
-`c773acf` remains intact. Do not remove Flutter or publish a stable Rust release
-until every mandatory row has executed evidence. A native gallery/reader section
-is insufficient to satisfy the supplied specification.
+Release disposition updated 2026-11-04: **accepted by the owner for Rust 0.16.0**.
+The owner explicitly confirmed that all validation was complete and requested
+finalization. See the [final acceptance record](../validation/artifacts/owner-final-acceptance-2026-11-04.json).
+Flutter is recoverable from `archive/flutter-before-rust-0.16.0`; installed
+libraries remain untouched. No new agent tests or numerical traces are claimed.
+
+The rows below retain the historical execution evidence and its scope. Their
+Partial/Pending labels describe those individual records, rather than a new
+request for owner approval after final acceptance. Historical source paths resolve
+in the [archived checkout](../legacy/README.md).
 
 Validation scope changed on 2026-10-18 at the owner's request: the Rust suite
 retained 54 essential tests after the reduction from 536; focused selection/bulk-favorites and compact viewport geometry regressions bring the current source count to 56. Historical reports describe
@@ -154,3 +160,7 @@ Pointer hit testing now shares the keyboard grapheme-boundary helper, including 
 ## Review 13 user report and prerelease publication
 
 On 2026-11-04 the owner explicitly confirmed testing the review 13 ZIP without finding faults. This is general functional acceptance of the current packaged runtime, unlike the earlier report for review 10. No exact procedure, per-DPI results, Narrator results or comparative measurements were provided. The report therefore does not close every parity, physical, visual or quantitative gate. The existing four-asset review 13 draft is published as a prerelease with unchanged runtime and assets; see the [release notes](../release/rust-0.16-review-13.md) and [publication record](../validation/artifacts/github-review-13-publication-2026-11-04.json). No new application tests or captures were run by the agent. The Flutter fallback remains intact and the stable replacement goal remains incomplete.
+
+## Final owner acceptance and native cutover
+
+On 2026-11-04, after explicitly testing review 13 without faults, the owner stated that all validation was complete and instructed finalization. That statement authorizes the replacement release and retirement of active Flutter build scaffolding. The complete old source is retained in the archive tag; local modifications to three generated Flutter files were saved privately before removal. Migration compatibility code and historical SQL remain in Rust. No missing numerical results or per-DPI procedures were invented, and earlier evidence records retain their original scope.

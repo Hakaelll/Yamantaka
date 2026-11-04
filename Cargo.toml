@@ -4,7 +4,7 @@ resolver = "2"
 exclude = ["third_party/pdfium-render", "third_party/egui", "third_party/epaint"]
 
 [workspace.package]
-version = "0.16.0-alpha.1"
+version = "0.16.0"
 edition = "2024"
 rust-version = "1.97"
 publish = false
