@@ -508,6 +508,14 @@
     "procedureSpecified": false,
     "dpiScalesSpecified": false,
     "narratorResultSpecified": false,
-    "coversReview10": false
+    "coversReview10": false,
+    "scopeConfirmed": true,
+    "physicalChecksPerformed": [
+      "two-monitor use"
+    ],
+    "physicalChecksNotPerformed": [
+      "Windows DPI scale changes",
+      "Narrator"
+    ]
   }
 }

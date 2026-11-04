@@ -38,4 +38,15 @@ The settings layout, small conflict state and capture provenance were inspected.
 
 ## Remaining acceptance
 
-Seven inherited configurable commands remain unconnected to the native editor: command palette, go to page, document navigator, toggle panel, toggle bookmark, toggle chrome and toggle immersive. Their stored overrides remain preserved. Physical keyboard layouts, AltGr behavior, pointer selection in every combination menu, save-failure injection, Narrator, monitor DPI and complete original-command parity remain acceptance work. No Computer Use or personal data publication was performed.
+At this checkpoint, seven inherited configurable commands were unconnected to the native editor: command palette, go to page, document navigator, toggle panel, toggle bookmark, toggle chrome and toggle immersive. Their stored overrides remained preserved. Physical keyboard layouts, AltGr behavior, pointer selection in every combination menu, save-failure injection, Narrator, monitor DPI and complete original-command parity remained acceptance work. No Computer Use or personal data publication was performed.
+
+## Later implementation status: 2026-11-04
+
+The later [reader-command checkpoint](rust-reader-commands-2026-10-31.md) and
+[command-palette checkpoint](rust-command-palette-2026-10-31.md) connect those
+seven commands. Current source inspection finds all 16 IDs in Flutter's
+configurable command set among the native editor's 30 definitions. The reader
+dispatcher routes the six reader controls, while the command palette has its
+own application action. The preserved-unavailable count applies to other stored
+IDs, not to these seven commands. This follow-up is source inspection, not a new
+runtime or physical keyboard test; the remaining acceptance above is unchanged.

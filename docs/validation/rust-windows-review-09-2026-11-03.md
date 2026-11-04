@@ -40,6 +40,7 @@ the final replacement Release.
 ## User follow-up: 2026-11-04
 
 The user reported no issues when asked about review 09 with two monitors. This
-is a user observation for that build. The report does not specify a test
-procedure, DPI scales or Narrator results, and does not cover the later review-10
-runtime. The physical acceptance row records this limited scope.
+is a user observation for that build. The user then confirmed that only the
+two-monitor check was performed: Windows scale changes and Narrator were not
+tested. The report does not specify a detailed procedure and does not cover the
+later review-10 runtime. The physical acceptance row records this limited scope.
