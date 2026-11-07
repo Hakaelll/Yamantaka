@@ -209,6 +209,7 @@ pub enum Icon {
     Pencil,
     Arrow,
     Rectangle,
+    Copy,
     Archive,
     Star,
 }
@@ -238,6 +239,16 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
         Icon::Rectangle => {
             painter.rect_stroke(
                 egui::Rect::from_min_max(v(-7.0, -5.0), v(7.0, 5.0)),
+                1,
+                s,
+                egui::StrokeKind::Inside,
+            );
+        }
+        Icon::Copy => {
+            line(v(-6.0, 3.0), v(-6.0, -7.0));
+            line(v(-6.0, -7.0), v(3.0, -7.0));
+            painter.rect_stroke(
+                egui::Rect::from_min_max(v(-2.0, -3.0), v(6.0, 7.0)),
                 1,
                 s,
                 egui::StrokeKind::Inside,

@@ -1,7 +1,7 @@
 use super::*;
 use yamantaka_domain::{annotations::AnnotationColor, pdf_geometry::NormalizedPageRect};
 
-type Anchor = (egui::Id, egui::LayerId, egui::Rect);
+type Anchor = (egui::Id, egui::LayerId, egui::Rect, egui::Rect);
 
 #[derive(Default)]
 pub(super) struct Passive {
@@ -69,16 +69,50 @@ impl SelectionState {
         color: AnnotationColor,
         p: Palette,
     ) -> Option<SelectionAction> {
+        let pressed = ui.input(|input| {
+            input
+                .pointer
+                .primary_pressed()
+                .then(|| input.pointer.interact_pos())
+                .flatten()
+        });
+        let outside = pressed.is_some_and(|position| {
+            ui.ctx()
+                .layer_id_at(position)
+                .is_none_or(|layer| !self.passive.layers.contains(&layer))
+        });
         self.passive.layers.clear();
-        let (anchor_id, layer, anchor) = self.passive.anchor?;
+        let (anchor_id, layer, anchor, viewport) = self.passive.anchor?;
         if !self.has_passage() || !matches!(self.gesture, SelectionGesture::Selected(..)) {
+            return None;
+        }
+        if outside
+            || (!egui::Popup::is_any_open(ui.ctx())
+                && ui
+                    .input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)))
+        {
+            self.dismiss_passage();
             return None;
         }
         let id = anchor_id.with("selection-study-actions");
         let tr = |es, en| if english { en } else { es };
-        let frame = egui::Frame::popup(ui.style())
+        let frame = egui::Frame::new()
             .fill(p.surface)
+            .corner_radius(13)
+            .inner_margin(egui::Margin::symmetric(5, 4))
+            .shadow(egui::epaint::Shadow {
+                offset: [0, 2],
+                blur: 9,
+                spread: 0,
+                color: Color32::from_black_alpha(44),
+            })
             .stroke(egui::Stroke::new(1.0, p.line));
+        let compact = ui.ctx().content_rect().width() <= 340.0;
+        let alignment = if anchor.top() - viewport.top() >= if compact { 74.0 } else { 46.0 } {
+            egui::RectAlign::TOP
+        } else {
+            egui::RectAlign::BOTTOM
+        };
         let mut action = None;
         let focus = self.focused_page(ui.ctx()).is_some()
             && ui
@@ -87,11 +121,21 @@ impl SelectionState {
         egui::Popup::new(id, ui.ctx().clone(), anchor, layer)
             .open(true)
             .frame(frame)
-            .gap(6.0)
+            .align(alignment)
+            .align_alternatives(&[
+                egui::RectAlign::BOTTOM,
+                egui::RectAlign::TOP,
+                egui::RectAlign::TOP_START,
+                egui::RectAlign::TOP_END,
+            ])
+            .gap(7.0)
             .show(|ui| {
                 self.passive.layers.push(ui.layer_id());
                 let width = ui.ctx().content_rect().width();
                 ui.set_max_width((width - 20.0).max(140.0));
+                ui.spacing_mut().button_padding = egui::vec2(8.0, 3.0);
+                ui.spacing_mut().item_spacing = egui::vec2(2.0, 3.0);
+                ui.spacing_mut().interact_size.y = 30.0;
                 ui.horizontal_wrapped(|ui| {
                     for (label, candidate) in [
                         (tr("Resaltar", "Highlight"), SelectionAction::Highlight),
@@ -99,7 +143,18 @@ impl SelectionState {
                         (tr("Añadir nota", "Add note"), SelectionAction::Annotate),
                         (tr("Copiar", "Copy"), SelectionAction::Copy),
                     ] {
-                        let response = theme::navigation(ui, label, false, p);
+                        let icon_only = compact && matches!(candidate, SelectionAction::Copy);
+                        let response =
+                            context_button(ui, if icon_only { "" } else { label }, label, p);
+                        if icon_only {
+                            theme::icon(
+                                ui.painter(),
+                                response.rect.center(),
+                                theme::Icon::Copy,
+                                p.ink,
+                            );
+                            response.clone().on_hover_text(label);
+                        }
                         if focus && matches!(candidate, SelectionAction::Highlight) {
                             response.request_focus();
                         }
@@ -108,19 +163,17 @@ impl SelectionState {
                         }
                     }
                     let mut chosen = color;
-                    let color_label = annotations::panel::color_label(color, english);
-                    let button = theme::icon_button(
-                        ui,
-                        &format!("Color · {color_label}"),
-                        theme::Icon::Down,
-                        p,
+                    let name = format!(
+                        "Color · {}",
+                        annotations::panel::color_label(color, english)
                     );
+                    let button = context_button(ui, "", &name, p).on_hover_text(&name);
                     ui.painter().circle_filled(
-                        button.rect.center() - egui::vec2(8.0, 0.0),
-                        4.0,
+                        button.rect.center(),
+                        5.0,
                         annotations::panel::mark_color(color),
                     );
-                    egui::Popup::menu(&button).show(|ui| {
+                    egui::Popup::menu(&button).frame(frame).show(|ui| {
                         self.passive.layers.push(ui.layer_id());
                         for option in [
                             AnnotationColor::Yellow,
@@ -145,11 +198,42 @@ impl SelectionState {
     }
 }
 
+fn context_button(ui: &mut egui::Ui, text: &str, name: &str, p: Palette) -> egui::Response {
+    let response = ui.add(
+        egui::Button::new(RichText::new(text).size(13.0).color(p.ink))
+            .min_size(egui::vec2(30.0, 30.0))
+            .frame_when_inactive(false)
+            .corner_radius(8),
+    );
+    response
+        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), name));
+    if response.has_focus() {
+        ui.painter().rect_stroke(
+            response.rect,
+            8,
+            egui::Stroke::new(1.5, p.accent),
+            egui::StrokeKind::Inside,
+        );
+    }
+    theme::record_control_bounds(ui, name, response.rect);
+    response
+}
+
 impl Passive {
     pub(super) fn anchor(&mut self, ui: &egui::Ui, id: egui::Id, bounds: egui::Rect) {
         let bounds = bounds.intersect(ui.clip_rect());
         if bounds.is_positive() {
-            self.anchor = Some((id, ui.layer_id(), bounds));
+            let bounds = match self.anchor {
+                Some((previous_id, _, previous, _))
+                    if previous_id == id
+                        && (previous.center().y - bounds.center().y).abs()
+                            < 0.7 * previous.height().max(bounds.height()) =>
+                {
+                    previous.union(bounds)
+                }
+                _ => bounds,
+            };
+            self.anchor = Some((id, ui.layer_id(), bounds, ui.clip_rect()));
         }
     }
 

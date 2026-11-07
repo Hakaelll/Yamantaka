@@ -142,7 +142,7 @@ impl SelectionState {
         {
             self.passive.completed = true;
         }
-        if ui.memory(|memory| memory.has_focus(id)) {
+        if (self.enabled || !self.has_passage()) && ui.memory(|memory| memory.has_focus(id)) {
             ui.painter().rect_stroke(
                 page.paper,
                 0,
