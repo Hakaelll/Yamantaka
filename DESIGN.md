@@ -76,9 +76,9 @@ spacing:
   button-block: "9px"
   field-block: "10px"
   search-inline: "36px"
-  gallery-gutter: "36px"
-  library-wide-inset: "42px"
-  library-narrow-inset: "22px"
+  gallery-gutter: "26px"
+  library-wide-inset: "32px"
+  library-narrow-inset: "12px"
 components:
   button-primary-dark:
     backgroundColor: "{colors.dark-accent}"
@@ -157,7 +157,7 @@ Beauty comes from physical coherence and clear hierarchy: connected book geometr
 - Drawn vector controls with separate focus, pressed and selected states.
 - Cover-only pointer motion with an equivalent static reduced-motion state.
 
-This refreshed system records the current stage 2 Rust build. The preserved
+This document records the native Windows layout and the existing book rendering system. The preserved
 [Flutter v0.15 document](docs/architecture/flutter-design-v015.md) is historical;
 its feature inventory and acceptance claims are not Rust implementation facts.
 The native sources are `rust/ui/src/theme.rs`, `book.rs`, `app.rs`, `main.rs` and
@@ -165,20 +165,11 @@ The native sources are `rust/ui/src/theme.rs`, `book.rs`, `app.rs`, `main.rs` an
 logical points at text scale 1.0. The product has no CSS runtime; sidecar HTML/CSS
 is explicitly illustrative panel translation, never a native screenshot.
 
-**Evidence and acceptance scope:** authoritative current captures are in
-`build/rust-visual/stage2/`: `library-dark.png`, `library-light.png`,
-`library-details.png`, `library-list.png`, `library-small-200.png`,
-`settings-light.png`, `settings-small-200.png`, `reader-dark.png` and the subsequent
-`reader-small-200.png`. They show a
-labeled synthetic study collection and a PDF fixture. The initial independent
-stage 2 review returned **fix**. Independent confirmation of the eight named fixes
-and compact-reader regression returned **remaining: clear; disposition: ship**.
-That verdict covers only those corrections; see `docs/validation/rust-visual-stage2.md`
-and the reviewed snapshot in `docs/screenshots/rust-stage2/`. Earlier bounded stage
-1 acceptance does not approve this replacement. No web detector evaluates this
-native build. Narrator, physical
-DPI, multiple monitors, the full language/text/layout matrix, functional parity
-and the full QUALITY BAR challenger/card ceiling remain separate evidence gates.
+The [release library captures](docs/screenshots/rust-readme-2026-11-03/) and
+[earlier visual review](docs/validation/rust-visual-stage2.md) record the baseline.
+New comparisons use the native synthetic fixture, with the same language, theme,
+viewport and text scale on both builds. The [testing guide](TESTING.md) lists the
+workspace checks and the native capture workflow.
 
 The [direction seed record](docs/architecture/rust-visual-seed.md) preserves seed
 `26a7630f`, API source, pool `c3b204a1eed6` and grounded candidate 7. It is recorded
@@ -256,78 +247,79 @@ this is constrained composition, not a global removal of branding or context.
 
 ## Layout
 
-The library uses horizontal utility bands and an open collection with no permanent
-sidebar. Details opens a resizable bottom inspection tray, preserving gallery width
-and column alignment. Settings category navigation and the reader's optional text
-panel belong to their own surfaces.
+The application uses the native window frame and a common horizontal session bar.
+Library and the active reading keep their positions. Open readings use the
+existing tab model. When the row runs out of space, the active tab stays visible
+and Open readings lists the rest. Session contains the queue, workspaces,
+history and reopening. Settings is a destination in the same row. Concentration
+mode gives the document the window and keeps a named exit control.
 
-The window starts at 1440×960 and has a 640×480 minimum. These are logical points
-before text zoom. Compact library composition is triggered below 650 content
-height; below 420 height the complete library body can scroll vertically. Side
-insets switch at 850 available width. Utility insets are 24×8, or 18×4 when compact;
-library vertical inset is 18, or 10 when compact, with compact vertical gaps of 4.
+### Library and book details
 
-Columns derive from available width divided by 240, or 260 when compact. Equal
-slots are separated by the gallery gutter; normal covers cap at 228 points.
-Compact cover width is bounded by
-`min(slot, clamp((available_height - CAPTION_HEIGHT - 5) / 1.34, 110, 180))`.
-Normal cover allocation is `width × (width × 1.34 + CAPTION_HEIGHT)`, with the
-shared caption height of 102 points. Captions reserve two title lines at 16
-points, a separate 13-point author line, page/progress metadata and a two-point
-progress track for started books. Long titles and authors truncate with ellipses;
-the semantic book button retains the full title, author, page count and progress.
-When the zoom-adjusted content width falls below 420, the cover collection becomes
-76-point jacket-and-title rows with explicit Read controls instead of the normal
-grid. Continue reading is a secondary action beside the library filters. Compact
-composition keeps the existing Resume action in the utility band. Neither layout
-reserves a separate continuity strip.
+A single working row contains Add PDFs, catalogue search, Collection, Filters,
+View, Organize library and selection. Compact layouts use named icon controls and
+put Collection inside Filters. Active criteria have a visible reset and result
+count. View owns the grid/list choice, ordering, grouping and cover density.
+Library-wide PDF content search opens its own surface with the existing opt-in
+local index. Organize library also reaches tags, collections, rules, duplicates,
+folder import, source checks, recovery and library notes.
 
-Search requests 40-point height; it spans its row on narrow layouts. Filters move
-into a labeled semantic vector menu below 420 content width. View and inspector
-controls switch from text plus vectors to semantic vector buttons when space is
-limited. The utility row uses the same adaptation below 540 available width.
+Continue shows a real book miniature, the document title and its last page. It
+uses the active reading or an independent query for the most recently opened
+book in progress. Search results and filtered collections get the main space
+while Continue remains available in the result row. Saved readings also remain
+available from Session.
 
-The inspection tray defaults to 148 points and ranges from 80 to half the available
-content height (with a 160-point floor in the range calculation); its content
-scrolls and wraps. List view switches at 760 available points from 92-point aligned
-rows with headings to 184-point stacked rows. Wide list rows include a 54-point
-actual book miniature, separated progress, page count and two 40-point actions.
+The gallery uses an open canvas with 26-point gutters at normal width and
+20-point gutters in compact density. Jacket slots cap at 212 and 172 points
+respectively. Captions align below the projected geometry. They keep two title
+lines, an author line and reading progress for books that have been started.
+Each book has an accessible actions menu. Click or Enter opens it, while
+modified clicks and selection mode keep their selection behavior. Narrow
+windows use a miniature and title row. At the smallest size the full accessible
+label carries metadata that would otherwise compete with the book actions.
 
-Settings scrolls as a complete page. Its outer horizontal inset is 44, or 16 below
-720 available width; its content caps at 1040. At 850 available content width,
-180-point category navigation sits beside a content column capped at 700. Smaller
-layouts wrap category controls horizontally; cramped layouts below 420 use one
-category menu. Theme choices sit beside each other from 460 available points,
-otherwise stack. All four categories remain reachable.
+Book details opens in the main area. Its return restores catalogue state and
+focus. The cover, title and reading action come first. Metadata and goals,
+organization, original file and cover, and connections and revisions form four
+groups. Source recovery and validation stay with the relevant book. The actions
+and confirmation text remain reachable by scrolling when the text scale grows.
 
-Reader controls float above each reading pane in a neutral surface with an
-8-point corner radius, a fine border and a maximum width of 360 points. The primary
-row keeps its 8×2 insets, 2-point gaps and 64×40 page field. Narrow panes keep Library,
-the page field, Reading options and the navigator; Previous and Next remain in
-Reading options. The compact full-panel navigator retains an ordinary toolbar
-because that state does not display a PDF.
+### Reading and study
 
-Controls disappear after three seconds without interaction, or two in fullscreen.
-They retain a small focusable reveal button and return at the pane's upper edge.
-Menus, keyboard focus, dragging and open navigators protect active controls.
-Visibility changes never reserve space or change PDF geometry. The document's
-auto-hide preference can keep them visible. Manual hiding and immersive mode retain
-their explicit exit controls. PDF scroll areas have no edge fades over document
-pixels. The optional page-text panel defaults to 280 and ranges from 180 to 500.
+The normal reader reserves a stable toolbar above the PDF. Page navigation,
+zoom, Find, Navigate, Notes and View use named controls. Compare is direct on
+wide windows. In the narrowest row, page entry and the study actions stay
+direct, with secondary controls under More controls. The existing preference
+hides the controls inside the same toolbar area, preserving the PDF viewport and
+leaving a keyboard-accessible reveal. Concentration uses the existing explicit
+exit path.
 
-The Accessibility category includes Standard and Electronic ink reader profiles.
-Electronic ink gives both reading panes a white canvas, light controls, single-page
-navigation and flat pages without animated scrolling. It preserves each document's
-saved layout, book mode and environment for returning to Standard. It does not
-change the gallery's composition or physical cover behavior.
+Navigate and Notes share one bottom study tray. Navigate groups contents, pages,
+bookmarks and positions. Notes groups annotations and extracted page text. Find
+uses the same study area, with an editable query, match count and previous/next
+actions. Selection actions stay near the passage. In compact windows the study
+area becomes a temporary full-width view with Back to PDF. Geometry and opening
+preparation use the same toolbar and tray allocation as the visible reader.
+Comparison labels the active document and keeps the existing automatic,
+side-by-side and stacked arrangements and synchronization controls.
 
-**The Stable Collection Rule.** Inspection opens below the library; preserve gallery width rather than shifting its columns sideways.
+### Settings and recovery
 
-The Tools menu includes Import folder and the existing Cancel import action.
+Settings puts its categories across the top and uses a named selector when they
+cannot fit. A single content column uses labelled rows with bounded controls.
+The storage section retains backup export, reviewed restore and legacy import.
+Accessibility retains application text scale, reduced motion and the Electronic
+ink profile. That profile keeps a white canvas and single-page navigation while
+retaining each document's Standard preferences for later use.
+
+
+
+Organize library includes Import folder and the existing Cancel import action.
 Its contents scroll within the remaining viewport height, preserving access to
 secondary destinations at enlarged text. Folder import uses the existing quiet
 background workflow and never adds a permanent progress strip. Pending imports
-appear as a Tools submenu only when work is paused. Its bounded, scrollable list
+appear as an Organize library submenu only when work is paused. Its bounded, scrollable list
 shows the source label, confirmed count and Resume/Discard actions. Discard keeps
 catalogued books. Startup leaves the work paused; recovery adds no global banner.
 
@@ -404,29 +396,23 @@ native fields use accent treatment. Search and filters have a Reset filters path
 
 ### Continuity and list rows
 
-Continue reading sits beside the filters as a transparent secondary action,
-with an arrow-only version below 1100 points of content width. Its tooltip shows
-the document title, current page and percentage. Short windows keep the existing
-Resume action in the utility band, avoiding duplicate controls. There is no
-separate continuity card, miniature or progress track above the collection.
-List rows are open
-aligned content with separators, actual miniature in wide mode and independent
-Read/Details actions. Selected rows use raised fill; keyboard focus adds its own
-outline. Narrow rows wrap document context into a bounded two-line title region.
+Continue displays the current book and its saved page alongside a small 3D
+cover. The action and title wrap into a narrower composition when needed.
+List rows use open alignment, separators, a physical miniature and independent
+Read and Book details actions. Selected rows use raised fill. Keyboard focus
+has its own outline.
 
-### Inspection tray
+### Book details
 
-The bottom tray has wrapped document title, author, reading position, Read,
-Favorite, Explorer and Close actions, followed by original-file context. Internal
-insets are 24×12. It adds vertical inspection space without changing gallery width. The Compare with another PDF action and its cancel/result state stay inside this
-scrollable tray. Check file and its cancellation/result use the same local flow.
-Both result labels have an explicit bounded width and wrap at enlarged text.
-Neither operation adds a global progress banner or changes collection width. Result text uses the secondary foreground and wraps with the
-available inspector width.
+Read or Continue and Favorite sit beside the cover. File actions stay with the
+original path and cover controls. Check file, Compare with another PDF and
+Locate PDF keep their cancellation, review and result in this area. Result text
+wraps at enlarged text. More actions contains the less frequent file and cover
+operations.
 
 ### Settings theme choices and fields
 
-Four categories expose appearance, accessibility, language and privacy. Appearance
+The category row exposes appearance, accessibility, language, privacy, storage and shortcuts. Appearance
 choices are working radio-style controls with drawn diagrams of the library and
 reader palettes; diagrams are illustrations, not screenshots or pretend controls.
 Hover uses raised fill, selected boundaries interpolate to accent and a filled
@@ -444,7 +430,7 @@ accessibility or language acceptance matrix.
 Each document ID selects one of six material/artwork families: foil rings, split
 diamond, connected facets, tonal bars, flowing waves or radial spokes. Families
 share geometry and physics but use different nonoverlapping title/art/author
-regions and alignments. Click selects; double-click or Enter reads. Contextual
+regions and alignments. Click or Enter reads. Modifier keys and selection mode select. Contextual
 actions and visible Read controls provide additional paths. Pointer response is
 bounded to the actual book rectangle rather than its whole catalogue cell.
 
@@ -471,11 +457,11 @@ bounded to the actual book rectangle rather than its whole catalogue cell.
 - **Don't** treat panel HTML/CSS examples or settings diagrams as native screenshots.
 - **Don't** claim whole-rewrite, Narrator, physical-DPI or full QUALITY BAR approval from these captures.
 
-Missing-source relocation stays inside the scrollable document inspector. Locate PDF opens the native picker; selection produces a review rather than a write. A complete-reference match and a legacy partial match use distinct explanatory copy, followed by Update location and Cancel. The selected file name is visible and its full path is available on hover. No additional global toolbar or gallery overlay is introduced.
+Missing-source relocation stays inside the scrollable book details view. Locate PDF opens the native picker; selection produces a review rather than a write. A complete-reference match and a legacy partial match use distinct explanatory copy, followed by Update location and Cancel. The selected file name is visible and its full path is available on hover. No additional global toolbar or gallery overlay is introduced.
 
-Library-wide source checks live in Tools → Check library files. Its submenu contains the current phase, outcome counts, cancellation or restart, and missing/changed catalogue shortcuts. The popup may grow to its available viewport height; overflow scrolls inside it. The gallery keeps its normal chrome. Modified sources join the existing composable State filters and Reset filters behavior.
+Library-wide source checks live under Organize library → Check library files. Its submenu contains the current phase, outcome counts, cancellation or restart, and missing/changed catalogue shortcuts. The popup may grow to its available viewport height; overflow scrolls inside it. The gallery keeps its normal chrome. Modified sources join the existing composable State filters and Reset filters behavior.
 
-New-import content verification stays in the background import flow. It adds no progress row, modal or persistent gallery chrome. A later Check file result uses the existing inspector status to confirm the imported reference. Registered paths reuse their document without reopening the metadata analysis flow.
+New-import content verification stays in the background import flow. It adds no progress row, modal or persistent gallery chrome. A later Check file result uses the file status in book details to confirm the imported reference. Registered paths reuse their document without reopening the metadata analysis flow.
 
 
 Storage settings use the existing Operate layout and category navigation. Cover
@@ -488,7 +474,7 @@ cancellation. Narrow layouts reduce the heading and scroll the actions; syntheti
 area. The saved PDF page choice and resident cover textures remain in place.
 
 
-Collections are an Operate surface reached from Tools, with no persistent
+Collections are an Operate surface reached from Organize library, with no persistent
 navigation rail. The same manager gains membership checkboxes when opened from
 a document's details. Flat rows keep names, member counts, pin state and View
 books together; rename and reviewed deletion stay local to the row. Search and
@@ -506,7 +492,7 @@ control label and participates in the existing reset feedback. Gallery covers,
 physics and reader chrome keep their established composition.
 
 
-Tags are a dedicated Operate surface in Tools and in document details. Row color
+Tags are a dedicated Operate surface in Organize library and in document details. Row color
 marks identify stored colors; name, independent book/annotation counts and
 separate assignment/filter checkboxes keep their meanings distinct. Multi-tag
 filters match any selected tag and use one compact control in the existing
@@ -521,7 +507,7 @@ Bulk organization uses a temporary, named destination chooser with a fixed selec
 
 Automatic cover regeneration stays inside the selection menu. A temporary confirmation names the selected count and states that manual covers will be replaced without changing PDFs. Cancel receives initial focus; background shortcuts stay inactive during review. The compact version keeps the entire consequence and both actions visible, with no reserved empty panel space. Progress and remaining-work cancellation use the existing selection menu, not a persistent banner. Existing cover textures remain registered through regeneration and any governed upload wait; replacement switches the texture and source page together.
 
-Library removal shares the temporary cover-review component. Its consequence names the fixed count, deletion of local reading data, preservation of PDFs and absence of undo. Cancel receives initial focus. The compact layout keeps the consequence and both actions visible without reserved empty space. Progress stays in the selection menu. Reader recovery lives inside Tools with Open readings and Reopen last reading; no additional recovery row interrupts the library header or raised 3D covers.
+Library removal shares the temporary cover-review component. Its consequence names the fixed count, deletion of local reading data, preservation of PDFs and absence of undo. Cancel receives initial focus. The compact layout keeps the consequence and both actions visible without reserved empty space. Progress stays in the selection menu. Reader recovery lives inside Session with Open readings and Reopen last reading; no additional recovery row interrupts the library header or raised 3D covers.
 
 Collection ordering and icon changes stay inside each row's existing actions menu. Move earlier and Move later work with keyboard-accessible controls and the complete pinned or unpinned order. The inline icon editor uses five named choices with a saved-state marker and cancellation; headings draw the corresponding local stroke icon. Narrow layouts wrap the choices in the normal manager scroll area. The library gains no additional action bar.
 
@@ -535,15 +521,15 @@ Backup export uses an inline Storage section rather than another modal or persis
 
 Restore sits beside export in Storage and uses a protected review dialog. The filename, backup version, record counts, and consequence appear before the explicit Restore and close action. Cancel receives initial keyboard focus. The scroll body leaves the cancellation footer stable. Background preparation stays in that dialog; a completed handover closes the application before installation. A native completion message identifies the retained safety directory and explains reopening. No permanent library bar or loading screen is added.
 
-Reading queue lives in Tools as a temporary dialog. Each open reading has a status, optional blocking reason and next action, with bounded reorder controls and an inline editor. Close receives initial focus; navigation and completion actions stay below the scroll body. The library gains no permanent bar.
+Reading queue lives in Session as a temporary dialog. Each open reading has a status, optional blocking reason and next action, with bounded reorder controls and an inline editor. Close receives initial focus; navigation and completion actions stay below the scroll body. The library gains no permanent bar.
 
-Saved workspaces share that temporary Tools pattern. A named save field precedes a bounded list; each row exposes Open and a quiet Options menu. Rename and duplicate edit inline. Updating and deletion require confirmation with Cancel initially focused. Close and paging remain outside the list. The reader stays visible behind the dialog and survives failed opening.
+Saved workspaces share that temporary Session pattern. A named save field precedes a bounded list; each row exposes Open and a quiet Options menu. Rename and duplicate edit inline. Updating and deletion require confirmation with Cancel initially focused. Close and paging remain outside the list. The reader stays visible behind the dialog and survives failed opening.
 
 Concentration mode removes the reader toolbar and navigator without changing the window's fullscreen state. F8 and a floating, keyboard-focusable exit button restore the controls. It adds no animation or waiting period. Cover density lives inside the existing sorting menu and reuses the physical book renderer. Workspace queue writes stay silent on success; a failed write preserves the current readings and reports the error.
 
 Workspace deletion exposes one temporary Undo deletion action in the manager, available until a later deletion or application exit. Restoring it leaves the current reader in place. Startup recovery stays silent when a saved workspace matches; conflicts preserve the readings and explain that the workspace was not linked. No startup wizard, progress bar or permanent recovery strip is added.
 
-Compact library composition follows width rather than the remaining scroll height. Compact jackets retain a 180-point target, while regular jackets keep their 228-point cap. Reserved projection space protects the lifting cover; miniature lift stays restrained. Below the full filter-row width, filters move to the existing temporary-menu pattern with an explicit active reset. At the smallest enlarged-text size, search and view choices use labelled popups and the page shares a single scroll area, so the header can leave room for a complete book row.
+Compact library composition follows width rather than the remaining scroll height. Compact jackets cap at 172 points and regular jackets at 212. Reserved projection space protects the lifting cover; miniature lift stays restrained. Below the full filter-row width, filters move to the existing temporary-menu pattern with an explicit active reset. At the smallest enlarged-text size, search and view choices use labelled popups and the page shares a single scroll area, so the header can leave room for a complete book row.
 
 ## Corporate identity
 

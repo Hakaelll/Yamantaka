@@ -16,7 +16,12 @@ impl YamantakaApp {
             return;
         };
         let p = Palette::new(self.dark);
-        let compact = ui.ctx().content_rect().height() < 600.0;
+        let compact = ui.available_width() < 520.0 || ui.ctx().content_rect().height() < 600.0;
+        let back = if self.inspector {
+            self.tr("Volver a la ficha", "Back to book details")
+        } else {
+            self.tr("Volver a la biblioteca", "Back to library")
+        };
         let writing = editor.pending.as_ref().is_some_and(|(_, writing)| *writing);
         let mut actions = Actions::default();
         egui::ScrollArea::vertical()
@@ -26,19 +31,17 @@ impl YamantakaApp {
                 egui::Frame::new()
                     .inner_margin(egui::Margin::symmetric(
                         if compact { 14 } else { 42 },
-                        if compact { 10 } else { 26 },
+                        if compact { 8 } else { 26 },
                     ))
                     .show(ui, |ui| {
                         ui.set_max_width(ui.available_width().min(1280.0));
+                        if compact {
+                            ui.spacing_mut().item_spacing.y = 4.0;
+                        }
                         ui.horizontal_top(|ui| {
                             actions.close = ui
                                 .add_enabled_ui(!writing, |ui| {
-                                    theme::icon_button(
-                                        ui,
-                                        self.tr("Volver a la biblioteca", "Back to library"),
-                                        theme::Icon::Left,
-                                        p,
-                                    )
+                                    theme::icon_button(ui, back, theme::Icon::Left, p)
                                 })
                                 .inner
                                 .clicked();
@@ -46,7 +49,7 @@ impl YamantakaApp {
                                 ui.label(
                                     RichText::new(self.tr("Título y autor", "Title and author"))
                                         .font(egui::FontId::new(
-                                            if compact { 24.0 } else { 32.0 },
+                                            if compact { 20.0 } else { 32.0 },
                                             egui::FontFamily::Name("Editorial".into()),
                                         )),
                                 );
@@ -60,7 +63,7 @@ impl YamantakaApp {
                                 );
                             });
                         });
-                        ui.add_space(if compact { 14.0 } else { 24.0 });
+                        ui.add_space(if compact { 8.0 } else { 24.0 });
                         editor.recovery_panel(ui, p, self.english);
                         if ui.available_width() >= 1040.0 {
                             let left = (ui.available_width() - 344.0).max(340.0);

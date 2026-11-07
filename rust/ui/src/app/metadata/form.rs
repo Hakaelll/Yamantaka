@@ -1,5 +1,6 @@
 use super::view::Actions;
 use super::*;
+use crate::app::settings::quiet;
 
 impl YamantakaApp {
     pub(super) fn metadata_form(
@@ -10,34 +11,31 @@ impl YamantakaApp {
         p: Palette,
         compact: bool,
     ) {
+        let description = self.tr(
+            "Las correcciones se guardan en tu biblioteca.",
+            "Your corrections are saved to your library.",
+        );
         egui::Frame::new()
             .fill(p.surface)
             .stroke(egui::Stroke::new(1.0, p.line))
             .corner_radius(12)
-            .inner_margin(if compact { 16 } else { 24 })
+            .inner_margin(if compact { 12 } else { 24 })
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.label(
-                    RichText::new(self.tr("Detalles de tu biblioteca", "Library details"))
-                        .size(20.0)
-                        .strong(),
-                );
-                ui.add_space(6.0);
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(self.tr(
-                            "Tus correcciones se guardan aquí. El PDF original no cambia.",
-                            "Your corrections are saved here. The original PDF stays unchanged.",
-                        ))
-                        .color(p.secondary),
-                    )
-                    .wrap(),
-                );
-                ui.add_space(22.0);
+                if !compact {
+                    ui.label(
+                        RichText::new(self.tr("Detalles de tu biblioteca", "Library details"))
+                            .size(20.0)
+                            .strong(),
+                    );
+                    ui.add_space(6.0);
+                    quiet(ui, description, p);
+                    ui.add_space(22.0);
+                }
                 self.metadata_field(ui, editor, MetadataField::Title, p);
-                ui.add_space(26.0);
+                ui.add_space(if compact { 12.0 } else { 26.0 });
                 self.metadata_field(ui, editor, MetadataField::Author, p);
-                ui.add_space(26.0);
+                ui.add_space(if compact { 12.0 } else { 26.0 });
                 ui.horizontal_wrapped(|ui| {
                     if ui
                         .add_enabled_ui(editor.ready(), |ui| {
@@ -75,6 +73,9 @@ impl YamantakaApp {
                         actions.save = editor.apply(MetadataMutation::DismissSuggestions);
                     }
                 });
+                if compact {
+                    quiet(ui, description, p);
+                }
                 if editor.snapshot.is_some() && !editor.clean_draft() {
                     ui.add_space(8.0);
                     ui.label(
@@ -178,13 +179,11 @@ impl YamantakaApp {
         field: MetadataField,
         p: Palette,
     ) {
-        let label = ui.label(
-            RichText::new(match field {
-                MetadataField::Title => self.tr("Título", "Title"),
-                MetadataField::Author => self.tr("Autor", "Author"),
-            })
-            .strong(),
-        );
+        let caption = match field {
+            MetadataField::Title => self.tr("Título", "Title"),
+            MetadataField::Author => self.tr("Autor", "Author"),
+        };
+        let label = ui.label(RichText::new(caption).strong());
         ui.add_space(6.0);
         let enabled = editor.pending.is_none() && editor.source_pending.is_none();
         let value = match field {
@@ -195,18 +194,21 @@ impl YamantakaApp {
             .add_enabled_ui(enabled, |ui| {
                 ui.visuals_mut().widgets.inactive.bg_stroke =
                     egui::Stroke::new(1.0, p.secondary.gamma_multiply(0.7));
-                ui.add(
-                    egui::TextEdit::singleline(value)
-                        .id_salt((
-                            "metadata-field",
-                            &editor.document.id,
-                            field == MetadataField::Title,
-                        ))
-                        .desired_width(f32::INFINITY)
-                        .margin(egui::vec2(12.0, 10.0))
-                        .char_limit(512),
-                )
-                .labelled_by(label.id)
+                let response = ui
+                    .add(
+                        egui::TextEdit::singleline(value)
+                            .id_salt((
+                                "metadata-field",
+                                &editor.document.id,
+                                field == MetadataField::Title,
+                            ))
+                            .desired_width(f32::INFINITY)
+                            .margin(egui::vec2(12.0, 10.0))
+                            .char_limit(512),
+                    )
+                    .labelled_by(label.id);
+                theme::record_control_bounds(ui, caption, response.rect);
+                response
             })
             .inner
             .changed()

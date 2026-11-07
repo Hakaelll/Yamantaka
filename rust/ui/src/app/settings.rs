@@ -24,105 +24,85 @@ impl YamantakaApp {
     }
     pub(super) fn settings(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark);
-        let cramped = ui.available_width() < 420.0;
-        let inset = if ui.available_width() < 720.0 { 16 } else { 44 };
+        let inset = if ui.available_width() < 760.0 { 16 } else { 42 };
+        let compact = ui.available_width() - 2.0 * f32::from(inset) < 420.0;
+        let labels = [
+            self.tr("Apariencia", "Appearance"),
+            self.tr("Accesibilidad", "Accessibility"),
+            self.tr("Idioma", "Language"),
+            self.tr("Privacidad", "Privacy"),
+            self.tr("Almacenamiento", "Storage"),
+            self.tr("Atajos", "Shortcuts"),
+        ];
         let mut category = ui
             .ctx()
             .data_mut(|data| data.get_temp::<usize>(egui::Id::new(CATEGORY_KEY)))
             .unwrap_or(0)
-            .min(5);
+            .min(labels.len() - 1);
         let mut changed = false;
-        egui::ScrollArea::vertical()
-            .id_salt("settings-page")
-            .animated(!self.reduced_motion)
-            .auto_shrink([false, false])
+        egui::Frame::new()
+            .inner_margin(egui::Margin::symmetric(inset, if compact { 8 } else { 12 }))
             .show(ui, |ui| {
-                egui::Frame::new()
-                    .inner_margin(egui::Margin::symmetric(
-                        inset,
-                        if cramped { 12 } else { 24 },
-                    ))
-                    .show(ui, |ui| {
-                        ui.set_max_width(ui.available_width().min(1040.0));
-                        if !cramped {
-                            theme::display(
-                                ui,
-                                self.tr("Ajustes", "Settings"),
-                                if ui.available_width() < 420.0 {
-                                    26.0
-                                } else {
-                                    38.0
-                                },
-                            );
-                            ui.add_space(4.0);
-                            quiet(
-                                ui,
-                                self.tr(
-                                    "Un espacio de lectura a tu medida.",
-                                    "A reading space that feels like yours.",
-                                ),
-                                p,
-                            );
-                            ui.add_space(if cramped { 8.0 } else { 24.0 });
-                            ui.separator();
-                            ui.add_space(if cramped { 8.0 } else { 24.0 });
-                        } else {
-                            ui.horizontal_wrapped(|ui| {
-                                theme::display(ui, self.tr("Ajustes", "Settings"), 20.0);
-                                let label = self.tr(
-                                    [
-                                        "Apariencia",
-                                        "Accesibilidad",
-                                        "Idioma",
-                                        "Privacidad",
-                                        "Almacenamiento",
-                                        "Atajos",
-                                    ][category],
-                                    [
-                                        "Appearance",
-                                        "Accessibility",
-                                        "Language",
-                                        "Privacy",
-                                        "Storage",
-                                        "Shortcuts",
-                                    ][category],
-                                );
-                                let response = theme::navigation(ui, label, true, p);
-                                egui::Popup::menu(&response).show(|ui| {
-                                    self.settings_navigation(ui, &mut category, false, p)
-                                });
+                ui.set_max_width(ui.available_width().min(1000.0));
+                if compact {
+                    ui.spacing_mut().item_spacing.y = 6.0;
+                }
+                if ui.available_width() >= 680.0 {
+                    theme::display(ui, self.tr("Ajustes", "Settings"), 38.0);
+                    ui.add_space(12.0);
+                    ui.horizontal_wrapped(|ui| {
+                        for (index, label) in labels.iter().copied().enumerate() {
+                            let selected = category == index;
+                            let response = theme::navigation(ui, label, selected, p);
+                            response.widget_info(|| {
+                                egui::WidgetInfo::selected(
+                                    egui::WidgetType::SelectableLabel,
+                                    ui.is_enabled(),
+                                    selected,
+                                    label,
+                                )
                             });
-                            ui.add_space(8.0);
-                        }
-                        if ui.available_width() >= 850.0 {
-                            let content_width = (ui.available_width() - 232.0).min(700.0);
-                            ui.horizontal_top(|ui| {
-                                ui.allocate_ui_with_layout(
-                                    egui::vec2(180.0, 0.0),
-                                    egui::Layout::top_down(egui::Align::Min),
-                                    |ui| {
-                                        ui.set_width(180.0);
-                                        self.settings_navigation(ui, &mut category, false, p);
-                                    },
-                                );
-                                ui.add_space(22.0);
-                                ui.allocate_ui_with_layout(
-                                    egui::vec2(content_width, 0.0),
-                                    egui::Layout::top_down(egui::Align::Min),
-                                    |ui| {
-                                        ui.set_width(content_width);
-                                        changed |= self.settings_section(ui, category, p);
-                                    },
-                                );
-                            });
-                        } else {
-                            if !cramped {
-                                self.settings_navigation(ui, &mut category, true, p);
-                                ui.add_space(22.0);
+                            if response.clicked() {
+                                category = index;
                             }
-                            changed |= self.settings_section(ui, category, p);
                         }
-                        ui.add_space(32.0);
+                    });
+                } else {
+                    ui.horizontal_wrapped(|ui| {
+                        let title = theme::display(
+                            ui,
+                            self.tr("Ajustes", "Settings"),
+                            if compact { 20.0 } else { 28.0 },
+                        );
+                        let selector = egui::ComboBox::from_id_salt("settings-category-selector")
+                            .selected_text(labels[category])
+                            .width(134.0)
+                            .height((ui.ctx().content_rect().height() - 64.0).max(60.0))
+                            .show_ui(ui, |ui| {
+                                for (index, label) in labels.iter().copied().enumerate() {
+                                    ui.selectable_value(&mut category, index, label);
+                                }
+                            })
+                            .response
+                            .labelled_by(title.id);
+                        theme::record_control_bounds(
+                            ui,
+                            self.tr("Categoría de ajustes", "Settings category"),
+                            selector.rect,
+                        );
+                    });
+                }
+                ui.add_space(if compact { 4.0 } else { 12.0 });
+                ui.separator();
+                egui::ScrollArea::vertical()
+                    .id_salt(("settings-page", category))
+                    .animated(!self.reduced_motion)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.set_max_width(ui.available_width().min(760.0));
+                        ui.add_space(if compact { 4.0 } else { 20.0 });
+                        changed |= self.settings_section(ui, category, p);
+                        ui.add_space(if compact { 12.0 } else { 24.0 });
                     });
             });
         ui.ctx().data_mut(|data| {
@@ -133,45 +113,6 @@ impl YamantakaApp {
         }
     }
 
-    fn settings_navigation(
-        &self,
-        ui: &mut egui::Ui,
-        category: &mut usize,
-        compact: bool,
-        p: Palette,
-    ) {
-        let labels = [
-            self.tr("Apariencia", "Appearance"),
-            self.tr("Accesibilidad", "Accessibility"),
-            self.tr("Idioma", "Language"),
-            self.tr("Privacidad", "Privacy"),
-            self.tr("Almacenamiento", "Storage"),
-            self.tr("Atajos", "Shortcuts"),
-        ];
-        let mut choices = |ui: &mut egui::Ui| {
-            for (index, label) in labels.iter().enumerate() {
-                let selected = *category == index;
-                let response = theme::navigation(ui, label, selected, p);
-                response.widget_info(|| {
-                    egui::WidgetInfo::selected(
-                        egui::WidgetType::SelectableLabel,
-                        ui.is_enabled(),
-                        selected,
-                        label,
-                    )
-                });
-                if response.clicked() {
-                    *category = index;
-                }
-            }
-        };
-        if compact {
-            ui.horizontal_wrapped(choices);
-        } else {
-            choices(ui);
-        }
-    }
-
     fn settings_section(&mut self, ui: &mut egui::Ui, category: usize, p: Palette) -> bool {
         let mut changed = false;
         let cramped = ui.available_width() < 420.0;
@@ -179,19 +120,21 @@ impl YamantakaApp {
             5 => {
                 self.shortcut_settings(ui, p);
             }
+            0 if cramped => {
+                ui.label(RichText::new(self.tr("Tema de la interfaz", "Interface theme")).strong());
+                let light = self.tr("Papel claro", "Warm paper");
+                let dark = self.tr("Grafito oscuro", "Dark graphite");
+                ui.horizontal_wrapped(|ui| {
+                    for (value, label) in [(false, light), (true, dark)] {
+                        let response = ui.radio_value(&mut self.dark, value, label);
+                        theme::record_control_bounds(ui, label, response.rect);
+                        changed |= response.changed();
+                    }
+                });
+            }
             0 => {
-                if !cramped {
-                    section_title(ui, self.tr("Apariencia", "Appearance"));
-                    quiet(
-                        ui,
-                        self.tr(
-                            "Elige la luz que acompaña a tu colección.",
-                            "Choose the light around your collection.",
-                        ),
-                        p,
-                    );
-                }
-                ui.add_space(if cramped { 4.0 } else { 24.0 });
+                section_title(ui, self.tr("Apariencia", "Appearance"));
+                ui.add_space(10.0);
                 let available = ui.available_width();
                 let width = if available >= 460.0 {
                     ((available - ui.spacing().item_spacing.x) / 2.0).min(310.0)
@@ -216,7 +159,6 @@ impl YamantakaApp {
                             dark,
                             self.dark == dark,
                             self.reduced_motion,
-                            cramped,
                             label,
                             description,
                             p,
@@ -249,7 +191,7 @@ impl YamantakaApp {
                         p,
                     );
                 }
-                ui.add_space(26.0);
+                ui.add_space(if cramped { 4.0 } else { 20.0 });
                 let scale_heading =
                     ui.label(RichText::new(self.tr("Tamaño del texto", "Text size")).strong());
                 ui.add_space(4.0);
@@ -304,9 +246,9 @@ impl YamantakaApp {
                         }
                     }
                 });
-                ui.add_space(24.0);
+                ui.add_space(if cramped { 12.0 } else { 24.0 });
                 ui.separator();
-                ui.add_space(20.0);
+                ui.add_space(if cramped { 8.0 } else { 20.0 });
                 let motion_label = self.tr("Reducir el movimiento", "Reduce motion").to_owned();
                 changed |= ui
                     .checkbox(&mut self.reduced_motion, motion_label)
@@ -329,7 +271,7 @@ impl YamantakaApp {
                         p,
                     );
                 }
-                ui.add_space(24.0);
+                ui.add_space(if cramped { 4.0 } else { 20.0 });
                 ui.horizontal_wrapped(|ui| {
                     if ui.radio(!self.english, "Español").clicked() && self.english {
                         self.english = false;
@@ -449,7 +391,7 @@ impl YamantakaApp {
             }
         }
         if category < 3 {
-            ui.add_space(28.0);
+            ui.add_space(if cramped { 12.0 } else { 28.0 });
             ui.separator();
             ui.add_space(14.0);
             quiet(
@@ -481,7 +423,6 @@ fn theme_choice(
     dark: bool,
     selected: bool,
     reduced_motion: bool,
-    cramped: bool,
     label: &str,
     description: &str,
     p: Palette,
@@ -499,7 +440,7 @@ fn theme_choice(
         p.secondary,
         text_width,
     );
-    let height = if cramped { 106.0 } else { 144.0 } + title.size().y + detail.size().y;
+    let height = 144.0 + title.size().y + detail.size().y;
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::selected(
@@ -509,6 +450,7 @@ fn theme_choice(
             label,
         )
     });
+    theme::record_control_bounds(ui, label, rect);
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
         let selection = ui.ctx().animate_bool_with_time_and_easing(
@@ -544,22 +486,11 @@ fn theme_choice(
             egui::StrokeKind::Inside,
         );
         let preview = egui::Rect::from_min_size(
-            rect.min
-                + egui::vec2(
-                    12.0,
-                    if cramped {
-                        30.0 + title.size().y + detail.size().y
-                    } else {
-                        12.0
-                    },
-                ),
-            egui::vec2(width - 24.0, if cramped { 68.0 } else { 104.0 }),
+            rect.min + egui::vec2(12.0, 12.0),
+            egui::vec2(width - 24.0, 104.0),
         );
         paint_theme_preview(painter, preview, dark);
-        let text_pos = egui::pos2(
-            rect.left() + 16.0,
-            rect.top() + if cramped { 12.0 } else { 130.0 },
-        );
+        let text_pos = rect.min + egui::vec2(16.0, 130.0);
         painter.galley(text_pos, title.clone(), p.ink);
         painter.galley(
             text_pos + egui::vec2(0.0, title.size().y + 4.0),

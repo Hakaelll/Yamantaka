@@ -9,9 +9,11 @@ $executablePath = (Resolve-Path -LiteralPath $Executable).Path
 $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
+$libraryControlsEn = @('Library','Session','Settings','Add PDFs','Filters','View','Organize library','Select')
+$libraryControlsEs = @('Biblioteca','Sesión','Ajustes','Añadir PDF','Filtros','Vista','Organizar biblioteca','Seleccionar')
 $cases = @(
-    @{ name='readme-library-dark'; args=@('--pdf-covers','--reduce-motion') },
-    @{ name='readme-library-light'; args=@('--pdf-covers','--light','--reduce-motion') },
+    @{ name='readme-library-dark'; args=@('--pdf-covers','--reduce-motion'); visible=$libraryControlsEn + @('Collection','Search title or author','Continue'); firstBook=$true },
+    @{ name='readme-library-light'; args=@('--pdf-covers','--light','--reduce-motion'); visible=$libraryControlsEn + @('Collection','Search title or author','Continue'); firstBook=$true },
     @{ name='chrome-hidden'; args=@('--reader','--continuous','--chrome=hidden') },
     @{ name='chrome-revealed'; args=@('--reader','--continuous','--chrome=revealed') },
     @{ name='chrome-pinned'; args=@('--reader','--continuous','--chrome=pinned') },
@@ -45,7 +47,7 @@ $cases = @(
     @{ name='duplicates-members'; args=@('--duplicates','--duplicates-members','--es') },
     @{ name='duplicates-small'; args=@('--duplicates','--duplicates-members','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
     @{ name='duplicates-empty'; args=@('--duplicates','--duplicates-empty','--light') },
-    @{ name='duplicates-tools'; args=@('--tools-menu','--es') },
+    @{ name='duplicates-tools'; args=@('--tools-menu','--es'); visible=@('Organizar biblioteca','Copias idénticas') },
     @{ name='rollback-review'; args=@('--rollback-preview','--es') },
     @{ name='rollback-review-small'; args=@('--rollback-preview','--es','--light','--size=640x480','--text-scale=2') },
     @{ name='index-protected-prompt'; args=@('--index-protected','--es','--light','--size=640x480','--text-scale=2') },
@@ -97,10 +99,12 @@ $cases = @(
     @{ name='library-compact-dark-es'; args=@('--size=720x540','--pdf-covers','--es','--tilt-negative') },
     @{ name='library-compact-light'; args=@('--size=900x600','--pdf-covers','--light') },
     @{ name='library-short-wide'; args=@('--size=1440x600','--pdf-covers','--es','--tilt') },
-    @{ name='library-compact-view-menu'; args=@('--size=640x480','--text-scale=2','--library-view-menu','--pdf-covers','--reduce-motion') },
-    @{ name='library-compact-search-menu'; args=@('--size=640x480','--text-scale=2','--library-search-menu','--pdf-covers','--reduce-motion') },
+    @{ name='library-compact-view-menu'; args=@('--size=640x480','--text-scale=2','--library-view-menu','--pdf-covers','--reduce-motion'); visible=@('View','Covers','List','Recent') },
+    @{ name='library-compact-search-menu'; args=@('--size=640x480','--text-scale=2','--library-search-menu','--pdf-covers','--reduce-motion'); visible=@('Search library','Search title or author') },
     @{ name='library-compact-filters-active'; args=@('--size=720x540','--pdf-covers','--smart-view=missing','--light','--es') },
-    @{ name='library-wide-light-pdf'; args=@('--pdf-covers','--light','--es') },
+    @{ name='library-wide-light-pdf'; args=@('--pdf-covers','--light','--es'); visible=$libraryControlsEs + @('Colección','Buscar por título o autor','Continuar'); firstBook=$true },
+    @{ name='library-1280'; args=@('--pdf-covers','--size=1280x720','--light','--es','--reduce-motion'); visible=$libraryControlsEs + @('Colección','Buscar por título o autor','Continuar'); firstBook=$true },
+    @{ name='library-ultrawide'; args=@('--pdf-covers','--size=2560x1080','--reduce-motion'); visible=$libraryControlsEn + @('Collection','Search title or author','Continue'); firstBook=$true },
     @{ name='window-placement-cycle'; args=@('--window-placement','--es') },
     @{ name='window-placement-unknown'; args=@('--window-placement','--window-placement-unknown','--light') },
     @{ name='window-placement-backup-glow'; args=@('--window-placement','--window-placement-backup','--software','--light') },
@@ -261,6 +265,7 @@ $cases = @(
     @{ name='library-selection-menu-small-200'; args=@('--pdf-covers','--library-selection','--selection-menu','--size=640x480','--text-scale=2') },
     @{ name='library-selection-favorites'; args=@('--pdf-covers','--library-selection','--selection-favorite') },
     @{ name='filters-empty-smart'; args=@('--smart-view=missing') },
+    @{ name='filters-empty-smart-small-200-es'; args=@('--pdf-covers','--smart-view=missing','--size=640x480','--text-scale=2','--light','--es'); visible=@('Filtros','Limpiar filtros','Continuar') },
     @{ name='filters-reset-smart-es'; args=@('--pdf-covers','--smart-view=missing','--reset-library-filters','--es','--light','--reduce-motion') },
     @{ name='tags-manager'; args=@('--pdf-covers','--library-tags') },
     @{ name='tags-renamed'; args=@('--pdf-covers','--library-tags','--tag-management=rename') },
@@ -278,7 +283,7 @@ $cases = @(
     @{ name='tags-small-200'; args=@('--pdf-covers','--library-tags','--size=640x480','--text-scale=2') },
     @{ name='smart-annotated'; args=@('--pdf-covers','--smart-view=annotated') },
     @{ name='smart-recent-es'; args=@('--pdf-covers','--smart-view=recentlyOpened','--es','--light','--reduce-motion') },
-    @{ name='smart-menu-small-200'; args=@('--pdf-covers','--smart-view=annotated','--smart-menu','--size=640x480','--text-scale=2') },
+    @{ name='smart-menu-small-200'; args=@('--pdf-covers','--smart-view=annotated','--smart-menu','--size=640x480','--text-scale=2'); visible=@('Filters','Collection','With annotations') },
     @{ name='collections-manager'; args=@('--pdf-covers','--collections') },
     @{ name='collections-actions-small-200'; args=@('--pdf-covers','--collections','--collection-actions','--size=640x480','--text-scale=2') },
     @{ name='collections-actions'; args=@('--pdf-covers','--collections','--collection-actions') },
@@ -312,7 +317,7 @@ $cases = @(
     @{ name='import-recovery-small-200'; args=@('--pdf-covers','--import-recovery','--size=640x480','--text-scale=2') },
     @{ name='folder-import-dark'; args=@('--pdf-covers','--folder-import') },
     @{ name='folder-import-tools-es'; args=@('--pdf-covers','--folder-import','--tools-menu','--light','--es','--reduce-motion') },
-    @{ name='folder-import-small-200'; args=@('--pdf-covers','--folder-import','--tools-menu','--size=640x480','--text-scale=2') },
+    @{ name='folder-import-small-200'; args=@('--pdf-covers','--folder-import','--tools-menu','--size=640x480','--text-scale=2'); visible=@('Organize library','Import folder…') },
     @{ name='compare-pdf-identical'; args=@('--pdf-covers','--compare-pdf') },
     @{ name='compare-pdf-different-es'; args=@('--pdf-covers','--compare-different','--light','--es','--reduce-motion') },
     @{ name='cover-capacity-retry-dark'; args=@('--pdf-covers','--cover-capacity-retry') },
@@ -358,10 +363,12 @@ $cases = @(
     @{ name='pdf-saved-cover-page-es'; args=@('--pdf-covers','--saved-cover-page','--details','--light','--es','--reduce-motion') },
     @{ name='pdf-covers-dark'; args=@('--pdf-covers') },
     @{ name='pdf-covers-light-es'; args=@('--pdf-covers','--light','--es') },
-    @{ name='pdf-covers-details'; args=@('--pdf-covers','--details') },
+    @{ name='pdf-covers-details'; args=@('--pdf-covers','--details'); visible=@('Back to library','Continue') },
+    @{ name='pdf-covers-details-small-200-es'; args=@('--pdf-covers','--details','--size=640x480','--text-scale=2','--es'); visible=@('Volver a la biblioteca','Continuar') },
     @{ name='pdf-covers-tilted'; args=@('--pdf-covers','--tilt') },
     @{ name='pdf-covers-reduced'; args=@('--pdf-covers','--reduce-motion') },
-    @{ name='pdf-covers-small-200'; args=@('--pdf-covers','--size=640x480','--text-scale=2') },
+    @{ name='pdf-covers-small-200'; args=@('--pdf-covers','--size=640x480','--text-scale=2'); visible=$libraryControlsEn + @('Search library','Read document','Book details'); firstBook=$true },
+    @{ name='pdf-covers-small-200-es'; args=@('--pdf-covers','--size=640x480','--text-scale=2','--es'); visible=$libraryControlsEs + @('Buscar en biblioteca','Leer documento','Ver ficha'); firstBook=$true },
     @{ name='tabs-close-others'; args=@('--reader','--tabs-close-others') },
     @{ name='tabs-close-others-es'; args=@('--reader','--tabs-close-others','--light','--es','--reduced-motion') },
     @{ name='tabs-close-right'; args=@('--reader','--tabs-close-right') },
@@ -426,7 +433,7 @@ $cases = @(
     @{ name='annotation-multi-saved-es'; args=@('--reader','--annotations','--annotation-multi','--annotation-save','--light','--es') },
     @{ name='annotation-editor-dark'; args=@('--reader','--annotations') },
     @{ name='annotation-editor-light-es'; args=@('--reader','--annotations','--light','--es') },
-    @{ name='annotation-editor-small-200'; args=@('--reader','--annotations','--size=640x480','--text-scale=2') },
+    @{ name='annotation-editor-small-200'; args=@('--reader','--annotations','--size=640x480','--text-scale=2'); visible=@('Back to PDF') },
     @{ name='annotation-saved-rotated'; args=@('--reader','--annotations','--annotation-save','--rotation=90') },
     @{ name='selection-keyboard-dark'; args=@('--reader','--selection','--selection-keyboard') },
     @{ name='selection-keyboard-rotated'; args=@('--reader','--selection','--selection-keyboard','--rotation=90') },
@@ -450,7 +457,8 @@ $cases = @(
     @{ name='find-no-text-es'; args=@('--find','--find-scanned','--light','--es') },
     @{ name='find-dark'; args=@('--find') },
     @{ name='find-light-es'; args=@('--find','--light','--es') },
-    @{ name='find-small-200'; args=@('--find','--size=640x480','--text-scale=2') },
+    @{ name='find-small-200'; args=@('--find','--size=640x480','--text-scale=2'); visible=@('Back to PDF','Find') },
+    @{ name='find-short-wide'; args=@('--find','--size=1280x480'); visible=@('Back to PDF','Find') },
     @{ name='find-closed-wrap'; args=@('--find','--find-previous','--find-closed') },
     @{ name='find-next'; args=@('--find','--find-next') },
     @{ name='find-previous-wrap'; args=@('--find','--find-previous') },
@@ -490,13 +498,13 @@ $cases = @(
     @{ name='library-tilted'; args=@('--tilt') },
     @{ name='library-reduced'; args=@('--reduce-motion') },
     @{ name='library-opengl'; args=@('--opengl') },
-    @{ name='settings-light'; args=@('--settings','--light') },
+    @{ name='settings-light'; args=@('--settings','--light'); visible=@('Settings','Warm paper','Dark graphite') },
     @{ name='privacy-sessions-dark'; args=@('--settings','--privacy') },
     @{ name='privacy-sessions-light-es'; args=@('--settings','--privacy','--light','--es','--sessions-disabled','--reduce-motion') },
     @{ name='privacy-sessions-small-200'; args=@('--settings','--privacy','--size=640x480','--text-scale=2') },
     @{ name='reader-session-recorded'; args=@('--reader','--sessions-preview') },
     @{ name='reader-session-disabled'; args=@('--reader','--sessions-preview','--sessions-disabled') },
-    @{ name='settings-small-200'; args=@('--settings','--size=640x480','--text-scale=2') },
+    @{ name='settings-small-200'; args=@('--settings','--size=640x480','--text-scale=2'); visible=@('Settings category','Warm paper','Dark graphite') },
     @{ name='reader-dark'; args=@('--reader') },
     @{ name='reader-text'; args=@('--reader','--text-panel') },
     @{ name='reader-text-light-es'; args=@('--reader','--text-panel','--light','--es') },
@@ -509,7 +517,7 @@ $cases = @(
     @{ name='reader-options'; args=@('--reader','--reader-options') },
     @{ name='reader-sepia-rotated'; args=@('--reader','--reader-theme=sepia','--rotation=90') },
     @{ name='reader-fit-width'; args=@('--reader','--fit-width') },
-    @{ name='reader-options-small-200'; args=@('--reader','--reader-options','--size=640x480','--text-scale=2') },
+    @{ name='reader-options-small-200'; args=@('--reader','--reader-options','--size=640x480','--text-scale=2'); visible=@('Reading','Layout','Positions','Document recovery') },
     @{ name='reader-small-200'; args=@('--reader','--size=640x480','--text-scale=2') }
 )
 $duplicateCases = @($cases | Group-Object -Property name | Where-Object { $_.Count -gt 1 })
@@ -559,6 +567,18 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.ContainsKey('visible')) {
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $case.visible
+    }
+    if ($case.firstBook) {
+        # The resume strip also renders a miniature of the same document.
+        $firstSlot = $controls.controls | Where-Object {
+            $_.label -ceq 'Book slot · demo-0' -and $_.rect[2] - $_.rect[0] -ge 40
+        } | Select-Object -First 1
+        if (-not $firstSlot -or $firstSlot.rect[1] -lt $firstSlot.clip[1] - 0.5 -or $firstSlot.rect[3] -gt $firstSlot.clip[3] + 0.5) {
+            throw "The first library book is not fully visible in $($case.name)."
+        }
+    }
     if ($case.name -like 'duplicates-merge-*') {
         if ($controls.duplicates.merge.pending -or $controls.duplicates.merge.writing) { throw 'Duplicate consolidation did not settle.' }
         $history = $case.name -in @('duplicates-merge-history','duplicates-merge-history-undo')
@@ -1233,11 +1253,15 @@ foreach ($case in $cases) {
         }
 
     }
-    if ($case.name -eq 'filters-empty-smart') {
+    if ($case.name -in @('filters-empty-smart','filters-empty-smart-small-200-es')) {
         if (-not $controls.libraryQueryLoaded -or -not $controls.libraryFiltersActive -or $controls.libraryDocumentCount -ne 0 -or $controls.smartView -ne 'missing') {
             throw 'The empty smart view must finish its query and retain its active filter.'
         }
-        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Reset filters')
+        if ($case.name -eq 'filters-empty-smart') {
+            $resumeLabel = $controls.controls.label | Where-Object { $_ -clike 'Continue · *' } | Select-Object -First 1
+            if (-not $resumeLabel) { throw 'Continue must remain available when filters return no books.' }
+            & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Reset filters',$resumeLabel)
+        }
     } elseif ($case.name -eq 'filters-reset-smart-es') {
         if (-not $controls.libraryQueryLoaded -or $controls.libraryFiltersActive -or $controls.libraryDocumentCount -ne 10 -or $null -ne $controls.smartView) {
             throw 'Reset must clear every filter and return the ten synthetic books.'
@@ -1295,7 +1319,9 @@ foreach ($case in $cases) {
         if (-not $transition.geometryUnchanged -or -not $transition.expectedVisibilityMet -or $controls.readerOpening.firstRaster.emptyPagePaints -ne 0) { throw 'Reading controls changed page geometry, visibility or first-page continuity.' }
         $labels=switch ($case.name) {
             'chrome-hidden' { @('Show reading controls') }
-            'chrome-compact' { @('Biblioteca','Opciones de lectura','Navegador de lectura') }
+            'chrome-revealed' { @('Library','Session','Settings','Page','Next page','Zoom out','Zoom in','Find','Navigate','Notes','View','Compare') }
+            'chrome-compact' { @('Biblioteca','Sesión','Ajustes','Página','Buscar','Navegar','Notas','Vista','Más controles') }
+            'chrome-reference' { @('Keyboard active','Main · On the Nature of Things','Reference · The Architecture of Thought') }
             'chrome-menu-held' { @('Automatically hide controls','Previous page','Next page') }
             default { @() }
         }

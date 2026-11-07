@@ -17,6 +17,11 @@ impl YamantakaApp {
         };
         let p = Palette::new(self.dark);
         let compact = ui.ctx().content_rect().height() < 650.0;
+        let back = if self.inspector {
+            self.tr("Volver a la ficha", "Back to book details")
+        } else {
+            self.tr("Volver a la biblioteca", "Back to library")
+        };
         let mut actions = PickerActions::default();
         let can_close = picker.can_close();
         egui::ScrollArea::vertical()
@@ -40,13 +45,8 @@ impl YamantakaApp {
                         if compact {
                             ui.horizontal_top(|ui| {
                                 actions.close |= ui
-                                    .add_enabled_ui(picker.can_close(), |ui| {
-                                        theme::icon_button(
-                                            ui,
-                                            self.tr("Volver a la biblioteca", "Back to library"),
-                                            theme::Icon::Left,
-                                            p,
-                                        )
+                                    .add_enabled_ui(can_close, |ui| {
+                                        theme::icon_button(ui, back, theme::Icon::Left, p)
                                     })
                                     .inner
                                     .clicked();
@@ -75,10 +75,10 @@ impl YamantakaApp {
                             });
                         } else {
                             actions.close |= ui
-                                .add_enabled_ui(picker.can_close(), |ui| {
+                                .add_enabled_ui(can_close, |ui| {
                                     theme::control(
                                         ui,
-                                        self.tr("Volver a la biblioteca", "Back to library"),
+                                        back,
                                         Some(theme::Icon::Left),
                                         false,
                                         false,
