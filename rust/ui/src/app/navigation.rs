@@ -94,16 +94,19 @@ pub(in crate::app) fn positions(
 }
 
 impl YamantakaApp {
-    pub(super) fn navigation_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
+    pub(super) fn navigation_menu(&mut self, ui: &mut egui::Ui, p: Palette) -> bool {
         let Some(nav) = &self.reader.navigation else {
-            return;
+            return false;
         };
         if let Some(action) = positions(ui, nav, self.english, p) {
-            if action.apply(self.reader.navigation.as_mut().unwrap()) {
+            let navigated = action.apply(self.reader.navigation.as_mut().unwrap());
+            if navigated {
                 self.apply_navigation();
             }
             ui.close();
+            return navigated;
         }
+        false
     }
 }
 

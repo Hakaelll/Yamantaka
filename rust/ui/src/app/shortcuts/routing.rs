@@ -28,10 +28,9 @@ impl YamantakaApp {
                 if !self.reading_focus.reference()
                     && self.reader.panel
                     && !self.reader_focus
-                    && ctx.content_rect().width() < 620.0
+                    && bookmarks::compact_study(ctx)
                 {
-                    self.reader.panel = false;
-                    self.reader.find.stop();
+                    self.close_study_tray();
                 }
                 egui::Popup::close_all(ctx);
                 self.reading_focus.switch(ctx);

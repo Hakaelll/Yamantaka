@@ -78,7 +78,7 @@ impl YamantakaApp {
             governor: &self.governor,
             marks_error: self.reader.annotation_paint.error().map(str::to_owned),
         };
-        let action = self.reader.annotations.show_editor(ui, &context, p);
+        let action = self.reader.annotations.show_editor(ui, &context, p, false);
         if let Some(action) = action {
             self.apply_notes_action(false, action);
         }

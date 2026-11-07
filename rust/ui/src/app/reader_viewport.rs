@@ -35,7 +35,6 @@ impl YamantakaApp {
     }
 
     pub(super) fn reader_viewport(&mut self, ui: &mut egui::Ui, document: &Document, p: Palette) {
-        self.reader_overlay_controls(ui, document, p);
         ui.spacing_mut().scroll.fade.strength = 0.0;
         let viewport = ui.available_size();
         let viewport_size = [
@@ -125,11 +124,7 @@ impl YamantakaApp {
             self.reader.links.request_visible(&self.runtime, &document.id, &link_pages);
             self.reader.annotation_paint.request(&self.runtime, &self.governor, &document.id, &link_pages);
             self.request_selection_pages(&document.id, &link_pages);
-            if self.reader.panel && self.reader.reader_panel_tab == outline::ReaderPanelTab::Find {
-                self.reader.find.request_highlights(&self.runtime, &document.id, &link_pages, ui.ctx());
-            } else {
-                self.reader.find.clear_highlights();
-            }
+            self.reader.find.request_highlights(&self.runtime, &document.id, &link_pages, ui.ctx());
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
             let preview_bytes = self.governor.limits().pages.min(14 * 1024 * 1024) / if self.reference.is_some() { 2 } else { 1 };

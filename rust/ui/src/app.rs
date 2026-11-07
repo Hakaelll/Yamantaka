@@ -1045,7 +1045,13 @@ impl YamantakaApp {
         egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(
                 margin,
-                if ui.available_width() < 420.0 { 3 } else if compact { 8 } else { 16 },
+                if ui.available_width() < 420.0 {
+                    3
+                } else if compact {
+                    8
+                } else {
+                    16
+                },
             ))
             .show(ui, |ui| {
                 if compact {
@@ -1053,26 +1059,78 @@ impl YamantakaApp {
                 }
                 self.library_header(ui, p);
                 if self.documents.is_empty() && !self.library_loaded {
-                    ui.label(RichText::new(self.tr("Cargando biblioteca…", "Loading library…")).color(p.secondary));
+                    ui.label(
+                        RichText::new(self.tr("Cargando biblioteca…", "Loading library…"))
+                            .color(p.secondary),
+                    );
                 } else if self.documents.is_empty() {
-                    let filtered=self.library_has_filters();
-                    ui.add_space(if compact{18.0}else{36.0});
-                    theme::display(ui,if filtered{self.tr("No hay libros que coincidan","No matching books")}else{self.tr("Un lugar para tus próximas lecturas","A place for your next reads")},28.0);
-                    ui.label(RichText::new(if filtered{self.tr("Prueba otro título o restablece los filtros para ver tu colección.","Try another title or reset the filters to see your collection.")}else{self.tr("Añade tus PDF o arrástralos a esta ventana para empezar.","Add your PDFs or drag them into this window to begin.")}).color(p.secondary));
-                    ui.add_space(12.0);
-                    if filtered {
-                        if theme::control(ui,self.tr("Restablecer filtros","Reset filters"),None,false,true,p).clicked(){self.reset_library_filters();}
-                    } else if theme::control(ui,self.tr("Elegir documentos","Choose documents"),Some(theme::Icon::Add),false,true,p).clicked() && let Some(paths)=yamantaka_windows::pick_pdfs(){self.import(paths);}
+                    self.library_empty(ui, p);
                 } else {
                     if ui.ctx().content_rect().height() < 420.0 {
-                        self.library_catalogue(ui,compact,p);
+                        self.library_catalogue(ui, compact, p);
                     } else {
-                        egui::ScrollArea::vertical().id_salt("catalogue").show(ui,|ui|self.library_catalogue(ui,compact,p));
+                        egui::ScrollArea::vertical()
+                            .id_salt("catalogue")
+                            .show(ui, |ui| self.library_catalogue(ui, compact, p));
                     }
                 }
             });
         self.persist_library_state();
     }
+
+    fn library_empty(&mut self, ui: &mut egui::Ui, p: Palette) {
+        let filtered = self.library_has_filters();
+        let cramped = ui.ctx().content_rect().height() < 290.0;
+        let (title, help) = if filtered {
+            (
+                self.tr("Sin coincidencias", "No matching books"),
+                self.tr(
+                    "Prueba otro título o limpia los filtros.",
+                    "Try another title or clear the filters.",
+                ),
+            )
+        } else {
+            (
+                self.tr("Biblioteca vacía", "Library is empty"),
+                self.tr(
+                    "Añade tus PDF o arrástralos aquí.",
+                    "Add PDFs or drag them here.",
+                ),
+            )
+        };
+        ui.add_space(if cramped { 2.0 } else { 20.0 });
+        let heading = theme::display(ui, title, if cramped { 20.0 } else { 28.0 });
+        theme::record_control_bounds(ui, title, heading.rect);
+        ui.label(RichText::new(help).size(14.0).color(p.secondary));
+        if filtered {
+            if !cramped
+                && theme::control(
+                    ui,
+                    self.tr("Restablecer filtros", "Reset filters"),
+                    None,
+                    false,
+                    true,
+                    p,
+                )
+                .clicked()
+            {
+                self.reset_library_filters();
+            }
+        } else if theme::control(
+            ui,
+            self.tr("Elegir documentos", "Choose documents"),
+            Some(theme::Icon::Add),
+            false,
+            true,
+            p,
+        )
+        .clicked()
+            && let Some(paths) = yamantaka_windows::pick_pdfs()
+        {
+            self.import(paths);
+        }
+    }
+
     fn library_filters(&mut self, ui: &mut egui::Ui, p: Palette) {
         self.tag_filter_control(ui, p);
         if theme::navigation(
@@ -1203,25 +1261,21 @@ impl YamantakaApp {
             return;
         };
         self.sync_tab_context();
+        if self.reader_focus || !self.reader.panel || !bookmarks::compact_study(ui.ctx()) {
+            self.reader_toolbar(ui, &document, info.pages.len().max(1) as u32, p);
+        }
         if self.reader_focus {
             self.prepare_annotations(&document.id);
             self.reader.text.clear();
             self.reader.thumbnails.clear();
         }
-        if self.reader.panel && !self.reader_focus && ui.ctx().content_rect().width() < 620.0 {
-            if self.reader_chrome_hidden {
-                self.reader_focus_exit(ui, p);
-            } else {
-                self.compact_reader_toolbar(ui, info.pages.len().max(1) as u32, p);
-                ui.add_space(4.0);
-            }
+        if self.reader.panel && !self.reader_focus && bookmarks::compact_study(ui.ctx()) {
+            self.reader_panel(ui, &document, &info, p);
+            return;
         }
         self.selection_toolbar(ui, p);
         if !self.reader_focus {
             self.reader_panel(ui, &document, &info, p);
-        }
-        if self.reader.panel && !self.reader_focus && ui.ctx().content_rect().width() < 620.0 {
-            return;
         }
         if self.preview_reference
             && self.reader.reader_preferences.is_some()
@@ -2207,7 +2261,7 @@ impl App for YamantakaApp {
                     matches!(self.surface, Surface::Reader)
                         && !(self.reader.panel
                             && !self.reader_focus
-                            && ctx.content_rect().width() < 620.0)
+                            && bookmarks::compact_study(&ctx))
                 })
                 .map(|reference| &reference.input_layers),
         );
@@ -2318,7 +2372,7 @@ impl App for YamantakaApp {
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
             egui::Frame::new().fill(p.canvas).show(ui, |ui| {
                 let before_toolbar = ui.available_rect_before_wrap().top();
-                if !matches!(self.surface, Surface::Reader) {
+                if !matches!(self.surface, Surface::Reader) || !self.reader_focus {
                     self.session_bar(ui);
                 }
                 let toolbar_extent = ui.available_rect_before_wrap().top() - before_toolbar;
@@ -2412,7 +2466,9 @@ impl App for YamantakaApp {
                     });
                 }
                 let mut opening_rect = ui.available_rect_before_wrap();
-                opening_rect.min.y -= toolbar_extent;
+                if self.reader_focus && !matches!(self.surface, Surface::Reader) {
+                    opening_rect.min.y -= toolbar_extent;
+                }
                 self.measure_opening_view(ui, opening_rect);
                 if self.opening.busy() && ui.ctx().current_pass_index() == 0 {
                     let previous = self.reader.reader_preferences_cancel.clone();
@@ -2489,6 +2545,17 @@ impl App for YamantakaApp {
         }
         if let Some(path) = &self.capture {
             if !self.capture_requested {
+                let study_only = matches!(self.surface, Surface::Reader)
+                    && self.reader.panel
+                    && !self.reader_focus
+                    && bookmarks::compact_study(&ctx);
+                let page_rendering_ready = study_only
+                    || (self.reader.viewport.refinements_settled()
+                        && self.reader.viewport.prefetch.settled()
+                        && self.reference.as_ref().is_none_or(|reference| {
+                            reference.pane.viewport.refinements_settled()
+                                && reference.pane.viewport.prefetch.settled()
+                        }));
                 let ready = self.library_loaded
                     && self.stored_note_recovery_ready()
                     && self.selection_note_recovery_ready()
@@ -2497,13 +2564,10 @@ impl App for YamantakaApp {
                     && self.managed_pages.settled()
                     && self.preview_device_loss.is_none()
                     && matches!(self.nearby_turn_preview, 0 | 3)
-                    && self.reader.viewport.refinements_settled()
+                    && page_rendering_ready
                     && self.reader_profile_preview != 1
                     && (self.idle_probe.is_none() || !matches!(self.surface,Surface::Reader) || self.reader_chrome_hidden ||
                         (self.reader.panel || self.reader.chrome.settled()) && self.reference.as_ref().is_none_or(|reference|reference.pane.chrome.settled()))
-                    && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.refinements_settled())
-                    && self.reader.viewport.prefetch.settled()
-                    && self.reference.as_ref().is_none_or(|reference|reference.pane.viewport.prefetch.settled())
                     && self.window_state.as_ref().is_none_or(crate::window_state::State::verification_ready)
                     && (!matches!(self.surface, Surface::Reader)
                         || (!self.reader.panel && self.reader.reader_panel_tab != outline::ReaderPanelTab::Find)
@@ -2569,7 +2633,7 @@ impl App for YamantakaApp {
                     && matches!(self.reference_chooser_demo, 0 | 3)
                     && matches!(self.reference_sync_demo, 0 | 10)
                     && (self.reference_chooser_demo == 0 || self.reference.as_ref().is_some_and(|reference|reference.chooser.loaded && reference.chooser.total == 1))
-                    && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.goals.ready())
+                    && (!matches!(self.surface, Surface::Library) || !self.inspector || self.metadata.is_some() || self.cover_picker.is_some() || self.goals.ready())
                     && self.metadata_preview.is_none_or(|(_,stage)|stage==3)
                     && self.metadata.as_ref().is_none_or(|editor|editor.capture_ready())
                     && self.library_covers.slots_ready()
@@ -2578,7 +2642,7 @@ impl App for YamantakaApp {
                     && self.global_notes.source_ready(if matches!(self.surface,Surface::Reader) {self.reader.active.as_ref().map(|(doc,_)|(doc.id.as_str(),self.reader.page))} else {None})
                     // The compact drawer hides the PDF, so it has no visible marks to request.
                     && (!matches!(self.surface, Surface::Reader)
-                        || self.reader.panel && ctx.content_rect().width() < 620.0
+                        || study_only
                         || self.reader.annotation_paint.ready())
                     && self.outline_preview_target.is_none()
                     && self.thumbnail_preview_page.is_none()
@@ -2614,7 +2678,7 @@ impl App for YamantakaApp {
                         || self.search.completed && !self.search.searching)
                     && (!matches!(self.surface, Surface::Reader)
                         || self.reader.reader_preferences.is_some()
-                            && (self.reader.panel && ctx.content_rect().width() < 620.0
+                            && (self.reader.panel && bookmarks::compact_study(&ctx)
                                 || !self.reader.viewport.pages.is_empty()
                                     && self.reader.viewport.pages
                                         .values()
@@ -2722,7 +2786,7 @@ impl App for YamantakaApp {
                     record["libraryVisibleFavorites"]=self.documents.iter().filter(|doc|doc.favorite).count().into();
                     record["librarySelection"]=self.library_selection.summary();
                     record["libraryGrouping"]=self.grouping_summary();
-                    record["workspaceLayout"]=serde_json::json!({"columns":self.library_columns,"panelWidth":self.reader_panel_width,"panelRestorePending":self.reader_panel_restore,"panelActualWidth":egui::containers::panel::PanelState::load(&ctx,egui::Id::new("reader-panel")).map(|state|state.size().x)});
+                    record["workspaceLayout"]=serde_json::json!({"columns":self.library_columns,"panelWidth":self.reader_panel_width,"panelRestorePending":self.reader_panel_restore,"trayActualHeight":egui::containers::panel::PanelState::load(&ctx,egui::Id::new("reader-study-tray")).map(|state|state.size().y)});
                     record["libraryFiltersActive"]=self.library_has_filters().into();
                     record["libraryQueryLoaded"]=self.library_loaded.into();
                     record["smartView"]=self.smart_view.map(|view|view.key()).into();

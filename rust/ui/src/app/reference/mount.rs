@@ -188,7 +188,7 @@ impl YamantakaApp {
         let frame = match plan_primary(
             &self.reader,
             &mut stage.pages,
-            geometry.primary,
+            comparison_paper(geometry.primary),
             &self.runtime,
             ui,
             self.governor.limits().pages,
@@ -216,7 +216,7 @@ impl YamantakaApp {
         if let Err(error) = plan_primary(
             &reference.pane,
             &mut stage.reference_pages,
-            geometry.reference,
+            comparison_paper(geometry.reference),
             &self.runtime,
             ui,
             self.governor.limits().pages,
@@ -386,7 +386,7 @@ impl YamantakaApp {
             let frame = plan_primary(
                 &self.reader,
                 &mut mount.pages,
-                geometry.primary,
+                comparison_paper(geometry.primary),
                 &self.runtime,
                 ui,
                 self.governor.limits().pages,

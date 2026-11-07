@@ -47,6 +47,8 @@ impl YamantakaApp {
                             .on_hover_text("Yamantaka");
                     }
                     let label = self.tr("Biblioteca", "Library");
+                    let returning_to_metadata =
+                        matches!(self.surface, Surface::Reader) && self.metadata_return_available();
                     let library = if compact {
                         theme::icon_toggle(
                             ui,
@@ -65,8 +67,13 @@ impl YamantakaApp {
                             p,
                         )
                     };
+                    let library = if returning_to_metadata {
+                        library.on_hover_text(self.tr("Volver a los metadatos", "Back to metadata"))
+                    } else {
+                        library
+                    };
                     if library.clicked() {
-                        if self.inspector {
+                        if self.inspector && !returning_to_metadata {
                             self.close_book_details();
                         }
                         self.show_surface(Surface::Library);
@@ -76,6 +83,9 @@ impl YamantakaApp {
                     let can_show_all = tabs.len() as f32 * 184.0 <= lane;
                     let overflow = !can_show_all && tabs.len() > 1;
                     let room = if overflow { lane - 44.0 } else { lane };
+                    let visible_count = if can_show_all { tabs.len().max(1) } else { 1 };
+                    let tab_width = (room / visible_count as f32 - 48.0)
+                        .clamp(28.0, if compact { 136.0 } else { 236.0 });
                     let busy = self.library_selection.removing()
                         || self.tabs.busy()
                         || self.opening.busy()
@@ -92,17 +102,14 @@ impl YamantakaApp {
                         };
                         ui.push_id(("reading-tab", id), |ui| {
                             let selected = current && matches!(self.surface, Surface::Reader);
-                            let tab_width = (room - 44.0).clamp(28.0, 136.0);
                             ui.add_enabled_ui(!busy, |ui| {
                                 ui.allocate_ui_with_layout(
                                     egui::vec2(tab_width, 40.0),
                                     egui::Layout::left_to_right(egui::Align::Center),
                                     |ui| {
                                         ui.set_width(tab_width);
-                                        let response =
-                                            theme::bounded_choice(ui, &title, selected, p)
-                                                .on_hover_text(&title);
-                                        if response.clicked() {
+                                        let response = theme::reading_tab(ui, &title, selected, p);
+                                        if response.clicked() && !selected {
                                             if current && self.reader.active.is_some() {
                                                 self.show_surface(Surface::Reader);
                                             } else {

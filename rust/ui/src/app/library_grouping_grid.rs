@@ -78,7 +78,7 @@ impl YamantakaApp {
                                                 (ui.ctx().content_rect().width() - 24.0)
                                                     .clamp(160.0, 300.0),
                                             );
-                                            self.library_book_menu(ui, &document);
+                                            self.library_book_menu(ui, document);
                                         });
                                         response
                                     })

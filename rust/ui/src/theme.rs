@@ -460,6 +460,20 @@ pub fn bounded_navigation(ui: &mut egui::Ui, label: &str, p: Palette) -> egui::R
     .on_hover_text(label)
 }
 
+pub fn reading_tab(ui: &mut egui::Ui, title: &str, active: bool, p: Palette) -> egui::Response {
+    let width = ui.available_width();
+    control_impl(
+        ui,
+        title,
+        None,
+        active,
+        false,
+        ControlLabel::Bounded(width),
+        p,
+    )
+    .on_hover_text(title)
+}
+
 fn control_impl(
     ui: &mut egui::Ui,
     label: &str,

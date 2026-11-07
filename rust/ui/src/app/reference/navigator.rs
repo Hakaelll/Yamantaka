@@ -116,7 +116,7 @@ impl ReferenceView {
                         .max_height(height)
                         .min_scrolled_height(height.min(360.0));
                     scroll.show(ui, |ui| {
-                        let action = self.pane.annotations.show_editor(ui, &context, p);
+                        let action = self.pane.annotations.show_editor(ui, &context, p, true);
                         let export_action = if !self.pane.annotations.editing() || tools.export.busy() {
                             let scope = yamantaka_application::annotation_export::worker::AnnotationExportScope::Document(document.id.clone());
                             tools.export.show(ui, english, &scope, self.pane.annotations.ready(), p).map(annotations::NotesAction::Export)

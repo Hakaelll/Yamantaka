@@ -159,7 +159,7 @@ impl YamantakaApp {
         if let Some(page) = self.thumbnail_preview_page.take() {
             self.choose_thumbnail_page(page.min(info.pages.len().saturating_sub(1) as u32), false);
         }
-        let compact = ui.ctx().content_rect().width() < 620.0;
+        let compact = bookmarks::compact_study(ui.ctx());
         if !compact {
             ui.label(RichText::new(self.tr("Encuentra tu página", "Find your page")).size(22.0));
             ui.add_space(6.0);

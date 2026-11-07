@@ -4,7 +4,7 @@ mod view;
 use std::collections::HashSet;
 use yamantaka_domain::outline::PdfOutline;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum ReaderPanelTab {
     Outline,
     Thumbnails,
@@ -13,6 +13,16 @@ pub(super) enum ReaderPanelTab {
     Annotations,
     Text,
     Positions,
+}
+
+impl ReaderPanelTab {
+    pub(super) fn study_group(self) -> Self {
+        match self {
+            Self::Outline | Self::Thumbnails | Self::Bookmarks | Self::Positions => Self::Outline,
+            Self::Annotations | Self::Text => Self::Annotations,
+            Self::Find => Self::Find,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -167,7 +177,7 @@ impl YamantakaApp {
     }
 
     pub(super) fn outline_panel_content(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let compact = ui.ctx().content_rect().width() < 620.0;
+        let compact = bookmarks::compact_study(ui.ctx());
         if let Some(destination) =
             self.reader
                 .outline

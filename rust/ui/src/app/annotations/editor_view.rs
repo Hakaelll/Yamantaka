@@ -27,44 +27,49 @@ impl AnnotationState {
         ui: &mut egui::Ui,
         context: &NotesContext<'_>,
         p: Palette,
+        show_intro: bool,
     ) -> Option<NotesAction> {
         let tr = |es, en| if context.english { en } else { es };
         let busy = context.busy || self.pending.is_some() || self.recovered.is_some();
         let offset = self.page.as_ref().map_or(0, |page| page.offset);
         let mut action = None;
-        ui.label(
-            RichText::new(tr("Notas de lectura", "Reading notes"))
-                .size(22.0)
-                .color(p.ink),
-        );
-        ui.add_space(6.0);
-        ui.label(
-            RichText::new(tr(
-                "Conserva una idea y vuelve a su contexto.",
-                "Keep an idea and return to its context.",
-            ))
-            .color(p.secondary),
-        );
-        ui.add_space(16.0);
+        if show_intro {
+            ui.label(
+                RichText::new(tr("Notas de lectura", "Reading notes"))
+                    .size(22.0)
+                    .color(p.ink),
+            );
+            ui.add_space(6.0);
+            ui.label(
+                RichText::new(tr(
+                    "Conserva una idea y vuelve a su contexto.",
+                    "Keep an idea and return to its context.",
+                ))
+                .color(p.secondary),
+            );
+            ui.add_space(16.0);
+        }
         if self.recovered.is_some() {
             return self.stored_recovery_panel(ui, p, context.english);
         }
-        ui.horizontal_wrapped(|ui| {
-            for (redo, es, en) in [(false, "Deshacer", "Undo"), (true, "Rehacer", "Redo")] {
-                ui.add_enabled_ui(!busy && self.history_available(redo), |ui| {
-                    if theme::navigation(ui, tr(es, en), false, p).clicked() {
-                        action = Some(NotesAction::Change(
-                            if redo {
-                                AnnotationMutation::Redo
-                            } else {
-                                AnnotationMutation::Undo
-                            },
-                            offset,
-                        ));
-                    }
-                });
-            }
-        });
+        if show_intro || self.history_available(false) || self.history_available(true) {
+            ui.horizontal_wrapped(|ui| {
+                for (redo, es, en) in [(false, "Deshacer", "Undo"), (true, "Rehacer", "Redo")] {
+                    ui.add_enabled_ui(!busy && self.history_available(redo), |ui| {
+                        if theme::navigation(ui, tr(es, en), false, p).clicked() {
+                            action = Some(NotesAction::Change(
+                                if redo {
+                                    AnnotationMutation::Redo
+                                } else {
+                                    AnnotationMutation::Undo
+                                },
+                                offset,
+                            ));
+                        }
+                    });
+                }
+            });
+        }
         if busy {
             ui.horizontal(|ui| {
                 ui.spinner();
@@ -132,10 +137,10 @@ impl AnnotationState {
                 }
                 let passage=editor.passage();
                 if !passage.is_empty() {
-                    egui::Frame::new().fill(p.raised).inner_margin(12).corner_radius(8).show(ui,|ui| {
+                    egui::Frame::new().fill(p.raised).inner_margin(if show_intro { 12 } else { 8 }).corner_radius(8).show(ui,|ui| {
                         egui::ScrollArea::vertical().id_salt("annotation-passage").max_height(110.0).show(ui,|ui| {ui.label(RichText::new(passage).color(p.ink));});
                     });
-                    ui.add_space(14.0);
+                    ui.add_space(if show_intro { 14.0 } else { 6.0 });
                 }
                 let kinds=[AnnotationKind::Highlight,AnnotationKind::Underline,AnnotationKind::Strikeout,AnnotationKind::TextNote,AnnotationKind::PageMarker,AnnotationKind::PageComment];
                 let geometry=!matches!(&editor.source,EditorSource::PageNote {..}) && editor.stored().is_none_or(|record|!record.values.rects.is_empty());
@@ -355,11 +360,9 @@ impl AnnotationState {
                         .inner
                         .clicked()
                     {
-                        action = Some(NotesAction::Navigate(
-                            data.values.page_index,
-                            ui.ctx().content_rect().width() < 620.0,
-                        ));
-                        if ui.ctx().content_rect().width() < 620.0 {
+                        let close = bookmarks::compact_study(ui.ctx());
+                        action = Some(NotesAction::Navigate(data.values.page_index, close));
+                        if close {
                             ui.close();
                         }
                     }

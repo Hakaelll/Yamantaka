@@ -57,18 +57,9 @@ impl YamantakaApp {
                     .max_rect(rect)
                     .invisible(),
             );
-            if panel
-                && !self.reader_focus
-                && ui.ctx().content_rect().width() < 620.0
-                && !self.reader_chrome_hidden
-            {
-                reader_controls::toolbar_frame(&mut measuring, |ui| {
-                    ui.allocate_space(egui::vec2(0.0, 40.0));
-                });
-                measuring.add_space(4.0);
-            }
+            reader_controls::toolbar_slot(&mut measuring);
             if panel && !self.reader_focus {
-                if ui.ctx().content_rect().width() < 620.0 {
+                if bookmarks::compact_study(ui.ctx()) {
                     return candidate.plan_pages(
                         vec![candidate.page],
                         (ui.input(|input| input.max_texture_side) as u32).min(768),
@@ -79,22 +70,27 @@ impl YamantakaApp {
                     .then(|| {
                         egui::containers::panel::PanelState::load(
                             ui.ctx(),
-                            egui::Id::new("reader-panel"),
+                            egui::Id::new(bookmarks::STUDY_TRAY_ID),
                         )
                     })
                     .flatten();
                 ui.ctx().data_mut(|data| {
-                    let id = egui::Id::new("opening-reader-panel");
+                    let id = egui::Id::new("opening-reader-study-tray");
                     data.remove::<egui::containers::panel::PanelState>(id);
                     if let Some(state) = state {
                         data.insert_persisted(id, state);
                     }
                 });
-                bookmarks::navigator_frame("opening-reader-panel", self.reader_panel_width)
-                    .resizable(false)
-                    .show(&mut measuring, |ui| {
-                        bookmarks::navigator_content(ui, |_| {})
-                    });
+                bookmarks::study_tray(
+                    "opening-reader-study-tray",
+                    measuring.available_height(),
+                    self.reader_panel_width,
+                    Palette::new(self.dark),
+                )
+                .resizable(false)
+                .show(&mut measuring, |ui| {
+                    ui.set_min_height(ui.available_height())
+                });
             }
             let viewport = measuring.available_size();
             let viewport = [

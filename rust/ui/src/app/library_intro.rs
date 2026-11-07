@@ -22,7 +22,7 @@ impl YamantakaApp {
         }
     }
 
-    fn reading_shortcut(&mut self, ui: &mut egui::Ui, p: Palette) {
+    fn reading_shortcut(&mut self, ui: &mut egui::Ui, p: Palette, inline: bool) {
         let active = self.reader.active.as_ref().map(|(document, _)| document);
         let Some(document) = active.or(self.resume_document.as_ref()).cloned() else {
             return;
@@ -39,54 +39,69 @@ impl YamantakaApp {
             page.saturating_add(1).min(document.page_count.max(1)),
             document.page_count.max(1)
         );
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 7.0;
-            let compact = ui.available_width() < 500.0;
-            let cover = ui
-                .push_id(("resume-cover", &document.id), |ui| {
-                    book::miniature(
-                        ui,
-                        &document,
-                        if compact { 26.0 } else { 36.0 },
-                        false,
-                        true,
-                        p,
-                    )
-                })
-                .inner;
-            let title_width =
-                (ui.available_width() - if compact { 110.0 } else { 135.0 }).clamp(40.0, 370.0);
-            ui.allocate_ui_with_layout(
-                egui::vec2(title_width, 32.0),
-                egui::Layout::top_down(egui::Align::Min),
-                |ui| {
-                    ui.set_width(title_width);
-                    ui.spacing_mut().item_spacing.y = 2.0;
-                    ui.add(
-                        egui::Label::new(RichText::new(document.display_title()).strong())
-                            .truncate(),
-                    )
-                    .on_hover_text(document.display_title());
-                    ui.label(RichText::new(&position).size(12.0).color(p.secondary));
-                },
-            );
-            let button = theme::control(
-                ui,
-                self.tr("Continuar", "Continue"),
-                (!compact).then_some(theme::Icon::Right),
-                false,
-                false,
-                p,
-            )
-            .on_hover_text(format!("{} · {position}", document.display_title()));
-            if button.clicked() || cover.clicked() {
-                if in_session {
-                    self.show_surface(Surface::Reader);
-                } else {
-                    self.open(document);
-                }
+        let action = self.tr("Continuar", "Continue");
+        let clicked = if inline {
+            let context = format!("{} · {position}", document.display_title());
+            let label = if ui.available_width() >= 360.0 {
+                format!("{action} · {context}")
+            } else {
+                action.to_owned()
+            };
+            theme::bounded_navigation(ui, &label, p)
+                .on_hover_text(&context)
+                .clicked()
+        } else {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 7.0;
+                let compact = ui.available_width() < 500.0;
+                let cover = ui
+                    .push_id(("resume-cover", &document.id), |ui| {
+                        book::miniature(
+                            ui,
+                            &document,
+                            if compact { 26.0 } else { 36.0 },
+                            false,
+                            true,
+                            p,
+                        )
+                    })
+                    .inner;
+                let title_width =
+                    (ui.available_width() - if compact { 110.0 } else { 135.0 }).clamp(40.0, 370.0);
+                ui.allocate_ui_with_layout(
+                    egui::vec2(title_width, 32.0),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| {
+                        ui.set_width(title_width);
+                        ui.spacing_mut().item_spacing.y = 2.0;
+                        ui.add(
+                            egui::Label::new(RichText::new(document.display_title()).strong())
+                                .truncate(),
+                        )
+                        .on_hover_text(document.display_title());
+                        ui.label(RichText::new(&position).size(12.0).color(p.secondary));
+                    },
+                );
+                let button = theme::control(
+                    ui,
+                    action,
+                    (!compact).then_some(theme::Icon::Right),
+                    false,
+                    false,
+                    p,
+                )
+                .on_hover_text(format!("{} · {position}", document.display_title()));
+                button.clicked() || cover.clicked()
+            })
+            .inner
+        };
+        if clicked {
+            if in_session {
+                self.show_surface(Surface::Reader);
+            } else {
+                self.open(document);
             }
-        });
+        }
     }
 
     pub(super) fn library_header(&mut self, ui: &mut egui::Ui, p: Palette) {
@@ -162,6 +177,7 @@ impl YamantakaApp {
                 if clear.clicked() {
                     self.reset_library_filters();
                 }
+                self.reading_shortcut(ui, p, true);
                 if let Some((_, collection)) = &self.collections.filter {
                     ui.add(
                         egui::Label::new(RichText::new(collection).size(13.0).color(p.secondary))
@@ -171,10 +187,10 @@ impl YamantakaApp {
                 }
             });
         } else if small {
-            self.reading_shortcut(ui, p);
+            self.reading_shortcut(ui, p, false);
         } else {
             ui.horizontal(|ui| {
-                self.reading_shortcut(ui, p);
+                self.reading_shortcut(ui, p, false);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(RichText::new(&count).size(13.0).color(p.secondary));
                 });

@@ -253,19 +253,6 @@ impl ReferenceView {
         let notes_blocked = primary.annotations.writing();
         let primary = primary.navigation.as_ref();
         let compact = ui.available_width() < 560.0 || ui.available_height() < 180.0;
-        if !can_choose
-            && !compact
-            && let Some((document, _)) = &self.pane.active
-        {
-            ui.add(
-                egui::Label::new(
-                    RichText::new(document.display_title())
-                        .color(p.secondary)
-                        .size(12.0),
-                )
-                .truncate(),
-            );
-        }
         if self.busy() {
             ui.horizontal_wrapped(|ui| {
                 if let Some(error) = self.error.clone() {
@@ -775,6 +762,11 @@ impl YamantakaApp {
             return;
         };
         reference.follow_primary_page(self.reader.page);
+        let reference_title = reference
+            .pane
+            .active
+            .as_ref()
+            .map(|(document, _)| document.display_title().to_owned());
         let rect = ui.available_rect_before_wrap();
         let geometry = comparison_rects(rect, reference.layout, reference.ratio, reference.swapped);
         let stacked = geometry.stacked;
@@ -824,12 +816,34 @@ impl YamantakaApp {
         );
         let primary_rect = geometry.primary;
         let reference_rect = geometry.reference;
+        let primary_paper = comparison_paper(primary_rect);
+        let reference_paper = comparison_paper(reference_rect);
+        let keyboard = self.tr("Teclado", "Keyboard active");
+        comparison_header(
+            ui,
+            primary_rect,
+            self.tr("Principal", "Main"),
+            document.display_title(),
+            (!self.reading_focus.reference()).then_some(keyboard),
+            p,
+        );
+        let reference_role = self.tr("Referencia", "Reference");
+        comparison_header(
+            ui,
+            reference_rect,
+            reference_role,
+            reference_title
+                .as_deref()
+                .unwrap_or(self.tr("Abriendo…", "Opening…")),
+            self.reading_focus.reference().then_some(keyboard),
+            p,
+        );
         ui.scope_builder(
             egui::UiBuilder::new()
-                .max_rect(primary_rect)
+                .max_rect(primary_paper)
                 .id_salt("reading-pane"),
             |ui| {
-                ui.set_clip_rect(primary_rect.intersect(ui.clip_rect()));
+                ui.set_clip_rect(primary_paper.intersect(ui.clip_rect()));
                 self.reader_viewport(ui, document, p);
             },
         );
@@ -842,10 +856,10 @@ impl YamantakaApp {
                 .follow_primary_position(self.reader.navigation.as_ref().map(|nav| nav.position()));
             ui.scope_builder(
                 egui::UiBuilder::new()
-                    .max_rect(reference_rect)
+                    .max_rect(reference_paper)
                     .id_salt("reference-pane"),
                 |ui| {
-                    ui.set_clip_rect(reference_rect.intersect(ui.clip_rect()));
+                    ui.set_clip_rect(reference_paper.intersect(ui.clip_rect()));
                     close = reference.show(
                         ui,
                         &mut ReferenceTools {
@@ -947,6 +961,46 @@ struct ComparisonRects {
     divider: egui::Rect,
     stacked: bool,
 }
+
+fn comparison_paper(mut pane: egui::Rect) -> egui::Rect {
+    pane.min.y += (pane.height() - 1.0).clamp(0.0, 32.0);
+    pane
+}
+
+fn comparison_header(
+    ui: &mut egui::Ui,
+    pane: egui::Rect,
+    role: &str,
+    title: &str,
+    keyboard: Option<&str>,
+    p: Palette,
+) {
+    let mut rect = pane;
+    rect.max.y = comparison_paper(pane).top();
+    ui.painter().rect_filled(rect, 0, p.surface);
+    ui.painter().line_segment(
+        [rect.left_bottom(), rect.right_bottom()],
+        egui::Stroke::new(1.0, p.line),
+    );
+    let mut header = ui.new_child(
+        egui::UiBuilder::new()
+            .id_salt(("comparison-header", role))
+            .max_rect(rect.shrink2(egui::vec2(8.0, 2.0)))
+            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+    );
+    header.set_clip_rect(rect.intersect(header.clip_rect()));
+    header.spacing_mut().item_spacing.x = 8.0;
+    if let Some(keyboard) = keyboard {
+        let status = header.label(RichText::new(keyboard).size(12.0).color(p.accent));
+        theme::record_control_bounds(&header, keyboard, status.rect);
+    }
+    let name = format!("{role} · {title}");
+    let response = header
+        .add(egui::Label::new(RichText::new(&name).size(13.0)).truncate())
+        .on_hover_text(&name);
+    theme::record_control_bounds(&header, &name, response.rect);
+}
+
 fn comparison_rects(
     rect: egui::Rect,
     layout: ComparisonLayout,
