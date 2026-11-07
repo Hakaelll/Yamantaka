@@ -52,6 +52,7 @@ impl YamantakaApp {
             }
         }
         let p = Palette::new(self.dark);
+        let compact = ui.available_width() < 380.0;
         ui.add_space(10.0);
         ui.horizontal_wrapped(|ui| {
             ui.label(
@@ -76,6 +77,9 @@ impl YamantakaApp {
             }
             if self.goals.reading.is_some() || self.goals.writing.is_some() {
                 ui.spinner();
+            }
+            if compact && !self.goals.editing {
+                ui.end_row();
             }
             ui.add_enabled_ui(self.goals.loaded && self.goals.writing.is_none(), |ui| {
                 if !self.goals.editing

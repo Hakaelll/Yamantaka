@@ -1,272 +1,200 @@
 use super::*;
 
 impl YamantakaApp {
-    pub(super) fn reading_shortcut(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let active = self.tabs.model.active().map(|tab| tab.document());
-        let Some(document) = self
-            .documents
-            .iter()
-            .find(|document| Some(document.id.as_str()) == active)
-            .or_else(|| {
-                self.documents
-                    .iter()
-                    .find(|document| document.reading_progress > 0.0)
-            })
-            .cloned()
-        else {
+    pub(super) fn refresh_resume_document(&mut self) {
+        let cancel = Cancellation::default();
+        if self
+            .runtime
+            .submit(Action::Query(
+                LibraryQuery {
+                    reading_state: LibraryReadingState::InProgress,
+                    sort: LibrarySort::LastOpened,
+                    sort_direction: SortDirection::Descending,
+                    page_size: 1,
+                    ..Default::default()
+                },
+                cancel.clone(),
+            ))
+            .is_ok()
+            && let Some(previous) = self.resume_query.replace(cancel)
+        {
+            previous.cancel();
+        }
+    }
+
+    fn reading_shortcut(&mut self, ui: &mut egui::Ui, p: Palette) {
+        let active = self.reader.active.as_ref().map(|(document, _)| document);
+        let Some(document) = active.or(self.resume_document.as_ref()).cloned() else {
             return;
         };
-        let label = self.tr("Continuar leyendo", "Continue reading");
-        let response = if ui.ctx().content_rect().width() >= 1100.0 {
-            theme::control(ui, label, Some(theme::Icon::Right), false, false, p)
+        let in_session = active.is_some();
+        let page = if in_session {
+            self.reader.page
         } else {
-            theme::icon_button(ui, label, theme::Icon::Right, p)
+            document.last_page_index
         };
-        if response
-            .on_hover_text(format!(
-                "{}\n{} {} / {} · {:.0}%",
-                document.display_title(),
-                self.tr("Página", "Page"),
-                document
-                    .last_page_index
-                    .saturating_add(1)
-                    .min(document.page_count),
-                document.page_count,
-                document.reading_progress.clamp(0.0, 1.0) * 100.0,
-            ))
-            .clicked()
-        {
-            self.open(document);
-        }
-    }
-}
-
-impl YamantakaApp {
-    pub(super) fn library_header(&mut self, ui: &mut egui::Ui, compact: bool, p: Palette) {
-        let available = ui.available_width();
-        let tiny = available < 420.0 && ui.ctx().content_rect().height() < 420.0;
-        let search_width = if available > 700.0 {
-            360.0
-        } else {
-            (available - 200.0).max(200.0)
-        };
-        let title_width = if available > 500.0 {
-            (available - search_width - 18.0).max(150.0)
-        } else {
-            available
-        };
-        if !tiny {
-            ui.horizontal_wrapped(|ui| {
-                if available >= 420.0 {
-                    ui.allocate_ui_with_layout(
-                        egui::vec2(
-                            title_width,
-                            if available < 420.0 {
-                                26.0
-                            } else if compact {
-                                52.0
-                            } else {
-                                64.0
-                            },
-                        ),
-                        egui::Layout::top_down(egui::Align::Min),
-                        |ui| {
-                            ui.set_width(title_width);
-                            ui.label(
-                                RichText::new(self.tr("Tu biblioteca", "Your library")).font(
-                                    egui::FontId::new(
-                                        if compact { 26.0 } else { 38.0 },
-                                        if compact {
-                                            egui::FontFamily::Proportional
-                                        } else {
-                                            egui::FontFamily::Name("Editorial".into())
-                                        },
-                                    ),
-                                ),
-                            );
-                            if available >= 420.0 {
-                                ui.add(
-                                    egui::Label::new(
-                                        RichText::new(format!(
-                                            "{} {}",
-                                            self.count,
-                                            if self.count == 1 {
-                                                self.tr(
-                                                    "documento en tu colección",
-                                                    "document in your collection",
-                                                )
-                                            } else {
-                                                self.tr(
-                                                    "documentos en tu colección",
-                                                    "documents in your collection",
-                                                )
-                                            }
-                                        ))
-                                        .color(p.secondary)
-                                        .size(13.0),
-                                    )
-                                    .wrap(),
-                                );
-                            }
-                        },
-                    );
-                }
-                let search_width = if available <= 500.0 {
-                    available
-                } else {
-                    search_width
-                };
-                ui.allocate_ui_with_layout(
-                    egui::vec2(search_width, 40.0),
-                    egui::Layout::top_down(egui::Align::Min),
-                    |ui| {
-                        ui.set_width(search_width);
-                        self.library_search(ui, search_width, p);
-                    },
-                );
-            });
-        }
-        ui.add_space(if compact { 4.0 } else { 12.0 });
-        ui.horizontal_wrapped(|ui| {
-            if tiny {
-                self.library_search_menu(ui, p);
-            }
-            if available < 900.0 {
-                let label = self.tr("Filtros y orden", "Filters and sorting");
-                let response = if available >= 600.0 {
-                    theme::control(
+        let position = format!(
+            "{} {} / {}",
+            self.tr("Pág.", "Page"),
+            page.saturating_add(1).min(document.page_count.max(1)),
+            document.page_count.max(1)
+        );
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 7.0;
+            let compact = ui.available_width() < 500.0;
+            let cover = ui
+                .push_id(("resume-cover", &document.id), |ui| {
+                    book::miniature(
                         ui,
-                        label,
-                        Some(theme::Icon::Sort),
-                        self.library_has_filters(),
+                        &document,
+                        if compact { 26.0 } else { 36.0 },
                         false,
+                        true,
                         p,
                     )
+                })
+                .inner;
+            let title_width =
+                (ui.available_width() - if compact { 110.0 } else { 135.0 }).clamp(40.0, 370.0);
+            ui.allocate_ui_with_layout(
+                egui::vec2(title_width, 32.0),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ui.set_width(title_width);
+                    ui.spacing_mut().item_spacing.y = 2.0;
+                    ui.add(
+                        egui::Label::new(RichText::new(document.display_title()).strong())
+                            .truncate(),
+                    )
+                    .on_hover_text(document.display_title());
+                    ui.label(RichText::new(&position).size(12.0).color(p.secondary));
+                },
+            );
+            let button = theme::control(
+                ui,
+                self.tr("Continuar", "Continue"),
+                (!compact).then_some(theme::Icon::Right),
+                false,
+                false,
+                p,
+            )
+            .on_hover_text(format!("{} · {position}", document.display_title()));
+            if button.clicked() || cover.clicked() {
+                if in_session {
+                    self.show_surface(Surface::Reader);
                 } else {
-                    theme::icon_toggle(ui, label, theme::Icon::Sort, self.library_has_filters(), p)
-                };
-                let mut popup = egui::Popup::menu(&response);
-                if self.smart_menu_preview {
-                    popup = popup.open(true);
+                    self.open(document);
                 }
-                popup.show(|ui| {
-                    let height =
-                        (ui.ctx().content_rect().bottom() - ui.cursor().top() - 12.0).max(40.0);
-                    ui.set_max_height(height);
-                    egui::ScrollArea::vertical()
-                        .id_salt("compact-library-filters")
-                        .max_height(height)
-                        .show(ui, |ui| self.library_filters(ui, p));
-                });
-            } else {
-                self.library_filters(ui, p);
-            }
-            if available < 900.0
-                && self.library_has_filters()
-                && theme::icon_button(
-                    ui,
-                    self.tr("Restablecer filtros", "Reset filters"),
-                    theme::Icon::Close,
-                    p,
-                )
-                .clicked()
-            {
-                self.reset_library_filters();
-            }
-            if !compact {
-                self.reading_shortcut(ui, p);
-            }
-            self.library_selection_control(ui, p);
-            if available < 420.0 {
-                self.library_view_menu(ui, p);
-            } else {
-                let labelled = ui.available_width() > 900.0;
-                let view_width = if labelled { 300.0 } else { 140.0 };
-                ui.add_space((ui.available_size_before_wrap().x - view_width - 10.0).max(0.0));
-                ui.allocate_ui_with_layout(
-                    egui::vec2(view_width, 40.0),
-                    egui::Layout::right_to_left(egui::Align::Center),
-                    |ui| {
-                        let response = if labelled {
-                            theme::control(
-                                ui,
-                                self.tr("Lista", "List"),
-                                Some(theme::Icon::List),
-                                self.list,
-                                false,
-                                p,
-                            )
-                        } else {
-                            theme::icon_toggle(
-                                ui,
-                                self.tr("Lista", "List"),
-                                theme::Icon::List,
-                                self.list,
-                                p,
-                            )
-                        };
-                        if response.clicked() {
-                            self.list = true;
-                        }
-                        let response = if labelled {
-                            theme::control(
-                                ui,
-                                self.tr("Portadas", "Covers"),
-                                Some(theme::Icon::Grid),
-                                !self.list,
-                                false,
-                                p,
-                            )
-                        } else {
-                            theme::icon_toggle(
-                                ui,
-                                self.tr("Portadas", "Covers"),
-                                theme::Icon::Grid,
-                                !self.list,
-                                p,
-                            )
-                        };
-                        if response.clicked() {
-                            self.list = false;
-                        }
-                        let response = if labelled {
-                            theme::control(
-                                ui,
-                                self.tr("Detalles", "Details"),
-                                Some(theme::Icon::Panel),
-                                self.inspector,
-                                false,
-                                p,
-                            )
-                        } else {
-                            theme::icon_toggle(
-                                ui,
-                                self.tr("Detalles", "Details"),
-                                theme::Icon::Panel,
-                                self.inspector,
-                                p,
-                            )
-                        };
-                        if response.clicked() {
-                            self.inspector = !self.inspector;
-                        }
-                    },
-                );
             }
         });
-        ui.add_space(if compact { 4.0 } else { 12.0 });
     }
-}
 
-impl YamantakaApp {
-    fn library_view_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
+    pub(super) fn library_header(&mut self, ui: &mut egui::Ui, p: Palette) {
+        let width = ui.available_width();
+        let compact = width < 940.0;
+        let small = width < 525.0;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = if small { 4.0 } else { 8.0 };
+            let add_label = self.tr("Añadir PDF", "Add PDFs");
+            let add = if compact {
+                theme::primary_icon(ui, add_label, theme::Icon::Add, p)
+            } else {
+                theme::control(ui, add_label, Some(theme::Icon::Add), false, true, p)
+            };
+            if add.clicked()
+                && let Some(paths) = yamantaka_windows::pick_pdfs()
+            {
+                self.import(paths);
+            }
+            if small {
+                self.library_search_menu(ui, p);
+            } else {
+                let search_width =
+                    (width - if compact { 320.0 } else { 735.0 }).clamp(126.0, 430.0);
+                self.library_search(ui, search_width, p);
+            }
+            if !compact {
+                self.collection_menu(ui, p);
+            }
+            let filters = self.tr("Filtros", "Filters");
+            let active = self.library_has_filters();
+            let response = if compact {
+                theme::icon_toggle(ui, filters, theme::Icon::Sort, active, p)
+            } else {
+                theme::control(ui, filters, Some(theme::Icon::Sort), active, false, p)
+            };
+            let mut popup = egui::Popup::menu(&response);
+            if self.smart_menu_preview {
+                popup = popup.open(true);
+            }
+            popup.show(|ui| {
+                egui::ScrollArea::vertical()
+                    .max_height((ui.ctx().content_rect().height() - 96.0).max(58.0))
+                    .show(ui, |ui| {
+                        if compact {
+                            self.collection_menu(ui, p);
+                        }
+                        self.library_filters(ui, p);
+                    });
+            });
+            self.library_view_menu(ui, compact, p);
+            self.tools_menu(ui, compact, p);
+            self.library_selection_control(ui, p);
+        });
+
+        let filtered = self.library_has_filters();
+        let count = match (self.count, filtered) {
+            (1, true) => self.tr("resultado", "result"),
+            (1, false) => self.tr("libro", "book"),
+            (_, true) => self.tr("resultados", "results"),
+            (_, false) => self.tr("libros", "books"),
+        };
+        let count = format!("{} {count}", self.count);
+        if filtered {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(&count).size(13.0).color(p.secondary));
+                let label = self.tr("Limpiar filtros", "Clear filters");
+                let clear = if small {
+                    theme::icon_button(ui, label, theme::Icon::Close, p)
+                } else {
+                    theme::navigation(ui, label, false, p)
+                };
+                if clear.clicked() {
+                    self.reset_library_filters();
+                }
+                if let Some((_, collection)) = &self.collections.filter {
+                    ui.add(
+                        egui::Label::new(RichText::new(collection).size(13.0).color(p.secondary))
+                            .truncate(),
+                    )
+                    .on_hover_text(collection);
+                }
+            });
+        } else if small {
+            self.reading_shortcut(ui, p);
+        } else {
+            ui.horizontal(|ui| {
+                self.reading_shortcut(ui, p);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(RichText::new(&count).size(13.0).color(p.secondary));
+                });
+            });
+        }
+        ui.add_space(if small { 0.0 } else { 6.0 });
+    }
+
+    fn library_view_menu(&mut self, ui: &mut egui::Ui, compact: bool, p: Palette) {
         let icon = if self.list {
             theme::Icon::List
         } else {
             theme::Icon::Grid
         };
-        let response =
-            theme::icon_button(ui, self.tr("Vista de biblioteca", "Library view"), icon, p);
+        let label = self.tr("Vista", "View");
+        let response = if compact {
+            theme::icon_button(ui, label, icon, p)
+        } else {
+            theme::control(ui, label, Some(icon), false, false, p)
+        };
         let mut popup = egui::Popup::menu(&response);
         if self.demo
             && self.capture.is_some()
@@ -290,24 +218,11 @@ impl YamantakaApp {
                     ui.close();
                 }
             }
-            if theme::control(
-                ui,
-                self.tr("Detalles", "Details"),
-                Some(theme::Icon::Panel),
-                self.inspector,
-                false,
-                p,
-            )
-            .clicked()
-            {
-                self.inspector = !self.inspector;
-                ui.close();
-            }
+            ui.separator();
+            self.library_sort_control(ui, p);
         });
     }
-}
 
-impl YamantakaApp {
     fn library_search(
         &mut self,
         ui: &mut egui::Ui,
@@ -325,11 +240,11 @@ impl YamantakaApp {
                         .lerp_to_gamma(p.secondary, if self.dark { 0.5 } else { 0.65 }),
                 );
                 ui.add_sized(
-                    [search_width, 40.0],
+                    [search_width, 36.0],
                     egui::TextEdit::singleline(&mut self.query)
                         .hint_text(hint.clone())
                         .background_color(p.surface)
-                        .margin(egui::vec2(36.0, 10.0)),
+                        .margin(egui::vec2(36.0, 8.0)),
                 )
             })
             .inner;

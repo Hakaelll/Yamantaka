@@ -273,6 +273,8 @@ pub struct YamantakaApp {
     bulk_picker: Option<bulk_picker::BulkPicker>,
     library_selection: library_selection::SelectionState,
     query_cancel: Cancellation,
+    resume_query: Option<Cancellation>,
+    resume_document: Option<Document>,
     library_loaded: bool,
     error: Option<String>,
     close_review: close_review::CloseReview,
@@ -548,6 +550,8 @@ impl YamantakaApp {
             library_selection: Default::default(),
             grouping,
             query_cancel: Cancellation::default(),
+            resume_query: None,
+            resume_document: None,
             library_loaded: false,
             error: None,
             close_review: Default::default(),
@@ -586,6 +590,7 @@ impl YamantakaApp {
         app.refresh();
         app.request_import_rule_context(false);
         app.send(Action::PendingImports);
+        app.refresh_resume_document();
         app.begin_reader_continuity();
         if app.search.enabled {
             app.send(Action::Index(
@@ -863,6 +868,10 @@ impl YamantakaApp {
         self.reader.thumbnails.clear();
         self.open_intent.leave_destination();
         self.dismiss_password_challenge();
+        if matches!(surface, Surface::Library) && !matches!(self.surface, Surface::Library) {
+            self.library_selection.focus = self.selected.clone();
+            self.refresh_resume_document();
+        }
         self.surface = surface;
     }
     fn open(&mut self, document: Document) -> bool {
@@ -1018,167 +1027,8 @@ impl YamantakaApp {
             self.error = Some(error.to_string());
         }
     }
-    fn toolbar(&mut self, ui: &mut egui::Ui) {
-        let p = Palette::new(self.dark);
-        let compact = ui.ctx().content_rect().height() < 650.0;
-        if self.logo.is_none()
-            && let Ok(icon) = image::load_from_memory(include_bytes!(
-                "../../../assets/branding/yamantaka-logo-purple.png"
-            ))
-        {
-            let icon = icon.to_rgba8();
-            self.logo = Some(ui.ctx().load_texture(
-                "Yamantaka brand",
-                egui::ColorImage::from_rgba_unmultiplied(
-                    [icon.width() as usize, icon.height() as usize],
-                    icon.as_raw(),
-                ),
-                TextureOptions::LINEAR,
-            ));
-        }
-        egui::Frame::new()
-            .fill(p.surface)
-            .inner_margin(egui::Margin::symmetric(
-                if compact { 18 } else { 24 },
-                if compact { 4 } else { 8 },
-            ))
-            .show(ui, |ui| {
-                let narrow = ui.available_width() < 540.0;
-                ui.horizontal_wrapped(|ui| {
-                    if let Some(logo) = &self.logo {
-                        ui.add(
-                            egui::Image::new(logo)
-                                .fit_to_exact_size(egui::vec2(24.0, 24.0))
-                                .corner_radius(5),
-                        );
-                    }
-                    if !compact && !narrow {
-                        if self.startup_mode.is_safe() {
-                            if theme::navigation(ui, self.tr("Modo seguro", "Safe mode"), true, p)
-                                .clicked()
-                            {
-                                self.safe_notice = true;
-                            }
-                        } else {
-                            ui.label(RichText::new("Yamantaka").size(16.0).strong());
-                        }
-                        ui.add_space(12.0);
-                    }
-                    let response = if narrow {
-                        theme::icon_toggle(
-                            ui,
-                            self.tr("Biblioteca", "Library"),
-                            theme::Icon::Book,
-                            matches!(self.surface, Surface::Library),
-                            p,
-                        )
-                    } else {
-                        theme::control(
-                            ui,
-                            self.tr("Biblioteca", "Library"),
-                            Some(theme::Icon::Book),
-                            matches!(self.surface, Surface::Library),
-                            false,
-                            p,
-                        )
-                    };
-                    if response.clicked() {
-                        self.show_surface(Surface::Library);
-                        self.refresh();
-                    }
-                    if self.reader.active.is_some() {
-                        let response = if narrow {
-                            theme::icon_button(
-                                ui,
-                                self.tr("Lector", "Reader"),
-                                theme::Icon::Right,
-                                p,
-                            )
-                        } else {
-                            theme::navigation(
-                                ui,
-                                self.tr("Lector", "Reader"),
-                                matches!(self.surface, Surface::Reader),
-                                p,
-                            )
-                        };
-                        if response.clicked() {
-                            self.show_surface(Surface::Reader);
-                        }
-                    }
-                    if narrow {
-                        if theme::primary_icon(
-                            ui,
-                            self.tr("Añadir PDF", "Add PDFs"),
-                            theme::Icon::Add,
-                            p,
-                        )
-                        .clicked()
-                            && let Some(paths) = yamantaka_windows::pick_pdfs()
-                        {
-                            self.import(paths);
-                        }
-                        self.tools_menu(ui, true, p);
-                        if matches!(self.surface, Surface::Library)
-                            && let Some(document) = self
-                                .documents
-                                .iter()
-                                .find(|doc| doc.reading_progress > 0.0)
-                                .cloned()
-                            && theme::icon_button(
-                                ui,
-                                self.tr("Retomar lectura", "Resume reading"),
-                                theme::Icon::Right,
-                                p,
-                            )
-                            .on_hover_text(document.display_title())
-                            .clicked()
-                        {
-                            self.open(document);
-                        }
-                    } else {
-                        let action_width = if compact { 330.0 } else { 245.0 };
-                        ui.add_space(
-                            (ui.available_size_before_wrap().x - action_width - 10.0).max(0.0),
-                        );
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(action_width, 40.0),
-                            egui::Layout::right_to_left(egui::Align::Center),
-                            |ui| {
-                                self.tools_menu(ui, false, p);
-                                if theme::control(
-                                    ui,
-                                    self.tr("Añadir PDF", "Add PDFs"),
-                                    Some(theme::Icon::Add),
-                                    false,
-                                    true,
-                                    p,
-                                )
-                                .clicked()
-                                    && let Some(paths) = yamantaka_windows::pick_pdfs()
-                                {
-                                    self.import(paths);
-                                }
-                                if compact
-                                    && matches!(self.surface, Surface::Library)
-                                    && let Some(document) = self
-                                        .documents
-                                        .iter()
-                                        .find(|doc| doc.reading_progress > 0.0)
-                                        .cloned()
-                                    && theme::navigation(ui, self.tr("Retomar", "Resume"), false, p)
-                                        .on_hover_text(document.display_title())
-                                        .clicked()
-                                {
-                                    self.open(document);
-                                }
-                            },
-                        );
-                    }
-                });
-            });
-    }
     fn library(&mut self, ui: &mut egui::Ui) {
+        ui.spacing_mut().scroll.fade.strength = 0.0;
         if ui.ctx().content_rect().height() < 420.0 {
             egui::ScrollArea::vertical()
                 .id_salt("library-small-page")
@@ -1191,18 +1041,20 @@ impl YamantakaApp {
     fn library_body(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark);
         let compact = ui.ctx().content_rect().height() < 650.0;
-        let margin = if ui.available_width() < 850.0 { 22 } else { 42 };
+        let margin = if ui.available_width() < 640.0 { 12 } else { 32 };
         egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(
                 margin,
-                if compact { 10 } else { 18 },
+                if ui.available_width() < 420.0 { 3 } else if compact { 8 } else { 16 },
             ))
             .show(ui, |ui| {
                 if compact {
                     ui.spacing_mut().item_spacing.y = 4.0;
                 }
-                self.library_header(ui, compact, p);
-                if self.documents.is_empty() {
+                self.library_header(ui, p);
+                if self.documents.is_empty() && !self.library_loaded {
+                    ui.label(RichText::new(self.tr("Cargando biblioteca…", "Loading library…")).color(p.secondary));
+                } else if self.documents.is_empty() {
                     let filtered=self.library_has_filters();
                     ui.add_space(if compact{18.0}else{36.0});
                     theme::display(ui,if filtered{self.tr("No hay libros que coincidan","No matching books")}else{self.tr("Un lugar para tus próximas lecturas","A place for your next reads")},28.0);
@@ -1223,7 +1075,6 @@ impl YamantakaApp {
     }
     fn library_filters(&mut self, ui: &mut egui::Ui, p: Palette) {
         self.tag_filter_control(ui, p);
-        self.collection_filter(ui, p);
         if theme::navigation(
             ui,
             self.tr("Todos los libros", "All books"),
@@ -1248,6 +1099,16 @@ impl YamantakaApp {
             self.refresh();
         }
         self.library_state_filter(ui, p);
+        if self.library_has_filters()
+            && theme::navigation(ui, self.tr("Limpiar filtros", "Clear filters"), false, p)
+                .clicked()
+        {
+            self.reset_library_filters();
+            ui.close();
+        }
+    }
+
+    fn library_sort_control(&mut self, ui: &mut egui::Ui, p: Palette) {
         let sort_name = self.tr(
             match self.sort {
                 LibrarySort::LastOpened => "Recientes",
@@ -1321,17 +1182,6 @@ impl YamantakaApp {
                     self.library_grouping_options(ui, p);
                 });
         });
-        if self.library_has_filters()
-            && theme::navigation(
-                ui,
-                self.tr("Restablecer filtros", "Reset filters"),
-                false,
-                p,
-            )
-            .clicked()
-        {
-            self.reset_library_filters();
-        }
     }
     fn reader(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark && !self.electronic_ink());
@@ -1595,6 +1445,15 @@ impl App for YamantakaApp {
                 Update::AnnotationRecovered(reply) => self.accept_stored_note_recovery(*reply),
                 Update::SelectionRecovered(reply) => self.accept_selection_note_recovery(*reply),
                 Update::Library(documents, count, memberships, cancel) => {
+                    if self
+                        .resume_query
+                        .as_ref()
+                        .is_some_and(|token| token.same_request(&cancel))
+                    {
+                        self.resume_query = None;
+                        self.resume_document = documents.into_iter().next();
+                        continue;
+                    }
                     if self.command_palette.owns(&cancel) {
                         self.command_palette.accept(documents, cancel);
                         continue;
@@ -1921,6 +1780,14 @@ impl App for YamantakaApp {
                                 reference.pane.viewport.fail_refinement(token)
                             }))
                     {
+                        continue;
+                    }
+                    if cancel.as_ref().is_some_and(|token| {
+                        self.resume_query
+                            .as_ref()
+                            .is_some_and(|pending| pending.same_request(token))
+                    }) {
+                        self.resume_query = None;
                         continue;
                     }
                     if let Some(token) = &cancel
@@ -2452,7 +2319,7 @@ impl App for YamantakaApp {
             egui::Frame::new().fill(p.canvas).show(ui, |ui| {
                 let before_toolbar = ui.available_rect_before_wrap().top();
                 if !matches!(self.surface, Surface::Reader) {
-                    self.toolbar(ui);
+                    self.session_bar(ui);
                 }
                 let toolbar_extent = ui.available_rect_before_wrap().top() - before_toolbar;
                 if let Some(error) = self.error.clone().or_else(|| {
@@ -2560,16 +2427,6 @@ impl App for YamantakaApp {
                 } else if self.opening.busy() {
                     ui.ctx().request_repaint();
                 }
-                if matches!(self.surface, Surface::Library)
-                    && self.inspector
-                    && self.cover_picker.is_none()
-                    && self.metadata.is_none()
-                {
-                    egui::Panel::bottom("document-details")
-                        .default_size(148.0)
-                        .size_range(80.0..=ui.ctx().content_rect().height().max(160.0) * 0.5)
-                        .show(ui, |ui| self.details(ui));
-                }
                 egui::CentralPanel::default()
                     .frame(egui::Frame::new().fill(p.canvas))
                     .show(ui, |ui| match self.surface {
@@ -2577,6 +2434,7 @@ impl App for YamantakaApp {
                         Surface::Library if self.cover_picker.is_some() => {
                             self.cover_picker_view(ui)
                         }
+                        Surface::Library if self.inspector => self.details(ui),
                         Surface::Library => self.library(ui),
                         Surface::Reader => self.reader(ui),
                         Surface::Settings => self.settings(ui),

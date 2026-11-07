@@ -15,8 +15,8 @@ impl YamantakaApp {
         } else if ui.ctx().content_rect().width() < 420.0 {
             self.compact_covers(ui, documents, p);
         } else {
-            let gap = if compact { 28.0 } else { 36.0 };
-            let preferred = if compact { 180.0 } else { 228.0 };
+            let gap = if compact { 20.0 } else { 26.0 };
+            let preferred = if compact { 172.0 } else { 212.0 };
             let columns = ((ui.available_width() + gap) / (preferred + gap))
                 .floor()
                 .max(1.0) as usize;
@@ -34,7 +34,7 @@ impl YamantakaApp {
                                 egui::Layout::top_down(egui::Align::Center),
                                 |ui| {
                                     ui.push_id(&document.id, |ui| {
-                                        book::cover(
+                                        let response = book::cover(
                                             ui,
                                             document,
                                             width,
@@ -42,50 +42,54 @@ impl YamantakaApp {
                                             self.reduced_motion,
                                             p,
                                             self.preview_tilt.filter(|_| document.id == "demo-0"),
-                                        )
+                                        );
+                                        let menu_rect = egui::Rect::from_min_size(
+                                            egui::pos2(
+                                                response.rect.right() - 32.0,
+                                                response.rect.bottom() - 35.0,
+                                            ),
+                                            egui::vec2(32.0, 26.0),
+                                        );
+                                        let label = format!(
+                                            "{} · {}",
+                                            self.tr("Acciones del libro", "Book actions"),
+                                            document.display_title()
+                                        );
+                                        let actions = ui
+                                            .put(menu_rect, egui::Button::new("⋯").frame(false))
+                                            .on_hover_text(&label);
+                                        actions.widget_info(|| {
+                                            egui::WidgetInfo::labeled(
+                                                egui::WidgetType::Button,
+                                                actions.enabled(),
+                                                &label,
+                                            )
+                                        });
+                                        if actions.has_focus() {
+                                            ui.painter().rect_stroke(
+                                                actions.rect,
+                                                4.0,
+                                                egui::Stroke::new(2.0, p.accent),
+                                                egui::StrokeKind::Inside,
+                                            );
+                                        }
+                                        egui::Popup::menu(&actions).show(|ui| {
+                                            ui.set_max_width(
+                                                (ui.ctx().content_rect().width() - 24.0)
+                                                    .clamp(160.0, 300.0),
+                                            );
+                                            self.library_book_menu(ui, &document);
+                                        });
+                                        response
                                     })
                                     .inner
                                 },
                             )
                             .inner;
                         self.library_book_response(ui, &response, document);
-                        response.context_menu(|ui| {
-                            if ui
-                                .button(self.tr("Abrir documento", "Open document"))
-                                .clicked()
-                            {
-                                self.open(document.clone());
-                                ui.close();
-                            }
-                            if ui
-                                .button(self.tr("Mostrar en Explorer", "Show in Explorer"))
-                                .clicked()
-                            {
-                                if let Err(error) = yamantaka_windows::reveal(&document.path) {
-                                    self.error = Some(error.to_string());
-                                }
-                                ui.close();
-                            }
-                            if ui
-                                .add_enabled(
-                                    !self.library_selection.writing(),
-                                    egui::Button::new(
-                                        self.tr("Cambiar favorito", "Toggle favorite"),
-                                    ),
-                                )
-                                .clicked()
-                            {
-                                self.send(Action::Favorite(
-                                    document.id.clone(),
-                                    !document.favorite,
-                                ));
-                                self.refresh();
-                                ui.close();
-                            }
-                        });
                     }
                 });
-                ui.add_space(14.0);
+                ui.add_space(8.0);
             }
         }
     }

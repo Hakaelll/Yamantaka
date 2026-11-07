@@ -99,7 +99,9 @@ impl YamantakaApp {
     ) {
         if self.library_selection.focus.as_deref() == Some(&document.id) {
             response.request_focus();
-            response.scroll_to_me(Some(egui::Align::Center));
+            if !ui.clip_rect().contains_rect(response.rect) {
+                response.scroll_to_me(None);
+            }
             self.library_selection.focus = None;
         }
         let keyboard_space =
@@ -178,43 +180,50 @@ impl YamantakaApp {
             }
         }
         response.context_menu(|ui| {
-            ui.set_max_width((ui.ctx().content_rect().width() - 24.0).max(160.0));
-            let ids = if self.library_selection.model.contains(&document.id) {
-                self.library_selection.model.ids().to_vec()
-            } else {
-                vec![document.id.clone()]
-            };
-            let label = if ids.len() > 1 {
-                format!(
-                    "{} ({})…",
-                    self.tr("Retirar selección", "Remove selection"),
-                    ids.len()
-                )
-            } else {
-                self.tr("Retirar de la biblioteca…", "Remove from library…")
-                    .into()
-            };
-            if ui
-                .add_enabled_ui(!self.library_selection.writing(), |ui| {
-                    theme::bounded_navigation(ui, &label, Palette::new(self.dark))
-                })
-                .inner
-                .clicked()
-            {
-                self.review_removal_ids(ids);
-                ui.close();
-            }
+            ui.set_max_width((ui.ctx().content_rect().width() - 24.0).clamp(160.0, 300.0));
+            self.library_book_menu(ui, document);
         });
         if keyboard_allowed
             && !self.library_selection.model.mode
             && !(modifiers.ctrl || modifiers.command || modifiers.shift)
-            && (response.double_clicked()
+            && (response.clicked()
                 || response.has_focus()
                     && ui.input_mut(|input| {
                         input.consume_key(egui::Modifiers::NONE, egui::Key::Enter)
                     }))
+            && !keyboard_space
         {
             self.open(document.clone());
+        }
+    }
+
+    pub(super) fn library_book_menu(&mut self, ui: &mut egui::Ui, document: &Document) {
+        let p = Palette::new(self.dark);
+        self.list_context_menu(ui, document, p);
+        let ids = if self.library_selection.model.contains(&document.id) {
+            self.library_selection.model.ids().to_vec()
+        } else {
+            vec![document.id.clone()]
+        };
+        let label = if ids.len() > 1 {
+            format!(
+                "{} ({})…",
+                self.tr("Retirar selección", "Remove selection"),
+                ids.len()
+            )
+        } else {
+            self.tr("Retirar de la biblioteca…", "Remove from library…")
+                .into()
+        };
+        if ui
+            .add_enabled_ui(!self.library_selection.writing(), |ui| {
+                theme::bounded_navigation(ui, &label, Palette::new(self.dark))
+            })
+            .inner
+            .clicked()
+        {
+            self.review_removal_ids(ids);
+            ui.close();
         }
     }
     pub(super) fn library_selection_shortcuts(&mut self, ctx: &egui::Context) {
@@ -308,6 +317,14 @@ impl YamantakaApp {
                     self.reconcile_removal(ctx, &report);
                     if !report.succeeded.is_empty() {
                         self.removal_views_changed();
+                        if self
+                            .resume_document
+                            .as_ref()
+                            .is_some_and(|doc| report.succeeded.contains(&doc.id))
+                        {
+                            self.resume_document = None;
+                        }
+                        self.refresh_resume_document();
                     }
                 }
                 match pending.action {

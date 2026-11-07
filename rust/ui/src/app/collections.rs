@@ -284,33 +284,79 @@ impl YamantakaApp {
         }
         self.collections.filter = None;
     }
-    pub(super) fn collection_filter(&mut self, ui: &mut egui::Ui, p: Palette) {
-        let Some((_, name)) = self.collections.filter.clone() else {
-            return;
-        };
-        let short = if name.chars().count() > 24 {
-            format!("{}…", name.chars().take(24).collect::<String>())
-        } else {
-            name.clone()
-        };
-        if theme::navigation(ui, &short, true, p)
-            .on_hover_text(&name)
-            .clicked()
-        {
-            self.show_collections(None);
-        }
-        if theme::icon_button(
+    pub(super) fn collection_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
+        let selected = self.collections.filter.clone();
+        let mut button = theme::navigation(
             ui,
-            self.tr("Quitar filtro de colección", "Clear collection filter"),
-            theme::Icon::Minus,
+            self.tr("Colección", "Collection"),
+            selected.is_some(),
             p,
-        )
-        .clicked()
-        {
-            self.clear_collection_filter();
-            self.offset = 0;
-            self.refresh();
-            self.persist_library_state();
+        );
+        if let Some((_, name)) = &selected {
+            button = button.on_hover_text(name);
         }
+        egui::Popup::menu(&button).show(|ui| {
+            if button.clicked() {
+                self.collections.query = CollectionQuery::default();
+                self.load_collections();
+            }
+            let width = (ui.ctx().content_rect().width() - 32.0).clamp(120.0, 270.0);
+            ui.set_width(width);
+            if theme::bounded_choice(
+                ui,
+                self.tr("Todas las colecciones", "All collections"),
+                selected.is_none(),
+                p,
+            )
+            .clicked()
+            {
+                self.clear_collection_filter();
+                self.offset = 0;
+                self.refresh();
+                self.persist_library_state();
+                ui.close();
+            }
+            egui::ScrollArea::vertical()
+                .max_height((ui.ctx().content_rect().height() - 148.0).max(40.0))
+                .show(ui, |ui| {
+                    if self.collections.pending.is_some() {
+                        ui.label(self.tr("Cargando colecciones…", "Loading collections…"));
+                    } else if self.collections.loaded {
+                        let target = self
+                            .collections
+                            .entries
+                            .iter()
+                            .find(|item| {
+                                ui.push_id(&item.id, |ui| {
+                                    theme::bounded_choice(
+                                        ui,
+                                        &item.name,
+                                        selected.as_ref().is_some_and(|(id, _)| id == &item.id),
+                                        p,
+                                    )
+                                    .on_hover_text(&item.name)
+                                    .clicked()
+                                })
+                                .inner
+                            })
+                            .cloned();
+                        if let Some(collection) = target {
+                            self.apply_collection_filter(&collection);
+                            ui.close();
+                        }
+                    }
+                });
+            ui.separator();
+            if theme::bounded_navigation(
+                ui,
+                self.tr("Gestionar colecciones…", "Manage collections…"),
+                p,
+            )
+            .clicked()
+            {
+                self.show_collections(None);
+                ui.close();
+            }
+        });
     }
 }

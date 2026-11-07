@@ -1,6 +1,227 @@
 use super::*;
 
 impl YamantakaApp {
+    pub(in crate::app) fn session_bar(&mut self, ui: &mut egui::Ui) {
+        let p = Palette::new(self.dark);
+        if self.logo.is_none()
+            && let Ok(icon) = image::load_from_memory(include_bytes!(
+                "../../../../../assets/branding/yamantaka-logo-purple.png"
+            ))
+        {
+            let icon = icon.to_rgba8();
+            self.logo = Some(ui.ctx().load_texture(
+                "Yamantaka brand",
+                egui::ColorImage::from_rgba_unmultiplied(
+                    [icon.width() as usize, icon.height() as usize],
+                    icon.as_raw(),
+                ),
+                TextureOptions::LINEAR,
+            ));
+        }
+        let tabs: Vec<_> = self
+            .tabs
+            .model
+            .tabs()
+            .iter()
+            .map(|tab| {
+                let title = self
+                    .tabs
+                    .captions
+                    .get(tab.document())
+                    .cloned()
+                    .unwrap_or_else(|| self.tr("Documento", "Document").into());
+                (tab.id().to_owned(), title, tab.pinned())
+            })
+            .collect();
+        let active = self.tabs.model.active().map(|tab| tab.id().to_owned());
+        egui::Frame::new()
+            .fill(p.surface)
+            .inner_margin(egui::Margin::symmetric(12, 2))
+            .show(ui, |ui| {
+                let width = ui.available_width();
+                let compact = width < 690.0;
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    if !compact && let Some(logo) = &self.logo {
+                        ui.add(egui::Image::new(logo).fit_to_exact_size(egui::vec2(22.0, 22.0)))
+                            .on_hover_text("Yamantaka");
+                    }
+                    let label = self.tr("Biblioteca", "Library");
+                    let library = if compact {
+                        theme::icon_toggle(
+                            ui,
+                            label,
+                            theme::Icon::Book,
+                            matches!(self.surface, Surface::Library),
+                            p,
+                        )
+                    } else {
+                        theme::control(
+                            ui,
+                            label,
+                            Some(theme::Icon::Book),
+                            matches!(self.surface, Surface::Library),
+                            false,
+                            p,
+                        )
+                    };
+                    if library.clicked() {
+                        if self.inspector {
+                            self.close_book_details();
+                        }
+                        self.show_surface(Surface::Library);
+                    }
+                    let reserved = if compact { 92.0 } else { 214.0 };
+                    let lane = (ui.available_width() - reserved).max(0.0);
+                    let can_show_all = tabs.len() as f32 * 184.0 <= lane;
+                    let overflow = !can_show_all && tabs.len() > 1;
+                    let room = if overflow { lane - 44.0 } else { lane };
+                    let busy = self.library_selection.removing()
+                        || self.tabs.busy()
+                        || self.opening.busy()
+                        || self.reader.reader_preferences_loading;
+                    for (id, title, pinned) in &tabs {
+                        let current = active.as_ref() == Some(id);
+                        if !can_show_all && !current {
+                            continue;
+                        }
+                        let title = if *pinned {
+                            format!("{} · {title}", self.tr("Fijada", "Pinned"))
+                        } else {
+                            title.clone()
+                        };
+                        ui.push_id(("reading-tab", id), |ui| {
+                            let selected = current && matches!(self.surface, Surface::Reader);
+                            let tab_width = (room - 44.0).clamp(28.0, 136.0);
+                            ui.add_enabled_ui(!busy, |ui| {
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(tab_width, 40.0),
+                                    egui::Layout::left_to_right(egui::Align::Center),
+                                    |ui| {
+                                        ui.set_width(tab_width);
+                                        let response =
+                                            theme::bounded_choice(ui, &title, selected, p)
+                                                .on_hover_text(&title);
+                                        if response.clicked() {
+                                            if current && self.reader.active.is_some() {
+                                                self.show_surface(Surface::Reader);
+                                            } else {
+                                                self.select_reader_tab(id);
+                                            }
+                                        }
+                                    },
+                                );
+                                if theme::icon_button(
+                                    ui,
+                                    &format!(
+                                        "{} · {title}",
+                                        self.tr("Cerrar lectura", "Close reading")
+                                    ),
+                                    theme::Icon::Close,
+                                    p,
+                                )
+                                .clicked()
+                                {
+                                    self.close_reader_tab(id);
+                                }
+                            });
+                        });
+                    }
+                    if overflow {
+                        let label = self.tr("Lecturas abiertas", "Open readings");
+                        let response = theme::icon_button(ui, label, theme::Icon::Menu, p);
+                        egui::Popup::menu(&response).show(|ui| {
+                            egui::ScrollArea::vertical()
+                                .max_height((ui.ctx().content_rect().height() - 80.0).max(60.0))
+                                .show(ui, |ui| self.reader_documents_menu(ui));
+                        });
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let label = self.tr("Ajustes", "Settings");
+                        let settings = if compact {
+                            theme::icon_toggle(
+                                ui,
+                                label,
+                                theme::Icon::Settings,
+                                matches!(self.surface, Surface::Settings),
+                                p,
+                            )
+                        } else {
+                            theme::control(
+                                ui,
+                                label,
+                                Some(theme::Icon::Settings),
+                                matches!(self.surface, Surface::Settings),
+                                false,
+                                p,
+                            )
+                        };
+                        if settings.clicked() {
+                            self.show_surface(Surface::Settings);
+                        }
+                        self.session_menu(ui, compact, p);
+                    });
+                });
+            });
+    }
+
+    fn session_menu(&mut self, ui: &mut egui::Ui, compact: bool, p: Palette) {
+        let label = self.tr("Sesión", "Session");
+        let response = if compact {
+            theme::icon_button(ui, label, theme::Icon::Menu, p)
+        } else {
+            theme::control(ui, label, Some(theme::Icon::Menu), false, false, p)
+        };
+        egui::Popup::menu(&response).show(|ui| {
+            egui::ScrollArea::vertical()
+                .max_height((ui.ctx().content_rect().height() - 80.0).max(60.0))
+                .show(ui, |ui| {
+                    if !self.tabs.model.tabs().is_empty() {
+                        ui.menu_button(self.tr("Lecturas abiertas", "Open readings"), |ui| {
+                            self.reader_documents_menu(ui);
+                        });
+                    }
+                    if !self.tabs.model.closed().is_empty()
+                        && theme::bounded_navigation(
+                            ui,
+                            self.tr("Reabrir última lectura", "Reopen last reading"),
+                            p,
+                        )
+                        .clicked()
+                    {
+                        self.reopen_reader_tab();
+                        ui.close();
+                    }
+                    if theme::bounded_navigation(ui, self.tr("Cola de lectura", "Reading queue"), p)
+                        .clicked()
+                    {
+                        self.show_reading_queue();
+                        ui.close();
+                    }
+                    if theme::bounded_navigation(
+                        ui,
+                        self.tr("Espacios de trabajo", "Workspaces"),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_workspaces();
+                        ui.close();
+                    }
+                    if theme::bounded_navigation(
+                        ui,
+                        self.tr("Diario de lectura", "Reading journal"),
+                        p,
+                    )
+                    .clicked()
+                    {
+                        self.show_history();
+                        ui.close();
+                    }
+                });
+        });
+    }
+
     pub(in crate::app) fn reader_documents_menu(&mut self, ui: &mut egui::Ui) {
         self.sync_tab_context();
         let entries: Vec<_> = self

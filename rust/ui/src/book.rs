@@ -7,7 +7,7 @@ use yamantaka_domain::Document;
 
 mod material;
 
-pub(crate) const CAPTION_HEIGHT: f32 = 102.0;
+pub(crate) const CAPTION_HEIGHT: f32 = 91.0;
 const COVER_HEADROOM: f32 = 32.0;
 pub(crate) fn cover_height(width: f32) -> f32 {
     width * 1.34 + COVER_HEADROOM - 10.0
@@ -681,7 +681,7 @@ fn cover_impl(
     }
     let title_rect = Rect::from_min_size(
         egui::pos2(rect.left() + 10.0, rect.top() + height + 5.0),
-        egui::vec2(width - 20.0, 42.0),
+        egui::vec2(width - 20.0, 41.0),
     );
     let mut title = egui::text::LayoutJob::simple(
         document.display_title().to_owned(),
@@ -705,19 +705,25 @@ fn cover_impl(
         painter.layout_job(author_job),
         palette.secondary,
     );
+    let pages = format!(
+        "{} {}",
+        document.page_count,
+        if english { "pages" } else { "páginas" }
+    );
+    let progress = document.reading_progress.clamp(0.0, 1.0);
+    let meta = if progress > 0.0 {
+        format!("{pages} · {:.0}%", progress * 100.0)
+    } else {
+        pages
+    };
     painter.text(
         egui::pos2(title_rect.left(), rect.bottom() - 20.0),
         egui::Align2::LEFT_CENTER,
-        format!(
-            "{} {}  ·  {}%",
-            document.page_count,
-            if english { "pages" } else { "páginas" },
-            (document.reading_progress * 100.0).round()
-        ),
+        meta,
         FontId::proportional(12.0),
         palette.secondary,
     );
-    if document.reading_progress > 0.0 {
+    if progress > 0.0 {
         let track = Rect::from_min_size(
             egui::pos2(title_rect.left(), rect.bottom() - 5.0),
             egui::vec2(title_rect.width(), 2.0),
@@ -726,10 +732,7 @@ fn cover_impl(
         painter.rect_filled(
             Rect::from_min_size(
                 track.min,
-                egui::vec2(
-                    track.width() * document.reading_progress.clamp(0.0, 1.0) as f32,
-                    track.height(),
-                ),
+                egui::vec2(track.width() * progress as f32, track.height()),
             ),
             1.0,
             palette.accent,

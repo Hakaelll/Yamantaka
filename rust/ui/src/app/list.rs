@@ -417,7 +417,7 @@ impl YamantakaApp {
             }
             let details = format!(
                 "{}: {}",
-                self.tr("Ver detalles", "Show details"),
+                self.tr("Ver ficha", "Book details"),
                 document.display_title()
             );
             if theme::icon_button(ui, &details, theme::Icon::Panel, p).clicked() {
@@ -427,7 +427,7 @@ impl YamantakaApp {
         });
     }
 
-    fn list_context_menu(&mut self, ui: &mut egui::Ui, document: &Document, p: Palette) {
+    pub(super) fn list_context_menu(&mut self, ui: &mut egui::Ui, document: &Document, p: Palette) {
         if theme::control(
             ui,
             self.tr("Leer documento", "Read document"),
@@ -444,7 +444,7 @@ impl YamantakaApp {
         }
         if theme::control(
             ui,
-            self.tr("Ver detalles", "Show details"),
+            self.tr("Ver ficha", "Book details"),
             Some(theme::Icon::Panel),
             false,
             false,

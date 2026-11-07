@@ -145,7 +145,7 @@ impl YamantakaApp {
         self.run_search();
     }
     pub(super) fn tools_menu(&mut self, ui: &mut egui::Ui, compact: bool, p: Palette) {
-        let label = self.tr("Herramientas", "Tools");
+        let label = self.tr("Organizar biblioteca", "Organize library");
         let response = if compact {
             theme::icon_button(ui, label, theme::Icon::Menu, p)
         } else {
@@ -193,52 +193,6 @@ impl YamantakaApp {
                         self.show_automation_rules();
                         ui.close();
                     }
-                    if !self.tabs.model.tabs().is_empty() {
-                        let label = format!(
-                            "{} ({})",
-                            self.tr("Lecturas abiertas", "Open readings"),
-                            self.tabs.model.tabs().len()
-                        );
-                        let response = ui.menu_button(&label, |ui| self.reader_documents_menu(ui));
-                        theme::record_control_bounds(ui, &label, response.response.rect);
-                    }
-                    if !self.tabs.model.closed().is_empty()
-                        && ui
-                            .add_enabled_ui(
-                                !self.library_selection.removing()
-                                    && !self.tabs.busy()
-                                    && !self.opening.busy(),
-                                |ui| {
-                                    theme::navigation(
-                                        ui,
-                                        self.tr("Reabrir última lectura", "Reopen last reading"),
-                                        false,
-                                        p,
-                                    )
-                                },
-                            )
-                            .inner
-                            .clicked()
-                    {
-                        self.reopen_reader_tab();
-                        ui.close();
-                    }
-                    if theme::bounded_navigation(ui, self.tr("Cola de lectura", "Reading queue"), p)
-                        .clicked()
-                    {
-                        self.show_reading_queue();
-                        ui.close();
-                    }
-                    if theme::bounded_navigation(
-                        ui,
-                        self.tr("Espacios de trabajo", "Workspaces"),
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.show_workspaces();
-                        ui.close();
-                    }
                     if theme::navigation(
                         ui,
                         self.tr("Copias idénticas", "Identical copies"),
@@ -271,17 +225,6 @@ impl YamantakaApp {
                     }
                     if theme::navigation(
                         ui,
-                        self.tr("Diario de lectura", "Reading journal"),
-                        matches!(self.surface, Surface::History),
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.show_history();
-                        ui.close();
-                    }
-                    if theme::navigation(
-                        ui,
                         self.tr("Notas de la biblioteca", "Library notes"),
                         matches!(self.surface, Surface::Notes),
                         p,
@@ -289,33 +232,6 @@ impl YamantakaApp {
                     .clicked()
                     {
                         self.show_global_notes();
-                        ui.close();
-                    }
-                    if theme::control(
-                        ui,
-                        self.tr("Búsqueda global", "Global search"),
-                        Some(theme::Icon::Search),
-                        matches!(self.surface, Surface::Search),
-                        false,
-                        p,
-                    )
-                    .on_hover_text("Ctrl+Shift+F")
-                    .clicked()
-                    {
-                        self.show_search();
-                        ui.close();
-                    }
-                    if theme::control(
-                        ui,
-                        self.tr("Ajustes", "Settings"),
-                        Some(theme::Icon::Settings),
-                        matches!(self.surface, Surface::Settings),
-                        false,
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.show_surface(Surface::Settings);
                         ui.close();
                     }
                     if self.preview_tools_menu
@@ -459,7 +375,7 @@ impl YamantakaApp {
                         ui.set_max_width(ui.available_width().min(1280.0));
                         theme::display(
                             ui,
-                            self.tr("Búsqueda global", "Global search"),
+                            self.tr("Buscar en el contenido de los PDF", "Search PDF contents"),
                             if cramped { 22.0 } else { 36.0 },
                         );
                         if !cramped {
