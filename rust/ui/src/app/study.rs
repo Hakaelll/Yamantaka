@@ -20,10 +20,11 @@ pub(super) enum Tool {
     Pen,
     Arrow,
     Rectangle,
+    Erase,
 }
 
 impl Tool {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 8] = [
         Self::Select,
         Self::Highlight,
         Self::Underline,
@@ -31,6 +32,7 @@ impl Tool {
         Self::Pen,
         Self::Arrow,
         Self::Rectangle,
+        Self::Erase,
     ];
 
     fn label(self, en: bool) -> &'static str {
@@ -49,6 +51,8 @@ impl Tool {
             (Self::Arrow, true) => "Arrow",
             (Self::Rectangle, false) => "Recuadro",
             (Self::Rectangle, true) => "Rectangle",
+            (Self::Erase, false) => "Borrador",
+            (Self::Erase, true) => "Eraser",
         }
     }
 
@@ -66,7 +70,24 @@ impl Tool {
             Self::Pen => Some(theme::Icon::Pencil),
             Self::Arrow => Some(theme::Icon::Arrow),
             Self::Rectangle => Some(theme::Icon::Rectangle),
+            Self::Erase => Some(theme::Icon::Eraser),
             _ => None,
+        }
+    }
+
+    pub(super) fn selects_text(self) -> bool {
+        self != Self::Erase && self.drawing().is_none()
+    }
+
+    fn description(self, en: bool) -> &'static str {
+        match (self, en) {
+            (Self::Erase, true) => {
+                "Click a mark to erase it. Marks with written notes are protected."
+            }
+            (Self::Erase, false) => {
+                "Pulsa una marca para borrarla. Las marcas con notas escritas están protegidas."
+            }
+            _ => self.label(en),
         }
     }
 }
@@ -136,6 +157,7 @@ pub(super) struct Pane {
 enum Intent {
     PageNote(u32),
     Drawing(Stroke),
+    Erase(String),
 }
 
 struct Stroke {
@@ -306,6 +328,7 @@ impl Pane {
 enum Draft {
     Marks(Arc<AnnotationDraftBatch>),
     Drawing(Arc<AnnotationDraft>),
+    Erase(String),
 }
 
 struct Save {
@@ -316,6 +339,40 @@ struct Save {
 }
 
 impl reader_pane::ReaderPane {
+    pub(super) fn study_page_input(&mut self, ui: &egui::Ui, input: PageInput, p: Palette) {
+        if input.tool != Tool::Erase {
+            self.study.page_input(ui, input);
+            return;
+        }
+        let visible = input.paper.intersect(ui.clip_rect());
+        if self.study.hidden || self.study.has_unsaved() || !visible.is_positive() {
+            return;
+        }
+        let response = ui.interact(
+            visible,
+            ui.id().with(("study-erase", input.page)),
+            egui::Sense::CLICK,
+        );
+        if (response.hovered() || response.clicked())
+            && let Some(pointer) = response
+                .hover_pos()
+                .or_else(|| response.interact_pointer_pos())
+            && let Some(id) = self.annotation_paint.erase_target(
+                ui,
+                input.page,
+                input.paper,
+                input.rotation,
+                pointer,
+                p,
+            )
+        {
+            if response.clicked_by(egui::PointerButton::Primary) {
+                self.study.intent = Some(Intent::Erase(id.to_owned()));
+            }
+            response.on_hover_cursor(egui::CursorIcon::PointingHand);
+        }
+    }
+
     fn submit_study_save(&mut self, runtime: &Runtime, governor: &MemoryGovernor) {
         let Some(save) = &mut self.study.save else {
             return;
@@ -336,6 +393,7 @@ impl reader_pane::ReaderPane {
                 confirm_page_note: false,
                 tags: Vec::new(),
             },
+            Draft::Erase(id) => AnnotationMutation::EraseMark { id: id.clone() },
         };
         self.annotations
             .command(runtime, governor, Some(mutation), 0);
@@ -505,7 +563,7 @@ impl YamantakaApp {
                 ui.set_min_width(ui.available_width());
                 if visible {
                     ui.horizontal(|ui| {
-                        let wide = ui.available_width() >= if comparison { 1190.0 } else { 1100.0 };
+                        let wide = ui.available_width() >= if comparison { 1300.0 } else { 1210.0 };
                         if comparison && ui.available_width() >= 530.0 {
                             ui.label(
                                 RichText::new(if reference {
@@ -529,6 +587,7 @@ impl YamantakaApp {
                                     false,
                                     p,
                                 )
+                                .on_hover_text(tool.description(en))
                                 .clicked()
                                 {
                                     next_tool = Some(tool);
@@ -574,6 +633,7 @@ impl YamantakaApp {
                                                 false,
                                                 p,
                                             )
+                                            .on_hover_text(tool.description(en))
                                             .clicked()
                                             {
                                                 next_tool = Some(tool);
@@ -626,11 +686,17 @@ impl YamantakaApp {
         }
         if hide {
             self.study_pane_mut(reference).study.hidden = !hidden;
+            if !hidden && self.study.tool == Tool::Erase {
+                self.study.tool = Tool::Select;
+            }
         }
         if let Some(tool) = next_tool {
             self.study.tool = tool;
             let pane = self.study_pane_mut(reference);
             pane.study.cancel_gesture();
+            if tool == Tool::Erase {
+                pane.study.hidden = false;
+            }
             if tool == Tool::Note && pane.selection.has_passage() {
                 self.apply_study_action(ui.ctx(), reference, selection::SelectionAction::Annotate);
             } else {
@@ -693,8 +759,7 @@ impl YamantakaApp {
             None
         };
         let action = action.or_else(|| {
-            tool.drawing()
-                .is_none()
+            tool.selects_text()
                 .then(|| pane.selection.context_actions(ui, en, color, p))
                 .flatten()
         });
@@ -792,6 +857,13 @@ impl YamantakaApp {
         match intent {
             Intent::PageNote(page) => {
                 self.study_note(reference, Some(page), AnnotationKind::PageComment)
+            }
+            Intent::Erase(mark) => {
+                let pane = self.study_pane_mut(reference);
+                if let Some((document, _)) = &pane.active {
+                    pane.queue_study_save(document.id.clone(), Draft::Erase(mark));
+                    self.submit_study_save(reference);
+                }
             }
             Intent::Drawing(stroke) => {
                 let pane = self.study_pane(reference);

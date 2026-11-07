@@ -377,7 +377,9 @@ pub(super) fn change(
             .collect(),
         AnnotationChange::Create { .. } => vec![uuid::Uuid::new_v4().to_string()],
         AnnotationChange::Save { record } => vec![record.data().id.clone()],
-        AnnotationChange::Remove { id } | AnnotationChange::Edit { id, .. } => vec![(*id).into()],
+        AnnotationChange::Remove { id }
+        | AnnotationChange::EraseMark { id }
+        | AnnotationChange::Edit { id, .. } => vec![(*id).into()],
         AnnotationChange::Review { ids, .. } | AnnotationChange::AddTag { ids, .. } => {
             validate_batch(ids.len())?;
             ids.iter()
@@ -472,13 +474,20 @@ pub(super) fn change(
             )?;
             pages.insert(record.values.page_index);
         }
-        AnnotationChange::Remove { id } => {
+        AnnotationChange::Remove { id } | AnnotationChange::EraseMark { id } => {
             pages.insert(target(&tx, document, id)?);
-            tx.execute(
-                "DELETE FROM annotations WHERE id=? AND document_id=?",
-                params![id, document],
-            )
-            .map_err(storage)?;
+            let erase = matches!(change, AnnotationChange::EraseMark { .. });
+            let affected = tx.execute(
+                "DELETE FROM annotations WHERE id=? AND document_id=? AND
+                 (NOT ? OR (status='attached' AND COALESCE(trim(note),'')='' AND
+                 type IN ('highlight','underline','strikeout','pageMarker','ink','arrow','rectangle')))",
+                params![id, document, erase],
+            ).map_err(storage)?;
+            if affected == 0 {
+                return Err(Failure::Invalid(
+                    "This mark cannot be erased from the page".into(),
+                ));
+            }
         }
         AnnotationChange::Edit {
             id,

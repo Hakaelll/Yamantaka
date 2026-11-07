@@ -56,6 +56,35 @@ fn drawing_survives_history_and_v9_backup() {
         },
     );
     let id = created.entries()[0].data().id.clone();
+    assert!(
+        database
+            .change_annotation(
+                "original",
+                AnnotationChange::EraseMark { id: "annotation" },
+                &query,
+                IndexAccess::Disabled,
+                &governor,
+                &cancel
+            )
+            .is_err()
+    );
+    assert_eq!(
+        change(&mut database, AnnotationChange::EraseMark { id: &id }).total,
+        0
+    );
+    assert_eq!(
+        change(&mut database, AnnotationChange::Undo).entries()[0]
+            .data()
+            .id,
+        id
+    );
+    assert_eq!(change(&mut database, AnnotationChange::Redo).total, 0);
+    assert_eq!(
+        change(&mut database, AnnotationChange::Undo).entries()[0]
+            .data()
+            .id,
+        id
+    );
     assert_eq!(change(&mut database, AnnotationChange::Undo).total, 0);
     assert_eq!(
         change(&mut database, AnnotationChange::Redo).entries()[0]

@@ -311,6 +311,8 @@ group the tools under the active tool selector. The paper and saved drawings
 stay in the PDF viewport. Note indicators use the available page margin and
 open the exact entry in Notes. Colors on the paper describe the saved marks.
 The interface uses violet for the active tool and keyboard focus.
+The eraser previews its target on the paper. It removes one mark per click
+through annotation history, with written notes protected.
 
 ### Settings and recovery
 

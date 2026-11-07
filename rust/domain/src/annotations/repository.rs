@@ -204,6 +204,9 @@ pub enum AnnotationChange<'a> {
     Remove {
         id: &'a str,
     },
+    EraseMark {
+        id: &'a str,
+    },
     Edit {
         id: &'a str,
         expected: &'a super::revision::AnnotationRevision,

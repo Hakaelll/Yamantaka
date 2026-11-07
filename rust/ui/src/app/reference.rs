@@ -585,7 +585,7 @@ impl ReferenceView {
                     runtime,
                     &document.id,
                     &selection_pages,
-                    tools.study_tool.drawing().is_none()
+                    tools.study_tool.selects_text()
                         && !self.pane.loading
                         && self
                             .pane
@@ -656,7 +656,7 @@ impl ReferenceView {
                 self.pane
                     .find
                     .paint(ui, page.page, paper, layout.rotation(), p);
-                if !self.busy() && !self.close_requested && tools.study_tool.drawing().is_none() {
+                if !self.busy() && !self.close_requested && tools.study_tool.selects_text() {
                     self.pane.selection.show_page(
                         ui,
                         selection::SelectionPage {
@@ -691,7 +691,7 @@ impl ReferenceView {
                     }
                 }
                 if !self.busy() && !self.close_requested && !self.pane.viewport.source_changed {
-                    self.pane.study.page_input(
+                    self.pane.study_page_input(
                         ui,
                         study::PageInput {
                             tool: tools.study_tool,
@@ -700,6 +700,7 @@ impl ReferenceView {
                             paper,
                             rotation: layout.rotation(),
                         },
+                        p,
                     );
                     if tools.study_tool == study::Tool::Select
                         && !self.pane.study.hidden
@@ -716,7 +717,7 @@ impl ReferenceView {
                     }
                 }
             }
-            if !self.busy() && !self.close_requested && tools.study_tool.drawing().is_none() {
+            if !self.busy() && !self.close_requested && tools.study_tool.selects_text() {
                 self.pane
                     .selection
                     .drag_viewport(ui, &frame, origin, layout.rotation());

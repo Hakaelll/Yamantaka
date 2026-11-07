@@ -28,6 +28,9 @@ pub enum AnnotationMutation {
     Remove {
         id: String,
     },
+    EraseMark {
+        id: String,
+    },
     Edit {
         id: String,
         expected: yamantaka_domain::annotations::revision::AnnotationRevision,
@@ -73,6 +76,7 @@ impl AnnotationMutation {
                 tags,
             },
             Self::Remove { id } => AnnotationChange::Remove { id },
+            Self::EraseMark { id } => AnnotationChange::EraseMark { id },
             Self::Edit {
                 id,
                 expected,

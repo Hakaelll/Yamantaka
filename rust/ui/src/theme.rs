@@ -210,6 +210,7 @@ pub enum Icon {
     Arrow,
     Rectangle,
     Copy,
+    Eraser,
     Archive,
     Star,
 }
@@ -253,6 +254,19 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
                 s,
                 egui::StrokeKind::Inside,
             );
+        }
+        Icon::Eraser => {
+            painter.add(egui::Shape::closed_line(
+                vec![
+                    v(-7.0, 2.0),
+                    v(1.0, -6.0),
+                    v(7.0, 0.0),
+                    v(1.0, 6.0),
+                    v(-3.0, 6.0),
+                ],
+                s,
+            ));
+            line(v(-3.0, -2.0), v(3.0, 4.0));
         }
         Icon::Down => {
             line(v(-4.0, -2.0), v(0.0, 2.0));

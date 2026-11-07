@@ -130,7 +130,7 @@ impl YamantakaApp {
             self.reader.annotation_paint.request(&self.runtime, &self.governor, &document.id, &link_pages);
             self.reader.study.keep_visible(&link_pages);
             let text_ready = !self.reader.loading && self.reader.viewport.pages.values().any(|slot| slot.image_key.is_some());
-            self.reader.selection.request_passive(&self.runtime, &document.id, &link_pages, can_interact && tool.drawing().is_none() && text_ready);
+            self.reader.selection.request_passive(&self.runtime, &document.id, &link_pages, can_interact && tool.selects_text() && text_ready);
             self.reader.find.request_highlights(&self.runtime, &document.id, &link_pages, ui.ctx());
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
@@ -176,7 +176,7 @@ impl YamantakaApp {
                     ui.painter().rect_stroke(paper, 1, egui::Stroke::new(2.0, p.accent), egui::StrokeKind::Inside);
                 }
                 self.reader.find.paint(ui, visible.page, paper, layout.rotation(), p);
-                if can_interact && tool.drawing().is_none() {
+                if can_interact && tool.selects_text() {
                     self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
                 }
                 if can_interact && tool == study::Tool::Select && !self.reader.selection.enabled {
@@ -187,13 +187,13 @@ impl YamantakaApp {
                     }
                 }
                 if can_interact {
-                    self.reader.study.page_input(ui, study::PageInput {tool, color, page: visible.page, paper, rotation: layout.rotation()});
+                    self.reader.study_page_input(ui, study::PageInput {tool, color, page: visible.page, paper, rotation: layout.rotation()}, p);
                     if tool == study::Tool::Select && !self.reader.study.hidden {
                         note_badge = self.reader.annotation_paint.note_badges(ui, visible.page, paper, layout.rotation(), self.english, p).or(note_badge.take());
                     }
                 }
             }
-            if can_interact && tool.drawing().is_none() {
+            if can_interact && tool.selects_text() {
                 self.reader.selection.drag_viewport(ui, &frame, origin, layout.rotation());
             }
             self.opening.observe_frame(&document.id, &frame, &self.reader.viewport);

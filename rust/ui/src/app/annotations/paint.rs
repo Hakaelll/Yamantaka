@@ -4,7 +4,31 @@ use yamantaka_domain::annotations::marks::AnnotationMarks;
 
 #[cfg(test)]
 mod tests {
-    use super::badge_group_len;
+    use super::*;
+
+    #[test]
+    fn eraser_hits_the_rotated_outline_without_hitting_its_interior() {
+        let paper = egui::Rect::from_min_size(egui::pos2(10.0, 10.0), egui::vec2(200.0, 100.0));
+        let points = [[0.2, 0.2], [0.8, 0.8]];
+        let hit = |point| {
+            drawing_hit(
+                paper,
+                PageRotation::Deg90,
+                AnnotationKind::Rectangle,
+                &points,
+                point,
+            )
+        };
+        assert!(hit(egui::pos2(50.0, 58.0)));
+        assert!(!hit(paper.center()));
+        assert!(drawing_hit(
+            paper,
+            PageRotation::Deg0,
+            AnnotationKind::Arrow,
+            &points,
+            paper.center()
+        ));
+    }
 
     #[test]
     fn badges_group_within_one_target_height() {
@@ -168,6 +192,68 @@ impl AnnotationPaint {
 }
 
 impl AnnotationPaint {
+    pub(in crate::app) fn erase_target(
+        &self,
+        ui: &egui::Ui,
+        page: u32,
+        paper: egui::Rect,
+        rotation: PageRotation,
+        pointer: egui::Pos2,
+        p: Palette,
+    ) -> Option<&str> {
+        let marks = self.marks(page)?;
+        let mark = marks.marks().iter().rev().find(|mark| {
+            if mark.has_note() {
+                return false;
+            }
+            if let Some(drawing) = mark.drawing() {
+                return drawing_hit(paper, rotation, mark.kind(), drawing.points(), pointer);
+            }
+            matches!(
+                mark.kind(),
+                AnnotationKind::Highlight
+                    | AnnotationKind::Underline
+                    | AnnotationKind::Strikeout
+                    | AnnotationKind::PageMarker
+            ) && mark.rects().iter().any(|rect| {
+                reader_viewport::page_region(paper, rotation, rect.region())
+                    .expand(3.0)
+                    .contains(pointer)
+            })
+        })?;
+        let painter = ui.painter().with_clip_rect(paper);
+        if let Some(drawing) = mark.drawing() {
+            let width = drawing_width(paper);
+            paint_shape(
+                &painter,
+                paper,
+                rotation,
+                mark.kind(),
+                drawing.points(),
+                egui::Stroke::new(width + 4.0, p.accent),
+            );
+            paint_shape(
+                &painter,
+                paper,
+                rotation,
+                mark.kind(),
+                drawing.points(),
+                egui::Stroke::new(width, panel::mark_color(mark.color())),
+            );
+        } else {
+            for rect in mark.rects() {
+                let rect = reader_viewport::page_region(paper, rotation, rect.region());
+                painter.rect_stroke(
+                    rect.expand(1.0),
+                    3,
+                    egui::Stroke::new(1.5, p.accent),
+                    egui::StrokeKind::Outside,
+                );
+            }
+        }
+        Some(mark.id())
+    }
+
     pub(in crate::app) fn paint(
         &self,
         ui: &egui::Ui,
@@ -382,6 +468,55 @@ fn draw_position(paper: egui::Rect, rotation: PageRotation, point: [f64; 2]) -> 
     paper.min + egui::vec2(x as f32 * paper.width(), y as f32 * paper.height())
 }
 
+fn drawing_width(paper: egui::Rect) -> f32 {
+    (paper.width().min(paper.height()) * 0.003).max(1.0)
+}
+
+fn arrow_head(a: egui::Pos2, b: egui::Pos2) -> [egui::Pos2; 2] {
+    let turn = egui::emath::Rot2::from_angle(std::f32::consts::TAU / 10.0);
+    let wing = (b - a) / 4.0;
+    [b - turn * wing, b - turn.inverse() * wing]
+}
+
+fn drawing_hit(
+    paper: egui::Rect,
+    rotation: PageRotation,
+    kind: AnnotationKind,
+    points: &[[f64; 2]],
+    pointer: egui::Pos2,
+) -> bool {
+    let [start, end, ..] = points else {
+        return false;
+    };
+    let position = |point| draw_position(paper, rotation, point);
+    let (a, b) = (position(*start), position(*end));
+    let radius = 5.0 + drawing_width(paper) * 0.5;
+    let near = |a: egui::Pos2, b: egui::Pos2| {
+        let line = b - a;
+        let offset = pointer - a;
+        let length = line.length_sq();
+        let fraction = if length > 0.0 {
+            (offset.dot(line) / length).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        (offset - fraction * line).length_sq() <= radius * radius
+    };
+    match kind {
+        AnnotationKind::Ink => points
+            .windows(2)
+            .any(|pair| near(position(pair[0]), position(pair[1]))),
+        AnnotationKind::Arrow => {
+            near(a, b) || arrow_head(a, b).into_iter().any(|wing| near(b, wing))
+        }
+        AnnotationKind::Rectangle => {
+            let rect = egui::Rect::from_two_pos(a, b);
+            rect.expand(radius).contains(pointer) && !rect.shrink(radius).contains(pointer)
+        }
+        _ => false,
+    }
+}
+
 pub(in crate::app) fn paint_drawing(
     ui: &egui::Ui,
     paper: egui::Rect,
@@ -390,15 +525,28 @@ pub(in crate::app) fn paint_drawing(
     points: &[[f64; 2]],
     color: AnnotationColor,
 ) {
+    paint_shape(
+        &ui.painter().with_clip_rect(paper),
+        paper,
+        rotation,
+        kind,
+        points,
+        egui::Stroke::new(drawing_width(paper), panel::mark_color(color)),
+    );
+}
+
+fn paint_shape(
+    painter: &egui::Painter,
+    paper: egui::Rect,
+    rotation: PageRotation,
+    kind: AnnotationKind,
+    points: &[[f64; 2]],
+    stroke: egui::Stroke,
+) {
     let [start, end, ..] = points else { return };
-    let painter = ui.painter().with_clip_rect(paper);
     let position = |point| draw_position(paper, rotation, point);
     let a = position(*start);
     let b = position(*end);
-    let stroke = egui::Stroke::new(
-        (paper.width().min(paper.height()) * 0.003).max(1.0),
-        panel::mark_color(color),
-    );
     match kind {
         AnnotationKind::Ink => {
             painter.add(egui::Shape::line(
@@ -406,7 +554,12 @@ pub(in crate::app) fn paint_drawing(
                 stroke,
             ));
         }
-        AnnotationKind::Arrow => painter.arrow(a, b - a, stroke),
+        AnnotationKind::Arrow => {
+            painter.line_segment([a, b], stroke);
+            for wing in arrow_head(a, b) {
+                painter.line_segment([b, wing], stroke);
+            }
+        }
         AnnotationKind::Rectangle => {
             painter.rect_stroke(
                 egui::Rect::from_two_pos(a, b),
