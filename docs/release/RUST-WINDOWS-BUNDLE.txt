@@ -1,4 +1,4 @@
-Yamantaka 0.16.0 for Windows x64
+Yamantaka for Windows x64
 
 Native Rust application for Windows 10/11 x64. Flutter, Dart and Rust are not
 required to run this distribution. Extract the complete ZIP and start
@@ -22,8 +22,7 @@ components; Cargo.lock records the pinned dependency resolution.
 
 The accompanying package-manifest.json lists bundled files and SHA-256 hashes.
 SHA256SUMS.txt covers the archive and manifest. verification.json describes
-packaging checks. Final validation was accepted by the owner on 2026-11-04;
-packaging checks are not new runtime or numerical performance measurements.
+packaging checks.
 
 This distribution is not Authenticode-signed. Verify its published checksums
 against the release page before installing or sharing it.

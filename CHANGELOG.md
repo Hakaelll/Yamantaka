@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.17.0 — 2026-11-07
+
+- Add contextual highlight, underline, copy and note actions when selecting PDF text.
+- Add a Study toolbar for repeated marking, freehand drawing, arrows, rectangles and erasing. The eraser previews its target and protects written notes.
+- Add page markers that open the matching note, page filtering and a direct Pending filter for review.
+- Refine the library, reader and settings with more consistent controls, lighter menus and compact layouts.
+- Include drawings in local v9 backups, with continued support for older libraries and backups.
+
 ## 0.16.0 — 2026-11-04
 
 - Replace the active Flutter project with the native Rust Windows application.
