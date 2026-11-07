@@ -5,6 +5,7 @@ pub mod review;
 pub mod revision;
 pub mod selection_note_draft;
 pub mod stored_note_draft;
+pub mod study;
 use crate::{
     Failure, Result,
     memory::{ByteLease, Cost, MemoryCategory, MemoryGovernor, MemoryRepresentation},
@@ -13,6 +14,7 @@ use crate::{
     text_selection::{GeometryCoverage, SelectedPage},
 };
 use serde::{Deserialize, Serialize};
+use study::StudyGeometry;
 pub mod repository;
 
 pub const MAX_ANNOTATION_NOTE_UTF16: usize = 4000;
@@ -26,6 +28,14 @@ pub enum AnnotationKind {
     TextNote,
     PageMarker,
     PageComment,
+    Ink,
+    Arrow,
+    Rectangle,
+}
+impl AnnotationKind {
+    pub fn is_drawing(self) -> bool {
+        matches!(self, Self::Ink | Self::Arrow | Self::Rectangle)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,17 +90,39 @@ impl AnnotationRect {
     }
 }
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RectangleFields {
-    left: f64,
-    top: f64,
-    right: f64,
-    bottom: f64,
+#[serde(untagged, deny_unknown_fields)]
+enum RectangleFields {
+    Edges {
+        left: f64,
+        top: f64,
+        right: f64,
+        bottom: f64,
+    },
+    Extent {
+        left: f64,
+        top: f64,
+        width: f64,
+        height: f64,
+    },
 }
 impl TryFrom<RectangleFields> for AnnotationRect {
     type Error = Failure;
     fn try_from(value: RectangleFields) -> Result<Self> {
-        Ok(NormalizedPageRect::new([value.left, value.top], [value.right, value.bottom])?.into())
+        let (origin, end) = match value {
+            RectangleFields::Edges {
+                left,
+                top,
+                right,
+                bottom,
+            } => ([left, top], [right, bottom]),
+            RectangleFields::Extent {
+                left,
+                top,
+                width,
+                height,
+            } => ([left, top], [left + width, top + height]),
+        };
+        Ok(NormalizedPageRect::new(origin, end)?.into())
     }
 }
 
@@ -123,6 +155,8 @@ pub struct AnnotationDraftValues {
     pub context_before: Option<String>,
     pub context_after: Option<String>,
     pub rects: Vec<AnnotationRect>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drawing: Option<StudyGeometry>,
     pub page_rotation: u16,
     pub document_fingerprint: String,
     pub status: AttachmentStatus,
@@ -176,6 +210,44 @@ impl AnnotationDraft {
             context_before: None,
             context_after: None,
             rects: Vec::new(),
+            drawing: None,
+            page_rotation: source.rotation.degrees(),
+            document_fingerprint: copy(source.fingerprint)?,
+            status: AttachmentStatus::Attached,
+            review_state: AnnotationReviewState::Pending,
+        };
+        Self::from_reserved(values, AnnotationPlacement::Attached, lease)
+    }
+    pub fn drawing(
+        source: AnnotationSource<'_>,
+        page: u32,
+        color: AnnotationColor,
+        geometry: StudyGeometry,
+        governor: &MemoryGovernor,
+    ) -> Result<Self> {
+        validate_source_note(&source, None)?;
+        let bytes = source.document_id.len()
+            + source.fingerprint.len()
+            + geometry.allocated_bytes()
+            + std::mem::size_of::<Self>();
+        let lease = governor
+            .try_reserve_one(Cost::new(
+                MemoryCategory::Text,
+                MemoryRepresentation::Cpu,
+                bytes,
+            ))
+            .map_err(|_| Failure::MemoryBudget)?;
+        let values = AnnotationDraftValues {
+            document_id: copy(source.document_id)?,
+            page_index: page,
+            kind: geometry.kind(),
+            color,
+            note: None,
+            selected_text: None,
+            context_before: None,
+            context_after: None,
+            rects: Vec::new(),
+            drawing: Some(geometry),
             page_rotation: source.rotation.degrees(),
             document_fingerprint: copy(source.fingerprint)?,
             status: AttachmentStatus::Attached,
@@ -192,6 +264,9 @@ impl AnnotationDraft {
         governor: &MemoryGovernor,
     ) -> Result<Self> {
         validate_source_note(&source, note)?;
+        if requested.is_drawing() {
+            return Err(Failure::Invalid("Drawing requires a page gesture".into()));
+        }
         let coverage = selected.geometry_coverage();
         let meaningful = selected.ink_regions().all(|region| {
             region.max()[0] - region.min()[0] > 0.0001 && region.max()[1] - region.min()[1] > 0.0001
@@ -260,6 +335,7 @@ impl AnnotationDraft {
             context_before: (!before.is_empty()).then(|| copy(before)).transpose()?,
             context_after: (!after.is_empty()).then(|| copy(after)).transpose()?,
             rects,
+            drawing: None,
             page_rotation: source.rotation.degrees(),
             document_fingerprint: copy(source.fingerprint)?,
             status: AttachmentStatus::Attached,
@@ -276,6 +352,14 @@ impl AnnotationDraft {
             .rects
             .capacity()
             .checked_mul(std::mem::size_of::<AnnotationRect>())
+            .and_then(|value| {
+                value.checked_add(
+                    values
+                        .drawing
+                        .as_ref()
+                        .map_or(0, StudyGeometry::allocated_bytes),
+                )
+            })
             .and_then(|value| value.checked_add(values.document_id.capacity()))
             .and_then(|value| value.checked_add(values.document_fingerprint.capacity()))
             .and_then(|value| value.checked_add(values.note.as_ref().map_or(0, String::capacity)))

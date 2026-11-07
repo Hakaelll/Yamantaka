@@ -14,6 +14,12 @@ pub(in crate::app) fn kind_label(kind: AnnotationKind, english: bool) -> &'stati
         (AnnotationKind::PageMarker, false) => "Marca de página",
         (AnnotationKind::PageComment, true) => "Page note",
         (AnnotationKind::PageComment, false) => "Nota de página",
+        (AnnotationKind::Ink, true) => "Pen drawing",
+        (AnnotationKind::Ink, false) => "Dibujo a lápiz",
+        (AnnotationKind::Arrow, true) => "Arrow",
+        (AnnotationKind::Arrow, false) => "Flecha",
+        (AnnotationKind::Rectangle, true) => "Rectangle",
+        (AnnotationKind::Rectangle, false) => "Recuadro",
     }
 }
 pub(in crate::app) fn review_label(state: AnnotationReviewState, english: bool) -> &'static str {
@@ -40,7 +46,7 @@ pub(in crate::app) fn color_label(color: AnnotationColor, english: bool) -> &'st
         (AnnotationColor::Violet, false) => "Violeta",
     }
 }
-pub(super) fn mark_color(color: AnnotationColor) -> Color32 {
+pub(in crate::app) fn mark_color(color: AnnotationColor) -> Color32 {
     match color {
         AnnotationColor::Yellow => Color32::from_rgb(190, 139, 20),
         AnnotationColor::Green => Color32::from_rgb(35, 141, 87),

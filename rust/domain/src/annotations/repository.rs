@@ -10,6 +10,7 @@ pub enum AnnotationGrouping {
 #[derive(Default)]
 pub struct AnnotationQuery {
     pub document_id: Option<String>,
+    pub annotation_id: Option<String>,
     pub page: Option<u32>,
     pub kind: Option<AnnotationKind>,
     pub color: Option<AnnotationColor>,
@@ -113,6 +114,22 @@ impl AnnotationRecord {
                         .rects
                         .capacity()
                         .checked_mul(std::mem::size_of::<AnnotationRect>())?,
+                )
+            })
+            .and_then(|bytes| {
+                bytes.checked_add(
+                    values
+                        .drawing
+                        .as_ref()
+                        .map_or(0, StudyGeometry::allocated_bytes),
+                )
+            })
+            .and_then(|bytes| {
+                bytes.checked_add(
+                    values
+                        .drawing
+                        .as_ref()
+                        .map_or(0, StudyGeometry::allocated_bytes),
                 )
             })
             .ok_or(Failure::MemoryBudget)?;

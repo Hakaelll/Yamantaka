@@ -113,11 +113,19 @@ fn save(
         ));
     }
     PageRotation::from_degrees(i64::from(values.page_rotation))?;
-    let bytes = values
-        .rects
-        .len()
+    let drawing = values.drawing.as_ref();
+    if values.kind.is_drawing() != drawing.is_some()
+        || drawing
+            .is_some_and(|geometry| geometry.kind() != values.kind || !values.rects.is_empty())
+    {
+        return Err(Failure::Invalid(
+            "Annotation kind and geometry disagree".into(),
+        ));
+    }
+    let bytes = drawing
+        .map_or(values.rects.len(), |geometry| geometry.points().len())
         .checked_mul(160)
-        .and_then(|bytes| bytes.checked_add(2))
+        .and_then(|bytes| bytes.checked_add(64))
         .ok_or(Failure::MemoryBudget)?;
     let mut lease = governor
         .try_reserve_one(Cost::new(
@@ -129,7 +137,11 @@ fn save(
     let mut json = Vec::new();
     json.try_reserve_exact(bytes)
         .map_err(|_| Failure::MemoryBudget)?;
-    serde_json::to_writer(&mut json, &values.rects).map_err(storage)?;
+    match drawing {
+        Some(geometry) => serde_json::to_writer(&mut json, geometry),
+        None => serde_json::to_writer(&mut json, &values.rects),
+    }
+    .map_err(storage)?;
     lease
         .try_resize(json.capacity())
         .map_err(|_| Failure::MemoryBudget)?;
@@ -282,6 +294,18 @@ fn create_draft(
             "Annotation draft belongs to another document".into(),
         ));
     }
+    if draft.values().kind.is_drawing()
+        && !drawing_source_matches(
+            db,
+            document,
+            &draft.values().document_fingerprint,
+            draft.values().page_index,
+        )?
+    {
+        return Err(Failure::Invalid(
+            "The drawing source changed. Reopen the PDF before drawing.".into(),
+        ));
+    }
     if matches!(
         draft.placement(),
         AnnotationPlacement::PageNoteFallback { .. }
@@ -364,11 +388,18 @@ pub(super) fn change(
         }
         _ => Vec::new(),
     };
-    if let AnnotationChange::Edit { id, expected, .. } = &change {
+    if let AnnotationChange::Edit {
+        id, expected, kind, ..
+    } = &change
+    {
         let current =
             read_one(&tx, document, id, governor, cancel)?.ok_or(Failure::StaleAnnotation)?;
         if current.revision() != *expected {
             return Err(Failure::StaleAnnotation);
+        }
+        let previous = current.data().values.kind;
+        if (previous.is_drawing() || kind.is_drawing()) && previous != *kind {
+            return Err(Failure::Invalid("A drawing keeps its original kind".into()));
         }
     }
     let mut entry = history::Entry::new(document, governor)?;

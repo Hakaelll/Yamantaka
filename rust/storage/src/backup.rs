@@ -268,6 +268,21 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
                     "Incomplete or invalid row: {table}"
                 )));
             }
+            if table == "annotations" {
+                use yamantaka_domain::annotations::{AnnotationKind, study::StudyGeometry};
+                let kind = match row["type"].as_str() {
+                    Some("ink") => Some(AnnotationKind::Ink),
+                    Some("arrow") => Some(AnnotationKind::Arrow),
+                    Some("rectangle") => Some(AnnotationKind::Rectangle),
+                    _ => None,
+                };
+                if let Some(kind) = kind {
+                    let geometry = row["rects_json"].as_str().ok_or_else(|| {
+                        Failure::Invalid("Drawing geometry is missing from the backup".into())
+                    })?;
+                    StudyGeometry::decode(kind, geometry)?;
+                }
+            }
             let values: Vec<_> = columns
                 .iter()
                 .map(|column| {

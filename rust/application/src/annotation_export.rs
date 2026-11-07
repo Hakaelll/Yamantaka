@@ -194,6 +194,12 @@ impl<'a, W: Write> AnnotationExporter<'a, W> {
                 }
                 self.writer.write_all(b",\"rects\":").map_err(write_error)?;
                 serde_json::to_writer(&mut self.writer, &values.rects).map_err(write_error)?;
+                if let Some(drawing) = &values.drawing {
+                    self.writer
+                        .write_all(b",\"drawing\":")
+                        .map_err(write_error)?;
+                    serde_json::to_writer(&mut self.writer, drawing).map_err(write_error)?;
+                }
                 write!(
                     self.writer,
                     ",\"pageRotation\":{},\"documentFingerprint\":",
@@ -227,6 +233,9 @@ impl<'a, W: Write> AnnotationExporter<'a, W> {
                     AnnotationKind::TextNote => "Nota de texto",
                     AnnotationKind::PageMarker => "Marcador visual",
                     AnnotationKind::PageComment => "Comentario de página",
+                    AnnotationKind::Ink => "Dibujo",
+                    AnnotationKind::Arrow => "Flecha",
+                    AnnotationKind::Rectangle => "Recuadro",
                 };
                 let color = match values.color {
                     AnnotationColor::Yellow => "Amarillo suave",

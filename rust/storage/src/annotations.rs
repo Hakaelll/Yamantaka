@@ -54,11 +54,45 @@ fn decode<'a, T: Deserialize<'a>>(value: &'a str) -> Result<T> {
     T::deserialize(serde::de::value::StrDeserializer::<serde::de::value::Error>::new(value))
         .map_err(|_| Failure::Invalid("Unsupported annotation enum value".into()))
 }
+fn decode_color(value: &str) -> Result<AnnotationColor> {
+    match value.to_ascii_lowercase().as_str() {
+        "#e6c75a" => Ok(AnnotationColor::Yellow),
+        "#79b58a" => Ok(AnnotationColor::Green),
+        "#78a9c8" => Ok(AnnotationColor::Blue),
+        "#c98e9e" => Ok(AnnotationColor::Rose),
+        "#a897c8" | "#c5adff" => Ok(AnnotationColor::Violet),
+        _ => decode(value),
+    }
+}
 fn field<'a>(row: &'a Row<'_>, index: usize) -> Result<&'a str> {
     row.get_ref(index)
         .map_err(storage)?
         .as_str()
         .map_err(storage)
+}
+fn decode_geometry(
+    kind: AnnotationKind,
+    json: &str,
+) -> Result<(Vec<AnnotationRect>, Option<study::StudyGeometry>)> {
+    if kind.is_drawing() {
+        return Ok((Vec::new(), Some(study::StudyGeometry::decode(kind, json)?)));
+    }
+    let rects = serde_json::from_str(json)
+        .map_err(|_| Failure::Invalid("Annotation geometry cannot be decoded safely".into()))?;
+    Ok((rects, None))
+}
+fn drawing_source_matches(
+    db: &Connection,
+    document: &str,
+    fingerprint: &str,
+    page: u32,
+) -> Result<bool> {
+    db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM documents WHERE id=? AND fingerprint=? AND is_modified=0 AND page_count>?)",
+        params![document, fingerprint, page],
+        |row| row.get(0),
+    )
+    .map_err(storage)
 }
 fn read_title(
     db: &Connection,
@@ -137,20 +171,31 @@ fn read_record(
         cancel.check()?;
         tags.push(tag.map_err(storage)?);
     }
+    let kind: AnnotationKind = decode(field(row, 3)?)?;
+    let (rects, drawing) = decode_geometry(kind, field(row, 9)?)?;
+    let document_id = field(row, 1)?;
+    let fingerprint = field(row, 11)?;
+    let page = row.get(2).map_err(storage)?;
+    let status =
+        if kind.is_drawing() && !drawing_source_matches(db, document_id, fingerprint, page)? {
+            AttachmentStatus::ReviewRequired
+        } else {
+            decode(field(row, 12)?)?
+        };
     let values = AnnotationDraftValues {
-        document_id: row.get(1).map_err(storage)?,
-        page_index: row.get(2).map_err(storage)?,
-        kind: decode(field(row, 3)?)?,
-        color: decode(field(row, 4)?)?,
+        document_id: document_id.into(),
+        page_index: page,
+        kind,
+        color: decode_color(field(row, 4)?)?,
         note: row.get(5).map_err(storage)?,
         selected_text: row.get(6).map_err(storage)?,
         context_before: row.get(7).map_err(storage)?,
         context_after: row.get(8).map_err(storage)?,
-        rects: serde_json::from_str(field(row, 9)?)
-            .map_err(|_| Failure::Invalid("Annotation geometry cannot be decoded safely".into()))?,
+        rects,
+        drawing,
         page_rotation: PageRotation::from_degrees(row.get(10).map_err(storage)?)?.degrees(),
-        document_fingerprint: row.get(11).map_err(storage)?,
-        status: decode(field(row, 12)?)?,
+        document_fingerprint: fingerprint.into(),
+        status,
         review_state: decode(field(row, 15)?)?,
     };
     let mut extensions = Vec::new();
@@ -251,6 +296,7 @@ fn read_page(
     let mut values = Vec::new();
     for (column, value) in [
         ("document_id", query.document_id.clone()),
+        ("id", query.annotation_id.clone()),
         ("type", query.kind.map(name).transpose()?),
         ("color", query.color.map(name).transpose()?),
         ("review_state", query.review.map(name).transpose()?),

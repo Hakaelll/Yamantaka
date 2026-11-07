@@ -1,12 +1,24 @@
 use super::*;
 
 pub struct AnnotationMark {
+    id: String,
     kind: AnnotationKind,
     color: AnnotationColor,
     rects: Vec<AnnotationRect>,
+    drawing: Option<StudyGeometry>,
+    has_note: bool,
     _lease: ByteLease,
 }
 impl AnnotationMark {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    pub fn has_note(&self) -> bool {
+        self.has_note
+    }
+    pub fn drawing(&self) -> Option<&StudyGeometry> {
+        self.drawing.as_ref()
+    }
     pub fn kind(&self) -> AnnotationKind {
         self.kind
     }
@@ -17,21 +29,31 @@ impl AnnotationMark {
         &self.rects
     }
     pub fn from_reserved(
+        id: String,
         kind: AnnotationKind,
         color: AnnotationColor,
         rects: Vec<AnnotationRect>,
+        drawing: Option<StudyGeometry>,
+        has_note: bool,
         mut lease: ByteLease,
     ) -> Result<Self> {
         let bytes = rects
             .capacity()
             .checked_mul(std::mem::size_of::<AnnotationRect>())
+            .and_then(|bytes| bytes.checked_add(id.capacity()))
+            .and_then(|bytes| {
+                bytes.checked_add(drawing.as_ref().map_or(0, StudyGeometry::allocated_bytes))
+            })
             .and_then(|bytes| bytes.checked_add(std::mem::size_of::<Self>()))
             .ok_or(Failure::MemoryBudget)?;
         lease.try_resize(bytes).map_err(|_| Failure::MemoryBudget)?;
         Ok(Self {
+            id,
             kind,
             color,
             rects,
+            drawing,
+            has_note,
             _lease: lease,
         })
     }
