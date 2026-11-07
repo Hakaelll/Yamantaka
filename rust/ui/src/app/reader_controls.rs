@@ -68,6 +68,19 @@ impl YamantakaApp {
         }
         self.reader_study_control(ui, ReaderPanelTab::Outline, labeled, p);
         self.reader_study_control(ui, ReaderPanelTab::Annotations, labeled, p);
+        if width >= 430.0
+            && study_control(
+                ui,
+                self.tr("Estudio", "Study"),
+                Icon::Pencil,
+                self.study.active,
+                labeled,
+                p,
+            )
+            .clicked()
+        {
+            self.toggle_study();
+        }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let more =
                 theme::icon_button(ui, self.tr("Más controles", "More controls"), Icon::Menu, p);

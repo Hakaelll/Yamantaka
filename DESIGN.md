@@ -305,6 +305,13 @@ preparation use the same toolbar and tray allocation as the visible reader.
 Comparison labels the active document and keeps the existing automatic,
 side-by-side and stacked arrangements and synchronization controls.
 
+Selecting PDF text opens contextual marks near the passage. Study reveals
+a second native working row for repeated marking and drawing. Compact widths
+group the tools under the active tool selector. The paper and saved drawings
+stay in the PDF viewport. Note indicators use the available page margin and
+open the exact entry in Notes. Colors on the paper describe the saved marks.
+The interface uses violet for the active tool and keyboard focus.
+
 ### Settings and recovery
 
 Settings puts its categories across the top and uses a named selector when they

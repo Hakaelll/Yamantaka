@@ -2,6 +2,7 @@ use super::*;
 mod admission_preview;
 mod comparison_preview;
 mod keyboard;
+mod passive;
 mod pointer_scroll;
 mod view;
 mod words;
@@ -22,6 +23,7 @@ pub(super) struct SelectionState {
     pages: BTreeMap<u32, text::TextState>,
     gesture: SelectionGesture,
     focus_ids: BTreeMap<u32, egui::Id>,
+    passive: passive::Passive,
 }
 impl SelectionState {
     pub(super) fn extend_preview(&mut self, end_page: u32) -> bool {
@@ -70,9 +72,13 @@ impl SelectionState {
             self.pages.clear();
             self.gesture = SelectionGesture::default();
             self.focus_ids.clear();
+            self.passive = Default::default();
             self.document = Some(document.into());
         }
         self.focus_ids.retain(|page, _| visible.contains(page));
+        self.passive
+            .targets
+            .retain(|page, _| visible.contains(page));
         let selection = self.range();
         self.pages.retain(|page, _| {
             visible.contains(page)
@@ -153,11 +159,6 @@ impl YamantakaApp {
     pub(super) fn toggle_text_selection(&mut self) {
         self.reader.toggle_selection();
     }
-    pub(super) fn request_selection_pages(&mut self, document: &str, pages: &[u32]) {
-        self.reader
-            .selection
-            .request(&self.runtime, document, pages);
-    }
     pub(super) fn selection_toolbar(&mut self, ui: &mut egui::Ui, palette: Palette) {
         if self.reference.is_none() {
             self.selection_actions(ui, palette);
@@ -185,6 +186,9 @@ impl YamantakaApp {
                     ui.close();
                 }
             }
+            Some(
+                SelectionAction::Highlight | SelectionAction::Underline | SelectionAction::Color(_),
+            ) => {}
             None => {}
         }
     }
@@ -241,6 +245,9 @@ impl YamantakaApp {
 pub(super) enum SelectionAction {
     Copy,
     Annotate,
+    Highlight,
+    Underline,
+    Color(yamantaka_domain::annotations::AnnotationColor),
 }
 
 impl SelectionState {

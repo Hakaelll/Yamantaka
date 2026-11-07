@@ -219,6 +219,10 @@ impl YamantakaApp {
         if self.reference.is_some() && self.reader.selection.enabled {
             self.selection_actions(ui, p);
         }
+        if theme::navigation(ui, self.tr("Estudio", "Study"), self.study.active, p).clicked() {
+            self.toggle_study();
+            ui.close();
+        }
         ui.separator();
         let Some(mut preferences) = self.reader.reader_preferences.clone() else {
             ui.label(

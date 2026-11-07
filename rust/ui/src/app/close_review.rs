@@ -68,11 +68,11 @@ impl YamantakaApp {
                 .is_some_and(metadata::MetadataEditor::writing)
     }
     fn editor_drafts_open(&self) -> bool {
-        self.reader.annotations.unsaved_editor()
-            || self
-                .reference
-                .as_ref()
-                .is_some_and(|view| view.pane.annotations.unsaved_editor())
+        self.reader.study.has_unsaved()
+            || self.reader.annotations.unsaved_editor()
+            || self.reference.as_ref().is_some_and(|view| {
+                view.pane.study.has_unsaved() || view.pane.annotations.unsaved_editor()
+            })
             || self
                 .metadata
                 .as_ref()
@@ -125,8 +125,8 @@ impl YamantakaApp {
                 ui.add_space(if compact {6.0} else {12.0});
                 egui::ScrollArea::vertical().max_height((ctx.content_rect().height() - if compact {156.0} else {220.0}).max(32.0)).show(ui, |ui| {
                     ui.label(self.tr(
-                        if waiting { "Terminando de guardar los cambios. Puedes seguir en la aplicación." } else { "Hay notas o correcciones de metadatos sin guardar. Vuelve a la edición para conservarlas." },
-                        if waiting { "Finishing saved changes. You can stay in the app." } else { "Notes or metadata corrections have not been saved. Return to editing to keep them." },
+                        if waiting { "Terminando de guardar los cambios. Puedes seguir en la aplicación." } else { "Hay anotaciones o correcciones de metadatos sin guardar. Vuelve a la edición para conservarlas." },
+                        if waiting { "Finishing saved changes. You can stay in the app." } else { "There are unsaved annotations or metadata changes. Return to editing to keep them." },
                     ));
                 });
                 ui.add_space(if compact {10.0} else {20.0});
@@ -155,8 +155,10 @@ impl YamantakaApp {
             self.backups.close_after = false;
         } else if discard && !self.editor_writes_pending() {
             self.reader.annotations.discard_editor();
+            self.reader.study.discard();
             if let Some(view) = &mut self.reference {
                 view.pane.annotations.discard_editor();
+                view.pane.study.discard();
             }
             self.metadata = None;
             self.close_review = Default::default();

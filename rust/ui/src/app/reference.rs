@@ -24,6 +24,8 @@ struct ReferenceTools<'a> {
     governor: &'a MemoryGovernor,
     export: &'a mut annotations::export::ExportState,
     reduced_motion: bool,
+    study_tool: study::Tool,
+    study_color: yamantaka_domain::annotations::AnnotationColor,
 }
 pub(super) struct ReferenceView {
     pub(in crate::app) deferred: bool,
@@ -494,6 +496,7 @@ impl ReferenceView {
         );
         ui.spacing_mut().scroll.fade.strength = 0.0;
         let mut scroll = egui::ScrollArea::both()
+            .scroll_source(egui::scroll_area::ScrollSource::ALL)
             .animated(
                 !tools.reduced_motion
                     && self.pane.visual_profile != reader_profile::VisualProfile::ElectronicInk,
@@ -566,6 +569,7 @@ impl ReferenceView {
                 keep
             });
             let selection_pages: Vec<u32> = frame.pages.iter().map(|page| page.page).collect();
+            self.pane.study.keep_visible(&selection_pages);
             if !self.busy() && !self.close_requested {
                 if self.pane.panel && self.pane.reader_panel_tab == outline::ReaderPanelTab::Find {
                     self.pane.find.request_highlights(
@@ -577,9 +581,20 @@ impl ReferenceView {
                 } else {
                     self.pane.find.clear_highlights();
                 }
-                self.pane
-                    .selection
-                    .request(runtime, &document.id, &selection_pages);
+                self.pane.selection.request_passive(
+                    runtime,
+                    &document.id,
+                    &selection_pages,
+                    tools.study_tool.drawing().is_none()
+                        && !self.pane.loading
+                        && self
+                            .pane
+                            .viewport
+                            .pages
+                            .values()
+                            .any(|slot| slot.image_key.is_some())
+                        && !self.pane.viewport.source_changed,
+                );
             }
             let origin = ui.max_rect().min;
             for page in &frame.pages {
@@ -625,9 +640,11 @@ impl ReferenceView {
                 ) {
                     self.error = Some(error.to_string());
                 }
-                self.pane
-                    .annotation_paint
-                    .paint(ui, page.page, paper, layout.rotation());
+                if !self.pane.study.hidden && !self.pane.viewport.source_changed {
+                    self.pane
+                        .annotation_paint
+                        .paint(ui, page.page, paper, layout.rotation());
+                }
                 if self.differences.contains(&page.page) {
                     ui.painter().rect_stroke(
                         paper,
@@ -639,7 +656,7 @@ impl ReferenceView {
                 self.pane
                     .find
                     .paint(ui, page.page, paper, layout.rotation(), p);
-                if !self.busy() && !self.close_requested {
+                if !self.busy() && !self.close_requested && tools.study_tool.drawing().is_none() {
                     self.pane.selection.show_page(
                         ui,
                         selection::SelectionPage {
@@ -653,7 +670,11 @@ impl ReferenceView {
                         Some(&mut self.selection_preview),
                     );
                 }
-                if !self.busy() && !self.close_requested && !self.pane.selection.enabled {
+                if !self.busy()
+                    && !self.close_requested
+                    && tools.study_tool == study::Tool::Select
+                    && !self.pane.selection.enabled
+                {
                     match self.pane.links.regions(
                         ui,
                         page.page,
@@ -669,8 +690,33 @@ impl ReferenceView {
                         _ => {}
                     }
                 }
+                if !self.busy() && !self.close_requested && !self.pane.viewport.source_changed {
+                    self.pane.study.page_input(
+                        ui,
+                        study::PageInput {
+                            tool: tools.study_tool,
+                            color: tools.study_color,
+                            page: page.page,
+                            paper,
+                            rotation: layout.rotation(),
+                        },
+                    );
+                    if tools.study_tool == study::Tool::Select
+                        && !self.pane.study.hidden
+                        && let Some(id) = self.pane.annotation_paint.note_badges(
+                            ui,
+                            page.page,
+                            paper,
+                            layout.rotation(),
+                            english,
+                            p,
+                        )
+                    {
+                        self.notes_action = Some(annotations::NotesAction::Focus(id));
+                    }
+                }
             }
-            if !self.busy() && !self.close_requested {
+            if !self.busy() && !self.close_requested && tools.study_tool.drawing().is_none() {
                 self.pane
                     .selection
                     .drag_viewport(ui, &frame, origin, layout.rotation());
@@ -850,6 +896,8 @@ impl YamantakaApp {
         let mut close = false;
         let mut selected = None;
         let mut difference = None;
+        let study_tool = self.study_tool(true);
+        let study_color = self.study_color();
         if let Some(reference) = &mut self.reference {
             reference.follow_primary_zoom(self.reader.viewport.scale);
             reference
@@ -867,6 +915,8 @@ impl YamantakaApp {
                             governor: &self.governor,
                             export: &mut self.annotation_export,
                             reduced_motion: self.reduced_motion,
+                            study_tool,
+                            study_color,
                         },
                         self.english,
                         p,

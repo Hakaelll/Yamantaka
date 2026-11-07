@@ -101,7 +101,9 @@ impl SelectionState {
         p: Palette,
         preview: Option<&mut SelectionPreview>,
     ) {
-        if !self.enabled || self.document.as_deref() != Some(page.document) {
+        if !(self.enabled || self.passive.enabled)
+            || self.document.as_deref() != Some(page.document)
+        {
             return;
         }
         let Some(payload) = self
@@ -121,15 +123,25 @@ impl SelectionState {
         } else {
             "Seleccionar texto del PDF. Doble clic selecciona una palabra. Mayús+flechas amplía la selección; Ctrl+A selecciona la página; Ctrl+C copia el pasaje."
         };
-        selection_input(
-            ui,
-            payload,
-            page.paper,
-            page.rotation,
-            id,
-            label,
-            &mut self.gesture,
-        );
+        let dragging = matches!(self.gesture, SelectionGesture::Dragging(..));
+        if self.enabled {
+            selection_input(
+                ui,
+                payload,
+                page.paper,
+                page.rotation,
+                id,
+                label,
+                &mut self.gesture,
+            );
+        } else {
+            self.passive
+                .select(ui, payload, &page, id, label, &mut self.gesture);
+        }
+        if dragging && matches!(self.gesture, SelectionGesture::Selected(..)) && self.has_passage()
+        {
+            self.passive.completed = true;
+        }
         if ui.memory(|memory| memory.has_focus(id)) {
             ui.painter().rect_stroke(
                 page.paper,
@@ -142,11 +154,10 @@ impl SelectionState {
             && let Ok(Some(selected)) = range.page(payload)
         {
             for bounds in selected.regions() {
-                ui.painter().rect_filled(
-                    reader_viewport::page_region(page.paper, page.rotation, bounds),
-                    1,
-                    p.accent.gamma_multiply(0.25),
-                );
+                let bounds = reader_viewport::page_region(page.paper, page.rotation, bounds);
+                self.passive.anchor(ui, id, bounds);
+                ui.painter()
+                    .rect_filled(bounds, 1, p.accent.gamma_multiply(0.25));
             }
         }
     }

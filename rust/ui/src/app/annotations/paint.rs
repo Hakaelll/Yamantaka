@@ -2,6 +2,23 @@ use super::*;
 use yamantaka_application::annotations::{AnnotationMarksReply, AnnotationMarksRequest};
 use yamantaka_domain::annotations::marks::AnnotationMarks;
 
+#[cfg(test)]
+mod tests {
+    use super::badge_group_len;
+
+    #[test]
+    fn badges_group_within_one_target_height() {
+        let anchors = [
+            (20.0, "first"),
+            (32.0, "second"),
+            (50.0, "third"),
+            (54.0, "fourth"),
+        ];
+        assert_eq!(badge_group_len(&anchors), 2);
+        assert_eq!(badge_group_len(&anchors[2..]), 2);
+    }
+}
+
 #[derive(Default)]
 struct MarkSlot {
     payload: Option<AnnotationMarks>,
@@ -33,10 +50,12 @@ impl Drop for MarkSlot {
 pub(in crate::app) struct AnnotationPaint {
     document: Option<String>,
     pages: HashMap<u32, MarkSlot>,
+    pub(super) focused: Option<String>,
 }
 impl AnnotationPaint {
     pub(in crate::app) fn invalidate(&mut self) {
         self.pages.clear();
+        self.focused = None;
     }
     fn retain(&mut self, document: &str, visible: &[u32]) {
         if self.document.as_deref() != Some(document) {
@@ -160,6 +179,16 @@ impl AnnotationPaint {
             return;
         };
         for mark in records.marks() {
+            if let Some(drawing) = mark.drawing() {
+                paint_drawing(
+                    ui,
+                    paper,
+                    rotation,
+                    mark.kind(),
+                    drawing.points(),
+                    mark.color(),
+                );
+            }
             let color = panel::mark_color(mark.color());
             for rect in mark.rects() {
                 let region = reader_viewport::page_region(paper, rotation, rect.region());
@@ -189,7 +218,203 @@ impl AnnotationPaint {
                             .rect_filled(region, 0, color.linear_multiply(0.2));
                     }
                 }
+                if self.focused.as_deref() == Some(mark.id()) {
+                    ui.painter().rect_stroke(
+                        region.expand(1.0),
+                        2,
+                        egui::Stroke::new(1.3, color),
+                        egui::StrokeKind::Outside,
+                    );
+                }
             }
         }
+    }
+
+    pub(in crate::app) fn note_badges(
+        &self,
+        ui: &mut egui::Ui,
+        page: u32,
+        paper: egui::Rect,
+        rotation: PageRotation,
+        en: bool,
+        p: Palette,
+    ) -> Option<String> {
+        let marks = self.marks(page)?;
+        let visible = ui.clip_rect();
+        let outside = paper.right() + 42.0 <= visible.right();
+        let x = if outside {
+            paper.right() + 6.0
+        } else {
+            paper.right().min(visible.right()) - 32.0
+        };
+        if x + 28.0 < visible.left() {
+            return None;
+        }
+        let mut anchors = Vec::new();
+        for mark in marks.marks().iter().filter(|mark| mark.has_note()) {
+            let y = mark
+                .rects()
+                .first()
+                .map(|rect| {
+                    reader_viewport::page_region(paper, rotation, rect.region())
+                        .center()
+                        .y
+                })
+                .or_else(|| {
+                    mark.drawing()
+                        .and_then(|drawing| drawing.points().first())
+                        .map(|point| draw_position(paper, rotation, *point).y)
+                })
+                .unwrap_or(paper.top() + 16.0);
+            if y >= visible.top() + 12.0 && y <= visible.bottom() - 12.0 {
+                anchors.push((y, mark.id()));
+            }
+        }
+        anchors.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut action = None;
+        let mut remaining = anchors.as_slice();
+        while !remaining.is_empty() {
+            let count = badge_group_len(remaining);
+            let (group, rest) = remaining.split_at(count);
+            remaining = rest;
+            let label = if count == 1 {
+                if en {
+                    format!("Open note on page {}", page + 1)
+                } else {
+                    format!("Abrir nota de la página {}", page + 1)
+                }
+            } else if en {
+                format!("{count} notes on page {}", page + 1)
+            } else {
+                format!("{count} notas de la página {}", page + 1)
+            };
+            let rect =
+                egui::Rect::from_min_size(egui::pos2(x, group[0].0 - 12.0), egui::vec2(28.0, 24.0));
+            let selected = group
+                .iter()
+                .any(|(_, id)| self.focused.as_deref() == Some(*id));
+            let response = ui.interact(
+                rect,
+                ui.id().with(("study-note-badge", page, group[0].1)),
+                egui::Sense::click(),
+            );
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), &label)
+            });
+            theme::record_control_bounds(ui, &label, rect);
+            let fill = if response.hovered() || selected {
+                p.raised
+            } else {
+                p.surface
+            };
+            let outline = if response.has_focus() || selected {
+                p.accent
+            } else {
+                p.line
+            };
+            ui.painter().rect(
+                rect,
+                5,
+                fill,
+                egui::Stroke::new(1.0, outline),
+                egui::StrokeKind::Inside,
+            );
+            if count == 1 {
+                theme::icon(
+                    ui.painter(),
+                    rect.center(),
+                    theme::Icon::List,
+                    if selected { p.accent } else { p.secondary },
+                );
+                if response.clicked() {
+                    action = Some(group[0].1.to_owned());
+                }
+            } else {
+                ui.painter().text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    count.to_string(),
+                    egui::FontId::proportional(12.0),
+                    p.ink,
+                );
+                egui::Popup::menu(&response).show(|ui| {
+                    egui::ScrollArea::vertical()
+                        .max_height(160.0)
+                        .show(ui, |ui| {
+                            for (index, (_, id)) in group.iter().enumerate() {
+                                let label = format!(
+                                    "{} {} · {} {}",
+                                    if en { "Note" } else { "Nota" },
+                                    index + 1,
+                                    if en { "page" } else { "página" },
+                                    page + 1
+                                );
+                                if theme::navigation(
+                                    ui,
+                                    &label,
+                                    self.focused.as_deref() == Some(*id),
+                                    p,
+                                )
+                                .clicked()
+                                {
+                                    action = Some((*id).into());
+                                    ui.close();
+                                }
+                            }
+                        });
+                });
+            }
+            response.on_hover_text(label);
+        }
+        action
+    }
+}
+
+fn badge_group_len(anchors: &[(f32, &str)]) -> usize {
+    anchors
+        .iter()
+        .take_while(|(y, _)| *y - anchors[0].0 < 24.0)
+        .count()
+}
+
+fn draw_position(paper: egui::Rect, rotation: PageRotation, point: [f64; 2]) -> egui::Pos2 {
+    let [x, y] = rotation.rotate_point(point);
+    paper.min + egui::vec2(x as f32 * paper.width(), y as f32 * paper.height())
+}
+
+pub(in crate::app) fn paint_drawing(
+    ui: &egui::Ui,
+    paper: egui::Rect,
+    rotation: PageRotation,
+    kind: AnnotationKind,
+    points: &[[f64; 2]],
+    color: AnnotationColor,
+) {
+    let [start, end, ..] = points else { return };
+    let painter = ui.painter().with_clip_rect(paper);
+    let position = |point| draw_position(paper, rotation, point);
+    let a = position(*start);
+    let b = position(*end);
+    let stroke = egui::Stroke::new(
+        (paper.width().min(paper.height()) * 0.003).max(1.0),
+        panel::mark_color(color),
+    );
+    match kind {
+        AnnotationKind::Ink => {
+            painter.add(egui::Shape::line(
+                points.iter().copied().map(position).collect(),
+                stroke,
+            ));
+        }
+        AnnotationKind::Arrow => painter.arrow(a, b - a, stroke),
+        AnnotationKind::Rectangle => {
+            painter.rect_stroke(
+                egui::Rect::from_two_pos(a, b),
+                0,
+                stroke,
+                egui::StrokeKind::Middle,
+            );
+        }
+        _ => {}
     }
 }

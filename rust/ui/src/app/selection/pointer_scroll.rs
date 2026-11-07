@@ -22,9 +22,10 @@ impl SelectionState {
         // Releasing outside a page must finish the gesture too.
         if !down {
             self.gesture = SelectionGesture::Selected(anchor, previous);
+            self.passive.completed = anchor != previous;
             return;
         }
-        if !self.enabled || !ui.is_enabled() {
+        if !(self.enabled || self.passive.enabled) || !ui.is_enabled() {
             return;
         }
         let Some(pointer) = pointer else { return };

@@ -101,7 +101,9 @@ impl Drop for TextState {
 impl YamantakaApp {
     pub(super) fn request_page_text(&mut self, document: &str) {
         if self.reader.selection.enabled {
-            self.request_selection_pages(document, &[self.reader.page]);
+            self.reader
+                .selection
+                .request(&self.runtime, document, &[self.reader.page]);
             return;
         }
         self.reader

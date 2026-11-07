@@ -97,11 +97,11 @@ impl YamantakaApp {
             self.error = Some(error.to_string());
             return false;
         }
-        if self.reader.annotations.editing() {
+        if self.reader.annotations.editing() || self.reader.study.has_unsaved() {
             self.error = Some(
                 self.tr(
-                    "Termina o cancela la nota antes de cambiar de lectura.",
-                    "Finish or cancel the note before switching readings.",
+                    "Resuelve la anotación pendiente antes de cambiar de lectura.",
+                    "Resolve the pending annotation before switching readings.",
                 )
                 .into(),
             );

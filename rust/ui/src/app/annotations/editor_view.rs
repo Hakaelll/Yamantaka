@@ -2,12 +2,14 @@ use super::panel::{color_label, kind_label, review_label};
 use super::*;
 
 pub(in crate::app) enum NotesAction {
+    Focus(String),
+    ClearFocus,
     RetryDraft,
     Read(usize),
     Change(AnnotationMutation, usize),
     PageNote,
     Selection,
-    Navigate(u32, bool),
+    Navigate(yamantaka_domain::reader::ReaderPosition, String, bool),
     ReloadMarks,
     Export(yamantaka_application::annotation_export::AnnotationExportFormat),
 }
@@ -123,6 +125,7 @@ impl AnnotationState {
         if self.editor.is_some() {
             let english = context.english;
             let fallback = self.fallback();
+            let focus_note = !busy && std::mem::take(&mut self.focus_editor);
             let editor = self.editor.as_mut().unwrap();
             ui.add_enabled_ui(!busy,|ui| {
                 if let EditorSource::Selection {snapshot,..}=&editor.source
@@ -142,10 +145,23 @@ impl AnnotationState {
                     });
                     ui.add_space(if show_intro { 14.0 } else { 6.0 });
                 }
+                let label=ui.label(if english {"Your note"} else {"Tu nota"});
+                let note = ui.add(egui::TextEdit::multiline(&mut editor.note).desired_rows(4).desired_width(f32::INFINITY).char_limit(4000).hint_text(if english {"What would you like to remember?"} else {"¿Qué te gustaría recordar?"})).labelled_by(label.id);
+                if focus_note { note.request_focus(); }
+                let units=editor.note.encode_utf16().count();
+                ui.label(RichText::new(format!("{units} / 4000")).size(12.0).color(p.secondary));
+                ui.add_space(8.0);
+                egui::CollapsingHeader::new(if english {"Details"} else {"Detalles"})
+                    .id_salt("annotation-details")
+                    .default_open(!editor.tags.is_empty())
+                    .show(ui, |ui| {
                 let kinds=[AnnotationKind::Highlight,AnnotationKind::Underline,AnnotationKind::Strikeout,AnnotationKind::TextNote,AnnotationKind::PageMarker,AnnotationKind::PageComment];
                 let geometry=!matches!(&editor.source,EditorSource::PageNote {..}) && editor.stored().is_none_or(|record|!record.values.rects.is_empty());
                 ui.horizontal_wrapped(|ui| {
                     let label=ui.label(if english {"Mark"} else {"Marca"});
+                    if editor.kind.is_drawing() {
+                        ui.label(kind_label(editor.kind, english)).labelled_by(label.id);
+                    } else {
                     let response=egui::ComboBox::from_id_salt("annotation-kind").selected_text(kind_label(editor.kind,english)).show_ui(ui,|ui| {
                         for kind in kinds {
                             if (geometry || kind==AnnotationKind::PageComment)
@@ -154,6 +170,7 @@ impl AnnotationState {
                         }
                     });
                     response.response.labelled_by(label.id);
+                    }
                 });
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui| {
@@ -163,11 +180,6 @@ impl AnnotationState {
                     }
                 });
                 ui.add_space(14.0);
-                let label=ui.label(if english {"Your note"} else {"Tu nota"});
-                ui.add(egui::TextEdit::multiline(&mut editor.note).desired_rows(4).desired_width(f32::INFINITY).char_limit(4000).hint_text(if english {"What would you like to remember?"} else {"¿Qué te gustaría recordar?"})).labelled_by(label.id);
-                let units=editor.note.encode_utf16().count();
-                ui.label(RichText::new(format!("{units} / 4000")).size(12.0).color(p.secondary));
-                ui.add_space(8.0);
                 let label = ui.label(if english {"Tags, optional"} else {"Etiquetas, opcionales"});
                 ui.add(egui::TextEdit::singleline(&mut editor.tags).desired_width(f32::INFINITY).hint_text(if english {"Study, optics"} else {"Estudio, óptica"})).labelled_by(label.id);
                 let valid_tags = editor.tag_changes().is_ok();
@@ -183,6 +195,7 @@ impl AnnotationState {
                         for (state,en,es) in [(AnnotationReviewState::Pending,"Pending","Pendiente"),(AnnotationReviewState::Accepted,"Accepted","Aceptada"),(AnnotationReviewState::Resolved,"Resolved","Resuelta")] {ui.selectable_value(&mut editor.review,state,if english {en}else{es});}
                     }).response.labelled_by(label.id);
                 }
+                });
                 if fallback {
                     ui.add_space(12.0);
                     ui.label(if english {"Some selected passages have incomplete geometry. Keep those as page notes with their text."} else {"Algunos pasajes no tienen geometría completa. Consérvalos como notas de página con su texto."});
@@ -199,7 +212,8 @@ impl AnnotationState {
                     editor.note.encode_utf16().count() <= 4000
                         && editor.tag_changes().is_ok()
                         && (!fallback || editor.confirmed)
-                        && (!matches!(&editor.source, EditorSource::PageNote { .. })
+                        && (!(matches!(&editor.source, EditorSource::PageNote { .. })
+                            || editor.kind == AnnotationKind::TextNote)
                             || !editor.note.trim().is_empty())
                 });
             let actions = ui
@@ -276,6 +290,7 @@ impl AnnotationState {
         let busy = context.busy || self.pending.is_some() || self.editing();
         let mut action = None;
         let page = self.page.clone()?;
+        let mut previous_page = None;
         if page.total == 0 {
             ui.label(
                 RichText::new(if self.filters.count() > 0 {
@@ -291,6 +306,18 @@ impl AnnotationState {
         }
         for (index, record) in page.entries().iter().enumerate() {
             let data = record.data();
+            if previous_page != Some(data.values.page_index) {
+                previous_page = Some(data.values.page_index);
+                ui.label(
+                    RichText::new(format!(
+                        "{} {}",
+                        tr("Página", "Page"),
+                        data.values.page_index + 1
+                    ))
+                    .strong()
+                    .color(p.ink),
+                );
+            }
             ui.push_id(&data.id, |ui| {
                 ui.separator();
                 ui.add_space(8.0);
@@ -332,13 +359,21 @@ impl AnnotationState {
                         .color(p.ink),
                     );
                 });
-                let passage = data
-                    .values
-                    .selected_text
-                    .as_deref()
-                    .or(data.values.note.as_deref())
-                    .unwrap_or("");
-                ui.add(egui::Label::new(RichText::new(passage).color(p.secondary)).truncate());
+                if let Some(passage) = &data.values.selected_text {
+                    ui.label(RichText::new(passage).italics().color(p.secondary));
+                }
+                if let Some(note) = &data.values.note {
+                    ui.label(RichText::new(note).color(p.ink));
+                }
+                if data.values.status == AttachmentStatus::ReviewRequired {
+                    ui.label(
+                        RichText::new(tr(
+                            "El PDF cambió · revisa la ubicación",
+                            "The PDF changed · review the location",
+                        ))
+                        .color(p.secondary),
+                    );
+                }
                 if !data.tags.is_empty() {
                     ui.label(
                         RichText::new(data.tags.join(" · "))
@@ -361,7 +396,28 @@ impl AnnotationState {
                         .clicked()
                     {
                         let close = bookmarks::compact_study(ui.ctx());
-                        action = Some(NotesAction::Navigate(data.values.page_index, close));
+                        let point = data
+                            .values
+                            .rects
+                            .first()
+                            .map(|rect| {
+                                let rect = rect.region();
+                                [(rect.min()[0] + rect.max()[0]) * 0.5, rect.min()[1]]
+                            })
+                            .or_else(|| {
+                                data.values
+                                    .drawing
+                                    .as_ref()
+                                    .and_then(|drawing| drawing.points().first().copied())
+                            })
+                            .filter(|_| data.values.status == AttachmentStatus::Attached)
+                            .unwrap_or([0.5, 0.0]);
+                        if let Ok(position) = yamantaka_domain::reader::ReaderPosition::at(
+                            data.values.page_index,
+                            point,
+                        ) {
+                            action = Some(NotesAction::Navigate(position, data.id.clone(), close));
+                        }
                         if close {
                             ui.close();
                         }
@@ -443,5 +499,6 @@ impl AnnotationState {
             review: data.values.review_state,
             confirmed: false,
         });
+        self.focus_editor = true;
     }
 }

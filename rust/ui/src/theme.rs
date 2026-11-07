@@ -206,6 +206,9 @@ pub enum Icon {
     Folder,
     Bookmark,
     TextSelection,
+    Pencil,
+    Arrow,
+    Rectangle,
     Archive,
     Star,
 }
@@ -215,6 +218,31 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
     let v = |x, y| center + egui::vec2(x, y);
     let line = |a, b| painter.line_segment([a, b], s);
     match icon {
+        Icon::Pencil => {
+            let points = [
+                v(-6.0, 6.0),
+                v(-5.0, 1.0),
+                v(3.0, -7.0),
+                v(7.0, -3.0),
+                v(-1.0, 5.0),
+                v(-6.0, 6.0),
+            ];
+            painter.add(egui::Shape::line(points.to_vec(), s));
+            line(v(1.0, -5.0), v(5.0, -1.0));
+        }
+        Icon::Arrow => {
+            line(v(-6.0, 6.0), v(6.0, -6.0));
+            line(v(6.0, -6.0), v(0.0, -6.0));
+            line(v(6.0, -6.0), v(6.0, 0.0));
+        }
+        Icon::Rectangle => {
+            painter.rect_stroke(
+                egui::Rect::from_min_max(v(-7.0, -5.0), v(7.0, 5.0)),
+                1,
+                s,
+                egui::StrokeKind::Inside,
+            );
+        }
         Icon::Down => {
             line(v(-4.0, -2.0), v(0.0, 2.0));
             line(v(0.0, 2.0), v(4.0, -2.0));

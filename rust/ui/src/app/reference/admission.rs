@@ -333,6 +333,10 @@ impl YamantakaApp {
         let Some(reference) = &mut self.reference else {
             return true;
         };
+        if reference.pane.study.has_unsaved() {
+            self.reading_focus.target = shortcuts::ReadingTarget::Reference;
+            return false;
+        }
         if reference.pane.annotations.editing() && !reference.pane.annotations.writing() {
             reference.pane.reader_panel_tab = outline::ReaderPanelTab::Annotations;
             reference.navigator_requested = true;

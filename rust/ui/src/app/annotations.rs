@@ -99,6 +99,7 @@ pub(super) struct AnnotationState {
     page: Option<Arc<AnnotationPage>>,
     pending: Option<Pending>,
     editor: Option<AnnotationEditor>,
+    focus_editor: bool,
     recovered: Option<RecoveredDraft>,
     error: Option<String>,
     saved: bool,
@@ -114,6 +115,15 @@ pub(super) struct AnnotationState {
     bulk_tag_preview: Option<bool>,
 }
 impl AnnotationState {
+    pub(super) fn study_write_token(&self) -> Option<Cancellation> {
+        self.pending
+            .as_ref()
+            .filter(|pending| pending.writing)
+            .map(|pending| pending.cancel.clone())
+    }
+    pub(super) fn study_write_error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
     pub(in crate::app) fn history_available(&self, redo: bool) -> bool {
         !self.stale
             && !self.editing()
@@ -148,6 +158,7 @@ impl AnnotationState {
     }
     pub(in crate::app) fn discard_editor(&mut self) {
         self.editor = None;
+        self.focus_editor = false;
         self.recovered = None;
     }
     pub(in crate::app) fn unsaved_editor(&self) -> bool {
@@ -186,6 +197,7 @@ impl AnnotationState {
         self.filters_open = false;
         self.page = None;
         self.editor = None;
+        self.focus_editor = false;
         self.error = None;
         self.saved = false;
     }

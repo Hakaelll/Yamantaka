@@ -71,6 +71,7 @@ mod settings;
 mod shortcuts;
 mod smart_views;
 mod startup_repair;
+mod study;
 mod tabs;
 mod tags;
 mod text;
@@ -147,6 +148,7 @@ pub struct YamantakaApp {
     shortcut_bindings: shortcuts::bindings::Bindings,
     shortcut_error: Option<String>,
     reader: reader_pane::ReaderPane,
+    study: study::State,
     reading_focus: shortcuts::ReadingFocus,
     reference_shortcuts_preview: shortcuts::ShortcutPreview,
     reference: Option<reference::ReferenceView>,
@@ -403,6 +405,7 @@ impl YamantakaApp {
             window_state: None,
             quarantine: Default::default(),
             reader,
+            study: Default::default(),
             reading_focus: Default::default(),
             reference_shortcuts_preview: Default::default(),
             reference: None,
@@ -1273,7 +1276,10 @@ impl YamantakaApp {
             self.reader_panel(ui, &document, &info, p);
             return;
         }
-        self.selection_toolbar(ui, p);
+        self.study_toolbar(ui, p);
+        if !self.study.active {
+            self.selection_toolbar(ui, p);
+        }
         if !self.reader_focus {
             self.reader_panel(ui, &document, &info, p);
         }
@@ -1296,6 +1302,7 @@ impl YamantakaApp {
         } else {
             self.reader_viewport(ui, &document, p);
         }
+        self.study_after_viewport(ui, p);
         self.advance_profile_return();
         self.cache_reading_context();
     }
@@ -1494,7 +1501,10 @@ impl App for YamantakaApp {
                         self.reader.annotation_paint.accept(reply);
                     }
                 }
-                Update::Annotations(reply) => self.accept_annotation_reply(reply),
+                Update::Annotations(reply) => {
+                    self.accept_study_reply(&reply);
+                    self.accept_annotation_reply(reply);
+                }
                 Update::CoverRebuilt(reply) => self.accept_cover_rebuilt(*reply, ctx),
                 Update::AnnotationRecovered(reply) => self.accept_stored_note_recovery(*reply),
                 Update::SelectionRecovered(reply) => self.accept_selection_note_recovery(*reply),
@@ -2135,6 +2145,7 @@ impl App for YamantakaApp {
         if self.demo
             && self.capture.is_some()
             && self.selection_preview == selection::SelectionPreview::Waiting
+            && !self.study_passive_preview()
             && matches!(self.surface, Surface::Reader)
             && self.reader.active.is_some()
             && !self.reader.selection.enabled
@@ -2254,7 +2265,7 @@ impl App for YamantakaApp {
         self.reader_chrome_blocked = shortcut_modal;
         self.reading_focus.observe(
             &ctx,
-            shortcut_modal,
+            shortcut_modal || self.study.owns_input(&ctx),
             self.reference
                 .as_ref()
                 .filter(|_| {
@@ -2268,6 +2279,7 @@ impl App for YamantakaApp {
         if let Some(reference) = &mut self.reference {
             reference.input_layers.clear();
         }
+        self.study_escape(&ctx, shortcut_modal);
         self.reader.selection.keyboard_input(
             &ctx,
             shortcut_modal
@@ -2560,6 +2572,7 @@ impl App for YamantakaApp {
                                 && reference.pane.viewport.prefetch.settled()
                         }));
                 let ready = self.library_loaded
+                    && self.study_capture_ready()
                     && self.stored_note_recovery_ready()
                     && self.selection_note_recovery_ready()
                     && matches!(self.annotation_edit_conflict.phase,0|5)
@@ -2897,7 +2910,10 @@ impl App for YamantakaApp {
         if self.graphics_recovery.faulted() {
             while let Ok(update) = self.runtime.updates.try_recv() {
                 match update {
-                    Update::Annotations(reply) => self.accept_annotation_reply(reply),
+                    Update::Annotations(reply) => {
+                        self.accept_study_reply(&reply);
+                        self.accept_annotation_reply(reply);
+                    }
                     Update::Metadata(reply) => {
                         if let Some(editor) = &mut self.metadata {
                             editor.accept_shutdown_reply(*reply);

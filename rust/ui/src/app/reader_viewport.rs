@@ -52,9 +52,13 @@ impl YamantakaApp {
             return;
         };
         let anchor = navigation.position();
+        let tool = self.study_tool(false);
+        let color = self.study_color();
+        let can_interact = !self.reader_chrome_blocked && !self.reader.viewport.source_changed;
         ui.painter()
             .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
         let mut scrolling = egui::ScrollArea::both()
+            .scroll_source(egui::scroll_area::ScrollSource::ALL)
             .animated(!self.reduced_motion && !self.electronic_ink())
             .kinetic_scrolling(!self.reduced_motion && !self.electronic_ink())
             .id_salt(("pdf-viewport", &document.id))
@@ -87,6 +91,7 @@ impl YamantakaApp {
         let dpr = ui.ctx().pixels_per_point();
         let device_limit = ui.ctx().input(|input| input.max_texture_side).min(16384) as u32;
         let mut feedback = None;
+        let mut note_badge = None;
         scrolling.show_viewport(ui, |ui, visible| {
             if let Some(preferences) = &mut self.reader.reader_preferences {
                 preferences.scroll_offset = f64::from(visible.top()).max(0.0);
@@ -123,7 +128,9 @@ impl YamantakaApp {
             let link_pages: Vec<u32> = frame.pages.iter().map(|visible| visible.page).collect();
             self.reader.links.request_visible(&self.runtime, &document.id, &link_pages);
             self.reader.annotation_paint.request(&self.runtime, &self.governor, &document.id, &link_pages);
-            self.request_selection_pages(&document.id, &link_pages);
+            self.reader.study.keep_visible(&link_pages);
+            let text_ready = !self.reader.loading && self.reader.viewport.pages.values().any(|slot| slot.image_key.is_some());
+            self.reader.selection.request_passive(&self.runtime, &document.id, &link_pages, can_interact && tool.drawing().is_none() && text_ready);
             self.reader.find.request_highlights(&self.runtime, &document.id, &link_pages, ui.ctx());
             let origin = ui.max_rect().min;
             let count = frame.pages.len().max(1);
@@ -162,21 +169,31 @@ impl YamantakaApp {
                     Err(error) => self.error = Some(error.to_string()),
                     _ => {}
                 }
-                self.reader.annotation_paint.paint(ui, visible.page, paper, layout.rotation());
+                if !self.reader.study.hidden && !self.reader.viewport.source_changed {
+                    self.reader.annotation_paint.paint(ui, visible.page, paper, layout.rotation());
+                }
                 if self.reference.as_ref().is_some_and(|reference| reference.differences.contains(&visible.page)) {
                     ui.painter().rect_stroke(paper, 1, egui::Stroke::new(2.0, p.accent), egui::StrokeKind::Inside);
                 }
                 self.reader.find.paint(ui, visible.page, paper, layout.rotation(), p);
-                self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
-                if !self.reader.selection.enabled {
+                if can_interact && tool.drawing().is_none() {
+                    self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
+                }
+                if can_interact && tool == study::Tool::Select && !self.reader.selection.enabled {
                     match self.reader.links.regions(ui, visible.page, paper, layout.rotation(), p, self.english) {
                         Ok(Some(destination)) => self.reader.reader_destination = Some((document.id.clone(), destination)),
                         Err(error) => self.error = Some(error),
                         _ => {}
                     }
                 }
+                if can_interact {
+                    self.reader.study.page_input(ui, study::PageInput {tool, color, page: visible.page, paper, rotation: layout.rotation()});
+                    if tool == study::Tool::Select && !self.reader.study.hidden {
+                        note_badge = self.reader.annotation_paint.note_badges(ui, visible.page, paper, layout.rotation(), self.english, p).or(note_badge.take());
+                    }
+                }
             }
-            if self.password.is_none() && !self.link_confirmation_open() {
+            if can_interact && tool.drawing().is_none() {
                 self.reader.selection.drag_viewport(ui, &frame, origin, layout.rotation());
             }
             self.opening.observe_frame(&document.id, &frame, &self.reader.viewport);
@@ -193,6 +210,9 @@ impl YamantakaApp {
             }, self.reader.viewport.generation, !self.reader.viewport.retry && !self.reader.loading && self.reader.viewport.refinements_settled());
             feedback = layout.anchor_at_scroll(&frame, anchor).ok();
         });
+        if let Some(id) = note_badge {
+            self.apply_notes_action(false, annotations::NotesAction::Focus(id));
+        }
         if let Some(position) = feedback {
             let changed_page = position.page() != self.reader.page;
             if let Some(navigation) = &mut self.reader.navigation {

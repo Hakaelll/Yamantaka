@@ -1938,6 +1938,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--annotation-conflict") {
                     app.preview_annotation_conflict();
                 }
+                if args.iter().any(|arg| arg == "--study-tools") {
+                    app.preview_study();
+                }
+                if args.iter().any(|arg| arg == "--study-selection") {
+                    app.preview_study_selection();
+                }
                 if args.iter().any(|arg| arg == "--close-review") {
                     app.preview_editor_close(args.iter().any(|arg| arg == "--close-review-return"));
                 }

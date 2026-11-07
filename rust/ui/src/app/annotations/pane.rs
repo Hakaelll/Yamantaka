@@ -2,19 +2,23 @@ use super::*;
 
 impl reader_pane::ReaderPane {
     pub(in crate::app) fn begin_page_note(&mut self) {
+        self.begin_page_note_at(self.page, AnnotationColor::Violet);
+    }
+
+    pub(in crate::app) fn begin_page_note_at(&mut self, page: u32, color: AnnotationColor) {
         if self.annotations.editing() || self.annotations.writing() {
             return;
         }
         let Some((document, info)) = &self.active else {
             return;
         };
-        if self.page as usize >= info.pages.len() {
+        if page as usize >= info.pages.len() {
             return;
         }
         self.annotations.bind(&document.id);
         self.annotations.editor = Some(AnnotationEditor {
             source: EditorSource::PageNote {
-                page: self.page,
+                page,
                 fingerprint: document.fingerprint.clone(),
                 rotation: self
                     .reader_preferences
@@ -22,13 +26,14 @@ impl reader_pane::ReaderPane {
                     .map_or(PageRotation::Deg0, |prefs| prefs.page_rotation),
             },
             kind: AnnotationKind::PageComment,
-            color: AnnotationColor::Violet,
+            color,
             note: String::new(),
             tags: String::new(),
             review: AnnotationReviewState::Pending,
             confirmed: false,
         });
         self.annotations.error = None;
+        self.annotations.focus_editor = true;
         self.panel = true;
         self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
     }
@@ -36,6 +41,15 @@ impl reader_pane::ReaderPane {
 
 impl reader_pane::ReaderPane {
     pub(in crate::app) fn annotate_selection(&mut self, governor: &MemoryGovernor) {
+        self.annotate_selection_as(governor, AnnotationKind::Highlight, AnnotationColor::Violet);
+    }
+
+    pub(in crate::app) fn annotate_selection_as(
+        &mut self,
+        governor: &MemoryGovernor,
+        kind: AnnotationKind,
+        color: AnnotationColor,
+    ) {
         if self.annotations.editing() || self.annotations.writing() {
             return;
         }
@@ -54,14 +68,15 @@ impl reader_pane::ReaderPane {
                             .as_ref()
                             .map_or(PageRotation::Deg0, |prefs| prefs.page_rotation),
                     },
-                    kind: AnnotationKind::Highlight,
-                    color: AnnotationColor::Violet,
+                    kind,
+                    color,
                     note: String::new(),
                     tags: String::new(),
                     review: AnnotationReviewState::Pending,
                     confirmed: false,
                 });
                 self.annotations.error = None;
+                self.annotations.focus_editor = true;
                 self.panel = true;
                 self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
             }
@@ -84,8 +99,24 @@ impl YamantakaApp {
                 }
                 NotesAction::PageNote => self.begin_page_note(),
                 NotesAction::Selection => self.annotate_selection(),
-                NotesAction::Navigate(page, close) => {
-                    self.navigate(page);
+                NotesAction::Focus(id) => {
+                    self.reader
+                        .focus_annotation(Some(id), &self.runtime, &self.governor)
+                }
+                NotesAction::ClearFocus => {
+                    self.reader
+                        .focus_annotation(None, &self.runtime, &self.governor)
+                }
+                NotesAction::Navigate(position, id, close) => {
+                    self.reader.annotation_paint.focused = Some(id);
+                    if self
+                        .reader
+                        .navigation
+                        .as_mut()
+                        .is_some_and(|nav| nav.navigate_to(position))
+                    {
+                        self.apply_navigation();
+                    }
                     if close {
                         self.reader.panel = false;
                     }
@@ -121,7 +152,27 @@ impl YamantakaApp {
             }
             NotesAction::PageNote if !blocked => view.pane.begin_page_note(),
             NotesAction::Selection if !blocked => view.pane.annotate_selection(&self.governor),
-            NotesAction::Navigate(page, _) => view.set_page(page),
+            NotesAction::Focus(id) if !blocked => {
+                view.pane
+                    .focus_annotation(Some(id), &self.runtime, &self.governor);
+                self.reading_focus.target = shortcuts::ReadingTarget::Reference;
+                view.navigator_requested = true;
+            }
+            NotesAction::ClearFocus if !blocked => {
+                view.pane
+                    .focus_annotation(None, &self.runtime, &self.governor)
+            }
+            NotesAction::Navigate(position, id, _) => {
+                view.pane.annotation_paint.focused = Some(id);
+                if view
+                    .pane
+                    .navigation
+                    .as_mut()
+                    .is_some_and(|nav| nav.navigate_to(position))
+                {
+                    view.reference_navigation_changed();
+                }
+            }
             NotesAction::ReloadMarks => view.pane.annotation_paint.invalidate_document(None),
             _ => {
                 view.pane.annotations.error = Some(
@@ -138,6 +189,30 @@ impl YamantakaApp {
             view.pane.reader_panel_tab = outline::ReaderPanelTab::Annotations;
             view.navigator_requested = true;
         }
+    }
+}
+
+impl reader_pane::ReaderPane {
+    fn focus_annotation(
+        &mut self,
+        id: Option<String>,
+        runtime: &Runtime,
+        governor: &MemoryGovernor,
+    ) {
+        if self.annotations.editing() || self.annotations.writing() {
+            return;
+        }
+        let Some((document, _)) = &self.active else {
+            return;
+        };
+        self.annotations.bind(&document.id);
+        self.annotations.cancel_query();
+        self.annotation_paint.focused = id.clone();
+        self.annotations.filters.focused = id;
+        self.annotations.filters_open = false;
+        self.reader_panel_tab = outline::ReaderPanelTab::Annotations;
+        self.panel = true;
+        self.annotations.command(runtime, governor, None, 0);
     }
 }
 

@@ -271,8 +271,11 @@ impl YamantakaApp {
         p: Palette,
     ) {
         let manual_hidden = self.reader_chrome_hidden || self.reader_focus;
-        let keep_open =
-            !manual_hidden && (self.reader.panel || self.reader.loading || self.opening.busy());
+        let keep_open = !manual_hidden
+            && (self.study.active
+                || self.reader.panel
+                || self.reader.loading
+                || self.opening.busy());
         let policy = Policy {
             auto_hide: self
                 .reader

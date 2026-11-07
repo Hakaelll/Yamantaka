@@ -9,7 +9,7 @@ impl SelectionState {
             .find_map(|(page, id)| (focused == Some(*id)).then_some(*page))
     }
     pub(in crate::app) fn edit_commands(&mut self, ctx: &egui::Context, modal: bool) -> bool {
-        if !self.enabled
+        if !(self.enabled || self.passive.enabled)
             || modal
             || ctx.egui_wants_keyboard_input() && self.focused_page(ctx).is_none()
         {
@@ -26,14 +26,17 @@ impl SelectionState {
                     .events
                     .retain(|event| !matches!(event, egui::Event::Copy));
             }
-            if !popup_open && input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
+            if !popup_open
+                && self.has_passage()
+                && input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)
+            {
                 self.gesture = SelectionGesture::Empty;
             }
             copy
         })
     }
     pub(in crate::app) fn keyboard_input(&mut self, ctx: &egui::Context, modal: bool) {
-        if !self.enabled || modal {
+        if !(self.enabled || self.passive.enabled) || modal {
             return;
         }
         let Some(payload) = self

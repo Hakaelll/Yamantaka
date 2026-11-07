@@ -51,11 +51,11 @@ impl YamantakaApp {
             return;
         };
         let active = self.tabs.model.active().is_some_and(|t| t.id() == id);
-        if active && self.reader.annotations.editing() {
+        if active && (self.reader.annotations.editing() || self.reader.study.has_unsaved()) {
             self.error = Some(
                 self.tr(
-                    "Termina o cancela la nota antes de cerrar la lectura.",
-                    "Finish or cancel the note before closing the reading.",
+                    "Resuelve la anotación pendiente antes de cerrar la lectura.",
+                    "Resolve the pending annotation before closing the reading.",
                 )
                 .into(),
             );

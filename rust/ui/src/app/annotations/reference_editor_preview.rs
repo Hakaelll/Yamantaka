@@ -205,6 +205,7 @@ impl YamantakaApp {
                 assert_eq!(self.reader.page, 0);
                 if self.reference_notes_preview.filters.is_some() {
                     view.pane.annotations.filter_draft = filters::Filters {
+                        focused: None,
                         text: "Final reference".into(),
                         tag: "Reference study".into(),
                         kind: Some(AnnotationKind::PageComment),
@@ -237,6 +238,7 @@ impl YamantakaApp {
                 assert_eq!(view.pane.annotations.filters.count(), 0);
                 let empty = self.reference_notes_preview.filters.unwrap();
                 view.pane.annotations.filter_draft = filters::Filters {
+                    focused: None,
                     text: if empty {
                         "No matching reference note"
                     } else {

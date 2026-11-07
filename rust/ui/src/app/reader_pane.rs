@@ -27,6 +27,7 @@ pub(super) struct ReaderPane {
     pub annotation_paint: annotations::paint::AnnotationPaint,
     pub text: text::TextState,
     pub selection: selection::SelectionState,
+    pub study: study::Pane,
     pub loading: bool,
 }
 
@@ -56,6 +57,7 @@ impl Default for ReaderPane {
             annotation_paint: Default::default(),
             text: Default::default(),
             selection: Default::default(),
+            study: Default::default(),
             loading: false,
         }
     }
@@ -98,6 +100,8 @@ impl ReaderPane {
         changed
     }
     pub fn prepare_replacement(&mut self, preferences: Cancellation) {
+        self.study.cancel_gesture();
+        self.study.hidden = false;
         self.links.clear();
         self.annotation_paint.invalidate();
         self.text.clear();

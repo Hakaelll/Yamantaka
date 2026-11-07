@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Clone, Default, PartialEq, Eq)]
 pub(super) struct Filters {
+    pub focused: Option<String>,
     pub text: String,
     pub tag: String,
     pub kind: Option<AnnotationKind>,
@@ -15,6 +16,13 @@ impl Filters {
             + usize::from(self.review.is_some())
     }
     pub(super) fn query(&self, document: String, offset: usize) -> AnnotationQuery {
+        if let Some(id) = &self.focused {
+            return AnnotationQuery {
+                document_id: Some(document),
+                annotation_id: Some(id.clone()),
+                ..Default::default()
+            };
+        }
         AnnotationQuery {
             document_id: Some(document),
             offset,
@@ -22,6 +30,7 @@ impl Filters {
             tag: (!self.tag.trim().is_empty()).then(|| self.tag.trim().into()),
             kind: self.kind,
             review: self.review,
+            grouping: Some(AnnotationGrouping::Page),
             ..Default::default()
         }
     }
@@ -61,6 +70,7 @@ impl YamantakaApp {
             return;
         };
         self.reader.annotations.filter_draft = Filters {
+            focused: None,
             text: if empty {
                 "No matching study note"
             } else {
@@ -90,6 +100,15 @@ impl AnnotationState {
         p: Palette,
     ) -> Option<NotesAction> {
         let tr = |es, en| if english { en } else { es };
+        if self.filters.focused.is_some() {
+            return ui
+                .add_enabled_ui(!self.editing() && !self.writing(), |ui| {
+                    theme::navigation(ui, tr("Volver a notas", "Back to notes"), false, p)
+                })
+                .inner
+                .clicked()
+                .then_some(NotesAction::ClearFocus);
+        }
         let count = self.filters.count();
         let caption = if count == 0 {
             tr("Filtrar notas", "Filter notes").to_owned()
@@ -101,6 +120,12 @@ impl AnnotationState {
         let mut apply = false;
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal_wrapped(|ui| {
+                let pending = self.filters.review == Some(AnnotationReviewState::Pending);
+                if theme::navigation(ui, tr("Pendientes", "Pending"), pending, p).clicked() {
+                    self.filter_draft = self.filters.clone();
+                    self.filter_draft.review = (!pending).then_some(AnnotationReviewState::Pending);
+                    apply = true;
+                }
                 if theme::navigation(ui, &caption, self.filters_open, p).clicked() {
                     self.filters_open = !self.filters_open;
                 }
@@ -164,6 +189,9 @@ impl AnnotationState {
                                 AnnotationKind::TextNote,
                                 AnnotationKind::PageMarker,
                                 AnnotationKind::PageComment,
+                                AnnotationKind::Ink,
+                                AnnotationKind::Arrow,
+                                AnnotationKind::Rectangle,
                             ] {
                                 ui.selectable_value(
                                     &mut draft.kind,
