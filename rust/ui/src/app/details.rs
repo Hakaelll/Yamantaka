@@ -99,7 +99,7 @@ impl YamantakaApp {
         let cover_width = if compact {
             (width * 0.28).clamp(68.0, 110.0)
         } else {
-            (width * 0.31).min(184.0)
+            (width * 0.31).min(214.0)
         };
         let read = if document.last_page_index > 0 || document.reading_progress > 0.0 {
             self.tr("Continuar", "Continue")
@@ -116,12 +116,18 @@ impl YamantakaApp {
             }
             ui.vertical(|ui| {
                 if !compact {
-                    ui.add_space(16.0);
+                    ui.add_space(12.0);
+                    ui.label(
+                        RichText::new(self.tr("FICHA DEL LIBRO", "BOOK DETAILS"))
+                            .size(11.0)
+                            .extra_letter_spacing(1.7)
+                            .color(p.secondary),
+                    );
                 }
                 ui.add(
                     egui::Label::new(RichText::new(document.display_title()).font(
                         egui::FontId::new(
-                            if compact { 18.0 } else { 38.0 },
+                            if compact { 18.0 } else { 46.0 },
                             egui::FontFamily::Name("Editorial".into()),
                         ),
                     ))
@@ -274,7 +280,7 @@ impl YamantakaApp {
 }
 
 fn details_heading(ui: &mut egui::Ui, label: &str) {
-    ui.label(RichText::new(label).size(18.0).strong());
+    ui.label(theme::editorial(label, 23.0));
     ui.add_space(4.0);
 }
 

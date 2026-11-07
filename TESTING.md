@@ -42,8 +42,9 @@ and source hashes.
 ```powershell
 ./tool/capture_rust_ui.ps1 -OutputDirectory build/verification/redesign-smoke -CaseNames @(
     'readme-library-dark', 'readme-library-light', 'library-1280',
-    'pdf-covers-small-200-es', 'pdf-covers-details-small-200-es',
-    'chrome-revealed', 'chrome-compact', 'chrome-reference',
+    'pdf-covers-small-200-es', 'pdf-covers-tilted', 'pdf-covers-tilted-small-200',
+    'pdf-covers-details-small-200-es',
+    'chrome-revealed', 'chrome-hidden', 'chrome-compact', 'chrome-reference',
     'find-short-wide', 'reader-tabs-small-200', 'eink-settings-small'
 )
 ```
@@ -52,6 +53,8 @@ Inspect PNGs together with their control records. Check the reported viewport
 and pixels per point against the requested size. A window larger than the
 monitor can be clamped. Compare compact layouts at 200% application text and
 use physical Windows scaling and Narrator for desktop accessibility sign-off.
+Compare the resting catalogue with the tilted fixture to check that the
+progress rail appears below the cover and leaves its slot unchanged.
 
 The `--demo --verify-reader-chrome=<result.json>` and
 `--demo --verify-reader-profile-input=<result.json>` probes exercise synthetic

@@ -2372,7 +2372,12 @@ impl App for YamantakaApp {
         ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
             egui::Frame::new().fill(p.canvas).show(ui, |ui| {
                 let before_toolbar = ui.available_rect_before_wrap().top();
-                if !matches!(self.surface, Surface::Reader) || !self.reader_focus {
+                if !matches!(self.surface, Surface::Reader)
+                    && (!matches!(self.surface, Surface::Library)
+                        || self.inspector
+                        || self.metadata.is_some()
+                        || self.cover_picker.is_some())
+                {
                     self.session_bar(ui);
                 }
                 let toolbar_extent = ui.available_rect_before_wrap().top() - before_toolbar;
@@ -2466,9 +2471,7 @@ impl App for YamantakaApp {
                     });
                 }
                 let mut opening_rect = ui.available_rect_before_wrap();
-                if self.reader_focus && !matches!(self.surface, Surface::Reader) {
-                    opening_rect.min.y -= toolbar_extent;
-                }
+                opening_rect.min.y -= toolbar_extent;
                 self.measure_opening_view(ui, opening_rect);
                 if self.opening.busy() && ui.ctx().current_pass_index() == 0 {
                     let previous = self.reader.reader_preferences_cancel.clone();

@@ -4,20 +4,20 @@ description: "A native Windows gallery for private reading and study."
 colors:
   dark-accent: "#BDA3F5"
   light-accent: "#6748A7"
-  dark-canvas: "#0F1012"
-  dark-surface: "#16171A"
-  dark-raised: "#202125"
-  dark-ink: "#EFEDE8"
-  dark-secondary: "#A7A8B0"
-  dark-line: "#323339"
-  light-canvas: "#F7F5EF"
-  light-surface: "#FFFDF8"
-  light-raised: "#EBE8E0"
-  light-ink: "#212227"
-  light-secondary: "#64646D"
-  light-line: "#D3CFC6"
-  dark-primary-ink: "#191324"
-  light-primary-ink: "#FFFFFF"
+  dark-canvas: "#161615"
+  dark-surface: "#1E1D1B"
+  dark-raised: "#2A2825"
+  dark-ink: "#F3EDE1"
+  dark-secondary: "#B3AB9F"
+  dark-line: "#3E3A35"
+  light-canvas: "#F4EFE5"
+  light-surface: "#FCF8F0"
+  light-raised: "#E8E0D3"
+  light-ink: "#29221C"
+  light-secondary: "#60544A"
+  light-line: "#CEC2B0"
+  dark-primary-ink: "#161615"
+  light-primary-ink: "#F4EFE5"
   jacket-slate: "#2B3D51"
   jacket-plum: "#532E39"
   jacket-forest: "#2C473A"
@@ -31,9 +31,6 @@ colors:
   paper-bottom: "#B1AB9D"
   paper-rule: "#989283"
 typography:
-  library-display:
-    fontFamily: "Source Serif 4 Display, Segoe UI Variable, Segoe UI, egui proportional fallback"
-    fontSize: "38px"
   display:
     fontFamily: "Segoe UI Variable, Segoe UI, egui proportional fallback"
     fontSize: "34px"
@@ -66,7 +63,7 @@ typography:
     fontWeight: 700
 rounded:
   native-field: "7px"
-  control: "8px"
+  control: "5px"
   theme-choice: "10px"
   continuity: "12px"
   cover-state: "6px"
@@ -81,13 +78,13 @@ spacing:
   library-narrow-inset: "12px"
 components:
   button-primary-dark:
-    backgroundColor: "{colors.dark-accent}"
+    backgroundColor: "{colors.dark-ink}"
     textColor: "{colors.dark-primary-ink}"
     typography: "{typography.label}"
     rounded: "{rounded.control}"
     height: "40px"
   button-primary-light:
-    backgroundColor: "{colors.light-accent}"
+    backgroundColor: "{colors.light-ink}"
     textColor: "{colors.light-primary-ink}"
     typography: "{typography.label}"
     rounded: "{rounded.control}"
@@ -152,10 +149,10 @@ Beauty comes from physical coherence and clear hierarchy: connected book geometr
 - Physical cover volumes with independent, readable catalogue labels.
 - Sculpted spine light, recessed hinges and fixed cloth weave attached to the book plane; projected selection follows the same volume.
 - Available PDF imagery is mounted on the physical cover and spine. Procedural jackets provide the fallback; native WGPU first-page extraction is verified in the [PDF cover checkpoint](docs/validation/rust-pdf-covers-2026-10-13.md).
-- Neutral graphite or warm paper; violet for action, selection and focus.
+- Neutral graphite or warm paper; violet for selection, position and focus.
 - Local Segoe interface type paired with editorial document lettering.
 - Drawn vector controls with separate focus, pressed and selected states.
-- Cover-only pointer motion with an equivalent static reduced-motion state.
+- Pointer feedback on controls, physical volumes and reader chrome, with immediate reduced-motion states.
 
 This document records the native Windows layout and the existing book rendering system. The preserved
 [Flutter v0.15 document](docs/architecture/flutter-design-v015.md) is historical;
@@ -184,7 +181,7 @@ subdued foil are book materials, not additional interface accents.
 
 ### Primary
 
-- **Soft violet** (`dark-accent`): primary actions, focus and selection on graphite.
+- **Soft violet** (`dark-accent`): focus, selection and reader position on graphite.
 - **Study violet** (`light-accent`): corresponding roles on warm paper.
 - **Deep plum ink / white action ink** (`dark-primary-ink`, `light-primary-ink`):
   paired foregrounds on accent controls.
@@ -206,7 +203,7 @@ paper supply the corresponding light layers; charcoal ink, warm grey and paper
 rule supply light-theme text and boundaries. The four paper tokens belong to the
 connected page block, not interface containers.
 
-**The Functional Violet Rule.** Use the accent for primary actions, selection and focus; preserve neutral surfaces around the collection.
+**The Functional Violet Rule.** Use the accent for selection, focus and reader position. Primary buttons invert the ink and canvas colors.
 
 ## Typography
 
@@ -222,7 +219,7 @@ provide contextual emphasis; no global line-height or tracking scale is establis
 
 ### Hierarchy
 
-- **Display / compact display:** library heading in spacious and compact layouts.
+- **Display / compact display:** headings for task views at different widths.
 - **Headline:** shared native Heading style; contextual settings section titles use 28 points.
 - **Title:** reader document context; list and constrained catalogue titles use 16 points.
 - **Body:** catalogue labels and supporting interface text.
@@ -230,7 +227,7 @@ provide contextual emphasis; no global line-height or tracking scale is establis
 - **Editorial:** inspection title at 22 points; book titles remain the library focus.
 - **Jacket:** families 0, 3 and 5 use the bold jacket face; families 1, 2 and 4 use editorial type.
 
-Settings has a contextual 38-point heading, with 20 points in cramped composition;
+Settings has a 42-point editorial heading on wide windows, with 20 points in cramped composition;
 these do not enlarge the global type ramp. Jacket titles start at 10% of cover
 width, or 11.5% for families 1 and 4, capped at 25 points (27 for family 3).
 Separate title and artwork regions prevent overlap. Titles allow three rows and
@@ -240,40 +237,43 @@ artwork without jacket title text. Normal catalogue titles remain upright in two
 rows. Constrained rows supply a readable title beside the miniature.
 
 Text scale sets native zoom from 1.0 to 2.0, affecting logical layout width as well
-as text. The library title/count band disappears below 420 available logical points;
-this is constrained composition, not a global removal of branding or context.
+as text. The catalogue starts with its controls and uses the available height
+for books.
 
 **The Two Voices Rule.** Segoe carries the interface; editorial type identifies documents. Keep catalogue labels independent of the projected jacket lettering.
 
 ## Layout
 
-The application uses the native window frame and a common horizontal session bar.
-Library and the active reading keep their positions. Open readings use the
-existing tab model. When the row runs out of space, the active tab stays visible
-and Open readings lists the rest. Session contains the queue, workspaces,
-history and reopening. Settings is a destination in the same row. Concentration
-mode gives the document the window and keeps a named exit control.
+The application uses the native window frame. The catalogue and reader each have
+one working row. The reader's document title opens the reading switcher where
+width allows. Compact readers reach Open readings from More controls. The menu
+uses the existing session model for selecting, pinning, reordering and reopening
+documents. Session groups the queue, workspaces and history. Secondary views
+provide a Library return control. Concentration keeps a named exit control.
 
 ### Library and book details
 
-A single working row contains Add PDFs, catalogue search, Collection, Filters,
-View, Organize library and selection. Compact layouts use named icon controls and
-put Collection inside Filters. Active criteria have a visible reset and result
-count. View owns the grid/list choice, ordering, grouping and cover density.
+A single working row contains catalogue search, Add PDFs, Filters, View and
+Organize library. Compact layouts use named icon controls. Collection lives
+inside Filters and active criteria have a visible reset and result count. View
+owns the grid/list choice, ordering, grouping and cover density.
 Library-wide PDF content search opens its own surface with the existing opt-in
 local index. Organize library also reaches tags, collections, rules, duplicates,
-folder import, source checks, recovery and library notes.
+folder import, source checks, recovery and library notes. Session, Settings
+and Select also start here. The selection actions appear while selecting.
 
-Continue shows a real book miniature, the document title and its last page. It
-uses the active reading or an independent query for the most recently opened
-book in progress. Search results and filtered collections get the main space
-while Continue remains available in the result row. Saved readings also remain
+Continue shows the recoverable title and last page on demand. It uses the active
+reading or an independent query for the most recently opened book in progress.
+While filtering, Continue moves to the result row. Saved readings also remain
 available from Session.
 
 The gallery uses an open canvas with 26-point gutters at normal width and
 20-point gutters in compact density. Jacket slots cap at 212 and 172 points
 respectively. Captions align below the projected geometry. They keep two title
-lines, an author line and reading progress for books that have been started.
+lines and an author line. A started book reveals its percentage and progress
+rail below the caption on cover hover or keyboard focus, within reserved space.
+In the compact row the same rail sits beneath the miniature. The pointer fade
+takes 120 ms and reduced motion makes the change immediate.
 Each book has an accessible actions menu. Click or Enter opens it, while
 modified clicks and selection mode keep their selection behavior. Narrow
 windows use a miniature and title row. At the smallest size the full accessible
@@ -287,13 +287,14 @@ and confirmation text remain reachable by scrolling when the text scale grows.
 
 ### Reading and study
 
-The normal reader reserves a stable toolbar above the PDF. Page navigation,
-zoom, Find, Navigate, Notes and View use named controls. Compare is direct on
-wide windows. In the narrowest row, page entry and the study actions stay
-direct, with secondary controls under More controls. The existing preference
-hides the controls inside the same toolbar area, preserving the PDF viewport and
-leaving a keyboard-accessible reveal. Concentration uses the existing explicit
-exit path.
+The normal reader reserves a stable toolbar above the PDF. Page and zoom
+controls form one group, and Find, Navigate and Notes form the other. A pointer
+reveal fades the controls in over 160 ms. Keyboard focus and reduced motion
+reveal them immediately. In the narrowest row, page entry and the study
+actions stay direct. More controls holds comparison, view and reading settings.
+The existing preference hides the controls within the toolbar area, preserving
+the PDF viewport and leaving a keyboard-accessible reveal. Concentration uses
+the existing explicit exit path.
 
 Navigate and Notes share one bottom study tray. Navigate groups contents, pages,
 bookmarks and positions. Notes groups annotations and extracted page text. Find
@@ -529,7 +530,7 @@ Concentration mode removes the reader toolbar and navigator without changing the
 
 Workspace deletion exposes one temporary Undo deletion action in the manager, available until a later deletion or application exit. Restoring it leaves the current reader in place. Startup recovery stays silent when a saved workspace matches; conflicts preserve the readings and explain that the workspace was not linked. No startup wizard, progress bar or permanent recovery strip is added.
 
-Compact library composition follows width rather than the remaining scroll height. Compact jackets cap at 172 points and regular jackets at 212. Reserved projection space protects the lifting cover; miniature lift stays restrained. Below the full filter-row width, filters move to the existing temporary-menu pattern with an explicit active reset. At the smallest enlarged-text size, search and view choices use labelled popups and the page shares a single scroll area, so the header can leave room for a complete book row.
+Compact library composition uses width and height to keep a complete first row visible. Compact jackets cap at 172 points and regular jackets at 212. Reserved projection space protects the lifting cover; miniature lift stays restrained. Below the full filter-row width, filters move to the existing temporary-menu pattern with an explicit active reset. At the smallest enlarged-text size, search and view choices use labelled popups and the page shares a single scroll area, so the header can leave room for a complete book row.
 
 ## Corporate identity
 

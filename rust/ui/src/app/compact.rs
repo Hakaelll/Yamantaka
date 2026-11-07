@@ -14,13 +14,14 @@ impl YamantakaApp {
         for document in documents {
             ui.push_id(("compact-jacket", &document.id), |ui| {
                 ui.horizontal_top(|ui| {
-                    let response = book::miniature(
+                    let response = book::catalogue_miniature(
                         ui,
                         &document,
                         if cramped { 44.0 } else { 58.0 },
                         self.library_selection.model.contains(&document.id),
                         self.reduced_motion,
                         p,
+                        self.preview_tilt.filter(|_| document.id == "demo-0"),
                     );
                     self.library_book_response(ui, &response, &document);
                     response.on_hover_text(document.display_title());
@@ -32,10 +33,8 @@ impl YamantakaApp {
                             ui.set_width(width);
                             ui.spacing_mut().item_spacing.y = 3.0;
                             ui.add(
-                                egui::Label::new(
-                                    RichText::new(document.display_title()).size(16.0),
-                                )
-                                .wrap(),
+                                egui::Label::new(theme::editorial(document.display_title(), 16.0))
+                                    .wrap(),
                             );
                             if !cramped {
                                 ui.add(
@@ -48,7 +47,7 @@ impl YamantakaApp {
                                 );
                             }
                             ui.horizontal(|ui| {
-                                if theme::primary_icon(
+                                if theme::icon_button(
                                     ui,
                                     self.tr("Leer documento", "Read document"),
                                     theme::Icon::Right,
@@ -72,9 +71,9 @@ impl YamantakaApp {
                         },
                     );
                 });
-                ui.add_space(8.0);
+                ui.add_space(6.0);
                 ui.separator();
-                ui.add_space(8.0);
+                ui.add_space(6.0);
             });
         }
     }

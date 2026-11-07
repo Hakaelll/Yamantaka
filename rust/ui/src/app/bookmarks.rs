@@ -156,7 +156,14 @@ impl YamantakaApp {
         };
         ui.horizontal(|ui| {
             if compact {
-                let back = theme::navigation(ui, self.tr("Volver al PDF", "Back to PDF"), false, p);
+                let back = theme::control(
+                    ui,
+                    self.tr("Volver al PDF", "Back to PDF"),
+                    Some(theme::Icon::Left),
+                    false,
+                    false,
+                    p,
+                );
                 if back.clicked() {
                     self.close_study_tray();
                     if back.has_focus() {
@@ -210,7 +217,7 @@ impl YamantakaApp {
                 });
             }
         });
-        ui.add_space(4.0);
+        ui.separator();
     }
 }
 

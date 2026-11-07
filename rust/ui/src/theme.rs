@@ -21,22 +21,22 @@ impl Palette {
     pub fn new(dark: bool) -> Self {
         if dark {
             Self {
-                canvas: Color32::from_rgb(15, 16, 18),
-                surface: Color32::from_rgb(22, 23, 26),
-                raised: Color32::from_rgb(32, 33, 37),
-                ink: Color32::from_rgb(239, 237, 232),
-                secondary: Color32::from_rgb(167, 168, 176),
-                line: Color32::from_rgb(50, 51, 57),
+                canvas: Color32::from_rgb(22, 22, 21),
+                surface: Color32::from_rgb(30, 29, 27),
+                raised: Color32::from_rgb(42, 40, 37),
+                ink: Color32::from_rgb(243, 237, 225),
+                secondary: Color32::from_rgb(179, 171, 159),
+                line: Color32::from_rgb(62, 58, 53),
                 accent: Color32::from_rgb(189, 163, 245),
             }
         } else {
             Self {
-                canvas: Color32::from_rgb(247, 245, 239),
-                surface: Color32::from_rgb(255, 253, 248),
-                raised: Color32::from_rgb(235, 232, 224),
-                ink: Color32::from_rgb(33, 34, 39),
-                secondary: Color32::from_rgb(100, 100, 109),
-                line: Color32::from_rgb(211, 207, 198),
+                canvas: Color32::from_rgb(244, 239, 229),
+                surface: Color32::from_rgb(252, 248, 240),
+                raised: Color32::from_rgb(232, 224, 211),
+                ink: Color32::from_rgb(41, 34, 28),
+                secondary: Color32::from_rgb(96, 84, 74),
+                line: Color32::from_rgb(206, 194, 176),
                 accent: Color32::from_rgb(103, 72, 167),
             }
         }
@@ -174,6 +174,17 @@ pub fn display(ui: &mut egui::Ui, text: &str, size: f32) -> egui::Response {
     ui.label(egui::RichText::new(text).size(size))
 }
 
+pub fn editorial(text: &str, size: f32) -> egui::RichText {
+    egui::RichText::new(text).font(FontId::new(size, FontFamily::Name("Editorial".into())))
+}
+
+pub fn reduced_motion(ctx: &egui::Context) -> bool {
+    ctx.data(|data| {
+        data.get_temp::<bool>(egui::Id::new("yamantaka-reduced-motion"))
+            .unwrap_or(false)
+    })
+}
+
 #[derive(Clone, Copy)]
 pub enum Icon {
     Close,
@@ -186,6 +197,7 @@ pub enum Icon {
     Settings,
     Left,
     Right,
+    Down,
     Panel,
     Minus,
     Plus,
@@ -203,6 +215,10 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
     let v = |x, y| center + egui::vec2(x, y);
     let line = |a, b| painter.line_segment([a, b], s);
     match icon {
+        Icon::Down => {
+            line(v(-4.0, -2.0), v(0.0, 2.0));
+            line(v(0.0, 2.0), v(4.0, -2.0));
+        }
         Icon::Close => {
             line(v(-4.0, -4.0), v(4.0, 4.0));
             line(v(-4.0, 4.0), v(4.0, -4.0));
@@ -460,18 +476,16 @@ pub fn bounded_navigation(ui: &mut egui::Ui, label: &str, p: Palette) -> egui::R
     .on_hover_text(label)
 }
 
-pub fn reading_tab(ui: &mut egui::Ui, title: &str, active: bool, p: Palette) -> egui::Response {
-    let width = ui.available_width();
+pub fn bounded_menu(ui: &mut egui::Ui, label: &str, p: Palette) -> egui::Response {
     control_impl(
         ui,
-        title,
-        None,
-        active,
+        label,
+        Some(Icon::Down),
         false,
-        ControlLabel::Bounded(width),
+        false,
+        ControlLabel::Bounded(ui.available_width()),
         p,
     )
-    .on_hover_text(title)
 }
 
 fn control_impl(
@@ -494,7 +508,7 @@ fn control_impl(
             label.to_owned(),
             FontId::proportional(14.0),
             Color32::PLACEHOLDER,
-            (width - 28.0).max(1.0),
+            (width - if symbol.is_some() { 52.0 } else { 28.0 }).max(1.0),
         );
         job.wrap.max_rows = 1;
         job.wrap.break_anywhere = true;
@@ -520,10 +534,7 @@ fn control_impl(
     response.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), selected, label)
     });
-    let reduced = ui.ctx().data(|data| {
-        data.get_temp::<bool>(egui::Id::new("yamantaka-reduced-motion"))
-            .unwrap_or(false)
-    });
+    let reduced = reduced_motion(ui.ctx());
     let hover = if reduced || response.has_focus() {
         f32::from(response.hovered())
     } else {
@@ -534,31 +545,39 @@ fn control_impl(
             |t| 1.0 - (1.0 - t).powi(3),
         )
     };
+    let pointer_down = response.is_pointer_button_down_on();
+    let press = if reduced {
+        f32::from(pointer_down)
+    } else {
+        ui.ctx().animate_bool_with_time_and_easing(
+            response.id.with("press"),
+            pointer_down,
+            0.11,
+            |t| 1.0 - (1.0 - t).powi(3),
+        )
+    };
     let foreground = if primary {
-        if p.canvas.r() < 100 {
-            Color32::from_rgb(25, 19, 36)
-        } else {
-            Color32::WHITE
-        }
-    } else if selected || response.hovered() {
+        p.canvas
+    } else if selected {
         p.ink
     } else {
-        p.secondary
+        p.secondary.lerp_to_gamma(p.ink, hover)
     };
     let fill = if primary {
-        p.accent.lerp_to_gamma(p.ink, hover * 0.10)
+        p.ink.lerp_to_gamma(p.accent, hover * 0.20 + press * 0.16)
     } else if selected {
-        p.raised
+        p.raised.lerp_to_gamma(p.line, press * 0.32)
     } else {
-        Color32::TRANSPARENT.lerp_to_gamma(p.raised, hover)
+        Color32::TRANSPARENT.lerp_to_gamma(p.raised, hover.max(press))
     };
-    let rect = rect.translate(egui::vec2(
-        0.0,
-        f32::from(response.is_pointer_button_down_on()),
-    ));
+    let visual = if reduced {
+        rect
+    } else {
+        rect.shrink(press * 0.75)
+    };
     ui.painter().rect_filled(
-        rect,
-        8.0,
+        visual,
+        5.0,
         if ui.is_enabled() {
             fill
         } else {
@@ -589,7 +608,7 @@ fn control_impl(
     if response.has_focus() {
         ui.painter().rect_stroke(
             rect.shrink(1.0),
-            8.0,
+            5.0,
             egui::Stroke::new(2.0, p.accent),
             egui::StrokeKind::Inside,
         );

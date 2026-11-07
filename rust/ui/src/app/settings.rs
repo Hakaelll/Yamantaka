@@ -48,8 +48,8 @@ impl YamantakaApp {
                     ui.spacing_mut().item_spacing.y = 6.0;
                 }
                 if ui.available_width() >= 680.0 {
-                    theme::display(ui, self.tr("Ajustes", "Settings"), 38.0);
-                    ui.add_space(12.0);
+                    ui.label(theme::editorial(self.tr("Ajustes", "Settings"), 42.0));
+                    ui.add_space(8.0);
                     ui.horizontal_wrapped(|ui| {
                         for (index, label) in labels.iter().copied().enumerate() {
                             let selected = category == index;

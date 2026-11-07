@@ -8,6 +8,7 @@ pub(crate) use probe::verify;
 pub(super) struct State {
     document: String,
     last_activity: Option<Instant>,
+    pointer_reveal: Option<f64>,
     hidden: bool,
     settled: bool,
     layer: Option<egui::LayerId>,
@@ -26,6 +27,7 @@ impl State {
     pub(super) fn bind(&mut self, document: &str) {
         if self.document != document {
             self.document = document.to_owned();
+            self.pointer_reveal = None;
             self.reveal();
         }
     }
@@ -36,6 +38,7 @@ impl State {
     }
     pub(super) fn focus_controls(&mut self) {
         self.reveal();
+        self.pointer_reveal = None;
         self.focus_first = true;
     }
 
@@ -74,6 +77,9 @@ impl State {
             return;
         }
         if !policy.auto_hide || pointer {
+            if self.hidden && pointer && policy.auto_hide && !theme::reduced_motion(ctx) {
+                self.pointer_reveal = Some(ctx.input(|input| input.time));
+            }
             self.reveal();
             return;
         }
@@ -202,11 +208,22 @@ impl State {
     ) {
         if self.hidden {
             self.reveal_button(ui, reveal_label, p);
-        } else if let Some(first) = contents(ui)
-            && self.focus_first
-        {
-            ui.memory_mut(|memory| memory.request_focus(first));
-            self.focus_first = false;
+        } else {
+            if let Some(started) = self.pointer_reveal {
+                let progress = ((ui.input(|input| input.time) - started) / 0.16) as f32;
+                if self.focus_first || progress >= 1.0 || theme::reduced_motion(ui.ctx()) {
+                    self.pointer_reveal = None;
+                } else {
+                    ui.set_opacity(1.0 - 0.15 * (1.0 - progress.clamp(0.0, 1.0)).powi(3));
+                    ui.ctx().request_repaint();
+                }
+            }
+            if let Some(first) = contents(ui)
+                && self.focus_first
+            {
+                ui.memory_mut(|memory| memory.request_focus(first));
+                self.focus_first = false;
+            }
         }
     }
 

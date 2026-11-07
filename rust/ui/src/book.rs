@@ -68,7 +68,7 @@ impl BookPhysics {
         }
         let seconds = seconds.clamp(0.001, 0.032);
         self.lift_velocity += ((target - self.lift) * 210.0 - self.lift_velocity * 29.0) * seconds;
-        self.lift = (self.lift + self.lift_velocity * seconds).clamp(0.0, 1.05);
+        self.lift = (self.lift + self.lift_velocity * seconds).clamp(-0.4, 1.05);
         if (target - self.lift).abs() < 0.001 && self.lift_velocity.abs() < 0.01 {
             self.lift = target;
             self.lift_velocity = 0.0;
@@ -113,7 +113,7 @@ pub fn cover(
         reduced_motion,
         palette,
         preview_pointer,
-        true,
+        Caption::Full,
     )
 }
 
@@ -133,8 +133,35 @@ pub fn miniature(
         reduced_motion,
         palette,
         None,
-        false,
+        Caption::None,
     )
+}
+
+pub fn catalogue_miniature(
+    ui: &mut egui::Ui,
+    document: &Document,
+    width: f32,
+    selected: bool,
+    reduced_motion: bool,
+    palette: Palette,
+    preview_pointer: Option<Vec2>,
+) -> Response {
+    cover_impl(
+        ui,
+        document,
+        width,
+        selected,
+        reduced_motion,
+        palette,
+        preview_pointer,
+        Caption::Miniature,
+    )
+}
+
+enum Caption {
+    Full,
+    Miniature,
+    None,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -146,9 +173,10 @@ fn cover_impl(
     reduced_motion: bool,
     palette: Palette,
     preview_pointer: Option<Vec2>,
-    caption: bool,
+    caption: Caption,
 ) -> Response {
-    let height = if caption {
+    let full_caption = matches!(caption, Caption::Full);
+    let height = if full_caption {
         cover_height(width)
     } else {
         width * 1.34
@@ -167,7 +195,10 @@ fn cover_impl(
             "Autor sin especificar"
         });
     let (rect, response) = ui.allocate_exact_size(
-        Vec2::new(width, height + if caption { CAPTION_HEIGHT } else { 8.0 }),
+        Vec2::new(
+            width,
+            height + if full_caption { CAPTION_HEIGHT } else { 8.0 },
+        ),
         Sense::click(),
     );
     response.widget_info(|| {
@@ -200,7 +231,7 @@ fn cover_impl(
         data.insert_temp(egui::Id::new("pdf-cover-requests"), requests);
     });
     let book = Rect::from_min_size(
-        rect.min + egui::vec2(11.0, if caption { COVER_HEADROOM } else { 10.0 }),
+        rect.min + egui::vec2(11.0, if full_caption { COVER_HEADROOM } else { 10.0 }),
         Vec2::new(width - 20.0, width * 1.34 - 14.0),
     );
     let mut physics = ui.ctx().data_mut(|data| {
@@ -225,9 +256,11 @@ fn cover_impl(
     let hovering_book =
         response.hover_pos().is_some_and(|pos| book.contains(pos)) || preview_pointer.is_some();
     let lift_moving = physics.emphasis(
-        if !hovering_book {
+        if response.is_pointer_button_down_on() && hovering_book {
+            -0.32
+        } else if !hovering_book {
             0.0
-        } else if caption {
+        } else if full_caption {
             1.0
         } else {
             0.2
@@ -676,7 +709,29 @@ fn cover_impl(
             StrokeKind::Inside,
         );
     }
-    if !caption {
+    let progress = document.reading_progress.clamp(0.0, 1.0) as f32;
+    let visibility = if !matches!(caption, Caption::None) && progress > 0.0 {
+        if reduced_motion || response.has_focus() {
+            f32::from(hovering_book || response.has_focus())
+        } else {
+            ui.ctx().animate_bool_with_time_and_easing(
+                response.id.with("progress"),
+                hovering_book,
+                0.12,
+                |t| 1.0 - (1.0 - t).powi(3),
+            )
+        }
+    } else {
+        0.0
+    };
+    if !full_caption {
+        if visibility > 0.0 {
+            let track = Rect::from_min_size(
+                egui::pos2(book.left(), rect.bottom() - 3.0),
+                egui::vec2(book.width(), 2.0),
+            );
+            paint_progress(ui, document, track, progress, visibility, palette);
+        }
         return response;
     }
     let title_rect = Rect::from_min_size(
@@ -685,7 +740,7 @@ fn cover_impl(
     );
     let mut title = egui::text::LayoutJob::simple(
         document.display_title().to_owned(),
-        FontId::proportional(16.0),
+        FontId::new(17.0, egui::FontFamily::Name("Editorial".into())),
         palette.ink,
         title_rect.width(),
     );
@@ -710,35 +765,51 @@ fn cover_impl(
         document.page_count,
         if english { "pages" } else { "páginas" }
     );
-    let progress = document.reading_progress.clamp(0.0, 1.0);
-    let meta = if progress > 0.0 {
-        format!("{pages} · {:.0}%", progress * 100.0)
-    } else {
-        pages
-    };
-    painter.text(
+    let pages = painter.text(
         egui::pos2(title_rect.left(), rect.bottom() - 20.0),
         egui::Align2::LEFT_CENTER,
-        meta,
+        pages,
         FontId::proportional(12.0),
         palette.secondary,
     );
-    if progress > 0.0 {
+    if visibility > 0.0 {
+        painter.text(
+            egui::pos2(pages.right() + 8.0, pages.center().y),
+            egui::Align2::LEFT_CENTER,
+            format!("{:.0}%", progress * 100.0),
+            FontId::proportional(12.0),
+            palette.secondary.gamma_multiply(visibility),
+        );
         let track = Rect::from_min_size(
             egui::pos2(title_rect.left(), rect.bottom() - 5.0),
             egui::vec2(title_rect.width(), 2.0),
         );
-        painter.rect_filled(track, 1.0, palette.line);
-        painter.rect_filled(
-            Rect::from_min_size(
-                track.min,
-                egui::vec2(track.width() * progress as f32, track.height()),
-            ),
-            1.0,
-            palette.accent,
-        );
+        paint_progress(ui, document, track, progress, visibility, palette);
     }
     response
+}
+
+fn paint_progress(
+    ui: &egui::Ui,
+    document: &Document,
+    track: Rect,
+    progress: f32,
+    visibility: f32,
+    palette: Palette,
+) {
+    if visibility >= 0.9 {
+        crate::theme::record_control_bounds(ui, &format!("Book progress · {}", document.id), track);
+    }
+    ui.painter()
+        .rect_filled(track, 1.0, palette.line.gamma_multiply(visibility));
+    ui.painter().rect_filled(
+        Rect::from_min_size(
+            track.min,
+            egui::vec2(track.width() * progress, track.height()),
+        ),
+        1.0,
+        palette.accent.gamma_multiply(visibility),
+    );
 }
 /// The six jackets share volume and physics, while type and artwork occupy
 /// distinct, non-overlapping regions. Miniatures communicate by color and art.
@@ -801,4 +872,24 @@ fn jacket_regions(
         ),
     };
     (title, art, author_region)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BookPhysics;
+
+    #[test]
+    fn a_pressed_cover_rebounds_and_reduced_motion_settles_immediately() {
+        let mut book = BookPhysics::default();
+        for _ in 0..60 {
+            book.emphasis(-0.32, 1.0 / 60.0, false);
+        }
+        assert_eq!(book.lift, -0.32);
+        for _ in 0..60 {
+            book.emphasis(1.0, 1.0 / 60.0, false);
+        }
+        assert_eq!(book.lift, 1.0);
+        assert!(!book.emphasis(-0.32, 1.0 / 60.0, true));
+        assert_eq!(book.lift, 0.0);
+    }
 }

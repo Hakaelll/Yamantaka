@@ -105,6 +105,52 @@ pub(crate) fn verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
     );
     output.textures_delta.clear();
     assert!(!state.hidden);
+    let reveal_started = state
+        .pointer_reveal
+        .expect("Pointer reveal did not start a fade");
+    let _ = ctx.run_ui(
+        egui::RawInput {
+            time: Some(reveal_started + 0.17),
+            ..Default::default()
+        },
+        |ui| {
+            state.show_inline(
+                ui,
+                Policy {
+                    auto_hide: true,
+                    blocked: false,
+                    manual_hidden: false,
+                },
+                "Show reading controls",
+                Palette::new(true),
+                |_| None,
+            );
+        },
+    );
+    assert!(
+        state.pointer_reveal.is_none(),
+        "Pointer fade kept running after its duration"
+    );
+    ctx.data_mut(|data| data.insert_temp(egui::Id::new("yamantaka-reduced-motion"), true));
+    state.hidden = true;
+    let _ = ctx.run_ui(
+        egui::RawInput {
+            events: vec![egui::Event::PointerMoved(egui::pos2(30.0, 20.0))],
+            ..Default::default()
+        },
+        |ui| {
+            state.advance(
+                ui.ctx(),
+                ui.available_rect_before_wrap(),
+                &Policy {
+                    auto_hide: true,
+                    blocked: false,
+                    manual_hidden: false,
+                },
+            );
+        },
+    );
+    assert!(!state.hidden && state.pointer_reveal.is_none());
     for (auto_hide, blocked) in [(false, false), (true, true)] {
         state.last_activity = Some(Instant::now() - Duration::from_secs(4));
         let mut output = ctx.run_ui(
@@ -135,7 +181,7 @@ pub(crate) fn verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
         path,
         serde_json::to_vec_pretty(
             &serde_json::json!({"synthetic":true,"timeoutHides":true,"keyboardReveal":true,
-        "focusRetained":true,"edgeReveal":true,"disabledKeepsVisible":true,"blockedKeepsVisible":true,"newDocumentReveals":true,"overlayPreservesParentRect":stable}),
+        "focusRetained":true,"edgeReveal":true,"pointerFadeSettles":true,"reducedMotionSkipsFade":true,"disabledKeepsVisible":true,"blockedKeepsVisible":true,"newDocumentReveals":true,"overlayPreservesParentRect":stable}),
         )?,
     )?;
     Ok(())

@@ -9,11 +9,11 @@ $executablePath = (Resolve-Path -LiteralPath $Executable).Path
 $repositoryPath = (Resolve-Path -LiteralPath "$PSScriptRoot/..").Path
 $null = New-Item -ItemType Directory -Path $OutputDirectory -Force
 $outputPath = (Resolve-Path -LiteralPath $OutputDirectory).Path
-$libraryControlsEn = @('Library','Session','Settings','Add PDFs','Filters','View','Organize library','Select')
-$libraryControlsEs = @('Biblioteca','Sesión','Ajustes','Añadir PDF','Filtros','Vista','Organizar biblioteca','Seleccionar')
+$libraryControlsEn = @('Add PDFs','Filters','View','Organize library')
+$libraryControlsEs = @('Añadir PDF','Filtros','Vista','Organizar biblioteca')
 $cases = @(
-    @{ name='readme-library-dark'; args=@('--pdf-covers','--reduce-motion'); visible=$libraryControlsEn + @('Collection','Search title or author','Continue'); firstBook=$true },
-    @{ name='readme-library-light'; args=@('--pdf-covers','--light','--reduce-motion'); visible=$libraryControlsEn + @('Collection','Search title or author','Continue'); firstBook=$true },
+    @{ name='readme-library-dark'; args=@('--pdf-covers','--reduce-motion'); visible=$libraryControlsEn + @('Search title or author','Continue'); firstBook=$true },
+    @{ name='readme-library-light'; args=@('--pdf-covers','--light','--reduce-motion'); visible=$libraryControlsEn + @('Search title or author','Continue'); firstBook=$true },
     @{ name='chrome-hidden'; args=@('--reader','--continuous','--chrome=hidden') },
     @{ name='chrome-revealed'; args=@('--reader','--continuous','--chrome=revealed') },
     @{ name='chrome-pinned'; args=@('--reader','--continuous','--chrome=pinned') },
@@ -102,9 +102,9 @@ $cases = @(
     @{ name='library-compact-view-menu'; args=@('--size=640x480','--text-scale=2','--library-view-menu','--pdf-covers','--reduce-motion'); visible=@('View','Covers','List','Recent') },
     @{ name='library-compact-search-menu'; args=@('--size=640x480','--text-scale=2','--library-search-menu','--pdf-covers','--reduce-motion'); visible=@('Search library','Search title or author') },
     @{ name='library-compact-filters-active'; args=@('--size=720x540','--pdf-covers','--smart-view=missing','--light','--es') },
-    @{ name='library-wide-light-pdf'; args=@('--pdf-covers','--light','--es'); visible=$libraryControlsEs + @('Colección','Buscar por título o autor','Continuar'); firstBook=$true },
-    @{ name='library-1280'; args=@('--pdf-covers','--size=1280x720','--light','--es','--reduce-motion'); visible=$libraryControlsEs + @('Colección','Buscar por título o autor','Continuar'); firstBook=$true },
-    @{ name='library-ultrawide'; args=@('--pdf-covers','--size=2560x1080','--reduce-motion'); visible=$libraryControlsEn + @('Collection','Search title or author','Continue'); firstBook=$true },
+    @{ name='library-wide-light-pdf'; args=@('--pdf-covers','--light','--es'); visible=$libraryControlsEs + @('Buscar por título o autor','Continuar'); firstBook=$true },
+    @{ name='library-1280'; args=@('--pdf-covers','--size=1280x720','--light','--es','--reduce-motion'); visible=$libraryControlsEs + @('Buscar por título o autor','Continuar'); firstBook=$true },
+    @{ name='library-ultrawide'; args=@('--pdf-covers','--size=2560x1080','--reduce-motion'); visible=$libraryControlsEn + @('Search title or author','Continue'); firstBook=$true },
     @{ name='window-placement-cycle'; args=@('--window-placement','--es') },
     @{ name='window-placement-unknown'; args=@('--window-placement','--window-placement-unknown','--light') },
     @{ name='window-placement-backup-glow'; args=@('--window-placement','--window-placement-backup','--software','--light') },
@@ -365,7 +365,8 @@ $cases = @(
     @{ name='pdf-covers-light-es'; args=@('--pdf-covers','--light','--es') },
     @{ name='pdf-covers-details'; args=@('--pdf-covers','--details'); visible=@('Back to library','Continue') },
     @{ name='pdf-covers-details-small-200-es'; args=@('--pdf-covers','--details','--size=640x480','--text-scale=2','--es'); visible=@('Volver a la biblioteca','Continuar') },
-    @{ name='pdf-covers-tilted'; args=@('--pdf-covers','--tilt') },
+    @{ name='pdf-covers-tilted'; args=@('--pdf-covers','--tilt'); visible=@('Book progress · demo-0') },
+    @{ name='pdf-covers-tilted-small-200'; args=@('--pdf-covers','--tilt','--size=640x480','--text-scale=2'); visible=@('Book progress · demo-0'); firstBook=$true },
     @{ name='pdf-covers-reduced'; args=@('--pdf-covers','--reduce-motion') },
     @{ name='pdf-covers-small-200'; args=@('--pdf-covers','--size=640x480','--text-scale=2'); visible=$libraryControlsEn + @('Search library','Read document','Book details'); firstBook=$true },
     @{ name='pdf-covers-small-200-es'; args=@('--pdf-covers','--size=640x480','--text-scale=2','--es'); visible=$libraryControlsEs + @('Buscar en biblioteca','Leer documento','Ver ficha'); firstBook=$true },
@@ -498,7 +499,7 @@ $cases = @(
     @{ name='library-tilted'; args=@('--tilt') },
     @{ name='library-reduced'; args=@('--reduce-motion') },
     @{ name='library-opengl'; args=@('--opengl') },
-    @{ name='settings-light'; args=@('--settings','--light'); visible=@('Settings','Warm paper','Dark graphite') },
+    @{ name='settings-light'; args=@('--settings','--light'); visible=@('Appearance','Warm paper','Dark graphite') },
     @{ name='privacy-sessions-dark'; args=@('--settings','--privacy') },
     @{ name='privacy-sessions-light-es'; args=@('--settings','--privacy','--light','--es','--sessions-disabled','--reduce-motion') },
     @{ name='privacy-sessions-small-200'; args=@('--settings','--privacy','--size=640x480','--text-scale=2') },
@@ -569,6 +570,12 @@ foreach ($case in $cases) {
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($case.ContainsKey('visible')) {
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $case.visible
+    }
+    if ($case.name -in @('readme-library-dark','pdf-covers-small-200-es')) {
+        $hidden = @('Book progress · demo-0','Collection','Session','Settings','Select','Colección','Sesión','Ajustes','Seleccionar')
+        if (@($controls.controls | Where-Object { $_.label -in $hidden }).Count -ne 0) {
+            throw 'Idle library shows contextual controls or reading progress.'
+        }
     }
     if ($case.firstBook) {
         # The resume strip also renders a miniature of the same document.
@@ -1319,8 +1326,8 @@ foreach ($case in $cases) {
         if (-not $transition.geometryUnchanged -or -not $transition.expectedVisibilityMet -or $controls.readerOpening.firstRaster.emptyPagePaints -ne 0) { throw 'Reading controls changed page geometry, visibility or first-page continuity.' }
         $labels=switch ($case.name) {
             'chrome-hidden' { @('Show reading controls') }
-            'chrome-revealed' { @('Library','Session','Settings','Page','Next page','Zoom out','Zoom in','Find','Navigate','Notes','View','Compare') }
-            'chrome-compact' { @('Biblioteca','Sesión','Ajustes','Página','Buscar','Navegar','Notas','Vista','Más controles') }
+            'chrome-revealed' { @('Library','Page','Next page','Zoom out','Zoom in','Find','Navigate','Notes','More controls') }
+            'chrome-compact' { @('Biblioteca','Página','Buscar','Navegar','Notas','Más controles') }
             'chrome-reference' { @('Keyboard active','Main · On the Nature of Things','Reference · The Architecture of Thought') }
             'chrome-menu-held' { @('Automatically hide controls','Previous page','Next page') }
             default { @() }

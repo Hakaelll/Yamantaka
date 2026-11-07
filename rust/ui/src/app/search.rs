@@ -234,6 +234,15 @@ impl YamantakaApp {
                         self.show_global_notes();
                         ui.close();
                     }
+                    ui.separator();
+                    if !self.library_selection.toolbar_visible() {
+                        self.library_selection_control(ui, p);
+                    }
+                    self.session_menu(ui, false, p);
+                    if theme::navigation(ui, self.tr("Ajustes", "Settings"), false, p).clicked() {
+                        self.show_surface(Surface::Settings);
+                        ui.close();
+                    }
                     if self.preview_tools_menu
                         && self.text_scale >= 2.0
                         && !self.library_check.capture_mode

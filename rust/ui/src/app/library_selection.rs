@@ -52,6 +52,12 @@ pub(super) struct SelectionState {
     preview_targets: Vec<String>,
 }
 impl SelectionState {
+    pub(super) fn toolbar_visible(&self) -> bool {
+        self.model.mode
+            || !self.model.ids().is_empty()
+            || self.notice.is_some()
+            || self.preview_menu
+    }
     pub(super) fn removing(&self) -> bool {
         self.pending
             .as_ref()

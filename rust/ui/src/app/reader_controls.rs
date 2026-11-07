@@ -10,8 +10,14 @@ impl YamantakaApp {
         p: Palette,
     ) -> Option<egui::Id> {
         let width = ui.available_width();
-        let labeled = width >= 810.0;
-        let inline_steps = width >= 444.0;
+        let labeled = width >= 1040.0;
+        let full_zoom = width >= 1200.0;
+        let inline_steps = width >= 500.0;
+        self.library_return(ui, true, p);
+        if width >= 730.0 {
+            self.reader_switcher(ui, if labeled { 248.0 } else { 176.0 }, p);
+            reader_group_rule(ui, p);
+        }
         if inline_steps {
             self.reader_page_step(ui, false, page_count, p);
         }
@@ -35,20 +41,20 @@ impl YamantakaApp {
         }
         if inline_steps {
             self.reader_page_step(ui, true, page_count, p);
-            ui.add_space(6.0);
-            if labeled {
+            reader_group_rule(ui, p);
+            if full_zoom {
                 self.reader_zoom_step(ui, false, p);
             }
-            let zoom = if labeled {
+            let zoom = if full_zoom {
                 theme::navigation(ui, &self.reader_zoom_label(), false, p)
             } else {
                 theme::icon_button(ui, "Zoom", Icon::Plus, p)
             };
-            egui::Popup::menu(&zoom).show(|ui| self.reader_zoom_menu(ui, !labeled, p));
-            if labeled {
+            egui::Popup::menu(&zoom).show(|ui| self.reader_zoom_menu(ui, !full_zoom, p));
+            if full_zoom {
                 self.reader_zoom_step(ui, true, p);
             }
-            ui.add_space(6.0);
+            reader_group_rule(ui, p);
         }
 
         let find_label = self.tr("Buscar", "Find");
@@ -62,30 +68,12 @@ impl YamantakaApp {
         }
         self.reader_study_control(ui, ReaderPanelTab::Outline, labeled, p);
         self.reader_study_control(ui, ReaderPanelTab::Annotations, labeled, p);
-        let view = if labeled {
-            theme::navigation(ui, self.tr("Vista", "View"), false, p)
-        } else {
-            theme::icon_button(ui, self.tr("Vista", "View"), Icon::Grid, p)
-        };
-        self.reader_options_popup(&view)
-            .show(|ui| self.reader_options_menu(ui, p));
-
-        if labeled {
-            self.reader_compare_control(ui, p);
-        } else {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let more =
                 theme::icon_button(ui, self.tr("Más controles", "More controls"), Icon::Menu, p);
-            egui::Popup::menu(&more).show(|ui| {
-                if !inline_steps {
-                    ui.horizontal(|ui| {
-                        self.reader_page_step(ui, false, page_count, p);
-                        self.reader_page_step(ui, true, page_count, p);
-                    });
-                    ui.menu_button("Zoom", |ui| self.reader_zoom_menu(ui, true, p));
-                }
-                self.reader_compare_control(ui, p);
-            });
-        }
+            self.reader_options_popup(&more)
+                .show(|ui| self.reader_options_menu(ui, p));
+        });
         Some(response.id)
     }
 
@@ -174,24 +162,6 @@ impl YamantakaApp {
         }
     }
 
-    fn reader_compare_control(&mut self, ui: &mut egui::Ui, p: Palette) {
-        if ui
-            .add_enabled_ui(self.reader.reader_preferences.is_some(), |ui| {
-                theme::navigation(
-                    ui,
-                    self.tr("Comparar", "Compare"),
-                    self.reference.is_some() || self.reference_mount.is_some(),
-                    p,
-                )
-            })
-            .inner
-            .clicked()
-        {
-            self.toggle_reference(ui.ctx());
-            ui.close();
-        }
-    }
-
     pub(super) fn set_reader_zoom(&mut self, zoom: f32) {
         if let Some(mut preferences) = self.reader.reader_preferences.clone() {
             preferences.zoom_mode = ZoomMode::Custom;
@@ -214,10 +184,18 @@ fn study_control(
     p: Palette,
 ) -> egui::Response {
     if labeled {
-        theme::navigation(ui, label, selected, p)
+        theme::control(ui, label, Some(icon), selected, false, p)
     } else {
         theme::icon_toggle(ui, label, icon, selected, p)
     }
+}
+
+fn reader_group_rule(ui: &mut egui::Ui, p: Palette) {
+    let (_, rect) = ui.allocate_space(egui::vec2(8.0, 24.0));
+    ui.painter().line_segment(
+        [rect.center_top(), rect.center_bottom()],
+        egui::Stroke::new(1.0, p.line),
+    );
 }
 
 pub(super) fn toolbar_slot(ui: &mut egui::Ui) -> egui::Rect {
