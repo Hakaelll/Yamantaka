@@ -291,6 +291,13 @@ impl AnnotationState {
         let mut action = None;
         let page = self.page.clone()?;
         let mut previous_page = None;
+        if self.filters.count() > 0 && page.total > 0 {
+            let count = match page.total {
+                1 => tr("1 resultado", "1 result").to_owned(),
+                total => format!("{total} {}", tr("resultados", "results")),
+            };
+            ui.label(RichText::new(count).size(13.0).color(p.secondary));
+        }
         if page.total == 0 {
             ui.label(
                 RichText::new(if self.filters.count() > 0 {
@@ -350,14 +357,26 @@ impl AnnotationState {
                             self.selected.0[index] = !selected;
                         }
                     }
-                    ui.label(
-                        RichText::new(format!(
-                            "{} · {}",
-                            kind_label(data.values.kind, context.english),
-                            review_label(data.values.review_state, context.english)
-                        ))
-                        .color(p.ink),
-                    );
+                    ui.horizontal(|ui| {
+                        let (rect, response) =
+                            ui.allocate_exact_size(egui::vec2(10.0, 16.0), egui::Sense::hover());
+                        ui.painter().circle_filled(
+                            rect.center(),
+                            4.0,
+                            panel::mark_color(data.values.color),
+                        );
+                        response.on_hover_text(color_label(data.values.color, context.english));
+                        ui.label(
+                            RichText::new(kind_label(data.values.kind, context.english))
+                                .strong()
+                                .color(p.ink),
+                        );
+                        ui.label(
+                            RichText::new(review_label(data.values.review_state, context.english))
+                                .size(13.0)
+                                .color(p.secondary),
+                        );
+                    });
                 });
                 if let Some(passage) = &data.values.selected_text {
                     ui.label(RichText::new(passage).italics().color(p.secondary));

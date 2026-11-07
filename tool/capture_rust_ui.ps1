@@ -430,6 +430,8 @@ $cases = @(
     @{ name='annotation-filter-empty'; args=@('--reader','--annotation-many','--annotation-filter-empty') },
     @{ name='annotation-filter-export'; args=@('--reader','--annotation-many','--annotation-filter','--export-json') },
     @{ name='annotation-filter-small-200'; args=@('--reader','--annotation-many','--annotation-filter','--size=640x480','--text-scale=2') },
+    @{ name='annotation-page-filter'; args=@('--reader','--annotation-page-filter','--es','--light'); visible=@('Página 1','Pendientes','Filtros activos (1)') },
+    @{ name='annotation-page-filter-small-200'; args=@('--reader','--annotation-page-filter','--es','--size=640x480','--text-scale=2'); visible=@('Página 1','Pendientes','Filtros activos (1)') },
     @{ name='annotation-export-json'; args=@('--reader','--annotation-many','--export-json') },
     @{ name='annotation-export-markdown-es'; args=@('--reader','--annotation-many','--export-markdown','--light','--es') },
     @{ name='annotation-export-small-200'; args=@('--reader','--annotation-many','--export-json','--size=640x480','--text-scale=2') },
@@ -574,6 +576,11 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'annotation-page-filter*' -and
+        ($controls.primaryAnnotations.filterCount -ne 1 -or $controls.primaryAnnotations.total -ne 1 -or
+         $controls.primaryAnnotations.entries[0].id -cne 'source-note-a')) {
+        throw 'The current-page filter did not isolate the first page note.'
+    }
     if ($case.ContainsKey('visible')) {
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels $case.visible
     }

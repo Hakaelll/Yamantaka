@@ -108,7 +108,7 @@ pub(super) struct AnnotationState {
     filters: filters::Filters,
     filter_draft: filters::Filters,
     filters_open: bool,
-    filter_preview: Option<bool>,
+    filter_preview: Option<filters::FilterPreview>,
     selected: bulk::BulkSelection,
     bulk_preview: Option<bool>,
     bulk_tag: String,

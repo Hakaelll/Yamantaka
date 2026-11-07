@@ -62,8 +62,9 @@ typography:
     fontFamily: "Segoe UI Bold, Segoe UI Variable, Segoe UI, egui proportional fallback"
     fontWeight: 700
 rounded:
-  native-field: "7px"
-  control: "5px"
+  native-field: "8px"
+  control: "9px"
+  menu: "12px"
   theme-choice: "10px"
   continuity: "12px"
   cover-state: "6px"
@@ -313,6 +314,10 @@ open the exact entry in Notes. Colors on the paper describe the saved marks.
 The interface uses violet for the active tool and keyboard focus.
 The eraser previews its target on the paper. It removes one mark per click
 through annotation history, with written notes protected.
+Notes can pin the page being read as a filter and combine it with Pending.
+List entries pair the saved mark color with its type and review state.
+Shared controls use softly rounded corners and a short violet selection
+indicator. Menus use the reader palette and a restrained shadow.
 
 ### Settings and recovery
 

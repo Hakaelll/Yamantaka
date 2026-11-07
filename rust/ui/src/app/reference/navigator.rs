@@ -122,7 +122,7 @@ impl ReferenceView {
                             tools.export.show(ui, english, &scope, self.pane.annotations.ready(), p).map(annotations::NotesAction::Export)
                         } else {None};
                         ui.add_space(16.0);
-                        let filter_action = self.pane.annotations.show_filters(ui, english, p);
+                        let filter_action = self.pane.annotations.show_filters(ui, english, self.pane.page, p);
                         ui.add_space(12.0);
                         let bulk_action =
                             self.pane

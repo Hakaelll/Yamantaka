@@ -563,7 +563,7 @@ impl YamantakaApp {
                 ui.set_min_width(ui.available_width());
                 if visible {
                     ui.horizontal(|ui| {
-                        let wide = ui.available_width() >= if comparison { 1300.0 } else { 1210.0 };
+                        let wide = ui.available_width() >= if comparison { 1340.0 } else { 1250.0 };
                         if comparison && ui.available_width() >= 530.0 {
                             ui.label(
                                 RichText::new(if reference {
@@ -577,7 +577,7 @@ impl YamantakaApp {
                         if wide {
                             for tool in Tool::ALL {
                                 if tool == Tool::Pen {
-                                    ui.separator();
+                                    reader_controls::reader_group_rule(ui, p);
                                 }
                                 if theme::control(
                                     ui,
@@ -648,6 +648,7 @@ impl YamantakaApp {
                         }
                         color_control(ui, en, &mut self.study.color, p);
                         if wide {
+                            reader_controls::reader_group_rule(ui, p);
                             history = history_controls(ui, tr, can_undo, can_redo, p);
                             hide = marks_control(ui, tr, hidden, p);
                         }

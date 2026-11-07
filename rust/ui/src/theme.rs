@@ -1,5 +1,9 @@
 use eframe::egui::{self, Color32, FontFamily, FontId, TextStyle};
 
+const CONTROL_RADIUS: u8 = 9;
+const FIELD_RADIUS: u8 = 8;
+const MENU_RADIUS: u8 = 12;
+
 #[derive(Clone, Copy)]
 pub struct Palette {
     pub canvas: Color32,
@@ -57,6 +61,15 @@ pub fn install(ctx: &egui::Context, dark: bool) {
     };
     style.visuals.panel_fill = p.canvas;
     style.visuals.window_fill = p.surface;
+    style.visuals.window_corner_radius = egui::CornerRadius::same(14);
+    style.visuals.menu_corner_radius = egui::CornerRadius::same(MENU_RADIUS);
+    style.visuals.window_stroke = egui::Stroke::new(1.0, p.line);
+    style.visuals.popup_shadow = egui::epaint::Shadow {
+        offset: [0, 3],
+        blur: 12,
+        spread: 0,
+        color: Color32::from_black_alpha(if dark { 60 } else { 38 }),
+    };
     style.visuals.extreme_bg_color = p.canvas;
     style.visuals.faint_bg_color = p.surface;
     style.visuals.override_text_color = Some(p.ink);
@@ -78,7 +91,7 @@ pub fn install(ctx: &egui::Context, dark: bool) {
         &mut style.visuals.widgets.hovered,
         &mut style.visuals.widgets.active,
     ] {
-        visual.corner_radius = egui::CornerRadius::same(7);
+        visual.corner_radius = egui::CornerRadius::same(FIELD_RADIUS);
         visual.fg_stroke = egui::Stroke::new(1.0, p.ink);
     }
     style.spacing.item_spacing = egui::vec2(10.0, 10.0);
@@ -619,7 +632,7 @@ fn control_impl(
     let fill = if primary {
         p.ink.lerp_to_gamma(p.accent, hover * 0.20 + press * 0.16)
     } else if selected {
-        p.raised.lerp_to_gamma(p.line, press * 0.32)
+        p.raised.lerp_to_gamma(p.accent, 0.08 + press * 0.10)
     } else {
         Color32::TRANSPARENT.lerp_to_gamma(p.raised, hover.max(press))
     };
@@ -630,7 +643,7 @@ fn control_impl(
     };
     ui.painter().rect_filled(
         visual,
-        5.0,
+        CONTROL_RADIUS,
         if ui.is_enabled() {
             fill
         } else {
@@ -661,16 +674,17 @@ fn control_impl(
     if response.has_focus() {
         ui.painter().rect_stroke(
             rect.shrink(1.0),
-            5.0,
+            CONTROL_RADIUS.saturating_sub(1),
             egui::Stroke::new(2.0, p.accent),
             egui::StrokeKind::Inside,
         );
     }
     if selected {
+        let indicator = (rect.width() * 0.45).clamp(14.0, 32.0);
         ui.painter().line_segment(
             [
-                egui::pos2(rect.left() + 12.0, rect.bottom() - 4.0),
-                egui::pos2(rect.right() - 12.0, rect.bottom() - 4.0),
+                egui::pos2(rect.center().x - indicator * 0.5, rect.bottom() - 4.0),
+                egui::pos2(rect.center().x + indicator * 0.5, rect.bottom() - 4.0),
             ],
             egui::Stroke::new(1.5, p.accent),
         );

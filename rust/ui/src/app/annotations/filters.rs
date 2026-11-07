@@ -1,8 +1,32 @@
 use super::*;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn page_scope_combines_with_review_and_exact_note_lookup_takes_priority() {
+        let mut filters = Filters {
+            page: Some(3),
+            review: Some(AnnotationReviewState::Pending),
+            ..Default::default()
+        };
+        let query = filters.query("book".into(), 80);
+        assert_eq!(query.page, Some(3));
+        assert_eq!(query.review, Some(AnnotationReviewState::Pending));
+        assert_eq!(filters.count(), 2);
+        filters.focused = Some("exact".into());
+        let exact = filters.query("book".into(), 80);
+        assert_eq!(exact.annotation_id.as_deref(), Some("exact"));
+        assert_eq!(exact.page, None);
+        assert_eq!(exact.offset, 0);
+    }
+}
+
 #[derive(Clone, Default, PartialEq, Eq)]
 pub(super) struct Filters {
     pub focused: Option<String>,
+    pub page: Option<u32>,
     pub text: String,
     pub tag: String,
     pub kind: Option<AnnotationKind>,
@@ -14,6 +38,7 @@ impl Filters {
             + usize::from(!self.tag.trim().is_empty())
             + usize::from(self.kind.is_some())
             + usize::from(self.review.is_some())
+            + usize::from(self.page.is_some())
     }
     pub(super) fn query(&self, document: String, offset: usize) -> AnnotationQuery {
         if let Some(id) = &self.focused {
@@ -30,12 +55,18 @@ impl Filters {
             tag: (!self.tag.trim().is_empty()).then(|| self.tag.trim().into()),
             kind: self.kind,
             review: self.review,
+            page: self.page,
             grouping: Some(AnnotationGrouping::Page),
             ..Default::default()
         }
     }
 }
 impl AnnotationState {
+    fn toggle_page_filter(&mut self, page: u32) {
+        self.filter_draft = self.filters.clone();
+        self.filter_draft.page = self.filters.page.is_none().then_some(page);
+    }
+
     pub(super) fn apply_filters(&mut self) -> bool {
         if self.editor.is_some()
             || self.pending.as_ref().is_some_and(|pending| pending.writing)
@@ -55,39 +86,67 @@ impl AnnotationState {
         true
     }
 }
+
+pub(super) enum FilterPreview {
+    Matching,
+    Empty,
+    Page,
+}
+
 impl YamantakaApp {
     pub fn preview_annotation_filters(&mut self, empty: bool) {
         if self.demo && self.capture.is_some() {
             self.preview_annotation_list();
-            self.reader.annotations.filter_preview = Some(empty);
+            self.reader.annotations.filter_preview = Some(if empty {
+                FilterPreview::Empty
+            } else {
+                FilterPreview::Matching
+            });
+        }
+    }
+
+    pub fn preview_annotation_page_filter(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.preview_annotation_list();
+            self.reader.annotations.filter_preview = Some(FilterPreview::Page);
         }
     }
     pub(in crate::app) fn apply_annotation_filter_preview(&mut self) {
         if !self.reader.annotations.ready() {
             return;
         }
-        let Some(empty) = self.reader.annotations.filter_preview.take() else {
+        let Some(preview) = self.reader.annotations.filter_preview.take() else {
             return;
         };
-        self.reader.annotations.filter_draft = Filters {
-            focused: None,
-            text: if empty {
-                "No matching study note"
-            } else {
-                "Synthetic"
-            }
-            .into(),
-            tag: "Study".into(),
-            kind: Some(AnnotationKind::Highlight),
-            review: Some(AnnotationReviewState::Pending),
-        };
+        let empty = matches!(preview, FilterPreview::Empty);
+        let details = !empty && !matches!(preview, FilterPreview::Page);
+        if matches!(preview, FilterPreview::Page) {
+            self.reader.annotations.toggle_page_filter(self.reader.page);
+        } else {
+            self.reader.annotations.filter_draft = Filters {
+                text: if empty {
+                    "No matching study note"
+                } else {
+                    "Synthetic"
+                }
+                .into(),
+                tag: "Study".into(),
+                kind: Some(AnnotationKind::Highlight),
+                review: Some(AnnotationReviewState::Pending),
+                ..Default::default()
+            };
+        }
         if self.reader.annotations.apply_filters() {
-            self.reader.annotations.filters_open = !empty;
+            self.reader.annotations.filters_open = details;
             self.annotation_command(None, 0);
         }
     }
     pub(in crate::app) fn annotation_filters_panel(&mut self, ui: &mut egui::Ui, p: Palette) {
-        if let Some(action) = self.reader.annotations.show_filters(ui, self.english, p) {
+        if let Some(action) =
+            self.reader
+                .annotations
+                .show_filters(ui, self.english, self.reader.page, p)
+        {
             self.apply_notes_action(false, action);
         }
     }
@@ -97,6 +156,7 @@ impl AnnotationState {
         &mut self,
         ui: &mut egui::Ui,
         english: bool,
+        current_page: u32,
         p: Palette,
     ) -> Option<NotesAction> {
         let tr = |es, en| if english { en } else { es };
@@ -120,6 +180,25 @@ impl AnnotationState {
         let mut apply = false;
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal_wrapped(|ui| {
+                let page = self.filters.page;
+                let page_label = page.map_or_else(
+                    || tr("Esta página", "This page").to_owned(),
+                    |page| format!("{} {}", tr("Página", "Page"), u64::from(page) + 1),
+                );
+                if theme::navigation(ui, &page_label, page.is_some(), p)
+                    .on_hover_text(if page.is_some() {
+                        tr("Quitar filtro de página", "Clear page filter")
+                    } else {
+                        tr(
+                            "Mostrar solo las anotaciones de esta página",
+                            "Show only annotations on this page",
+                        )
+                    })
+                    .clicked()
+                {
+                    self.toggle_page_filter(current_page);
+                    apply = true;
+                }
                 let pending = self.filters.review == Some(AnnotationReviewState::Pending);
                 if theme::navigation(ui, tr("Pendientes", "Pending"), pending, p).clicked() {
                     self.filter_draft = self.filters.clone();

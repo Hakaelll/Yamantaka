@@ -203,7 +203,7 @@ fn study_control(
     }
 }
 
-fn reader_group_rule(ui: &mut egui::Ui, p: Palette) {
+pub(super) fn reader_group_rule(ui: &mut egui::Ui, p: Palette) {
     let (_, rect) = ui.allocate_space(egui::vec2(8.0, 24.0));
     ui.painter().line_segment(
         [rect.center_top(), rect.center_bottom()],

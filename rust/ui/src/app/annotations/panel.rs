@@ -74,6 +74,10 @@ impl YamantakaApp {
                 .reference
                 .as_ref()
                 .is_some_and(|reference| reference.pane.annotations.writing());
+        if !self.reader.annotations.editing() {
+            self.annotation_filters_panel(ui, p);
+            ui.add_space(6.0);
+        }
         let context = NotesContext {
             english: self.english,
             page: self.reader.page,
@@ -92,8 +96,6 @@ impl YamantakaApp {
             ui.add_space(16.0);
             self.annotation_export_panel(ui, p);
         }
-        ui.add_space(16.0);
-        self.annotation_filters_panel(ui, p);
         ui.add_space(12.0);
         self.annotation_bulk_panel(ui, p);
         let context = NotesContext {
