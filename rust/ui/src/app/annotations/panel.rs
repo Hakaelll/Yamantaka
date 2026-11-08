@@ -114,7 +114,7 @@ impl YamantakaApp {
             }
             return;
         }
-        let action = self.reader.annotations.show_editor(ui, &context, p, false);
+        let action = self.reader.annotations.show_editor(ui, &context, p);
         if let Some(action) = action {
             self.apply_notes_action(false, action);
         }

@@ -56,32 +56,15 @@ impl AnnotationState {
         ui: &mut egui::Ui,
         context: &NotesContext<'_>,
         p: Palette,
-        show_intro: bool,
     ) -> Option<NotesAction> {
         let tr = |es, en| if context.english { en } else { es };
         let busy = context.busy || self.pending.is_some() || self.recovered.is_some();
         let offset = self.page.as_ref().map_or(0, |page| page.offset);
         let mut action = None;
-        if show_intro {
-            ui.label(
-                RichText::new(tr("Notas de lectura", "Reading notes"))
-                    .size(22.0)
-                    .color(p.ink),
-            );
-            ui.add_space(6.0);
-            ui.label(
-                RichText::new(tr(
-                    "Conserva una idea y vuelve a su contexto.",
-                    "Keep an idea and return to its context.",
-                ))
-                .color(p.secondary),
-            );
-            ui.add_space(16.0);
-        }
         if self.recovered.is_some() {
             return self.stored_recovery_panel(ui, p, context.english);
         }
-        if show_intro || self.history_available(false) || self.history_available(true) {
+        if self.history_available(false) || self.history_available(true) {
             ui.horizontal_wrapped(|ui| {
                 for (redo, es, en) in [(false, "Deshacer", "Undo"), (true, "Rehacer", "Redo")] {
                     ui.add_enabled_ui(!busy && self.history_available(redo), |ui| {
@@ -167,10 +150,10 @@ impl AnnotationState {
                 }
                 let passage=editor.passage();
                 if !passage.is_empty() {
-                    egui::Frame::new().fill(p.raised).inner_margin(if show_intro { 12 } else { 8 }).corner_radius(8).show(ui,|ui| {
+                    egui::Frame::new().fill(p.raised).inner_margin(8).corner_radius(8).show(ui,|ui| {
                         egui::ScrollArea::vertical().id_salt("annotation-passage").max_height(110.0).show(ui,|ui| {ui.label(RichText::new(passage).color(p.ink));});
                     });
-                    ui.add_space(if show_intro { 14.0 } else { 6.0 });
+                    ui.add_space(6.0);
                 }
                 let label=ui.label(if english {"Your note"} else {"Tu nota"});
                 let note = ui.add(egui::TextEdit::multiline(&mut editor.note).desired_rows(4).desired_width(f32::INFINITY).char_limit(4000).hint_text(if english {"What would you like to remember?"} else {"¿Qué te gustaría recordar?"})).labelled_by(label.id);
@@ -354,10 +337,60 @@ impl AnnotationState {
             }
             ui.push_id(&data.id, |ui| {
                 ui.separator();
-                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    if !busy
+                        && theme::control(
+                            ui,
+                            tr("Editar", "Edit"),
+                            Some(theme::Icon::Pencil),
+                            false,
+                            false,
+                            p,
+                        )
+                        .clicked()
+                    {
+                        self.edit_entry(index);
+                    }
+                    if (data.values.page_index as usize) < context.page_count {
+                        let caption = format!(
+                            "{} {}",
+                            tr("Página", "Page"),
+                            u64::from(data.values.page_index) + 1
+                        );
+                        if theme::navigation(ui, tr("Ver en PDF", "Show in PDF"), false, p)
+                            .on_hover_text(caption)
+                            .clicked()
+                        {
+                            action = NotesAction::open_annotation(ui, data);
+                        }
+                    }
+                    if !busy
+                        && !self.editing()
+                        && theme::navigation(ui, tr("Eliminar", "Remove"), false, p).clicked()
+                    {
+                        action = Some(NotesAction::Change(
+                            AnnotationMutation::Remove {
+                                id: data.id.clone(),
+                            },
+                            page.offset,
+                        ));
+                    }
+                });
+                if let Some(passage) = &data.values.selected_text {
+                    ui.label(RichText::new(passage).italics().color(p.secondary));
+                }
+                if let Some(note) = &data.values.note {
+                    ui.label(RichText::new(note).color(p.ink));
+                }
                 ui.horizontal_wrapped(|ui| {
                     if context.selectable {
                         let selected = self.selected.0[index];
+                        let icon = if selected {
+                            theme::Icon::Check
+                        } else {
+                            theme::Icon::Rectangle
+                        };
                         let caption = format!(
                             "{} {}",
                             tr(
@@ -376,7 +409,7 @@ impl AnnotationState {
                         );
                         if ui
                             .add_enabled_ui(self.pending.is_none() && !self.editing(), |ui| {
-                                theme::navigation(ui, &caption, selected, p)
+                                theme::icon_toggle(ui, &caption, icon, selected, p)
                             })
                             .inner
                             .clicked()
@@ -405,12 +438,6 @@ impl AnnotationState {
                         );
                     });
                 });
-                if let Some(passage) = &data.values.selected_text {
-                    ui.label(RichText::new(passage).italics().color(p.secondary));
-                }
-                if let Some(note) = &data.values.note {
-                    ui.label(RichText::new(note).color(p.ink));
-                }
                 if data.values.status == AttachmentStatus::ReviewRequired {
                     ui.label(
                         RichText::new(tr(
@@ -427,48 +454,6 @@ impl AnnotationState {
                             .color(p.secondary),
                     );
                 }
-                ui.horizontal_wrapped(|ui| {
-                    let caption = format!(
-                        "{} {}",
-                        tr("Página", "Page"),
-                        u64::from(data.values.page_index) + 1
-                    );
-                    if ui
-                        .add_enabled_ui(
-                            (data.values.page_index as usize) < context.page_count,
-                            |ui| theme::navigation(ui, &caption, false, p),
-                        )
-                        .inner
-                        .clicked()
-                    {
-                        action = NotesAction::open_annotation(ui, data);
-                    }
-                    if !busy
-                        && ui
-                            .add_enabled_ui(!self.editing(), |ui| {
-                                theme::navigation(ui, tr("Editar", "Edit"), false, p)
-                            })
-                            .inner
-                            .clicked()
-                    {
-                        self.edit_entry(index);
-                    }
-                    if !busy
-                        && ui
-                            .add_enabled_ui(!self.editing(), |ui| {
-                                theme::navigation(ui, tr("Eliminar", "Remove"), false, p)
-                            })
-                            .inner
-                            .clicked()
-                    {
-                        action = Some(NotesAction::Change(
-                            AnnotationMutation::Remove {
-                                id: data.id.clone(),
-                            },
-                            page.offset,
-                        ));
-                    }
-                });
             });
         }
         ui.add_space(12.0);

@@ -204,6 +204,17 @@ impl AnnotationState {
             {
                 action = NotesAction::open_annotation(ui, data);
             }
+            if !busy {
+                let label = tr("Editar", "Edit");
+                let response = if narrow {
+                    theme::icon_button(ui, label, theme::Icon::Pencil, p)
+                } else {
+                    theme::control(ui, label, Some(theme::Icon::Pencil), false, false, p)
+                };
+                if response.clicked() {
+                    self.edit_entry(0);
+                }
+            }
             for (enabled, offset, label, icon) in [
                 (
                     offset > 0,

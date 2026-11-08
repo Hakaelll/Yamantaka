@@ -24,8 +24,8 @@ $cases = @(
     @{ name='study-selection'; args=@('--reader','--study-selection','--es'); visible=@('Resaltar','Subrayar','Añadir nota','Copiar') },
     @{ name='study-selection-light'; args=@('--reader','--study-selection','--light','--es'); visible=@('Resaltar','Subrayar','Añadir nota','Copiar') },
     @{ name='study-selection-small-200'; args=@('--reader','--study-selection','--es','--size=640x480','--text-scale=2'); visible=@('Resaltar','Subrayar','Añadir nota','Copiar') },
-    @{ name='study-review-dark'; args=@('--reader','--study-review','--es'); visible=@('Volver a notas','Mostrar cita','Resolver','Ver en PDF','Siguiente') },
-    @{ name='study-review-light'; args=@('--reader','--study-review','--es','--light'); visible=@('Volver a notas','Mostrar cita','Resolver','Ver en PDF','Siguiente') },
+    @{ name='study-review-dark'; args=@('--reader','--study-review','--es'); visible=@('Volver a notas','Mostrar cita','Resolver','Ver en PDF','Editar','Siguiente') },
+    @{ name='study-review-light'; args=@('--reader','--study-review','--es','--light'); visible=@('Volver a notas','Mostrar cita','Resolver','Ver en PDF','Editar','Siguiente') },
     @{ name='study-review-small-200'; args=@('--reader','--study-review','--es','--size=640x480','--text-scale=2'); visible=@('Volver a notas','Mostrar cita','Resolver') },
     @{ name='chrome-compact'; args=@('--reader','--size=640x480','--text-scale=2','--chrome=revealed','--es') },
     @{ name='chrome-reference'; args=@('--reader','--reference','--reference-book','--chrome=revealed') },
@@ -186,6 +186,7 @@ $cases = @(
     @{ name='reader-reference-note-filters'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-filters','--light','--es') },
     @{ name='reader-reference-note-filters-empty'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-note-filters','--reference-note-filters-empty') },
     @{ name='reader-reference-notes'; args=@('--reader','--reference','--reference-book','--reference-notes','--es') },
+    @{ name='reader-reference-notes-small-200'; args=@('--reader','--reference','--reference-book','--reference-notes','--es','--light','--size=640x480','--text-scale=2','--reduce-motion') },
     @{ name='reader-reference-notes-shared-close'; args=@('--reader','--reference','--reference-notes','--es') },
     @{ name='reader-reference-notes-editor-small-200'; args=@('--reader','--reference','--reference-book','--reference-notes','--reference-notes-editor','--es','--size=640x480','--text-scale=2','--light','--reduce-motion') },
     @{ name='reader-reference-marks'; args=@('--reader','--reference','--reference-book','--reference-marks','--es') },
@@ -1098,9 +1099,9 @@ foreach ($case in $cases) {
         & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Deshacer')
         if(@($controls.controls | Where-Object { $_.label -ceq 'Rehacer' -and -not $_.enabled }).Count -ne 1) { throw 'Redo must be disabled after a new history branch.' }
     }
-    if ($case.name -eq 'reader-reference-notes') {
+    if ($case.name -in @('reader-reference-notes','reader-reference-notes-small-200')) {
         if ($controls.referenceNotesPhase -ne 12 -or $controls.referenceAnnotations.document -cne 'demo-1' -or $controls.referenceAnnotations.total -ne 1 -or $controls.referenceAnnotations.entries[0].note -cne 'Final reference note' -or $controls.primaryAnnotations.total -ne 2 -or $controls.retiredAnnotationWrites -ne 0) { throw 'Reference note creation, editing, removal or document ownership failed.' }
-        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Notas','Editar','Eliminar')
+        & "$PSScriptRoot/check_rust_control_bounds.ps1" -ControlFiles @($controlPath) -VisibleLabels @('Notas','Herramientas de notas','Editar','Ver en PDF','Eliminar')
     }
     if ($case.name -eq 'reader-reference-notes-shared-close') {
         if ($controls.referenceNotesPhase -ne 16 -or $controls.reference -or $controls.primaryAnnotations.total -ne 3 -or $controls.retiredAnnotationWrites -ne 0 -or @($controls.primaryAnnotations.entries | Where-Object note -CEQ 'Updated reference note').Count -ne 1 -or $controls.referenceAdmission.nativeCloses -ne 0) { throw 'An accepted reference write was lost or misrouted after shared-pane closure.' }

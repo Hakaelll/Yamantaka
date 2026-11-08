@@ -47,7 +47,8 @@ impl ReferenceView {
         }
         let mut popup = egui::Popup::menu(&button)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-        if std::mem::take(&mut self.navigator_requested) {
+        let requested = std::mem::take(&mut self.navigator_requested);
+        if requested {
             popup = popup.open_memory(egui::SetOpenCommand::Bool(true));
         }
         if self.search_preview
@@ -77,17 +78,34 @@ impl ReferenceView {
                 .find(|(tab, _)| *tab == self.pane.reader_panel_tab)
                 .unwrap()
                 .1;
-            let response = egui::ComboBox::from_id_salt("reference-navigator-section")
-                .selected_text(selected)
-                .width(ui.available_width())
-                .show_ui(ui, |ui| {
-                    self.input_layers.insert(ui.layer_id());
-                    for (tab, label) in sections {
-                        ui.selectable_value(&mut self.pane.reader_panel_tab, tab, label);
-                    }
-                })
-                .response;
-            theme::record_control_bounds(ui, selected, response.rect);
+            ui.horizontal(|ui| {
+                let notes_tools = previous == ReaderPanelTab::Annotations
+                    && !self.pane.annotations.editing()
+                    && !self.pane.annotations.reviewing();
+                let reserved = if notes_tools { 40.0 + ui.spacing().item_spacing.x } else { 0.0 };
+                let response = egui::ComboBox::from_id_salt("reference-navigator-section")
+                    .selected_text(selected)
+                    .width((ui.available_width() - reserved).max(40.0))
+                    .show_ui(ui, |ui| {
+                        self.input_layers.insert(ui.layer_id());
+                        for (tab, label) in sections {
+                            ui.selectable_value(&mut self.pane.reader_panel_tab, tab, label);
+                        }
+                    })
+                    .response;
+                theme::record_control_bounds(ui, selected, response.rect);
+                if notes_tools
+                    && theme::icon_toggle(
+                        ui,
+                        tr("Herramientas de notas", "Note tools"),
+                        theme::Icon::Settings,
+                        self.notes_tools_open,
+                        p,
+                    ).clicked()
+                {
+                    self.notes_tools_open = !self.notes_tools_open;
+                }
+            });
             ui.add_space(8.0);
             if previous != self.pane.reader_panel_tab {
                 self.stop_navigator_requests();
@@ -111,38 +129,58 @@ impl ReferenceView {
                         marks_error: self.pane.annotation_paint.error().map(str::to_owned),
                     };
                     let height = (ui.ctx().content_rect().height() - 100.0).max(80.0);
-                    let scroll = egui::ScrollArea::vertical()
-                        .id_salt("reference-notes")
+                    let annotations = &mut self.pane.annotations;
+                    let focused = annotations.focused_note();
+                    if requested && focused {
+                        self.notes_tools_open = false;
+                    }
+                    let mut scroll = egui::ScrollArea::vertical()
+                        .id_salt(("reference-notes", annotations.editing(), annotations.reviewing(), self.notes_tools_open, focused))
                         .max_height(height)
                         .min_scrolled_height(height.min(360.0));
+                    if requested && focused {
+                        scroll = scroll.vertical_scroll_offset(0.0);
+                    }
                     scroll.show(ui, |ui| {
-                        if self.pane.annotations.reviewing() {
-                            self.notes_action = if self.pane.annotations.editing() {
-                                self.pane.annotations.show_editor(ui, &context, p, false)
-                            } else {
-                                self.pane.annotations.show_review(ui, &context, p)
-                            };
+                        if annotations.editing() {
+                            self.notes_action = annotations.show_editor(ui, &context, p);
                             return;
                         }
-                        let action = self.pane.annotations.show_editor(ui, &context, p, true);
-                        let export_action = if !self.pane.annotations.editing() || tools.export.busy() {
+                        if annotations.reviewing() {
+                            self.notes_action = annotations.show_review(ui, &context, p);
+                            return;
+                        }
+                        if self.notes_tools_open {
+                            let filter = annotations.show_filters(ui, english, context.page, p);
+                            if matches!(filter, Some(annotations::NotesAction::Read(_) | annotations::NotesAction::ClearFocus)) {
+                                self.notes_tools_open = false;
+                                self.notes_action = filter;
+                                return;
+                            }
+                            let bulk = annotations.show_bulk(ui, english, notes_blocked, p);
+                            let action = annotations.show_editor(ui, &context, p);
                             let scope = yamantaka_application::annotation_export::worker::AnnotationExportScope::Document(document.id.clone());
-                            tools.export.show(ui, english, &scope, self.pane.annotations.ready(), p).map(annotations::NotesAction::Export)
-                        } else {None};
-                        ui.add_space(16.0);
-                        let filter_action = self.pane.annotations.show_filters(ui, english, self.pane.page, p);
-                        if self.pane.annotations.reviewing() {
-                            self.notes_action = filter_action;
+                            let export = tools.export.show(ui, english, &scope, annotations.ready(), p).map(annotations::NotesAction::Export);
+                            self.notes_action = filter.or(bulk).or(action).or(export);
                             return;
                         }
-                        ui.add_space(12.0);
-                        let bulk_action =
-                            self.pane
-                                .annotations
-                                .show_bulk(ui, english, notes_blocked, p);
-                        let list_action = self.pane.annotations.show_list(ui, &context, p);
-                        self.notes_action =
-                            action.or(export_action).or(filter_action).or(bulk_action).or(list_action);
+                        let back = if focused {
+                            annotations.show_filters(ui, english, context.page, p)
+                        } else {
+                            None
+                        };
+                        let issue = if annotations.study_write_error().is_some() || context.marks_error.is_some() {
+                            annotations.show_editor(ui, &context, p)
+                        } else {
+                            if !annotations.ready() {
+                                ui.horizontal(|ui| {
+                                    ui.spinner();
+                                    ui.label(tr("Actualizando notas…", "Updating notes…"));
+                                });
+                            }
+                            None
+                        };
+                        self.notes_action = back.or(issue).or_else(|| annotations.show_list(ui, &context, p));
                     });
                 }
                 ReaderPanelTab::Positions => {
@@ -292,6 +330,7 @@ impl ReferenceView {
         self.pane.text.clear();
         self.pane.bookmarks.cancel_query();
         self.pane.annotations.cancel_query();
+        self.notes_tools_open = false;
         self.search_visible = false;
     }
 }

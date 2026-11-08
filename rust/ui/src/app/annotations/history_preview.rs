@@ -70,6 +70,7 @@ impl YamantakaApp {
             59 if note == Some("Branched reference note") => {
                 assert_eq!(page.history.redo, 0);
                 assert!(page.history.undo > 0);
+                self.reference.as_mut().unwrap().notes_tools_open = true;
                 self.command_palette_preview.phase = 90;
             }
             _ => {}

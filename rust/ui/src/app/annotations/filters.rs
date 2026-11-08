@@ -62,6 +62,10 @@ impl Filters {
     }
 }
 impl AnnotationState {
+    pub(in crate::app) fn focused_note(&self) -> bool {
+        self.filters.focused.is_some()
+    }
+
     fn toggle_page_filter(&mut self, page: u32) {
         self.filter_draft = self.filters.clone();
         self.filter_draft.page = self.filters.page.is_none().then_some(page);

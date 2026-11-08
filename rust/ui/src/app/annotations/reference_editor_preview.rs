@@ -91,6 +91,7 @@ impl YamantakaApp {
             }
             2 if view.pane.annotations.ready() => {
                 if let Some(save) = self.reference_notes_preview.bulk {
+                    view.notes_tools_open = true;
                     assert_eq!(view.pane.annotations.page.as_ref().unwrap().total, 82);
                     assert_eq!(
                         view.pane.annotations.page.as_ref().unwrap().entries().len(),
@@ -204,6 +205,7 @@ impl YamantakaApp {
                 assert_eq!(self.reader.annotations.page.as_ref().unwrap().total, 2);
                 assert_eq!(self.reader.page, 0);
                 if self.reference_notes_preview.filters.is_some() {
+                    view.notes_tools_open = true;
                     view.pane.annotations.filter_draft = filters::Filters {
                         focused: None,
                         page: None,
