@@ -8,6 +8,60 @@ use yamantaka_domain::{
 use yamantaka_storage::{Database, backup};
 
 #[test]
+fn pending_review_loads_one_note_and_can_undo_resolution() {
+    let cancel = Cancellation::default();
+    let governor = MemoryGovernor::new(GlobalMemoryLimits::default());
+    let fixture = serde_json::from_str(include_str!("fixtures/populated-backup-v9.json")).unwrap();
+    let mut database = backup::preview_payload(fixture, &cancel).unwrap().database;
+    database
+        .execute_batch(
+            "UPDATE annotations SET review_state='pending' WHERE id='annotation';
+         INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,
+           document_fingerprint,status,created_at,updated_at,review_state)
+         VALUES('second','original',3,'pageComment','violet','Follow-up','[]',0,
+           'legacy','attached','2026-11-08','2026-11-08','pending');",
+        )
+        .unwrap();
+    let query = AnnotationQuery {
+        document_id: Some("original".into()),
+        review: Some(AnnotationReviewState::Pending),
+        limit: Some(std::num::NonZeroUsize::MIN),
+        ..Default::default()
+    };
+    let first = database.annotations(&query, &governor, &cancel).unwrap();
+    assert_eq!(first.total, 2);
+    assert_eq!(first.entries().len(), 1);
+    assert_eq!(first.entries()[0].data().id, "annotation");
+    let next = database
+        .change_annotation(
+            "original",
+            AnnotationChange::Review {
+                ids: &["annotation".into()],
+                state: AnnotationReviewState::Resolved,
+            },
+            &query,
+            IndexAccess::Disabled,
+            &governor,
+            &cancel,
+        )
+        .unwrap();
+    assert_eq!(next.total, 1);
+    assert_eq!(next.entries()[0].data().id, "second");
+    let restored = database
+        .change_annotation(
+            "original",
+            AnnotationChange::Undo,
+            &query,
+            IndexAccess::Disabled,
+            &governor,
+            &cancel,
+        )
+        .unwrap();
+    assert_eq!(restored.total, 2);
+    assert_eq!(restored.entries()[0].data().id, "annotation");
+}
+
+#[test]
 fn drawing_survives_history_and_v9_backup() {
     let cancel = Cancellation::default();
     let governor = MemoryGovernor::new(GlobalMemoryLimits::default());

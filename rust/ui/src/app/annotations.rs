@@ -23,6 +23,7 @@ mod history_preview;
 pub(super) mod paint;
 pub(super) mod panel;
 mod reference_preview;
+mod review;
 mod selection_note_recovery;
 mod stored_note_recovery;
 mod tags;
@@ -109,6 +110,8 @@ pub(super) struct AnnotationState {
     filter_draft: filters::Filters,
     filters_open: bool,
     filter_preview: Option<filters::FilterPreview>,
+    reviewing: bool,
+    review_revealed: bool,
     selected: bulk::BulkSelection,
     bulk_preview: Option<bool>,
     bulk_tag: String,
@@ -195,6 +198,8 @@ impl AnnotationState {
         self.filters = Default::default();
         self.filter_draft = Default::default();
         self.filters_open = false;
+        self.reviewing = false;
+        self.review_revealed = false;
         self.page = None;
         self.editor = None;
         self.focus_editor = false;
@@ -297,6 +302,7 @@ impl AnnotationState {
         }
         match reply.result {
             Ok(page) => {
+                self.review_revealed = false;
                 self.stale = !pending.writing
                     && self
                         .editor
@@ -363,7 +369,17 @@ impl AnnotationState {
         self.saved = false;
         Some(AnnotationRequest {
             operation,
-            query: self.filters.query(document, offset),
+            query: if self.reviewing {
+                AnnotationQuery {
+                    document_id: Some(document),
+                    review: Some(AnnotationReviewState::Pending),
+                    offset,
+                    limit: Some(std::num::NonZeroUsize::MIN),
+                    ..Default::default()
+                }
+            } else {
+                self.filters.query(document, offset)
+            },
             governor: governor.clone(),
             cancel,
         })

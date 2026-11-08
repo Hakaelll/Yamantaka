@@ -116,6 +116,14 @@ impl ReferenceView {
                         .max_height(height)
                         .min_scrolled_height(height.min(360.0));
                     scroll.show(ui, |ui| {
+                        if self.pane.annotations.reviewing() {
+                            self.notes_action = if self.pane.annotations.editing() {
+                                self.pane.annotations.show_editor(ui, &context, p, false)
+                            } else {
+                                self.pane.annotations.show_review(ui, &context, p)
+                            };
+                            return;
+                        }
                         let action = self.pane.annotations.show_editor(ui, &context, p, true);
                         let export_action = if !self.pane.annotations.editing() || tools.export.busy() {
                             let scope = yamantaka_application::annotation_export::worker::AnnotationExportScope::Document(document.id.clone());
@@ -123,6 +131,10 @@ impl ReferenceView {
                         } else {None};
                         ui.add_space(16.0);
                         let filter_action = self.pane.annotations.show_filters(ui, english, self.pane.page, p);
+                        if self.pane.annotations.reviewing() {
+                            self.notes_action = filter_action;
+                            return;
+                        }
                         ui.add_space(12.0);
                         let bulk_action =
                             self.pane

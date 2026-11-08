@@ -55,6 +55,23 @@ pub(in crate::app) fn mark_color(color: AnnotationColor) -> Color32 {
         AnnotationColor::Violet => Color32::from_rgb(132, 84, 190),
     }
 }
+pub(in crate::app) fn color_choice(
+    ui: &mut egui::Ui,
+    choice: AnnotationColor,
+    current: AnnotationColor,
+    english: bool,
+    p: Palette,
+) -> egui::Response {
+    theme::control(
+        ui,
+        color_label(choice, english),
+        Some(theme::Icon::Swatch(mark_color(choice))),
+        current == choice,
+        false,
+        p,
+    )
+}
+
 impl YamantakaApp {
     pub(in crate::app) fn prepare_annotations(&mut self, document: &str) {
         self.reader
@@ -74,8 +91,11 @@ impl YamantakaApp {
                 .reference
                 .as_ref()
                 .is_some_and(|reference| reference.pane.annotations.writing());
-        if !self.reader.annotations.editing() {
+        if !self.reader.annotations.reviewing() && !self.reader.annotations.editing() {
             self.annotation_filters_panel(ui, p);
+            if self.reader.annotations.reviewing() {
+                return;
+            }
             ui.add_space(6.0);
         }
         let context = NotesContext {
@@ -88,9 +108,18 @@ impl YamantakaApp {
             governor: &self.governor,
             marks_error: self.reader.annotation_paint.error().map(str::to_owned),
         };
+        if self.reader.annotations.reviewing() && !self.reader.annotations.editing() {
+            if let Some(action) = self.reader.annotations.show_review(ui, &context, p) {
+                self.apply_notes_action(false, action);
+            }
+            return;
+        }
         let action = self.reader.annotations.show_editor(ui, &context, p, false);
         if let Some(action) = action {
             self.apply_notes_action(false, action);
+        }
+        if self.reader.annotations.reviewing() {
+            return;
         }
         if self.reader.annotations.editor.is_none() || self.annotation_export.busy() {
             ui.add_space(16.0);

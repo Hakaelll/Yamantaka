@@ -13,6 +13,33 @@ pub(in crate::app) enum NotesAction {
     ReloadMarks,
     Export(yamantaka_application::annotation_export::AnnotationExportFormat),
 }
+impl NotesAction {
+    pub(super) fn open_annotation(ui: &mut egui::Ui, data: &AnnotationRecordData) -> Option<Self> {
+        let point = data
+            .values
+            .rects
+            .first()
+            .map(|rect| {
+                let rect = rect.region();
+                [(rect.min()[0] + rect.max()[0]) * 0.5, rect.min()[1]]
+            })
+            .or_else(|| {
+                data.values
+                    .drawing
+                    .as_ref()
+                    .and_then(|drawing| drawing.points().first().copied())
+            })
+            .filter(|_| data.values.status == AttachmentStatus::Attached)
+            .unwrap_or([0.5, 0.0]);
+        let position =
+            yamantaka_domain::reader::ReaderPosition::at(data.values.page_index, point).ok()?;
+        let close = bookmarks::compact_study(ui.ctx());
+        if close {
+            ui.close();
+        }
+        Some(Self::Navigate(position, data.id.clone(), close))
+    }
+}
 pub(in crate::app) struct NotesContext<'a> {
     pub english: bool,
     pub page: u32,
@@ -175,7 +202,7 @@ impl AnnotationState {
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui| {
                     for color in [AnnotationColor::Yellow,AnnotationColor::Green,AnnotationColor::Blue,AnnotationColor::Rose,AnnotationColor::Violet] {
-                        let response=theme::navigation(ui,color_label(color,english),editor.color==color,p);
+                        let response=panel::color_choice(ui,color,editor.color,english,p);
                         if response.clicked() {editor.color=color;}
                     }
                 });
@@ -414,32 +441,7 @@ impl AnnotationState {
                         .inner
                         .clicked()
                     {
-                        let close = bookmarks::compact_study(ui.ctx());
-                        let point = data
-                            .values
-                            .rects
-                            .first()
-                            .map(|rect| {
-                                let rect = rect.region();
-                                [(rect.min()[0] + rect.max()[0]) * 0.5, rect.min()[1]]
-                            })
-                            .or_else(|| {
-                                data.values
-                                    .drawing
-                                    .as_ref()
-                                    .and_then(|drawing| drawing.points().first().copied())
-                            })
-                            .filter(|_| data.values.status == AttachmentStatus::Attached)
-                            .unwrap_or([0.5, 0.0]);
-                        if let Ok(position) = yamantaka_domain::reader::ReaderPosition::at(
-                            data.values.page_index,
-                            point,
-                        ) {
-                            action = Some(NotesAction::Navigate(position, data.id.clone(), close));
-                        }
-                        if close {
-                            ui.close();
-                        }
+                        action = NotesAction::open_annotation(ui, data);
                     }
                     if !busy
                         && ui

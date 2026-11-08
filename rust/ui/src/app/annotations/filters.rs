@@ -91,6 +91,7 @@ pub(super) enum FilterPreview {
     Matching,
     Empty,
     Page,
+    Review,
 }
 
 impl YamantakaApp {
@@ -111,6 +112,14 @@ impl YamantakaApp {
             self.reader.annotations.filter_preview = Some(FilterPreview::Page);
         }
     }
+
+    pub fn preview_study_review(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.preview_annotation_list();
+            self.reader.annotations.filter_preview = Some(FilterPreview::Review);
+        }
+    }
+
     pub(in crate::app) fn apply_annotation_filter_preview(&mut self) {
         if !self.reader.annotations.ready() {
             return;
@@ -118,6 +127,11 @@ impl YamantakaApp {
         let Some(preview) = self.reader.annotations.filter_preview.take() else {
             return;
         };
+        if matches!(preview, FilterPreview::Review) {
+            self.reader.annotations.set_reviewing(true);
+            self.annotation_command(None, 0);
+            return;
+        }
         let empty = matches!(preview, FilterPreview::Empty);
         let details = !empty && !matches!(preview, FilterPreview::Page);
         if matches!(preview, FilterPreview::Page) {
@@ -213,6 +227,18 @@ impl AnnotationState {
                 {
                     self.filter_draft = Filters::default();
                     apply = true;
+                }
+                if theme::control(
+                    ui,
+                    tr("Repasar", "Review notes"),
+                    Some(theme::Icon::Book),
+                    false,
+                    false,
+                    p,
+                )
+                .clicked()
+                {
+                    self.set_reviewing(true);
                 }
             });
             if self.filters_open {
@@ -347,6 +373,6 @@ impl AnnotationState {
                 }
             }
         });
-        (apply && self.apply_filters()).then_some(NotesAction::Read(0))
+        (self.reviewing || (apply && self.apply_filters())).then_some(NotesAction::Read(0))
     }
 }

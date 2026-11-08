@@ -207,6 +207,9 @@ impl reader_pane::ReaderPane {
         };
         self.annotations.bind(&document.id);
         self.annotations.cancel_query();
+        if self.annotations.reviewing() {
+            self.annotations.set_reviewing(false);
+        }
         self.annotation_paint.focused = id.clone();
         self.annotations.filters.focused = id;
         self.annotations.filters_open = false;

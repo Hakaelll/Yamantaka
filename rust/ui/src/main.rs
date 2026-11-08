@@ -707,6 +707,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 ('synthetic-reference-strike','demo-1',0,'strikeout','green','Reference strikeout','[{"left":0.08,"top":0.21,"right":0.55,"bottom":0.23}]',0,'synthetic','attached','2026-10-30','2026-10-30','pending');
             "#)?;
         }
+        if capture.is_some() && args.iter().any(|arg| arg == "--study-review") {
+            db.execute_batch(r#"
+                INSERT INTO annotations(id,document_id,page_index,type,color,note,selected_text,rects_json,
+                    page_rotation,document_fingerprint,status,created_at,updated_at,review_state)
+                VALUES('review-passage','demo-0',0,'highlight','yellow','¿Qué permite distinguir un vector de una imagen?','Yamantaka Rust: text, links and vector geometry',
+                    '[{"left":0.08,"top":0.112,"right":0.55,"bottom":0.135}]',0,'synthetic','attached','2026-11-08','2026-11-08','pending'),
+                ('review-page','demo-0',1,'pageComment','blue','Volver al esquema de la segunda página.',NULL,
+                    '[]',0,'synthetic','attached','2026-11-08','2026-11-08','pending');
+            "#)?;
+        }
         if capture.is_some() && args.iter().any(|arg| arg == "--annotation-many") {
             db.execute_batch(r#"WITH RECURSIVE n(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM n WHERE x<180)
                 INSERT INTO annotations(id,document_id,page_index,type,color,note,rects_json,page_rotation,document_fingerprint,status,created_at,updated_at,review_state)
@@ -1867,6 +1877,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--annotation-page-filter") {
                     app.preview_annotation_page_filter();
+                }
+                if args.iter().any(|arg| arg == "--study-review") {
+                    app.preview_study_review();
                 }
                 if args
                     .iter()

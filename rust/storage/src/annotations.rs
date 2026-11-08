@@ -365,10 +365,10 @@ fn read_page(
         }
         None => "a.page_index,a.created_at,a.id",
     };
-    values.extend([
-        Value::Integer(ANNOTATION_PAGE_SIZE as i64),
-        Value::Integer(offset as i64),
-    ]);
+    let limit = query.limit.map_or(ANNOTATION_PAGE_SIZE, |limit| {
+        limit.get().min(ANNOTATION_PAGE_SIZE)
+    });
+    values.extend([Value::Integer(limit as i64), Value::Integer(offset as i64)]);
     let mut statement = db
         .prepare(&format!(
             "{SELECT_RECORDS}{where_sql} ORDER BY {order} LIMIT ? OFFSET ?"
@@ -377,7 +377,7 @@ fn read_page(
     let mut rows = statement
         .query(params_from_iter(&values))
         .map_err(storage)?;
-    let page_bytes = ANNOTATION_PAGE_SIZE
+    let page_bytes = limit
         .checked_mul(std::mem::size_of::<AnnotationRecord>())
         .and_then(|bytes| bytes.checked_add(std::mem::size_of::<AnnotationPage>()))
         .ok_or(Failure::MemoryBudget)?;
@@ -390,7 +390,7 @@ fn read_page(
         .map_err(|_| Failure::MemoryBudget)?;
     let mut entries = Vec::new();
     entries
-        .try_reserve_exact(ANNOTATION_PAGE_SIZE)
+        .try_reserve_exact(limit)
         .map_err(|_| Failure::MemoryBudget)?;
     while let Some(row) = rows.next().map_err(storage)? {
         entries.push(read_record(db, row, governor, cancel, true)?);

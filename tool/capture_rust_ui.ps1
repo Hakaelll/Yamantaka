@@ -24,6 +24,9 @@ $cases = @(
     @{ name='study-selection'; args=@('--reader','--study-selection','--es'); visible=@('Resaltar','Subrayar','Añadir nota','Copiar') },
     @{ name='study-selection-light'; args=@('--reader','--study-selection','--light','--es'); visible=@('Resaltar','Subrayar','Añadir nota','Copiar') },
     @{ name='study-selection-small-200'; args=@('--reader','--study-selection','--es','--size=640x480','--text-scale=2'); visible=@('Resaltar','Subrayar','Añadir nota','Copiar') },
+    @{ name='study-review-dark'; args=@('--reader','--study-review','--es'); visible=@('Volver a notas','Mostrar cita','Resolver','Ver en PDF','Siguiente') },
+    @{ name='study-review-light'; args=@('--reader','--study-review','--es','--light'); visible=@('Volver a notas','Mostrar cita','Resolver','Ver en PDF','Siguiente') },
+    @{ name='study-review-small-200'; args=@('--reader','--study-review','--es','--size=640x480','--text-scale=2'); visible=@('Volver a notas','Mostrar cita','Resolver') },
     @{ name='chrome-compact'; args=@('--reader','--size=640x480','--text-scale=2','--chrome=revealed','--es') },
     @{ name='chrome-reference'; args=@('--reader','--reference','--reference-book','--chrome=revealed') },
     @{ name='chrome-eink-glow'; args=@('--reader','--continuous','--electronic-ink','--software','--chrome=hidden') },
@@ -576,6 +579,11 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.name -like 'study-review-*' -and
+        ($controls.primaryAnnotations.total -ne 2 -or @($controls.primaryAnnotations.entries).Count -ne 1 -or
+         $controls.primaryAnnotations.entries[0].id -cne 'review-passage')) {
+        throw 'Study review did not load exactly the first pending annotation.'
+    }
     if ($case.name -like 'annotation-page-filter*' -and
         ($controls.primaryAnnotations.filterCount -ne 1 -or $controls.primaryAnnotations.total -ne 1 -or
          $controls.primaryAnnotations.entries[0].id -cne 'source-note-a')) {

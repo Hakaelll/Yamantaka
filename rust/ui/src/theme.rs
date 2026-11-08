@@ -226,6 +226,7 @@ pub enum Icon {
     Eraser,
     Archive,
     Star,
+    Swatch(Color32),
 }
 
 pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Color32) {
@@ -233,6 +234,10 @@ pub fn icon(painter: &egui::Painter, center: egui::Pos2, icon: Icon, color: Colo
     let v = |x, y| center + egui::vec2(x, y);
     let line = |a, b| painter.line_segment([a, b], s);
     match icon {
+        Icon::Swatch(fill) => {
+            painter.circle_filled(center, 5.5, fill);
+            painter.circle_stroke(center, 6.0, egui::Stroke::new(1.0, color));
+        }
         Icon::Pencil => {
             let points = [
                 v(-6.0, 6.0),

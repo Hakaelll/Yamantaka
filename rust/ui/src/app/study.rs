@@ -986,8 +986,7 @@ pub(super) fn color_control(ui: &mut egui::Ui, en: bool, color: &mut AnnotationC
             AnnotationColor::Rose,
             AnnotationColor::Violet,
         ] {
-            let label = annotations::panel::color_label(choice, en);
-            let response = theme::navigation(ui, label, *color == choice, p);
+            let response = annotations::panel::color_choice(ui, choice, *color, en, p);
             if response.clicked() {
                 *color = choice;
                 ui.close();

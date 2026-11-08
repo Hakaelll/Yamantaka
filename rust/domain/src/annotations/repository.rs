@@ -22,6 +22,7 @@ pub struct AnnotationQuery {
     pub updated_after: Option<String>,
     pub updated_before: Option<String>,
     pub offset: usize,
+    pub limit: Option<std::num::NonZeroUsize>,
 }
 pub struct AnnotationRecordData {
     pub id: String,
