@@ -1,7 +1,7 @@
 use super::*;
 use yamantaka_domain::annotations::marks::{AnnotationMark, AnnotationMarks};
 
-const VISIBLE_MARKS: &str = "FROM annotations a JOIN documents d ON d.id=a.document_id WHERE a.document_id=? AND a.page_index=? AND a.status='attached' AND (a.type NOT IN ('ink','arrow','rectangle') OR (d.fingerprint=a.document_fingerprint AND d.is_modified=0 AND d.page_count>a.page_index))";
+const VISIBLE_MARKS: &str = "FROM annotations a JOIN documents d ON d.id=a.document_id WHERE a.document_id=? AND a.page_index=? AND a.status='attached' AND (a.type NOT IN ('ink','arrow','rectangle','ellipse','line','crop') OR (d.fingerprint=a.document_fingerprint AND d.is_modified=0 AND d.page_count>a.page_index))";
 
 pub(super) fn read(
     db: &Database,

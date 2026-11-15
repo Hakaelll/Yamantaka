@@ -212,6 +212,7 @@ impl YamantakaApp {
                         text: "Final reference".into(),
                         tag: "Reference study".into(),
                         kind: Some(AnnotationKind::PageComment),
+                        color: None,
                         review: Some(AnnotationReviewState::Pending),
                     };
                     assert!(view.pane.annotations.apply_filters());
@@ -251,6 +252,7 @@ impl YamantakaApp {
                     .into(),
                     tag: "Reference study".into(),
                     kind: Some(AnnotationKind::PageComment),
+                    color: None,
                     review: Some(AnnotationReviewState::Pending),
                 };
                 assert!(view.pane.annotations.apply_filters());

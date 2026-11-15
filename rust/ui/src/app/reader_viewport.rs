@@ -42,6 +42,16 @@ impl YamantakaApp {
             f64::from(viewport.y.max(1.0)),
         ];
         self.apply_reader_destination(viewport_size);
+        if self.reader.viewport.viewport_size.replace(viewport_size) != Some(viewport_size) {
+            self.reader.viewport.scroll_anchor = true;
+        }
+        if !self.reader_chrome_blocked
+            && !self.reader.viewport.source_changed
+            && self.reader.viewport.layout.is_some()
+            && let Some(zoom) = gesture_zoom(ui, self.reader.viewport.scale)
+        {
+            self.set_reader_zoom(zoom);
+        }
         let (Some(layout), Some(preferences), Some(navigation)) = (
             self.reader.viewport.layout.clone(),
             self.reader.effective_preferences(),
@@ -54,6 +64,7 @@ impl YamantakaApp {
         let anchor = navigation.position();
         let tool = self.study_tool(false);
         let color = self.study_color();
+        let weight = self.study.weight;
         let can_interact = !self.reader_chrome_blocked && !self.reader.viewport.source_changed;
         ui.painter()
             .rect_filled(ui.available_rect_before_wrap(), 0, self.reader_canvas(p));
@@ -169,6 +180,9 @@ impl YamantakaApp {
                     Err(error) => self.error = Some(error.to_string()),
                     _ => {}
                 }
+                if visible.page == anchor.page() && !self.reader_focus {
+                    self.reader.guide.paint(ui, visible.page, paper, self.english, p);
+                }
                 if !self.reader.study.hidden && !self.reader.viewport.source_changed {
                     self.reader.annotation_paint.paint(ui, visible.page, paper, layout.rotation());
                 }
@@ -187,7 +201,7 @@ impl YamantakaApp {
                     }
                 }
                 if can_interact {
-                    self.reader.study_page_input(ui, study::PageInput {tool, color, page: visible.page, paper, rotation: layout.rotation()}, p);
+                    self.reader.study_page_input(ui, study::PageInput {tool, color, weight, page: visible.page, paper, rotation: layout.rotation()}, p);
                     if tool == study::Tool::Select && !self.reader.study.hidden {
                         note_badge = self.reader.annotation_paint.note_badges(ui, visible.page, paper, layout.rotation(), self.english, p).or(note_badge.take());
                     }
@@ -245,4 +259,71 @@ pub(super) fn page_region(
             )
     };
     egui::Rect::from_min_max(position(bounds.min()), position(bounds.max()))
+}
+
+/// Pinch and Ctrl+wheel share egui's per-frame scale.
+pub(super) fn gesture_zoom(ui: &egui::Ui, scale: f32) -> Option<f32> {
+    if !ui.rect_contains_pointer(ui.available_rect_before_wrap()) {
+        return None;
+    }
+    let delta = ui.input(|input| input.zoom_delta());
+    if !delta.is_finite() || delta <= 0.0 || delta == 1.0 {
+        return None;
+    }
+    let zoom = (scale * delta).clamp(0.2, 8.0);
+    (zoom != scale).then_some(zoom)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::gesture_zoom;
+    use eframe::egui::{self, Event, Modifiers, MouseWheelUnit, RawInput, TouchPhase};
+
+    #[test]
+    fn zoom_gestures_only_affect_the_reader_under_the_pointer() {
+        let run = |x, event| {
+            let ctx = egui::Context::default();
+            let mut zoom = None;
+            let mut output = ctx.run_ui(
+                RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(640.0, 480.0),
+                    )),
+                    events: vec![Event::PointerMoved(egui::pos2(x, 150.0)), event],
+                    ..Default::default()
+                },
+                |ui| {
+                    let panel = egui::Panel::left("other-pane").exact_size(300.0);
+                    panel.show(ui, |_ui| {});
+                    zoom = gesture_zoom(ui, 1.0);
+                },
+            );
+            output.textures_delta.clear();
+            zoom
+        };
+
+        let wheel = |modifiers| Event::MouseWheel {
+            unit: MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, 1.0),
+            phase: TouchPhase::Move,
+            modifiers,
+        };
+
+        assert_eq!(run(450.0, Event::Zoom(1.25)), Some(1.25));
+        assert_eq!(run(450.0, Event::Zoom(0.75)), Some(0.75));
+        assert_eq!(run(150.0, Event::Zoom(1.25)), None);
+        assert_eq!(run(450.0, wheel(Modifiers::NONE)), None);
+        assert!(
+            run(
+                450.0,
+                wheel(Modifiers {
+                    ctrl: true,
+                    command: true,
+                    ..Modifiers::NONE
+                }),
+            )
+            .is_some_and(|zoom| zoom > 1.0)
+        );
+    }
 }

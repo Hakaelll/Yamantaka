@@ -34,6 +34,7 @@ pub enum AnnotationMutation {
     Edit {
         id: String,
         expected: yamantaka_domain::annotations::revision::AnnotationRevision,
+        drawing: Option<yamantaka_domain::annotations::study::StudyGeometry>,
         kind: AnnotationKind,
         color: AnnotationColor,
         note: Option<String>,
@@ -80,6 +81,7 @@ impl AnnotationMutation {
             Self::Edit {
                 id,
                 expected,
+                drawing,
                 kind,
                 color,
                 note,
@@ -88,6 +90,7 @@ impl AnnotationMutation {
             } => AnnotationChange::Edit {
                 id,
                 expected,
+                drawing: drawing.as_ref(),
                 kind: *kind,
                 color: *color,
                 note: note.as_deref(),

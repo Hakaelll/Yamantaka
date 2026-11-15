@@ -30,6 +30,7 @@ impl reader_pane::ReaderPane {
             note: String::new(),
             tags: String::new(),
             review: AnnotationReviewState::Pending,
+            drawing: None,
             confirmed: false,
         });
         self.annotations.error = None;
@@ -73,6 +74,7 @@ impl reader_pane::ReaderPane {
                     note: String::new(),
                     tags: String::new(),
                     review: AnnotationReviewState::Pending,
+                    drawing: None,
                     confirmed: false,
                 });
                 self.annotations.error = None;
@@ -87,6 +89,34 @@ impl reader_pane::ReaderPane {
 
 impl YamantakaApp {
     pub(in crate::app) fn apply_notes_action(&mut self, reference: bool, action: NotesAction) {
+        if let NotesAction::BookStudy(tab, seed) = action {
+            self.open_book_study(reference, tab, seed);
+            return;
+        }
+        if let NotesAction::PreviewCrop(request) = action {
+            let pane = if reference {
+                let Some(reference) = &mut self.reference else {
+                    return;
+                };
+                &mut reference.pane
+            } else {
+                &mut self.reader
+            };
+            if let Some((document, info)) = &pane.active
+                && request.fingerprint == document.fingerprint
+                && !pane.viewport.source_changed
+                && let Some(page) = info.pages.get(request.page as usize)
+            {
+                pane.annotations.crop.request(
+                    &self.runtime,
+                    &document.id,
+                    document.display_title(),
+                    page.size(),
+                    request,
+                );
+            }
+            return;
+        }
         if !reference {
             match action {
                 NotesAction::RetryDraft => self.retry_annotation_draft(false),
@@ -122,6 +152,7 @@ impl YamantakaApp {
                     }
                 }
                 NotesAction::ReloadMarks => self.reader.annotation_paint.invalidate_document(None),
+                NotesAction::PreviewCrop(_) | NotesAction::BookStudy(..) => unreachable!(),
             }
             return;
         }

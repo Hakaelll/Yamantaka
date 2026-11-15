@@ -33,6 +33,10 @@ impl AnnotationState {
             review: editor.review,
             note: editor.note.clone(),
             tags: editor.tags.clone(),
+            drawing: editor
+                .drawing
+                .as_ref()
+                .and_then(|drawing| serde_json::to_string(drawing).ok()),
         })
     }
     pub(in crate::app) fn install_stored_draft(
@@ -44,7 +48,9 @@ impl AnnotationState {
         self.saved = false;
         self.error = None;
         self.stale = false;
-        if let Some(record) = record {
+        if let Some(record) = record
+            && let Ok(drawing) = draft.geometry()
+        {
             self.editor = Some(AnnotationEditor {
                 source: EditorSource::RecoveredStored {
                     record: Arc::new(record),
@@ -54,6 +60,7 @@ impl AnnotationState {
                 review: draft.review,
                 note: draft.note,
                 tags: draft.tags,
+                drawing,
                 confirmed: false,
             });
         } else {

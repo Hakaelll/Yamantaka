@@ -20,6 +20,12 @@ pub(in crate::app) fn kind_label(kind: AnnotationKind, english: bool) -> &'stati
         (AnnotationKind::Arrow, false) => "Flecha",
         (AnnotationKind::Rectangle, true) => "Rectangle",
         (AnnotationKind::Rectangle, false) => "Recuadro",
+        (AnnotationKind::Ellipse, true) => "Ellipse",
+        (AnnotationKind::Ellipse, false) => "Óvalo",
+        (AnnotationKind::Line, true) => "Line",
+        (AnnotationKind::Line, false) => "Línea",
+        (AnnotationKind::Crop, true) => "Crop",
+        (AnnotationKind::Crop, false) => "Recorte",
     }
 }
 pub(in crate::app) fn review_label(state: AnnotationReviewState, english: bool) -> &'static str {
@@ -84,6 +90,9 @@ impl YamantakaApp {
         info: &PdfInfo,
         p: Palette,
     ) {
+        if self.reader.viewport.source_changed {
+            self.reader.annotations.crop.clear();
+        }
         let busy = self.reader.annotations.pending.is_some()
             || self.global_notes.writing()
             || self.library_tags.writing()
@@ -92,6 +101,19 @@ impl YamantakaApp {
                 .as_ref()
                 .is_some_and(|reference| reference.pane.annotations.writing());
         if !self.reader.annotations.reviewing() && !self.reader.annotations.editing() {
+            ui.horizontal_wrapped(|ui| {
+                for (tab, caption) in [
+                    (book_study::Tab::Summary, self.tr("Resumen", "Summary")),
+                    (
+                        book_study::Tab::Review,
+                        self.tr("Repasar tarjetas", "Review cards"),
+                    ),
+                ] {
+                    if theme::navigation(ui, caption, false, p).clicked() {
+                        self.open_book_study(false, tab, None);
+                    }
+                }
+            });
             self.annotation_filters_panel(ui, p);
             if self.reader.annotations.reviewing() {
                 return;

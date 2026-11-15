@@ -10,6 +10,7 @@ use yamantaka_domain::{
 };
 mod bulk;
 mod conflict_preview;
+pub(super) mod crop;
 pub(super) use conflict_preview::ConflictPreview;
 mod editor_view;
 mod page_note_recovery;
@@ -56,6 +57,7 @@ pub(super) enum EditorSource {
 pub(super) struct AnnotationEditor {
     source: EditorSource,
     kind: AnnotationKind,
+    drawing: Option<yamantaka_domain::annotations::study::StudyGeometry>,
     color: AnnotationColor,
     note: String,
     tags: String,
@@ -96,6 +98,7 @@ struct Pending {
 }
 #[derive(Default)]
 pub(super) struct AnnotationState {
+    pub(super) crop: crop::Preview,
     document: Option<String>,
     page: Option<Arc<AnnotationPage>>,
     pending: Option<Pending>,
@@ -169,6 +172,7 @@ impl AnnotationState {
             || self.editor.as_ref().is_some_and(|editor| {
                 editor.stored().is_none_or(|record| {
                     editor.kind != record.values.kind
+                        || editor.drawing.is_some()
                         || editor.color != record.values.color
                         || editor.review != record.values.review_state
                         || editor.note != record.values.note.as_deref().unwrap_or("")
@@ -183,6 +187,7 @@ impl AnnotationState {
         if self.document.as_deref() == Some(document) {
             return;
         }
+        self.crop.clear();
         if self
             .pending
             .as_ref()
@@ -320,6 +325,7 @@ impl AnnotationState {
                 self.error = None;
                 self.saved = pending.writing;
                 if pending.writing {
+                    self.crop.clear();
                     self.revision = self.revision.wrapping_add(1);
                     self.editor = None;
                 }
@@ -394,6 +400,7 @@ impl AnnotationState {
             return Ok(AnnotationMutation::Edit {
                 id: record.data().id.clone(),
                 expected: record.revision().clone(),
+                drawing: editor.drawing.clone(),
                 kind: editor.kind,
                 color: editor.color,
                 note: Some(editor.note.clone()),

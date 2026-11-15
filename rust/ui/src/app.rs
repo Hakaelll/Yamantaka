@@ -3,6 +3,7 @@ mod backup_restore;
 mod backups;
 pub use backup_restore::RestoreHandover;
 mod automation;
+mod book_study;
 mod bookmarks;
 mod bulk_picker;
 mod cache_maintenance;
@@ -56,6 +57,7 @@ mod reader_pane;
 mod reader_profile;
 mod reader_surface;
 mod reader_viewport;
+mod reading_guide;
 mod reading_queue;
 mod reference;
 mod relations;
@@ -149,6 +151,7 @@ pub struct YamantakaApp {
     shortcut_error: Option<String>,
     reader: reader_pane::ReaderPane,
     study: study::State,
+    book_study: book_study::State,
     reading_focus: shortcuts::ReadingFocus,
     reference_shortcuts_preview: shortcuts::ShortcutPreview,
     reference: Option<reference::ReferenceView>,
@@ -406,6 +409,7 @@ impl YamantakaApp {
             quarantine: Default::default(),
             reader,
             study: Default::default(),
+            book_study: Default::default(),
             reading_focus: Default::default(),
             reference_shortcuts_preview: Default::default(),
             reference: None,
@@ -1506,6 +1510,7 @@ impl App for YamantakaApp {
                     self.accept_annotation_reply(reply);
                 }
                 Update::CoverRebuilt(reply) => self.accept_cover_rebuilt(*reply, ctx),
+                Update::StudyBook(reply) => self.accept_book_study(*reply),
                 Update::AnnotationRecovered(reply) => self.accept_stored_note_recovery(*reply),
                 Update::SelectionRecovered(reply) => self.accept_selection_note_recovery(*reply),
                 Update::Library(documents, count, memberships, cancel) => {
@@ -1916,6 +1921,14 @@ impl App for YamantakaApp {
                     if cancel.as_ref().is_some_and(|token| token.is_cancelled()) {
                         continue;
                     }
+                    if cancel.as_ref().is_some_and(|token| {
+                        self.reader.annotations.crop.fail(token)
+                            || self.reference.as_mut().is_some_and(|reference| {
+                                reference.pane.annotations.crop.fail(token)
+                            })
+                    }) {
+                        continue;
+                    }
                     if let Some(token) = &cancel
                         && self
                             .reference
@@ -2256,6 +2269,7 @@ impl App for YamantakaApp {
             || self.link_confirmation_open()
             || self.bulk_picker.is_some()
             || self.selection_review_open()
+            || self.book_study.open
             || self.tag_dialog_open()
             || self.legacy_import.open
             || self.backup_restore.open
@@ -2523,6 +2537,7 @@ impl App for YamantakaApp {
         self.pump_library_removal(&ctx);
         self.update_cover_batch_progress();
         self.selection_review_dialog(&ctx);
+        self.book_study_window(&ctx);
         self.tag_management_dialogs(&ctx);
         self.legacy_import_dialog(&ctx);
         self.duplicate_merge_dialog(&ctx);

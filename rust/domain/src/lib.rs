@@ -243,7 +243,17 @@ pub struct LibraryMembership {
     pub collection: Option<String>,
     pub tag: Option<String>,
 }
+pub mod study_book;
+
 pub trait LibraryRepository {
+    fn study_book(
+        &mut self,
+        _document: &str,
+        _operation: study_book::Operation,
+    ) -> Result<study_book::BookStudy> {
+        Err(Failure::Unsupported("Book study".into()))
+    }
+
     fn startup_workspace(
         &self,
         _expected: Option<&workspaces::WorkspaceRevision>,

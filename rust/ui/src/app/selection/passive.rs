@@ -98,17 +98,17 @@ impl SelectionState {
         let tr = |es, en| if english { en } else { es };
         let frame = egui::Frame::new()
             .fill(p.surface)
-            .corner_radius(13)
+            .corner_radius(20)
             .inner_margin(egui::Margin::symmetric(5, 4))
             .shadow(egui::epaint::Shadow {
                 offset: [0, 2],
-                blur: 9,
+                blur: 6,
                 spread: 0,
-                color: Color32::from_black_alpha(44),
+                color: Color32::from_black_alpha(32),
             })
             .stroke(egui::Stroke::new(1.0, p.line));
-        let compact = ui.ctx().content_rect().width() <= 340.0;
-        let alignment = if anchor.top() - viewport.top() >= if compact { 74.0 } else { 46.0 } {
+        let compact = ui.ctx().content_rect().width() < 420.0;
+        let alignment = if anchor.top() - viewport.top() >= 46.0 {
             egui::RectAlign::TOP
         } else {
             egui::RectAlign::BOTTOM
@@ -143,16 +143,15 @@ impl SelectionState {
                         (tr("Añadir nota", "Add note"), SelectionAction::Annotate),
                         (tr("Copiar", "Copy"), SelectionAction::Copy),
                     ] {
-                        let icon_only = compact && matches!(candidate, SelectionAction::Copy);
+                        let icon = match candidate {
+                            SelectionAction::Copy if compact => Some(theme::Icon::Copy),
+                            SelectionAction::Annotate if compact => Some(theme::Icon::Pencil),
+                            _ => None,
+                        };
                         let response =
-                            context_button(ui, if icon_only { "" } else { label }, label, p);
-                        if icon_only {
-                            theme::icon(
-                                ui.painter(),
-                                response.rect.center(),
-                                theme::Icon::Copy,
-                                p.ink,
-                            );
+                            context_button(ui, if icon.is_some() { "" } else { label }, label, p);
+                        if let Some(icon) = icon {
+                            theme::icon(ui.painter(), response.rect.center(), icon, p.ink);
                             response.clone().on_hover_text(label);
                         }
                         if focus && matches!(candidate, SelectionAction::Highlight) {
@@ -192,6 +191,16 @@ impl SelectionState {
                     if chosen != color {
                         action = Some(SelectionAction::Color(chosen));
                     }
+                    let more = context_button(ui, "…", tr("Más acciones", "More actions"), p);
+                    egui::Popup::menu(&more).frame(frame).show(|ui| {
+                        self.passive.layers.push(ui.layer_id());
+                        if theme::navigation(ui, tr("Copiar cita", "Copy citation"), false, p)
+                            .clicked()
+                        {
+                            action = Some(SelectionAction::CopyCitation);
+                            ui.close();
+                        }
+                    });
                 });
             });
         action

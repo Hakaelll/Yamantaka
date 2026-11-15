@@ -115,6 +115,7 @@ impl YamantakaApp {
                     Some(AnnotationMutation::Edit {
                         id: "synthetic-primary-mark".into(),
                         expected,
+                        drawing: None,
                         kind: AnnotationKind::Highlight,
                         color: AnnotationColor::Blue,
                         note: Some("Updated in the main reading".into()),

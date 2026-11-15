@@ -391,7 +391,11 @@ pub(super) fn change(
         _ => Vec::new(),
     };
     if let AnnotationChange::Edit {
-        id, expected, kind, ..
+        id,
+        expected,
+        kind,
+        drawing,
+        ..
     } = &change
     {
         let current =
@@ -402,6 +406,11 @@ pub(super) fn change(
         let previous = current.data().values.kind;
         if (previous.is_drawing() || kind.is_drawing()) && previous != *kind {
             return Err(Failure::Invalid("A drawing keeps its original kind".into()));
+        }
+        if drawing.is_some_and(|geometry| geometry.kind() != *kind)
+            || drawing.is_some() && current.data().values.status != AttachmentStatus::Attached
+        {
+            return Err(Failure::StaleAnnotation);
         }
     }
     let mut entry = history::Entry::new(document, governor)?;
@@ -480,7 +489,7 @@ pub(super) fn change(
             let affected = tx.execute(
                 "DELETE FROM annotations WHERE id=? AND document_id=? AND
                  (NOT ? OR (status='attached' AND COALESCE(trim(note),'')='' AND
-                 type IN ('highlight','underline','strikeout','pageMarker','ink','arrow','rectangle')))",
+                 type IN ('highlight','underline','strikeout','pageMarker','ink','arrow','rectangle','ellipse','line','crop')))",
                 params![id, document, erase],
             ).map_err(storage)?;
             if affected == 0 {
@@ -491,6 +500,7 @@ pub(super) fn change(
         }
         AnnotationChange::Edit {
             id,
+            drawing,
             kind,
             color,
             note,
@@ -506,6 +516,17 @@ pub(super) fn change(
             pages.insert(target(&tx, document, id)?);
             let note = note.map(str::trim).filter(|note| !note.is_empty());
             tx.execute("UPDATE annotations SET type=?,color=?,note=?,review_state=?,updated_at=? WHERE id=? AND document_id=?",params![name(kind)?,name(color)?,note,name(review)?,now,id,document]).map_err(storage)?;
+            if let Some(drawing) = drawing {
+                tx.execute(
+                    "UPDATE annotations SET rects_json=? WHERE id=? AND document_id=?",
+                    params![
+                        serde_json::to_string(drawing).map_err(storage)?,
+                        id,
+                        document
+                    ],
+                )
+                .map_err(storage)?;
+            }
             if let Some(values) = tag_values {
                 tags(&tx, id, values, &now, cancel)?;
             }

@@ -16,6 +16,8 @@ pub struct StoredNoteDraft {
     pub review: AnnotationReviewState,
     pub note: String,
     pub tags: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drawing: Option<String>,
 }
 impl StoredNoteDraft {
     pub fn same_editor(&self, other: &Self) -> bool {
@@ -25,6 +27,7 @@ impl StoredNoteDraft {
     }
     pub fn validate(&self) -> Result<()> {
         PageRotation::from_degrees(self.rotation.into())?;
+        self.geometry()?;
         if self.document.is_empty()
             || self.annotation.is_empty()
             || self.document.len() > 1024
@@ -40,5 +43,12 @@ impl StoredNoteDraft {
             ));
         }
         Ok(())
+    }
+
+    pub fn geometry(&self) -> Result<Option<study::StudyGeometry>> {
+        self.drawing
+            .as_deref()
+            .map(|json| study::StudyGeometry::decode(self.kind, json))
+            .transpose()
     }
 }

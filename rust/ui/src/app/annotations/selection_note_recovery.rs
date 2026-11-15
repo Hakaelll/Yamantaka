@@ -56,6 +56,7 @@ impl AnnotationState {
                 review: AnnotationReviewState::Pending,
                 note: draft.note,
                 tags: draft.tags,
+                drawing: None,
                 confirmed: draft.confirmed,
             });
         } else {

@@ -5,11 +5,36 @@ use serde::{Deserialize, Serialize};
 pub const MAX_STUDY_POINTS: usize = 2048;
 const MAX_ENCODED_BYTES: usize = 128 * 1024;
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum StrokeWeight {
+    Fine,
+    #[default]
+    Medium,
+    Thick,
+}
+
+impl StrokeWeight {
+    pub fn factor(self) -> f32 {
+        match self {
+            Self::Fine => 0.65,
+            Self::Medium => 1.0,
+            Self::Thick => 2.0,
+        }
+    }
+
+    fn is_medium(&self) -> bool {
+        *self == Self::Medium
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct StudyGeometry {
     version: u8,
     kind: AnnotationKind,
     points: Vec<[f64; 2]>,
+    #[serde(skip_serializing_if = "StrokeWeight::is_medium")]
+    weight: StrokeWeight,
 }
 
 impl StudyGeometry {
@@ -19,8 +44,10 @@ impl StudyGeometry {
                 (2..=MAX_STUDY_POINTS).contains(&points.len())
                     && points.windows(2).any(|pair| pair[0] != pair[1])
             }
-            AnnotationKind::Arrow => points.len() == 2 && points[0] != points[1],
-            AnnotationKind::Rectangle => {
+            AnnotationKind::Arrow | AnnotationKind::Line => {
+                points.len() == 2 && points[0] != points[1]
+            }
+            AnnotationKind::Rectangle | AnnotationKind::Ellipse | AnnotationKind::Crop => {
                 points.len() == 2 && points[0][0] != points[1][0] && points[0][1] != points[1][1]
             }
             _ => false,
@@ -37,7 +64,47 @@ impl StudyGeometry {
             version: 1,
             kind,
             points,
+            weight: StrokeWeight::Medium,
         })
+    }
+
+    pub fn with_weight(mut self, weight: StrokeWeight) -> Self {
+        self.version = if weight == StrokeWeight::Medium { 1 } else { 2 };
+        self.weight = weight;
+        self
+    }
+
+    pub fn bounds(&self) -> [[f64; 2]; 2] {
+        let mut bounds = [self.points[0]; 2];
+        for point in &self.points[1..] {
+            for (axis, coordinate) in point.iter().copied().enumerate() {
+                bounds[0][axis] = bounds[0][axis].min(coordinate);
+                bounds[1][axis] = bounds[1][axis].max(coordinate);
+            }
+        }
+        bounds
+    }
+
+    pub fn with_bounds(&self, bounds: [[f64; 2]; 2]) -> Result<Self> {
+        let original = self.bounds();
+        let mut points = self.points.clone();
+        for point in &mut points {
+            for (axis, coordinate) in point.iter_mut().enumerate() {
+                let span = original[1][axis] - original[0][axis];
+                let fraction = if span == 0.0 {
+                    0.0
+                } else {
+                    (*coordinate - original[0][axis]) / span
+                };
+                *coordinate = (bounds[0][axis] + fraction * (bounds[1][axis] - bounds[0][axis]))
+                    .clamp(0.0, 1.0);
+            }
+        }
+        Ok(Self::new(self.kind, points)?.with_weight(self.weight))
+    }
+
+    pub fn weight(&self) -> StrokeWeight {
+        self.weight
     }
 
     pub fn kind(&self) -> AnnotationKind {
@@ -59,6 +126,7 @@ impl StudyGeometry {
             version: u8,
             kind: AnnotationKind,
             points: Vec<[f64; 2]>,
+            weight: Option<StrokeWeight>,
         }
         if json.len() > MAX_ENCODED_BYTES {
             return Err(Failure::Invalid(
@@ -67,11 +135,13 @@ impl StudyGeometry {
         }
         let fields: Fields = serde_json::from_str(json)
             .map_err(|_| Failure::Invalid("Drawing geometry cannot be decoded safely".into()))?;
-        if fields.version != 1 || fields.kind != kind {
+        if !matches!((fields.version, fields.weight), (1, None) | (2, Some(_)))
+            || fields.kind != kind
+        {
             return Err(Failure::Invalid(
                 "Drawing kind or version does not match".into(),
             ));
         }
-        Self::new(kind, fields.points)
+        Ok(Self::new(kind, fields.points)?.with_weight(fields.weight.unwrap_or_default()))
     }
 }

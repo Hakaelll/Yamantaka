@@ -268,12 +268,25 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
                     "Incomplete or invalid row: {table}"
                 )));
             }
+            if table == "app_metadata"
+                && row["key"]
+                    .as_str()
+                    .is_some_and(|key| key.starts_with(crate::study_book::KEY))
+            {
+                let data = row["value"].as_str().ok_or_else(|| {
+                    Failure::Invalid("Study data is missing from the backup".into())
+                })?;
+                crate::study_book::decode(data)?;
+            }
             if table == "annotations" {
                 use yamantaka_domain::annotations::{AnnotationKind, study::StudyGeometry};
                 let kind = match row["type"].as_str() {
                     Some("ink") => Some(AnnotationKind::Ink),
                     Some("arrow") => Some(AnnotationKind::Arrow),
                     Some("rectangle") => Some(AnnotationKind::Rectangle),
+                    Some("ellipse") => Some(AnnotationKind::Ellipse),
+                    Some("line") => Some(AnnotationKind::Line),
+                    Some("crop") => Some(AnnotationKind::Crop),
                     _ => None,
                 };
                 if let Some(kind) = kind {

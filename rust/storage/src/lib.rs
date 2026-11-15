@@ -34,6 +34,7 @@ mod relations;
 mod revisions;
 pub mod search;
 pub mod startup;
+mod study_book;
 mod tags;
 mod workspaces;
 pub use database::Database;

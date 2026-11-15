@@ -363,6 +363,7 @@ pub fn preserved_split_references(document: &str) {
         review: yamantaka_domain::annotations::AnnotationReviewState::Accepted,
         note: "  Unsaved edit\n日本語  ".into(),
         tags: "Study, draft, ".into(),
+        drawing: None,
     };
     let with_edits = with_metadata
         .clone()

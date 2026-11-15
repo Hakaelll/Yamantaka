@@ -151,6 +151,19 @@ impl ReferenceView {
                             return;
                         }
                         if self.notes_tools_open {
+                            ui.horizontal_wrapped(|ui| {
+                                for (tab, label) in [
+                                    (book_study::Tab::Summary, tr("Resumen", "Summary")),
+                                    (book_study::Tab::Review, tr("Repasar tarjetas", "Review cards")),
+                                ] {
+                                    if theme::navigation(ui, label, false, p).clicked() {
+                                        self.notes_action = Some(annotations::NotesAction::BookStudy(tab, None));
+                                    }
+                                }
+                            });
+                            if self.notes_action.is_some() {
+                                return;
+                            }
                             let filter = annotations.show_filters(ui, english, context.page, p);
                             if matches!(filter, Some(annotations::NotesAction::Read(_) | annotations::NotesAction::ClearFocus)) {
                                 self.notes_tools_open = false;
@@ -330,6 +343,7 @@ impl ReferenceView {
         self.pane.text.clear();
         self.pane.bookmarks.cancel_query();
         self.pane.annotations.cancel_query();
+        self.pane.annotations.crop.clear();
         self.notes_tools_open = false;
         self.search_visible = false;
     }

@@ -11,26 +11,13 @@ pub(in crate::app) enum NotesAction {
     Selection,
     Navigate(yamantaka_domain::reader::ReaderPosition, String, bool),
     ReloadMarks,
+    PreviewCrop(crop::Request),
+    BookStudy(book_study::Tab, Option<book_study::Seed>),
     Export(yamantaka_application::annotation_export::AnnotationExportFormat),
 }
 impl NotesAction {
     pub(super) fn open_annotation(ui: &mut egui::Ui, data: &AnnotationRecordData) -> Option<Self> {
-        let point = data
-            .values
-            .rects
-            .first()
-            .map(|rect| {
-                let rect = rect.region();
-                [(rect.min()[0] + rect.max()[0]) * 0.5, rect.min()[1]]
-            })
-            .or_else(|| {
-                data.values
-                    .drawing
-                    .as_ref()
-                    .and_then(|drawing| drawing.points().first().copied())
-            })
-            .filter(|_| data.values.status == AttachmentStatus::Attached)
-            .unwrap_or([0.5, 0.0]);
+        let point = annotation_point(data);
         let position =
             yamantaka_domain::reader::ReaderPosition::at(data.values.page_index, point).ok()?;
         let close = bookmarks::compact_study(ui.ctx());
@@ -40,6 +27,24 @@ impl NotesAction {
         Some(Self::Navigate(position, data.id.clone(), close))
     }
 }
+fn annotation_point(data: &AnnotationRecordData) -> [f64; 2] {
+    data.values
+        .rects
+        .first()
+        .map(|rect| {
+            let rect = rect.region();
+            [(rect.min()[0] + rect.max()[0]) * 0.5, rect.min()[1]]
+        })
+        .or_else(|| {
+            data.values
+                .drawing
+                .as_ref()
+                .and_then(|drawing| drawing.points().first().copied())
+        })
+        .filter(|_| data.values.status == AttachmentStatus::Attached)
+        .unwrap_or([0.5, 0.0])
+}
+
 pub(in crate::app) struct NotesContext<'a> {
     pub english: bool,
     pub page: u32,
@@ -155,7 +160,12 @@ impl AnnotationState {
                     });
                     ui.add_space(6.0);
                 }
-                let label=ui.label(if english {"Your note"} else {"Tu nota"});
+                let label=ui.label(match (editor.kind == AnnotationKind::Crop, english) {
+                    (true, true) => "Crop title or note",
+                    (true, false) => "Título o comentario del recorte",
+                    (false, true) => "Your note",
+                    (false, false) => "Tu nota",
+                });
                 let note = ui.add(egui::TextEdit::multiline(&mut editor.note).desired_rows(4).desired_width(f32::INFINITY).char_limit(4000).hint_text(if english {"What would you like to remember?"} else {"¿Qué te gustaría recordar?"})).labelled_by(label.id);
                 if focus_note { note.request_focus(); }
                 let units=editor.note.encode_utf16().count();
@@ -190,6 +200,20 @@ impl AnnotationState {
                     }
                 });
                 ui.add_space(14.0);
+                if let Some(original) = editor.stored()
+                    .filter(|record| record.values.status == AttachmentStatus::Attached)
+                    .and_then(|record| record.values.drawing.as_ref()).cloned()
+                {
+                    let mut drawing = editor.drawing.clone().unwrap_or_else(|| original.clone());
+                    if drawing.kind() != AnnotationKind::Crop {
+                        let mut weight = drawing.weight();
+                        super::super::study::weight_control(ui, english, &mut weight);
+                        drawing = drawing.with_weight(weight);
+                    }
+                    position_controls(ui, english, &mut drawing);
+                    editor.drawing = (drawing != original).then_some(drawing);
+                    ui.add_space(8.0);
+                }
                 let label = ui.label(if english {"Tags, optional"} else {"Etiquetas, opcionales"});
                 ui.add(egui::TextEdit::singleline(&mut editor.tags).desired_width(f32::INFINITY).hint_text(if english {"Study, optics"} else {"Estudio, óptica"})).labelled_by(label.id);
                 let valid_tags = editor.tag_changes().is_ok();
@@ -376,7 +400,54 @@ impl AnnotationState {
                             page.offset,
                         ));
                     }
+                    if !busy {
+                        ui.menu_button(tr("Estudiar", "Study"), |ui| {
+                            for (tab, caption) in [
+                                (
+                                    book_study::Tab::Summary,
+                                    tr("Añadir al resumen", "Add to summary"),
+                                ),
+                                (book_study::Tab::Cards, tr("Crear tarjeta", "Create card")),
+                            ] {
+                                if ui.button(caption).clicked() {
+                                    let source = yamantaka_domain::study_book::Source {
+                                        annotation: data.id.clone(),
+                                        page: data.values.page_index,
+                                        point: annotation_point(data),
+                                    };
+                                    let text = data
+                                        .values
+                                        .selected_text
+                                        .as_deref()
+                                        .or(data.values.note.as_deref())
+                                        .unwrap_or_default()
+                                        .to_owned();
+                                    action = Some(NotesAction::BookStudy(
+                                        tab,
+                                        Some(book_study::Seed { source, text }),
+                                    ));
+                                    ui.close();
+                                }
+                            }
+                        });
+                    }
+                    if data.values.kind == AnnotationKind::Crop
+                        && data.values.status == AttachmentStatus::Attached
+                        && let Some(drawing) = &data.values.drawing
+                        && theme::navigation(ui, tr("Ver recorte", "Preview crop"), false, p)
+                            .clicked()
+                    {
+                        action = Some(NotesAction::PreviewCrop(crop::Request {
+                            id: data.id.clone(),
+                            page: data.values.page_index,
+                            fingerprint: data.values.document_fingerprint.clone(),
+                            points: [drawing.points()[0], drawing.points()[1]],
+                        }));
+                    }
                 });
+                if data.values.status == AttachmentStatus::Attached {
+                    self.crop.show(ui, &data.id, context.english, p);
+                }
                 if let Some(passage) = &data.values.selected_text {
                     ui.label(RichText::new(passage).italics().color(p.secondary));
                 }
@@ -503,8 +574,69 @@ impl AnnotationState {
             note: data.values.note.clone().unwrap_or_default(),
             tags: data.tags.join(", "),
             review: data.values.review_state,
+            drawing: None,
             confirmed: false,
         });
         self.focus_editor = true;
+    }
+}
+
+fn position_controls(
+    ui: &mut egui::Ui,
+    english: bool,
+    drawing: &mut yamantaka_domain::annotations::study::StudyGeometry,
+) {
+    let tr = |es, en| if english { en } else { es };
+    let [min, max] = drawing.bounds();
+    let mut origin = min.map(|v| v * 100.0);
+    let mut extent = [(max[0] - min[0]) * 100.0, (max[1] - min[1]) * 100.0];
+    let changed = egui::CollapsingHeader::new(tr("Posición y tamaño", "Position and size"))
+        .show(ui, |ui| {
+            let mut changed = false;
+            for (axis, position, size) in [
+                (0, tr("Horizontal", "Horizontal"), tr("Ancho", "Width")),
+                (1, tr("Vertical", "Vertical"), tr("Alto", "Height")),
+            ] {
+                ui.horizontal_wrapped(|ui| {
+                    let label = ui.label(position);
+                    changed |= ui
+                        .add(
+                            egui::DragValue::new(&mut origin[axis])
+                                .range(0.0..=(100.0 - extent[axis]).max(0.0))
+                                .speed(0.2)
+                                .suffix("%"),
+                        )
+                        .labelled_by(label.id)
+                        .changed();
+                    if extent[axis] > 0.0 {
+                        let label = ui.label(size);
+                        let lower = extent[axis].min(0.1);
+                        let upper = (100.0 - origin[axis]).max(lower);
+                        changed |= ui
+                            .add(
+                                egui::DragValue::new(&mut extent[axis])
+                                    .range(lower..=upper)
+                                    .speed(0.2)
+                                    .suffix("%"),
+                            )
+                            .labelled_by(label.id)
+                            .changed();
+                    }
+                });
+            }
+            changed
+        })
+        .body_returned
+        == Some(true);
+    if changed
+        && let Ok(updated) = drawing.with_bounds([
+            origin.map(|v| v / 100.0),
+            [
+                (origin[0] + extent[0]) / 100.0,
+                (origin[1] + extent[1]) / 100.0,
+            ],
+        ])
+    {
+        *drawing = updated;
     }
 }

@@ -159,6 +159,12 @@ pub fn save_library_backup() -> Option<PathBuf> {
         .set_file_name("yamantaka-backup.json")
         .save_file()
 }
+pub fn save_crop_image() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("PNG", &["png"])
+        .set_file_name("yamantaka-crop.png")
+        .save_file()
+}
 pub fn save_diagnostics_report() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .add_filter("JSON", &["json"])

@@ -173,6 +173,10 @@ impl YamantakaApp {
                 ui.close();
             }
         }
+        ui.label(self.tr(
+            "Ctrl + rueda · Pellizcar en el trackpad",
+            "Ctrl + wheel · Pinch on trackpad",
+        ));
     }
 
     pub(super) fn set_reader_zoom(&mut self, zoom: f32) {

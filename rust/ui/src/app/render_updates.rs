@@ -29,6 +29,14 @@ impl YamantakaApp {
         page: &RenderedPage,
         cancel: &Cancellation,
     ) {
+        if self.reader.annotations.crop.accept(ctx, page, cancel)
+            || self
+                .reference
+                .as_mut()
+                .is_some_and(|reference| reference.pane.annotations.crop.accept(ctx, page, cancel))
+        {
+            return;
+        }
         let reader = self.reader.viewport.accepts(page, cancel);
         let reference = self
             .reference

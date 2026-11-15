@@ -30,6 +30,7 @@ pub(super) struct Filters {
     pub text: String,
     pub tag: String,
     pub kind: Option<AnnotationKind>,
+    pub color: Option<AnnotationColor>,
     pub review: Option<AnnotationReviewState>,
 }
 impl Filters {
@@ -37,6 +38,7 @@ impl Filters {
         usize::from(!self.text.trim().is_empty())
             + usize::from(!self.tag.trim().is_empty())
             + usize::from(self.kind.is_some())
+            + usize::from(self.color.is_some())
             + usize::from(self.review.is_some())
             + usize::from(self.page.is_some())
     }
@@ -54,6 +56,7 @@ impl Filters {
             text: self.text.trim().into(),
             tag: (!self.tag.trim().is_empty()).then(|| self.tag.trim().into()),
             kind: self.kind,
+            color: self.color,
             review: self.review,
             page: self.page,
             grouping: Some(AnnotationGrouping::Page),
@@ -82,6 +85,7 @@ impl AnnotationState {
             pending.cancel.cancel();
         }
         self.selected = Default::default();
+        self.crop.clear();
         self.bulk_tag.clear();
         self.filters = self.filter_draft.clone();
         self.page = None;
@@ -223,6 +227,12 @@ impl AnnotationState {
                     self.filter_draft.review = (!pending).then_some(AnnotationReviewState::Pending);
                     apply = true;
                 }
+                let crops = self.filters.kind == Some(AnnotationKind::Crop);
+                if theme::navigation(ui, tr("Recortes", "Crops"), crops, p).clicked() {
+                    self.filter_draft = self.filters.clone();
+                    self.filter_draft.kind = (!crops).then_some(AnnotationKind::Crop);
+                    apply = true;
+                }
                 if theme::navigation(ui, &caption, self.filters_open, p).clicked() {
                     self.filters_open = !self.filters_open;
                 }
@@ -301,6 +311,9 @@ impl AnnotationState {
                                 AnnotationKind::Ink,
                                 AnnotationKind::Arrow,
                                 AnnotationKind::Rectangle,
+                                AnnotationKind::Ellipse,
+                                AnnotationKind::Line,
+                                AnnotationKind::Crop,
                             ] {
                                 ui.selectable_value(
                                     &mut draft.kind,
@@ -365,6 +378,31 @@ impl AnnotationState {
                                     &mut draft.review,
                                     Some(state),
                                     if english { en } else { es },
+                                );
+                            }
+                        })
+                        .response
+                        .labelled_by(label.id);
+                });
+                ui.horizontal_wrapped(|ui| {
+                    let label = ui.label("Color");
+                    egui::ComboBox::from_id_salt("annotation-filter-color")
+                        .selected_text(draft.color.map_or(tr("Todos", "All"), |color| {
+                            panel::color_label(color, english)
+                        }))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut draft.color, None, tr("Todos", "All"));
+                            for color in [
+                                AnnotationColor::Yellow,
+                                AnnotationColor::Green,
+                                AnnotationColor::Blue,
+                                AnnotationColor::Rose,
+                                AnnotationColor::Violet,
+                            ] {
+                                ui.selectable_value(
+                                    &mut draft.color,
+                                    Some(color),
+                                    panel::color_label(color, english),
                                 );
                             }
                         })

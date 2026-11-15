@@ -223,7 +223,7 @@ impl AnnotationPaint {
         })?;
         let painter = ui.painter().with_clip_rect(paper);
         if let Some(drawing) = mark.drawing() {
-            let width = drawing_width(paper);
+            let width = drawing_width(paper) * drawing.weight().factor();
             paint_shape(
                 &painter,
                 paper,
@@ -273,6 +273,7 @@ impl AnnotationPaint {
                     mark.kind(),
                     drawing.points(),
                     mark.color(),
+                    drawing.weight(),
                 );
             }
             let color = panel::mark_color(mark.color());
@@ -509,7 +510,16 @@ fn drawing_hit(
         AnnotationKind::Arrow => {
             near(a, b) || arrow_head(a, b).into_iter().any(|wing| near(b, wing))
         }
-        AnnotationKind::Rectangle => {
+        AnnotationKind::Line => near(a, b),
+        AnnotationKind::Ellipse => {
+            let rect = egui::Rect::from_two_pos(a, b);
+            let point = |step| {
+                let angle = step as f32 * std::f32::consts::TAU / 48.0;
+                rect.center() + egui::vec2(angle.cos(), angle.sin()) * rect.size() * 0.5
+            };
+            (0..48).any(|step| near(point(step), point(step + 1)))
+        }
+        AnnotationKind::Rectangle | AnnotationKind::Crop => {
             let rect = egui::Rect::from_two_pos(a, b);
             rect.expand(radius).contains(pointer) && !rect.shrink(radius).contains(pointer)
         }
@@ -524,6 +534,7 @@ pub(in crate::app) fn paint_drawing(
     kind: AnnotationKind,
     points: &[[f64; 2]],
     color: AnnotationColor,
+    weight: yamantaka_domain::annotations::study::StrokeWeight,
 ) {
     paint_shape(
         &ui.painter().with_clip_rect(paper),
@@ -531,7 +542,10 @@ pub(in crate::app) fn paint_drawing(
         rotation,
         kind,
         points,
-        egui::Stroke::new(drawing_width(paper), panel::mark_color(color)),
+        egui::Stroke::new(
+            drawing_width(paper) * weight.factor(),
+            panel::mark_color(color),
+        ),
     );
 }
 
@@ -559,6 +573,28 @@ fn paint_shape(
             for wing in arrow_head(a, b) {
                 painter.line_segment([b, wing], stroke);
             }
+        }
+        AnnotationKind::Line => {
+            painter.line_segment([a, b], stroke);
+        }
+        AnnotationKind::Ellipse => {
+            let rect = egui::Rect::from_two_pos(a, b);
+            painter.add(egui::Shape::ellipse_stroke(
+                rect.center(),
+                rect.size() / 2.0,
+                stroke,
+            ));
+        }
+        AnnotationKind::Crop => {
+            let rect = egui::Rect::from_two_pos(a, b);
+            let corners = [
+                rect.left_top(),
+                rect.right_top(),
+                rect.right_bottom(),
+                rect.left_bottom(),
+                rect.left_top(),
+            ];
+            painter.extend(egui::Shape::dashed_line(&corners, stroke, 5.0, 3.0));
         }
         AnnotationKind::Rectangle => {
             painter.rect_stroke(

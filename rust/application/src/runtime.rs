@@ -135,6 +135,7 @@ pub enum Action {
     AnnotationExport(Box<AnnotationExportRequest>),
     AnnotationMarks(Box<AnnotationMarksRequest>),
     Annotation(Box<AnnotationRequest>),
+    StudyBook(Box<yamantaka_domain::study_book::Request>),
     RecoverAnnotation(Box<crate::annotation_draft_recovery::Request>),
     RecoverSelection(Box<crate::selection_draft_recovery::Request>),
     Bookmarks(String, usize, Cancellation),
@@ -264,6 +265,7 @@ pub enum Update {
     AnnotationExport(AnnotationExportReply),
     AnnotationMarks(AnnotationMarksReply),
     Annotations(AnnotationReply),
+    StudyBook(Box<yamantaka_domain::study_book::Reply>),
     AnnotationRecovered(Box<crate::annotation_draft_recovery::Reply>),
     SelectionRecovered(Box<crate::selection_draft_recovery::Reply>),
     Bookmarks(String, usize, BookmarkPage, Cancellation),
@@ -1391,6 +1393,12 @@ impl Runtime {
                                 Action::AnnotationMarks(request) => {
                                     let reply = request.execute(&repository);
                                     emit(&events, &notify, Update::AnnotationMarks(reply), permit);
+                                }
+                                Action::StudyBook(request) => {
+                                    let exported = matches!(&request.operation, yamantaka_domain::study_book::Operation::Export(_));
+                                    let result = repository.study_book(&request.document, request.operation);
+                                    let reply = yamantaka_domain::study_book::Reply { document: request.document, result, exported };
+                                    emit(&events, &notify, Update::StudyBook(Box::new(reply)), permit);
                                 }
                                 Action::Annotation(request) => {
                                     let access = if indexer.progress().enabled {

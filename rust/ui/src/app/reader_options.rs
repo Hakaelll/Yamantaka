@@ -169,6 +169,18 @@ impl YamantakaApp {
     fn reader_options_content(&mut self, ui: &mut egui::Ui, p: Palette) {
         ui.set_max_width(280.0);
         self.operation_actions(ui, p);
+        let reference = self.reference.is_some() && self.reading_focus.reference();
+        let english = self.english;
+        if reference {
+            self.reference
+                .as_mut()
+                .unwrap()
+                .pane
+                .guide
+                .controls(ui, english, p);
+        } else {
+            self.reader.guide.controls(ui, english, p);
+        }
         if theme::navigation(ui, self.tr("Ajustes", "Settings"), false, p).clicked() {
             self.show_surface(Surface::Settings);
             ui.close();

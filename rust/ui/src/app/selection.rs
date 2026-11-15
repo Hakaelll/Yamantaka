@@ -187,7 +187,10 @@ impl YamantakaApp {
                 }
             }
             Some(
-                SelectionAction::Highlight | SelectionAction::Underline | SelectionAction::Color(_),
+                SelectionAction::Highlight
+                | SelectionAction::Underline
+                | SelectionAction::Color(_)
+                | SelectionAction::CopyCitation,
             ) => {}
             None => {}
         }
@@ -239,11 +242,37 @@ impl YamantakaApp {
             Err(error) => self.error = Some(error.to_string()),
         }
     }
+
+    pub(super) fn copy_selection_citation(&mut self, ctx: &egui::Context, reference: bool) {
+        let pane = self.study_pane(reference);
+        let (Some((document, _)), Some(range)) = (&pane.active, pane.selection.range()) else {
+            return;
+        };
+        match pane.selection.copy(&self.governor) {
+            Ok(text) => {
+                let start = u64::from(range.start().page()) + 1;
+                let end = u64::from(range.end().page()) + 1;
+                let pages = if start == end {
+                    start.to_string()
+                } else {
+                    format!("{start}–{end}")
+                };
+                ctx.copy_text(format!(
+                    "{}\n\n{} · {} {pages}",
+                    text.text(),
+                    document.display_title(),
+                    self.tr("pág.", "p."),
+                ));
+            }
+            Err(error) => self.error = Some(error.to_string()),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
 pub(super) enum SelectionAction {
     Copy,
+    CopyCitation,
     Annotate,
     Highlight,
     Underline,

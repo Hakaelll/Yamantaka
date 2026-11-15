@@ -5,7 +5,7 @@ use yamantaka_domain::{
     annotations::{
         AnnotationColor, AnnotationDraft, AnnotationKind, AnnotationSource,
         batch::AnnotationDraftBatch,
-        study::{MAX_STUDY_POINTS, StudyGeometry},
+        study::{MAX_STUDY_POINTS, StrokeWeight, StudyGeometry},
     },
     reader_preferences::PageRotation,
 };
@@ -20,11 +20,15 @@ pub(super) enum Tool {
     Pen,
     Arrow,
     Rectangle,
+    Ellipse,
+    Line,
+    Crop,
     Erase,
 }
 
 impl Tool {
-    const ALL: [Self; 8] = [
+    const SHAPES: [Self; 4] = [Self::Arrow, Self::Rectangle, Self::Ellipse, Self::Line];
+    const ALL: [Self; 11] = [
         Self::Select,
         Self::Highlight,
         Self::Underline,
@@ -32,6 +36,9 @@ impl Tool {
         Self::Pen,
         Self::Arrow,
         Self::Rectangle,
+        Self::Ellipse,
+        Self::Line,
+        Self::Crop,
         Self::Erase,
     ];
 
@@ -51,6 +58,12 @@ impl Tool {
             (Self::Arrow, true) => "Arrow",
             (Self::Rectangle, false) => "Recuadro",
             (Self::Rectangle, true) => "Rectangle",
+            (Self::Ellipse, false) => "Óvalo",
+            (Self::Ellipse, true) => "Ellipse",
+            (Self::Line, false) => "Línea",
+            (Self::Line, true) => "Line",
+            (Self::Crop, false) => "Recorte",
+            (Self::Crop, true) => "Crop",
             (Self::Erase, false) => "Borrador",
             (Self::Erase, true) => "Eraser",
         }
@@ -61,6 +74,9 @@ impl Tool {
             Self::Pen => Some(AnnotationKind::Ink),
             Self::Arrow => Some(AnnotationKind::Arrow),
             Self::Rectangle => Some(AnnotationKind::Rectangle),
+            Self::Ellipse => Some(AnnotationKind::Ellipse),
+            Self::Line => Some(AnnotationKind::Line),
+            Self::Crop => Some(AnnotationKind::Crop),
             _ => None,
         }
     }
@@ -70,6 +86,7 @@ impl Tool {
             Self::Pen => Some(theme::Icon::Pencil),
             Self::Arrow => Some(theme::Icon::Arrow),
             Self::Rectangle => Some(theme::Icon::Rectangle),
+            Self::Crop => Some(theme::Icon::Rectangle),
             Self::Erase => Some(theme::Icon::Eraser),
             _ => None,
         }
@@ -96,6 +113,7 @@ pub(super) struct State {
     pub active: bool,
     tool: Tool,
     color: AnnotationColor,
+    pub weight: StrokeWeight,
     bounds: Option<egui::Rect>,
     preview: u8,
 }
@@ -106,6 +124,7 @@ impl Default for State {
             active: false,
             tool: Tool::Select,
             color: AnnotationColor::Yellow,
+            weight: StrokeWeight::default(),
             bounds: None,
             preview: 0,
         }
@@ -164,6 +183,7 @@ struct Stroke {
     page: u32,
     kind: AnnotationKind,
     color: AnnotationColor,
+    weight: StrokeWeight,
     points: Vec<[f64; 2]>,
 }
 
@@ -173,6 +193,7 @@ impl Stroke {
             page,
             kind,
             color,
+            weight: StrokeWeight::default(),
             points: vec![point],
         }
     }
@@ -208,6 +229,7 @@ fn page_point(paper: egui::Rect, rotation: PageRotation, point: egui::Pos2) -> [
 pub(super) struct PageInput {
     pub tool: Tool,
     pub color: AnnotationColor,
+    pub weight: StrokeWeight,
     pub page: u32,
     pub paper: egui::Rect,
     pub rotation: PageRotation,
@@ -241,6 +263,7 @@ impl Pane {
         let PageInput {
             tool,
             color,
+            weight,
             page,
             paper,
             rotation,
@@ -271,12 +294,9 @@ impl Pane {
         if response.drag_started_by(egui::PointerButton::Primary)
             && let Some(start) = ui.input(|input| input.pointer.press_origin())
         {
-            self.stroke = Some(Stroke::new(
-                page,
-                kind,
-                color,
-                page_point(paper, rotation, start),
-            ));
+            let mut stroke = Stroke::new(page, kind, color, page_point(paper, rotation, start));
+            stroke.weight = weight;
+            self.stroke = Some(stroke);
         }
         if let Some(stroke) = self.stroke.as_mut().filter(|stroke| stroke.page == page) {
             if let Some(pointer) = ui.input(|input| input.pointer.interact_pos()) {
@@ -285,9 +305,11 @@ impl Pane {
             if response.drag_stopped_by(egui::PointerButton::Primary) {
                 let stroke = self.stroke.take().unwrap();
                 if stroke.points.len() >= 2
-                    && (stroke.kind != AnnotationKind::Rectangle
-                        || (stroke.points[0][0] != stroke.points[1][0]
-                            && stroke.points[0][1] != stroke.points[1][1]))
+                    && (!matches!(
+                        stroke.kind,
+                        AnnotationKind::Rectangle | AnnotationKind::Ellipse | AnnotationKind::Crop
+                    ) || (stroke.points[0][0] != stroke.points[1][0]
+                        && stroke.points[0][1] != stroke.points[1][1]))
                 {
                     self.intent = Some(Intent::Drawing(stroke));
                 }
@@ -299,6 +321,7 @@ impl Pane {
                     stroke.kind,
                     &stroke.points,
                     stroke.color,
+                    stroke.weight,
                 );
             }
         }
@@ -558,9 +581,11 @@ impl YamantakaApp {
         let comparison = self.reference.is_some();
         let bar = egui::Frame::NONE
             .fill(p.surface)
-            .inner_margin(egui::Margin::symmetric(6, 2))
+            .corner_radius(20)
+            .stroke(egui::Stroke::new(1.0, p.line))
+            .outer_margin(egui::Margin::symmetric(6, 4))
+            .inner_margin(egui::Margin::symmetric(5, 2))
             .show(ui, |ui| {
-                ui.set_min_width(ui.available_width());
                 if visible {
                     ui.horizontal(|ui| {
                         let wide = ui.available_width() >= if comparison { 1340.0 } else { 1250.0 };
@@ -575,7 +600,10 @@ impl YamantakaApp {
                             );
                         }
                         if wide {
-                            for tool in Tool::ALL {
+                            for tool in Tool::ALL
+                                .into_iter()
+                                .filter(|tool| !Tool::SHAPES.contains(tool))
+                            {
                                 if tool == Tool::Pen {
                                     reader_controls::reader_group_rule(ui, p);
                                 }
@@ -593,6 +621,36 @@ impl YamantakaApp {
                                     next_tool = Some(tool);
                                 }
                             }
+                            let selected = Tool::SHAPES.contains(&self.study.tool);
+                            let caption = if selected {
+                                self.study.tool.label(en)
+                            } else {
+                                tr("Formas", "Shapes")
+                            };
+                            let shapes = theme::control(
+                                ui,
+                                caption,
+                                Some(theme::Icon::Down),
+                                selected,
+                                false,
+                                p,
+                            )
+                            .on_hover_text(tr("Formas", "Shapes"));
+                            egui::Popup::menu(&shapes).id(tool_menu()).show(|ui| {
+                                for tool in Tool::SHAPES {
+                                    if theme::navigation(
+                                        ui,
+                                        tool.label(en),
+                                        self.study.tool == tool,
+                                        p,
+                                    )
+                                    .clicked()
+                                    {
+                                        next_tool = Some(tool);
+                                        ui.close();
+                                    }
+                                }
+                            });
                         } else {
                             let label = format!(
                                 "{} · {}",
@@ -641,12 +699,23 @@ impl YamantakaApp {
                                             }
                                         }
                                         ui.separator();
+                                        if self.study.tool.drawing().is_some()
+                                            && self.study.tool != Tool::Crop
+                                        {
+                                            weight_control(ui, en, &mut self.study.weight);
+                                        }
                                         history = history_controls(ui, tr, can_undo, can_redo, p);
                                         hide |= marks_control(ui, tr, hidden, p);
                                     });
                             });
                         }
                         color_control(ui, en, &mut self.study.color, p);
+                        if wide
+                            && self.study.tool.drawing().is_some()
+                            && self.study.tool != Tool::Crop
+                        {
+                            weight_control(ui, en, &mut self.study.weight);
+                        }
                         if wide {
                             reader_controls::reader_group_rule(ui, p);
                             history = history_controls(ui, tr, can_undo, can_redo, p);
@@ -734,6 +803,7 @@ impl YamantakaApp {
                     page: self.reader.page,
                     kind: AnnotationKind::Arrow,
                     color: self.study.color,
+                    weight: self.study.weight,
                     points: vec![[0.68, 0.23], [0.56, 0.135]],
                 }),
             );
@@ -784,6 +854,7 @@ impl YamantakaApp {
         use selection::SelectionAction;
         match action {
             SelectionAction::Copy => self.copy_selection(ctx, reference),
+            SelectionAction::CopyCitation => self.copy_selection_citation(ctx, reference),
             SelectionAction::Color(color) => self.study.color = color,
             SelectionAction::Annotate => self.study_note(reference, None, AnnotationKind::TextNote),
             SelectionAction::Highlight | SelectionAction::Underline => {
@@ -884,7 +955,11 @@ impl YamantakaApp {
                         },
                         stroke.page,
                         stroke.color,
-                        geometry,
+                        geometry.with_weight(if stroke.kind == AnnotationKind::Crop {
+                            StrokeWeight::Medium
+                        } else {
+                            stroke.weight
+                        }),
                         &self.governor,
                     )
                 });
@@ -930,6 +1005,39 @@ impl YamantakaApp {
             reference.pane.study.accept(reply);
         }
     }
+}
+
+pub(super) fn weight_control(ui: &mut egui::Ui, english: bool, weight: &mut StrokeWeight) {
+    let options = [
+        (StrokeWeight::Fine, "Fino", "Fine"),
+        (StrokeWeight::Medium, "Medio", "Medium"),
+        (StrokeWeight::Thick, "Grueso", "Thick"),
+    ];
+    let caption = options
+        .iter()
+        .find(|(value, _, _)| value == weight)
+        .map_or("", |(_, es, en)| if english { *en } else { *es });
+    let label = if english {
+        "Stroke width"
+    } else {
+        "Grosor del trazo"
+    };
+    let (sample, _) = ui.allocate_exact_size(egui::vec2(18.0, 20.0), egui::Sense::hover());
+    ui.painter().hline(
+        sample.x_range(),
+        sample.center().y,
+        egui::Stroke::new(2.0 * weight.factor(), ui.visuals().text_color()),
+    );
+    egui::ComboBox::from_id_salt("study-stroke-width")
+        .width(76.0)
+        .selected_text(caption)
+        .show_ui(ui, |ui| {
+            for (value, es, en) in options {
+                ui.selectable_value(weight, value, if english { en } else { es });
+            }
+        })
+        .response
+        .on_hover_text(label);
 }
 
 fn history_controls(
@@ -1039,6 +1147,7 @@ mod tests {
                             PageInput {
                                 tool: Tool::Arrow,
                                 color: AnnotationColor::Violet,
+                                weight: StrokeWeight::default(),
                                 page,
                                 paper: egui::Rect::from_min_size(
                                     egui::pos2(20.0, 20.0 + page as f32 * 120.0),

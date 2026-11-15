@@ -23,6 +23,7 @@ const NOTES_TABS: [(ReaderPanelTab, &str, &str); 2] = [
 impl YamantakaApp {
     pub(super) fn close_study_tray(&mut self) {
         self.reader.panel = false;
+        self.reader.annotations.crop.clear();
     }
 
     pub(super) fn select_study_tab(&mut self, tab: ReaderPanelTab) {
@@ -51,6 +52,31 @@ impl YamantakaApp {
                     self.reader_panel_content(ui, document, info, p, true)
                 });
             });
+            return;
+        }
+        let viewport = ui.ctx().content_rect().size();
+        if self.study.active
+            && self.reference.is_none()
+            && self.reader.reader_panel_tab == ReaderPanelTab::Annotations
+            && viewport.x >= 1100.0
+            && viewport.y >= 560.0
+        {
+            egui::Panel::right("reader-study-sidebar")
+                .exact_size((viewport.x * 0.28).clamp(320.0, 420.0))
+                .show_separator_line(false)
+                .frame(egui::Frame::new().outer_margin(egui::Margin::symmetric(12, 6)))
+                .show(ui, |ui| {
+                    egui::Frame::new()
+                        .fill(p.surface)
+                        .stroke(egui::Stroke::new(1.0, p.line))
+                        .corner_radius(20)
+                        .inner_margin(egui::Margin::same(12))
+                        .show(ui, |ui| {
+                            study_body(ui, |ui| {
+                                self.reader_panel_content(ui, document, info, p, false)
+                            });
+                        });
+                });
             return;
         }
 

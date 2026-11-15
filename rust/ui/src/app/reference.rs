@@ -26,6 +26,7 @@ struct ReferenceTools<'a> {
     reduced_motion: bool,
     study_tool: study::Tool,
     study_color: yamantaka_domain::annotations::AnnotationColor,
+    study_weight: yamantaka_domain::annotations::study::StrokeWeight,
 }
 pub(super) struct ReferenceView {
     pub(in crate::app) deferred: bool,
@@ -474,6 +475,13 @@ impl ReferenceView {
                 _ => {}
             }
         }
+        if !self.pane.viewport.source_changed
+            && self.pane.viewport.layout.is_some()
+            && let Some(zoom) = super::reader_viewport::gesture_zoom(ui, self.pane.viewport.scale)
+        {
+            self.set_zoom(ZoomMode::Custom, zoom);
+            self.pane.viewport.scroll_anchor = true;
+        }
         let (Some((document, _)), Some(layout), Some(preferences), Some(navigation)) = (
             &self.pane.active,
             self.pane.viewport.layout.clone(),
@@ -487,6 +495,9 @@ impl ReferenceView {
         let anchor = navigation.position();
         let size = ui.available_size();
         let viewport = [f64::from(size.x.max(1.0)), f64::from(size.y.max(1.0))];
+        if self.pane.viewport.viewport_size.replace(viewport) != Some(viewport) {
+            self.pane.viewport.scroll_anchor = true;
+        }
         ui.painter().rect_filled(
             ui.available_rect_before_wrap(),
             0,
@@ -642,6 +653,9 @@ impl ReferenceView {
                 ) {
                     self.error = Some(error.to_string());
                 }
+                if page.page == self.pane.page {
+                    self.pane.guide.paint(ui, page.page, paper, english, p);
+                }
                 if !self.pane.study.hidden && !self.pane.viewport.source_changed {
                     self.pane
                         .annotation_paint
@@ -698,6 +712,7 @@ impl ReferenceView {
                         study::PageInput {
                             tool: tools.study_tool,
                             color: tools.study_color,
+                            weight: tools.study_weight,
                             page: page.page,
                             paper,
                             rotation: layout.rotation(),
@@ -901,6 +916,7 @@ impl YamantakaApp {
         let mut difference = None;
         let study_tool = self.study_tool(true);
         let study_color = self.study_color();
+        let study_weight = self.study.weight;
         if let Some(reference) = &mut self.reference {
             reference.follow_primary_zoom(self.reader.viewport.scale);
             reference
@@ -920,6 +936,7 @@ impl YamantakaApp {
                             reduced_motion: self.reduced_motion,
                             study_tool,
                             study_color,
+                            study_weight,
                         },
                         self.english,
                         p,

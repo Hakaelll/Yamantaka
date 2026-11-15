@@ -74,6 +74,7 @@ impl reader_pane::ReaderPane {
             note: draft.note.clone(),
             tags: draft.tags.clone(),
             review: AnnotationReviewState::Pending,
+            drawing: None,
             confirmed: false,
         });
         self.panel = true;

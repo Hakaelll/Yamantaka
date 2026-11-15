@@ -14,6 +14,11 @@ pub(crate) fn remove(database: &mut Database, id: &str, cancel: &Cancellation) -
     // FTS5 has no document foreign key. Retire cached text even when search is off.
     tx.execute("DELETE FROM library_search WHERE document_id=?", [id])
         .map_err(storage)?;
+    tx.execute(
+        "DELETE FROM app_metadata WHERE key=?",
+        [format!("{}{id}", crate::study_book::KEY)],
+    )
+    .map_err(storage)?;
     if tx
         .execute("DELETE FROM documents WHERE id=?", [id])
         .map_err(storage)?

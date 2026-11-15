@@ -297,12 +297,12 @@ The existing preference hides the controls within the toolbar area, preserving
 the PDF viewport and leaving a keyboard-accessible reveal. Concentration uses
 the existing explicit exit path.
 
-Navigate and Notes share one bottom study tray. Navigate groups contents, pages,
-bookmarks and positions. Notes groups annotations and extracted page text. Find
-uses the same study area, with an editable query, match count and previous/next
-actions. Selection actions stay near the passage. In compact windows the study
-area becomes a temporary full-width view with Back to PDF. Geometry and opening
-preparation use the same toolbar and tray allocation as the visible reader.
+Navigate groups contents, pages, bookmarks and positions. Notes groups
+annotations and extracted page text. In Study on a wide single-reader window, the
+tray sits beside the PDF. It moves below the PDF at intermediate sizes and
+becomes a temporary full-width view with Back to PDF in compact windows. Find
+uses the same area, with an editable query, match count and previous/next
+actions. Geometry and opening preparation use the same allocation as the reader.
 Comparison labels the active document and keeps the existing automatic,
 side-by-side and stacked arrangements and synchronization controls.
 
@@ -311,10 +311,14 @@ a second native working row for repeated marking and drawing. Compact widths
 group the tools under the active tool selector. The paper and saved drawings
 stay in the PDF viewport. Note indicators use the available page margin and
 open the exact entry in Notes. Colors on the paper describe the saved marks.
-The interface uses violet for the active tool and keyboard focus.
+The interface uses violet for the active tool and keyboard focus. The reading
+guide has three heights and works on scanned pages. Ctrl + wheel and trackpad
+zoom apply to the document under the pointer.
 The eraser previews its target on the paper. It removes one mark per click
 through annotation history, with written notes protected.
-Notes can pin the page being read as a filter and combine it with Pending.
+Notes can pin the reading page and combine it with color, mark type, tags and
+review state. A crop previews its source region and can be copied or saved as
+PNG. Each book has a summary with Markdown export and a deck of review cards.
 List entries pair the saved mark color with its type and review state.
 Shared controls use softly rounded corners and a short violet selection
 indicator. Menus use the reader palette and a restrained shadow.

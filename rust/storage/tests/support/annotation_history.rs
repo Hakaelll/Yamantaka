@@ -108,6 +108,7 @@ pub fn verify(document: &str) {
     let edit = || AnnotationChange::Edit {
         id: &id,
         expected: &expected,
+        drawing: None,
         kind: AnnotationKind::PageComment,
         color: AnnotationColor::Green,
         note: Some("editedword"),
@@ -171,6 +172,7 @@ pub fn verify(document: &str) {
             AnnotationChange::Edit {
                 id: &id,
                 expected: &before_blob,
+                drawing: None,
                 kind: AnnotationKind::PageComment,
                 color: AnnotationColor::Green,
                 note: Some("lostoverwrite"),
@@ -254,6 +256,7 @@ pub fn verify(document: &str) {
             AnnotationChange::Edit {
                 id: &id,
                 expected: &before_external,
+                drawing: None,
                 kind: AnnotationKind::PageComment,
                 color: AnnotationColor::Violet,
                 note: Some("staleoverwrite"),
@@ -291,6 +294,7 @@ pub fn verify(document: &str) {
                 AnnotationChange::Edit {
                     id: &id,
                     expected: &expected,
+                    drawing: None,
                     kind: AnnotationKind::PageComment,
                     color: AnnotationColor::Violet,
                     note: Some(&format!("step{index}")),

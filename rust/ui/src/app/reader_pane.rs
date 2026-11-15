@@ -28,6 +28,7 @@ pub(super) struct ReaderPane {
     pub text: text::TextState,
     pub selection: selection::SelectionState,
     pub study: study::Pane,
+    pub guide: reading_guide::Guide,
     pub loading: bool,
 }
 
@@ -58,6 +59,7 @@ impl Default for ReaderPane {
             text: Default::default(),
             selection: Default::default(),
             study: Default::default(),
+            guide: Default::default(),
             loading: false,
         }
     }

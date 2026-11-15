@@ -1961,6 +1961,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 if args.iter().any(|arg| arg == "--study-tools") {
                     app.preview_study();
                 }
+                if args.iter().any(|arg| arg == "--study-guide") {
+                    app.preview_reading_guide();
+                }
+                if args.iter().any(|arg| arg == "--study-cards") {
+                    app.preview_book_study();
+                }
                 if args.iter().any(|arg| arg == "--study-selection") {
                     app.preview_study_selection();
                 }

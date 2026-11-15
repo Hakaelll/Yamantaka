@@ -211,6 +211,7 @@ pub enum AnnotationChange<'a> {
     Edit {
         id: &'a str,
         expected: &'a super::revision::AnnotationRevision,
+        drawing: Option<&'a StudyGeometry>,
         kind: AnnotationKind,
         color: AnnotationColor,
         note: Option<&'a str>,

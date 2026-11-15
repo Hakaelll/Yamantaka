@@ -31,10 +31,16 @@ pub enum AnnotationKind {
     Ink,
     Arrow,
     Rectangle,
+    Ellipse,
+    Line,
+    Crop,
 }
 impl AnnotationKind {
     pub fn is_drawing(self) -> bool {
-        matches!(self, Self::Ink | Self::Arrow | Self::Rectangle)
+        matches!(
+            self,
+            Self::Ink | Self::Arrow | Self::Rectangle | Self::Ellipse | Self::Line | Self::Crop
+        )
     }
 }
 

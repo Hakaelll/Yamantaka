@@ -236,6 +236,9 @@ impl<'a, W: Write> AnnotationExporter<'a, W> {
                     AnnotationKind::Ink => "Dibujo",
                     AnnotationKind::Arrow => "Flecha",
                     AnnotationKind::Rectangle => "Recuadro",
+                    AnnotationKind::Ellipse => "Óvalo",
+                    AnnotationKind::Line => "Línea",
+                    AnnotationKind::Crop => "Recorte",
                 };
                 let color = match values.color {
                     AnnotationColor::Yellow => "Amarillo suave",
