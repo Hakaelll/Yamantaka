@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.0 (2026-11-15)
+
+- Add trackpad pinch and Ctrl + wheel zoom to the reader and comparison.
+- Add a reading guide, a wide Study sidebar and more compact selection and review controls.
+- Add ellipses, lines and PNG crops, with editable drawing position, size and stroke width.
+- Add per-book summaries with Markdown export and review cards with spaced scheduling.
+- Combine note filters and keep Edit within reach in comparison.
+
 ## 0.17.0 — 2026-11-07
 
 - Add contextual highlight, underline, copy and note actions when selecting PDF text.
