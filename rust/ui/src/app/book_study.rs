@@ -205,9 +205,13 @@ impl YamantakaApp {
             .default_pos(egui::pos2(12.0, 12.0))
             .default_width((viewport.x - 40.0).clamp(180.0, 520.0))
             .max_width((viewport.x - 24.0).max(180.0))
-            .max_height((viewport.y - 40.0).max(120.0))
+            .max_height((viewport.y - if compact { 24.0 } else { 40.0 }).max(120.0))
             .show(ctx, |ui| {
                 if compact {
+                    let spacing = ui.spacing_mut();
+                    spacing.interact_size.y = 28.0;
+                    spacing.item_spacing = egui::vec2(6.0, 4.0);
+                    spacing.button_padding = egui::vec2(7.0, 3.0);
                     ui.horizontal(|ui| {
                         let close = ui.add(egui::Button::new("×").min_size(egui::vec2(30.0, 28.0)).corner_radius(8));
                         let label = tr("Cerrar", "Close");
