@@ -4398,6 +4398,7 @@ dependencies = [
  "tempfile",
  "unicode-segmentation",
  "uuid",
+ "winit",
  "yamantaka-application",
  "yamantaka-domain",
  "yamantaka-pdf",

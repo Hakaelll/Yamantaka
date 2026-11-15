@@ -15,6 +15,7 @@ yamantaka-storage.workspace = true
 yamantaka-pdf.workspace = true
 yamantaka-windows.workspace = true
 eframe.workspace = true
+winit = { version = "=0.30.13", default-features = false }
 raw-window-handle.workspace = true
 serde_json.workspace = true
 chrono.workspace = true

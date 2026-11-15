@@ -1313,6 +1313,7 @@ impl YamantakaApp {
 }
 impl App for YamantakaApp {
     fn raw_input_hook(&mut self, _: &egui::Context, input: &mut egui::RawInput) {
+        crate::native_wheel::preserve_modifiers(input);
         if self.demo && self.capture.is_some() {
             self.selection_preview
                 .input(input, self.selection_keyboard_preview);

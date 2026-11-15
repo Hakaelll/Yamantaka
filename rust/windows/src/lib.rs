@@ -165,6 +165,23 @@ pub fn save_crop_image() -> Option<PathBuf> {
         .set_file_name("yamantaka-crop.png")
         .save_file()
 }
+
+/// Reads a queued vertical wheel message, including Ctrl synthesized by Windows
+/// for zoom gestures. Windows can set that bit without a Ctrl key event.
+///
+/// # Safety
+/// `message` must point to a live Win32 `MSG`.
+pub unsafe fn vertical_wheel_message(message: *const std::ffi::c_void) -> Option<(f32, bool)> {
+    use windows::Win32::UI::WindowsAndMessaging::{MSG, WM_MOUSEWHEEL};
+    let message = unsafe { &*message.cast::<MSG>() };
+    if message.message != WM_MOUSEWHEEL {
+        return None;
+    }
+    let data = message.wParam.0;
+    let steps = (data >> 16) as i16;
+    const MK_CONTROL: usize = 0x0008;
+    Some((f32::from(steps) / 120.0, data & MK_CONTROL != 0))
+}
 pub fn save_diagnostics_report() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .add_filter("JSON", &["json"])

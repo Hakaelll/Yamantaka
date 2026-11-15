@@ -7,6 +7,7 @@ mod graphics_recovery;
 mod idle_probe;
 mod legacy_import_worker;
 mod managed_pages;
+mod native_wheel;
 mod page_presenter;
 mod profile_input_probe;
 mod restore_worker;
@@ -1142,6 +1143,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     ))?
     .to_rgba8();
     let mut options = eframe::NativeOptions {
+        event_loop_builder: Some(Box::new(native_wheel::install)),
         viewport: egui::ViewportBuilder::default()
             .with_title(if startup_mode.is_safe() {
                 if english {
