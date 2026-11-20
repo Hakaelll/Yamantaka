@@ -31,7 +31,7 @@ impl Palette {
                 ink: Color32::from_rgb(243, 237, 225),
                 secondary: Color32::from_rgb(179, 171, 159),
                 line: Color32::from_rgb(62, 58, 53),
-                accent: Color32::from_rgb(189, 163, 245),
+                accent: Color32::from_rgb(247, 244, 236),
             }
         } else {
             Self {
@@ -41,8 +41,15 @@ impl Palette {
                 ink: Color32::from_rgb(41, 34, 28),
                 secondary: Color32::from_rgb(96, 84, 74),
                 line: Color32::from_rgb(206, 194, 176),
-                accent: Color32::from_rgb(103, 72, 167),
+                accent: Color32::from_rgb(82, 74, 64),
             }
+        }
+    }
+
+    pub fn on_paper(self, paper: Color32) -> Self {
+        Self {
+            accent: Self::new(paper.r() < 100).accent,
+            ..self
         }
     }
 }
@@ -513,6 +520,25 @@ enum ControlLabel {
     Text,
     IconOnly,
     Bounded(f32),
+    Sidebar(f32, Option<u64>),
+}
+
+pub fn library_link(
+    ui: &mut egui::Ui,
+    label: &str,
+    count: Option<u64>,
+    selected: bool,
+    p: Palette,
+) -> egui::Response {
+    control_impl(
+        ui,
+        label,
+        None,
+        selected,
+        false,
+        ControlLabel::Sidebar(ui.available_width(), count),
+        p,
+    )
 }
 
 pub fn bounded_choice(
@@ -569,17 +595,26 @@ fn control_impl(
     p: Palette,
 ) -> egui::Response {
     let icon_only = matches!(label_style, ControlLabel::IconOnly);
-    let limit = if let ControlLabel::Bounded(width) = label_style {
-        Some(width)
-    } else {
-        None
+    let limit = match label_style {
+        ControlLabel::Bounded(width) | ControlLabel::Sidebar(width, _) => Some(width),
+        _ => None,
+    };
+    let count = match label_style {
+        ControlLabel::Sidebar(_, count) => count.map(|count| {
+            ui.painter()
+                .layout_no_wrap(count.to_string(), FontId::proportional(12.0), p.secondary)
+        }),
+        _ => None,
     };
     let galley = if let Some(width) = limit {
         let mut job = egui::text::LayoutJob::simple(
             label.to_owned(),
             FontId::proportional(14.0),
             Color32::PLACEHOLDER,
-            (width - if symbol.is_some() { 52.0 } else { 28.0 }).max(1.0),
+            (width
+                - if symbol.is_some() { 52.0 } else { 28.0 }
+                - count.as_ref().map_or(0.0, |count| count.size().x + 8.0))
+            .max(1.0),
         );
         job.wrap.max_rows = 1;
         job.wrap.break_anywhere = true;
@@ -600,8 +635,11 @@ fn control_impl(
     } else {
         (galley.size().x + if symbol.is_some() { 52.0 } else { 28.0 }).max(40.0)
     };
-    let width = limit.map_or(width, |limit| width.min(limit));
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 40.0), egui::Sense::click());
+    let (width, height) = match label_style {
+        ControlLabel::Sidebar(width, _) => (width, 34.0),
+        _ => (limit.map_or(width, |limit| width.min(limit)), 40.0),
+    };
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), selected, label)
     });
@@ -676,6 +714,13 @@ fn control_impl(
         galley,
         foreground,
     );
+    if let Some(count) = count {
+        let origin = egui::pos2(
+            rect.right() - 12.0 - count.size().x,
+            rect.center().y - count.size().y * 0.5,
+        );
+        ui.painter().galley(origin, count, p.secondary);
+    }
     if response.has_focus() {
         ui.painter().rect_stroke(
             rect.shrink(1.0),
@@ -684,7 +729,13 @@ fn control_impl(
             egui::StrokeKind::Inside,
         );
     }
-    if selected {
+    if selected && matches!(label_style, ControlLabel::Sidebar(..)) {
+        ui.painter().vline(
+            rect.left() + 3.0,
+            rect.y_range().shrink(8.0),
+            egui::Stroke::new(2.0, p.accent),
+        );
+    } else if selected {
         let indicator = (rect.width() * 0.45).clamp(14.0, 32.0);
         ui.painter().line_segment(
             [

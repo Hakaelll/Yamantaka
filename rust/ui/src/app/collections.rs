@@ -284,6 +284,60 @@ impl YamantakaApp {
         }
         self.collections.filter = None;
     }
+
+    pub(super) fn library_collection_links(&mut self, ui: &mut egui::Ui, p: Palette) {
+        if self.collections.failed {
+            if theme::bounded_navigation(
+                ui,
+                self.tr("Reintentar colecciones", "Retry collections"),
+                p,
+            )
+            .clicked()
+            {
+                self.collections.failed = false;
+                self.collections.query = CollectionQuery::default();
+                self.load_collections();
+            }
+            return;
+        }
+        if !self.collections.loaded {
+            if self.collections.pending.is_none() {
+                self.collections.query = CollectionQuery::default();
+                self.load_collections();
+            }
+            ui.label(RichText::new(self.tr("Cargando…", "Loading…")).color(p.secondary));
+            return;
+        }
+        if self.collections.entries.is_empty() {
+            ui.label(
+                RichText::new(self.tr("Sin colecciones", "No collections")).color(p.secondary),
+            );
+            return;
+        }
+        let selected = self.collections.filter.as_ref().map(|(id, _)| id);
+        let mut target = None;
+        for collection in &self.collections.entries {
+            ui.push_id(&collection.id, |ui| {
+                if theme::library_link(
+                    ui,
+                    &collection.name,
+                    Some(collection.document_count),
+                    selected == Some(&collection.id),
+                    p,
+                )
+                .on_hover_text(&collection.name)
+                .clicked()
+                {
+                    target = Some(collection.clone());
+                }
+            });
+        }
+        if let Some(collection) = target {
+            self.clear_library_filters();
+            self.apply_collection_filter(&collection);
+        }
+    }
+
     pub(super) fn collection_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
         let selected = self.collections.filter.clone();
         let mut button = theme::navigation(

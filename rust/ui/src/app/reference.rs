@@ -661,17 +661,18 @@ impl ReferenceView {
                         .annotation_paint
                         .paint(ui, page.page, paper, layout.rotation());
                 }
+                let on_paper = p.on_paper(YamantakaApp::reading_paper(preferences.reading_theme));
                 if self.differences.contains(&page.page) {
                     ui.painter().rect_stroke(
                         paper,
                         1,
-                        egui::Stroke::new(2.0, p.accent),
+                        egui::Stroke::new(2.0, on_paper.accent),
                         egui::StrokeKind::Inside,
                     );
                 }
                 self.pane
                     .find
-                    .paint(ui, page.page, paper, layout.rotation(), p);
+                    .paint(ui, page.page, paper, layout.rotation(), on_paper);
                 if !self.busy() && !self.close_requested && tools.study_tool.selects_text() {
                     self.pane.selection.show_page(
                         ui,
@@ -682,7 +683,7 @@ impl ReferenceView {
                             rotation: layout.rotation(),
                             english,
                         },
-                        p,
+                        on_paper,
                         Some(&mut self.selection_preview),
                     );
                 }
@@ -696,7 +697,7 @@ impl ReferenceView {
                         page.page,
                         paper,
                         layout.rotation(),
-                        p,
+                        on_paper,
                         english,
                     ) {
                         Ok(Some(destination)) => {
@@ -717,7 +718,7 @@ impl ReferenceView {
                             paper,
                             rotation: layout.rotation(),
                         },
-                        p,
+                        on_paper,
                     );
                     if tools.study_tool == study::Tool::Select
                         && !self.pane.study.hidden

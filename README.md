@@ -2,8 +2,8 @@
 
 **A private PDF library for reading and study on Windows.**
 
-Yamantaka combines an immersive library of three-dimensional book covers with a
-focused native reader. Organize books, compare passages, annotate documents and
+Yamantaka combines a library of 3D and 2D book covers with a focused native
+reader. Organize books, compare passages, annotate documents and
 return to your saved reading context. Everything runs locally, without accounts,
 telemetry or a cloud backend.
 
@@ -17,13 +17,13 @@ telemetry or a cloud backend.
 
 ## Download
 
-[Download Yamantaka 0.18.0 for Windows x64](https://github.com/Hakaelll/Yamantaka/releases/download/v0.18.0/yamantaka-0.18.0-windows-x64-portable.zip)
+[Download Yamantaka 0.19.0 for Windows x64](https://github.com/Hakaelll/Yamantaka/releases/download/v0.19.0/yamantaka-0.19.0-windows-x64-portable.zip)
 
 Windows 10 or Windows 11, x64. Extract the complete ZIP into a writable folder
 and start `yamantaka/yamantaka.exe`. Keep PDFium, licenses and companion files
 together. Flutter, Dart and Rust are not required to run the application.
 
-The [release page](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.18.0)
+The [release page](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.19.0)
 includes SHA-256 checksums, a file manifest and a CycloneDX SBOM. The distribution
 is unsigned; published hashes identify the prepared files.
 
@@ -31,7 +31,7 @@ is unsigned; published hashes identify the prepared files.
 
 | Area | Capabilities |
 | --- | --- |
-| Library | PDF-derived and manual covers, dimensional books with pointer physics, grid/list views, combined filters, sorting, grouping and bulk actions |
+| Library | PDF-derived and manual covers, 3D and 2D shelves, list view, adjustable cover size, collections, combined filters and bulk actions |
 | Reading | Document and Book modes, single/spread/continuous layouts, LTR/RTL reading, trackpad and Ctrl + wheel zoom, pan, rotation, margins, reading environments and a reading guide |
 | Navigation | Contents, thumbnails, cancellable search, visible-page match highlights, history, bookmarks and A/B positions |
 | Study | Contextual text marks, editable drawings, PNG crops, anchored notes, combined filters, per-book summaries and spaced review cards |
@@ -88,7 +88,7 @@ Cargo dependencies first:
 
 ```powershell
 python ./tool/fetch_rust_licenses.py
-./tool/package_windows.ps1 -Portable -OutputDirectory build/release/yamantaka-0.18.0
+./tool/package_windows.ps1 -Portable -OutputDirectory build/release/yamantaka-0.19.0
 ```
 
 Packaging uses locked, offline Cargo resolution, the static Microsoft C runtime
@@ -104,7 +104,7 @@ PDFium handles PDF rasterization on an owning serial worker. SQLite uses
 rusqlite with FTS5. Local changes to upstream components are documented in
 `third_party/`.
 
-See the [0.18.0 release notes](docs/release/v0.18.0.md), the
+See the [0.19.0 release notes](docs/release/v0.19.0.md), the
 [acceptance and evidence matrix](docs/architecture/rust-rewrite-parity.md),
 [testing guide](TESTING.md), [architecture](ARCHITECTURE.md),
 [privacy policy](PRIVACY.md) and [contribution guide](CONTRIBUTING.md).

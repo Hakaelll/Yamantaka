@@ -218,6 +218,8 @@ pub struct YamantakaApp {
     missing_only: bool,
     modified_only: bool,
     list: bool,
+    flat_covers: bool,
+    library_cover_scale: f32,
     library_density: yamantaka_domain::workspaces::WorkspaceDensity,
     library_columns: Vec<String>,
     reader_panel_width: f32,
@@ -384,6 +386,15 @@ impl YamantakaApp {
             .get("libraryView")
             .and_then(serde_json::Value::as_str)
             == Some("list");
+        let flat_covers = preferences
+            .get("libraryCoverStyle")
+            .and_then(serde_json::Value::as_str)
+            == Some("flat");
+        let library_cover_scale = preferences
+            .get("libraryCoverScale")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(1.0)
+            .clamp(0.78, 1.24) as f32;
         let inspector = preferences
             .get("libraryInspector")
             .and_then(serde_json::Value::as_bool)
@@ -487,6 +498,8 @@ impl YamantakaApp {
             missing_only,
             modified_only,
             list,
+            flat_covers,
+            library_cover_scale,
             library_density,
             library_columns: preferences
                 .get("libraryColumns")
@@ -708,6 +721,14 @@ impl YamantakaApp {
                 "libraryView",
                 serde_json::Value::from(if self.list { "list" } else { "covers" }),
             ),
+            (
+                "libraryCoverStyle",
+                if self.flat_covers { "flat" } else { "volume" }.into(),
+            ),
+            (
+                "libraryCoverScale",
+                serde_json::json!(self.library_cover_scale),
+            ),
             ("libraryInspector", self.inspector.into()),
             ("libraryMissingOnly", self.missing_only.into()),
             ("libraryModifiedOnly", self.modified_only.into()),
@@ -788,6 +809,12 @@ impl YamantakaApp {
             }
         });
     }
+    pub fn preview_flat_covers(&mut self) {
+        if self.demo && self.capture.is_some() {
+            self.flat_covers = true;
+        }
+    }
+
     pub fn preview_layout(&mut self, list: bool, details: bool, panel: bool) {
         if self.demo && self.capture.is_some() {
             self.list = list;
@@ -1036,6 +1063,25 @@ impl YamantakaApp {
     }
     fn library(&mut self, ui: &mut egui::Ui) {
         ui.spacing_mut().scroll.fade.strength = 0.0;
+        library_intro::paint_library_cloth(ui, Palette::new(self.dark), self.dark);
+        if ui.available_width() >= 970.0 && ui.available_height() >= 440.0 {
+            let p = Palette::new(self.dark);
+            egui::Panel::left("library-navigation")
+                .exact_size(218.0)
+                .frame(
+                    egui::Frame::new()
+                        .fill(if self.dark {
+                            Color32::from_black_alpha(24)
+                        } else {
+                            Color32::from_white_alpha(60)
+                        })
+                        .inner_margin(egui::Margin::symmetric(14, 17)),
+                )
+                .show(ui, |ui| self.library_sidebar(ui, p));
+        }
+        if !matches!(self.surface, Surface::Library) {
+            return;
+        }
         if ui.ctx().content_rect().height() < 420.0 {
             egui::ScrollArea::vertical()
                 .id_salt("library-small-page")
@@ -1048,7 +1094,7 @@ impl YamantakaApp {
     fn library_body(&mut self, ui: &mut egui::Ui) {
         let p = Palette::new(self.dark);
         let compact = ui.ctx().content_rect().height() < 650.0;
-        let margin = if ui.available_width() < 640.0 { 12 } else { 32 };
+        let margin = if ui.available_width() < 640.0 { 12 } else { 24 };
         egui::Frame::new()
             .inner_margin(egui::Margin::symmetric(
                 margin,

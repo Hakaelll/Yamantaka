@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.19.0 (2026-11-20)
+
+- Redesign the library around shelves, with a collection sidebar and counts.
+- Switch between 3D covers, flat 2D covers and a list. Adjust cover size from the library header.
+- Group shelves by author, collection, tag or reading status.
+- Use warm-white accents in dark mode and charcoal accents in light mode across the library, reader and Study tools.
+
 ## 0.18.0 (2026-11-15)
 
 - Add trackpad pinch and Ctrl + wheel zoom to the reader and comparison.

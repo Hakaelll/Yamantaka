@@ -8,7 +8,8 @@ pub(super) fn color(value: &str, p: Palette) -> Color32 {
         return Color32::from_rgb((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8);
     }
     match value {
-        "violet" | "purple" => p.accent,
+        "violet" | "purple" if p.canvas.r() < 100 => Color32::from_rgb(189, 163, 245),
+        "violet" | "purple" => Color32::from_rgb(103, 72, 167),
         "blue" => Color32::from_rgb(78, 142, 214),
         "green" => Color32::from_rgb(82, 156, 110),
         "red" => Color32::from_rgb(217, 89, 99),

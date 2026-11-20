@@ -1,6 +1,126 @@
 use super::*;
 
+pub(super) fn paint_library_cloth(ui: &egui::Ui, p: Palette, dark: bool) {
+    const TILE: usize = 128;
+    let id = egui::Id::new(("library-cloth", dark));
+    let texture = ui
+        .ctx()
+        .data(|data| data.get_temp::<egui::TextureHandle>(id));
+    let texture = texture.unwrap_or_else(|| {
+        let base = if dark {
+            p.surface.lerp_to_gamma(p.raised, 0.30)
+        } else {
+            p.canvas
+        };
+        let pixels = (0..TILE * TILE)
+            .map(|index| {
+                let (x, y) = (index % TILE, index / TILE);
+                let warp = [2, -1, -2, 0][x % 4];
+                let weft = [1, 2, -1, -2][y % 4];
+                let thread = (((x / 4 * 37) ^ (y / 4 * 21)) % 5) as i32 - 2;
+                let shade = (warp + weft + thread) / if dark { 1 } else { 2 };
+                let tint = |channel| (i32::from(channel) + shade).clamp(0, 255) as u8;
+                Color32::from_rgb(tint(base.r()), tint(base.g()), tint(base.b()))
+            })
+            .collect();
+        let texture = ui.ctx().load_texture(
+            "Library cloth",
+            egui::ColorImage::new([TILE, TILE], pixels),
+            egui::TextureOptions::LINEAR_REPEAT,
+        );
+        ui.ctx()
+            .data_mut(|data| data.insert_temp(id, texture.clone()));
+        texture
+    });
+    let area = ui.available_rect_before_wrap();
+    let tile_count = area.size() / TILE as f32;
+    ui.painter().image(
+        texture.id(),
+        area,
+        egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(tile_count.x, tile_count.y)),
+        Color32::WHITE,
+    );
+}
+
 impl YamantakaApp {
+    pub(super) fn library_sidebar(&mut self, ui: &mut egui::Ui, p: Palette) {
+        ui.label(theme::editorial("Yamantaka", 28.0).color(p.ink));
+        ui.add_space(14.0);
+        ui.spacing_mut().item_spacing.y = 4.0;
+        egui::ScrollArea::vertical()
+            .id_salt("library-sidebar-scroll")
+            .show(ui, |ui| {
+                let scopes = [
+                    (
+                        false,
+                        LibraryReadingState::All,
+                        self.tr("Todos los libros", "All books"),
+                        !self.library_has_filters(),
+                    ),
+                    (
+                        true,
+                        LibraryReadingState::All,
+                        self.tr("Favoritos", "Favorites"),
+                        self.favorites && self.collections.filter.is_none(),
+                    ),
+                    (
+                        false,
+                        LibraryReadingState::InProgress,
+                        self.tr("En lectura", "In progress"),
+                        self.reading_state == LibraryReadingState::InProgress
+                            && self.collections.filter.is_none(),
+                    ),
+                ];
+                for (favorites, state, label, selected) in scopes {
+                    let count = (selected
+                        && !favorites
+                        && state == LibraryReadingState::All
+                        && self.library_loaded)
+                        .then_some(self.count);
+                    if theme::library_link(ui, label, count, selected, p).clicked() {
+                        self.clear_library_filters();
+                        self.favorites = favorites;
+                        self.reading_state = state;
+                        self.refresh();
+                    }
+                }
+                if theme::library_link(
+                    ui,
+                    self.tr("Notas de la biblioteca", "Library notes"),
+                    None,
+                    false,
+                    p,
+                )
+                .clicked()
+                {
+                    self.show_global_notes();
+                    return;
+                }
+                ui.add_space(14.0);
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(self.tr("Colecciones", "Collections")).color(p.secondary),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if theme::icon_button(
+                            ui,
+                            self.tr("Gestionar colecciones", "Manage collections"),
+                            theme::Icon::Folder,
+                            p,
+                        )
+                        .clicked()
+                        {
+                            self.show_collections(None);
+                        }
+                    });
+                });
+                if matches!(self.surface, Surface::Library) {
+                    self.library_collection_links(ui, p);
+                }
+            });
+    }
+
     pub(super) fn refresh_resume_document(&mut self) {
         let cancel = Cancellation::default();
         if self
@@ -62,69 +182,114 @@ impl YamantakaApp {
 
     pub(super) fn library_header(&mut self, ui: &mut egui::Ui, p: Palette) {
         let width = ui.available_width();
-        let icons = width < 810.0;
+        let wide = width >= 840.0;
         let compact_search = width < 540.0;
         let filtered = self.library_has_filters();
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = if icons { 4.0 } else { 8.0 };
-            if compact_search {
-                self.library_search_menu(ui, p);
-            } else {
-                let reserve = if icons { 250.0 } else { 490.0 };
-                self.library_search(ui, (width - reserve).clamp(140.0, 410.0), p);
-            }
-            let add_label = self.tr("Añadir PDF", "Add PDFs");
-            let add = if icons {
-                theme::primary_icon(ui, add_label, theme::Icon::Add, p)
-            } else {
-                theme::control(ui, add_label, Some(theme::Icon::Add), false, true, p)
-            };
-            if add.clicked()
-                && let Some(paths) = yamantaka_windows::pick_pdfs()
-            {
-                self.import(paths);
-            }
-            let filters = self.tr("Filtros", "Filters");
-            let response = if icons {
-                theme::icon_toggle(ui, filters, theme::Icon::Sort, filtered, p)
-            } else {
-                theme::control(ui, filters, Some(theme::Icon::Sort), filtered, false, p)
-            };
-            let mut popup = egui::Popup::menu(&response);
-            if self.smart_menu_preview {
-                popup = popup.open(true);
-            }
-            popup.show(|ui| {
-                egui::ScrollArea::vertical()
-                    .max_height((ui.ctx().content_rect().height() - 82.0).max(58.0))
-                    .show(ui, |ui| {
-                        self.collection_menu(ui, p);
-                        self.library_filters(ui, p);
+        if width >= 460.0 {
+            ui.horizontal(|ui| {
+                let reserve = if wide {
+                    395.0
+                } else if width >= 660.0 {
+                    220.0
+                } else {
+                    0.0
+                };
+                ui.allocate_ui_with_layout(
+                    egui::vec2(width - reserve, 46.0),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| {
+                        let title = if let Some((_, name)) = &self.collections.filter {
+                            name.as_str()
+                        } else if self.favorites {
+                            self.tr("Favoritos", "Favorites")
+                        } else if self.reading_state == LibraryReadingState::InProgress {
+                            self.tr("En lectura", "In progress")
+                        } else {
+                            self.tr("Biblioteca", "Library")
+                        };
+                        ui.spacing_mut().item_spacing.y = 2.0;
+                        ui.add(
+                            egui::Label::new(theme::editorial(title, 32.0).color(p.ink)).truncate(),
+                        )
+                        .on_hover_text(title);
+                        if self.library_loaded {
+                            ui.label(
+                                RichText::new(if self.count == 1 {
+                                    self.tr("1 documento", "1 document").to_owned()
+                                } else {
+                                    format!("{} {}", self.count, self.tr("documentos", "documents"))
+                                })
+                                .size(13.0)
+                                .color(p.secondary),
+                            );
+                        }
+                    },
+                );
+                if reserve > 0.0 {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = 5.0;
+                        if wide {
+                            self.library_search_menu(ui, p);
+                        }
+                        self.library_display_options(ui, true, p);
+                        if wide && !self.list {
+                            self.library_size_control(ui, p);
+                        }
                     });
-            });
-            self.library_view_menu(ui, icons, p);
-            if self.library_selection.toolbar_visible() {
-                self.library_selection_control(ui, p);
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                self.tools_menu(ui, true, p);
-                if !filtered {
-                    self.reading_shortcut(ui, p, icons || ui.available_width() < 118.0, false);
                 }
             });
+            ui.add_space(5.0);
+        }
+        let show_groups =
+            width >= 620.0 && !self.list && self.library_loaded && !self.documents.is_empty();
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            if wide {
+                if show_groups {
+                    self.library_grouping_tabs(ui, p);
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    self.tools_menu(ui, true, p);
+                    if !filtered {
+                        self.reading_shortcut(ui, p, true, false);
+                    }
+                    self.library_actions(ui, filtered, p);
+                });
+            } else {
+                if compact_search {
+                    self.library_search_menu(ui, p);
+                } else {
+                    self.library_search(ui, (width - 250.0).clamp(140.0, 390.0), p);
+                }
+                self.library_actions(ui, filtered, p);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    self.tools_menu(ui, true, p);
+                    if !filtered {
+                        self.reading_shortcut(ui, p, true, false);
+                    }
+                });
+            }
         });
+        if !wide && show_groups {
+            ui.horizontal_wrapped(|ui| self.library_grouping_tabs(ui, p));
+        }
         if filtered {
             ui.horizontal(|ui| {
-                let count = if self.count == 1 {
-                    self.tr("resultado", "result")
-                } else {
-                    self.tr("resultados", "results")
-                };
-                ui.label(
-                    RichText::new(format!("{} {count}", self.count))
+                if width < 460.0 {
+                    ui.label(
+                        RichText::new(format!(
+                            "{} {}",
+                            self.count,
+                            if self.count == 1 {
+                                self.tr("resultado", "result")
+                            } else {
+                                self.tr("resultados", "results")
+                            },
+                        ))
                         .size(13.0)
                         .color(p.secondary),
-                );
+                    );
+                }
                 let label = self.tr("Limpiar filtros", "Clear filters");
                 let clear = if compact_search {
                     theme::icon_button(ui, label, theme::Icon::Close, p)
@@ -135,7 +300,20 @@ impl YamantakaApp {
                     self.reset_library_filters();
                 }
                 self.reading_shortcut(ui, p, false, true);
-                if let Some((_, collection)) = &self.collections.filter {
+                if wide && !self.query.trim().is_empty() {
+                    let query = self.query.trim();
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(format!("“{query}”"))
+                                .size(13.0)
+                                .color(p.secondary),
+                        )
+                        .truncate(),
+                    )
+                    .on_hover_text(query);
+                } else if width < 460.0
+                    && let Some((_, collection)) = &self.collections.filter
+                {
                     ui.add(
                         egui::Label::new(RichText::new(collection).size(13.0).color(p.secondary))
                             .truncate(),
@@ -145,6 +323,76 @@ impl YamantakaApp {
             });
         }
         ui.separator();
+    }
+
+    fn library_size_control(&mut self, ui: &mut egui::Ui, p: Palette) {
+        ui.scope(|ui| {
+            ui.spacing_mut().slider_width = 88.0;
+            ui.spacing_mut().interact_size.y = 18.0;
+            ui.spacing_mut().slider_rail_height = 4.0;
+            let visuals = ui.visuals_mut();
+            visuals.selection.bg_fill = p.accent;
+            visuals.widgets.inactive.bg_fill = p.line;
+            visuals.widgets.hovered.bg_fill = p.surface;
+            visuals.widgets.active.bg_fill = p.surface;
+            for widget in [
+                &mut visuals.widgets.inactive,
+                &mut visuals.widgets.hovered,
+                &mut visuals.widgets.active,
+            ] {
+                widget.expansion = 0.0;
+                widget.corner_radius = egui::CornerRadius::same(2);
+                widget.fg_stroke = egui::Stroke::new(1.5, p.accent);
+            }
+            let label = self.tr("Tamaño de las portadas", "Cover size");
+            let response = ui.add(
+                egui::Slider::new(&mut self.library_cover_scale, 0.78..=1.24)
+                    .step_by(0.01)
+                    .show_value(false)
+                    .handle_shape(egui::style::HandleShape::Circle)
+                    .trailing_fill(true),
+            );
+            response.widget_info(|| {
+                egui::WidgetInfo::slider(ui.is_enabled(), self.library_cover_scale.into(), label)
+            });
+            theme::record_control_bounds(ui, label, response.rect);
+            response.on_hover_text(label);
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(20.0, 40.0), egui::Sense::hover());
+            theme::icon(ui.painter(), rect.center(), theme::Icon::Book, p.secondary);
+        });
+    }
+
+    fn library_actions(&mut self, ui: &mut egui::Ui, filtered: bool, p: Palette) {
+        let add_label = self.tr("Añadir PDF", "Add PDFs");
+        let add = theme::primary_icon(ui, add_label, theme::Icon::Add, p);
+        if add.clicked()
+            && let Some(paths) = yamantaka_windows::pick_pdfs()
+        {
+            self.import(paths);
+        }
+        let response = theme::icon_toggle(
+            ui,
+            self.tr("Filtros", "Filters"),
+            theme::Icon::Sort,
+            filtered,
+            p,
+        );
+        let mut popup = egui::Popup::menu(&response);
+        if self.smart_menu_preview {
+            popup = popup.open(true);
+        }
+        popup.show(|ui| {
+            egui::ScrollArea::vertical()
+                .max_height((ui.ctx().content_rect().height() - 82.0).max(58.0))
+                .show(ui, |ui| {
+                    self.collection_menu(ui, p);
+                    self.library_filters(ui, p);
+                });
+        });
+        self.library_view_menu(ui, true, p);
+        if self.library_selection.toolbar_visible() {
+            self.library_selection_control(ui, p);
+        }
     }
 
     fn library_view_menu(&mut self, ui: &mut egui::Ui, compact: bool, p: Palette) {
@@ -171,20 +419,60 @@ impl YamantakaApp {
         }
         popup.show(|ui| {
             ui.set_max_width((ui.ctx().content_rect().width() - 32.0).clamp(160.0, 300.0));
-            for (list, es, en, icon) in [
-                (false, "Portadas", "Covers", theme::Icon::Grid),
-                (true, "Lista", "List", theme::Icon::List),
-            ] {
-                if theme::control(ui, self.tr(es, en), Some(icon), self.list == list, false, p)
-                    .clicked()
-                {
-                    self.list = list;
-                    ui.close();
-                }
-            }
+            self.library_display_options(ui, false, p);
             ui.separator();
             self.library_sort_control(ui, p);
         });
+    }
+
+    fn library_display_options(&mut self, ui: &mut egui::Ui, direct: bool, p: Palette) {
+        let volume = self.tr("Portadas 3D", "3D covers");
+        let flat = self.tr("Portadas 2D", "2D covers");
+        let list = self.tr("Lista", "List");
+        let options = [
+            (false, false, volume, "3D"),
+            (false, true, flat, "2D"),
+            (true, false, list, list),
+        ];
+        let mut render = |ui: &mut egui::Ui, (show_list, show_flat, label, short)| {
+            let selected = self.list == show_list && (show_list || self.flat_covers == show_flat);
+            if theme::control(
+                ui,
+                if direct { short } else { label },
+                None,
+                selected,
+                false,
+                p,
+            )
+            .on_hover_text(label)
+            .clicked()
+            {
+                self.list = show_list;
+                if !show_list {
+                    self.flat_covers = show_flat;
+                }
+                if !direct {
+                    ui.close();
+                }
+            }
+        };
+        if direct {
+            egui::Frame::new()
+                .fill(p.surface)
+                .stroke(egui::Stroke::new(1.0, p.line))
+                .corner_radius(12)
+                .inner_margin(egui::Margin::same(2))
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.x = 1.0;
+                    for option in options.into_iter().rev() {
+                        render(ui, option);
+                    }
+                });
+        } else {
+            for option in options {
+                render(ui, option);
+            }
+        }
     }
 
     fn library_search(

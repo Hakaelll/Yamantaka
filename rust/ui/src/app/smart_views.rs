@@ -13,6 +13,11 @@ impl YamantakaApp {
     }
     pub(super) fn reset_library_filters(&mut self) {
         self.grouping.reset();
+        self.clear_library_filters();
+        self.refresh();
+        self.persist_library_state();
+    }
+    pub(super) fn clear_library_filters(&mut self) {
         self.query.clear();
         self.smart_view = None;
         self.clear_tag_filters();
@@ -22,8 +27,6 @@ impl YamantakaApp {
         self.modified_only = false;
         self.favorites = false;
         self.offset = 0;
-        self.refresh();
-        self.persist_library_state();
     }
     pub fn preview_reset_library_filters(&mut self) {
         if !self.demo || self.capture.is_none() {

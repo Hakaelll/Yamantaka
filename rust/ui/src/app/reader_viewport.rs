@@ -186,22 +186,23 @@ impl YamantakaApp {
                 if !self.reader.study.hidden && !self.reader.viewport.source_changed {
                     self.reader.annotation_paint.paint(ui, visible.page, paper, layout.rotation());
                 }
+                let on_paper = p.on_paper(Self::reading_paper(preferences.reading_theme));
                 if self.reference.as_ref().is_some_and(|reference| reference.differences.contains(&visible.page)) {
-                    ui.painter().rect_stroke(paper, 1, egui::Stroke::new(2.0, p.accent), egui::StrokeKind::Inside);
+                    ui.painter().rect_stroke(paper, 1, egui::Stroke::new(2.0, on_paper.accent), egui::StrokeKind::Inside);
                 }
-                self.reader.find.paint(ui, visible.page, paper, layout.rotation(), p);
+                self.reader.find.paint(ui, visible.page, paper, layout.rotation(), on_paper);
                 if can_interact && tool.selects_text() {
-                    self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), p);
+                    self.selection_page(ui, &document.id, visible.page, paper, layout.rotation(), on_paper);
                 }
                 if can_interact && tool == study::Tool::Select && !self.reader.selection.enabled {
-                    match self.reader.links.regions(ui, visible.page, paper, layout.rotation(), p, self.english) {
+                    match self.reader.links.regions(ui, visible.page, paper, layout.rotation(), on_paper, self.english) {
                         Ok(Some(destination)) => self.reader.reader_destination = Some((document.id.clone(), destination)),
                         Err(error) => self.error = Some(error),
                         _ => {}
                     }
                 }
                 if can_interact {
-                    self.reader.study_page_input(ui, study::PageInput {tool, color, weight, page: visible.page, paper, rotation: layout.rotation()}, p);
+                    self.reader.study_page_input(ui, study::PageInput {tool, color, weight, page: visible.page, paper, rotation: layout.rotation()}, on_paper);
                     if tool == study::Tool::Select && !self.reader.study.hidden {
                         note_badge = self.reader.annotation_paint.note_badges(ui, visible.page, paper, layout.rotation(), self.english, p).or(note_badge.take());
                     }

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$OutputDirectory = 'build/release/yamantaka-0.18.0',
+    [string]$OutputDirectory = 'build/release/yamantaka-0.19.0',
     [string]$Cargo = 'cargo',
     [string]$Python = 'python',
     [switch]$Portable,

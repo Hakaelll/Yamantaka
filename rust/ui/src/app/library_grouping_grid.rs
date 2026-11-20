@@ -15,8 +15,8 @@ impl YamantakaApp {
         } else if ui.ctx().content_rect().width() < 420.0 {
             self.compact_covers(ui, documents, p);
         } else {
-            let gap = if compact { 20.0 } else { 26.0 };
-            let preferred = if compact { 172.0 } else { 212.0 };
+            let gap = if compact { 16.0 } else { 18.0 };
+            let preferred = (if compact { 132.0 } else { 164.0 }) * self.library_cover_scale;
             let columns = ((ui.available_width() + gap) / (preferred + gap))
                 .floor()
                 .max(1.0) as usize;
@@ -25,6 +25,21 @@ impl YamantakaApp {
                 ((ui.available_width() - gap * (columns - 1) as f32) / columns as f32).max(100.0);
             let width = slot.min(preferred);
             for row in documents.chunks(columns) {
+                let start = ui.available_rect_before_wrap();
+                let shelf_y = start.top() + book::cover_height(width) - 3.0;
+                let rail = egui::Rect::from_min_max(
+                    egui::pos2(start.left(), shelf_y),
+                    egui::pos2(start.right(), shelf_y + 4.0),
+                );
+                if ui.is_rect_visible(rail) {
+                    ui.painter()
+                        .rect_filled(rail, 2, p.surface.lerp_to_gamma(p.line, 0.6));
+                    ui.painter().hline(
+                        rail.x_range().shrink(2.0),
+                        rail.top(),
+                        egui::Stroke::new(1.0, p.line),
+                    );
+                }
                 ui.horizontal_top(|ui| {
                     ui.spacing_mut().item_spacing.x = gap;
                     for document in row {
@@ -39,9 +54,14 @@ impl YamantakaApp {
                                             document,
                                             width,
                                             self.library_selection.model.contains(&document.id),
-                                            self.reduced_motion,
                                             p,
-                                            self.preview_tilt.filter(|_| document.id == "demo-0"),
+                                            book::CoverStyle {
+                                                flat: self.flat_covers,
+                                                reduced_motion: self.reduced_motion,
+                                                preview_pointer: self
+                                                    .preview_tilt
+                                                    .filter(|_| document.id == "demo-0"),
+                                            },
                                         );
                                         let menu_rect = egui::Rect::from_min_size(
                                             egui::pos2(
@@ -89,7 +109,7 @@ impl YamantakaApp {
                         self.library_book_response(ui, &response, document);
                     }
                 });
-                ui.add_space(8.0);
+                ui.add_space(6.0);
             }
         }
     }
@@ -98,6 +118,9 @@ impl YamantakaApp {
 impl YamantakaApp {
     pub(super) fn library_catalogue(&mut self, ui: &mut egui::Ui, compact: bool, p: Palette) {
         self.grouped_library(ui, compact, p);
+        if self.offset == 0 && self.documents.len() >= self.count as usize {
+            return;
+        }
         ui.horizontal(|ui| {
             if ui
                 .add_enabled(

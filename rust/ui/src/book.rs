@@ -7,8 +7,8 @@ use yamantaka_domain::Document;
 
 mod material;
 
-pub(crate) const CAPTION_HEIGHT: f32 = 91.0;
-const COVER_HEADROOM: f32 = 32.0;
+pub(crate) const CAPTION_HEIGHT: f32 = 78.0;
+const COVER_HEADROOM: f32 = 27.0;
 pub(crate) fn cover_height(width: f32) -> f32 {
     width * 1.34 + COVER_HEADROOM - 10.0
 }
@@ -96,25 +96,21 @@ fn polygon(painter: &egui::Painter, points: Vec<Pos2>, fill: Color32) {
     painter.add(egui::Shape::convex_polygon(points, fill, Stroke::NONE));
 }
 
+pub struct CoverStyle {
+    pub flat: bool,
+    pub reduced_motion: bool,
+    pub preview_pointer: Option<Vec2>,
+}
+
 pub fn cover(
     ui: &mut egui::Ui,
     document: &Document,
     width: f32,
     selected: bool,
-    reduced_motion: bool,
     palette: Palette,
-    preview_pointer: Option<Vec2>,
+    style: CoverStyle,
 ) -> Response {
-    cover_impl(
-        ui,
-        document,
-        width,
-        selected,
-        reduced_motion,
-        palette,
-        preview_pointer,
-        Caption::Full,
-    )
+    cover_impl(ui, document, width, selected, palette, style, Caption::Full)
 }
 
 pub fn miniature(
@@ -130,9 +126,12 @@ pub fn miniature(
         document,
         width,
         selected,
-        reduced_motion,
         palette,
-        None,
+        CoverStyle {
+            flat: false,
+            reduced_motion,
+            preview_pointer: None,
+        },
         Caption::None,
     )
 }
@@ -142,18 +141,16 @@ pub fn catalogue_miniature(
     document: &Document,
     width: f32,
     selected: bool,
-    reduced_motion: bool,
     palette: Palette,
-    preview_pointer: Option<Vec2>,
+    style: CoverStyle,
 ) -> Response {
     cover_impl(
         ui,
         document,
         width,
         selected,
-        reduced_motion,
         palette,
-        preview_pointer,
+        style,
         Caption::Miniature,
     )
 }
@@ -164,15 +161,17 @@ enum Caption {
     None,
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cover_impl(
     ui: &mut egui::Ui,
     document: &Document,
     width: f32,
     selected: bool,
-    reduced_motion: bool,
     palette: Palette,
-    preview_pointer: Option<Vec2>,
+    CoverStyle {
+        flat,
+        reduced_motion,
+        preview_pointer,
+    }: CoverStyle,
     caption: Caption,
 ) -> Response {
     let full_caption = matches!(caption, Caption::Full);
@@ -234,45 +233,52 @@ fn cover_impl(
         rect.min + egui::vec2(11.0, if full_caption { COVER_HEADROOM } else { 10.0 }),
         Vec2::new(width - 20.0, width * 1.34 - 14.0),
     );
-    let mut physics = ui.ctx().data_mut(|data| {
-        data.get_temp::<BookPhysics>(response.id)
-            .unwrap_or_default()
-    });
-    let pointer = preview_pointer
-        .map(BookPhysics::pointer)
-        .unwrap_or_else(|| {
-            response
-                .hover_pos()
-                .filter(|pos| book.contains(*pos))
-                .map(|pos| {
-                    BookPhysics::pointer(
-                        ((pos - book.center()) / (book.size() * 0.5))
-                            .clamp(egui::vec2(-1.0, -1.0), Vec2::splat(1.0)),
-                    )
-                })
-                .unwrap_or(Vec2::ZERO)
-        });
-    let tilt_moving = physics.step(pointer, ui.input(|i| i.stable_dt), reduced_motion);
     let hovering_book =
         response.hover_pos().is_some_and(|pos| book.contains(pos)) || preview_pointer.is_some();
-    let lift_moving = physics.emphasis(
-        if response.is_pointer_button_down_on() && hovering_book {
-            -0.32
-        } else if !hovering_book {
-            0.0
-        } else if full_caption {
-            1.0
-        } else {
-            0.2
-        },
-        ui.input(|i| i.stable_dt),
-        reduced_motion,
-    );
-    if tilt_moving || lift_moving {
-        ui.ctx().request_repaint();
-    }
-    ui.ctx()
-        .data_mut(|data| data.insert_temp(response.id, physics));
+    let physics = if flat {
+        ui.ctx()
+            .data_mut(|data| data.remove::<BookPhysics>(response.id));
+        BookPhysics::default()
+    } else {
+        let mut physics = ui.ctx().data_mut(|data| {
+            data.get_temp::<BookPhysics>(response.id)
+                .unwrap_or_default()
+        });
+        let pointer = preview_pointer
+            .map(BookPhysics::pointer)
+            .unwrap_or_else(|| {
+                response
+                    .hover_pos()
+                    .filter(|pos| book.contains(*pos))
+                    .map(|pos| {
+                        BookPhysics::pointer(
+                            ((pos - book.center()) / (book.size() * 0.5))
+                                .clamp(egui::vec2(-1.0, -1.0), Vec2::splat(1.0)),
+                        )
+                    })
+                    .unwrap_or(Vec2::ZERO)
+            });
+        let tilt_moving = physics.step(pointer, ui.input(|i| i.stable_dt), reduced_motion);
+        let lift_moving = physics.emphasis(
+            if response.is_pointer_button_down_on() && hovering_book {
+                -0.32
+            } else if !hovering_book {
+                0.0
+            } else if full_caption {
+                1.0
+            } else {
+                0.2
+            },
+            ui.input(|i| i.stable_dt),
+            reduced_motion,
+        );
+        if tilt_moving || lift_moving {
+            ui.ctx().request_repaint();
+        }
+        ui.ctx()
+            .data_mut(|data| data.insert_temp(response.id, physics));
+        physics
+    };
     let pdf_cover = ui
         .ctx()
         .data(|data| data.get_temp::<PdfCover>(cover_id(&document.id)))
@@ -283,7 +289,13 @@ fn cover_impl(
                 && !document.missing
         });
     let depth = (width * 0.13).clamp(12.0, 30.0);
-    let project = |point| physics.project(point, depth * 0.5, book);
+    let project = |point| {
+        if flat {
+            point
+        } else {
+            physics.project(point, depth * 0.5, book)
+        }
+    };
     if ui.ctx().data(|data| {
         data.get_temp::<bool>(egui::Id::new("capture-control-bounds"))
             .unwrap_or(false)
@@ -297,7 +309,11 @@ fn cover_impl(
         let mut points = [Pos2::ZERO; 8];
         for (index, point) in corners.into_iter().enumerate() {
             points[index] = project(point);
-            points[index + 4] = physics.project(point, -depth * 0.5, book);
+            points[index + 4] = if flat {
+                point
+            } else {
+                physics.project(point, -depth * 0.5, book)
+            };
         }
         crate::theme::record_control_bounds(
             ui,
@@ -320,107 +336,121 @@ fn cover_impl(
     ];
     let ink = Color32::from_rgb(230, 222, 207);
     let color = colors[seed as usize % colors.len()];
-    painter.add(
-        egui::epaint::Shadow {
-            offset: [6, (10.0 + physics.lift * 9.0) as i8],
-            blur: (22.0 + physics.lift * 10.0) as u8,
-            spread: 0,
-            color: Color32::from_black_alpha(if palette.canvas.r() < 100 { 110 } else { 65 }),
-        }
-        .as_shape(book.shrink(3.0), 2),
-    );
-    painter.add(
-        egui::epaint::Shadow {
-            offset: [2, 4],
-            blur: 6,
-            spread: 0,
-            color: Color32::from_black_alpha((80.0 * (1.0 - physics.lift * 0.5)) as u8),
-        }
-        .as_shape(book.shrink(3.0), 2),
-    );
-    let back = |point| physics.project(point, -depth * 0.5, book);
-    polygon(
-        painter,
-        vec![
-            back(book.left_top()),
-            back(book.right_top()),
-            back(book.right_bottom()),
-            back(book.left_bottom()),
-        ],
-        color.gamma_multiply(0.55),
-    );
-    let paper = book.shrink(0.8);
-    let paper_front = |point| physics.project(point, depth * 0.5 - 1.0, book);
-    let paper_back = |point| physics.project(point, -depth * 0.5 + 1.0, book);
-    for (a, b, shade) in [
-        (
-            paper.left_top(),
-            paper.right_top(),
-            Color32::from_rgb(217, 211, 195),
-        ),
-        (
-            paper.right_top(),
-            paper.right_bottom(),
-            Color32::from_rgb(198, 191, 175),
-        ),
-        (
-            paper.right_bottom(),
-            paper.left_bottom(),
-            Color32::from_rgb(177, 171, 157),
-        ),
-    ] {
+    if flat {
+        painter.rect_filled(
+            book.translate(egui::vec2(1.0, 2.0)),
+            2,
+            Color32::from_black_alpha(55),
+        );
+    } else {
+        painter.add(
+            egui::epaint::Shadow {
+                offset: [6, (10.0 + physics.lift * 9.0) as i8],
+                blur: (22.0 + physics.lift * 10.0) as u8,
+                spread: 0,
+                color: Color32::from_black_alpha(if palette.canvas.r() < 100 { 110 } else { 65 }),
+            }
+            .as_shape(book.shrink(3.0), 2),
+        );
+        painter.add(
+            egui::epaint::Shadow {
+                offset: [2, 4],
+                blur: 6,
+                spread: 0,
+                color: Color32::from_black_alpha((80.0 * (1.0 - physics.lift * 0.5)) as u8),
+            }
+            .as_shape(book.shrink(3.0), 2),
+        );
+        let back = |point| physics.project(point, -depth * 0.5, book);
         polygon(
             painter,
-            vec![paper_back(a), paper_back(b), paper_front(b), paper_front(a)],
-            shade,
-        );
-    }
-    for n in 1..7 {
-        let z = -depth * 0.5 + depth * n as f32 / 7.0;
-        painter.line_segment(
-            [
-                physics.project(paper.right_top(), z, book),
-                physics.project(paper.right_bottom(), z, book),
+            vec![
+                back(book.left_top()),
+                back(book.right_top()),
+                back(book.right_bottom()),
+                back(book.left_bottom()),
             ],
-            Stroke::new(0.45, Color32::from_rgb(152, 146, 131)),
+            color.gamma_multiply(0.55),
         );
-    }
-    let spine = [
-        back(book.left_top()),
-        project(book.left_top()),
-        project(book.left_bottom()),
-        back(book.left_bottom()),
-    ];
-    if let Some(cover) = &pdf_cover {
-        painter.add(material::pdf_spine(spine, cover));
-    } else {
-        polygon(painter, spine.to_vec(), color.gamma_multiply(0.48));
+        let paper = book.shrink(0.8);
+        let paper_front = |point| physics.project(point, depth * 0.5 - 1.0, book);
+        let paper_back = |point| physics.project(point, -depth * 0.5 + 1.0, book);
+        for (a, b, shade) in [
+            (
+                paper.left_top(),
+                paper.right_top(),
+                Color32::from_rgb(217, 211, 195),
+            ),
+            (
+                paper.right_top(),
+                paper.right_bottom(),
+                Color32::from_rgb(198, 191, 175),
+            ),
+            (
+                paper.right_bottom(),
+                paper.left_bottom(),
+                Color32::from_rgb(177, 171, 157),
+            ),
+        ] {
+            polygon(
+                painter,
+                vec![paper_back(a), paper_back(b), paper_front(b), paper_front(a)],
+                shade,
+            );
+        }
+        for n in 1..7 {
+            let z = -depth * 0.5 + depth * n as f32 / 7.0;
+            painter.line_segment(
+                [
+                    physics.project(paper.right_top(), z, book),
+                    physics.project(paper.right_bottom(), z, book),
+                ],
+                Stroke::new(0.45, Color32::from_rgb(152, 146, 131)),
+            );
+        }
+        let spine = [
+            back(book.left_top()),
+            project(book.left_top()),
+            project(book.left_bottom()),
+            back(book.left_bottom()),
+        ];
+        if let Some(cover) = &pdf_cover {
+            painter.add(material::pdf_spine(spine, cover));
+        } else {
+            polygon(painter, spine.to_vec(), color.gamma_multiply(0.48));
+        }
     }
     let jacket = if let Some(cover) = pdf_cover {
-        material::pdf_jacket(book, cover)
+        material::pdf_jacket(book, cover, flat)
     } else {
-        let mut jacket = material::jacket(book, color, ink, physics.tilt.x, seed, width);
-        jacket.push(egui::Shape::line_segment(
-            [
-                book.left_top() + egui::vec2(2.0, 1.5),
-                book.right_top() + egui::vec2(-1.0, 1.5),
-            ],
-            Stroke::new(1.1, Color32::from_white_alpha(44)),
-        ));
-        jacket.push(egui::Shape::line_segment(
-            [
-                egui::pos2(book.left() + book.width() * 0.085, book.top() + 2.0),
-                egui::pos2(book.left() + book.width() * 0.085, book.bottom() - 2.0),
-            ],
-            Stroke::new(1.8, Color32::from_black_alpha(40)),
-        ));
-        jacket.push(egui::Shape::line_segment(
-            [
-                book.min + egui::vec2(book.width() * 0.07, 2.0),
-                Pos2::new(book.left() + book.width() * 0.07, book.bottom() - 2.0),
-            ],
-            Stroke::new(1.0, Color32::from_white_alpha(26)),
-        ));
+        let mut jacket = if flat {
+            vec![egui::Shape::rect_filled(book, 2, color)]
+        } else {
+            material::jacket(book, color, ink, physics.tilt.x, seed, width)
+        };
+        if !flat {
+            jacket.push(egui::Shape::line_segment(
+                [
+                    book.left_top() + egui::vec2(2.0, 1.5),
+                    book.right_top() + egui::vec2(-1.0, 1.5),
+                ],
+                Stroke::new(1.1, Color32::from_white_alpha(44)),
+            ));
+            jacket.push(egui::Shape::line_segment(
+                [
+                    egui::pos2(book.left() + book.width() * 0.085, book.top() + 2.0),
+                    egui::pos2(book.left() + book.width() * 0.085, book.bottom() - 2.0),
+                ],
+                Stroke::new(1.8, Color32::from_black_alpha(40)),
+            ));
+            jacket.push(egui::Shape::line_segment(
+                [
+                    book.min + egui::vec2(book.width() * 0.07, 2.0),
+                    Pos2::new(book.left() + book.width() * 0.07, book.bottom() - 2.0),
+                ],
+                Stroke::new(1.0, Color32::from_white_alpha(26)),
+            ));
+        }
         let small = width < 170.0;
         let titleless = width <= 60.0;
         let miniature = width < 110.0;
@@ -667,19 +697,25 @@ fn cover_impl(
         }
         jacket
     };
-    let shapes = jacket
-        .into_iter()
-        .map(|shape| egui::epaint::ClippedShape {
-            clip_rect: book.expand(32.0),
-            shape,
-        })
-        .collect();
-    for primitive in ui.ctx().tessellate(shapes, ui.ctx().pixels_per_point()) {
-        if let egui::epaint::Primitive::Mesh(mut mesh) = primitive.primitive {
-            for vertex in &mut mesh.vertices {
-                vertex.pos = project(vertex.pos);
+    if flat {
+        painter
+            .with_clip_rect(ui.clip_rect().intersect(book))
+            .extend(jacket);
+    } else {
+        let shapes = jacket
+            .into_iter()
+            .map(|shape| egui::epaint::ClippedShape {
+                clip_rect: book.expand(32.0),
+                shape,
+            })
+            .collect();
+        for primitive in ui.ctx().tessellate(shapes, ui.ctx().pixels_per_point()) {
+            if let egui::epaint::Primitive::Mesh(mut mesh) = primitive.primitive {
+                for vertex in &mut mesh.vertices {
+                    vertex.pos = project(vertex.pos);
+                }
+                painter.add(egui::Shape::mesh(mesh));
             }
-            painter.add(egui::Shape::mesh(mesh));
         }
     }
     if selected {
@@ -711,7 +747,7 @@ fn cover_impl(
     }
     let progress = document.reading_progress.clamp(0.0, 1.0) as f32;
     let visibility = if !matches!(caption, Caption::None) && progress > 0.0 {
-        if reduced_motion || response.has_focus() {
+        if flat || reduced_motion || response.has_focus() {
             f32::from(hovering_book || response.has_focus())
         } else {
             ui.ctx().animate_bool_with_time_and_easing(
@@ -736,11 +772,11 @@ fn cover_impl(
     }
     let title_rect = Rect::from_min_size(
         egui::pos2(rect.left() + 10.0, rect.top() + height + 5.0),
-        egui::vec2(width - 20.0, 41.0),
+        egui::vec2(width - 20.0, 38.0),
     );
     let mut title = egui::text::LayoutJob::simple(
         document.display_title().to_owned(),
-        FontId::new(17.0, egui::FontFamily::Name("Editorial".into())),
+        FontId::new(16.0, egui::FontFamily::Name("Editorial".into())),
         palette.ink,
         title_rect.width(),
     );
@@ -751,7 +787,7 @@ fn cover_impl(
         author.to_owned(),
         FontId::proportional(13.0),
         palette.secondary,
-        title_rect.width(),
+        (title_rect.width() - 24.0).max(1.0),
     );
     author_job.wrap.max_rows = 1;
     author_job.wrap.overflow_character = Some('…');
@@ -760,21 +796,9 @@ fn cover_impl(
         painter.layout_job(author_job),
         palette.secondary,
     );
-    let pages = format!(
-        "{} {}",
-        document.page_count,
-        if english { "pages" } else { "páginas" }
-    );
-    let pages = painter.text(
-        egui::pos2(title_rect.left(), rect.bottom() - 20.0),
-        egui::Align2::LEFT_CENTER,
-        pages,
-        FontId::proportional(12.0),
-        palette.secondary,
-    );
     if visibility > 0.0 {
         painter.text(
-            egui::pos2(pages.right() + 8.0, pages.center().y),
+            egui::pos2(title_rect.left(), rect.bottom() - 12.0),
             egui::Align2::LEFT_CENTER,
             format!("{:.0}%", progress * 100.0),
             FontId::proportional(12.0),
@@ -786,7 +810,11 @@ fn cover_impl(
         );
         paint_progress(ui, document, track, progress, visibility, palette);
     }
-    response
+    response.on_hover_text(format!(
+        "{} {}",
+        document.page_count,
+        if english { "pages" } else { "páginas" }
+    ))
 }
 
 fn paint_progress(

@@ -43,8 +43,8 @@ Keep Yamantaka's name. The owner requested a corporate logo replacement on
 2026-11-02; use the canonical abstract black page-fold mark in `assets/branding/yamantaka-logo.svg`.
 This replaces the earlier logo-geometry preservation requirement. The user asks
 for a substantial visual replacement and an interface whose beauty and professional
-finish are striking. Dark neutrals and functional violet; warm paper and ivory in
-light mode; local Segoe UI Variable typography.
+finish are striking. Graphite with warm-white accents in dark mode. Warm paper
+with charcoal accents in light mode. Use local Segoe UI Variable typography.
 
 ## Evidence on Hand
 

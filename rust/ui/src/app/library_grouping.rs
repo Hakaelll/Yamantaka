@@ -193,6 +193,17 @@ impl YamantakaApp {
                 .color(p.secondary)
                 .size(12.0),
         );
+        self.library_grouping_choices(ui, p, true);
+    }
+    pub(super) fn library_grouping_tabs(&mut self, ui: &mut egui::Ui, p: Palette) {
+        ui.label(
+            egui::RichText::new(self.tr("Agrupar", "Group by"))
+                .color(p.secondary)
+                .size(13.0),
+        );
+        self.library_grouping_choices(ui, p, false);
+    }
+    fn library_grouping_choices(&mut self, ui: &mut egui::Ui, p: Palette, menu: bool) {
         for (mode, es, en) in [
             (Grouping::None, "Sin agrupar", "No grouping"),
             (Grouping::Author, "Autor", "Author"),
@@ -200,11 +211,18 @@ impl YamantakaApp {
             (Grouping::Tag, "Etiqueta", "Tag"),
             (Grouping::Reading, "Estado de lectura", "Reading state"),
         ] {
+            let (es, en) = if !menu && mode == Grouping::Collection {
+                ("Colecciones", "Collections")
+            } else {
+                (es, en)
+            };
             if theme::navigation(ui, self.tr(es, en), self.grouping.mode == mode, p).clicked() {
                 self.grouping.mode = mode;
                 self.grouping.collapsed.clear();
                 self.persist_library_state();
-                ui.close();
+                if menu {
+                    ui.close();
+                }
             }
         }
     }
@@ -215,7 +233,7 @@ impl YamantakaApp {
             .retain(|key| groups.iter().any(|group| &group.key == key));
         if self.grouping.mode == Grouping::None {
             if !self.list && ui.ctx().content_rect().width() >= 420.0 {
-                ui.add_space(if compact { 8.0 } else { 24.0 });
+                ui.add_space(if compact { 4.0 } else { 12.0 });
             }
             self.library_document_page(ui, self.documents.clone(), compact, p);
             return;
@@ -228,7 +246,10 @@ impl YamantakaApp {
                 let label = format!("{} · {}", group.label, group.documents.len());
                 let galley = ui.painter().layout(
                     label,
-                    egui::FontId::proportional(if miniature { 16.0 } else { 18.0 }),
+                    egui::FontId::new(
+                        if miniature { 16.0 } else { 23.0 },
+                        egui::FontFamily::Name("Editorial".into()),
+                    ),
                     p.ink,
                     (ui.available_width() - 38.0).max(1.0),
                 );

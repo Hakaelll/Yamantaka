@@ -19,7 +19,7 @@ pub(super) fn pdf_spine(points: [egui::Pos2; 4], cover: &super::PdfCover) -> Sha
     Shape::mesh(mesh)
 }
 
-pub(super) fn pdf_jacket(book: Rect, cover: super::PdfCover) -> Vec<Shape> {
+pub(super) fn pdf_jacket(book: Rect, cover: super::PdfCover, flat: bool) -> Vec<Shape> {
     let aspect = cover.size[0] as f32 / cover.size[1] as f32;
     let target = book.width() / book.height();
     let (left, right, bottom) = if aspect > target {
@@ -29,6 +29,14 @@ pub(super) fn pdf_jacket(book: Rect, cover: super::PdfCover) -> Vec<Shape> {
         (0.0, 1.0, aspect / target)
     };
     let mut mesh = egui::epaint::Mesh::with_texture(cover.texture);
+    if flat {
+        mesh.add_rect_with_uv(
+            book,
+            Rect::from_min_max(egui::pos2(left, 0.0), egui::pos2(right, bottom)),
+            Color32::WHITE,
+        );
+        return vec![Shape::mesh(mesh)];
+    }
     for row in 0..=12 {
         for column in 0..=8 {
             let x = column as f32 / 8.0;
@@ -92,7 +100,7 @@ pub(super) fn jacket(
     }
     let mut shapes = vec![Shape::mesh(mesh)];
     // Fixed weave in book coordinates: bounded detail, no random frame-to-frame shimmer.
-    if width >= 170.0 {
+    if width >= 145.0 {
         let start = book.left() + book.width() * 0.12;
         for row in 0..64 {
             let y = book.top() + book.height() * (row as f32 + 0.5) / 64.0;

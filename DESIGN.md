@@ -2,8 +2,8 @@
 name: Yamantaka
 description: "A native Windows gallery for private reading and study."
 colors:
-  dark-accent: "#BDA3F5"
-  light-accent: "#6748A7"
+  dark-accent: "#F7F4EC"
+  light-accent: "#524A40"
   dark-canvas: "#161615"
   dark-surface: "#1E1D1B"
   dark-raised: "#2A2825"
@@ -141,7 +141,7 @@ components:
 
 **Creative North Star: "Gallery study room"**
 
-A personal collection supplies the identity. Matte book volumes, visible paper edges and family-specific jacket lettering make books recognizable, while graphite surfaces, ivory text and functional violet keep the interface calm and precise. Light mode changes the room to warm paper without changing the collection's authored colors.
+A personal collection supplies the identity. Matte book volumes, visible paper edges and family-specific jacket lettering make books recognizable, while graphite surfaces, ivory text and warm-white accents keep the interface calm and precise. Light mode changes the room to warm paper without changing the collection's authored colors.
 
 Beauty comes from physical coherence and clear hierarchy: connected book geometry, lettering attached to the cover plane, stable catalogue titles, and restrained native controls. Segoe UI Variable is the explicitly required Windows interface face. Locally bundled Source Serif 4 Display accompanies document titles and three jacket families. The abstract black open-folio mark in `assets/branding/yamantaka-logo.svg` is the canonical brand asset, following the owner's 2026-11-02 request to replace the previous emblem.
 
@@ -150,7 +150,7 @@ Beauty comes from physical coherence and clear hierarchy: connected book geometr
 - Physical cover volumes with independent, readable catalogue labels.
 - Sculpted spine light, recessed hinges and fixed cloth weave attached to the book plane; projected selection follows the same volume.
 - Available PDF imagery is mounted on the physical cover and spine. Procedural jackets provide the fallback; native WGPU first-page extraction is verified in the [PDF cover checkpoint](docs/validation/rust-pdf-covers-2026-10-13.md).
-- Neutral graphite or warm paper; violet for selection, position and focus.
+- Graphite and warm paper, with contrasting accents for selection, position and focus.
 - Local Segoe interface type paired with editorial document lettering.
 - Drawn vector controls with separate focus, pressed and selected states.
 - Pointer feedback on controls, physical volumes and reader chrome, with immediate reduced-motion states.
@@ -177,14 +177,14 @@ review is claimed. The direction is code-led; no approved visual comp is implied
 
 ## Colors
 
-Graphite and warm paper share a functional violet accent. Jacket pigments and
-subdued foil are book materials, not additional interface accents.
+Graphite uses a warm-white accent. Warm paper uses a charcoal accent for contrast.
+Jacket pigments and subdued foil belong to the book materials.
 
 ### Primary
 
-- **Soft violet** (`dark-accent`): focus, selection and reader position on graphite.
-- **Study violet** (`light-accent`): corresponding roles on warm paper.
-- **Deep plum ink / white action ink** (`dark-primary-ink`, `light-primary-ink`):
+- **Warm white** (`dark-accent`): focus, selection and reader position on graphite.
+- **Warm charcoal** (`light-accent`): corresponding roles on warm paper.
+- **Graphite ink / white action ink** (`dark-primary-ink`, `light-primary-ink`):
   paired foregrounds on accent controls.
 
 ### Secondary
@@ -204,7 +204,7 @@ paper supply the corresponding light layers; charcoal ink, warm grey and paper
 rule supply light-theme text and boundaries. The four paper tokens belong to the
 connected page block, not interface containers.
 
-**The Functional Violet Rule.** Use the accent for selection, focus and reader position. Primary buttons invert the ink and canvas colors.
+Use the accent for selection, focus and reader position. Page overlays choose their accent from the paper theme. Primary buttons invert the ink and canvas colors.
 
 ## Typography
 
@@ -254,10 +254,13 @@ provide a Library return control. Concentration keeps a named exit control.
 
 ### Library and book details
 
-A single working row contains catalogue search, Add PDFs, Filters, View and
-Organize library. Compact layouts use named icon controls. Collection lives
-inside Filters and active criteria have a visible reset and result count. View
-owns the grid/list choice, ordering, grouping and cover density.
+Wide library windows place reading shortcuts and collections in a left
+navigation rail. The main area shows the current scope and result count above
+catalogue search, Add PDFs, Filters, View and Organize library. Named icon
+controls and menus provide access at smaller sizes. View holds ordering, grouping
+and cover density. At wide sizes, the cover size slider, grouped 3D, 2D and List choices
+and the catalogue search popup sit alongside the scope title. Grouping and
+library actions share the next row. The library remembers the cover mode and size.
 Library-wide PDF content search opens its own surface with the existing opt-in
 local index. Organize library also reaches tags, collections, rules, duplicates,
 folder import, source checks, recovery and library notes. Session, Settings
@@ -268,11 +271,13 @@ reading or an independent query for the most recently opened book in progress.
 While filtering, Continue moves to the result row. Saved readings also remain
 available from Session.
 
-The gallery uses an open canvas with 26-point gutters at normal width and
-20-point gutters in compact density. Jacket slots cap at 212 and 172 points
-respectively. Captions align below the projected geometry. They keep two title
-lines and an author line. A started book reveals its percentage and progress
-rail below the caption on cover hover or keyboard focus, within reserved space.
+The catalogue has a subtle cloth texture and thin rails beneath each row of
+covers. The user can group shelves by collection, author, tag or reading state.
+The 3D cover uses the existing perspective and pointer physics. The flat cover
+uses the same PDF artwork or generated jacket, painted face-on. Jacket slots
+default to 164 points in comfortable density and 132 points in compact density. Captions
+keep two title lines and an author line. A started book reveals its percentage
+and progress rail below the caption on cover hover or keyboard focus.
 In the compact row the same rail sits beneath the miniature. The pointer fade
 takes 120 ms and reduced motion makes the change immediate.
 Each book has an accessible actions menu. Click or Enter opens it, while
@@ -311,7 +316,7 @@ a second native working row for repeated marking and drawing. Compact widths
 group the tools under the active tool selector. The paper and saved drawings
 stay in the PDF viewport. Note indicators use the available page margin and
 open the exact entry in Notes. Colors on the paper describe the saved marks.
-The interface uses violet for the active tool and keyboard focus. The reading
+The accent marks the active tool and keyboard focus. The reading
 guide has three heights and works on scanned pages. Ctrl + wheel and trackpad
 zoom apply to the document under the pointer.
 The eraser previews its target on the paper. It removes one mark per click
@@ -320,7 +325,7 @@ Notes can pin the reading page and combine it with color, mark type, tags and
 review state. A crop previews its source region and can be copied or saved as
 PNG. Each book has a summary with Markdown export and a deck of review cards.
 List entries pair the saved mark color with its type and review state.
-Shared controls use softly rounded corners and a short violet selection
+Shared controls use softly rounded corners and a short selection
 indicator. Menus use the reader palette and a restrained shadow.
 
 ### Settings and recovery
@@ -378,7 +383,7 @@ radii. The projected jacket is a square-corner mesh with connected page geometry
 not a rounded UI card. Book selection and focus use the cover-state radius.
 
 Custom controls have no ordinary boundary stroke. Selection uses raised fill plus
-a 1.5-point violet underline; focus uses a distinct 2-point inset violet outline.
+a 1.5-point underline. Focus uses a distinct 2-point inset outline.
 Native fields retain visible borders. Book selection uses a 1.5-point outline and
 5-point dot; keyboard focus outlines the full allocation at 2 points. The corporate
 logo appears at 24×24 with a 5-point clipping radius, preserving its rounded-square silhouette.
@@ -471,7 +476,7 @@ bounded to the actual book rectangle rather than its whole catalogue cell.
 
 - **Don't** add a permanent library sidebar.
 - **Don't** make essential actions depend on pointer hover.
-- **Don't** turn violet into a large decorative surface.
+- **Don't** turn the accent into a large decorative surface.
 - **Don't** replace the physical books with generic flat cards.
 - **Don't** treat panel HTML/CSS examples or settings diagrams as native screenshots.
 - **Don't** claim whole-rewrite, Narrator, physical-DPI or full QUALITY BAR approval from these captures.
@@ -520,7 +525,7 @@ exact tag, with an explicit return to all tags. Tag and collection forms clamp
 to available width and stack controls on narrow windows; recorded native control
 bounds enforce that controls stay inside their horizontal clip.
 
-Library multiselection uses the existing filter row, never a separate persistent action bar. Its count opens a bounded, scrollable menu; narrow layouts use a checkbox icon with the full accessible name. When books are selected, favorite actions come first. A running write puts cancellation first. Selection keeps the projected violet cover outline and marker, list rows use raised fill and a marker, and keyboard focus retains its independent outline. The inspector cursor does not stand in for the multiselection set.
+Library multiselection uses the existing filter row, never a separate persistent action bar. Its count opens a bounded, scrollable menu; narrow layouts use a checkbox icon with the full accessible name. When books are selected, favorite actions come first. A running write puts cancellation first. Selection keeps the projected cover outline and marker, list rows use raised fill and a marker, and keyboard focus retains its independent outline. The inspector cursor does not stand in for the multiselection set.
 
 Bulk organization uses a temporary, named destination chooser with a fixed selection count. Its header, search field and navigation/cancel footer stay stable; only destination rows scroll. Small windows use icon pagination with accessible names. Long destination labels use the same custom control renderer with bounded text, while AccessKit and hover retain the complete name. Closing the chooser cancels its read scope; submitted writes retain their independent scope and report through the compact Result menu.
 
@@ -536,7 +541,7 @@ Library grouping stays within the existing sorting menu. Temporary section headi
 
 Flutter import lives in Settings → Storage and opens a temporary review dialog. Source selection, counts, copy confirmation, and next-launch selection occupy that same dialog. Progress and recoverable errors appear first in its scroll body; Close or Cancel stays in the footer and receives initial focus. Narrow windows and enlarged text keep the recovery action visible. The imported-copy result distinguishes the library chosen for the next launch from the library currently open. Use original can undo that choice before restarting. Published captures replace local source paths with a synthetic label; the live picker retains the actual location. The workflow adds no permanent library bar or new motion.
 
-Backup export uses an inline Storage section rather than another modal or persistent bar. The native save dialog chooses the destination; progress, cancellation, result, and retry occupy the same section. Export remains available after completion, followed by Show in folder. Compact layouts shorten the explanation and keep the result and export action together; the full filename remains in the normal layout. The section shares the established typography, restrained violet feedback, and bounded controls. It adds no decorative animation while a file is being written.
+Backup export uses an inline Storage section rather than another modal or persistent bar. The native save dialog chooses the destination; progress, cancellation, result, and retry occupy the same section. Export remains available after completion, followed by Show in folder. Compact layouts shorten the explanation and keep the result and export action together; the full filename remains in the normal layout. The section shares the established typography, restrained feedback, and bounded controls. It adds no decorative animation while a file is being written.
 
 Restore sits beside export in Storage and uses a protected review dialog. The filename, backup version, record counts, and consequence appear before the explicit Restore and close action. Cancel receives initial keyboard focus. The scroll body leaves the cancellation footer stable. Background preparation stays in that dialog; a completed handover closes the application before installation. A native completion message identifies the retained safety directory and explains reopening. No permanent library bar or loading screen is added.
 
@@ -552,7 +557,7 @@ Compact library composition uses width and height to keep a complete first row v
 
 ## Corporate identity
 
-The owner requested a replacement mark on 2026-11-02 and then asked for a more abstract black symbol. Two angular leaves frame an open reading space in the current geometric mark. Its symmetrical silhouette suggests an open folio in perspective without using a letterform. The `#101112` geometry sits on a warm paper `#F2EFE8` tile with a 104-unit radius on a 512-unit canvas. The tile keeps the black mark visible against both light and dark Windows surfaces. The mark uses no gradients, lettering assets or external fonts. Functional violet remains an interface accent rather than the logo color.
+The owner requested a replacement mark on 2026-11-02 and then asked for a more abstract black symbol. Two angular leaves frame an open reading space in the current geometric mark. Its symmetrical silhouette suggests an open folio in perspective without using a letterform. The `#101112` geometry sits on a warm paper `#F2EFE8` tile with a 104-unit radius on a 512-unit canvas. The tile keeps the black mark visible against both light and dark Windows surfaces. The mark uses no gradients, lettering assets or external fonts.
 
 `assets/branding/yamantaka-logo.svg` owns the geometry. Run `tool/generate_brand_assets.py` to rebuild PNG and multi-size ICO variants, then `tool/verify_brand_assets.ps1` to check them. The Rust executable embeds the Windows icon resource as well as setting its live window icon. Historical Flutter launcher assets use the same mark; this does not reactivate mobile or web targets. The previous emblem remains recoverable in Git.
 

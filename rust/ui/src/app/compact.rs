@@ -19,9 +19,12 @@ impl YamantakaApp {
                         &document,
                         if cramped { 44.0 } else { 58.0 },
                         self.library_selection.model.contains(&document.id),
-                        self.reduced_motion,
                         p,
-                        self.preview_tilt.filter(|_| document.id == "demo-0"),
+                        book::CoverStyle {
+                            flat: self.flat_covers,
+                            reduced_motion: self.reduced_motion,
+                            preview_pointer: self.preview_tilt.filter(|_| document.id == "demo-0"),
+                        },
                     );
                     self.library_book_response(ui, &response, &document);
                     response.on_hover_text(document.display_title());
