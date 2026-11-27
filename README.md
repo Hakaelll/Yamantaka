@@ -17,13 +17,13 @@ telemetry or a cloud backend.
 
 ## Download
 
-[Download Yamantaka 0.19.0 for Windows x64](https://github.com/Hakaelll/Yamantaka/releases/download/v0.19.0/yamantaka-0.19.0-windows-x64-portable.zip)
+[Download Yamantaka 0.19.1 for Windows x64](https://github.com/Hakaelll/Yamantaka/releases/download/v0.19.1/yamantaka-0.19.1-windows-x64-portable.zip)
 
 Windows 10 or Windows 11, x64. Extract the complete ZIP into a writable folder
 and start `yamantaka/yamantaka.exe`. Keep PDFium, licenses and companion files
 together. Flutter, Dart and Rust are not required to run the application.
 
-The [release page](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.19.0)
+The [release page](https://github.com/Hakaelll/Yamantaka/releases/tag/v0.19.1)
 includes SHA-256 checksums, a file manifest and a CycloneDX SBOM. The distribution
 is unsigned; published hashes identify the prepared files.
 
@@ -88,7 +88,7 @@ Cargo dependencies first:
 
 ```powershell
 python ./tool/fetch_rust_licenses.py
-./tool/package_windows.ps1 -Portable -OutputDirectory build/release/yamantaka-0.19.0
+./tool/package_windows.ps1 -Portable -OutputDirectory build/release/yamantaka-0.19.1
 ```
 
 Packaging uses locked, offline Cargo resolution, the static Microsoft C runtime
@@ -104,7 +104,7 @@ PDFium handles PDF rasterization on an owning serial worker. SQLite uses
 rusqlite with FTS5. Local changes to upstream components are documented in
 `third_party/`.
 
-See the [0.19.0 release notes](docs/release/v0.19.0.md), the
+See the [0.19.1 release notes](docs/release/v0.19.1.md), the
 [acceptance and evidence matrix](docs/architecture/rust-rewrite-parity.md),
 [testing guide](TESTING.md), [architecture](ARCHITECTURE.md),
 [privacy policy](PRIVACY.md) and [contribution guide](CONTRIBUTING.md).

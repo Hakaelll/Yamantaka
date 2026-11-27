@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.1 (2026-11-27)
+
+- Bring the first scanned page into focus sooner and keep zoom centered on the pointer or gesture in the reader and comparison.
+- Load PDF covers for every visible book in batches. Keep smaller textures for the library and release them as books leave the screen.
+- Fit library and reader menus to the available space at different window sizes and text scales.
+
 ## 0.19.0 (2026-11-20)
 
 - Redesign the library around shelves, with a collection sidebar and counts.
