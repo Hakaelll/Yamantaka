@@ -261,6 +261,9 @@ controls and menus provide access at smaller sizes. View holds ordering, groupin
 and cover density. At wide sizes, the cover size slider, grouped 3D, 2D and List choices
 and the catalogue search popup sit alongside the scope title. Grouping and
 library actions share the next row. The library remembers the cover mode and size.
+Toolbar dropdowns align with their trigger, cap their width and scroll within
+the available height. The View menu uses full-width choices with icons for 3D,
+2D and List.
 Library-wide PDF content search opens its own surface with the existing opt-in
 local index. Organize library also reaches tags, collections, rules, duplicates,
 folder import, source checks, recovery and library notes. Session, Settings

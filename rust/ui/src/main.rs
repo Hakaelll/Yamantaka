@@ -1208,6 +1208,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         && let (Ok(width), Ok(height)) = (width.parse::<f32>(), height.parse::<f32>())
     {
         options.viewport = options.viewport.with_inner_size([width, height]);
+        if demo && capture.is_some() && args.iter().any(|arg| arg == "--capture-full-viewport") {
+            options.viewport = options.viewport.with_clamp_size_to_monitor_size(false);
+        }
     }
     let instance = std::rc::Rc::new(instance);
     let app_instance = instance.clone();

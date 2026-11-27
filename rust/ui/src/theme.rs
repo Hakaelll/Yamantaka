@@ -521,6 +521,7 @@ enum ControlLabel {
     IconOnly,
     Bounded(f32),
     Sidebar(f32, Option<u64>),
+    MenuRow(f32),
 }
 
 pub fn library_link(
@@ -585,6 +586,88 @@ pub fn bounded_menu(ui: &mut egui::Ui, label: &str, p: Palette) -> egui::Respons
     )
 }
 
+pub fn menu_choice(
+    ui: &mut egui::Ui,
+    label: &str,
+    symbol: Icon,
+    selected: bool,
+    p: Palette,
+) -> egui::Response {
+    control_impl(
+        ui,
+        label,
+        Some(symbol),
+        selected,
+        false,
+        ControlLabel::MenuRow(ui.available_width()),
+        p,
+    )
+}
+
+pub struct DropdownSize {
+    width: f32,
+    height: f32,
+}
+
+pub fn dropdown(response: &egui::Response, width: f32) -> (egui::Popup<'static>, DropdownSize) {
+    const GAP: f32 = 6.0;
+    const PADDING: i8 = 8;
+    const FRAME: f32 = 2.0 * (PADDING as f32 + 1.0);
+    let viewport = response.ctx.content_rect().shrink(8.0);
+    let anchor = egui::PopupAnchor::from(response)
+        .rect(response.id, &response.ctx)
+        .unwrap_or(response.rect);
+    let below = viewport.bottom() - anchor.bottom();
+    let above = anchor.top() - viewport.top();
+    let open_above = below < 190.0 && above > below;
+    let right = anchor.center().x > viewport.center().x;
+    let alignment = match (open_above, right) {
+        (false, false) => egui::RectAlign::BOTTOM_START,
+        (false, true) => egui::RectAlign::BOTTOM_END,
+        (true, false) => egui::RectAlign::TOP_START,
+        (true, true) => egui::RectAlign::TOP_END,
+    };
+    let size = DropdownSize {
+        width: width.min((viewport.width() - FRAME).max(1.0)),
+        height: ((if open_above { above } else { below }) - GAP - FRAME).clamp(1.0, 640.0),
+    };
+    let outer_width = size.width + FRAME;
+    let offset = if right {
+        anchor
+            .right()
+            .max(viewport.left() + outer_width)
+            .min(viewport.right())
+            - anchor.right()
+    } else {
+        anchor
+            .left()
+            .min(viewport.right() - outer_width)
+            .max(viewport.left())
+            - anchor.left()
+    };
+    let style = response.ctx.style_of(response.ctx.theme());
+    let popup = egui::Popup::menu(response)
+        .anchor(anchor.translate(egui::vec2(offset, 0.0)))
+        .align(alignment)
+        .align_alternatives(&[])
+        .gap(GAP)
+        .width(outer_width)
+        .frame(egui::Frame::popup(&style).inner_margin(egui::Margin::same(PADDING)));
+    (popup, size)
+}
+
+impl DropdownSize {
+    pub fn show(self, ui: &mut egui::Ui, contents: impl FnOnce(&mut egui::Ui)) {
+        ui.set_width(self.width);
+        ui.set_max_height(self.height);
+        ui.spacing_mut().item_spacing.y = 4.0;
+        egui::ScrollArea::vertical()
+            .max_height(self.height)
+            .auto_shrink([false, true])
+            .show(ui, contents);
+    }
+}
+
 fn control_impl(
     ui: &mut egui::Ui,
     label: &str,
@@ -596,7 +679,9 @@ fn control_impl(
 ) -> egui::Response {
     let icon_only = matches!(label_style, ControlLabel::IconOnly);
     let limit = match label_style {
-        ControlLabel::Bounded(width) | ControlLabel::Sidebar(width, _) => Some(width),
+        ControlLabel::Bounded(width)
+        | ControlLabel::Sidebar(width, _)
+        | ControlLabel::MenuRow(width) => Some(width),
         _ => None,
     };
     let count = match label_style {
@@ -636,7 +721,7 @@ fn control_impl(
         (galley.size().x + if symbol.is_some() { 52.0 } else { 28.0 }).max(40.0)
     };
     let (width, height) = match label_style {
-        ControlLabel::Sidebar(width, _) => (width, 34.0),
+        ControlLabel::Sidebar(width, _) | ControlLabel::MenuRow(width) => (width, 34.0),
         _ => (limit.map_or(width, |limit| width.min(limit)), 40.0),
     };
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());

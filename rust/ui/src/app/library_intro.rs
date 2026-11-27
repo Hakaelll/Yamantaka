@@ -377,17 +377,15 @@ impl YamantakaApp {
             filtered,
             p,
         );
-        let mut popup = egui::Popup::menu(&response);
+        let (mut popup, size) = theme::dropdown(&response, 240.0);
         if self.smart_menu_preview {
             popup = popup.open(true);
         }
         popup.show(|ui| {
-            egui::ScrollArea::vertical()
-                .max_height((ui.ctx().content_rect().height() - 82.0).max(58.0))
-                .show(ui, |ui| {
-                    self.collection_menu(ui, p);
-                    self.library_filters(ui, p);
-                });
+            size.show(ui, |ui| {
+                self.collection_menu(ui, p);
+                self.library_filters(ui, p);
+            });
         });
         self.library_view_menu(ui, true, p);
         if self.library_selection.toolbar_visible() {
@@ -407,7 +405,7 @@ impl YamantakaApp {
         } else {
             theme::control(ui, label, Some(icon), false, false, p)
         };
-        let mut popup = egui::Popup::menu(&response);
+        let (mut popup, size) = theme::dropdown(&response, 212.0);
         if self.demo
             && self.capture.is_some()
             && ui.ctx().data(|data| {
@@ -418,10 +416,11 @@ impl YamantakaApp {
             popup = popup.open(true);
         }
         popup.show(|ui| {
-            ui.set_max_width((ui.ctx().content_rect().width() - 32.0).clamp(160.0, 300.0));
-            self.library_display_options(ui, false, p);
-            ui.separator();
-            self.library_sort_control(ui, p);
+            size.show(ui, |ui| {
+                self.library_display_options(ui, false, p);
+                ui.separator();
+                self.library_sort_control(ui, p);
+            });
         });
     }
 
@@ -430,23 +429,18 @@ impl YamantakaApp {
         let flat = self.tr("Portadas 2D", "2D covers");
         let list = self.tr("Lista", "List");
         let options = [
-            (false, false, volume, "3D"),
-            (false, true, flat, "2D"),
-            (true, false, list, list),
+            (false, false, volume, "3D", theme::Icon::Book),
+            (false, true, flat, "2D", theme::Icon::Grid),
+            (true, false, list, list, theme::Icon::List),
         ];
-        let mut render = |ui: &mut egui::Ui, (show_list, show_flat, label, short)| {
+        let mut render = |ui: &mut egui::Ui, (show_list, show_flat, label, short, icon)| {
             let selected = self.list == show_list && (show_list || self.flat_covers == show_flat);
-            if theme::control(
-                ui,
-                if direct { short } else { label },
-                None,
-                selected,
-                false,
-                p,
-            )
-            .on_hover_text(label)
-            .clicked()
-            {
+            let response = if direct {
+                theme::navigation(ui, short, selected, p)
+            } else {
+                theme::menu_choice(ui, label, icon, selected, p)
+            };
+            if response.on_hover_text(label).clicked() {
                 self.list = show_list;
                 if !show_list {
                     self.flat_covers = show_flat;
@@ -521,7 +515,7 @@ impl YamantakaApp {
             !self.query.trim().is_empty(),
             p,
         );
-        let mut popup = egui::Popup::menu(&response);
+        let (mut popup, size) = theme::dropdown(&response, 420.0);
         if self.demo
             && self.capture.is_some()
             && ui.ctx().data(|data| {
@@ -532,12 +526,15 @@ impl YamantakaApp {
             popup = popup.open(true);
         }
         popup.show(|ui| {
-            let width = (ui.ctx().content_rect().width() - 56.0).clamp(120.0, 640.0);
-            let label = ui.label(self.tr("Buscar en biblioteca", "Search library"));
-            let input = self.library_search(ui, width, p).labelled_by(label.id);
-            if response.clicked() {
-                input.request_focus();
-            }
+            size.show(ui, |ui| {
+                let label = ui.label(self.tr("Buscar en biblioteca", "Search library"));
+                let input = self
+                    .library_search(ui, ui.available_width(), p)
+                    .labelled_by(label.id);
+                if response.clicked() {
+                    input.request_focus();
+                }
+            });
         });
     }
 }

@@ -116,6 +116,9 @@ $cases = @(
     @{ name='library-shelves-collections'; args=@('--size=1440x960','--pdf-covers','--grouping=collection','--reduce-motion','--es'); visible=@('Personal study','Plegar Personal study (2)','2D','3D'); firstBook=$true },
     @{ name='library-shelves-2d-small'; args=@('--size=640x480','--text-scale=2','--flat-covers','--pdf-covers','--library-view-menu','--es'); visible=@('Vista','Portadas 3D','Portadas 2D','Lista') },
     @{ name='library-compact-search-menu'; args=@('--size=640x480','--text-scale=2','--library-search-menu','--pdf-covers','--reduce-motion'); visible=@('Search library','Search title or author') },
+    @{ name='library-view-qhd'; args=@('--size=2048x1152','--capture-full-viewport','--opengl','--library-view-menu','--pdf-covers','--es','--reduce-motion'); visible=@('Vista','Portadas 3D','Portadas 2D','Lista','Recientes') },
+    @{ name='library-search-qhd-150'; args=@('--size=2048x1152','--capture-full-viewport','--opengl','--text-scale=1.5','--library-search-menu','--pdf-covers','--light','--es','--reduce-motion'); visible=@('Buscar en biblioteca','Buscar por título o autor') },
+    @{ name='library-tools-qhd'; args=@('--size=2048x1152','--capture-full-viewport','--opengl','--tools-menu','--pdf-covers','--es','--reduce-motion'); visible=@('Organizar biblioteca','Reglas guardadas','Copias idénticas','Ajustes') },
     @{ name='library-compact-filters-active'; args=@('--size=720x540','--pdf-covers','--smart-view=missing','--light','--es') },
     @{ name='library-wide-light-pdf'; args=@('--pdf-covers','--light','--es'); visible=$libraryControlsEs + @('Buscar en biblioteca','Continuar'); firstBook=$true },
     @{ name='library-1280'; args=@('--pdf-covers','--size=1280x720','--light','--es','--reduce-motion'); visible=$libraryControlsEs + @('Buscar en biblioteca','Continuar'); firstBook=$true },
@@ -537,6 +540,7 @@ $cases = @(
     @{ name='reader-sepia-rotated'; args=@('--reader','--reader-theme=sepia','--rotation=90') },
     @{ name='reader-fit-width'; args=@('--reader','--fit-width') },
     @{ name='reader-options-small-200'; args=@('--reader','--reader-options','--size=640x480','--text-scale=2'); visible=@('Reading','Layout','Positions','Document recovery') },
+    @{ name='reader-options-qhd'; args=@('--reader','--reader-options','--size=2048x1152','--capture-full-viewport','--opengl','--es','--reduce-motion'); visible=@('Más controles','Lectura','Páginas','Posiciones','Estudio') },
     @{ name='reader-small-200'; args=@('--reader','--size=640x480','--text-scale=2') }
 )
 $duplicateCases = @($cases | Group-Object -Property name | Where-Object { $_.Count -gt 1 })
@@ -586,6 +590,14 @@ foreach ($case in $cases) {
         throw "Native capture did not produce PNG and control bounds: $($case.name)"
     }
     $controls = Get-Content -LiteralPath $controlPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($case.args -contains '--capture-full-viewport') {
+        $scale = if ($case.args -contains '--text-scale=1.5') { 1.5 } else { 1.0 }
+        $width = ($controls.viewport[2] - $controls.viewport[0]) * $scale
+        $height = ($controls.viewport[3] - $controls.viewport[1]) * $scale
+        if ([Math]::Abs($width - 2048) -gt 2 -or [Math]::Abs($height - 1152) -gt 2) {
+            throw "Expected the full 2048 x 1152 logical viewport in $($case.name), got $width x $height."
+        }
+    }
     if ($case.name -like 'study-review-*' -and
         ($controls.primaryAnnotations.total -ne 2 -or @($controls.primaryAnnotations.entries).Count -ne 1 -or
          $controls.primaryAnnotations.entries[0].id -cne 'review-passage')) {

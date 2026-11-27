@@ -151,105 +151,97 @@ impl YamantakaApp {
         } else {
             theme::control(ui, label, Some(theme::Icon::Menu), false, false, p)
         };
-        let mut popup = egui::Popup::menu(&response);
+        let (mut popup, size) = theme::dropdown(&response, 244.0);
         if self.preview_tools_menu {
             popup = popup.open(true);
         }
         popup.show(|ui| {
-            let height = (ui.ctx().content_rect().bottom() - ui.cursor().top() - 12.0).max(40.0);
-            egui::ScrollArea::vertical()
-                .max_height(height)
-                .show(ui, |ui| {
-                    if theme::navigation(
-                        ui,
-                        self.tr("Colecciones", "Collections"),
-                        matches!(self.surface, Surface::Collections),
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.show_collections(None);
-                        ui.close();
+            size.show(ui, |ui| {
+                if theme::navigation(
+                    ui,
+                    self.tr("Colecciones", "Collections"),
+                    matches!(self.surface, Surface::Collections),
+                    p,
+                )
+                .clicked()
+                {
+                    self.show_collections(None);
+                    ui.close();
+                }
+                if theme::navigation(
+                    ui,
+                    self.tr("Etiquetas", "Tags"),
+                    matches!(self.surface, Surface::Tags),
+                    p,
+                )
+                .clicked()
+                {
+                    self.show_tags(None);
+                    ui.close();
+                }
+                if theme::navigation(
+                    ui,
+                    self.tr("Reglas guardadas", "Saved rules"),
+                    matches!(self.surface, Surface::Automation),
+                    p,
+                )
+                .clicked()
+                {
+                    self.show_automation_rules();
+                    ui.close();
+                }
+                if theme::navigation(
+                    ui,
+                    self.tr("Copias idénticas", "Identical copies"),
+                    matches!(self.surface, Surface::Duplicates),
+                    p,
+                )
+                .clicked()
+                {
+                    self.show_surface(Surface::Duplicates);
+                    ui.close();
+                }
+                self.library_check_menu(ui, p);
+                self.operation_actions(ui, p);
+                let import_folder =
+                    theme::navigation(ui, self.tr("Importar carpeta…", "Import folder…"), false, p)
+                        .on_hover_text(self.tr(
+                            "Añadir los PDF de una carpeta y sus subcarpetas.",
+                            "Add PDFs from a folder and its subfolders.",
+                        ));
+                if self.preview_tools_menu
+                    && self.text_scale >= 2.0
+                    && !self.library_check.capture_mode
+                {
+                    import_folder.scroll_to_me(Some(egui::Align::Center));
+                }
+                if import_folder.clicked() {
+                    ui.close();
+                    if let Some(root) = yamantaka_windows::pick_pdf_folder() {
+                        self.import_folder(root);
                     }
-                    if theme::navigation(
-                        ui,
-                        self.tr("Etiquetas", "Tags"),
-                        matches!(self.surface, Surface::Tags),
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.show_tags(None);
-                        ui.close();
-                    }
-                    if theme::navigation(
-                        ui,
-                        self.tr("Reglas guardadas", "Saved rules"),
-                        matches!(self.surface, Surface::Automation),
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.show_automation_rules();
-                        ui.close();
-                    }
-                    if theme::navigation(
-                        ui,
-                        self.tr("Copias idénticas", "Identical copies"),
-                        matches!(self.surface, Surface::Duplicates),
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.show_surface(Surface::Duplicates);
-                        ui.close();
-                    }
-                    self.library_check_menu(ui, p);
-                    self.operation_actions(ui, p);
-                    if theme::navigation(
-                        ui,
-                        self.tr("Importar carpeta…", "Import folder…"),
-                        false,
-                        p,
-                    )
-                    .on_hover_text(self.tr(
-                        "Añadir los PDF de una carpeta y sus subcarpetas.",
-                        "Add PDFs from a folder and its subfolders.",
-                    ))
-                    .clicked()
-                    {
-                        ui.close();
-                        if let Some(root) = yamantaka_windows::pick_pdf_folder() {
-                            self.import_folder(root);
-                        }
-                    }
-                    if theme::navigation(
-                        ui,
-                        self.tr("Notas de la biblioteca", "Library notes"),
-                        matches!(self.surface, Surface::Notes),
-                        p,
-                    )
-                    .clicked()
-                    {
-                        self.show_global_notes();
-                        ui.close();
-                    }
-                    ui.separator();
-                    if !self.library_selection.toolbar_visible() {
-                        self.library_selection_control(ui, p);
-                    }
-                    self.session_menu(ui, false, p);
-                    if theme::navigation(ui, self.tr("Ajustes", "Settings"), false, p).clicked() {
-                        self.show_surface(Surface::Settings);
-                        ui.close();
-                    }
-                    if self.preview_tools_menu
-                        && self.text_scale >= 2.0
-                        && !self.library_check.capture_mode
-                    {
-                        ui.scroll_to_cursor(Some(egui::Align::Max));
-                    }
-                });
+                }
+                if theme::navigation(
+                    ui,
+                    self.tr("Notas de la biblioteca", "Library notes"),
+                    matches!(self.surface, Surface::Notes),
+                    p,
+                )
+                .clicked()
+                {
+                    self.show_global_notes();
+                    ui.close();
+                }
+                ui.separator();
+                if !self.library_selection.toolbar_visible() {
+                    self.library_selection_control(ui, p);
+                }
+                self.session_menu(ui, false, p);
+                if theme::navigation(ui, self.tr("Ajustes", "Settings"), false, p).clicked() {
+                    self.show_surface(Surface::Settings);
+                    ui.close();
+                }
+            });
         });
     }
     pub(super) fn show_search(&mut self) {

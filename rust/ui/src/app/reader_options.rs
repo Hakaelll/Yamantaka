@@ -10,17 +10,15 @@ impl YamantakaApp {
         }
     }
 
-    pub(super) fn reader_options_popup(&self, response: &egui::Response) -> egui::Popup<'static> {
-        let popup = egui::Popup::menu(response)
-            .align(egui::RectAlign::BOTTOM_END)
-            .align_alternatives(&[])
-            .gap(8.0)
-            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-        if self.preview_reader_options {
+    pub(super) fn show_reader_options(&mut self, response: &egui::Response, p: Palette) {
+        let (popup, size) = theme::dropdown(response, 304.0);
+        let popup = popup.close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+        let popup = if self.preview_reader_options {
             popup.open_memory(egui::SetOpenCommand::Bool(true))
         } else {
             popup
-        }
+        };
+        popup.show(|ui| size.show(ui, |ui| self.reader_options_menu(ui, p)));
     }
 
     pub(super) fn reader_canvas(&self, palette: Palette) -> Color32 {
@@ -130,8 +128,7 @@ impl YamantakaApp {
         }
     }
 
-    pub(super) fn reader_options_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
-        ui.set_min_width(264.0);
+    fn reader_options_menu(&mut self, ui: &mut egui::Ui, p: Palette) {
         ui.menu_button(
             format!(
                 "{} ({})",
@@ -141,7 +138,7 @@ impl YamantakaApp {
             |ui| self.reader_documents_menu(ui),
         );
         ui.separator();
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             for (index, es, en) in [
                 (0, "Lectura", "Reading"),
                 (1, "Páginas", "Layout"),
@@ -155,19 +152,10 @@ impl YamantakaApp {
             }
         });
         ui.separator();
-        // Use the space below the popup's actual cursor, including the compact
-        // zoom row. The menu must never move over the toolbar at enlarged text.
-        let height =
-            (ui.ctx().content_rect().bottom() - ui.cursor().top() - 28.0).clamp(48.0, 760.0);
-        ui.set_min_width(264.0);
-        egui::ScrollArea::vertical()
-            .max_height(height)
-            .min_scrolled_height(height)
-            .show(ui, |ui| self.reader_options_content(ui, p));
+        self.reader_options_content(ui, p);
     }
 
     fn reader_options_content(&mut self, ui: &mut egui::Ui, p: Palette) {
-        ui.set_max_width(280.0);
         self.operation_actions(ui, p);
         let reference = self.reference.is_some() && self.reading_focus.reference();
         let english = self.english;

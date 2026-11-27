@@ -84,8 +84,7 @@ impl YamantakaApp {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let more =
                 theme::icon_button(ui, self.tr("Más controles", "More controls"), Icon::Menu, p);
-            self.reader_options_popup(&more)
-                .show(|ui| self.reader_options_menu(ui, p));
+            self.show_reader_options(&more, p);
         });
         Some(response.id)
     }
