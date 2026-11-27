@@ -11,7 +11,6 @@ yamantaka-windows.workspace = true
 crossbeam-channel.workspace = true
 pdfium-render.workspace = true
 sha2.workspace = true
+tempfile.workspace = true
 [lints]
 workspace = true
-[dev-dependencies]
-tempfile.workspace = true

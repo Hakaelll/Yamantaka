@@ -89,6 +89,10 @@ impl reader_pane::ReaderPane {
 
 impl YamantakaApp {
     pub(in crate::app) fn apply_notes_action(&mut self, reference: bool, action: NotesAction) {
+        if let NotesAction::Notebook(passage) = action {
+            self.open_study_library(false, Some(passage));
+            return;
+        }
         if let NotesAction::BookStudy(tab, seed) = action {
             self.open_book_study(reference, tab, seed);
             return;
@@ -152,7 +156,9 @@ impl YamantakaApp {
                     }
                 }
                 NotesAction::ReloadMarks => self.reader.annotation_paint.invalidate_document(None),
-                NotesAction::PreviewCrop(_) | NotesAction::BookStudy(..) => unreachable!(),
+                NotesAction::PreviewCrop(_)
+                | NotesAction::BookStudy(..)
+                | NotesAction::Notebook(_) => unreachable!(),
             }
             return;
         }

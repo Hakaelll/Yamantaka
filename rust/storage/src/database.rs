@@ -418,6 +418,13 @@ fn order(query: &LibraryQuery) -> String {
     format!("{column} {direction},id ASC")
 }
 impl LibraryRepository for Database {
+    fn study_library(
+        &mut self,
+        operation: yamantaka_domain::study_library::Operation,
+    ) -> Result<yamantaka_domain::study_library::Outcome> {
+        self.access_study_library(operation)
+    }
+
     fn study_book(
         &mut self,
         document: &str,

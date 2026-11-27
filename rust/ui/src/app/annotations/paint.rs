@@ -74,7 +74,7 @@ impl Drop for MarkSlot {
 pub(in crate::app) struct AnnotationPaint {
     document: Option<String>,
     pages: HashMap<u32, MarkSlot>,
-    pub(super) focused: Option<String>,
+    pub(in crate::app) focused: Option<String>,
 }
 impl AnnotationPaint {
     pub(in crate::app) fn invalidate(&mut self) {
@@ -464,7 +464,11 @@ fn badge_group_len(anchors: &[(f32, &str)]) -> usize {
         .count()
 }
 
-fn draw_position(paper: egui::Rect, rotation: PageRotation, point: [f64; 2]) -> egui::Pos2 {
+pub(in crate::app) fn draw_position(
+    paper: egui::Rect,
+    rotation: PageRotation,
+    point: [f64; 2],
+) -> egui::Pos2 {
     let [x, y] = rotation.rotate_point(point);
     paper.min + egui::vec2(x as f32 * paper.width(), y as f32 * paper.height())
 }

@@ -108,10 +108,13 @@ impl SelectionState {
             })
             .stroke(egui::Stroke::new(1.0, p.line));
         let compact = ui.ctx().content_rect().width() < 420.0;
-        let alignment = if anchor.top() - viewport.top() >= 46.0 {
-            egui::RectAlign::TOP
-        } else {
+        let above = anchor.top() - viewport.top();
+        let below = viewport.bottom() - anchor.bottom();
+        let required = if compact { 74.0 } else { 46.0 };
+        let alignment = if below >= required || below > above {
             egui::RectAlign::BOTTOM
+        } else {
+            egui::RectAlign::TOP
         };
         let mut action = None;
         let focus = self.focused_page(ui.ctx()).is_some()
@@ -194,11 +197,21 @@ impl SelectionState {
                     let more = context_button(ui, "…", tr("Más acciones", "More actions"), p);
                     egui::Popup::menu(&more).frame(frame).show(|ui| {
                         self.passive.layers.push(ui.layer_id());
-                        if theme::navigation(ui, tr("Copiar cita", "Copy citation"), false, p)
-                            .clicked()
-                        {
-                            action = Some(SelectionAction::CopyCitation);
-                            ui.close();
+                        for (caption, choice) in [
+                            (
+                                tr("Copiar cita", "Copy citation"),
+                                SelectionAction::CopyCitation,
+                            ),
+                            (
+                                tr("Añadir a cuaderno", "Add to notebook"),
+                                SelectionAction::Notebook,
+                            ),
+                            (tr("Vincular pasaje", "Link passage"), SelectionAction::Link),
+                        ] {
+                            if theme::navigation(ui, caption, false, p).clicked() {
+                                action = Some(choice);
+                                ui.close();
+                            }
                         }
                     });
                 });

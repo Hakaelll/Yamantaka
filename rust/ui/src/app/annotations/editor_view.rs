@@ -13,6 +13,7 @@ pub(in crate::app) enum NotesAction {
     ReloadMarks,
     PreviewCrop(crop::Request),
     BookStudy(book_study::Tab, Option<book_study::Seed>),
+    Notebook(yamantaka_domain::study_library::Passage),
     Export(yamantaka_application::annotation_export::AnnotationExportFormat),
 }
 impl NotesAction {
@@ -402,6 +403,15 @@ impl AnnotationState {
                     }
                     if !busy {
                         ui.menu_button(tr("Estudiar", "Study"), |ui| {
+                            if ui
+                                .button(tr("Añadir a cuaderno", "Add to notebook"))
+                                .clicked()
+                            {
+                                action = Some(NotesAction::Notebook(
+                                    study_library::annotation_passage(data, annotation_point(data)),
+                                ));
+                                ui.close();
+                            }
                             for (tab, caption) in [
                                 (
                                     book_study::Tab::Summary,

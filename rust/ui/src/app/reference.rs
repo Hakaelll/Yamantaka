@@ -671,6 +671,9 @@ impl ReferenceView {
                         .annotation_paint
                         .paint(ui, page.page, paper, layout.rotation());
                 }
+                self.pane
+                    .study
+                    .paint_passage(ui, page.page, paper, layout.rotation(), p);
                 let on_paper = p.on_paper(YamantakaApp::reading_paper(preferences.reading_theme));
                 if self.differences.contains(&page.page) {
                     ui.painter().rect_stroke(

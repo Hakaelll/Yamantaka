@@ -725,3 +725,118 @@ fn concurrent_long_document_inspections_finish_before_hot_handle_eviction() {
         assert_eq!(ticket.wait().unwrap().pages.len(), 5000);
     }
 }
+
+#[test]
+fn marked_pdf_copy_preserves_text_and_leaves_the_source_untouched() {
+    use yamantaka_domain::{
+        annotations::{AnnotationColor, AnnotationKind},
+        pdf_geometry::NormalizedPageRect,
+        study_library::{PdfMark, PdfMarks},
+    };
+    let engine = engine();
+    let source = fixture("textual.pdf");
+    let hash = Sha256::digest(fs::read(&source).unwrap());
+    let cancel = Cancellation::default();
+    engine
+        .open("original".into(), source.clone(), None, cancel.clone())
+        .unwrap();
+    let original = engine
+        .render(key("original", 0, 0), Priority::Visible, cancel.clone())
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let copy = directory.path().join("study.pdf");
+    let target = |path: PathBuf| PdfMarks {
+        document: "original".into(),
+        fingerprint: "fixture".into(),
+        pages: 0..1,
+        destination: path,
+    };
+    let mark = PdfMark {
+        page: 0,
+        kind: AnnotationKind::Highlight,
+        color: AnnotationColor::Yellow,
+        rects: vec![
+            NormalizedPageRect::new([0.15, 0.15], [0.45, 0.22])
+                .unwrap()
+                .into(),
+        ],
+        drawing: None,
+    };
+    engine
+        .export_marked_pdf(target(copy.clone()), vec![mark], cancel.clone())
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(
+        engine
+            .open("copy".into(), copy.clone(), None, cancel.clone())
+            .unwrap()
+            .pages
+            .len(),
+        1
+    );
+    assert_eq!(
+        engine.text("original".into(), 0, cancel.clone()).unwrap(),
+        engine.text("copy".into(), 0, cancel.clone()).unwrap()
+    );
+    let marked = engine
+        .render(key("copy", 0, 0), Priority::Visible, cancel.clone())
+        .unwrap();
+    assert_ne!(marked.pixels(), original.pixels());
+    assert_eq!(Sha256::digest(fs::read(&source).unwrap()), hash);
+    assert!(matches!(
+        engine
+            .export_marked_pdf(target(source), vec![], cancel)
+            .unwrap()
+            .wait(),
+        Err(Failure::DestinationOccupied)
+    ));
+}
+
+#[test]
+#[ignore = "requires the optional Windows OCR add-on and a raster-only Spanish fixture"]
+fn installed_addon_recognizes_searchable_scanned_text() {
+    use yamantaka_domain::{pdf_find::PdfFindQuery, pdf_text::TextGeometryPurpose};
+    let helper = PathBuf::from(std::env::var_os("YAMANTAKA_OCR_HELPER").unwrap());
+    let scan = PathBuf::from(std::env::var_os("YAMANTAKA_OCR_FIXTURE").unwrap());
+    let engine = engine();
+    let cancel = Cancellation::default();
+    let info = engine
+        .open("scan".into(), scan, None, cancel.clone())
+        .unwrap();
+    assert_eq!(
+        engine
+            .recognize_pages(
+                "scan".into(),
+                vec![(0, info.pages.get(0).unwrap().size())],
+                &helper,
+                &cancel
+            )
+            .unwrap(),
+        1
+    );
+    let geometry = engine
+        .try_text_geometry(
+            "scan".into(),
+            0,
+            TextGeometryPurpose::Reader,
+            cancel.clone(),
+        )
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(geometry.text().contains("biblioteca"));
+    assert!(geometry.characters().iter().any(|c| c.region.is_some()));
+    let matches = engine
+        .try_find_page(
+            "scan".into(),
+            0,
+            PdfFindQuery::new("biblioteca", false, true).unwrap(),
+            0,
+            cancel,
+        )
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(matches.matches()[0].position(0).is_some());
+}

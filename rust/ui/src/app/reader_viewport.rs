@@ -195,6 +195,7 @@ impl YamantakaApp {
                 }
                 if !self.reader.study.hidden && !self.reader.viewport.source_changed {
                     self.reader.annotation_paint.paint(ui, visible.page, paper, layout.rotation());
+                    self.reader.study.paint_passage(ui, visible.page, paper, layout.rotation(), p);
                 }
                 let on_paper = p.on_paper(Self::reading_paper(preferences.reading_theme));
                 if self.reference.as_ref().is_some_and(|reference| reference.differences.contains(&visible.page)) {

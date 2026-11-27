@@ -75,6 +75,8 @@ mod shortcuts;
 mod smart_views;
 mod startup_repair;
 mod study;
+mod study_document;
+mod study_library;
 mod tabs;
 mod tags;
 mod text;
@@ -153,6 +155,8 @@ pub struct YamantakaApp {
     reader: reader_pane::ReaderPane,
     study: study::State,
     book_study: book_study::State,
+    study_library: study_library::State,
+    study_document: study_document::State,
     reading_focus: shortcuts::ReadingFocus,
     reference_shortcuts_preview: shortcuts::ShortcutPreview,
     reference: Option<reference::ReferenceView>,
@@ -423,6 +427,8 @@ impl YamantakaApp {
             reader,
             study: Default::default(),
             book_study: Default::default(),
+            study_library: Default::default(),
+            study_document: Default::default(),
             reading_focus: Default::default(),
             reference_shortcuts_preview: Default::default(),
             reference: None,
@@ -1561,6 +1567,10 @@ impl App for YamantakaApp {
                 }
                 Update::CoverRebuilt(reply) => self.accept_cover_rebuilt(*reply, ctx),
                 Update::StudyBook(reply) => self.accept_book_study(*reply),
+                Update::StudyLibrary(reply) => self.accept_study_library(reply),
+                Update::StudyPdfMarks(request, result, cancel) => {
+                    self.accept_study_pdf_marks(*request, result, cancel)
+                }
                 Update::AnnotationRecovered(reply) => self.accept_stored_note_recovery(*reply),
                 Update::SelectionRecovered(reply) => self.accept_selection_note_recovery(*reply),
                 Update::Library(documents, count, memberships, cancel) => {
@@ -2320,6 +2330,8 @@ impl App for YamantakaApp {
             || self.bulk_picker.is_some()
             || self.selection_review_open()
             || self.book_study.open
+            || self.study_library.open()
+            || self.study_document.open()
             || self.tag_dialog_open()
             || self.legacy_import.open
             || self.backup_restore.open
@@ -2589,6 +2601,8 @@ impl App for YamantakaApp {
         self.update_cover_batch_progress();
         self.selection_review_dialog(&ctx);
         self.book_study_window(&ctx);
+        self.study_library_window(&ctx);
+        self.study_document_window(&ctx);
         self.tag_management_dialogs(&ctx);
         self.legacy_import_dialog(&ctx);
         self.duplicate_merge_dialog(&ctx);

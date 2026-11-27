@@ -1297,6 +1297,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 ])?;
             }
             let backup_source = database.file_path();
+            let study_engine = engine.clone();
             let runtime = Runtime::start(database, engine, move || notify.request_repaint())?;
             let presenter = cc.wgpu_render_state.clone().map(|state| {
                 app_graphics.install(&state.device, &cc.egui_ctx);
@@ -1327,6 +1328,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 presenter,
                 startup_mode,
             );
+            app.install_study_engine(study_engine);
             app.graphics_recovery = app_graphics.clone();
             if let Some(mode) = args
                 .iter()
@@ -1992,6 +1994,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 if args.iter().any(|arg| arg == "--study-cards") {
                     app.preview_book_study();
+                }
+                if args
+                    .iter()
+                    .any(|arg| arg == "--study-notebooks" || arg == "--study-passage-links")
+                {
+                    app.preview_study_notebooks(
+                        args.iter().any(|arg| arg == "--study-passage-links"),
+                    );
                 }
                 if args.iter().any(|arg| arg == "--study-selection") {
                     app.preview_study_selection();

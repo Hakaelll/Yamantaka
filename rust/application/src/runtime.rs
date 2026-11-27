@@ -136,6 +136,8 @@ pub enum Action {
     AnnotationMarks(Box<AnnotationMarksRequest>),
     Annotation(Box<AnnotationRequest>),
     StudyBook(Box<yamantaka_domain::study_book::Request>),
+    StudyLibrary(Box<yamantaka_domain::study_library::Operation>),
+    StudyPdfMarks(Box<yamantaka_domain::study_library::PdfMarks>, Cancellation),
     RecoverAnnotation(Box<crate::annotation_draft_recovery::Request>),
     RecoverSelection(Box<crate::selection_draft_recovery::Request>),
     Bookmarks(String, usize, Cancellation),
@@ -266,6 +268,12 @@ pub enum Update {
     AnnotationMarks(AnnotationMarksReply),
     Annotations(AnnotationReply),
     StudyBook(Box<yamantaka_domain::study_book::Reply>),
+    StudyLibrary(yamantaka_domain::Result<yamantaka_domain::study_library::Outcome>),
+    StudyPdfMarks(
+        Box<yamantaka_domain::study_library::PdfMarks>,
+        yamantaka_domain::Result<Vec<yamantaka_domain::study_library::PdfMark>>,
+        Cancellation,
+    ),
     AnnotationRecovered(Box<crate::annotation_draft_recovery::Reply>),
     SelectionRecovered(Box<crate::selection_draft_recovery::Reply>),
     Bookmarks(String, usize, BookmarkPage, Cancellation),
@@ -1393,6 +1401,29 @@ impl Runtime {
                                 Action::AnnotationMarks(request) => {
                                     let reply = request.execute(&repository);
                                     emit(&events, &notify, Update::AnnotationMarks(reply), permit);
+                                }
+                                Action::StudyLibrary(operation) => {
+                                    let result = repository.study_library(*operation);
+                                    emit(&events, &notify, Update::StudyLibrary(result), permit);
+                                }
+                                Action::StudyPdfMarks(request, cancel) => {
+                                    let result = engine.memory_governor().ok_or(Failure::MemoryBudget).and_then(|governor| {
+                                        let mut marks = Vec::new();
+                                        let mut points = 0;
+                                        repository.visit_annotations(&request.document, &governor, &cancel, &mut |record| {
+                                            use yamantaka_domain::annotations::{AnnotationKind, AttachmentStatus};
+                                            let data = &record.data().values;
+                                            if data.status == AttachmentStatus::Attached && data.document_fingerprint == request.fingerprint
+                                                && request.pages.contains(&data.page_index) && (matches!(data.kind, AnnotationKind::Highlight | AnnotationKind::Underline) || data.kind.is_drawing() && data.kind != AnnotationKind::Crop) {
+                                                points += data.rects.len() * 2 + data.drawing.as_ref().map_or(0, |drawing| drawing.points().len());
+                                                if points > 100_000 || marks.len() >= 4096 { return Err(Failure::Invalid("Export a smaller page range".into())); }
+                                                marks.push(yamantaka_domain::study_library::PdfMark {page: data.page_index, kind: data.kind, color: data.color, rects: data.rects.clone(), drawing: data.drawing.clone()});
+                                            }
+                                            Ok(())
+                                        })?;
+                                        Ok(marks)
+                                    });
+                                    emit(&events, &notify, Update::StudyPdfMarks(request, result, cancel), permit);
                                 }
                                 Action::StudyBook(request) => {
                                     let exported = matches!(&request.operation, yamantaka_domain::study_book::Operation::Export(_));

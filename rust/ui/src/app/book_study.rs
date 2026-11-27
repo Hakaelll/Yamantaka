@@ -248,7 +248,11 @@ impl YamantakaApp {
                         });
                         ui.separator();
                         if session.pending {
-                            ui.spinner();
+                            ui.horizontal(|ui| {
+                                ui.spinner();
+                                ui.label(if session.dirty { tr("Guardando cambios…", "Saving changes…") }
+                                else { tr("Cargando estudio…", "Loading study…") });
+                            });
                         }
                         if let Some(error) = &session.error {
                             ui.label(error);
@@ -388,6 +392,11 @@ impl YamantakaApp {
                                         card.due
                                             .is_none_or(|timestamp| timestamp <= now.timestamp())
                                     };
+                                    let count = book.cards.iter().filter(|card| due(card)).count();
+                                    if count > 0 {
+                                        let label = if english { format!("Due now · {count}") } else { format!("Pendientes · {count}") };
+                                        ui.label(RichText::new(label).color(p.secondary));
+                                    }
                                     let start =
                                         session.review_index.unwrap_or(0).min(book.cards.len());
                                     let current = (start..book.cards.len())

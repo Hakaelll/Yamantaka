@@ -1,0 +1,13 @@
+[package]
+name = "yamantaka-ocr"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+windows = { workspace = true, features = ["Foundation", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage_Streams", "Win32_System_WinRT"] }
+
+[lints]
+workspace = true

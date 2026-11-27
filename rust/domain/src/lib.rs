@@ -244,8 +244,16 @@ pub struct LibraryMembership {
     pub tag: Option<String>,
 }
 pub mod study_book;
+pub mod study_library;
 
 pub trait LibraryRepository {
+    fn study_library(
+        &mut self,
+        _operation: study_library::Operation,
+    ) -> Result<study_library::Outcome> {
+        Err(Failure::Unsupported("Study library".into()))
+    }
+
     fn study_book(
         &mut self,
         _document: &str,

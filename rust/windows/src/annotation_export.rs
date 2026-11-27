@@ -6,6 +6,7 @@ pub fn pick_annotation_export(title: &str, extension: &str) -> Result<Option<Pat
     let label = match extension {
         "md" => "Markdown",
         "json" => "JSON",
+        "pdf" => "PDF",
         _ => {
             return Err(Failure::Invalid(
                 "Unsupported annotation export format".into(),
@@ -14,7 +15,11 @@ pub fn pick_annotation_export(title: &str, extension: &str) -> Result<Option<Pat
     };
     Ok(rfd::FileDialog::new()
         .set_title(title)
-        .set_file_name(format!("Yamantaka notes.{extension}"))
+        .set_file_name(if extension == "pdf" {
+            "Yamantaka study copy.pdf".into()
+        } else {
+            format!("Yamantaka notes.{extension}")
+        })
         .add_filter(label, &[extension])
         .save_file())
 }

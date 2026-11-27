@@ -168,6 +168,7 @@ fn color_menu() -> egui::Id {
 #[derive(Default)]
 pub(super) struct Pane {
     pub hidden: bool,
+    pub passage: Option<yamantaka_domain::study_library::Passage>,
     stroke: Option<Stroke>,
     intent: Option<Intent>,
     save: Option<Save>,
@@ -323,6 +324,17 @@ impl Pane {
                     stroke.color,
                     stroke.weight,
                 );
+                if stroke.kind != AnnotationKind::Ink {
+                    for &point in &stroke.points {
+                        let endpoint = annotations::paint::draw_position(paper, rotation, point);
+                        ui.painter().circle(
+                            endpoint,
+                            3.5,
+                            Color32::WHITE,
+                            egui::Stroke::new(1.4, annotations::panel::mark_color(stroke.color)),
+                        );
+                    }
+                }
             }
         }
         response.on_hover_cursor(egui::CursorIcon::Crosshair);
@@ -474,7 +486,7 @@ impl YamantakaApp {
         }
     }
 
-    fn study_pane_mut(&mut self, reference: bool) -> &mut reader_pane::ReaderPane {
+    pub(super) fn study_pane_mut(&mut self, reference: bool) -> &mut reader_pane::ReaderPane {
         if reference && let Some(view) = &mut self.reference {
             &mut view.pane
         } else {
@@ -588,7 +600,7 @@ impl YamantakaApp {
             .show(ui, |ui| {
                 if visible {
                     ui.horizontal(|ui| {
-                        let wide = ui.available_width() >= if comparison { 1340.0 } else { 1250.0 };
+                        let wide = ui.available_width() >= if comparison { 1388.0 } else { 1298.0 };
                         if comparison && ui.available_width() >= 530.0 {
                             ui.label(
                                 RichText::new(if reference {
@@ -657,7 +669,7 @@ impl YamantakaApp {
                                 tr("Herramientas", "Tools"),
                                 self.study.tool.label(en)
                             );
-                            let title = if ui.available_width() < 285.0 {
+                            let title = if ui.available_width() < 360.0 {
                                 self.study.tool.label(en)
                             } else {
                                 &label
@@ -710,6 +722,7 @@ impl YamantakaApp {
                             });
                         }
                         color_control(ui, en, &mut self.study.color, p);
+                        self.study_library_menu(ui, p, reference);
                         if wide
                             && self.study.tool.drawing().is_some()
                             && self.study.tool != Tool::Crop
@@ -855,6 +868,8 @@ impl YamantakaApp {
         match action {
             SelectionAction::Copy => self.copy_selection(ctx, reference),
             SelectionAction::CopyCitation => self.copy_selection_citation(ctx, reference),
+            SelectionAction::Notebook => self.send_passage_to_notebook(reference),
+            SelectionAction::Link => self.capture_link_passage(reference),
             SelectionAction::Color(color) => self.study.color = color,
             SelectionAction::Annotate => self.study_note(reference, None, AnnotationKind::TextNote),
             SelectionAction::Highlight | SelectionAction::Underline => {

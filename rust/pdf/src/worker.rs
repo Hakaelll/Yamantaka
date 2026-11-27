@@ -60,6 +60,14 @@ struct InspectInfo {
     author: Option<String>,
 }
 enum Request {
+    MarkedExport {
+        id: String,
+        epoch: u64,
+        request: yamantaka_domain::study_library::PdfMarks,
+        marks: Vec<yamantaka_domain::study_library::PdfMark>,
+        cancel: Cancellation,
+        reply: Reply<()>,
+    },
     SourceRevision {
         id: String,
         epoch: u64,
@@ -154,7 +162,8 @@ enum Request {
 impl Request {
     fn document_id(&self) -> Option<&str> {
         match self {
-            Self::DetectCover { id, .. }
+            Self::MarkedExport { id, .. }
+            | Self::DetectCover { id, .. }
             | Self::SourceRevision { id, .. }
             | Self::Cover { id, .. }
             | Self::Open { id, .. }
@@ -177,7 +186,7 @@ impl Request {
                 yamantaka_domain::pdf_ticket::PdfOpenPurpose::Reader => 1,
                 yamantaka_domain::pdf_ticket::PdfOpenPurpose::Background => 7,
             },
-            Self::Cover { .. } | Self::DetectCover { .. } => 7,
+            Self::Cover { .. } | Self::DetectCover { .. } | Self::MarkedExport { .. } => 7,
             Self::Render { priority, .. } => 2 + *priority as u8,
             Self::Text { .. }
             | Self::Outline { .. }
@@ -194,6 +203,7 @@ impl Request {
 #[derive(Default)]
 struct Scheduler {
     queue: Vec<Request>,
+    recognized: HashMap<(String, u32), Arc<yamantaka_domain::pdf_text::PdfPageText>>,
     in_flight: Option<(RenderKey, u64, Consumers)>,
     epochs: HashMap<String, u64>,
     visible: HashSet<String>,
@@ -228,6 +238,74 @@ impl Drop for Inner {
 #[derive(Clone)]
 pub struct PdfWorker(Arc<Inner>);
 impl PdfWorker {
+    pub fn recognize_pages(
+        &self,
+        id: String,
+        pages: Vec<(u32, [f32; 2])>,
+        helper: &Path,
+        cancel: &Cancellation,
+    ) -> Result<usize> {
+        if pages.is_empty() || pages.len() > 24 {
+            return Err(Failure::Invalid(
+                "Select one to 24 pages to recognize".into(),
+            ));
+        }
+        let epoch = self.epoch(&id, false);
+        let mut recognized = Vec::new();
+        for (page, size) in pages {
+            cancel.check()?;
+            let existing = self.try_text_geometry(
+                id.clone(),
+                page,
+                yamantaka_domain::pdf_text::TextGeometryPurpose::Reader,
+                cancel.clone(),
+            )?;
+            if existing.epoch != epoch {
+                return Err(Failure::Cancelled);
+            }
+            if existing
+                .wait()?
+                .characters()
+                .iter()
+                .any(|character| character.region.is_some())
+            {
+                continue;
+            }
+            let scale = 2300.0 / size[0].max(size[1]);
+            let [width, height] =
+                size.map(|dimension| (dimension * scale).round().clamp(1.0, 2300.0) as u32);
+            let render = self.try_render(
+                RenderKey {
+                    document_id: id.clone(),
+                    page,
+                    region: None,
+                    physical_width: width,
+                    physical_height: height,
+                    rotation: 0,
+                    generation: 0,
+                },
+                Priority::Thumbnail,
+                cancel.clone(),
+            )?;
+            if render.epoch != epoch {
+                return Err(Failure::Cancelled);
+            }
+            let raster = render.wait()?;
+            let text = crate::ocr::recognize(helper, &raster, &self.0.governor, cancel)?;
+            if !text.text().trim().is_empty() {
+                recognized.push(((id.clone(), page), text));
+            }
+        }
+        cancel.check()?;
+        let count = recognized.len();
+        let mut scheduler = self.0.scheduler.lock().unwrap();
+        if scheduler.epochs.get(&id).copied().unwrap_or_default() != epoch {
+            return Err(Failure::Cancelled);
+        }
+        scheduler.recognized.extend(recognized);
+        Ok(count)
+    }
+
     pub fn start(library: &Path, limits: MemoryLimits) -> Result<Self> {
         let total = limits
             .pages
@@ -300,6 +378,26 @@ impl PdfWorker {
             governor,
         })))
     }
+    pub fn export_marked_pdf(
+        &self,
+        request: yamantaka_domain::study_library::PdfMarks,
+        marks: Vec<yamantaka_domain::study_library::PdfMark>,
+        cancel: Cancellation,
+    ) -> Result<PdfTicket<()>> {
+        let id = request.document.clone();
+        let epoch = self.epoch(&id, false);
+        let (reply, ticket) = self.reply(epoch, cancel.clone(), false)?;
+        self.enqueue(Request::MarkedExport {
+            id,
+            epoch,
+            request,
+            marks,
+            cancel,
+            reply,
+        })?;
+        Ok(ticket)
+    }
+
     fn reply<T>(
         &self,
         epoch: u64,
@@ -403,6 +501,9 @@ impl PdfWorker {
         } else {
             if let Request::Open { id, epoch, .. } | Request::Close { id, epoch, .. } = &request {
                 scheduler.epochs.insert(id.clone(), *epoch);
+                scheduler
+                    .recognized
+                    .retain(|(document, _), _| document != id);
             }
             scheduler.queue.push(request);
         }
@@ -742,6 +843,7 @@ fn fail_request(request: Request) {
         Request::Text { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Outline { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::FindPage { reply, .. } => reply.send(Err(Failure::Cancelled)),
+        Request::MarkedExport { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::PageLinks { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::TextGeometry { reply, .. } => reply.send(Err(Failure::Cancelled)),
         Request::Close { reply, .. } => reply.send(Err(Failure::Cancelled)),
@@ -1331,6 +1433,16 @@ fn run(
                         .get(&id)
                         .ok_or(Failure::NativeDocumentUnavailable)?;
                     loaded.with_source(|document| {
+                        if purpose != yamantaka_domain::pdf_text::TextGeometryPurpose::FrontMatter
+                            && let Some(text) = scheduler
+                                .lock()
+                                .unwrap()
+                                .recognized
+                                .get(&(id.clone(), page))
+                                .cloned()
+                        {
+                            return Ok(text);
+                        }
                         crate::text_geometry::read(
                             document,
                             page,
@@ -1377,6 +1489,29 @@ fn run(
                         .and(result),
                 );
             }
+            Request::MarkedExport {
+                id,
+                epoch,
+                request,
+                marks,
+                cancel,
+                reply,
+            } => {
+                let result = (|| {
+                    cancel.check()?;
+                    epoch_matches(&scheduler, &id, epoch)?;
+                    let loaded = documents
+                        .get(&id)
+                        .ok_or(Failure::NativeDocumentUnavailable)?;
+                    let temporary = loaded.with_source(|document| {
+                        crate::marked_export::prepare(pdfium, document, &request, marks, &cancel)
+                    })?;
+                    cancel.check()?;
+                    epoch_matches(&scheduler, &id, epoch)?;
+                    crate::marked_export::publish(temporary, &request.destination)
+                })();
+                reply.send(result);
+            }
             Request::FindPage {
                 id,
                 epoch,
@@ -1393,6 +1528,15 @@ fn run(
                         .get(&id)
                         .ok_or(Failure::NativeDocumentUnavailable)?;
                     loaded.with_source(|document| {
+                        let recognized = scheduler
+                            .lock()
+                            .unwrap()
+                            .recognized
+                            .get(&(id.clone(), page))
+                            .cloned();
+                        if let Some(text) = recognized {
+                            return crate::ocr::find(&text, &query, offset, &governor, &cancel);
+                        }
                         crate::find::read(document, page, &query, offset, &governor, || {
                             cancel.check()?;
                             epoch_matches(&scheduler, &id, epoch)

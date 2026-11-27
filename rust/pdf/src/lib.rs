@@ -6,6 +6,8 @@ mod covers;
 mod destination;
 mod find;
 mod links;
+mod marked_export;
+mod ocr;
 mod outline;
 mod page_geometry;
 mod source;

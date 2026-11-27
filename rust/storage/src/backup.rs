@@ -278,6 +278,14 @@ pub fn preview_payload(mut payload: Value, cancel: &Cancellation) -> Result<Rest
                 })?;
                 crate::study_book::decode(data)?;
             }
+            if table == "app_metadata"
+                && row["key"].as_str() == Some(yamantaka_domain::study_library::KEY)
+            {
+                let data = row["value"]
+                    .as_str()
+                    .ok_or_else(|| Failure::Invalid("Missing study library".into()))?;
+                yamantaka_domain::study_library::decode(data)?;
+            }
             if table == "annotations" {
                 use yamantaka_domain::annotations::{AnnotationKind, study::StudyGeometry};
                 let kind = match row["type"].as_str() {

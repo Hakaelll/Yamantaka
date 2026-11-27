@@ -22,6 +22,8 @@ $cases = @(
     @{ name='study-tools-light'; args=@('--reader','--study-tools','--light','--es'); visible=@('Estudio','Lápiz','Flecha','Recorte','Borrador','Salir de Estudio') },
     @{ name='study-sidebar-guide'; args=@('--reader','--study-tools','--study-guide','--annotation-page-filter','--light','--es'); visible=@('Mover guía de lectura','Resumen','Repasar tarjetas','Filtros activos (1)') },
     @{ name='study-cards-small-200'; args=@('--reader','--study-cards','--es','--size=640x480','--text-scale=2'); visible=@('Resumen','Tarjetas','Otra vez','Recordada','Saltar') },
+    @{ name='study-notebooks-qhd'; args=@('--reader','--study-notebooks','--es','--size=2048x1152','--capture-full-viewport','--opengl','--reduce-motion'); visible=@('Cuadernos','Vínculos','Lectura y método') },
+    @{ name='study-passage-links-small-200'; args=@('--reader','--study-passage-links','--es','--size=640x480','--text-scale=2','--light'); visible=@('Cuadernos','Vínculos') },
     @{ name='study-tools-small-200'; args=@('--reader','--study-tools','--es','--size=640x480','--text-scale=2'); visible=@('Herramientas · Flecha','Salir de Estudio') },
     @{ name='study-selection'; args=@('--reader','--study-selection','--es'); visible=@('Resaltar','Subrayar','Añadir nota','Copiar') },
     @{ name='study-selection-light'; args=@('--reader','--study-selection','--light','--es'); visible=@('Resaltar','Subrayar','Añadir nota','Copiar') },

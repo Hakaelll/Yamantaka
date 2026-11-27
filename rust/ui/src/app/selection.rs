@@ -190,7 +190,9 @@ impl YamantakaApp {
                 SelectionAction::Highlight
                 | SelectionAction::Underline
                 | SelectionAction::Color(_)
-                | SelectionAction::CopyCitation,
+                | SelectionAction::CopyCitation
+                | SelectionAction::Notebook
+                | SelectionAction::Link,
             ) => {}
             None => {}
         }
@@ -273,6 +275,8 @@ impl YamantakaApp {
 pub(super) enum SelectionAction {
     Copy,
     CopyCitation,
+    Notebook,
+    Link,
     Annotate,
     Highlight,
     Underline,

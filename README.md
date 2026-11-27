@@ -34,7 +34,7 @@ is unsigned; published hashes identify the prepared files.
 | Library | PDF-derived and manual covers, 3D and 2D shelves, list view, adjustable cover size, collections, combined filters and bulk actions |
 | Reading | Document and Book modes, single/spread/continuous layouts, LTR/RTL reading, trackpad and Ctrl + wheel zoom, pan, rotation, margins, reading environments and a reading guide |
 | Navigation | Contents, thumbnails, cancellable search, visible-page match highlights, history, bookmarks and A/B positions |
-| Study | Contextual text marks, editable drawings, PNG crops, anchored notes, combined filters, per-book summaries and spaced review cards |
+| Study | Contextual marks, editable drawings, PNG crops, anchored notes, notebooks, passage links, marked PDF copies, optional local OCR, summaries and review cards |
 | Organization | Collections, tags, smart views, relations, backlinks, revisions and reviewed local automation with undo |
 | Continuity | Reading progress and sessions, recent documents, workspaces, queue, focus and optional synchronized comparison |
 | Local search | Opt-in FTS5 indexing, resumable indexing, filters, ranked previews and exclusion management |
@@ -46,8 +46,11 @@ library. Full-text indexing stores extracted text locally only after consent.
 PDF passwords stay transient in memory. Scanned books can need manual metadata
 or page notes when readable text or reliable geometry is unavailable.
 
-Printing, OCR, encrypted backups and secondary reader windows are outside this
+Printing, encrypted backups and secondary reader windows are outside this
 release's completed feature scope.
+
+The optional [OCR add-on](docs/user-guide/study-tools.md) uses the Windows OCR
+language installed for your profile and has a separate build.
 
 ## First use and migration
 
@@ -98,7 +101,7 @@ Choose a fresh output directory for each package.
 
 ## Architecture and validation
 
-The six-crate workspace separates domain, application, storage, PDF execution,
+The six application crates separate domain, application, storage, PDF execution,
 Windows integration and UI. The interface uses egui/eframe, wgpu and AccessKit;
 PDFium handles PDF rasterization on an owning serial worker. SQLite uses
 rusqlite with FTS5. Local changes to upstream components are documented in

@@ -5,6 +5,8 @@ use std::io::Write;
 use yamantaka_domain::study_book::{BookStudy, Operation, Source};
 use yamantaka_domain::{Cancellation, Failure, Result};
 
+mod library;
+
 pub(crate) const KEY: &str = "rust.study.v1:";
 
 fn valid(book: &BookStudy) -> bool {

@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/domain", "rust/application", "rust/storage", "rust/pdf", "rust/windows", "rust/ui"]
+members = ["rust/domain", "rust/application", "rust/storage", "rust/pdf", "rust/windows", "rust/ui", "rust/ocr"]
 resolver = "2"
 exclude = ["third_party/pdfium-render", "third_party/egui", "third_party/epaint"]
 
