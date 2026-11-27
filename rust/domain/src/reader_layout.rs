@@ -344,6 +344,42 @@ impl ReaderLayout {
             (rect.top + rect.height * point[1]).clamp(0.0, frame.content_size[1] - viewport[1]),
         ])
     }
+    /// Keep the page point beneath a viewport coordinate fixed during a zoom.
+    /// Returns no offset when the pointer is on the background.
+    pub fn scroll_for_zoom_at(
+        &self,
+        frame: &ReaderFrame,
+        anchor: ReaderPosition,
+        pointer: [f64; 2],
+        zoom: f64,
+    ) -> Result<Option<[f64; 2]>> {
+        let [x, y] = [frame.scroll[0] + pointer[0], frame.scroll[1] + pointer[1]];
+        let Some(page) = frame.pages.iter().find(|page| {
+            let rect = page.rect;
+            x >= rect.left
+                && x <= rect.left + rect.width
+                && y >= rect.top
+                && y <= rect.top + rect.height
+        }) else {
+            return Ok(None);
+        };
+        let next = self.frame(
+            frame.viewport,
+            anchor,
+            ZoomMode::Custom,
+            zoom,
+            [0.0, 0.0],
+            0.0,
+        )?;
+        let rect = self.page_rect(page.page, next.content_size[0], next.origin_y, next.zoom);
+        let x = rect.left + rect.width * ((x - page.rect.left) / page.rect.width) - pointer[0];
+        let y = rect.top + rect.height * ((y - page.rect.top) / page.rect.height) - pointer[1];
+        Ok(Some([
+            x.clamp(0.0, next.content_size[0] - next.viewport[0]),
+            y.clamp(0.0, next.content_size[1] - next.viewport[1]),
+        ]))
+    }
+
     /// Recover the viewport's top-left PDF point, including blank page margins.
     /// The frame and coordinate space must belong to this layout and page.
     pub fn pdf_point_at_viewport(
@@ -407,6 +443,36 @@ fn validate_viewport(viewport: [f64; 2]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zoom_keeps_the_off_center_page_point_under_the_pointer() {
+        let preferences = ReaderPreferences::new("test-scan");
+        let layout =
+            ReaderLayout::new([[600.0, 800.0]], &preferences, ReadingDirection::Ltr, 24.0).unwrap();
+        let anchor = ReaderPosition::new(0, 0.0).unwrap();
+        let viewport = [380.0, 480.0];
+        let pointer = [101.0, 93.0];
+        let before = layout
+            .frame(viewport, anchor, ZoomMode::Custom, 1.0, [106.0, 181.0], 0.0)
+            .unwrap();
+        let scroll = layout
+            .scroll_for_zoom_at(&before, anchor, pointer, 2.0)
+            .unwrap()
+            .unwrap();
+        let after = layout
+            .frame(viewport, anchor, ZoomMode::Custom, 2.0, scroll, 0.0)
+            .unwrap();
+        let point = |frame: &ReaderFrame| {
+            let rect = frame.pages[0].rect;
+            [
+                (frame.scroll[0] + pointer[0] - rect.left) / rect.width,
+                (frame.scroll[1] + pointer[1] - rect.top) / rect.height,
+            ]
+        };
+        for (before, after) in point(&before).into_iter().zip(point(&after)) {
+            assert!((before - after).abs() < 1e-9);
+        }
+    }
 
     #[test]
     fn small_fit_page_has_visible_geometry_on_both_axes() {

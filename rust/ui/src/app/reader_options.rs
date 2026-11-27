@@ -97,16 +97,20 @@ impl YamantakaApp {
             self.error = Some("Reader zoom cannot be represented".into());
             return;
         }
-        let chrome_only = self
-            .reader
-            .reader_preferences
-            .as_ref()
-            .is_some_and(|saved| {
-                let mut previous = saved.clone();
-                previous.updated_at = None;
-                previous.controls_auto_hide = preferences.controls_auto_hide;
-                previous == preferences
-            });
+        let (chrome_only, rebuild_layout) =
+            self.reader
+                .reader_preferences
+                .as_ref()
+                .map_or((false, true), |saved| {
+                    let mut previous = saved.clone();
+                    previous.updated_at = None;
+                    previous.controls_auto_hide = preferences.controls_auto_hide;
+                    let chrome_only = previous == preferences;
+                    // A frame takes its zoom separately from the document geometry.
+                    previous.zoom_mode = preferences.zoom_mode;
+                    previous.zoom_level = preferences.zoom_level;
+                    (chrome_only, previous != preferences)
+                });
         self.reader.zoom = zoom;
         if !chrome_only {
             self.reader.viewport.generation += 1;
@@ -115,10 +119,10 @@ impl YamantakaApp {
             self.reset_render_request();
         }
         self.reader.reader_preferences = Some(preferences.clone());
-        if !chrome_only {
-            self.rebuild_reader_layout();
-        } else {
+        if chrome_only {
             self.reader.chrome.reveal();
+        } else if rebuild_layout || self.reader.viewport.layout.is_none() {
+            self.rebuild_reader_layout();
         }
         if !self.demo {
             self.send(Action::SaveReaderPreferences(

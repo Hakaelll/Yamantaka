@@ -111,7 +111,7 @@ impl YamantakaApp {
                     cancel: Cancellation::default(),
                     image: Some(image),
                     image_key: Some(key),
-                    plan: Default::default(),
+                    plan: render_plan::RenderPlan::prepared_preview(),
                     refinement: Default::default(),
                 },
             );

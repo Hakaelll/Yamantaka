@@ -1205,7 +1205,7 @@ fn run(
                             .set_fixed_size(key.physical_width as i32, key.physical_height as i32)
                             .set_origin(-(x as i32), -(y as i32))
                             .rotate(rotation, false)
-                            .set_reverse_byte_order(false);
+                            .set_reverse_byte_order(true);
                         let bytes = key.byte_size(limits.max_dimension, usize::MAX)?;
                         let category = if key.region.is_some() {
                             MemoryCategory::Tiles
@@ -1232,9 +1232,6 @@ fn run(
                             page.render_into_bitmap_with_config(&mut bitmap, &config)
                                 .map_err(pdf_failure)?;
                         } // Destroy the borrowed native bitmap before touching its bytes.
-                        for pixel in buffer.as_mut_slice().chunks_exact_mut(4) {
-                            pixel.swap(0, 2);
-                        }
                         let rendered =
                             Arc::new(RenderedPage::from_pixels(key.clone(), buffer.finish())?);
                         cache.insert(raster_key, rendered.clone(), rendered.pixels().len());

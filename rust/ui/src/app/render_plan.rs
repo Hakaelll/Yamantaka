@@ -6,6 +6,7 @@ const PREVIEW_SIDE: u32 = 768;
 #[derive(Default)]
 pub(super) struct RenderPlan {
     target: Option<(RenderKey, Instant)>,
+    prepared_preview: bool,
 }
 
 pub(super) struct RenderDecision {
@@ -14,6 +15,13 @@ pub(super) struct RenderDecision {
 }
 
 impl RenderPlan {
+    pub(super) fn prepared_preview() -> Self {
+        Self {
+            prepared_preview: true,
+            ..Self::default()
+        }
+    }
+
     pub(super) fn ready(&self, image: Option<&RenderKey>) -> bool {
         self.target
             .as_ref()
@@ -28,7 +36,14 @@ impl RenderPlan {
         now: Instant,
     ) -> RenderDecision {
         if self.target.as_ref().is_none_or(|(key, _)| key != target) {
-            self.target = Some((target.clone(), now));
+            // Opening already prepared a preview for the verified viewport.
+            // Wait for stability only on subsequent changes to its target.
+            let due = if std::mem::take(&mut self.prepared_preview) {
+                now
+            } else {
+                now + SETTLE
+            };
+            self.target = Some((target.clone(), due));
         }
         let mut decision = RenderDecision {
             request: None,
@@ -44,7 +59,7 @@ impl RenderPlan {
             }
             return decision;
         }
-        let due = self.target.as_ref().unwrap().1 + SETTLE;
+        let due = self.target.as_ref().unwrap().1;
         if now < due {
             decision.wake_after = Some(due - now);
         } else {
@@ -108,4 +123,42 @@ fn matches_display(image: &RenderKey, target: &RenderKey) -> bool {
         [image.physical_height, image.physical_width]
     };
     width == target.physical_width && height == target.physical_height
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prepared_open_refines_immediately_and_zoom_still_waits() {
+        let target = RenderKey {
+            document_id: "scan".into(),
+            page: 0,
+            region: None,
+            physical_width: 1000,
+            physical_height: 1400,
+            rotation: 0,
+            generation: 0,
+        };
+        let now = Instant::now();
+        let preview = preview_key(&target);
+        let mut plan = RenderPlan::prepared_preview();
+        assert_eq!(
+            plan.next(&target, Some(&preview), None, now).request,
+            Some(target.clone())
+        );
+        let zoomed = RenderKey {
+            physical_width: 1400,
+            physical_height: 1960,
+            ..target.clone()
+        };
+        let decision = plan.next(&zoomed, Some(&target), None, now);
+        assert_eq!(decision.request, None);
+        assert_eq!(decision.wake_after, Some(SETTLE));
+        assert_eq!(
+            plan.next(&zoomed, Some(&target), None, now + SETTLE)
+                .request,
+            Some(zoomed)
+        );
+    }
 }

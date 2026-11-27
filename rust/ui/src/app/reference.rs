@@ -475,10 +475,17 @@ impl ReferenceView {
                 _ => {}
             }
         }
+        let mut zoom_scroll = None;
         if !self.pane.viewport.source_changed
             && self.pane.viewport.layout.is_some()
             && let Some(zoom) = super::reader_viewport::gesture_zoom(ui, self.pane.viewport.scale)
         {
+            zoom_scroll = super::reader_viewport::gesture_scroll_offset(
+                ui,
+                &self.pane,
+                ui.make_persistent_id("reference-pages"),
+                zoom,
+            );
             self.set_zoom(ZoomMode::Custom, zoom);
             self.pane.viewport.scroll_anchor = true;
         }
@@ -522,7 +529,10 @@ impl ReferenceView {
             .max_height(size.y.max(1.0))
             .min_scrolled_height(0.0)
             .auto_shrink([false, false]);
-        if self.pane.viewport.scroll_anchor {
+        if let Some(offset) = zoom_scroll {
+            scroll = scroll.scroll_offset(offset);
+            self.pane.viewport.scroll_anchor = false;
+        } else if self.pane.viewport.scroll_anchor {
             if let Ok([x, y]) = layout.scroll_for_anchor(
                 viewport,
                 anchor,

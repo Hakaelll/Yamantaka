@@ -45,11 +45,18 @@ impl YamantakaApp {
         if self.reader.viewport.viewport_size.replace(viewport_size) != Some(viewport_size) {
             self.reader.viewport.scroll_anchor = true;
         }
+        let mut zoom_scroll = None;
         if !self.reader_chrome_blocked
             && !self.reader.viewport.source_changed
             && self.reader.viewport.layout.is_some()
             && let Some(zoom) = gesture_zoom(ui, self.reader.viewport.scale)
         {
+            zoom_scroll = gesture_scroll_offset(
+                ui,
+                &self.reader,
+                ui.make_persistent_id(("pdf-viewport", &document.id)),
+                zoom,
+            );
             self.set_reader_zoom(zoom);
         }
         let (Some(layout), Some(preferences), Some(navigation)) = (
@@ -76,7 +83,10 @@ impl YamantakaApp {
             .max_height(viewport.y.max(1.0))
             .min_scrolled_height(0.0)
             .auto_shrink([false, false]);
-        if self.reader.viewport.scroll_anchor {
+        if let Some(offset) = zoom_scroll {
+            scrolling = scrolling.scroll_offset(offset);
+            self.reader.viewport.scroll_anchor = false;
+        } else if self.reader.viewport.scroll_anchor {
             match layout.scroll_for_anchor(
                 viewport_size,
                 anchor,
@@ -260,6 +270,51 @@ pub(super) fn page_region(
             )
     };
     egui::Rect::from_min_max(position(bounds.min()), position(bounds.max()))
+}
+
+pub(super) fn gesture_scroll_offset(
+    ui: &egui::Ui,
+    reader: &reader_pane::ReaderPane,
+    scroll_id: egui::Id,
+    zoom: f32,
+) -> Option<egui::Vec2> {
+    let available = ui.available_size();
+    let viewport = [
+        f64::from(available.x.max(1.0)),
+        f64::from(available.y.max(1.0)),
+    ];
+    if reader.viewport.scroll_anchor || reader.viewport.viewport_size != Some(viewport) {
+        return None;
+    }
+    let pointer = ui.input(|input| {
+        input
+            .multi_touch()
+            .map(|touch| touch.center_pos)
+            .or_else(|| input.pointer.hover_pos())
+    })? - ui.available_rect_before_wrap().min;
+    let scroll = egui::scroll_area::State::load(ui.ctx(), scroll_id)?.offset;
+    let layout = reader.viewport.layout.as_ref()?;
+    let preferences = reader.effective_preferences()?;
+    let anchor = reader.navigation.as_ref()?.position();
+    let frame = layout
+        .frame(
+            viewport,
+            anchor,
+            preferences.zoom_mode,
+            f64::from(reader.zoom),
+            [f64::from(scroll.x), f64::from(scroll.y)],
+            0.0,
+        )
+        .ok()?;
+    let [x, y] = layout
+        .scroll_for_zoom_at(
+            &frame,
+            anchor,
+            [f64::from(pointer.x), f64::from(pointer.y)],
+            f64::from(zoom),
+        )
+        .ok()??;
+    Some(egui::vec2(x as f32, y as f32))
 }
 
 /// Pinch and Ctrl+wheel share egui's per-frame scale.

@@ -171,6 +171,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if idle_probe && (!demo || capture.is_none()) {
         return Err("Idle observation requires --demo and --capture".into());
     }
+    let performance_pdf = args.iter().find_map(|arg| {
+        arg.to_str()
+            .and_then(|arg| arg.strip_prefix("--measure-reader-pdf="))
+            .map(PathBuf::from)
+    });
+    if performance_pdf.is_some() && (!demo || capture.is_none()) {
+        return Err("Reader performance measurement requires --demo and --capture".into());
+    }
     let executable = std::env::current_exe()?;
     if demo
         && args.iter().any(|arg| {
@@ -278,37 +286,44 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             Database::in_memory_at(11)?
         };
-        let fixture = crate::qa_ui_root()
-            .join(if args.iter().any(|arg| arg == "--metadata-reanalyze") {
-                if args.iter().any(|arg| arg == "--metadata-evidence-later") {
-                    "../../build/rust-fixtures/front-matter-evidence-later.pdf"
-                } else if args.iter().any(|arg| arg == "--metadata-reanalyze-limit") {
-                    "../../build/rust-fixtures/front-matter-work-limit.pdf"
+        let fixture = if let Some(path) = &performance_pdf {
+            path.canonicalize()?
+        } else {
+            crate::qa_ui_root()
+                .join(if args.iter().any(|arg| arg == "--metadata-reanalyze") {
+                    if args.iter().any(|arg| arg == "--metadata-evidence-later") {
+                        "../../build/rust-fixtures/front-matter-evidence-later.pdf"
+                    } else if args.iter().any(|arg| arg == "--metadata-reanalyze-limit") {
+                        "../../build/rust-fixtures/front-matter-work-limit.pdf"
+                    } else {
+                        "../../build/rust-fixtures/front-matter-missing.pdf"
+                    }
+                } else if protected || cover_rebuild || protected_index {
+                    "../../build/rust-fixtures/protected.pdf"
+                } else if args.iter().any(|arg| arg == "--links") {
+                    if args.iter().any(|arg| arg == "--rejected-link") {
+                        "../../build/rust-fixtures/rejected-links.pdf"
+                    } else if args.iter().any(|arg| arg == "--external-links") {
+                        "../../build/rust-fixtures/external-links.pdf"
+                    } else {
+                        "../../build/rust-fixtures/links.pdf"
+                    }
+                } else if args.iter().any(|arg| arg == "--find-scanned") {
+                    "../../build/rust-fixtures/scanned.pdf"
+                } else if args.iter().any(|arg| arg == "--thumbnails-long") {
+                    "../../build/rust-fixtures/5000-pages.pdf"
+                } else if args.iter().any(|arg| {
+                    arg == "--outline"
+                        || arg == "--thumbnails"
+                        || arg == "--find"
+                        || arg == "--links"
+                }) {
+                    "../../build/rust-fixtures/outline.pdf"
                 } else {
-                    "../../build/rust-fixtures/front-matter-missing.pdf"
-                }
-            } else if protected || cover_rebuild || protected_index {
-                "../../build/rust-fixtures/protected.pdf"
-            } else if args.iter().any(|arg| arg == "--links") {
-                if args.iter().any(|arg| arg == "--rejected-link") {
-                    "../../build/rust-fixtures/rejected-links.pdf"
-                } else if args.iter().any(|arg| arg == "--external-links") {
-                    "../../build/rust-fixtures/external-links.pdf"
-                } else {
-                    "../../build/rust-fixtures/links.pdf"
-                }
-            } else if args.iter().any(|arg| arg == "--find-scanned") {
-                "../../build/rust-fixtures/scanned.pdf"
-            } else if args.iter().any(|arg| arg == "--thumbnails-long") {
-                "../../build/rust-fixtures/5000-pages.pdf"
-            } else if args.iter().any(|arg| {
-                arg == "--outline" || arg == "--thumbnails" || arg == "--find" || arg == "--links"
-            }) {
-                "../../build/rust-fixtures/outline.pdf"
-            } else {
-                "../../build/rust-fixtures/textual.pdf"
-            })
-            .canonicalize()?;
+                    "../../build/rust-fixtures/textual.pdf"
+                })
+                .canonicalize()?
+        };
         let names = [
             ("On the Nature of Things", "Lucretius"),
             ("The Architecture of Thought", "Study collection"),
@@ -1324,6 +1339,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 app.idle_probe = Some(idle_probe::Probe::new(
                     args.iter().any(|arg| arg == "--idle-positive-control"),
                 ));
+            }
+            if performance_pdf.is_some() {
+                app.measure_reader_performance();
             }
             if args.iter().any(|arg| arg == "--eink-return-standard") {
                 app.preview_profile_return();

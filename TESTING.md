@@ -62,6 +62,25 @@ keyboard, focus, viewport and scroll/zoom behavior in egui. Native captures
 also cover protected import, source relocation and annotation recovery with
 isolated data. Use the release acceptance record for the scope of older tests.
 
+### Image-heavy PDF measurements
+
+Build both revisions in Release mode with the reader performance probe and use
+the same PDFium DLL beside each executable. Generate an isolated scan fixture
+with the existing Pillow and ReportLab dependencies, then alternate the builds:
+
+```powershell
+python tool/create_reader_performance_pdf.py build/performance/scans.pdf
+./tool/measure_reader_performance.ps1 -Baseline baseline/yamantaka-rust.exe `
+    -Candidate candidate/yamantaka-rust.exe -Pdf build/performance/scans.pdf `
+    -OutputDirectory build/performance/reader-pair
+```
+
+Each run starts a new application process. The probe times the first usable and
+final raster for opening, page changes and a burst of zoom commands. It also
+checks a warm return to the same reading tab. The report records update timing
+inside the native reader, blank page paints and peak process working set. The
+probe exercises the zoom command, while the input probes cover Ctrl + wheel.
+
 ### Redesign evidence, 2026-11-07
 
 | Workflow | Native evidence |

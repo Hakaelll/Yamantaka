@@ -54,6 +54,7 @@ mod reader_controls;
 mod reader_destination;
 mod reader_options;
 mod reader_pane;
+mod reader_performance;
 mod reader_profile;
 mod reader_surface;
 mod reader_viewport;
@@ -299,6 +300,7 @@ pub struct YamantakaApp {
     capture_ready_since: Option<Instant>,
     pub(crate) idle_probe: Option<crate::idle_probe::Probe>,
     capture_render_events: Vec<serde_json::Value>,
+    reader_performance: Option<reader_performance::Probe>,
     nearby_turn_preview: u8,
     nearby_rotation_preview: bool,
     nearby_expect_miss: bool,
@@ -589,6 +591,7 @@ impl YamantakaApp {
             capture_ready_since: None,
             idle_probe: None,
             capture_render_events: Vec::new(),
+            reader_performance: None,
             graphics_recovery: Default::default(),
             preview_device_loss: None,
             device_loss_configured: false,
@@ -2581,6 +2584,7 @@ impl App for YamantakaApp {
                     });
             });
         });
+        self.advance_reader_performance(&ctx);
         self.pump_library_removal(&ctx);
         self.update_cover_batch_progress();
         self.selection_review_dialog(&ctx);
@@ -2634,6 +2638,7 @@ impl App for YamantakaApp {
                                 && reference.pane.viewport.prefetch.settled()
                         }));
                 let ready = self.library_loaded
+                    && self.reader_performance.as_ref().is_none_or(reader_performance::Probe::ready)
                     && self.study_capture_ready()
                     && self.stored_note_recovery_ready()
                     && self.selection_note_recovery_ready()
@@ -2853,6 +2858,9 @@ impl App for YamantakaApp {
                         "memoryScope":"Tracked PDF buffers, extracted-text geometry and selected-text payloads, page/thumbnail/PDF-cover GPU payloads, wgpu staging and Glow image copies. egui text layout, UI/font textures and opaque driver allocations are not covered."});
                     record["selectionAdmission"]=self.selection_admission_verified.clone().unwrap_or(serde_json::Value::Null);
                     record["idleObservation"] = self.idle_probe.as_ref().map(|probe|probe.summary()).unwrap_or_default();
+                    if let Some(probe) = &self.reader_performance {
+                        record["readerPerformance"] = probe.summary();
+                    }
                     record["readerVisualProfile"] = self.reader.profile_summary();
                     record["readerVisualProfileReturn"] = self.reader_profile_preview.into();
                     record["readerAutoHide"] = self.reader.chrome.summary();
