@@ -1,8 +1,11 @@
 mod preview;
 mod source;
 mod source_preview;
+mod thumbnail;
 use super::*;
 use yamantaka_application::cover_source::CoverSource;
+
+const MAX_COVER_LOADS: usize = 12;
 
 #[derive(Default)]
 pub(super) struct LibraryCovers {
@@ -32,6 +35,7 @@ struct CoverSlot {
     source_page: Option<u32>,
     refresh_requested: bool,
     deferred: Option<(Arc<yamantaka_domain::RenderedPage>, u64)>,
+    retry_capacity: Option<u64>,
     monitor_generation: u64,
     observed: Option<yamantaka_windows::source_monitor::FileState>,
     validation_pending: bool,
@@ -49,6 +53,7 @@ impl CoverSlot {
             source_page: None,
             refresh_requested: true,
             deferred: None,
+            retry_capacity: None,
             monitor_generation: generation,
             observed: None,
             validation_pending: false,
@@ -82,6 +87,7 @@ impl LibraryCovers {
                 && let Some(slot) = self.slots.get_mut(id)
             {
                 slot.refresh_requested = true;
+                slot.retry_capacity = None;
             }
         }
     }
@@ -102,17 +108,13 @@ impl YamantakaApp {
         }
     }
     pub(super) fn pump_library_covers(&mut self, ctx: &egui::Context) {
-        if self.startup_mode.is_safe() {
-            ctx.data_mut(|data| data.remove::<Vec<Document>>(egui::Id::new("pdf-cover-requests")));
-            return;
-        }
-        if self.cover_picker.is_some() {
-            return;
-        }
         let requested = ctx.data_mut(|data| {
             data.remove_temp::<Vec<Document>>(egui::Id::new("pdf-cover-requests"))
                 .unwrap_or_default()
         });
+        if self.startup_mode.is_safe() || self.cover_picker.is_some() {
+            return;
+        }
         let mut cancelled = false;
         self.library_covers.slots.retain(|id, slot| {
             let keep = requested.iter().any(|doc| {
@@ -163,7 +165,16 @@ impl YamantakaApp {
             }
         }
         self.observe_library_sources(ctx);
+        let mut loading = self
+            .library_covers
+            .slots
+            .values()
+            .filter(|slot| !slot.finished && !slot.refresh_requested)
+            .count();
         for document in requested {
+            if loading >= MAX_COVER_LOADS {
+                break;
+            }
             if document.missing
                 || self.library_covers.paused.contains(&document.id)
                 || self
@@ -172,6 +183,7 @@ impl YamantakaApp {
                     .get(&document.id)
                     .is_none_or(|slot| {
                         !slot.refresh_requested
+                            || slot.retry_capacity == Some(epoch)
                             || !matches!(
                                 slot.observed,
                                 Some(yamantaka_windows::source_monitor::FileState::Present(_))
@@ -190,6 +202,7 @@ impl YamantakaApp {
                 cancel.clone(),
             )) {
                 Ok(()) => {
+                    loading += 1;
                     self.library_covers.generation = generation;
                     if let Some(slot) = self.library_covers.slots.get_mut(&document.id) {
                         slot.cancel.cancel();
@@ -198,6 +211,7 @@ impl YamantakaApp {
                         slot.finished = false;
                         slot.refresh_requested = false;
                         slot.deferred = None;
+                        slot.retry_capacity = None;
                     }
                 }
                 Err(yamantaka_domain::Failure::QueueFull) => {
@@ -237,28 +251,51 @@ impl YamantakaApp {
             return;
         }
         slot.finished = true;
-        let Ok(page) = result else {
-            if slot.validation_pending {
-                slot.image = None;
-                slot.validation_pending = false;
-                ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(id)));
+        let page = match result {
+            Ok(page) if page.key.document_id == id && page.key.generation == slot.generation => {
+                thumbnail::prepare(&self.governor, &page)
             }
-            return;
+            Ok(_) => return,
+            Err(error) => Err(error),
         };
-        if page.key.document_id != id || page.key.generation != slot.generation {
-            return;
+        match page {
+            Ok(page) => {
+                let image = render_updates::upload_image(
+                    ctx,
+                    &mut self.presenter,
+                    &mut self.managed_pages,
+                    &page,
+                );
+                upload_cover(ctx, slot, id, page, self.governor.capacity_epoch(), image);
+                slot.validation_pending = false;
+            }
+            Err(yamantaka_domain::Failure::MemoryBudget) => {
+                slot.refresh_requested = true;
+                slot.retry_capacity = Some(self.governor.capacity_epoch());
+            }
+            Err(_) => {
+                if slot.validation_pending {
+                    slot.image = None;
+                    slot.validation_pending = false;
+                    ctx.data_mut(|data| data.remove::<book::PdfCover>(book::cover_id(id)));
+                }
+            }
         }
-        let image =
-            render_updates::upload_image(ctx, &mut self.presenter, &mut self.managed_pages, &page);
-        upload_cover(ctx, slot, id, page, self.governor.capacity_epoch(), image);
-        slot.validation_pending = false;
+    }
+    pub(super) fn upload_cover_thumbnail(
+        &mut self,
+        ctx: &egui::Context,
+        page: &Arc<yamantaka_domain::RenderedPage>,
+    ) -> yamantaka_domain::Result<PageImage> {
+        let page = thumbnail::prepare(&self.governor, page)?;
+        render_updates::upload_image(ctx, &mut self.presenter, &mut self.managed_pages, &page)
     }
     pub(super) fn cover_summary(&self) -> serde_json::Value {
         serde_json::json!({"resident": self.library_covers.slots.len(),"sourceInvalidations":self.library_covers.source_invalidations,"sourceChange":self.library_covers.source_verified,"bulkRegeneration": self.library_covers.verified,"paused": self.library_covers.paused.len(),"deferredUploads":self.library_covers.slots.values().filter(|slot|slot.deferred.is_some()).count(),
             "blockedBeforeRelease":self.library_covers.blocked_before_release,"capacityPreview":self.library_covers.capacity_preview,"capacityRevision":self.runtime.pdf_capacity_revision(),
             "ready":self.library_covers.slots.values().filter(|slot| slot.image.is_some()).count(),
             "pending":self.library_covers.slots.values().filter(|slot| !slot.finished).count(),
-            "source":"PDF selected page","sourcePages":self.library_covers.slots.iter().filter_map(|(id,slot)| slot.source_page.map(|page|(id.clone(),page))).collect::<std::collections::BTreeMap<_,_>>(),"maximumVisible":16})
+            "source":"PDF selected page","sourcePages":self.library_covers.slots.iter().filter_map(|(id,slot)| slot.source_page.map(|page|(id.clone(),page))).collect::<std::collections::BTreeMap<_,_>>()})
     }
     pub(super) fn install_selected_cover(
         &mut self,
@@ -273,11 +310,7 @@ impl YamantakaApp {
             old.cancel.cancel();
             self.runtime.wake();
         }
-        let dimensions = if aspect > 1.0 {
-            [512, (512.0 / aspect).round() as u32]
-        } else {
-            [(512.0 * aspect).round() as u32, 512]
-        };
+        let dimensions = thumbnail::dimensions(aspect);
         ctx.data_mut(|data| {
             data.insert_temp(
                 book::cover_id(&document.id),

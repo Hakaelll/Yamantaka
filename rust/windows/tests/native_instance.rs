@@ -111,7 +111,22 @@ fn verify_visible_source_monitor(root: &std::path::Path) {
     };
     let first = next();
     assert!(matches!(first[0].state, FileState::Present(_)));
-    assert!(monitor.set_targets(vec![target.clone(); 17]).is_err());
+    let limit = yamantaka_domain::MAX_LIBRARY_PAGE + 1;
+    let mut visible = vec![target.clone()];
+    visible.extend((1..limit).map(|index| Target {
+        document: format!("book-{index}"),
+        path: root.join(format!("book-{index}.pdf")),
+        generation: 1,
+    }));
+    monitor.set_targets(visible.clone()).unwrap();
+    let observed = next();
+    assert_eq!(observed.len(), limit);
+    assert_eq!(observed.last().unwrap().target, visible[limit - 1]);
+    assert_eq!(observed.last().unwrap().state, FileState::Unavailable);
+    visible.push(target.clone());
+    assert!(monitor.set_targets(visible).is_err());
+    monitor.set_targets(vec![target.clone()]).unwrap();
+    assert_eq!(next().len(), 1);
     assert_eq!(std::fs::read(&path).unwrap(), b"before");
     {
         let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();

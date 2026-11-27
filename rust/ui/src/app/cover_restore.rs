@@ -72,8 +72,7 @@ impl YamantakaApp {
             self.invalidate_library_cover(ctx, id);
             return true;
         }
-        let uploaded =
-            render_updates::upload_image(ctx, &mut self.presenter, &mut self.managed_pages, image);
+        let uploaded = self.upload_cover_thumbnail(ctx, image);
         match uploaded {
             Ok(texture) => {
                 let picker = self.cover_picker.take().unwrap();

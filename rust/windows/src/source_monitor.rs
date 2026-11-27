@@ -9,7 +9,8 @@ use std::{
 use yamantaka_domain::{Failure, Result};
 
 const INTERVAL: Duration = Duration::from_secs(1);
-const MAX_FILES: usize = 16;
+// At most one catalogue page and the book shown in the inspector.
+const MAX_FILES: usize = yamantaka_domain::MAX_LIBRARY_PAGE + 1;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Target {
@@ -54,9 +55,9 @@ impl Monitor {
     }
     pub fn set_targets(&self, targets: Vec<Target>) -> Result<()> {
         if targets.len() > MAX_FILES {
-            return Err(Failure::Invalid(
-                "Visible source observation is bounded to sixteen explicit files".into(),
-            ));
+            return Err(Failure::Invalid(format!(
+                "Visible source observation is bounded to {MAX_FILES} explicit files"
+            )));
         }
         let (state, wake) = &*self.shared;
         let mut state = state.lock().unwrap_or_else(|error| error.into_inner());

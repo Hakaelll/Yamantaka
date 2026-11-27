@@ -791,7 +791,7 @@ foreach ($case in $cases) {
     }
     if ($case.name -like 'covers-glow-*') {
         $covers = $controls.libraryCovers
-        if ($controls.pagePresenter -ne 'egui-glow' -or $covers.ready -le 0 -or $covers.ready -ne $covers.resident -or $covers.resident -gt 16 -or $covers.pending -ne 0 -or $covers.deferredUploads -ne 0) { throw 'Alternate-compositor PDF covers did not settle inside the visible limit.' }
+        if ($controls.pagePresenter -ne 'egui-glow' -or $covers.ready -le 0 -or $covers.ready -ne $covers.resident -or $covers.resident -gt $controls.libraryDocumentCount -or $covers.pending -ne 0 -or $covers.deferredUploads -ne 0) { throw 'Alternate-compositor PDF covers did not settle.' }
         if (-not $controls.managedPages.settled -or $controls.managedPages.failed -or $controls.trackedMemory.gpu -le 0 -or $controls.trackedMemory.transient -ne 0 -or $controls.trackedMemory.pages -gt 72MB) { throw 'Cover texture accounting did not settle within its budget.' }
         if ($case.name -in @('covers-glow-picker-saved','covers-glow-restored')) {
             if (-not $controls.coverPickerDemo.complete -or -not $controls.coverPickerDemo.saved -or $controls.coverPicker.open -or $covers.sourcePages.'demo-0' -ne 1) { throw 'The selected or restored PDF cover was not installed.' }

@@ -220,15 +220,15 @@ fn cover_impl(
             .data_mut(|data| data.remove::<BookPhysics>(response.id));
         return response;
     }
-    ui.ctx().data_mut(|data| {
-        let mut requests = data
-            .get_temp::<Vec<Document>>(egui::Id::new("pdf-cover-requests"))
-            .unwrap_or_default();
-        if requests.len() < 16 && !requests.iter().any(|doc| doc.id == document.id) {
-            requests.push(document.clone());
-        }
-        data.insert_temp(egui::Id::new("pdf-cover-requests"), requests);
-    });
+    if !document.missing {
+        ui.ctx().data_mut(|data| {
+            let requests =
+                data.get_temp_mut_or_default::<Vec<Document>>(egui::Id::new("pdf-cover-requests"));
+            if !requests.iter().any(|doc| doc.id == document.id) {
+                requests.push(document.clone());
+            }
+        });
+    }
     let book = Rect::from_min_size(
         rect.min + egui::vec2(11.0, if full_caption { COVER_HEADROOM } else { 10.0 }),
         Vec2::new(width - 20.0, width * 1.34 - 14.0),

@@ -16,6 +16,7 @@ pub(super) struct CoverPicker {
     pub(super) preview: Option<Cancellation>,
     pub(super) saving: Option<Cancellation>,
     pub(super) image: Option<PageImage>,
+    raster: Option<Arc<RenderedPage>>,
     pub(super) image_page: Option<u32>,
     pub(super) aspect: Option<f64>,
     pub(super) source_version: Option<yamantaka_domain::source_revision::PhysicalSourceVersion>,
@@ -86,6 +87,7 @@ impl YamantakaApp {
             restore_committed: false,
             restoring: false,
             image: None,
+            raster: None,
             image_page: None,
             aspect: None,
             source_version: None,
@@ -196,6 +198,7 @@ impl YamantakaApp {
         {
             Ok(texture) => {
                 picker.image = Some(texture);
+                picker.raster = Some(page.clone());
                 picker.image_page = Some(picker.page);
                 picker.aspect = Some(f64::from(page.width) / f64::from(page.height));
                 picker.source_version = page.source_version();
@@ -252,8 +255,13 @@ impl YamantakaApp {
             Ok(()) => {
                 self.cover_picker_demo.saved = true;
                 let mut picker = self.cover_picker.take().unwrap();
-                if let (Some(image), Some(aspect)) = (picker.image.take(), picker.aspect) {
+                drop(picker.image.take());
+                if let (Some(page), Some(aspect)) = (picker.raster.take(), picker.aspect)
+                    && let Ok(image) = self.upload_cover_thumbnail(ctx, &page)
+                {
                     self.install_selected_cover(ctx, &picker.document, picker.page, aspect, image);
+                } else {
+                    self.invalidate_library_cover(ctx, &picker.document.id);
                 }
             }
             Err(error) => {

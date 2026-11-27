@@ -24,10 +24,12 @@ def verify(directory):
         assert controls["synthetic"] and controls["pagePresenter"] == "native-wgpu"
         assert covers["blockedBeforeRelease"] == covers["ready"] == covers["resident"] == 10
         assert covers["capacityPreview"] == 3 and covers["capacityRevision"] > 0 and covers["pending"] == 0
-        assert covers["maximumVisible"] == 16
         expected = {f"demo-{index}": 0 for index in range(10)}
         assert covers["sourcePages"] == expected
-        database = root / "build/demo-store/captures" / str(controls["captureProcessId"]) / "export-preview.sqlite3"
+        captures = root / "build/demo-store/captures"
+        databases = list(captures.glob(f"{controls['captureProcessId']}-*/export-preview.sqlite3"))
+        assert len(databases) == 1, "Expected one isolated store for the capture process"
+        database = databases[0]
         with sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True) as db:
             rows = db.execute("SELECT d.id,d.path,d.reading_progress,c.source_page_index,c.selection_mode,c.algorithm_version FROM documents d JOIN document_covers c ON c.document_id=d.id ORDER BY d.id").fetchall()
             assert db.execute("SELECT count(*) FROM library_search").fetchone()[0] == 0

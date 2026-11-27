@@ -59,6 +59,7 @@ impl YamantakaApp {
             slot.observed = Some(observation.state);
             slot.cancel.cancel();
             slot.deferred = None;
+            slot.retry_capacity = None;
             slot.finished = true;
             slot.validation_pending = true;
             slot.refresh_requested = matches!(slot.observed, Some(FileState::Present(_)));
